@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(client)
+
+add_executable(client
+  include/client/config.hpp
+  src/config.cpp
+  src/main.cpp
+)
+
+target_link_libraries (client net blake2)
+
+target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../net/include)
+
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set (Boost_USE_MULTITHREADED ON)
+set (Boost_USE_STATIC_LIBS ON)
+set (Boost_USE_STATIC_RUNTIME ON)
+
+find_package (Boost REQUIRED COMPONENTS system filesystem program_options)
+find_package (Threads)
+
+target_link_libraries (client Boost::system
+                              Boost::filesystem
+                              Boost::program_options
+                              Boost::disable_autolinking
+                              ${CMAKE_THREAD_LIBS_INIT})

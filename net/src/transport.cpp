@@ -1,0 +1,348 @@
+/* Send blaming letters to @yrtimd */
+#include <csnode/packstream.hpp>
+#include <lib/system/allocators.hpp>
+#include <lib/system/keys.hpp>
+
+#include "network.hpp"
+#include "transport.hpp"
+
+Transport* Transport::transportPtr_ = nullptr;
+
+Transport* Transport::init(Network* netPtr) {
+  if (!transportPtr_) {
+    PublicKey pk;
+    for (int i = 0; i < 32; ++i)
+      *(pk.str + i) = (char)(rand() % 255);
+
+    transportPtr_ = new Transport(netPtr, pk);
+  }
+
+  return transportPtr_;
+}
+
+enum RegFlags: uint8_t {
+  UsingIPv6    = 1,
+  RedirectPort = 1 << 1,
+  RedirectIP   = 1 << 2
+};
+
+void Transport::run(const Config& config) {
+  acceptRegistrations_ = config.getNodeType() == NodeType::Router;
+
+  // Form registration packet
+  oPackStream_.init(BaseFlags::NetworkMsg);
+
+  uint8_t regFlag = 0;
+  if (!config.isSymmetric()) {
+    if (config.getAddressEndpoint().ipSpecified) {
+      regFlag|= RegFlags::RedirectIP;
+      if (config.getAddressEndpoint().ip.is_v6())
+        regFlag|= RegFlags::UsingIPv6;
+    }
+
+    regFlag|= RegFlags::RedirectPort;
+  }
+  else if (config.hasTwoSockets())
+    regFlag|= RegFlags::RedirectPort;
+
+  oPackStream_ <<
+    NetworkCommand::Registration <<
+    NODE_VERSION;
+
+  if (!config.isSymmetric()) {
+    if (config.getAddressEndpoint().ipSpecified) {
+      uint8_t* flagChar = oPackStream_.getCurrPtr();
+      oPackStream_ << config.getAddressEndpoint().ip;
+      *flagChar|= regFlag;
+    }
+    else {
+      oPackStream_ << regFlag;
+    }
+
+    oPackStream_ << config.getAddressEndpoint().port;
+  }
+  else if (config.hasTwoSockets()) {
+    oPackStream_ << regFlag << config.getInputEndpoint().port;
+  }
+  else
+    oPackStream_ << regFlag;
+
+  ConnectionId randomId = 0;
+  regPackConnId_ = (uint64_t*)oPackStream_.getCurrPtr();
+
+  oPackStream_ <<
+    randomId <<
+    myPublicKey_;
+
+  regPack_ = *(oPackStream_.getPackets());
+  oPackStream_.clear();
+
+  if (config.getBootstrapType() == BootstrapType::IpList) {
+    for (auto& ep : config.getIpList()) {
+      auto elt = nh_.allocate();
+      elt->endpoints.in = net_->resolve(ep);
+      elt->connId = ++randomId;
+      *(connectionsEnd_++) = elt;
+
+      Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
+      *regPackConnId_ = elt->connId;
+      memcpy(req.data(), regPack_.data(), regPack_.size());
+
+      LOG_EVENT("Sending connection request to " << elt->endpoints.in);
+      sendDirect(&req, elt->endpoints);
+    }
+  }
+  else {
+    // Connect to SS logic
+
+  }
+
+  RegionAllocator allocator(100000l, 10);
+  uint32_t ctr = 0;
+  for (;;) {
+    if (++ctr == 30) {
+      for (auto& nb : getNeighbourhood()) {
+        //std::cout << nb.endpoints.in << ": " << nb.packetsCount.load(std::memory_order_relaxed) << std::endl;
+      }
+
+      /*Packet p(allocator.allocateNext(512));
+      *static_cast<uint8_t*>(p.data()) = 1;
+      *(static_cast<uint8_t*>(p.data()) + 1) = 5;
+      sendBroadcast(&p);*/
+
+      ctr = 0;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+}
+
+template <>
+inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
+  uint16_t result = ep.port();
+
+  if (ep.protocol() == ip::udp::v4()) {
+    uint32_t addr = ep.address().to_v4().to_uint();
+    result^= *(uint16_t*)&addr;
+    result^= *((uint16_t*)&addr + 1);
+  }
+  else {
+    auto bytes = ep.address().to_v6().to_bytes();
+    auto ptr = (uint8_t*)&result;
+    auto bytesPtr = bytes.data();
+    for (uint32_t i = 0; i < 8; ++i) *ptr^= *(bytesPtr++);
+    ++ptr;
+    for (uint32_t i = 8; i < 16; ++i) *ptr^= *(bytesPtr++);
+  }
+
+  return result;
+}
+
+RemoteNode& Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
+  RemoteNode& rn = remoteNodes_.tryStore(ep);
+
+  if (rn.status == RemoteNode::Status::IsNeighbour)
+    rn.neighbour->packetsCount.fetch_add(1, std::memory_order_relaxed);
+
+  return rn;
+}
+
+// Processing network packages
+
+void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sender) {
+  iPackStream_.init(task->pack.getMsgData(),
+                    task->pack.getMsgSize());
+
+  NetworkCommand cmd;
+  iPackStream_ >> cmd;
+
+  if (!iPackStream_.good())
+    return sender.addStrike();
+
+  switch (cmd) {
+  case NetworkCommand::Registration:
+    {
+      LOG_EVENT("Got registration request from " << task->sender);
+
+      if (/*sender.status != RemoteNode::Status::New  ||*/
+          !acceptRegistrations_ ||
+          !iPackStream_.canPeek<NodeVersion>()) {
+        return sender.addStrike();
+      }
+
+      if (iPackStream_.peek<NodeVersion>() != NODE_VERSION) {
+        sender.addStrike();
+        return refuseRegistration(sender, RegistrationRefuseReasons::BadClientVersion);
+      }
+
+      iPackStream_.skip<NodeVersion>();
+      if (!iPackStream_.canPeek<uint8_t>())
+        return sender.addStrike();
+
+      auto& flags = iPackStream_.peek<uint8_t>();
+
+      sender.neighbour = nh_.allocate();
+      auto& eps = sender.neighbour->endpoints;
+      eps.in = task->sender;
+
+      eps.specialOut = false;
+      if (flags & RegFlags::RedirectIP) {
+        boost::asio::ip::address addr;
+        iPackStream_ >> addr;
+
+        eps.out.address(addr);
+        eps.specialOut = true;
+      }
+      else {
+        iPackStream_.skip<uint8_t>();
+      }
+
+      if (flags & RegFlags::RedirectPort) {
+        Port port;
+        iPackStream_ >> port;
+
+        if (!eps.specialOut) {
+          eps.specialOut = true;
+          eps.out.address(task->sender.address());
+        }
+
+        eps.out.port(port);
+      }
+      else if (eps.specialOut)
+        eps.out.port(task->sender.port());
+
+      iPackStream_ >> sender.neighbour->connId;
+      iPackStream_ >> sender.neighbour->key;
+
+      if (!iPackStream_.good() || !iPackStream_.end()) {
+        nh_.deallocate(sender.neighbour);
+
+        return sender.addStrike();
+      }
+
+      return confirmRegistration(sender);
+    }
+  case NetworkCommand::ConfirmationRequest: break;
+  case NetworkCommand::ConfirmationResponse: break;
+  case NetworkCommand::RegistrationConfirmed:
+    {
+      LOG_EVENT("Confirming...");
+      ConnectionId cId;
+      iPackStream_ >> cId;
+      if (!iPackStream_.good() ||
+          !iPackStream_.canPeek<PublicKey>()) return sender.addStrike();
+
+      bool found = false;
+      for (auto ptr = connections_; ptr != connectionsEnd_; ++ptr) {
+        if ((*ptr)->connId == cId) {
+          sender.neighbour = *ptr;
+          sender.status = RemoteNode::Status::IsNeighbour;
+
+          if (task->sender != (*ptr)->endpoints.in) {
+            (*ptr)->endpoints.out = (*ptr)->endpoints.in;
+            (*ptr)->endpoints.specialOut = true;
+            (*ptr)->endpoints.in = task->sender;
+          }
+          else
+            (*ptr)->endpoints.specialOut = false;
+
+          LOG_EVENT("Connection to " << task->sender << " established");
+          nh_.insert(sender.neighbour);
+
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        LOG_ERROR("Unknown registration");
+        return sender.addStrike();
+      }
+
+      iPackStream_ >> sender.neighbour->key;
+      return;
+    }
+  case NetworkCommand::RegistrationRefused:
+    RegistrationRefuseReasons reason;
+    iPackStream_ >> reason;
+    if (!iPackStream_.good() || !iPackStream_.end())
+      return sender.addStrike();
+
+    LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << (int)reason);
+    break;
+  case NetworkCommand::Ping:
+    LOG_EVENT("Ping from " << task->sender);
+    break;
+  case NetworkCommand::Pong: break;
+  default:
+    sender.addStrike();
+  }
+}
+
+void Transport::processNodeMessage(const Message& msg) {
+  dispatchNodeMessage(msg.getFirstPack(),
+                      msg.getFullData(),
+                      msg.getFullSize());
+  }
+
+void Transport::processNodeMessage(const Packet& pack) {
+  dispatchNodeMessage(pack, pack.getMsgData(), pack.getMsgSize());
+}
+
+void dispatchNodeMessage(const Packet& firstPack,
+                         const uint8_t* data,
+                         const size_t size) {
+
+}
+
+void Transport::refuseRegistration(RemoteNode& node, const RegistrationRefuseReasons reason) {
+  LOG_EVENT("Refusing registration");
+
+  oPackStream_.init(BaseFlags::NetworkMsg);
+  oPackStream_ << NetworkCommand::RegistrationRefused << reason;
+
+  sendDirect(oPackStream_.getPackets(), node.neighbour->endpoints);
+  oPackStream_.clear();
+}
+
+void Transport::confirmRegistration(RemoteNode& node) {
+  LOG_EVENT("Confirming registration with " << node.neighbour->endpoints.in << " on " << (node.neighbour->endpoints.specialOut ? node.neighbour->endpoints.out : node.neighbour->endpoints.in));
+
+  node.status = RemoteNode::Status::IsNeighbour;
+
+  oPackStream_.init(BaseFlags::NetworkMsg);
+  oPackStream_ << NetworkCommand::RegistrationConfirmed << node.neighbour->connId<< myPublicKey_;
+
+  sendDirect(oPackStream_.getPackets(), node.neighbour->endpoints);
+  oPackStream_.clear();
+}
+
+void Transport::sendDirect(const Packet* pack, const NeighbourEndpoints& eps) {
+  net_->sendDirect(*pack,
+                   eps.specialOut ?
+                   eps.out : eps.in);
+}
+
+void Transport::sendBroadcast(const Packet* pack) {
+  for (auto& nb : nh_)
+    sendDirect(pack, nb.endpoints);
+}
+
+Neighbourhood::Element* Neighbourhood::allocate() {
+  return allocator_.emplace();
+}
+
+void Neighbourhood::deallocate(Element* elt) {
+  return allocator_.remove(elt);
+}
+
+void Neighbourhood::insert(Element* elt) {
+  Element* firstPtr = first_.load(std::memory_order_acquire);
+  do {
+    elt->next.store(firstPtr, std::memory_order_relaxed);
+  }
+  while (!first_.compare_exchange_strong(firstPtr,
+                                         elt,
+                                         std::memory_order_release,
+                                         std::memory_order_relaxed));
+}
