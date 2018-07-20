@@ -19,7 +19,11 @@ target_include_directories(net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csnode/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/../csdb
+                                      ${CMAKE_BINARY_DIR}/csdb/snappy
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+
+target_link_libraries (net snappy)

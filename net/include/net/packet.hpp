@@ -134,6 +134,12 @@ public:
   static const uint32_t MaxParallelCollections = 1024;
   static const uint32_t MaxFragments = 1024;
 
+  PacketCollector():
+    ptrs_(static_cast<PacketPtr**>(malloc(MaxParallelCollections * MaxFragments * sizeof(PacketPtr*)))),
+    activePtr_(ptrs_),
+    ptrsEnd_(ptrs_ + MaxParallelCollections * MaxFragments) {
+  }
+
   Message& getMessage(PacketPtr pack);
 
 private:
@@ -141,9 +147,9 @@ private:
 
   Message lastMessage_;
 
-  PacketPtr* ptrs_[MaxParallelCollections * MaxFragments];
-  PacketPtr** activePtr_ = ptrs_;
-  PacketPtr** ptrsEnd_ = ptrs_ + MaxParallelCollections * MaxFragments;
+  PacketPtr** ptrs_;
+  PacketPtr** activePtr_;
+  PacketPtr** ptrsEnd_;
 };
 
 #endif // __PACKET_HPP__

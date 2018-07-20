@@ -102,28 +102,28 @@ void Message::composeFullData() const {
     if (getFirstPack().isCompressed()) {
       size_t uncompressedSize;
 
-      snappy::GetUncompressedLength(fullData_.get(),
-                                    fullData_.getSize(),
-                                    uncompressedSize);
+      snappy::GetUncompressedLength((const char*)fullData_.get(),
+                                    (size_t)fullData_.size(),
+                                    &uncompressedSize);
       RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize);
 
-      snappy::RawUncompress(fullData_.get(),
-                            fullData_.getSize(),
-                            uncompressedData);
+      snappy::RawUncompress((const char*)fullData_.get(),
+                            (size_t)fullData_.size(),
+                            (char*)uncompressedData.get());
 
       fullData_ = uncompressedData;
     }
   }
   else {
     size_t uncompressedSize;
-    snappy::GetUncompressedLength(pack.getMsgData(),
-                                  pack.getMsgSize(),
-                                  uncompressedSize);
+    snappy::GetUncompressedLength((const char*)(*packets_)->getMsgData(),
+                                  (size_t)(*packets_)->getMsgSize(),
+                                  &uncompressedSize);
 
     fullData_ = allocator_.allocateNext(uncompressedSize);
 
-    snappy::RawUncompress(fullData_.get(),
-                          fullData_.getSize(),
-                          uncompressedData);
+    snappy::RawUncompress((const char*)fullData_.get(),
+                          (size_t)fullData_.size(),
+                          (char*)fullData_.get());
   }
 }

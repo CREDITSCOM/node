@@ -289,10 +289,9 @@ void Transport::processNodeMessage(const Packet& pack) {
   dispatchNodeMessage(pack, pack.getMsgData(), pack.getMsgSize());
 }
 
-void dispatchNodeMessage(const Packet& firstPack,
-                         const uint8_t* data,
-                         const size_t size) {
-
+void Transport::dispatchNodeMessage(const Packet& firstPack,
+                                    const uint8_t* data,
+                                    const size_t size) {
 }
 
 void Transport::refuseRegistration(RemoteNode& node, const RegistrationRefuseReasons reason) {

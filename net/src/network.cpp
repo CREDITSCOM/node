@@ -34,14 +34,6 @@ ip::udp::endpoint Network::resolve(const EndpointData& data) {
                              data.ip.to_string(),
                              std::to_string(data.port));
 
-  auto it = resolver_.resolve(q);
-  ip::udp::resolver::iterator end;
-
-  while (it != end) {
-    std::cout << "Resolved " << data.ip << ": " << (ip::udp::endpoint)(*it) << std::endl;
-    ++it;
-  }
-
   return *(resolver_.resolve(q));
 }
 
@@ -143,7 +135,7 @@ void Network::processorRoutine() {
     }
 
     // Non-network data
-    uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
+    /*uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
       if (task->pack.isFragmented() || task->pack.isCompressed()) {
         Message& msg = collector.getMessage(&task->pack);
@@ -157,7 +149,7 @@ void Network::processorRoutine() {
     if (recCounter < OPacMan::MaxTimesRedirect)
       transport_->sendBroadcast(&task->pack);
 
-    ++recCounter;
+      ++recCounter;*/
   }
 }
 
