@@ -3,6 +3,7 @@
 #define __STRUCTURES_HPP__
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 
 #include "allocators.hpp"
 
@@ -108,6 +109,27 @@ public:
     free(elements_);
   }
 
+  class const_iterator {
+  public:
+    const_iterator& operator++() {
+      ptr_ = fcb_->incrementPtr(ptr_);
+      return *this;
+    }
+
+    bool operator!=(const const_iterator& rhs) {
+      return ptr_ != rhs.ptr_;
+    }
+
+    T& operator*() { return *ptr_; }
+    T* operator->() { return ptr_; }
+
+  private:
+    T* ptr_ = nullptr;
+    FixedCircularBuffer const* fcb_;
+
+    friend class FixedCircularBuffer;
+  };
+
   template <typename... Args>
   T& emplace(Args&&... args) {
     T* place;
@@ -118,16 +140,34 @@ public:
     else {
       head_->~T();
       place = head_;
-      incrementPtr(head_);
+      head_ = incrementPtr(head_);
     }
 
-    return new(place) T(std::forward<Args>(args)...);
+    return *(new(place) T(std::forward<Args>(args)...));
+  }
+
+  const_iterator end() const {
+    const_iterator ci;
+    if (size_ < Size)
+      ci.ptr_ = head_ + size_;
+    else if (head_ == elements_)
+      ci.ptr_ = end_;
+    else
+      ci.ptr_ = head_;
+    return ci;
+  }
+
+  const_iterator begin() const {
+    const_iterator ci;
+    ci.ptr_ = head_;
+    ci.fcb_ = this;
+    return ci;
   }
 
   void clear() {
     for (uint32_t i = size_; i > 0; --i) {
       head_->~T();
-      incrementPtr(head_);
+      head_ = incrementPtr(head_);
     }
 
     head_ = elements_;
@@ -135,9 +175,11 @@ public:
   }
 
 private:
-  void incrementPtr(T* ptr) {
+  T* incrementPtr(T* ptr) const {
     if (++ptr == end_)
       ptr = head_;
+
+    return ptr;
   }
 
   T* elements_;
@@ -146,7 +188,76 @@ private:
   T* end_ = elements_ + Size;
 
   uint32_t size_ = 0;
+  friend class const_iterator;
 };
+
+class CallsQueue {
+public:
+  struct Call {
+    std::function<void()> func;
+    std::atomic<Call*> next;
+  };
+
+  static CallsQueue& instance() {
+    static CallsQueue inst;
+    return inst;
+  }
+
+  // Called from a single thread
+  inline void callAll();
+  inline void insert(std::function<void()>);
+
+private:
+  CallsQueue() { }
+  std::atomic<Call*> head_ = { nullptr };
+};
+
+inline void CallsQueue::callAll() {
+  Call* startHead = head_.load(std::memory_order_relaxed);
+  //LOG_WARN("Calling, the head is " << startHead);
+  Call* elt = startHead;
+  while (elt) {
+    elt->func();
+    if (head_.compare_exchange_strong(startHead,
+                                      nullptr,
+                                      std::memory_order_relaxed,
+                                      std::memory_order_relaxed))
+      startHead = nullptr;
+
+    Call* rem = elt;
+    elt = rem->next.load(std::memory_order_relaxed);
+    delete rem;
+  }
+
+  if (startHead) {
+    Call* newHead = head_.load(std::memory_order_relaxed);
+    Call* toChange = startHead;
+    while (!newHead->next.
+           compare_exchange_strong(toChange,
+                                   nullptr,
+                                   std::memory_order_relaxed,
+                                   std::memory_order_relaxed)) {
+      newHead = toChange;
+      toChange = startHead;
+    }
+  }
+}
+
+inline void CallsQueue::insert(std::function<void()> f) {
+  Call* newElt = new Call;
+  newElt->func = f;
+
+  Call* head = head_.load(std::memory_order_relaxed);
+  do {
+    newElt->next.store(head);
+  }
+  while (!head_.compare_exchange_strong(head,
+                                        newElt,
+                                        std::memory_order_acquire,
+                                        std::memory_order_relaxed));
+
+  //LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
+}
 
 template <size_t Length>
 struct FixedString {
@@ -159,7 +270,30 @@ struct FixedString {
     return memcmp(str, rhs.str, Length) == 0;
   }
 
+  bool operator!=(const FixedString& rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator<(const FixedString& rhs) const {
+    return memcmp(str, rhs.str, Length) < 0;
+  }
+
   char str[Length];
+};
+
+struct SpinLock {
+public:
+  SpinLock(std::atomic_flag& flag):
+    flag_(flag) {
+    while (flag_.test_and_set(std::memory_order_acquire));
+  }
+
+  ~SpinLock() {
+    flag_.clear(std::memory_order_release);
+  }
+
+private:
+  std::atomic_flag& flag_;
 };
 
 #endif // __STRUCTURES_HPP__

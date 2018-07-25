@@ -6,20 +6,6 @@
 #include "network.hpp"
 #include "transport.hpp"
 
-Transport* Transport::transportPtr_ = nullptr;
-
-Transport* Transport::init(Network* netPtr) {
-  if (!transportPtr_) {
-    PublicKey pk;
-    for (int i = 0; i < 32; ++i)
-      *(pk.str + i) = (char)(rand() % 255);
-
-    transportPtr_ = new Transport(netPtr, pk);
-  }
-
-  return transportPtr_;
-}
-
 enum RegFlags: uint8_t {
   UsingIPv6    = 1,
   RedirectPort = 1 << 1,
@@ -88,8 +74,8 @@ void Transport::run(const Config& config) {
       *regPackConnId_ = elt->connId;
       memcpy(req.data(), regPack_.data(), regPack_.size());
 
-      LOG_EVENT("Sending connection request to " << elt->endpoints.in);
-      sendDirect(&req, elt->endpoints);
+      //LOG_EVENT("Sending connection request to " << elt->endpoints.in);
+      //sendDirect(&req, elt->endpoints);
     }
   }
   else {
@@ -100,17 +86,41 @@ void Transport::run(const Config& config) {
   RegionAllocator allocator(100000l, 10);
   uint32_t ctr = 0;
   for (;;) {
-    if (++ctr == 30) {
+    ++ctr;
+
+    if (ctr % 10 == 0) {
+      bool unestablished = false;
+      for (auto connPtr = connections_; connPtr != connectionsEnd_; ++connPtr) {
+        if (!(*connPtr)->placed.load(std::memory_order_relaxed)) {
+          unestablished = true;
+          LOG_EVENT("Sending connection request to " << (*connPtr)->endpoints.in);
+
+          Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
+          *regPackConnId_ = (*connPtr)->connId;
+          memcpy(req.data(), regPack_.data(), regPack_.size());
+
+          sendDirect(&req, (*connPtr)->endpoints);
+        }
+      }
+
+      if (!unestablished)
+        connectionsEnd_ = connections_;
+    }
+
+    if (ctr % 3 == 0) {
+      for (auto& c : sendPacks_)
+        sendBroadcast(&c);
+    }
+
+    if (ctr % 30 == 0) {
       for (auto& nb : getNeighbourhood()) {
         //std::cout << nb.endpoints.in << ": " << nb.packetsCount.load(std::memory_order_relaxed) << std::endl;
       }
 
-      /*Packet p(allocator.allocateNext(512));
+      Packet p(allocator.allocateNext(2));
       *static_cast<uint8_t*>(p.data()) = 1;
       *(static_cast<uint8_t*>(p.data()) + 1) = 5;
-      sendBroadcast(&p);*/
-
-      ctr = 0;
+      sendBroadcast(&p);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -143,6 +153,8 @@ RemoteNode& Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 
   if (rn.status == RemoteNode::Status::IsNeighbour)
     rn.neighbour->packetsCount.fetch_add(1, std::memory_order_relaxed);
+
+  //LOG_WARN("SENDER is " << &rn);
 
   return rn;
 }
@@ -181,7 +193,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
 
       auto& flags = iPackStream_.peek<uint8_t>();
 
-      sender.neighbour = nh_.allocate();
+      if (!sender.neighbour)
+        sender.neighbour = nh_.allocate();
+
       auto& eps = sender.neighbour->endpoints;
       eps.in = task->sender;
 
@@ -273,7 +287,6 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
   case NetworkCommand::Ping:
     LOG_EVENT("Ping from " << task->sender);
     break;
-  case NetworkCommand::Pong: break;
   default:
     sender.addStrike();
   }
@@ -283,7 +296,7 @@ void Transport::processNodeMessage(const Message& msg) {
   dispatchNodeMessage(msg.getFirstPack(),
                       msg.getFullData(),
                       msg.getFullSize());
-  }
+}
 
 void Transport::processNodeMessage(const Packet& pack) {
   dispatchNodeMessage(pack, pack.getMsgData(), pack.getMsgSize());
@@ -291,7 +304,52 @@ void Transport::processNodeMessage(const Packet& pack) {
 
 void Transport::dispatchNodeMessage(const Packet& firstPack,
                                     const uint8_t* data,
-                                    const size_t size) {
+                                    size_t size) {
+  if (!size) {
+    LOG_ERROR("Bad packet size, why is it zero?");
+    return;
+  }
+
+  ++data;
+  --size;
+
+  switch(firstPack.getType()) {
+  case MsgTypes::RoundTable:
+    return node_->getRoundTable(data, size);
+  case MsgTypes::Transactions:
+    return node_->getTransaction(data, size);
+  case MsgTypes::FirstTransaction:
+    return node_->getFirstTransaction(data, size);
+  case MsgTypes::TransactionList:
+    return node_->getTransactionsList(data, size);
+  case MsgTypes::ConsVector:
+    return node_->getVector(data, size, firstPack.getSender());
+  case MsgTypes::ConsMatrix:
+    return node_->getMatrix(data, size, firstPack.getSender());
+  case MsgTypes::NewBlock:
+    return node_->getBlock(data, size, firstPack.getSender());
+  case MsgTypes::BlockHash:
+    return node_->getHash(data, size, firstPack.getSender());
+  default:
+    LOG_ERROR("Unknown type");
+    break;
+  }
+}
+
+void Transport::addTask(Packet* pack, const uint32_t packNum) {
+  auto end = pack + packNum;
+  for (auto ptr = pack; ptr != end; ++ptr) {
+    sendBroadcast(ptr);
+    {
+      SpinLock l(sendPacksFlag_);
+      sendPacks_.emplace(*ptr);
+    }
+  }
+}
+
+void Transport::clearTasks() {
+  SpinLock l(sendPacksFlag_);
+  sendPacks_.clear();
 }
 
 void Transport::refuseRegistration(RemoteNode& node, const RegistrationRefuseReasons reason) {
@@ -314,6 +372,8 @@ void Transport::confirmRegistration(RemoteNode& node) {
 
   sendDirect(oPackStream_.getPackets(), node.neighbour->endpoints);
   oPackStream_.clear();
+
+  nh_.insert(node.neighbour);
 }
 
 void Transport::sendDirect(const Packet* pack, const NeighbourEndpoints& eps) {
@@ -323,19 +383,35 @@ void Transport::sendDirect(const Packet* pack, const NeighbourEndpoints& eps) {
 }
 
 void Transport::sendBroadcast(const Packet* pack) {
-  for (auto& nb : nh_)
+  //int i = 0;
+  for (auto& nb : nh_) {
+    //LOG_EVENT("FFF " << ++i);
     sendDirect(pack, nb.endpoints);
+  }
 }
 
 Neighbourhood::Element* Neighbourhood::allocate() {
+  SpinLock l(allocFlag_);
   return allocator_.emplace();
 }
 
 void Neighbourhood::deallocate(Element* elt) {
+  SpinLock l(allocFlag_);
   return allocator_.remove(elt);
 }
 
 void Neighbourhood::insert(Element* elt) {
+  LOG_WARN("Try Eltplus " << elt);
+  bool tmp = false;
+  if (!elt->placed.
+      compare_exchange_strong(tmp,
+                              true,
+                              std::memory_order_acquire,
+                              std::memory_order_relaxed))
+    return;
+
+  LOG_WARN("Eltplus " << elt);
+
   Element* firstPtr = first_.load(std::memory_order_acquire);
   do {
     elt->next.store(firstPtr, std::memory_order_relaxed);

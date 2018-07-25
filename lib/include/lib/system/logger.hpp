@@ -42,12 +42,12 @@
 #define LOG_EVENT(TEXT)
 #endif
 
-#if LOG_LEVEL & FLAG_LOG_PACKETS
-#define LOG_IN_PACK(PACKET, SIZE) std::cout << "-> [" << (SIZE - Packet::headerLength()) << "] " << (int)(PACKET)->command << " : " << (int)(PACKET)->subcommand << " " << byteStreamToHex((PACKET)->HashBlock, hash_length) << std::endl
-#define LOG_OUT_PACK(PACKET, SIZE) std::cout << "<- [" << (SIZE - Packet::headerLength()) << "] " << (int)(PACKET)->command << " : " << (int)(PACKET)->subcommand << " " << byteStreamToHex((PACKET)->HashBlock, hash_length) << std::endl
+#if (false && LOG_LEVEL & FLAG_LOG_PACKETS)
+#define LOG_IN_PACK(DATA, SIZE) std::cout << "-!> " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
+#define LOG_OUT_PACK(DATA, SIZE) std::cout << "<!- " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
 #else
-#define LOG_IN_PACK(PACKET, SIZE)
-#define LOG_OUT_PACK(PACKET, SIZE)
+#define LOG_IN_PACK(DATA, SIZE)
+#define LOG_OUT_PACK(DATA, SIZE)
 #endif
 
 #if LOG_LEVEL & FLAG_LOG_NODES_BUFFER
@@ -63,5 +63,19 @@
 #else
 #define LOG_DEBUG(TEXT)
 #endif
+
+static inline std::string byteStreamToHex(const char* stream, const size_t length) {
+  static std::string map = "0123456789ABCDEF";
+
+  std::string result;
+  result.reserve(length * 2);
+
+  for (size_t i = 0; i < length; ++i) {
+    result.push_back(map[(uint8_t)(stream[i]) >> 4]);
+    result.push_back(map[(uint8_t)(stream[i]) & (uint8_t)15]);
+  }
+
+  return result;
+}
 
 #endif // __LOGGER_HPP__

@@ -3,6 +3,8 @@
 
 IPacMan::Task& IPacMan::allocNext() {
   lastElt_ = queue_.lockWrite();
+  new (&lastElt_->element) Task();
+
   lastElt_->element.pack.data_ =
     allocator_.allocateNext(Packet::MaxSize);
   return lastElt_->element;
@@ -21,6 +23,7 @@ TaskPtr<IPacMan> IPacMan::getNextTask() {
 }
 
 void IPacMan::releaseTask(IPacMan::Queue::Element* elt) {
+  elt->element.~Task();
   queue_.unlockRead(elt);
 }
 
@@ -32,11 +35,13 @@ TaskPtr<OPacMan> OPacMan::getNextTask() {
 }
 
 void OPacMan::releaseTask(OPacMan::Queue::Element* elt) {
+  elt->element.~Task();
   queue_.unlockRead(elt);
 }
 
 OPacMan::Task& OPacMan::allocNext() {
   lastElt_ = queue_.lockWrite();
+  new (&lastElt_->element) Task();
   return lastElt_->element;
 }
 

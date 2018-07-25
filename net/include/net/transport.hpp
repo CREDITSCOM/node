@@ -6,7 +6,9 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
+#include <net/network.hpp>
 #include <client/config.hpp>
+#include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 
 #include "neighbourhood.hpp"
@@ -23,8 +25,7 @@ enum class NetworkCommand: uint8_t {
   ConfirmationResponse,
   RegistrationConfirmed,
   RegistrationRefused,
-  Ping,
-  Pong
+  Ping
 };
 
 enum class RegistrationRefuseReasons: uint8_t {
@@ -60,30 +61,39 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
 public:
-  static Transport* init(Network*);
+  Transport(const Config& config, Node* node):
+    netPacksAllocator_(1 << 24, 1),
+    myPublicKey_(node->getMyPublicKey()),
+    oPackStream_(&netPacksAllocator_, node->getMyPublicKey()),
+    net_(new Network(config, this)),
+    node_(node) {
+    good_ = net_->isGood();
+  }
+
+  ~Transport() {
+    delete net_;
+  }
+
   void run(const Config& config);
 
   RemoteNode& getPackSenderEntry(const ip::udp::endpoint&);
 
   void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNode&);
-
   void processNodeMessage(const Message&);
   void processNodeMessage(const Packet&);
 
   const Neighbourhood& getNeighbourhood() const { return nh_; }
 
-  void sendDirect(const Packet* pack, const NeighbourEndpoints&);
-  void sendBroadcast(const Packet* pack);
+  void addTask(Packet*, const uint32_t packNum);
+  void clearTasks();
 
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
+  bool isGood() const { return good_; }
+
+  void sendBroadcast(const Packet* pack);
 
 private:
-  Transport(Network* net,
-            const PublicKey& myPublicKey):
-    netPacksAllocator_(1 << 24, 1),
-    myPublicKey_(myPublicKey),
-    oPackStream_(&netPacksAllocator_, myPublicKey),
-    net_(net) { }
+  void sendDirect(const Packet* pack, const NeighbourEndpoints&);
 
   // Dealing with network connections
   void refuseRegistration(RemoteNode&, const RegistrationRefuseReasons);
@@ -91,15 +101,16 @@ private:
 
   void dispatchNodeMessage(const Packet& firstPack,
                            const uint8_t* data,
-                           const size_t);
+                           size_t);
 
-  static Transport* transportPtr_;
+  bool good_;
 
   static const uint32_t MaxPacksQueue = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
   static const uint32_t MaxConnectionRequests = 32;
 
-  FixedCircularBuffer<PacketPtr,
+  std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
+  FixedCircularBuffer<Packet,
                       MaxPacksQueue> sendPacks_;
 
   FixedHashMap<ip::udp::endpoint,
@@ -123,6 +134,7 @@ private:
   bool acceptRegistrations_ = false;
 
   Network* net_;
+  Node* node_;
   Neighbourhood nh_;
 };
 

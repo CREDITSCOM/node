@@ -69,6 +69,22 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
 
+Config Config::read(po::variables_map& vm) {
+  Config result = readFromFile(vm.count("config-file") ?
+                               vm["config-file"].as<std::string>() :
+                               DEFAULT_PATH_TO_CONFIG);
+
+  result.pathToDb_ = vm.count("db-path") ?
+    vm["db-path"].as<std::string>() :
+    DEFAULT_PATH_TO_DB;
+
+  srand(time(NULL));
+  for (int i = 0; i < 32; ++i)
+    *(result.publicKey_.str + i) = (char)(rand() % 255);
+
+  return result;
+}
+
 Config Config::readFromFile(const std::string& fileName) {
   Config result;
 

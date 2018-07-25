@@ -71,7 +71,7 @@ private:
 
 class OPacMan {
 public:
-  const static std::size_t MaxTimesRedirect = 1;
+  const static std::size_t MaxTimesRedirect = 5;
 
   struct Task {
     ip::udp::endpoint endpoint;

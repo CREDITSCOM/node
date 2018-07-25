@@ -2,9 +2,9 @@
 #include <lib/system/logger.hpp>
 
 #include "network.hpp"
+#include "transport.hpp"
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
-Network* Network::networkPtr_ = nullptr;
 
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {
   try {
@@ -12,6 +12,7 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 
     sock.set_option(ip::v6_only(false));
     sock.set_option(ip::udp::socket::reuse_address(true));
+    sock.set_option(ip::udp::socket::send_buffer_size(Packet::MaxSize));
 
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
@@ -30,11 +31,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 }
 
 ip::udp::endpoint Network::resolve(const EndpointData& data) {
-  ip::udp::resolver::query q(data.ip.is_v4() ? ip::udp::v4() : ip::udp::v6(),
-                             data.ip.to_string(),
-                             std::to_string(data.port));
+  //ip::udp::resolver::query q(data.ip.is_v4() ? ip::udp::v4() : ip::udp::v6(),
+  //data.ip.to_string(),
+  //std::to_string(data.port));
 
-  return *(resolver_.resolve(q));
+//return *(resolver_.resolve(q));
+  return ip::udp::endpoint(data.ip, data.port);
 }
 
 ip::udp::socket* Network::getSocketInThread(const bool openOwn,
@@ -87,6 +89,8 @@ void Network::readerRoutine(const Config& config) {
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
   boost::system::error_code lastError;
 
+  LOG_OUT_PACK(task->pack.data(), task->pack.size());
+
   auto size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
                            ep,
                            NO_FLAGS,
@@ -115,15 +119,23 @@ void Network::writerRoutine(const Config& config) {
 void Network::processorRoutine() {
   FixedHashMap<Hash, uint32_t, uint16_t> packetMap;
   PacketCollector collector;
+  CallsQueue& externals = CallsQueue::instance();
 
   for (;;) {
+    externals.callAll();
+
     auto task = iPacMan_.getNextTask();
+    LOG_IN_PACK(task->pack.data(), task->pack.size());
 
     auto& remoteSender = transport_->getPackSenderEntry(task->sender);
-    if (remoteSender.status == RemoteNode::BlackListed)
+    if (remoteSender.status == RemoteNode::BlackListed) {
+      LOG_WARN("Blacklisted guy");
       continue;
+    }
 
     if (!(task->pack.isHeaderValid())) {
+      LOG_WARN("Header is not valid (" << task->pack.getHeadersLength() << ", " << task->pack.size()  << "): " << byteStreamToHex((const char*)task->pack.data(), task->pack.size()));
+
       remoteSender.addStrike();
       continue;
     }
@@ -135,21 +147,26 @@ void Network::processorRoutine() {
     }
 
     // Non-network data
-    /*uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
+    uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
       if (task->pack.isFragmented() || task->pack.isCompressed()) {
-        Message& msg = collector.getMessage(&task->pack);
+        Message& msg = collector.getMessage(task->pack);
         if (msg.isComplete())
           transport_->processNodeMessage(msg);
+        else
+          LOG_NOTICE("Message is not complete");
       }
       else
         transport_->processNodeMessage(task->pack);
+    }
+    else {
+      //LOG_WARN("Cutting off since " << recCounter << " && " << (task->pack.addressedToMe(transport_->getMyPublicKey()) ? "11" : "00"));
     }
 
     if (recCounter < OPacMan::MaxTimesRedirect)
       transport_->sendBroadcast(&task->pack);
 
-      ++recCounter;*/
+    ++recCounter;
   }
 }
 
@@ -162,18 +179,9 @@ void Network::sendDirect(const Packet p, const ip::udp::endpoint& ep) {
   oPacMan_.enQueueLast();
 }
 
-Network& Network::init(const Config& config) {
-  if (!networkPtr_)
-    networkPtr_ = new Network(config);
-  else
-    LOG_ERROR("Network already initialized");
-
-  return *networkPtr_;
-}
-
-Network::Network(const Config& config):
+Network::Network(const Config& config, Transport* transport):
   resolver_(context_),
-  transport_(Transport::init(this)),
+  transport_(transport),
   readerThread_(&Network::readerRoutine, this, config),
   writerThread_(&Network::writerRoutine, this, config),
   processorThread_(&Network::processorRoutine, this) {
@@ -199,9 +207,7 @@ Network::Network(const Config& config):
   good_ = (readerStatus_.load() == ThreadStatus::Success &&
            writerStatus_.load() == ThreadStatus::Success);
 
-  if (good_)
-    transport_->run(config);
-  else
+  if (!good_)
     LOG_ERROR("Cannot start the network: error binding sockets");
 }
 

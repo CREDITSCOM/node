@@ -2,11 +2,19 @@
 #define __CONFIG_HPP__
 #include <string>
 #include <boost/asio.hpp>
+#include <boost/program_options.hpp>
 
+#include <lib/system/keys.hpp>
+
+namespace po = boost::program_options;
 using namespace boost::asio;
 
 typedef uint16_t NodeVersion;
 const NodeVersion NODE_VERSION = 70;
+
+const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
+const std::string DEFAULT_PATH_TO_DB = "test_db";
+const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 
 typedef short unsigned Port;
 
@@ -34,7 +42,7 @@ public:
   Config(const Config&) = default;
   Config(Config&&) = default;
 
-  static Config readFromFile(const std::string& fileName);
+  static Config read(po::variables_map&);
 
   const EndpointData& getInputEndpoint() const { return inputEp_; }
   const EndpointData& getOutputEndpoint() const { return outputEp_; }
@@ -42,6 +50,9 @@ public:
   BootstrapType getBootstrapType() const { return bType_; }
   NodeType getNodeType() const { return nType_; }
   const std::vector<EndpointData>& getIpList() const { return bList_; }
+
+  const PublicKey& getMyPublicKey() const { return publicKey_; }
+  const std::string& getPathToDB() const { return pathToDb_; }
 
   bool isGood() const { return good_; }
 
@@ -53,6 +64,7 @@ public:
 
 private:
   Config() { }
+  static Config readFromFile(const std::string& fileName);
 
   bool good_ = false;
 
@@ -73,6 +85,9 @@ private:
 
   std::vector<EndpointData> bList_;
   bool server_;
+
+  std::string pathToDb_;
+  PublicKey publicKey_;
 };
 
 #endif // __CONFIG_HPP__

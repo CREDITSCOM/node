@@ -2,16 +2,11 @@
 #include <iomanip>
 #include <iostream>
 
-#include <boost/program_options.hpp>
-
 #include <lib/system/logger.hpp>
-#include <net/network.hpp>
+#include <csnode/node.hpp>
 
 #include "config.hpp"
 
-namespace po = boost::program_options;
-
-const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const uint32_t CLOSE_TIMEOUT_SECONDS = 10;
 
 void panic() {
@@ -26,7 +21,8 @@ int main(int argc, char* argv[]) {
   po::options_description desc("Allowed options");
   desc.add_options()
     ("help", "produce this message")
-    ("config-file", po::value<std::string>(), "path to configuration file");
+    ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
+    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")");
 
   po::variables_map vm;
 
@@ -45,13 +41,13 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  auto config = Config::readFromFile(vm.count("config-file") ?
-                                     vm["config-file"].as<std::string>() :
-                                     DEFAULT_PATH_TO_CONFIG);
+  auto config = Config::read(vm);
   if (!config.isGood()) panic();
 
-  auto& net = Network::init(config);
-  if (!net.isGood()) panic();
+  Node node(config);
+  if (!node.isGood()) panic();
+
+  node.run(config);
 
   return 0;
 }

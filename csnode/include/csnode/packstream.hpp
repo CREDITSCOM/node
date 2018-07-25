@@ -71,7 +71,7 @@ public:
   OPackStream(RegionAllocator* allocator,
               const PublicKey& myKey):
     allocator_(allocator),
-    packets_(static_cast<Packet*>(malloc(sizeof(Packet) * PacketCollector::MaxFragments))),
+    packets_(static_cast<Packet*>(calloc(PacketCollector::MaxFragments, sizeof(Packet)))),
     packetsEnd_(packets_),
     senderKey_(myKey)
   { }
@@ -85,7 +85,7 @@ public:
     ++ptr_;
 
     if (flags & BaseFlags::Fragmented)
-      *this << packetsCount_ << packetsCount_;
+      *this << (uint16_t)0 << packetsCount_;
 
     if (!(flags & BaseFlags::NetworkMsg))
       *this << id_ << senderKey_;
@@ -145,12 +145,13 @@ public:
   }
 
   uint32_t getPacketsCount() { return packetsCount_; }
+
   uint8_t* getCurrPtr() { return ptr_; }
   uint32_t getCurrSize() const { return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data()); }
 
 private:
   void newPack() {
-    *(packetsEnd_) = Packet(allocator_->allocateNext(Packet::MaxSize));
+    new(packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
 
     ptr_ = static_cast<uint8_t*>(packetsEnd_->data());
     end_ = ptr_ + packetsEnd_->size();
@@ -194,13 +195,25 @@ private:
 };
 
 template <>
-IPackStream& IPackStream::operator>>(std::string&);
+inline IPackStream& IPackStream::operator>>(std::string& str) {
+  str = std::string(ptr_, end_);
+  ptr_ = end_;
+  return *this;
+}
 
 template <>
-IPackStream& IPackStream::operator>>(csdb::Transaction&);
+inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
+  cont = csdb::Transaction::from_byte_stream((char*)ptr_, (size_t)(end_ - ptr_));
+  ptr_ = end_;
+  return *this;
+}
 
 template <>
-IPackStream& IPackStream::operator>>(csdb::Pool&);
+inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
+  pool = csdb::Pool::from_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_);
+  ptr_ = end_;
+  return *this;
+}
 
 template <>
 inline IPackStream& IPackStream::operator>>(ip::address& addr) {
@@ -244,12 +257,24 @@ inline OPackStream& OPackStream::operator<<(const ip::address& ip) {
 }
 
 template <>
-OPackStream& OPackStream::operator<<(const std::string& str);
+inline OPackStream& OPackStream::operator<<(const std::string& str) {
+  insertBytes(str.data(), str.size());
+  return *this;
+}
 
 template <>
-OPackStream& OPackStream::operator<<(const csdb::Transaction& trans);
+inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
+  auto byteArray = trans.to_byte_stream();
+  insertBytes((char*)byteArray.data(), byteArray.size());
+  return *this;
+}
 
 template <>
-OPackStream& OPackStream::operator<<(const csdb::Pool& pool);
+inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
+  size_t bSize;
+  auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  insertBytes((char*)dataPtr, bSize);
+  return *this;
+}
 
 #endif // __PACKSTREAM_HPP__

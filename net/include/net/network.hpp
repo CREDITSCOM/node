@@ -3,21 +3,18 @@
 #include <boost/asio.hpp>
 
 #include <client/config.hpp>
-
 #include "pacmans.hpp"
-#include "transport.hpp"
 
+class Transport;
 class Network {
 public:
-  static Network& init(const Config&);
-  static Network& get() { return *networkPtr_; }
+  Network(const Config&, Transport*);
+  ~Network();
 
   bool isGood() const { return good_; }
   ip::udp::endpoint resolve(const EndpointData&);
 
   void sendDirect(const Packet, const ip::udp::endpoint&);
-
-  ~Network();
 
   Network(const Network&) = delete;
   Network(Network&&) = delete;
@@ -25,8 +22,6 @@ public:
   Network& operator=(Network&&) = delete;
 
 private:
-  Network(const Config&);
-
   void readerRoutine(const Config&);
   void writerRoutine(const Config&);
   void processorRoutine();
@@ -40,8 +35,6 @@ private:
                                      const EndpointData&,
                                      std::atomic<ThreadStatus>&,
                                      const bool useIPv6);
-
-  static Network* networkPtr_;
 
   bool good_;
 

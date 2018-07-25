@@ -28,6 +28,7 @@ public:
     uint32_t lastPacketsCount = 0;
     ConnectionId connId;
 
+    std::atomic<bool> placed = { false };
     std::atomic<Element*> next;
   };
 
@@ -69,7 +70,9 @@ public:
   void remove(Element*);
 
 private:
+  std::atomic_flag allocFlag_ = ATOMIC_FLAG_INIT;
   TypedAllocator<Element, 64> allocator_;
+
   std::atomic<Element*> first_ = { nullptr };
 };
 
