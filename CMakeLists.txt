@@ -26,6 +26,7 @@ add_subdirectory(csnode)
 add_subdirectory(solver)
 add_subdirectory(crypto)
 add_subdirectory(csdb)
+<<<<<<< HEAD
 
 # Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
 add_definitions(-DUSE_STD_THREAD)
@@ -49,6 +50,8 @@ option(WITH_STDTHREADS "" ON)
 option(WITH_LIBEVENT "" OFF)
 option(WITH_OPENSSL "" OFF)
 
+=======
+>>>>>>> 553a8c3d78a963d465e86aef32da2c6dd9944d22
 add_subdirectory(third-party)
 
 add_subdirectory(client)
