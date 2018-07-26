@@ -15,10 +15,10 @@ Node::Node(const Config& config):
   bc_(config.getPathToDB().c_str()),
   solver_(Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
   transport_(new Transport(config, this)),
-  allocator_(1 << 24, 5),
-  ostream_(&allocator_, myPublicKey_),
   stats_(bc_),
-  api_(bc_, solver_) {
+  api_(bc_, solver_),
+  allocator_(1 << 24, 5),
+  ostream_(&allocator_, myPublicKey_) {
   good_ = init();
 }
 
@@ -79,6 +79,7 @@ void Node::sendRoundTable() {
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTable
            << roundNum_
+           << static_cast<uint8_t>(confidantNodes_.size())
            << mainNode_;
 
   for (auto& conf : confidantNodes_)
@@ -380,8 +381,6 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 inline bool Node::readRoundData(const bool tail) {
   uint32_t roundNum;
   PublicKey mainNode;
-  std::vector<PublicKey> confidants;
-  confidants.reserve(MAX_CONFIDANTS);
 
   istream_ >> roundNum;
   if (roundNum <= roundNum_) {
@@ -389,6 +388,17 @@ inline bool Node::readRoundData(const bool tail) {
                << ". Ignoring...");
     return false;
   }
+
+  uint8_t confSize = 0;
+  istream_ >> confSize;
+
+  if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
+    LOG_WARN("Bad confidants num");
+    return false;
+  }
+
+  std::vector<PublicKey> confidants;
+  confidants.reserve(confSize);
 
   istream_ >> mainNode;
   //LOG_EVENT("SET MAIN " << byteStreamToHex(mainNode.str, 32));
@@ -398,7 +408,7 @@ inline bool Node::readRoundData(const bool tail) {
 
     //LOG_EVENT("ADDED CONF " << byteStreamToHex(confidants.back().str, 32));
 
-    if (confidants.size() == MAX_CONFIDANTS && !istream_.end()) {
+    if (confidants.size() == confSize && !istream_.end()) {
       if (tail)
         break;
       else {
@@ -408,7 +418,7 @@ inline bool Node::readRoundData(const bool tail) {
     }
   }
 
-  if (!istream_.good() || confidants.size() < MIN_CONFIDANTS) {
+  if (!istream_.good() || confidants.size() < confSize) {
     LOG_WARN("Bad round table format, ignoring");
     return false;
   }

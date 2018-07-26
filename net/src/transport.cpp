@@ -12,12 +12,10 @@ enum RegFlags: uint8_t {
   RedirectIP   = 1 << 2
 };
 
-void Transport::run(const Config& config) {
-  acceptRegistrations_ = config.getNodeType() == NodeType::Router;
+namespace {
+// Packets formation
 
-  // Form registration packet
-  oPackStream_.init(BaseFlags::NetworkMsg);
-
+void addMyOut(const Config& config, OPackStream& stream) {
   uint8_t regFlag = 0;
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -31,38 +29,60 @@ void Transport::run(const Config& config) {
   else if (config.hasTwoSockets())
     regFlag|= RegFlags::RedirectPort;
 
-  oPackStream_ <<
-    NetworkCommand::Registration <<
-    NODE_VERSION;
-
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
-      uint8_t* flagChar = oPackStream_.getCurrPtr();
-      oPackStream_ << config.getAddressEndpoint().ip;
+      uint8_t* flagChar = stream.getCurrPtr();
+      stream << config.getAddressEndpoint().ip;
       *flagChar|= regFlag;
     }
     else {
-      oPackStream_ << regFlag;
+      stream << regFlag;
     }
 
-    oPackStream_ << config.getAddressEndpoint().port;
+    stream << config.getAddressEndpoint().port;
   }
   else if (config.hasTwoSockets()) {
-    oPackStream_ << regFlag << config.getInputEndpoint().port;
+    stream << regFlag << config.getInputEndpoint().port;
   }
   else
-    oPackStream_ << regFlag;
+    stream << regFlag;
+}
 
-  ConnectionId randomId = 0;
-  regPackConnId_ = (uint64_t*)oPackStream_.getCurrPtr();
+void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const PublicKey& pk) {
+  stream.init(BaseFlags::NetworkMsg);
 
-  oPackStream_ <<
-    randomId <<
-    myPublicKey_;
+  stream <<
+    NetworkCommand::Registration <<
+    NODE_VERSION;
 
+  addMyOut(config, stream);
+  *regPackConnId = (uint64_t*)stream.getCurrPtr();
+
+  stream <<
+    (ConnectionId)0 <<
+    pk;
+}
+
+void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKey& pk) {
+  stream.init(BaseFlags::NetworkMsg);
+  stream << NetworkCommand::SSRegistration
+         << NODE_VERSION
+         << (uint8_t)(config.getNodeType() == NodeType::Router);
+
+  addMyOut(config, stream);
+
+  stream << pk;
+}
+}
+
+void Transport::run(const Config& config) {
+  acceptRegistrations_ = config.getNodeType() == NodeType::Router;
+
+  formRegPack(config, oPackStream_, &regPackConnId_, myPublicKey_);
   regPack_ = *(oPackStream_.getPackets());
   oPackStream_.clear();
 
+  ConnectionId randomId = 0;
   if (config.getBootstrapType() == BootstrapType::IpList) {
     for (auto& ep : config.getIpList()) {
       auto elt = nh_.allocate();
@@ -73,14 +93,19 @@ void Transport::run(const Config& config) {
       Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
       *regPackConnId_ = elt->connId;
       memcpy(req.data(), regPack_.data(), regPack_.size());
-
-      //LOG_EVENT("Sending connection request to " << elt->endpoints.in);
-      //sendDirect(&req, elt->endpoints);
     }
   }
   else {
     // Connect to SS logic
+    ssEp_.specialOut = false;
+    ssEp_.in = net_->resolve(config.getSignalServerEndpoint());
 
+    LOG_EVENT("Connecting to Singal Server on " << ssEp_.in);
+
+    formSSConnectPack(config, oPackStream_, myPublicKey_);
+    ssStatus_ = SSBootstrapStatus::Empty;
+
+    sendDirect(oPackStream_.getPackets(), ssEp_);
   }
 
   RegionAllocator allocator(100000l, 10);
@@ -288,6 +313,30 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
     break;
   case NetworkCommand::Ping:
     LOG_EVENT("Ping from " << task->sender);
+    break;
+  case NetworkCommand::SSRegistration:
+    if (ssStatus_ != SSBootstrapStatus::Requested) {
+      LOG_WARN("Unexpected Signal Server response");
+      return;
+    }
+
+    LOG_EVENT("Connection to the Signal Server has been established");
+    if (task->pack.getMsgSize() > 2) {
+      node_->getRoundTable(task->pack.getMsgData() + 2, task->pack.getMsgSize() - 2);
+      ssStatus_ = SSBootstrapStatus::Complete;
+    }
+    else
+      ssStatus_ = SSBootstrapStatus::RegisteredWait;
+
+    break;
+  case NetworkCommand::SSFirstRound:
+    if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
+      LOG_WARN("Unexpected Signal Server response");
+      return;
+    }
+
+    node_->getRoundTable(task->pack.getMsgData() + 2, task->pack.getMsgSize() - 2);
+    ssStatus_ = SSBootstrapStatus::Complete;
     break;
   default:
     sender.addStrike();

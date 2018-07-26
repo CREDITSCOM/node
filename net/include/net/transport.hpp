@@ -25,7 +25,9 @@ enum class NetworkCommand: uint8_t {
   ConfirmationResponse,
   RegistrationConfirmed,
   RegistrationRefused,
-  Ping
+  Ping,
+  SSRegistration,
+  SSFirstRound
 };
 
 enum class RegistrationRefuseReasons: uint8_t {
@@ -35,6 +37,14 @@ enum class RegistrationRefuseReasons: uint8_t {
   BadClientVersion,
   Timeout,
   BadResponse
+};
+
+enum class SSBootstrapStatus: uint8_t {
+  Empty,
+  Requested,
+  RegisteredWait,
+  Complete,
+  Denied
 };
 
 struct RemoteNode {
@@ -123,6 +133,10 @@ private:
 
   IPackStream iPackStream_;
   OPackStream oPackStream_;
+
+  // SS Data
+  SSBootstrapStatus ssStatus_ = SSBootstrapStatus::Empty;
+  NeighbourEndpoints ssEp_;
 
   // Registration data
   Packet regPack_;

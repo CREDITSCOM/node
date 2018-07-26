@@ -47,6 +47,8 @@ public:
   const EndpointData& getInputEndpoint() const { return inputEp_; }
   const EndpointData& getOutputEndpoint() const { return outputEp_; }
 
+  const EndpointData& getSignalServerEndpoint() const { return signalServerEp_; }
+
   BootstrapType getBootstrapType() const { return bType_; }
   NodeType getNodeType() const { return nType_; }
   const std::vector<EndpointData>& getIpList() const { return bList_; }
