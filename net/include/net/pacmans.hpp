@@ -87,15 +87,14 @@ public:
 
   typedef FUQueue<Task, 10000> Queue;
 
-  Task& allocNext();
-  void enQueueLast();
+  Queue::Element* allocNext();
+  void enQueueLast(Queue::Element*);
 
   TaskPtr<OPacMan> getNextTask();
   void releaseTask(Queue::Element*);
 
 private:
   Queue queue_;
-  typename Queue::Element* lastElt_;
 };
 
 #endif // __PACMANS_HPP__

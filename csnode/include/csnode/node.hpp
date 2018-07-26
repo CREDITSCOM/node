@@ -2,6 +2,9 @@
 #define __NODE_HPP__
 #include <memory>
 
+#include <csstats.h>
+#include <csconnector/csconnector.h>
+
 #include <client/config.hpp>
 
 #include "blockchain.hpp"
@@ -84,6 +87,9 @@ private:
 
   Credits::ISolver* solver_;
   Transport* transport_;
+
+  csstats::csstats stats_;
+  csconnector::csconnector api_;
 
   RegionAllocator allocator_;
 

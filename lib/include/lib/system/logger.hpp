@@ -64,6 +64,8 @@
 #define LOG_DEBUG(TEXT)
 #endif
 
+#define SUPER_TIC()
+
 static inline std::string byteStreamToHex(const char* stream, const size_t length) {
   static std::string map = "0123456789ABCDEF";
 

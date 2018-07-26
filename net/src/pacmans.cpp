@@ -39,12 +39,12 @@ void OPacMan::releaseTask(OPacMan::Queue::Element* elt) {
   queue_.unlockRead(elt);
 }
 
-OPacMan::Task& OPacMan::allocNext() {
-  lastElt_ = queue_.lockWrite();
-  new (&lastElt_->element) Task();
-  return lastElt_->element;
+OPacMan::Queue::Element* OPacMan::allocNext() {
+  auto elt = queue_.lockWrite();
+  new (&elt->element) Task();
+  return elt;
 }
 
-void OPacMan::enQueueLast() {
-  queue_.unlockWrite(lastElt_);
+void OPacMan::enQueueLast(Queue::Element* elt) {
+  queue_.unlockWrite(elt);
 }

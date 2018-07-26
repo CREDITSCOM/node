@@ -108,8 +108,10 @@ void Transport::run(const Config& config) {
     }
 
     if (ctr % 3 == 0) {
-      for (auto& c : sendPacks_)
+      for (auto& c : sendPacks_) {
         sendBroadcast(&c);
+        //LOG_WARN("RS " << byteStreamToHex((const char*)c.data(), 100));
+      }
     }
 
     if (ctr % 30 == 0) {

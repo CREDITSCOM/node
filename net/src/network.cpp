@@ -153,8 +153,8 @@ void Network::processorRoutine() {
         Message& msg = collector.getMessage(task->pack);
         if (msg.isComplete())
           transport_->processNodeMessage(msg);
-        else
-          LOG_NOTICE("Message is not complete");
+        //else
+        //LOG_NOTICE("Message is not complete");
       }
       else
         transport_->processNodeMessage(task->pack);
@@ -171,12 +171,12 @@ void Network::processorRoutine() {
 }
 
 void Network::sendDirect(const Packet p, const ip::udp::endpoint& ep) {
-  auto& task = oPacMan_.allocNext();
+  auto qePtr = oPacMan_.allocNext();
 
-  task.endpoint = ep;
-  task.pack = p;
+  qePtr->element.endpoint = ep;
+  qePtr->element.pack = p;
 
-  oPacMan_.enQueueLast();
+  oPacMan_.enQueueLast(qePtr);
 }
 
 Network::Network(const Config& config, Transport* transport):

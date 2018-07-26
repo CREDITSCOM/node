@@ -14,6 +14,7 @@ add_subdirectory(csnode)
 add_subdirectory(solver)
 add_subdirectory(crypto)
 add_subdirectory(csdb)
+add_subdirectory(api)
 add_subdirectory(third-party)
 
 add_subdirectory(client)
