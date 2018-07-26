@@ -311,12 +311,45 @@ Fake_Solver::createPool()
   ftime(&tt);
   srand(tt.time * 1000 + tt.millitm);
 
-  testPool = csdb::Pool();
-
   std::string aStr(64, '0');
   std::string bStr(64, '0');
 
-  uint32_t limit = randFT(50000, 150000);
+  static csdb::Pool pizd;
+  static bool pizdFlag = false;
+  if (!pizdFlag) {
+    pizdFlag = true;
+
+    csdb::Transaction transaction;
+    transaction.set_currency(csdb::Currency("CS"));
+
+    for (size_t i = 0; i < 64; ++i) {
+      aStr[i] = mp[randFT(0, 15)];
+      bStr[i] = mp[randFT(0, 15)];
+    }
+
+    transaction.set_target(csdb::Address::from_string(aStr));
+    transaction.set_source(csdb::Address::from_string(bStr));
+
+    transaction.set_amount(csdb::Amount(1, 0));
+    transaction.set_balance(csdb::Amount(2, 0));
+
+    for (uint32_t i = 0; i < 300000; ++i)
+      pizd.add_transaction(transaction);
+  }
+
+  testPool = pizd;
+
+  /*std::string aStr(64, '0');
+    std::string bStr(64, '0');*/
+
+  uint32_t limit = randFT(200000, 300000);
+  testPool.transactions().resize(limit);
+
+  for (auto& t : testPool.transactions()) {
+    t.set_amount(csdb::Amount(randFT(1, 1000), 0));
+    t.set_balance(csdb::Amount(t.balance().integral() + 1, 0));
+  }
+
 
   /*if (randFT(0, 150) == 42) {
     csdb::Transaction smart_trans;
@@ -340,7 +373,7 @@ Fake_Solver::createPool()
     testPool.add_transaction(smart_trans);
     }*/
 
-  csdb::Transaction transaction;
+  /*csdb::Transaction transaction;
   transaction.set_currency(csdb::Currency("CS"));
 
       for (size_t i = 0; i < 64; ++i) {
@@ -358,7 +391,7 @@ Fake_Solver::createPool()
 
     testPool.add_transaction(transaction);
     --limit;
-  }
+    }*/
 
   addTimestampToPool(testPool);
 }
