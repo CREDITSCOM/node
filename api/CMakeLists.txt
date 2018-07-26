@@ -2,6 +2,9 @@
 
 project(csconnector)
 
+add_subdirectory(api_gen)
+add_subdirectory(executor_gen)
+
 set(THRIFT_EXECUTOR_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(THRIFT_EXECUTOR_GENERATED_FILES
   ${THRIFT_GEN_DIR}/API.cpp
@@ -46,6 +49,3 @@ target_include_directories(csconnector
 
 set_property(TARGET csconnector PROPERTY CXX_STANDARD 14)
 set_property(TARGET csconnector PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-
-add_subdirectory(api_gen)
-add_subdirectory(executor_gen)

@@ -19,14 +19,6 @@ endif()
 #set(CMAKE_CXX_FLAGS_DEBUG "-g")
 #set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_subdirectory(api)
-add_subdirectory(lib)
-add_subdirectory(net)
-add_subdirectory(csnode)
-add_subdirectory(solver)
-add_subdirectory(crypto)
-add_subdirectory(csdb)
-<<<<<<< HEAD
 
 # Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
 add_definitions(-DUSE_STD_THREAD)
@@ -50,11 +42,13 @@ option(WITH_STDTHREADS "" ON)
 option(WITH_LIBEVENT "" OFF)
 option(WITH_OPENSSL "" OFF)
 
-=======
->>>>>>> 553a8c3d78a963d465e86aef32da2c6dd9944d22
 add_subdirectory(third-party)
+add_subdirectory(api)
+add_subdirectory(lib)
+add_subdirectory(net)
+add_subdirectory(csnode)
+add_subdirectory(solver)
+add_subdirectory(crypto)
+add_subdirectory(csdb)
 
 add_subdirectory(client)
-
-# enable_testing()
-# add_subdirectory(tests)
