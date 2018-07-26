@@ -1,5 +1,6 @@
 #define TESTING
 #include <algorithm>
+#include <array>
 #include <list>
 #include <mutex>
 #include <thread>
