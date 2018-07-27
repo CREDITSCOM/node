@@ -109,6 +109,8 @@ private:
   void refuseRegistration(RemoteNode&, const RegistrationRefuseReasons);
   void confirmRegistration(RemoteNode&);
 
+  bool parseSSSignal(const TaskPtr<IPacMan>&);
+
   void dispatchNodeMessage(const Packet& firstPack,
                            const uint8_t* data,
                            size_t);
@@ -144,6 +146,7 @@ private:
 
   Neighbourhood::Element* connections_[MaxConnectionRequests];
   Neighbourhood::Element** connectionsEnd_ = connections_;
+  std::atomic<uint32_t> connectAttempts_ = { 0 };
 
   bool acceptRegistrations_ = false;
 
