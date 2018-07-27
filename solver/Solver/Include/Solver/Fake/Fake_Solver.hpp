@@ -24,7 +24,7 @@
 //#define MONITOR_NODE
 //#define SPAMMER
 //#define SPAM_MAIN
-#define STARTER
+//#define STARTER
 
 namespace Credits{
 
