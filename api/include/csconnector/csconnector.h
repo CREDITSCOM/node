@@ -20,6 +20,8 @@ using namespace ::apache::thrift::server;
 
 using namespace api;
 
+class APIHandler;
+
 namespace csconnector {
 
     struct Config {
@@ -32,10 +34,13 @@ namespace csconnector {
         csconnector(BlockChain &m_blockchain, Credits::ISolver* solver, const Config &config = Config{});
         ~csconnector();
 
+        auto getApi() { return api_; }
+
 
         csconnector(const csconnector &) = delete;
         csconnector &operator=(const csconnector &)= delete;
     private:
+        std::shared_ptr<APIHandler> api_;
         TThreadedServer server;
         std::thread thread;
     };

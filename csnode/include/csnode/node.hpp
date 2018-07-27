@@ -65,6 +65,8 @@ public:
   BlockChain& getBlockChain() { return bc_; }
   const BlockChain& getBlockChain() const { return bc_; }
 
+  csconnector::csconnector& getConnector() { return api_; }
+
 private:
   bool init();
 

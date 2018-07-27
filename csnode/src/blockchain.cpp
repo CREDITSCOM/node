@@ -13,7 +13,7 @@ BlockChain::BlockChain(const char* path) {
     LOG_ERROR("Couldn't open database at " << path);
 }
 
-void BlockChain::writeLastBlock(csdb::Pool&& pool) {
+void BlockChain::writeLastBlock(csdb::Pool& pool) {
   std::lock_guard<std::mutex> l(dbLock_);
 
   pool.set_storage(storage_);

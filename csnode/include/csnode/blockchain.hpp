@@ -12,7 +12,7 @@ class BlockChain {
 public:
   BlockChain(const char* path);
 
-  void writeLastBlock(csdb::Pool&& pool);
+  void writeLastBlock(csdb::Pool& pool);
 
   csdb::PoolHash getLastHash();
   size_t getSize();

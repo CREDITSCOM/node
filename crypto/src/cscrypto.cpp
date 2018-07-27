@@ -50,11 +50,11 @@ namespace cscrypto
 
     using namespace CryptoPP;
 
-    static_assert(Hash256Bit::sizeBytes == BLAKE2s::DIGESTSIZE, "Hash256Bit size doesn't match Blake2s digest size");
+    static_assert(Hash256Bit::sizeBytes == BLAKE2sp::DIGESTSIZE, "Hash256Bit size doesn't match Blake2s digest size");
 
     Hash256Bit result;
 
-    BLAKE2s blake2s;
+    BLAKE2sp blake2s;
     blake2s.Update(data, length);
     blake2s.Final(result.data());
 
@@ -66,7 +66,7 @@ namespace cscrypto
 
     Hash result;
 
-    blake2s(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
+    blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
 
 #endif // #ifdef USE_CRYPTOPP
 

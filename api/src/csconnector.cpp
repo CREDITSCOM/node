@@ -6,8 +6,8 @@ namespace csconnector {
     using namespace stdcxx;
 
     csconnector::csconnector(BlockChain &m_blockchain, Credits::ISolver* solver, const Config &config)
-		: server(
-                    make_shared<APIProcessor>(make_shared<APIHandler>(m_blockchain, *solver)),
+      :  api_(make_shared<APIHandler>(m_blockchain, *solver)),
+         server(make_shared<APIProcessor>(api_),
                     make_shared<TServerSocket>(config.port),
                     make_shared<TBufferedTransportFactory>(),
                     make_shared<TBinaryProtocolFactory>())

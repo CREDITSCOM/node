@@ -12,6 +12,8 @@ enum RegFlags: uint8_t {
   RedirectIP   = 1 << 2
 };
 
+uint32_t CONNECTION_MAX_ATTEMPTS = 32;
+
 namespace {
 // Packets formation
 
@@ -46,6 +48,18 @@ void addMyOut(const Config& config, OPackStream& stream) {
   }
   else
     stream << regFlag;
+}
+
+template <typename T>
+T getSecureRandom() {
+  T result;
+
+  srand(time(NULL));            // ToFix: use libsodium here
+  uint8_t* ptr = (uint8_t*)&result;
+  for (uint32_t i = 0; i < sizeof(T); ++i, ++ptr)
+    *ptr = rand() % 256;
+
+  return result;
 }
 
 void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const PublicKey& pk) {
@@ -87,7 +101,7 @@ void Transport::run(const Config& config) {
     for (auto& ep : config.getIpList()) {
       auto elt = nh_.allocate();
       elt->endpoints.in = net_->resolve(ep);
-      elt->connId = ++randomId;
+      elt->connId = getSecureRandom<ConnectionId>();
       *(connectionsEnd_++) = elt;
 
       Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
@@ -113,7 +127,7 @@ void Transport::run(const Config& config) {
   for (;;) {
     ++ctr;
 
-    if (ctr % 10 == 0) {
+    if (ctr % 30 == 0) {
       bool unestablished = false;
       for (auto connPtr = connections_; connPtr != connectionsEnd_; ++connPtr) {
         if (!(*connPtr)->placed.load(std::memory_order_relaxed)) {
@@ -128,8 +142,10 @@ void Transport::run(const Config& config) {
         }
       }
 
-      if (!unestablished)
+      if (!unestablished || connectAttempts_.load(std::memory_order_relaxed) == CONNECTION_MAX_ATTEMPTS)
         connectionsEnd_ = connections_;
+      else
+        connectAttempts_.fetch_add(1, std::memory_order_relaxed);
     }
 
     if (ctr % 3 == 0) {
@@ -322,8 +338,8 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
 
     LOG_EVENT("Connection to the Signal Server has been established");
     if (task->pack.getMsgSize() > 2) {
-      node_->getRoundTable(task->pack.getMsgData() + 2, task->pack.getMsgSize() - 2);
-      ssStatus_ = SSBootstrapStatus::Complete;
+      if (!parseSSSignal(task))
+        LOG_WARN("Bad Signal Server response");
     }
     else
       ssStatus_ = SSBootstrapStatus::RegisteredWait;
@@ -332,6 +348,10 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
   case NetworkCommand::SSFirstRound:
     if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
       LOG_WARN("Unexpected Signal Server response");
+
+      if (!parseSSSignal(task))
+        LOG_WARN("Bad Signal Server response");
+
       return;
     }
 
@@ -347,6 +367,42 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
   default:
     sender.addStrike();
   }
+}
+
+bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
+  iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
+  iPackStream_.safeSkip<uint8_t>(2);
+
+  node_->getRoundTable(iPackStream_.getCurrPtr(), task->pack.getMsgSize() - 2);
+  iPackStream_.safeSkip<uint32_t>();
+
+  uint8_t numConf;
+  iPackStream_ >> numConf;
+  if (!iPackStream_.good()) return false;
+
+  iPackStream_.safeSkip<PublicKey>(numConf + 1);
+
+  uint8_t numCirc;
+  iPackStream_ >> numCirc;
+  if (!iPackStream_.good()) return false;
+
+  for (uint8_t i = 0; i < numCirc; ++i) {
+    iPackStream_.safeSkip<uint8_t>(2);
+    ip::address ip;
+    Port port;
+    iPackStream_ >> ip >> port;
+    if (!iPackStream_.good()) return false;
+
+    auto elt = nh_.allocate();
+    elt->endpoints.in = ip::udp::endpoint(ip, port);
+    elt->connId = getSecureRandom<ConnectionId>();
+    *(connectionsEnd_++) = elt;
+  }
+
+  connectAttempts_.store(0, std::memory_order_relaxed);
+  ssStatus_ = SSBootstrapStatus::Complete;
+
+  return true;
 }
 
 void Transport::processNodeMessage(const Message& msg) {

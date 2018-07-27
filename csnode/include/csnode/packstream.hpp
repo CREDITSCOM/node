@@ -34,6 +34,15 @@ public:
   }
 
   template <typename T>
+  void safeSkip(uint32_t num = 1) {
+    auto size = sizeof(T) * num;
+
+    if ((uint32_t)(end_ - ptr_) >= size) good_ = false;
+    else
+      ptr_+= size;
+  }
+
+  template <typename T>
   IPackStream& operator>>(T& cont) {
     if (!canPeek<T>()) good_ = false;
     else {
