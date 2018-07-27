@@ -74,7 +74,7 @@ Fake_Solver::closeMainRound()
 #else
     node_->sendBlock(m_pool);
 #endif
-    node_->getBlockChain().writeLastBlock(std::move(m_pool));
+    node_->getBlockChain().writeLastBlock(m_pool);
   }
 }
 
@@ -216,7 +216,7 @@ Fake_Solver::writeNewBlock()
       node_->getMyLevel() == NodeLevel::Writer) {
     addTimestampToPool(m_pool);
     node_->sendBlock(m_pool);
-    node_->getBlockChain().writeLastBlock(std::move(m_pool));
+    node_->getBlockChain().writeLastBlock(m_pool);
     consensusAchieved = false;
   }
 }
@@ -227,7 +227,11 @@ Fake_Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
-  node_->getBlockChain().writeLastBlock(std::move(block));
+  node_->getBlockChain().writeLastBlock(block);
+
+#ifdef MONITOR_NODE
+  node_->getConnector().getApi()->logNewBlock(block);
+#endif
 
 #ifndef SPAMMER
 #ifndef MONITOR_NODE
@@ -333,7 +337,7 @@ Fake_Solver::createPool()
     transaction.set_amount(csdb::Amount(1, 0));
     transaction.set_balance(csdb::Amount(2, 0));
 
-    for (uint32_t i = 0; i < 300000; ++i)
+    for (uint32_t i = 0; i < 8000; ++i)
       pizd.add_transaction(transaction);
   }
 
@@ -342,7 +346,7 @@ Fake_Solver::createPool()
   /*std::string aStr(64, '0');
     std::string bStr(64, '0');*/
 
-  uint32_t limit = randFT(200000, 300000);
+  uint32_t limit = randFT(5000, 8000);
   testPool.transactions().resize(limit);
 
   for (auto& t : testPool.transactions()) {
@@ -474,7 +478,7 @@ Fake_Solver::addInitialBalance()
     LOG_ERROR("Initial transaction is not valid");
 
   addTimestampToPool(pool);
-  node_->getBlockChain().writeLastBlock(std::move(pool));
+  node_->getBlockChain().writeLastBlock(pool);
 
 #ifdef SPAMMER
   spamThread = std::thread(&Fake_Solver::spamWithTransactions, this);

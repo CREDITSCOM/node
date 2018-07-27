@@ -16,6 +16,8 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TSocket.h>
 
+const uint32_t MAX_BLOCKS_TO_KEEP = 100;
+
 class APIHandlerBase
 {
   public:
@@ -88,6 +90,8 @@ class APIHandler : public APIHandlerInterface
       api::SmartContractAddressesListGetResult& _return,
       const api::Address& deployer) override;
 
+    void logNewBlock(const csdb::Pool&);
+
   private:
     bool GetTransaction(const api::TransactionId& transactionId,
                         api::Transaction& transaction);
@@ -101,6 +105,9 @@ class APIHandler : public APIHandlerInterface
 
     void GetSmartContractAddress(const std::string& data,
                                  std::string& smartContractAddress);
+
+    std::mutex lbMut_;
+    std::list<api::Pool> lastBlocks_;
 
     Credits::ISolver& solver;
 
