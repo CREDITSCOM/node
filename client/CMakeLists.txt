@@ -21,11 +21,13 @@ set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 
-find_package (Boost REQUIRED COMPONENTS system filesystem program_options)
+find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex)
 find_package (Threads)
 
 target_link_libraries (client Boost::system
                               Boost::filesystem
                               Boost::program_options
+                              Boost::date_time
+                              Boost::regex
                               Boost::disable_autolinking
                               ${CMAKE_THREAD_LIBS_INIT})

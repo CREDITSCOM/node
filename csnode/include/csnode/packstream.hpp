@@ -1,5 +1,6 @@
 #ifndef __PACKSTREAM_HPP__
 #define __PACKSTREAM_HPP__
+#include <algorithm>
 #include <cstring>
 
 #include <csdb/pool.h>

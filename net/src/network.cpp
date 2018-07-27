@@ -8,9 +8,10 @@ const ip::udp::socket::message_flags NO_FLAGS = 0;
 
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {
   try {
-    ip::udp::socket sock(context, ip::udp::v6());
+    ip::udp::socket sock(context, ipv6 ? ip::udp::v6() : ip::udp::v4());
 
-    sock.set_option(ip::v6_only(false));
+    if (ipv6) sock.set_option(ip::v6_only(false));
+
     sock.set_option(ip::udp::socket::reuse_address(true));
     sock.set_option(ip::udp::socket::send_buffer_size(Packet::MaxSize));
 
