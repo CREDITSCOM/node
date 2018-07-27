@@ -37,7 +37,7 @@ public:
   void safeSkip(uint32_t num = 1) {
     auto size = sizeof(T) * num;
 
-    if ((uint32_t)(end_ - ptr_) >= size) good_ = false;
+    if ((uint32_t)(end_ - ptr_) < size) good_ = false;
     else
       ptr_+= size;
   }
@@ -242,7 +242,8 @@ inline IPackStream& IPackStream::operator>>(ip::address& addr) {
     }
     else {
       uint32_t ipnum;
-      *this >> ipnum;
+	  for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
+		*this >> *ptr;
       addr = ip::make_address_v4(ipnum);
     }
   }
@@ -252,15 +253,15 @@ inline IPackStream& IPackStream::operator>>(ip::address& addr) {
 
 template <>
 inline OPackStream& OPackStream::operator<<(const ip::address& ip) {
+  *this << (uint8_t)(ip.is_v6());
   if (ip.is_v6()) {
-    *this << (uint8_t)1;
-
     auto bts = ip.to_v6().to_bytes();
     for (auto& b : bts) *this << b;
   }
   else {
-    *this << (uint8_t)0
-          << ip.to_v4().to_uint();
+	uint32_t ipnum = ip.to_v4().to_uint();
+	for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
+		*this << *ptr;
   }
 
   return *this;

@@ -50,12 +50,12 @@ private:
   std::atomic<bool> singleSockOpened_ = { false };
   std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
 
+  std::atomic<ThreadStatus> readerStatus_ = { NonInit };
+  std::atomic<ThreadStatus> writerStatus_ = { NonInit };
+
   std::thread readerThread_;
   std::thread writerThread_;
   std::thread processorThread_;
-
-  std::atomic<ThreadStatus> readerStatus_ = { NonInit };
-  std::atomic<ThreadStatus> writerStatus_ = { NonInit };
 };
 
 #endif // __NETWORK_HPP__

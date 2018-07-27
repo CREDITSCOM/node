@@ -27,7 +27,7 @@ enum class NetworkCommand: uint8_t {
   RegistrationRefused,
   Ping,
   SSRegistration = 1,
-  SSFirstRound = 20,
+  SSFirstRound = 31,
   SSRegistrationRefused = 25
 };
 

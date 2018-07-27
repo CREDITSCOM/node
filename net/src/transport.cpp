@@ -8,8 +8,8 @@
 
 enum RegFlags: uint8_t {
   UsingIPv6    = 1,
-  RedirectPort = 1 << 1,
-  RedirectIP   = 1 << 2
+  RedirectIP   = 1 << 1,
+  RedirectPort = 1 << 2
 };
 
 uint32_t CONNECTION_MAX_ATTEMPTS = 32;
@@ -347,17 +347,16 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
     break;
   case NetworkCommand::SSFirstRound:
     if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-      LOG_WARN("Unexpected Signal Server response");
+	  LOG_WARN("Unexpected Signal Server response");
+	  return;
+	}
 
-      if (!parseSSSignal(task))
-        LOG_WARN("Bad Signal Server response");
-
+    if (!parseSSSignal(task)) {
+      LOG_WARN("Bad Signal Server response");
       return;
     }
-
-    node_->getRoundTable(task->pack.getMsgData() + 2, task->pack.getMsgSize() - 2);
-    ssStatus_ = SSBootstrapStatus::Complete;
     break;
+
   case NetworkCommand::SSRegistrationRefused:
 	  uint16_t expectedVersion;
 	  iPackStream_ >> expectedVersion;
@@ -365,15 +364,16 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
 	  LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion);
 	  break;
   default:
+	LOG_WARN("Unexpected network command. That is sad.");
     sender.addStrike();
   }
 }
 
 bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
-  iPackStream_.safeSkip<uint8_t>(2);
+  iPackStream_.safeSkip<uint8_t>(1);
 
-  node_->getRoundTable(iPackStream_.getCurrPtr(), task->pack.getMsgSize() - 2);
+  auto trStart = iPackStream_.getCurrPtr();
   iPackStream_.safeSkip<uint32_t>();
 
   uint8_t numConf;
@@ -382,21 +382,28 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
   iPackStream_.safeSkip<PublicKey>(numConf + 1);
 
+  auto trFinish = iPackStream_.getCurrPtr();
+  node_->getRoundTable(trStart, (trFinish - trStart));
+
   uint8_t numCirc;
   iPackStream_ >> numCirc;
   if (!iPackStream_.good()) return false;
 
   for (uint8_t i = 0; i < numCirc; ++i) {
-    iPackStream_.safeSkip<uint8_t>(2);
+    //iPackStream_.safeSkip<uint8_t>();
     ip::address ip;
-    Port port;
-    iPackStream_ >> ip >> port;
+    uint16_t port;
+	iPackStream_ >> ip;
+	iPackStream_ >> port;
     if (!iPackStream_.good()) return false;
 
     auto elt = nh_.allocate();
     elt->endpoints.in = ip::udp::endpoint(ip, port);
     elt->connId = getSecureRandom<ConnectionId>();
     *(connectionsEnd_++) = elt;
+
+	iPackStream_ >> elt->key;
+	if (!iPackStream_.good()) return false;
   }
 
   connectAttempts_.store(0, std::memory_order_relaxed);
