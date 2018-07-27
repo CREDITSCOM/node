@@ -20,14 +20,15 @@ typedef uint64_t ConnectionId;
 typedef uint64_t Tick;
 
 enum class NetworkCommand: uint8_t {
-  Registration,
+  Registration = 2,
   ConfirmationRequest,
   ConfirmationResponse,
   RegistrationConfirmed,
   RegistrationRefused,
   Ping,
-  SSRegistration,
-  SSFirstRound
+  SSRegistration = 1,
+  SSFirstRound = 20,
+  SSRegistrationRefused = 25
 };
 
 enum class RegistrationRefuseReasons: uint8_t {

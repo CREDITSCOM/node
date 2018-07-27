@@ -103,7 +103,7 @@ void Transport::run(const Config& config) {
     LOG_EVENT("Connecting to Singal Server on " << ssEp_.in);
 
     formSSConnectPack(config, oPackStream_, myPublicKey_);
-    ssStatus_ = SSBootstrapStatus::Empty;
+    ssStatus_ = SSBootstrapStatus::Requested;
 
     sendDirect(oPackStream_.getPackets(), ssEp_);
   }
@@ -338,6 +338,12 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
     node_->getRoundTable(task->pack.getMsgData() + 2, task->pack.getMsgSize() - 2);
     ssStatus_ = SSBootstrapStatus::Complete;
     break;
+  case NetworkCommand::SSRegistrationRefused:
+	  uint16_t expectedVersion;
+	  iPackStream_ >> expectedVersion;
+
+	  LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion);
+	  break;
   default:
     sender.addStrike();
   }

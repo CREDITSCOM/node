@@ -46,13 +46,13 @@ private:
 
   Transport* transport_;
 
-  std::thread readerThread_;
-  std::thread writerThread_;
-  std::thread processorThread_;
-
   // Only needed in a one-socket configuration
   std::atomic<bool> singleSockOpened_ = { false };
   std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
+
+  std::thread readerThread_;
+  std::thread writerThread_;
+  std::thread processorThread_;
 
   std::atomic<ThreadStatus> readerStatus_ = { NonInit };
   std::atomic<ThreadStatus> writerStatus_ = { NonInit };
