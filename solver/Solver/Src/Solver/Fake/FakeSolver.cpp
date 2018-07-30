@@ -337,8 +337,11 @@ Fake_Solver::createPool()
     transaction.set_amount(csdb::Amount(1, 0));
     transaction.set_balance(csdb::Amount(2, 0));
 
-    for (uint32_t i = 0; i < 8000; ++i)
+    for (uint32_t i = 0; i < 350000; ++i) {
+      //Transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+      //t.set_balance(csdb::Amount(t.balance().integral() + 1, 0));
       pizd.add_transaction(transaction);
+    }
   }
 
   testPool = pizd;
@@ -346,13 +349,14 @@ Fake_Solver::createPool()
   /*std::string aStr(64, '0');
     std::string bStr(64, '0');*/
 
-  uint32_t limit = randFT(5000, 8000);
+  uint32_t limit = randFT(200000, 350000);
   testPool.transactions().resize(limit);
 
-  for (auto& t : testPool.transactions()) {
-    t.set_amount(csdb::Amount(randFT(1, 1000), 0));
-    t.set_balance(csdb::Amount(t.balance().integral() + 1, 0));
-  }
+  //t.set_amount(csdb::Amount(randFT(1, 1000), 0));
+  //t.set_balance(csdb::Amount(t.balance().integral() + 1, 0));
+
+  //for (auto& t : testPool.transactions()) {
+  //}
 
 
   /*if (randFT(0, 150) == 42) {

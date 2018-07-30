@@ -12,7 +12,7 @@ enum RegFlags: uint8_t {
   RedirectPort = 1 << 2
 };
 
-uint32_t CONNECTION_MAX_ATTEMPTS = 32;
+uint32_t CONNECTION_MAX_ATTEMPTS = 8;
 
 namespace {
 // Packets formation
@@ -155,7 +155,7 @@ void Transport::run(const Config& config) {
       }
     }
 
-    if (ctr % 30 == 0) {
+    if (ctr % 150 == 0) {
       for (auto& nb : getNeighbourhood()) {
         //std::cout << nb.endpoints.in << ": " << nb.packetsCount.load(std::memory_order_relaxed) << std::endl;
       }
