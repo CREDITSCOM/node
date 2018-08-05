@@ -1,6 +1,7 @@
 #define TESTING
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <list>
 #include <mutex>
 #include <thread>
@@ -220,59 +221,56 @@ TEST(fuqueue, multithreaded_stress) {
 }
 
 TEST(typed_allocator, one_page) {
-  TypedAllocator<uint32_t, 100> allocator;
+  TypedAllocator<uint32_t> allocator(100);
 
-  std::array<uint32_t*, 100> uis;
+  std::array<MemPtr<TypedSlot<uint32_t>>, 100> uis = {};
 
   for (uint32_t i = 0; i < 100; ++i)
     uis[i] = allocator.emplace(i);
 
   for (uint32_t i = 0; i < 100; ++i)
-    ASSERT_EQ(*(uis[i]), i);
+    ASSERT_EQ(**(uis[i]), i);
 
   for (uint32_t i = 0; i < 100; ++i)
-    allocator.remove(uis[i]);
+    uis[i] = MemPtr<TypedSlot<uint32_t>>();
 }
 
 TEST(typed_allocator, multiple_pages) {
-  TypedAllocator<uint32_t, 100> allocator;
+  TypedAllocator<uint32_t> allocator(100);
 
-  std::array<uint32_t*, 1000> uis;
+  std::array<MemPtr<TypedSlot<uint32_t>>, 1000> uis;
 
   for (uint32_t i = 0; i < 1000; ++i)
     uis[i] = allocator.emplace(i);
 
   for (uint32_t i = 0; i < 1000; ++i)
-    ASSERT_EQ(*(uis[i]), i);
+    ASSERT_EQ(**(uis[i]), i);
 
   for (uint32_t i = 0; i < 1000; ++i)
-    allocator.remove(uis[i]);
+    uis[i] = MemPtr<TypedSlot<uint32_t>>();
 }
 
 TEST(typed_allocator, reput) {
-  TypedAllocator<uint32_t, 10> allocator;
+  TypedAllocator<uint32_t> allocator(1);
 
-  uint32_t* first = allocator.emplace(42);
-  allocator.remove(first);
+  auto first = *allocator.emplace(42);
 
-  for (uint32_t i = 0; i < 100; ++i) {
-    ASSERT_EQ(allocator.emplace(i), first);
-    allocator.remove(first);
-  }
+  for (uint32_t i = 0; i < 10; ++i)
+    ASSERT_EQ(*allocator.emplace(i), first);
 }
 
 TEST(typed_allocator, inconsistent) {
-  TypedAllocator<uint32_t, 100> allocator;
+  TypedAllocator<uint32_t> allocator(100);
 
-  std::array<uint32_t*, 1000> uis;
+  std::array<MemPtr<TypedSlot<uint32_t>>, 1000> uis;
 
   for (uint32_t i = 0; i < 1000; ++i) {
     uis[i] = allocator.emplace(i);
-    if (i % 7 == 0) allocator.remove(uis[i]);
+    if (i % 7 == 0) uis[i] = MemPtr<TypedSlot<uint32_t>>();
   }
 
   for (uint32_t i = 0; i < 1000; ++i)
-    if (i % 7) { ASSERT_EQ(*(uis[i]), i); }
+    if (i % 7) { ASSERT_EQ(**(uis[i]), i); }
 }
 
 template <>
@@ -307,11 +305,13 @@ TEST(fixed_hash_map, depush) {
     c = 2;
   }
 
-  for (uint32_t i = 990; i < 1000; ++i)
-    ASSERT_EQ(hm.tryStore(hs[i]), 2);
+  for (uint32_t i = 990; i < 1000; ++i) {
+    auto& c = hm.tryStore(hs[i]);
+    ASSERT_EQ(c, 2);
+  }
 
   for (uint32_t i = 0; i < 990; ++i) {
-    auto c = hm.tryStore(hs[i]);
+    auto& c = hm.tryStore(hs[i]);
     ASSERT_EQ(c, 0);
   }
 }
@@ -336,5 +336,97 @@ TEST(fixed_hash_map, heap) {
   for (uint16_t i = 0; i < COUNT; ++i) {
     auto c = hm.tryStore(hs[i]);
     ASSERT_EQ(c, 7);
+  }
+}
+
+struct IntWithCounter {
+  static uint32_t counter;
+  uint32_t i;
+
+  IntWithCounter(uint32_t _i): i(_i) { ++counter; }
+  IntWithCounter() { ++counter; }
+  ~IntWithCounter() { --counter; }
+};
+
+uint32_t IntWithCounter::counter = 0;
+
+TEST(fixed_hash_map, destroy) {
+  IntWithCounter::counter = 0;
+
+  {
+    FixedHashMap<uint16_t, IntWithCounter, uint8_t, 10> hm;
+
+    for (uint16_t i = 0; i < 100; ++i) {
+      IntWithCounter& c = hm.tryStore(i);
+    }
+
+    ASSERT_EQ(IntWithCounter::counter, 10);
+  }
+
+  // Todo: Typed allocator destructor
+  // ASSERT_EQ(IntWithCounter::counter, 0);
+}
+
+TEST(fixed_circular_buffer, short) {
+  IntWithCounter::counter = 0;
+
+  FixedCircularBuffer<IntWithCounter, 32> fcb;
+  for (uint32_t i = 0; i < 30; ++i)
+    fcb.emplace(i);
+
+  uint32_t j = 0;
+  for (auto& ii : fcb) {
+    ASSERT_EQ(ii.i, j);
+    ++j;
+  }
+
+  ASSERT_EQ(j, 30);
+
+  fcb.clear();
+  ASSERT_EQ(IntWithCounter::counter, 0);
+}
+
+TEST(fixed_circular_buffer, override) {
+  IntWithCounter::counter = 0;
+
+  {
+    FixedCircularBuffer<IntWithCounter, 32> fcb;
+    for (uint32_t i = 0; i < 40; ++i)
+      fcb.emplace(i);
+
+    uint32_t j = 32;
+    auto iter = fcb.begin();
+    for (uint32_t i = 8; i < 40; ++i) {
+      ASSERT_EQ(iter->i, i);
+      ++iter;
+    }
+
+    ASSERT_EQ(IntWithCounter::counter, 32);
+  }
+
+  ASSERT_EQ(IntWithCounter::counter, 0);
+}
+
+TEST(fixed_vector, base) {
+  FixedVector<uint32_t, 10> fv;
+
+  for (uint32_t i = 0; i < 10; ++i) {
+    fv.emplace(i);
+  }
+
+  uint32_t cnt = 0;
+  for (auto& i : fv) {
+    ASSERT_EQ(cnt, i);
+    ++cnt;
+  }
+
+  fv.remove(fv.begin() + 7);
+
+  auto it = fv.begin();
+  ASSERT_EQ(fv.end(), it + 9);
+
+  for (uint32_t i = 0; i < 9; ++i) {
+    ASSERT_EQ(*it, (i < 7 ? i : i + 1));
+    ++it;
   }
 }

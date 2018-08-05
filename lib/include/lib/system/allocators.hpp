@@ -54,14 +54,21 @@ public:
     return *this;
   }
 
-  void* get() { return ptr_->get(); }
-  const void* get() const { return ptr_->get(); }
+  typename MemRegion::Type* get() { return ptr_->get(); }
+  const typename MemRegion::Type* get() const { return ptr_->get(); }
 
-  void* operator*() { return get(); }
-  const void* operator*() const { return get(); }
+  typename MemRegion::Type* operator*() { return get(); }
+  const typename MemRegion::Type* operator*() const { return get(); }
+
+  typename MemRegion::Type* operator->() { return get(); }
+  const typename MemRegion::Type* operator->() const { return get(); }
 
   size_t size() const { return ptr_->size(); }
   operator bool() const { return ptr_; }
+
+  bool operator!=(const MemPtr& rhs) const {
+    return ptr_ != rhs.ptr_;
+  }
 
 private:
   MemPtr(MemRegion* region): ptr_(region) {
@@ -96,6 +103,7 @@ struct RegionPage {
 class Region {
 public:
   using Allocator = RegionAllocator;
+  using Type = void;
 
   void use() {
     users_.fetch_add(1, std::memory_order_relaxed);
@@ -264,52 +272,145 @@ inline void Region::unuse() {
   }
 }
 
+/* By the way, we're gonna need this soon enough */
+struct SpinLock {
+public:
+  SpinLock(std::atomic_flag& flag):
+    flag_(flag) {
+    while (flag_.test_and_set(std::memory_order_acquire));
+  }
+
+  ~SpinLock() {
+    flag_.clear(std::memory_order_release);
+  }
+
+private:
+  std::atomic_flag& flag_;
+};
+
 /* Not, TypedAllocator is a completely different thing. It allocates
    big chunks of data, uses it for objects of fixed size and keeps
-   track of freed objects for reuse.
-   Not thread-safe. */
-template <typename T, uint32_t PageSize = 1024>
+   track of freed objects for reuse. */
+template <typename T>
+class TypedAllocator;
+
+template <typename T>
+class TypedSlot {
+public:
+  using Allocator = TypedAllocator<T>;
+  using Type = T;
+
+  template <typename... Args>
+  TypedSlot(Args&&... args): element_(std::forward<Args>(args)...) { }
+
+  void use() {
+    users_.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  inline void unuse();
+
+  T* get() { return &element_; }
+  const T* get() const { return &element_; }
+
+  uint32_t size() const { return sizeof(T); }
+
+private:
+  std::atomic<uint32_t> users_ = { 0 };
+  T element_;
+
+  Allocator* allocator_;
+  friend Allocator;
+};
+
+template <typename T>
 class TypedAllocator {
 public:
-  TypedAllocator() {
+  const uint32_t PageSize;
+  using PtrType = MemPtr<TypedSlot<T>>;
+  using IntType = TypedSlot<T>;
+
+  TypedAllocator(const uint32_t _pageSize): PageSize(_pageSize) {
     allocateNextPage();
   }
 
   template <typename... Args>
-  T* emplace(Args&&... args) {
-    if (freeChunksLast_ < freeChunks_) allocateNextPage();
+  PtrType emplace(Args&&... args) {
+    IntType** place = freeChunksLast_.load(std::memory_order_acquire);
+    do {
+      if (!place) {
+        SpinLock l(allocFlag_);
 
-    auto result = *freeChunksLast_;
-    --freeChunksLast_;
+        place = freeChunksLast_.load(std::memory_order_relaxed);
+        if (place) continue;
 
-    return new(result) T(std::forward<Args>(args)...);
+        place = allocateNextPage();
+      }
+    }
+    while (!freeChunksLast_.
+           compare_exchange_strong(place,
+                                   (place == freeChunks_ ? nullptr : (place - 1)),
+                                   std::memory_order_release,
+                                   std::memory_order_relaxed));
+
+    return new(*place) IntType(std::forward<Args>(args)...);
   }
 
-  void remove(T* toFree) {
-    toFree->~T();
-    *(++freeChunksLast_) = toFree;
+  void remove(IntType* toFree) {
+    toFree->~IntType();
+    {
+      SpinLock l(freeFlag_);
+      IntType** place = freeChunksLast_.load(std::memory_order_acquire);
+      IntType** nextPlace;
+
+      do {
+        nextPlace = place ? place + 1 : freeChunks_;
+        *nextPlace = toFree;
+      }
+      while (!freeChunksLast_.
+             compare_exchange_strong(place,
+                                     nextPlace,
+                                     std::memory_order_release,
+                                     std::memory_order_relaxed));
+    }
   }
 
 private:
-  void allocateNextPage() {
+  // Assumption: the flag is captured and freeChunksLast = nullptr
+  IntType** allocateNextPage() {
     ++pages_;
 
-    T* page = static_cast<T*>(malloc(sizeof(T) * PageSize));
+    IntType* page = static_cast<IntType*>(malloc(sizeof(IntType) * PageSize));
+
     free(freeChunks_);
-    freeChunks_ = static_cast<T**>(malloc(sizeof(void*) * PageSize * pages_));
+    freeChunks_ = static_cast<IntType**>(malloc(sizeof(IntType*) * PageSize * pages_));
 
-    T** chunkPtr = static_cast<T**>(freeChunks_) + PageSize;
-    T* pageEnd = static_cast<T*>(page) + PageSize;
+    IntType** chunkPtr = static_cast<IntType**>(freeChunks_) + PageSize;
+    IntType* pageEnd = static_cast<IntType*>(page) + PageSize;
 
-    for (T* ptr = page; ptr != pageEnd; ++ptr)
+    for (IntType* ptr = page; ptr != pageEnd; ++ptr) {
       *(--chunkPtr) = ptr;
+      ptr->allocator_ = this;
+    }
 
-    freeChunksLast_ = static_cast<T**>(freeChunks_) + PageSize - 1;
+    auto newChunks = static_cast<IntType**>(freeChunks_) + PageSize - 1;
+    freeChunksLast_.store(newChunks, std::memory_order_release);
+
+    return newChunks;
   }
 
   uint32_t pages_ = 0;
-  T** freeChunks_ = nullptr;
-  T** freeChunksLast_;
+  std::atomic_flag allocFlag_ = ATOMIC_FLAG_INIT;
+
+  IntType** freeChunks_ = nullptr;
+  std::atomic<IntType**> freeChunksLast_;
+  std::atomic_flag freeFlag_ = ATOMIC_FLAG_INIT;
 };
+
+template <typename T>
+inline void TypedSlot<T>::unuse() {
+  if (users_.fetch_sub(1, std::memory_order_release) == 1) {
+    allocator_->remove(this);
+  }
+}
 
 #endif  //__ALLOCATORS_HPP__

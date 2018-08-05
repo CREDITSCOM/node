@@ -32,11 +32,6 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 }
 
 ip::udp::endpoint Network::resolve(const EndpointData& data) {
-  //ip::udp::resolver::query q(data.ip.is_v4() ? ip::udp::v4() : ip::udp::v6(),
-  //data.ip.to_string(),
-  //std::to_string(data.port));
-
-//return *(resolver_.resolve(q));
   return ip::udp::endpoint(data.ip, data.port);
 }
 
@@ -91,6 +86,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   boost::system::error_code lastError;
 
   LOG_OUT_PACK(task->pack.data(), task->pack.size());
+  LOG_WARN("Sending to " << ep);
 
   auto size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
                            ep,
@@ -128,16 +124,15 @@ void Network::processorRoutine() {
     auto task = iPacMan_.getNextTask();
     LOG_IN_PACK(task->pack.data(), task->pack.size());
 
-    auto& remoteSender = transport_->getPackSenderEntry(task->sender);
-    if (remoteSender.status == RemoteNode::BlackListed) {
-      LOG_WARN("Blacklisted guy");
+    auto remoteSender = transport_->getPackSenderEntry(task->sender);
+    if (remoteSender->isBlackListed()) {
+      LOG_WARN("Blacklisted");
       continue;
     }
 
     if (!(task->pack.isHeaderValid())) {
-      LOG_WARN("Header is not valid (" << task->pack.getHeadersLength() << ", " << task->pack.size()  << "): " << byteStreamToHex((const char*)task->pack.data(), task->pack.size()));
-
-      remoteSender.addStrike();
+      LOG_WARN("Header is not valid");
+      remoteSender->addStrike();
       continue;
     }
 
@@ -154,14 +149,9 @@ void Network::processorRoutine() {
         Message& msg = collector.getMessage(task->pack);
         if (msg.isComplete())
           transport_->processNodeMessage(msg);
-        //else
-        //LOG_NOTICE("Message is not complete");
       }
       else
         transport_->processNodeMessage(task->pack);
-    }
-    else {
-      //LOG_WARN("Cutting off since " << recCounter << " && " << (task->pack.addressedToMe(transport_->getMyPublicKey()) ? "11" : "00"));
     }
 
     if (recCounter < OPacMan::MaxTimesRedirect)

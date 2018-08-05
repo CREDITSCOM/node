@@ -8,6 +8,7 @@ add_library(net
   include/net/packet.hpp
   include/net/pacmans.hpp
   include/net/transport.hpp
+  src/neighbourhood.cpp
   src/network.cpp
   src/packet.cpp
   src/pacmans.cpp
@@ -40,4 +41,3 @@ set (Boost_USE_STATIC_RUNTIME ON)
 
 find_package (Boost REQUIRED COMPONENTS system filesystem)
 target_link_libraries (net Boost::system Boost::filesystem Boost::disable_autolinking)
-

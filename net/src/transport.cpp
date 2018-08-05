@@ -31,43 +31,29 @@ void addMyOut(const Config& config, OPackStream& stream) {
   else if (config.hasTwoSockets())
     regFlag|= RegFlags::RedirectPort;
 
+  uint8_t* flagChar = stream.getCurrPtr() - 1;
+  *flagChar|= regFlag;
+
   if (!config.isSymmetric()) {
-    if (config.getAddressEndpoint().ipSpecified) {
-      uint8_t* flagChar = stream.getCurrPtr();
+    if (config.getAddressEndpoint().ipSpecified)
       stream << config.getAddressEndpoint().ip;
-      *flagChar|= regFlag;
-    }
-    else {
-      stream << regFlag;
-    }
 
     stream << config.getAddressEndpoint().port;
   }
-  else if (config.hasTwoSockets()) {
-    stream << regFlag << config.getInputEndpoint().port;
-  }
-  else
-    stream << regFlag;
+  else if (config.hasTwoSockets())
+    stream << config.getInputEndpoint().port;
 }
 
-template <typename T>
-T getSecureRandom() {
-  T result;
-
-  srand(time(NULL));            // ToFix: use libsodium here
-  uint8_t* ptr = (uint8_t*)&result;
-  for (uint32_t i = 0; i < sizeof(T); ++i, ++ptr)
-    *ptr = rand() % 256;
-
-  return result;
-}
-
-void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const PublicKey& pk) {
+void formRegPack(const Config& config,
+                 OPackStream& stream,
+                 uint64_t** regPackConnId,
+                 const PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
 
   stream <<
     NetworkCommand::Registration <<
-    NODE_VERSION;
+    NODE_VERSION <<
+    (uint8_t)0;
 
   addMyOut(config, stream);
   *regPackConnId = (uint64_t*)stream.getCurrPtr();
@@ -96,75 +82,53 @@ void Transport::run(const Config& config) {
   regPack_ = *(oPackStream_.getPackets());
   oPackStream_.clear();
 
-  ConnectionId randomId = 0;
   if (config.getBootstrapType() == BootstrapType::IpList) {
+    uint32_t cntr = 0;
     for (auto& ep : config.getIpList()) {
-      auto elt = nh_.allocate();
-      elt->endpoints.in = net_->resolve(ep);
-      elt->connId = getSecureRandom<ConnectionId>();
-      *(connectionsEnd_++) = elt;
+      if (cntr++ == Neighbourhood::MaxConnections) {
+        LOG_WARN("Connections limit reached");
+        break;
+      }
 
-      Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
-      *regPackConnId_ = elt->connId;
-      memcpy(req.data(), regPack_.data(), regPack_.size());
+      LOG_EVENT("Creating connection to " << ep.ip);
+      nh_.establishConnection(net_->resolve(ep));
     }
   }
   else {
     // Connect to SS logic
-    ssEp_.specialOut = false;
-    ssEp_.in = net_->resolve(config.getSignalServerEndpoint());
-
-    LOG_EVENT("Connecting to Singal Server on " << ssEp_.in);
+    LOG_EVENT("Connecting to Singal Server on " << ssEp_);
+    ssEp_ = net_->resolve(config.getSignalServerEndpoint());
 
     formSSConnectPack(config, oPackStream_, myPublicKey_);
     ssStatus_ = SSBootstrapStatus::Requested;
-
-    sendDirect(oPackStream_.getPackets(), ssEp_);
+    net_->sendDirect(*(oPackStream_.getPackets()),
+                     ssEp_);
   }
 
-  RegionAllocator allocator(100000l, 10);
+  // Okay, now let's get to business
+  oPackStream_.init(BaseFlags::NetworkMsg);
+  oPackStream_ << NetworkCommand::Ping;
+  auto pingPack = *(oPackStream_.getPackets());
+
   uint32_t ctr = 0;
   for (;;) {
     ++ctr;
+    bool resendPacks = ctr % 3 == 0;
+    bool sendPing = ctr % 10 == 0;
+    bool checkConnections = ctr % 30 == 0;
 
-    if (ctr % 30 == 0) {
-      bool unestablished = false;
-      for (auto connPtr = connections_; connPtr != connectionsEnd_; ++connPtr) {
-        if (!(*connPtr)->placed.load(std::memory_order_relaxed)) {
-          unestablished = true;
-          LOG_EVENT("Sending connection request to " << (*connPtr)->endpoints.in);
-
-          Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
-          *regPackConnId_ = (*connPtr)->connId;
-          memcpy(req.data(), regPack_.data(), regPack_.size());
-
-          sendDirect(&req, (*connPtr)->endpoints);
-        }
-      }
-
-      if (!unestablished || connectAttempts_.load(std::memory_order_relaxed) == CONNECTION_MAX_ATTEMPTS)
-        connectionsEnd_ = connections_;
-      else
-        connectAttempts_.fetch_add(1, std::memory_order_relaxed);
+    if (checkConnections) {
+      nh_.checkPending();
+      nh_.checkSilent();
     }
 
-    if (ctr % 3 == 0) {
-      for (auto& c : sendPacks_) {
+    if (resendPacks) {
+      for (auto& c : sendPacks_)
         sendBroadcast(&c);
-        //LOG_WARN("RS " << byteStreamToHex((const char*)c.data(), 100));
-      }
     }
 
-    if (ctr % 150 == 0) {
-      for (auto& nb : getNeighbourhood()) {
-        //std::cout << nb.endpoints.in << ": " << nb.packetsCount.load(std::memory_order_relaxed) << std::endl;
-      }
-
-      Packet p(allocator.allocateNext(2));
-      *static_cast<uint8_t*>(p.data()) = 1;
-      *(static_cast<uint8_t*>(p.data()) + 1) = 5;
-      sendBroadcast(&p);
-    }
+    if (sendPing)
+      sendBroadcast(&pingPack);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
@@ -191,20 +155,20 @@ inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
   return result;
 }
 
-RemoteNode& Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
-  RemoteNode& rn = remoteNodes_.tryStore(ep);
+RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
+  auto& rn = remoteNodesMap_.tryStore(ep);
 
-  if (rn.status == RemoteNode::Status::IsNeighbour)
-    rn.neighbour->packetsCount.fetch_add(1, std::memory_order_relaxed);
+  if (!rn)  // Newcomer
+    rn = remoteNodes_.emplace();
 
-  //LOG_WARN("SENDER is " << &rn);
-
+  rn->packets.fetch_add(1, std::memory_order_relaxed);
   return rn;
 }
 
 // Processing network packages
 
-void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sender) {
+void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
+                                   RemoteNodePtr& sender) {
   iPackStream_.init(task->pack.getMsgData(),
                     task->pack.getMsgSize());
 
@@ -212,161 +176,43 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNode& sen
   iPackStream_ >> cmd;
 
   if (!iPackStream_.good())
-    return sender.addStrike();
+    return sender->addStrike();
 
+  bool result = true;
   switch (cmd) {
   case NetworkCommand::Registration:
-    {
-      LOG_EVENT("Got registration request from " << task->sender);
-
-      if (/*sender.status != RemoteNode::Status::New  ||*/
-          !acceptRegistrations_ ||
-          !iPackStream_.canPeek<NodeVersion>()) {
-        return sender.addStrike();
-      }
-
-      if (iPackStream_.peek<NodeVersion>() != NODE_VERSION) {
-        sender.addStrike();
-        return refuseRegistration(sender, RegistrationRefuseReasons::BadClientVersion);
-      }
-
-      iPackStream_.skip<NodeVersion>();
-      if (!iPackStream_.canPeek<uint8_t>())
-        return sender.addStrike();
-
-      auto& flags = iPackStream_.peek<uint8_t>();
-
-      if (!sender.neighbour)
-        sender.neighbour = nh_.allocate();
-
-      auto& eps = sender.neighbour->endpoints;
-      eps.in = task->sender;
-
-      eps.specialOut = false;
-      if (flags & RegFlags::RedirectIP) {
-        boost::asio::ip::address addr;
-        iPackStream_ >> addr;
-
-        eps.out.address(addr);
-        eps.specialOut = true;
-      }
-      else {
-        iPackStream_.skip<uint8_t>();
-      }
-
-      if (flags & RegFlags::RedirectPort) {
-        Port port;
-        iPackStream_ >> port;
-
-        if (!eps.specialOut) {
-          eps.specialOut = true;
-          eps.out.address(task->sender.address());
-        }
-
-        eps.out.port(port);
-      }
-      else if (eps.specialOut)
-        eps.out.port(task->sender.port());
-
-      iPackStream_ >> sender.neighbour->connId;
-      iPackStream_ >> sender.neighbour->key;
-
-      if (!iPackStream_.good() || !iPackStream_.end()) {
-        nh_.deallocate(sender.neighbour);
-
-        return sender.addStrike();
-      }
-
-      return confirmRegistration(sender);
-    }
+    result = gotRegistrationRequest(task, sender);
+    break;
   case NetworkCommand::ConfirmationRequest: break;
   case NetworkCommand::ConfirmationResponse: break;
   case NetworkCommand::RegistrationConfirmed:
-    {
-      LOG_EVENT("Confirming...");
-      ConnectionId cId;
-      iPackStream_ >> cId;
-      if (!iPackStream_.good() ||
-          !iPackStream_.canPeek<PublicKey>()) return sender.addStrike();
-
-      bool found = false;
-      for (auto ptr = connections_; ptr != connectionsEnd_; ++ptr) {
-        if ((*ptr)->connId == cId) {
-          sender.neighbour = *ptr;
-          sender.status = RemoteNode::Status::IsNeighbour;
-
-          if (task->sender != (*ptr)->endpoints.in) {
-            (*ptr)->endpoints.out = (*ptr)->endpoints.in;
-            (*ptr)->endpoints.specialOut = true;
-            (*ptr)->endpoints.in = task->sender;
-          }
-          else
-            (*ptr)->endpoints.specialOut = false;
-
-          LOG_EVENT("Connection to " << task->sender << " established");
-          nh_.insert(sender.neighbour);
-
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        LOG_ERROR("Unknown registration");
-        return sender.addStrike();
-      }
-
-      iPackStream_ >> sender.neighbour->key;
-      return;
-    }
+    result = gotRegistrationConfirmation(task, sender);
+    break;
   case NetworkCommand::RegistrationRefused:
-    RegistrationRefuseReasons reason;
-    iPackStream_ >> reason;
-    if (!iPackStream_.good() || !iPackStream_.end())
-      return sender.addStrike();
-
-    LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << (int)reason);
+    result = gotRegistrationRefusal(task, sender);
     break;
   case NetworkCommand::Ping:
     LOG_EVENT("Ping from " << task->sender);
     break;
   case NetworkCommand::SSRegistration:
-    if (ssStatus_ != SSBootstrapStatus::Requested) {
-      LOG_WARN("Unexpected Signal Server response");
-      return;
-    }
-
-    LOG_EVENT("Connection to the Signal Server has been established");
-    if (task->pack.getMsgSize() > 2) {
-      if (!parseSSSignal(task))
-        LOG_WARN("Bad Signal Server response");
-    }
-    else
-      ssStatus_ = SSBootstrapStatus::RegisteredWait;
-
+    if (task->sender != ssEp_) { result = false; break; }
+    gotSSRegistration(task);
     break;
   case NetworkCommand::SSFirstRound:
-    if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-	  LOG_WARN("Unexpected Signal Server response");
-	  return;
-	}
-
-    if (!parseSSSignal(task)) {
-      LOG_WARN("Bad Signal Server response");
-      return;
-    }
+    if (task->sender != ssEp_) { result = false; break; }
+    gotSSDispatch(task);
     break;
-
   case NetworkCommand::SSRegistrationRefused:
-	  uint16_t expectedVersion;
-	  iPackStream_ >> expectedVersion;
-
-	  LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion);
-	  break;
+    if (task->sender != ssEp_) { result = false; break; }
+    gotSSRefusal(task);
+    break;
   default:
-	LOG_WARN("Unexpected network command. That is sad.");
-    sender.addStrike();
+    result = false;
+    LOG_WARN("Unexpected network command");
   }
+
+  if (!result)
+    sender->addStrike();
 }
 
 bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
@@ -390,23 +236,18 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   if (!iPackStream_.good()) return false;
 
   for (uint8_t i = 0; i < numCirc; ++i) {
-    //iPackStream_.safeSkip<uint8_t>();
-    ip::address ip;
-    uint16_t port;
-	iPackStream_ >> ip;
-	iPackStream_ >> port;
+    EndpointData ep;
+    ep.ipSpecified = true;
+
+    iPackStream_ >> ep.ip >> ep.port;
     if (!iPackStream_.good()) return false;
 
-    auto elt = nh_.allocate();
-    elt->endpoints.in = ip::udp::endpoint(ip, port);
-    elt->connId = getSecureRandom<ConnectionId>();
-    *(connectionsEnd_++) = elt;
+    nh_.establishConnection(net_->resolve(ep));
 
-	iPackStream_ >> elt->key;
-	if (!iPackStream_.good()) return false;
+    iPackStream_.safeSkip<PublicKey>();
+    if (!iPackStream_.good()) return false;
   }
 
-  connectAttempts_.store(0, std::memory_order_relaxed);
   ssStatus_ = SSBootstrapStatus::Complete;
 
   return true;
@@ -472,72 +313,153 @@ void Transport::clearTasks() {
   sendPacks_.clear();
 }
 
-void Transport::refuseRegistration(RemoteNode& node, const RegistrationRefuseReasons reason) {
-  LOG_EVENT("Refusing registration");
+/* Sending network tasks */
+void Transport::sendRegistrationRequest(Connection& conn) {
+  Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
+  *regPackConnId_ = conn.id;
+  memcpy(req.data(), regPack_.data(), regPack_.size());
+
+  ++(conn.attempts);
+  sendDirect(&req, conn);
+}
+
+void Transport::sendRegistrationConfirmation(const Connection& conn) {
+  LOG_EVENT("Confirming registration with " << conn.in);
 
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::RegistrationRefused << reason;
+  oPackStream_ << NetworkCommand::RegistrationConfirmed << conn.id << myPublicKey_;
 
-  sendDirect(oPackStream_.getPackets(), node.neighbour->endpoints);
+  sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
 
-void Transport::confirmRegistration(RemoteNode& node) {
-  LOG_EVENT("Confirming registration with " << node.neighbour->endpoints.in << " on " << (node.neighbour->endpoints.specialOut ? node.neighbour->endpoints.out : node.neighbour->endpoints.in));
-
-  node.status = RemoteNode::Status::IsNeighbour;
+void Transport::sendRegistrationRefusal(const Connection& conn,
+                                        const RegistrationRefuseReasons reason) {
+    LOG_EVENT("Refusing registration with " << conn.in);
 
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::RegistrationConfirmed << node.neighbour->connId<< myPublicKey_;
+  oPackStream_ << NetworkCommand::RegistrationRefused << conn.id << reason;
 
-  sendDirect(oPackStream_.getPackets(), node.neighbour->endpoints);
+  sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
-
-  nh_.insert(node.neighbour);
 }
 
-void Transport::sendDirect(const Packet* pack, const NeighbourEndpoints& eps) {
-  net_->sendDirect(*pack,
-                   eps.specialOut ?
-                   eps.out : eps.in);
-}
+// Requests processing
 
-void Transport::sendBroadcast(const Packet* pack) {
-  //int i = 0;
-  for (auto& nb : nh_) {
-    //LOG_EVENT("FFF " << ++i);
-    sendDirect(pack, nb.endpoints);
+bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task,
+                                       RemoteNodePtr& sender) {
+  LOG_EVENT("Got registration request from " << task->sender);
+
+  NodeVersion vers;
+  iPackStream_ >> vers;
+  if (!iPackStream_.good()) return false;
+
+  Connection conn;
+  conn.in = task->sender;
+  auto& flags = iPackStream_.peek<uint8_t>();
+
+  if (flags & RegFlags::RedirectIP) {
+    boost::asio::ip::address addr;
+    iPackStream_ >> addr;
+
+    conn.out.address(addr);
+    conn.specialOut = true;
   }
-}
-
-Neighbourhood::Element* Neighbourhood::allocate() {
-  SpinLock l(allocFlag_);
-  return allocator_.emplace();
-}
-
-void Neighbourhood::deallocate(Element* elt) {
-  SpinLock l(allocFlag_);
-  return allocator_.remove(elt);
-}
-
-void Neighbourhood::insert(Element* elt) {
-  LOG_WARN("Try Eltplus " << elt);
-  bool tmp = false;
-  if (!elt->placed.
-      compare_exchange_strong(tmp,
-                              true,
-                              std::memory_order_acquire,
-                              std::memory_order_relaxed))
-    return;
-
-  LOG_WARN("Eltplus " << elt);
-
-  Element* firstPtr = first_.load(std::memory_order_acquire);
-  do {
-    elt->next.store(firstPtr, std::memory_order_relaxed);
+  else {
+    conn.specialOut = false;
+    iPackStream_.skip<uint8_t>();
   }
-  while (!first_.compare_exchange_strong(firstPtr,
-                                         elt,
-                                         std::memory_order_release,
-                                         std::memory_order_relaxed));
+
+  if (flags & RegFlags::RedirectPort) {
+    Port port;
+    iPackStream_ >> port;
+
+    if (!conn.specialOut) {
+      conn.specialOut = true;
+      conn.out.address(task->sender.address());
+    }
+
+    conn.out.port(port);
+  }
+  else if (conn.specialOut)
+    conn.out.port(task->sender.port());
+
+  if (vers != NODE_VERSION) {
+    sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
+    return true;
+  }
+
+  iPackStream_ >> conn.id;
+  iPackStream_ >> conn.key;
+
+  if (!iPackStream_.good() || !iPackStream_.end())
+    return false;
+
+  nh_.gotRegistration(std::move(conn), sender);
+  return true;
+}
+
+bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task,
+                                            RemoteNodePtr& sender) {
+  ConnectionId cId;
+  PublicKey key;
+  iPackStream_ >> cId >> key;
+
+  if (!iPackStream_.good())
+    return false;
+
+  nh_.gotConfirmation(cId, task->sender, key, sender);
+  return true;
+}
+
+bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task,
+                                       RemoteNodePtr&) {
+  RegistrationRefuseReasons reason;
+  Connection::Id id;
+  iPackStream_ >> id >> reason;
+
+  if (!iPackStream_.good() || !iPackStream_.end())
+    return false;
+
+  nh_.gotRefusal(id);
+
+  LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << (int)reason);
+
+  return true;
+}
+
+bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task) {
+  if (ssStatus_ != SSBootstrapStatus::Requested) {
+    LOG_WARN("Unexpected Signal Server response");
+    return false;
+  }
+
+  LOG_EVENT("Connection to the Signal Server has been established");
+  if (task->pack.getMsgSize() > 2) {
+    if (!parseSSSignal(task))
+      LOG_WARN("Bad Signal Server response");
+  }
+  else
+    ssStatus_ = SSBootstrapStatus::RegisteredWait;
+
+  return true;
+}
+
+bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
+  if (ssStatus_ != SSBootstrapStatus::RegisteredWait)
+    LOG_WARN("Unexpected Signal Server response");
+
+  if (!parseSSSignal(task))
+    LOG_WARN("Bad Signal Server response");
+
+  return true;
+}
+
+bool Transport::gotSSRefusal(const TaskPtr<IPacMan>& task) {
+  uint16_t expectedVersion;
+  iPackStream_ >> expectedVersion;
+
+  LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion);
+
+  return true;
 }

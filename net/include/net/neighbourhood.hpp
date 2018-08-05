@@ -8,72 +8,87 @@
 using namespace boost::asio;
 
 class Network;
+class Transport;
+class Packet;
 
-struct NeighbourEndpoints {
-  ip::udp::endpoint in;
+struct Connection;
+struct RemoteNode {
+  std::atomic<uint64_t> packets = { 0 };
 
-  bool specialOut;
-  ip::udp::endpoint out;
+  std::atomic<uint32_t> strikes = { 0 };
+  std::atomic<bool> blackListed = { false };
+
+  void addStrike() {
+    strikes.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  bool isBlackListed() {
+    return blackListed.load(std::memory_order_relaxed);
+  }
+
+  std::atomic<Connection*> connection = { nullptr };
 };
 
-typedef uint64_t ConnectionId;
+typedef MemPtr<TypedSlot<RemoteNode>> RemoteNodePtr;
+
+struct Connection {
+  typedef uint64_t Id;
+
+  Id id;
+
+  uint64_t lastPacketsCount = 0;
+  uint32_t attempts = 0;
+
+  PublicKey key;
+  ip::udp::endpoint in;
+
+  bool specialOut = false;
+  ip::udp::endpoint out;
+
+  RemoteNodePtr node;
+
+  bool operator!=(const Connection& rhs) const {
+    return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
+  }
+};
+
+typedef MemPtr<TypedSlot<Connection>> ConnectionPtr;
 
 class Neighbourhood {
 public:
-  struct Element {
-    NeighbourEndpoints endpoints;
-    PublicKey key;
+  const static uint32_t MaxConnections = 64;
+  const static uint32_t MaxConnectAttempts = 8;
 
-    std::atomic<uint32_t> packetsCount = { 0 };
-    uint32_t lastPacketsCount = 0;
-    ConnectionId connId;
+  Neighbourhood(Transport* net):
+    transport_(net),
+    connectionsAllocator_(MaxConnections + 1) { }
 
-    std::atomic<bool> placed = { false };
-    std::atomic<Element*> next;
-  };
+  void sendByNeighbours(const Packet*);
 
-  class const_iterator {
-  public:
-    const_iterator& operator++() {
-      ptr_ = ptr_->next.load(std::memory_order_relaxed);
-      return *this;
-    }
+  void establishConnection(const ip::udp::endpoint&);
 
-    bool operator!=(const const_iterator& rhs) const {
-      return ptr_ != rhs.ptr_;
-    }
+  void gotRegistration(Connection&&, RemoteNodePtr);
 
-    const Element* operator->() const { return ptr_; }
-    const Element& operator*() const { return *ptr_; }
+  void gotConfirmation(const Connection::Id&,
+                       const ip::udp::endpoint&,
+                       const PublicKey&,
+                       RemoteNodePtr);
 
-  private:
-    Element* ptr_;
-    friend class Neighbourhood;
-  };
+  void gotRefusal(const Connection::Id&);
 
-  const_iterator begin() const {
-    const_iterator result;
-    result.ptr_ = first_.load(std::memory_order_relaxed);
-    return result;
-  }
-
-  const_iterator end() const {
-    const_iterator result;
-    result.ptr_ = nullptr;
-    return result;
-  }
-
-  Element* allocate();
-  void deallocate(Element*);
-
-  void insert(Element*);
-  void remove(Element*);
+  void checkPending();
+  void checkSilent();
 
 private:
-  std::atomic_flag allocFlag_ = ATOMIC_FLAG_INIT;
-  TypedAllocator<Element, 64> allocator_;
+  Transport* transport_;
 
-  std::atomic<Element*> first_ = { nullptr };
+  TypedAllocator<Connection> connectionsAllocator_;
+
+  std::atomic_flag nLockFlag_ = ATOMIC_FLAG_INIT;
+  FixedVector<ConnectionPtr, MaxConnections> neighbours_;
+
+  std::atomic_flag pLockFlag_ = ATOMIC_FLAG_INIT;
+  FixedVector<ConnectionPtr, MaxConnections> pendingConnections_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

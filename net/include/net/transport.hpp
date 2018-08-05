@@ -34,7 +34,7 @@ enum class NetworkCommand: uint8_t {
 enum class RegistrationRefuseReasons: uint8_t {
   Unspecified,
   LimitReached,
-  TooManyQueries,
+  BadId,
   BadClientVersion,
   Timeout,
   BadResponse
@@ -48,36 +48,19 @@ enum class SSBootstrapStatus: uint8_t {
   Denied
 };
 
-struct RemoteNode {
-  enum Status: uint8_t {
-    New,
-    BlackListed,
-    AwaitingRegistration,
-    IsNeighbour
-  };
-
-  std::atomic<Status> status = { Status::New };
-  std::atomic<uint32_t> strikes = { 0 };
-
-  void addStrike() {
-    strikes.fetch_add(1, std::memory_order_relaxed);
-  }
-
-  Tick regTick;
-  Neighbourhood::Element* neighbour;
-};
-
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
 public:
   Transport(const Config& config, Node* node):
+    remoteNodes_(MaxRemoteNodes + 1),
     netPacksAllocator_(1 << 24, 1),
     myPublicKey_(node->getMyPublicKey()),
     oPackStream_(&netPacksAllocator_, node->getMyPublicKey()),
     net_(new Network(config, this)),
-    node_(node) {
+    node_(node),
+    nh_(this) {
     good_ = net_->isGood();
   }
 
@@ -87,13 +70,12 @@ public:
 
   void run(const Config& config);
 
-  RemoteNode& getPackSenderEntry(const ip::udp::endpoint&);
+  RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
-  void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNode&);
+  void processNetworkTask(const TaskPtr<IPacMan>&,
+                          RemoteNodePtr&);
   void processNodeMessage(const Message&);
   void processNodeMessage(const Packet&);
-
-  const Neighbourhood& getNeighbourhood() const { return nh_; }
 
   void addTask(Packet*, const uint32_t packNum);
   void clearTasks();
@@ -101,35 +83,61 @@ public:
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
   bool isGood() const { return good_; }
 
-  void sendBroadcast(const Packet* pack);
+  void sendBroadcast(const Packet* pack) {
+    nh_.sendByNeighbours(pack);
+  }
+
+  void sendDirect(const Packet* pack,
+                  const Connection& conn) {
+    net_->sendDirect(*pack,
+                     conn.specialOut ?
+                     conn.out : conn.in);
+  }
+
+  void sendRegistrationRequest(Connection&);
+  void sendRegistrationConfirmation(const Connection&);
+  void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
 
 private:
-  void sendDirect(const Packet* pack, const NeighbourEndpoints&);
-
   // Dealing with network connections
-  void refuseRegistration(RemoteNode&, const RegistrationRefuseReasons);
-  void confirmRegistration(RemoteNode&);
-
+  void bootstrapThroughSS();
   bool parseSSSignal(const TaskPtr<IPacMan>&);
 
   void dispatchNodeMessage(const Packet& firstPack,
                            const uint8_t* data,
                            size_t);
 
+  /* Network packages processing */
+  bool gotRegistrationRequest(const TaskPtr<IPacMan>&,
+                              RemoteNodePtr&);
+
+  bool gotRegistrationConfirmation(const TaskPtr<IPacMan>&,
+                                   RemoteNodePtr&);
+
+  bool gotRegistrationRefusal(const TaskPtr<IPacMan>&,
+                              RemoteNodePtr&);
+
+  bool gotSSRegistration(const TaskPtr<IPacMan>&);
+  bool gotSSRefusal(const TaskPtr<IPacMan>&);
+  bool gotSSDispatch(const TaskPtr<IPacMan>&);
+
+  /* Actions */
   bool good_;
 
   static const uint32_t MaxPacksQueue = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
-  static const uint32_t MaxConnectionRequests = 32;
 
   std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
   FixedCircularBuffer<Packet,
                       MaxPacksQueue> sendPacks_;
 
+  TypedAllocator<RemoteNode> remoteNodes_;
+
   FixedHashMap<ip::udp::endpoint,
-               RemoteNode,
+               RemoteNodePtr,
                uint16_t,
-               MaxRemoteNodes> remoteNodes_;
+               MaxRemoteNodes,
+               true> remoteNodesMap_;
 
   RegionAllocator netPacksAllocator_;
   PublicKey myPublicKey_;
@@ -139,20 +147,16 @@ private:
 
   // SS Data
   SSBootstrapStatus ssStatus_ = SSBootstrapStatus::Empty;
-  NeighbourEndpoints ssEp_;
+  ip::udp::endpoint ssEp_;
 
   // Registration data
   Packet regPack_;
   uint64_t* regPackConnId_;
-
-  Neighbourhood::Element* connections_[MaxConnectionRequests];
-  Neighbourhood::Element** connectionsEnd_ = connections_;
-  std::atomic<uint32_t> connectAttempts_ = { 0 };
-
   bool acceptRegistrations_ = false;
 
   Network* net_;
   Node* node_;
+
   Neighbourhood nh_;
 };
 
