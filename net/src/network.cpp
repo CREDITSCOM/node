@@ -86,7 +86,6 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   boost::system::error_code lastError;
 
   LOG_OUT_PACK(task->pack.data(), task->pack.size());
-  LOG_WARN("Sending to " << ep);
 
   auto size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
                            ep,

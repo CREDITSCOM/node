@@ -12,8 +12,6 @@ enum RegFlags: uint8_t {
   RedirectPort = 1 << 2
 };
 
-uint32_t CONNECTION_MAX_ATTEMPTS = 8;
-
 namespace {
 // Packets formation
 

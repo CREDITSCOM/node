@@ -57,7 +57,7 @@ typedef MemPtr<TypedSlot<Connection>> ConnectionPtr;
 class Neighbourhood {
 public:
   const static uint32_t MaxConnections = 64;
-  const static uint32_t MaxConnectAttempts = 8;
+  const static uint32_t MaxConnectAttempts = 64;
 
   Neighbourhood(Transport* net):
     transport_(net),

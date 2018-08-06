@@ -1,11 +1,16 @@
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
+#include <sys/timeb.h>
+
 template <typename T>
 T getSecureRandom() {
   T result;
 
-  srand(time(NULL));            // ToFix: use libsodium here
+  struct timeb t;
+  ftime(&t);
+
+  srand(t.time * 1000 + t.millitm);            // ToFix: use libsodium here
   uint8_t* ptr = (uint8_t*)&result;
   for (uint32_t i = 0; i < sizeof(T); ++i, ++ptr)
     *ptr = rand() % 256;
@@ -84,8 +89,10 @@ void Neighbourhood::gotRegistration(Connection&& conn,
   {
     SpinLock l(nLockFlag_);
     if (auto nh = findInVec(conn.id, neighbours_)) {
-      if (node->connection.load(std::memory_order_relaxed) != **nh)
+      if (node->connection.load(std::memory_order_relaxed) != **nh) {
+        LOG_WARN("RemoteNode has a different connection: " << node->connection.load(std::memory_order_relaxed)->in << " vs " << (**nh)->in);
         return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
+      }
       return transport_->sendRegistrationConfirmation(conn);
     }
   }
@@ -97,6 +104,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
           (!conn.specialOut && conn.in == (*pc)->in))
         pendingConnections_.remove(pc);
       else {
+        LOG_WARN("Bad connection: " << (conn.specialOut ? "1" : "0") << " " << (conn.specialOut ? conn.out : conn.in) << " " << (*pc)->in);
         return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
       }
     }
@@ -108,9 +116,10 @@ void Neighbourhood::gotRegistration(Connection&& conn,
       return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
 
     ConnectionPtr newConn = connectionsAllocator_.emplace(std::move(conn));
-    neighbours_.emplace(newConn);
     newConn->node = node;
+
     node->connection.store(*newConn, std::memory_order_relaxed);
+    neighbours_.emplace(newConn);
   }
 
   transport_->sendRegistrationConfirmation(conn);

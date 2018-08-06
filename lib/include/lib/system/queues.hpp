@@ -3,12 +3,13 @@
 #define __QUEUES_HPP__
 #include <atomic>
 #include <cstdint>
+#include <thread>
 
 #include "logger.hpp"
 
 /* Fixed Uniform Queue (FUQueue) is a simple lock-free queue that
    allows many writers and many readers */
-template <typename T, std::size_t MaxSize>
+template <typename T, std::size_t MaxSize, uint32_t BackOffTreshold = 1000>
 class FUQueue {
 public:
   struct Element {
@@ -66,11 +67,17 @@ private:
     auto target = leftBarr.load(std::memory_order_acquire);
     typename Element::State state = targetState;
 
+    uint32_t attempts = 0;
     while (!target->lockState.
            compare_exchange_strong(state,
                                    newState,
                                    std::memory_order_release,
                                    std::memory_order_relaxed)) {
+      if (++attempts == BackOffTreshold) {
+        attempts = 0;
+        std::this_thread::yield();
+      }
+
       if (state != spinState && target != rightBarr.load(std::memory_order_relaxed)) {
         auto nextTarget = nextPtr(target);
         leftBarr.compare_exchange_strong(target,
