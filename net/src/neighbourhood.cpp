@@ -1,20 +1,18 @@
+#include <sodium.h>
+
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
-#include <sys/timeb.h>
+Neighbourhood::Neighbourhood(Transport* net):
+    transport_(net),
+    connectionsAllocator_(MaxConnections + 1) {
+  sodium_init();
+}
 
 template <typename T>
 T getSecureRandom() {
   T result;
-
-  struct timeb t;
-  ftime(&t);
-
-  srand(t.time * 1000 + t.millitm);            // ToFix: use libsodium here
-  uint8_t* ptr = (uint8_t*)&result;
-  for (uint32_t i = 0; i < sizeof(T); ++i, ++ptr)
-    *ptr = rand() % 256;
-
+  randombytes_buf(static_cast<void*>(&result), sizeof(T));
   return result;
 }
 
@@ -31,13 +29,26 @@ void Neighbourhood::checkPending() {
        conn != pendingConnections_.end();
        ++conn) {
     // Attempt to reconnect if the connection hasn't been established yet
-    if ((*conn)->attempts < Neighbourhood::MaxConnectAttempts)
+    //if ((*conn)->attempts < Neighbourhood::MaxConnectAttempts)
       transport_->sendRegistrationRequest(***conn);
-    else {
-      pendingConnections_.remove(conn);
-      --conn;
-    }
+      //else {
+      //  pendingConnections_.remove(conn);
+      //  --conn;
+      //}
   }
+
+  LOG_EVENT("PENDING: ");
+  for (auto conn = pendingConnections_.begin();
+       conn != pendingConnections_.end();
+       ++conn)
+    LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
+
+  SpinLock ll(nLockFlag_);
+  LOG_EVENT("NEIGH: ");
+  for (auto conn = neighbours_.begin();
+       conn != neighbours_.end();
+       ++conn)
+    LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
 }
 
 void Neighbourhood::checkSilent() {
@@ -83,6 +94,24 @@ static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
   return nullptr;
 }
 
+void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
+  conn->node = node;
+
+  Connection* connection = nullptr;
+  while (!node->connection.compare_exchange_strong(connection,
+                                                   *conn,
+                                                   std::memory_order_release,
+                                                   std::memory_order_relaxed));
+
+  if (connection) {
+    LOG_WARN("Reconnected from " << connection->in << " to " << conn->in);
+    auto connPtr = findInVec(connection->id, neighbours_);
+    if (connPtr) neighbours_.remove(connPtr);
+  }
+
+  neighbours_.emplace(conn);
+}
+
 void Neighbourhood::gotRegistration(Connection&& conn,
                                     RemoteNodePtr node) {
   // Have we met?
@@ -90,7 +119,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
     SpinLock l(nLockFlag_);
     if (auto nh = findInVec(conn.id, neighbours_)) {
       if (node->connection.load(std::memory_order_relaxed) != **nh) {
-        LOG_WARN("RemoteNode has a different connection: " << node->connection.load(std::memory_order_relaxed)->in << " vs " << (**nh)->in);
+        LOG_WARN("RemoteNode has a different connection" << node->connection.load(std::memory_order_relaxed)->in << " vs " << (**nh)->in);
         return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
       }
       return transport_->sendRegistrationConfirmation(conn);
@@ -100,13 +129,13 @@ void Neighbourhood::gotRegistration(Connection&& conn,
   {
     SpinLock l(pLockFlag_);
     if (auto pc = findInVec(conn.id, pendingConnections_)) {
-      if ((conn.specialOut && conn.out == (*pc)->in) ||
-          (!conn.specialOut && conn.in == (*pc)->in))
+      //if ((conn.specialOut && conn.out == (*pc)->in) ||
+      //(!conn.specialOut && conn.in == (*pc)->in))
         pendingConnections_.remove(pc);
-      else {
-        LOG_WARN("Bad connection: " << (conn.specialOut ? "1" : "0") << " " << (conn.specialOut ? conn.out : conn.in) << " " << (*pc)->in);
-        return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
-      }
+        //else {
+        //LOG_WARN("Bad connection of id " << conn.id << ": " << (conn.specialOut ? "1" : "0") << " " << (conn.specialOut ? conn.out : conn.in) << " " << (*pc)->in);
+        //return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
+        //}
     }
   }
 
@@ -116,10 +145,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
       return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
 
     ConnectionPtr newConn = connectionsAllocator_.emplace(std::move(conn));
-    newConn->node = node;
-
-    node->connection.store(*newConn, std::memory_order_relaxed);
-    neighbours_.emplace(newConn);
+    connectNode(node, newConn);
   }
 
   transport_->sendRegistrationConfirmation(conn);
@@ -147,15 +173,10 @@ void Neighbourhood::gotConfirmation(const Connection::Id& id, const ip::udp::end
     tsPtr->specialOut = true;
     tsPtr->in = ep;
   }
-  else
-    tsPtr->specialOut = false;
 
 
   SpinLock l(nLockFlag_);
-  neighbours_.emplace(tsPtr);
-  tsPtr->node = node;
-  node->connection.store(*tsPtr,
-                         std::memory_order_relaxed);
+  connectNode(node, tsPtr);
 }
 
 void Neighbourhood::gotRefusal(const Connection::Id& id) {

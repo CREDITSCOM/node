@@ -59,9 +59,7 @@ public:
   const static uint32_t MaxConnections = 64;
   const static uint32_t MaxConnectAttempts = 64;
 
-  Neighbourhood(Transport* net):
-    transport_(net),
-    connectionsAllocator_(MaxConnections + 1) { }
+  Neighbourhood(Transport*);
 
   void sendByNeighbours(const Packet*);
 
@@ -75,6 +73,8 @@ public:
                        RemoteNodePtr);
 
   void gotRefusal(const Connection::Id&);
+
+  void connectNode(RemoteNodePtr, ConnectionPtr);
 
   void checkPending();
   void checkSilent();

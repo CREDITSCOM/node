@@ -313,6 +313,7 @@ void Transport::clearTasks() {
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
+  LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
   Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
