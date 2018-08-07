@@ -85,12 +85,20 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
   transport_->sendRegistrationRequest(**conn);
 }
 
-void Neighbourhood::addSignalServer(const ip::udp::endpoint& ep) {
-  ConnectionPtr& conn =
-    neighbours_.emplace(neighbours_.emplace());
+void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
+  ConnectionPtr& conn = connectionsAllocator_.emplace();
 
   conn->id = getSecureRandom<Connection::Id>();
-  conn->in = ep;
+  conn->in = in;
+  if (in != out) {
+    conn->specialOut = true;
+    conn->out = out;
+  }
+
+  conn->node = node;
+  node->connection.store(*conn, std::memory_order_release);
+
+  neighbours_.emplace(conn);
 }
 
 template <typename Vec>

@@ -65,7 +65,7 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKe
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
          << NODE_VERSION
-         << (uint8_t)(config.getNodeType() == NodeType::Router);
+         << (uint8_t)(config.getNodeType() == NodeType::Router ? 8 : 0);
 
   addMyOut(config, stream);
 
@@ -96,7 +96,6 @@ void Transport::run(const Config& config) {
     // Connect to SS logic
     ssEp_ = net_->resolve(config.getSignalServerEndpoint());
     LOG_EVENT("Connecting to Singal Server on " << ssEp_);
-    nh_.addSignalServer(ssEp_);
 
     formSSConnectPack(config, oPackStream_, myPublicKey_);
     ssStatus_ = SSBootstrapStatus::Requested;
@@ -195,7 +194,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
     break;
   case NetworkCommand::SSRegistration:
     //if (task->sender != ssEp_) { result = false; break; }
-    gotSSRegistration(task);
+    gotSSRegistration(task, sender);
     break;
   case NetworkCommand::SSFirstRound:
     //if (task->sender != ssEp_) { result = false; break; }
@@ -428,13 +427,15 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task,
   return true;
 }
 
-bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task) {
+bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
   if (ssStatus_ != SSBootstrapStatus::Requested) {
     LOG_WARN("Unexpected Signal Server response");
     return false;
   }
 
   LOG_EVENT("Connection to the Signal Server has been established");
+  nh_.addSignalServer(task->sender, ssEp_, rNode);
+
   if (task->pack.getMsgSize() > 2) {
     if (!parseSSSignal(task))
       LOG_WARN("Bad Signal Server response");

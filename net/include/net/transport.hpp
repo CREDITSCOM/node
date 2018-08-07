@@ -116,7 +116,7 @@ private:
   bool gotRegistrationRefusal(const TaskPtr<IPacMan>&,
                               RemoteNodePtr&);
 
-  bool gotSSRegistration(const TaskPtr<IPacMan>&);
+  bool gotSSRegistration(const TaskPtr<IPacMan>&, RemoteNodePtr&);
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
 

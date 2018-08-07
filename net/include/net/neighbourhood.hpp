@@ -64,7 +64,7 @@ public:
   void sendByNeighbours(const Packet*);
 
   void establishConnection(const ip::udp::endpoint&);
-  void addSignalServer(const ip::udp::endpoint&);
+  void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
 
   void gotRegistration(Connection&&, RemoteNodePtr);
 
