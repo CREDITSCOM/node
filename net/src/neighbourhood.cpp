@@ -85,6 +85,14 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
   transport_->sendRegistrationRequest(**conn);
 }
 
+void Neighbourhood::addSignalServer(const ip::udp::endpoint& ep) {
+  ConnectionPtr& conn =
+    neighbours_.emplace(neighbours_.emplace());
+
+  conn->id = getSecureRandom<Connection::Id>();
+  conn->in = ep;
+}
+
 template <typename Vec>
 static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
   for (auto it = vec.begin(); it != vec.end(); ++it)

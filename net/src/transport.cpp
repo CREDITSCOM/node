@@ -94,8 +94,9 @@ void Transport::run(const Config& config) {
   }
   else {
     // Connect to SS logic
-    LOG_EVENT("Connecting to Singal Server on " << ssEp_);
     ssEp_ = net_->resolve(config.getSignalServerEndpoint());
+    LOG_EVENT("Connecting to Singal Server on " << ssEp_);
+    addSignalServer(ssEp_);
 
     formSSConnectPack(config, oPackStream_, myPublicKey_);
     ssStatus_ = SSBootstrapStatus::Requested;
