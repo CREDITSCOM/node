@@ -193,15 +193,15 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
     LOG_EVENT("Ping from " << task->sender);
     break;
   case NetworkCommand::SSRegistration:
-    if (task->sender != ssEp_) { result = false; break; }
+    //if (task->sender != ssEp_) { result = false; break; }
     gotSSRegistration(task);
     break;
   case NetworkCommand::SSFirstRound:
-    if (task->sender != ssEp_) { result = false; break; }
+    //if (task->sender != ssEp_) { result = false; break; }
     gotSSDispatch(task);
     break;
   case NetworkCommand::SSRegistrationRefused:
-    if (task->sender != ssEp_) { result = false; break; }
+    //if (task->sender != ssEp_) { result = false; break; }
     gotSSRefusal(task);
     break;
   default:

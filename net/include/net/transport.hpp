@@ -100,7 +100,6 @@ public:
 
 private:
   // Dealing with network connections
-  void bootstrapThroughSS();
   bool parseSSSignal(const TaskPtr<IPacMan>&);
 
   void dispatchNodeMessage(const Packet& firstPack,
