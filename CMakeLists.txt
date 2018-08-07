@@ -15,9 +15,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+if (!MSCV)
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+endif()
 
 # Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
 add_definitions(-DUSE_STD_THREAD)

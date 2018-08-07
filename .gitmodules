@@ -10,6 +10,6 @@
 [submodule "third-party/ed25519"]
 	path = third-party/ed25519
 	url = https://gitlab.com/credits_bc/third_party/ed25519
-[submodule "third-party/libsodium"]
+[submodule "third-party/libsodium.git"]
 	path = third-party/libsodium
-	url = https://github.com/jedisct1/libsodium
+	url = https://gitlab.com/main-credits-dev/libsodium.git
