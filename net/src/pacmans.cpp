@@ -2,17 +2,23 @@
 #include "pacmans.hpp"
 
 IPacMan::Task& IPacMan::allocNext() {
-  lastElt_ = queue_.lockWrite();
-  new (&lastElt_->element) Task();
+  if (!lockedLast_) {
+    lastElt_ = queue_.lockWrite();
+    lockedLast_ = true;
 
-  lastElt_->element.pack.data_ =
-    allocator_.allocateNext(Packet::MaxSize);
+    new (&lastElt_->element) Task();
+
+    lastElt_->element.pack.data_ =
+      allocator_.allocateNext(Packet::MaxSize);
+  }
+
   return lastElt_->element;
 }
 
 void IPacMan::enQueueLast() {
   allocator_.shrinkLast(lastElt_->element.size);
   queue_.unlockWrite(lastElt_);
+  lockedLast_ = false;
 }
 
 TaskPtr<IPacMan> IPacMan::getNextTask() {

@@ -86,7 +86,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
-  ConnectionPtr& conn = connectionsAllocator_.emplace();
+  ConnectionPtr conn = connectionsAllocator_.emplace();
 
   conn->id = getSecureRandom<Connection::Id>();
   conn->in = in;

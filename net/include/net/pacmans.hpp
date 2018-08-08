@@ -65,6 +65,7 @@ public:
 private:
   Queue queue_;
   typename Queue::Element* lastElt_;
+  bool lockedLast_ = false;
 
   RegionAllocator allocator_;
 };
