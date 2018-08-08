@@ -1,3 +1,4 @@
+/* Send blaming letters to @yrtimd */
 #ifndef __NETWORK_HPP__
 #define __NETWORK_HPP__
 #include <boost/asio.hpp>

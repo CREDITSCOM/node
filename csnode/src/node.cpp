@@ -47,8 +47,8 @@ bool Node::init() {
   return true;
 }
 
-void Node::run(const Config& config) {
-  transport_->run(config);
+void Node::run(const Config&) {
+  transport_->run();
 }
 
 /* Requests */

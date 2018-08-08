@@ -54,6 +54,7 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 class Transport {
 public:
   Transport(const Config& config, Node* node):
+    config_(config),
     remoteNodes_(MaxRemoteNodes + 1),
     netPacksAllocator_(1 << 24, 1),
     myPublicKey_(node->getMyPublicKey()),
@@ -68,7 +69,7 @@ public:
     delete net_;
   }
 
-  void run(const Config& config);
+  void run();
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
@@ -93,6 +94,8 @@ public:
                      conn.specialOut ?
                      conn.out : conn.in);
   }
+
+  void refillNeighbourhood();
 
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&);
@@ -122,6 +125,7 @@ private:
 
   /* Actions */
   bool good_;
+  Config config_;
 
   static const uint32_t MaxPacksQueue = 2048;
   static const uint32_t MaxRemoteNodes = 4096;

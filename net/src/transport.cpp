@@ -73,35 +73,14 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKe
 }
 }
 
-void Transport::run(const Config& config) {
-  acceptRegistrations_ = config.getNodeType() == NodeType::Router;
+void Transport::run() {
+  acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
-  formRegPack(config, oPackStream_, &regPackConnId_, myPublicKey_);
+  formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_);
   regPack_ = *(oPackStream_.getPackets());
   oPackStream_.clear();
 
-  if (config.getBootstrapType() == BootstrapType::IpList) {
-    uint32_t cntr = 0;
-    for (auto& ep : config.getIpList()) {
-      if (cntr++ == Neighbourhood::MaxConnections) {
-        LOG_WARN("Connections limit reached");
-        break;
-      }
-
-      LOG_EVENT("Creating connection to " << ep.ip);
-      nh_.establishConnection(net_->resolve(ep));
-    }
-  }
-  else {
-    // Connect to SS logic
-    ssEp_ = net_->resolve(config.getSignalServerEndpoint());
-    LOG_EVENT("Connecting to Singal Server on " << ssEp_);
-
-    formSSConnectPack(config, oPackStream_, myPublicKey_);
-    ssStatus_ = SSBootstrapStatus::Requested;
-    net_->sendDirect(*(oPackStream_.getPackets()),
-                     ssEp_);
-  }
+  refillNeighbourhood();
 
   // Okay, now let's get to business
   oPackStream_.init(BaseFlags::NetworkMsg);
@@ -213,6 +192,31 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
     sender->addStrike();
 }
 
+void Transport::refillNeighbourhood() {
+  if (config_.getBootstrapType() == BootstrapType::IpList) {
+    uint32_t cntr = 0;
+    for (auto& ep : config_.getIpList()) {
+      if (!nh_.canHaveNewConnection()) {
+        LOG_WARN("Connections limit reached");
+        break;
+      }
+
+      LOG_EVENT("Creating connection to " << ep.ip);
+      nh_.establishConnection(net_->resolve(ep));
+    }
+  }
+  else {
+    // Connect to SS logic
+    ssEp_ = net_->resolve(config_.getSignalServerEndpoint());
+    LOG_EVENT("Connecting to Singal Server on " << ssEp_);
+
+    formSSConnectPack(config_, oPackStream_, myPublicKey_);
+    ssStatus_ = SSBootstrapStatus::Requested;
+    net_->sendDirect(*(oPackStream_.getPackets()),
+                     ssEp_);
+  }
+}
+
 bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
@@ -244,6 +248,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
     iPackStream_.safeSkip<PublicKey>();
     if (!iPackStream_.good()) return false;
+
+    if (!nh_.canHaveNewConnection())
+      break;
   }
 
   ssStatus_ = SSBootstrapStatus::Complete;

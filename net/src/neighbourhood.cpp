@@ -1,3 +1,4 @@
+/* Send blaming letters to @yrtimd */
 #include <sodium.h>
 
 #include "neighbourhood.hpp"
@@ -22,6 +23,12 @@ void Neighbourhood::sendByNeighbours(const Packet* pack) {
     transport_->sendDirect(pack, **nb);
 }
 
+bool Neighbourhood::canHaveNewConnection() {
+  SpinLock l(nLockFlag_);
+  SpinLock ll(pLockFlag_);
+  return !((neighbours_.size() + pendingConnections_.size()) >= MaxNeighbours);
+}
+
 void Neighbourhood::checkPending() {
   SpinLock l(pLockFlag_);
   // If the connection cannot be established, retry it
@@ -29,12 +36,14 @@ void Neighbourhood::checkPending() {
        conn != pendingConnections_.end();
        ++conn) {
     // Attempt to reconnect if the connection hasn't been established yet
-    //if ((*conn)->attempts < Neighbourhood::MaxConnectAttempts)
+    if (((*conn)->node &&
+         (*conn)->node->connection.load(std::memory_order_relaxed) != **conn) ||
+        ((*conn)->attempts >= Neighbourhood::MaxConnectAttempts)) {
+      pendingConnections_.remove(conn);
+      --conn;
+    }
+    else
       transport_->sendRegistrationRequest(***conn);
-      //else {
-      //  pendingConnections_.remove(conn);
-      //  --conn;
-      //}
   }
 
   LOG_EVENT("PENDING: ");
@@ -52,27 +61,35 @@ void Neighbourhood::checkPending() {
 }
 
 void Neighbourhood::checkSilent() {
-  SpinLock l(nLockFlag_);
-  for (auto conn = neighbours_.begin();
-           conn != neighbours_.end();
-           ++conn) {
-    const auto packetsCount = (*(*conn)->node)->packets.
-      load(std::memory_order_relaxed);
+  bool needRefill = false;
+  {
+    SpinLock l(nLockFlag_);
+    for (auto conn = neighbours_.begin();
+         conn != neighbours_.end();
+         ++conn) {
+      const auto packetsCount = (*(*conn)->node)->packets.
+        load(std::memory_order_relaxed);
 
-    if (packetsCount == (*conn)->lastPacketsCount) {
-      LOG_WARN("Node " << (*conn)->in << " stopped responding");
-      ConnectionPtr tc = *conn;
-      neighbours_.remove(conn);
-      --conn;
+      if (packetsCount == (*conn)->lastPacketsCount) {
+        LOG_WARN("Node " << (*conn)->in << " stopped responding");
+        ConnectionPtr tc = *conn;
+        neighbours_.remove(conn);
+        --conn;
 
-      {
-        SpinLock ll(pLockFlag_);
-        pendingConnections_.emplace(tc);
+        {
+          SpinLock ll(pLockFlag_);
+          pendingConnections_.emplace(tc);
+        }
       }
+      else
+        (*conn)->lastPacketsCount = packetsCount;
     }
-    else
-      (*conn)->lastPacketsCount = packetsCount;
+
+    SpinLock ll(pLockFlag_);
+    needRefill = ((neighbours_.size() + pendingConnections_.size()) < MinConnections);
   }
+
+  if (needRefill) transport_->refillNeighbourhood();
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
@@ -86,6 +103,8 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
+  if ((*node)->connection.load(std::memory_order_relaxed)) return;
+
   ConnectionPtr conn = connectionsAllocator_.emplace();
 
   conn->id = getSecureRandom<Connection::Id>();
