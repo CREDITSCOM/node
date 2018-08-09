@@ -15,7 +15,7 @@ enum RegFlags: uint8_t {
 namespace {
 // Packets formation
 
-void addMyOut(const Config& config, OPackStream& stream) {
+void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagValue = 0) {
   uint8_t regFlag = 0;
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -29,17 +29,20 @@ void addMyOut(const Config& config, OPackStream& stream) {
   else if (config.hasTwoSockets())
     regFlag|= RegFlags::RedirectPort;
 
-  uint8_t* flagChar = stream.getCurrPtr() - 1;
-  *flagChar|= regFlag;
+  uint8_t* flagChar = stream.getCurrPtr();
 
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified)
       stream << config.getAddressEndpoint().ip;
+    else
+      stream << (uint8_t)0;
 
     stream << config.getAddressEndpoint().port;
   }
   else if (config.hasTwoSockets())
-    stream << config.getInputEndpoint().port;
+    stream << (uint8_t)0 << config.getInputEndpoint().port;
+
+  *flagChar|= initFlagValue | regFlag;
 }
 
 void formRegPack(const Config& config,
@@ -48,10 +51,8 @@ void formRegPack(const Config& config,
                  const PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
 
-  stream <<
-    NetworkCommand::Registration <<
-    NODE_VERSION <<
-    (uint8_t)0;
+  stream << NetworkCommand::Registration
+         << NODE_VERSION;
 
   addMyOut(config, stream);
   *regPackConnId = (uint64_t*)stream.getCurrPtr();
@@ -64,10 +65,9 @@ void formRegPack(const Config& config,
 void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
-         << NODE_VERSION
-         << (uint8_t)(config.getNodeType() == NodeType::Router ? 8 : 0);
+         << NODE_VERSION;
 
-  addMyOut(config, stream);
+  addMyOut(config, stream, (uint8_t)(config.getNodeType() == NodeType::Router ? 8 : 0));
 
   stream << pk;
 }
@@ -92,12 +92,11 @@ void Transport::run() {
     ++ctr;
     bool resendPacks = ctr % 3 == 0;
     bool sendPing = ctr % 10 == 0;
-    bool checkConnections = ctr % 30 == 0;
+    bool checkPending = ctr % 50 == 0;
+    bool checkSilent = ctr % 150 == 0;
 
-    if (checkConnections) {
-      nh_.checkPending();
-      nh_.checkSilent();
-    }
+    if (checkPending) nh_.checkPending();
+    if (checkSilent) nh_.checkSilent();
 
     if (resendPacks) {
       for (auto& c : sendPacks_)
@@ -194,7 +193,6 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
 
 void Transport::refillNeighbourhood() {
   if (config_.getBootstrapType() == BootstrapType::IpList) {
-    uint32_t cntr = 0;
     for (auto& ep : config_.getIpList()) {
       if (!nh_.canHaveNewConnection()) {
         LOG_WARN("Connections limit reached");
