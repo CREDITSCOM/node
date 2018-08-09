@@ -28,7 +28,8 @@ enum class NetworkCommand: uint8_t {
   Ping,
   SSRegistration = 1,
   SSFirstRound = 31,
-  SSRegistrationRefused = 25
+  SSRegistrationRefused = 25,
+  SSPingWhiteNode = 32
 };
 
 enum class RegistrationRefuseReasons: uint8_t {
@@ -122,6 +123,7 @@ private:
   bool gotSSRegistration(const TaskPtr<IPacMan>&, RemoteNodePtr&);
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
+  bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
 
   /* Actions */
   bool good_;

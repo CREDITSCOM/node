@@ -183,6 +183,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
     //if (task->sender != ssEp_) { result = false; break; }
     gotSSRefusal(task);
     break;
+  case NetworkCommand::SSPingWhiteNode:
+	  gotSSPingWhiteNode(task);
+	  break;
   default:
     result = false;
     LOG_WARN("Unexpected network command");
@@ -470,4 +473,12 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>& task) {
   LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion);
 
   return true;
+}
+
+bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+	Connection conn;
+	conn.in = task->sender;
+	conn.specialOut = false;
+	sendDirect(&task->pack, conn);
+	return true;
 }
