@@ -101,8 +101,8 @@ Config Config::readFromFile(const std::string& fileName) {
       result.outputEp_ = readEndpoint(config,
                                       BLOCK_NAME_HOST_OUTPUT);
 
-      result.twoSockets_ = (result.outputEp_.ip != result.inputEp_.ip ||
-                            result.outputEp_.port != result.inputEp_.port);
+      result.twoSockets_ = true;/*(result.outputEp_.ip != result.inputEp_.ip ||
+                                  result.outputEp_.port != result.inputEp_.port);*/
     }
     else
       result.twoSockets_ = false;
@@ -127,10 +127,11 @@ Config Config::readFromFile(const std::string& fileName) {
     result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE),
                                BOOTSTRAP_TYPES_MAP);
 
-    if (result.bType_ == BootstrapType::SignalServer)
+    if (result.bType_ == BootstrapType::SignalServer ||
+        result.nType_ == NodeType::Router)
       result.signalServerEp_ = readEndpoint(config,
                                             BLOCK_NAME_SIGNAL_SERVER);
-    else {
+    if (result.bType_ == BootstrapType::IpList) {
       const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
       std::string line;

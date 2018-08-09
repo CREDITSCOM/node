@@ -1,3 +1,4 @@
+/* Send blaming letters to @yrtimd */
 #ifndef __PACKSTREAM_HPP__
 #define __PACKSTREAM_HPP__
 #include <algorithm>

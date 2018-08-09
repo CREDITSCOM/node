@@ -41,7 +41,6 @@ bool Node::init() {
 
   LOG_EVENT("Everything init");
 
-  //solver_->initApi();
   solver_->addInitialBalance();
 
   return true;
@@ -363,6 +362,8 @@ void Node::onRoundStart() {
     std::cerr << byteStreamToHex(e.str, 32) << " ";
 
   std::cerr << std::endl;
+
+  transport_->processPostponed(roundNum_);
 }
 
 void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes) {
@@ -376,6 +377,18 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
   mainNode_ = mainNode;
   std::swap(confidantNodes, confidantNodes_);
   onRoundStart();
+}
+
+Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
+  if (rNum == roundNum_)
+    return MessageActions::Process;
+
+  if (rNum < roundNum_)
+    return (type == MsgTypes::NewBlock ||
+            type == MsgTypes::RoundTable) ?
+      MessageActions::Process : MessageActions::Drop;
+
+  return MessageActions::Postpone;
 }
 
 inline bool Node::readRoundData(const bool tail) {

@@ -97,6 +97,7 @@ public:
   }
 
   void refillNeighbourhood();
+  void processPostponed(const RoundNum) { }
 
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&);

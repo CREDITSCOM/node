@@ -110,6 +110,7 @@ private:
   mutable uint32_t headersLength_ = 0;
 
   friend class IPacMan;
+  friend class Message;
 };
 
 typedef Packet* PacketPtr;
@@ -130,6 +131,13 @@ public:
   size_t getFullSize() const {
     if (!fullData_) composeFullData();
     return fullData_.size();
+  }
+
+  Packet extractData() {
+    if (!fullData_) composeFullData();
+    Packet result(std::move(fullData_));
+    result.headersLength_ = packets_->headersLength_;
+    return result;
   }
 
 private:
