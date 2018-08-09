@@ -3,7 +3,7 @@
 
 #include "packet.hpp"
 
-RegionAllocator Message::allocator_(1 << 25, 1);
+RegionAllocator Message::allocator_(1 << 25, 2);
 
 enum Lengths {
   FragmentedHeader = 36

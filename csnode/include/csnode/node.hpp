@@ -1,3 +1,4 @@
+/* Send blaming letters to @yrtimd */
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
 #include <memory>
@@ -19,6 +20,8 @@ enum NodeLevel {
 
 typedef std::string Vector;
 typedef std::string Matrix;
+
+typedef uint32_t RoundNum;
 
 class Transport;
 namespace Credits { class ISolver; }
@@ -57,6 +60,13 @@ public:
   void becomeWriter();
   void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
 
+  enum MessageActions {
+    Process,
+    Postpone,
+    Drop
+  };
+  MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
+
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
   NodeLevel getMyLevel() const { return myLevel_; }
 
@@ -78,7 +88,7 @@ private:
   bool good_ = true;
 
   // Current round state
-  uint32_t roundNum_ = 0;
+  RoundNum roundNum_ = 0;
   NodeLevel myLevel_;
 
   PublicKey mainNode_;

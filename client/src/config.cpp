@@ -101,8 +101,8 @@ Config Config::readFromFile(const std::string& fileName) {
       result.outputEp_ = readEndpoint(config,
                                       BLOCK_NAME_HOST_OUTPUT);
 
-      result.twoSockets_ = (result.outputEp_.ip != result.inputEp_.ip ||
-                            result.outputEp_.port != result.inputEp_.port);
+      result.twoSockets_ = true;/*(result.outputEp_.ip != result.inputEp_.ip ||
+                                  result.outputEp_.port != result.inputEp_.port);*/
     }
     else
       result.twoSockets_ = false;

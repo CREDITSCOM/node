@@ -205,7 +205,9 @@ void Transport::refillNeighbourhood() {
       nh_.establishConnection(net_->resolve(ep));
     }
   }
-  else {
+
+  if (config_.getBootstrapType() == BootstrapType::SignalServer ||
+      config_.getNodeType() == NodeType::Router) {
     // Connect to SS logic
     ssEp_ = net_->resolve(config_.getSignalServerEndpoint());
     LOG_EVENT("Connecting to Singal Server on " << ssEp_);
@@ -237,20 +239,22 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_ >> numCirc;
   if (!iPackStream_.good()) return false;
 
-  for (uint8_t i = 0; i < numCirc; ++i) {
-    EndpointData ep;
-    ep.ipSpecified = true;
+  if (config_.getBootstrapType() == BootstrapType::SignalServer) {
+    for (uint8_t i = 0; i < numCirc; ++i) {
+      EndpointData ep;
+      ep.ipSpecified = true;
 
-    iPackStream_ >> ep.ip >> ep.port;
-    if (!iPackStream_.good()) return false;
+      iPackStream_ >> ep.ip >> ep.port;
+      if (!iPackStream_.good()) return false;
 
-    nh_.establishConnection(net_->resolve(ep));
+      nh_.establishConnection(net_->resolve(ep));
 
-    iPackStream_.safeSkip<PublicKey>();
-    if (!iPackStream_.good()) return false;
+      iPackStream_.safeSkip<PublicKey>();
+      if (!iPackStream_.good()) return false;
 
-    if (!nh_.canHaveNewConnection())
-      break;
+      if (!nh_.canHaveNewConnection())
+        break;
+    }
   }
 
   ssStatus_ = SSBootstrapStatus::Complete;
