@@ -342,11 +342,11 @@ Fake_Solver::createPool()
 
     uint32_t limit = randFT(1000, 2000);
 
-    if (randFT(0, 150) == 42) {
+    /*if (randFT(0, 150) == 42) {
         csdb::Transaction smart_trans;
         smart_trans.set_currency(csdb::Currency("CS"));
 
-        smart_trans.set_target(Credits::BlockChain::getAddressFromKey(
+        smart_trans.set_target(BlockChain::getAddressFromKey(
           "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
         smart_trans.set_source(csdb::Address::from_string(
           "0000000000000000000000000000000000000000000000000000000000000001"));
@@ -362,7 +362,7 @@ Fake_Solver::createPool()
         smart_trans.add_user_field(0, serialize(sm));
 
         testPool.add_transaction(smart_trans);
-    }
+        }*/
 
     csdb::Transaction transaction;
     transaction.set_currency(csdb::Currency("CS"));
@@ -482,6 +482,14 @@ Fake_Solver::addInitialBalance()
     spamThread.detach();
 #endif
 
+#ifdef STARTER
+  auto self = this;
+  runAfter(std::chrono::milliseconds(5000), [self] () {
+                                              LOG_WARN("GGG is " << self);
+                                              self->startRounds();
+                                            });
+#endif
+
     TRACE();
 }
 
@@ -524,6 +532,18 @@ Fake_Solver::nextRound()
     }
 #endif
 }
+
+#ifdef STARTER
+void Fake_Solver::startRounds() {
+  ips.clear();
+  for (int i = 0; i < 3; ++i)
+    ips.push_back(node_->getMyPublicKey());
+
+  node_->becomeWriter();
+  node_->initNextRound(node_->getMyPublicKey(), std::move(ips));
+  node_->sendRoundTable();
+}
+#endif
 
 // Needed for dataBase
 void

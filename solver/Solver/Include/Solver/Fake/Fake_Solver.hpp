@@ -54,6 +54,10 @@ class Fake_Solver : public ISolver
 
     void nextRound() override;
 
+#ifdef STARTER
+    void startRounds();
+#endif
+
   private:
     void _initApi();
 
