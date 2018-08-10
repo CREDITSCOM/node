@@ -30,6 +30,7 @@ bool Neighbourhood::canHaveNewConnection() {
 }
 
 void Neighbourhood::checkPending() {
+  {
   SpinLock l(pLockFlag_);
   // If the connection cannot be established, retry it
   for (auto conn = pendingConnections_.begin();
@@ -51,7 +52,7 @@ void Neighbourhood::checkPending() {
        conn != pendingConnections_.end();
        ++conn)
     LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
-
+  }
   SpinLock ll(nLockFlag_);
   LOG_EVENT("NEIGH: ");
   for (auto conn = neighbours_.begin();
