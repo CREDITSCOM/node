@@ -38,6 +38,8 @@ enum MsgTypes: uint8_t {
   BlockHash
 };
 
+typedef uint32_t RoundNum;
+
 class Packet {
 public:
   const static std::size_t MaxSize = 1 << 15;
@@ -76,6 +78,7 @@ public:
   const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); };
 
   MsgTypes getType() const { return getWithOffset<MsgTypes>(getHeadersLength()); }
+  RoundNum getRoundNum() const { return getWithOffset<RoundNum>(getHeadersLength() + 1); }
 
   void* data() { return data_.get(); }
   const void* data() const { return data_.get(); }
@@ -133,7 +136,7 @@ public:
     return fullData_.size();
   }
 
-  Packet extractData() {
+  Packet extractData() const {
     if (!fullData_) composeFullData();
     Packet result(std::move(fullData_));
     result.headersLength_ = packets_->headersLength_;

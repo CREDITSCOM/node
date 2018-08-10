@@ -97,17 +97,21 @@ public:
   }
 
   void refillNeighbourhood();
-  void processPostponed(const RoundNum) { }
+  void processPostponed(const RoundNum);
 
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&);
   void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
 
 private:
+  void postponePacket(const RoundNum, const MsgTypes, const Packet&);
+
   // Dealing with network connections
   bool parseSSSignal(const TaskPtr<IPacMan>&);
 
-  void dispatchNodeMessage(const Packet& firstPack,
+  void dispatchNodeMessage(const MsgTypes,
+                           const RoundNum,
+                           const Packet&,
                            const uint8_t* data,
                            size_t);
 
@@ -159,6 +163,22 @@ private:
   Packet regPack_;
   uint64_t* regPackConnId_;
   bool acceptRegistrations_ = false;
+
+  struct PostponedPacket {
+    RoundNum round;
+    MsgTypes type;
+    Packet pack;
+
+    PostponedPacket(const RoundNum r,
+                    const MsgTypes t,
+                    const Packet& p): round(r),
+                                      type(t),
+                                      pack(p) { }
+  };
+  typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
+  PPBuf postponedPacketsFirst_;
+  PPBuf postponedPacketsSecond_;
+  PPBuf* postponed_[2] = { &postponedPacketsFirst_, &postponedPacketsSecond_ };
 
   Network* net_;
   Node* node_;

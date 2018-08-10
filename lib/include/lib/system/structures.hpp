@@ -51,7 +51,8 @@ public:
   T& emplace(Args&&... args) {
     T* place;
     if (size_ < Size) {
-      place = tail_++;
+      place = tail_;
+      tail_ = incrementPtr(tail_);
       ++size_;
     }
     else {
@@ -88,6 +89,35 @@ public:
 
     head_ = tail_ = elements_;
     size_ = 0;
+  }
+
+  void remove(T* toRem) {
+    toRem->~T();
+    --size_;
+
+    if (toRem >= head_ && toRem >= tail_) {
+      memmove(head_ + 1, head_, (toRem - head_));
+      ++head_;
+    }
+    else if (toRem >= head_) {
+      auto dToHead = (toRem - head_);
+      auto dToTail = (tail_ - toRem - 1);
+
+      if (dToHead < dToTail) {
+        LOG_WARN("111");
+        memmove(head_ + 1, head_, dToHead);
+        ++head_;
+      }
+      else {
+        LOG_WARN("222");
+        memmove(toRem, toRem + 1, dToTail);
+        --tail_;
+      }
+    }
+    else {
+      memmove(toRem, toRem + 1, (tail_ - toRem - 1));
+      --tail_;
+    }
   }
 
   uint32_t size() const { return size_; }
@@ -136,9 +166,9 @@ public:
   void remove(T* element) {
     element->~T();
 
-    memcpy(static_cast<void*>(element),
-           static_cast<const void*>(element + 1),
-           sizeof(T) * (end_ - element - 1));
+    memmove(static_cast<void*>(element),
+            static_cast<const void*>(element + 1),
+            sizeof(T) * (end_ - element - 1));
     --end_;
   }
 

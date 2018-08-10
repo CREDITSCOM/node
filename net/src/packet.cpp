@@ -97,14 +97,16 @@ void Message::composeFullData() const {
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack)
       totalSize+= pack->size() - headersLength;
 
-    fullData_ = allocator_.allocateNext(totalSize - 1);
+    const uint32_t MsgHeaderSize = 1 + sizeof(RoundNum);
+
+    fullData_ = allocator_.allocateNext(totalSize - MsgHeaderSize);
 
     uint8_t* data = static_cast<uint8_t*>(fullData_.get());
     pack = packets_;
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
       //LOG_WARN("-- " << byteStreamToHex((const char*)pack->data(), 100));
-      uint32_t cSize = pack->size() - headersLength - (i == 0 ? 1 : 0);
-      memcpy(data, pack->getMsgData() + (i == 0 ? 1 : 0), cSize);
+      uint32_t cSize = pack->size() - headersLength - (i == 0 ? MsgHeaderSize : 0);
+      memcpy(data, pack->getMsgData() + (i == 0 ? MsgHeaderSize : 0), cSize);
       data+= cSize;
     }
 
@@ -117,17 +119,17 @@ void Message::composeFullData() const {
                                     fullData_.size(),
                                     &uncompressedSize);
 
-      RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize + 1);
+      RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize + MsgHeaderSize);
 
       //LOG_WARN("Uncomressed block will be " << uncompressedSize);
 
       snappy::RawUncompress((const char*)fullData_.get(),
                             (size_t)fullData_.size(),
-                            (char*)uncompressedData.get() + 1);
+                            (char*)uncompressedData.get() + MsgHeaderSize);
 
       //LOG_WARN("Unpresult " << (t1 ? 1 : 0) << ", " << (t2 ? 1 : 0));
 
-      *static_cast<uint8_t*>(uncompressedData.get()) = *static_cast<const uint8_t*>(packets_->getMsgData());
+      memcpy(uncompressedData.get(), packets_->getMsgData(), MsgHeaderSize);
       fullData_ = uncompressedData;
     }
   }

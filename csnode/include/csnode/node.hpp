@@ -21,8 +21,6 @@ enum NodeLevel {
 typedef std::string Vector;
 typedef std::string Matrix;
 
-typedef uint32_t RoundNum;
-
 class Transport;
 namespace Credits { class ISolver; }
 
@@ -36,7 +34,7 @@ public:
 
   /* Incoming requests processing */
   void getInitRing(const uint8_t*, const size_t);
-  void getRoundTable(const uint8_t*, const size_t);
+  void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getTransaction(const uint8_t*, const size_t);
   void getFirstTransaction(const uint8_t*, const size_t);
   void getTransactionsList(const uint8_t*, const size_t);

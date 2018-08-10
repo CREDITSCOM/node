@@ -407,6 +407,34 @@ TEST(fixed_circular_buffer, override) {
   ASSERT_EQ(IntWithCounter::counter, 0);
 }
 
+TEST(fixed_circular_buffer, deletions) {
+  FixedCircularBuffer<uint32_t, 32> fcb;
+  for (uint32_t i = 0; i < 20; ++i)
+    fcb.emplace(i);
+
+  fcb.remove(fcb.frontPtr() + 10);
+  fcb.remove(fcb.frontPtr() + 15);
+
+  auto iter = fcb.begin();
+  for (uint32_t i = 0; i < 18; ++i) {
+    ASSERT_EQ(*iter, i < 10 ? i : i - (i < 14 ? 1 : 2));
+    ++iter;
+  }
+
+  /*for (uint32_t i = 0; i < 20; ++i)
+    fcb.emplace(i);
+
+  auto iter2 = fcb.begin();
+  for (uint32_t i = 6; i < 32; ++i) {
+    ASSERT_EQ(iter2->i, i < 10 ? i : i + (i < 14 ? 1 : 2));
+    ++iter2;
+  }
+
+  for (uint32_t i = 6; i < 32; ++i) {
+
+  }*/
+}
+
 TEST(fixed_vector, base) {
   FixedVector<uint32_t, 10> fv;
 

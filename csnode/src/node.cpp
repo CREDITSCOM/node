@@ -58,12 +58,13 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-void Node::getRoundTable(const uint8_t* data, const size_t size) {
+void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum) {
   istream_.init(data, size);
-  LOG_WARN("got msg of size " << size);
 
   if (!readRoundData(false))
     return;
+
+  roundNum_ = rNum;
 
   if (!istream_.good()) {
     LOG_WARN("Bad round table format, ignoring");
@@ -72,6 +73,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size) {
 
   onRoundStart();
   transport_->clearTasks();
+
+  transport_->processPostponed(rNum);
 }
 
 void Node::sendRoundTable() {
@@ -113,6 +116,7 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
 void Node::sendTransaction(const csdb::Transaction& trans) {
   ostream_.init(BaseFlags::Broadcast, mainNode_);
   ostream_ << MsgTypes::Transactions
+           << roundNum_
            << trans;
 
   LOG_EVENT("Sending transaction");
@@ -121,7 +125,7 @@ void Node::sendTransaction(const csdb::Transaction& trans) {
 
 void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented, mainNode_);
-  ostream_ << MsgTypes::Transactions;
+  ostream_ << MsgTypes::Transactions << roundNum_;
 
   for (auto& tr : transactions)
     ostream_ << tr;
@@ -156,7 +160,7 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
   }
 
   ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::FirstTransaction << trans;
+  ostream_ << MsgTypes::FirstTransaction << roundNum_ << trans;
 
   flushCurrentTasks();
 }
@@ -188,6 +192,7 @@ void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) 
 
   ostream_.init(BaseFlags::Fragmented, target);
   ostream_ << MsgTypes::TransactionList
+           << roundNum_
            << pool;
 
   flushCurrentTasks();
@@ -219,7 +224,7 @@ void Node::sendVector(const Vector& vector) {
   }
 
   ostream_.init(BaseFlags::Signed);
-  ostream_ << MsgTypes::ConsVector << vector;
+  ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
 
   flushCurrentTasks();
 }
@@ -250,7 +255,7 @@ void Node::sendMatrix(const Matrix& matrix) {
   }
 
   ostream_.init(BaseFlags::Signed);
-  ostream_ << MsgTypes::ConsMatrix << matrix;
+  ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
 
   flushCurrentTasks();
 }
@@ -290,6 +295,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
   std::string compressed;
   snappy::Compress((const char*)data, bSize, &compressed);
   ostream_ << MsgTypes::NewBlock
+           << roundNum_
            << compressed;
 
   LOG_EVENT("Sending block of " << pool.transactions_count());
@@ -325,6 +331,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
   ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
   ostream_ << MsgTypes::BlockHash
+           << roundNum_
            << hash;
   flushCurrentTasks();
 }
@@ -380,27 +387,19 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
-  if (rNum == roundNum_)
+  if (rNum == roundNum_ ||
+      type == MsgTypes::NewBlock ||
+      type == MsgTypes::RoundTable)
     return MessageActions::Process;
 
   if (rNum < roundNum_)
-    return (type == MsgTypes::NewBlock ||
-            type == MsgTypes::RoundTable) ?
-      MessageActions::Process : MessageActions::Drop;
+    return MessageActions::Drop;
 
   return MessageActions::Postpone;
 }
 
 inline bool Node::readRoundData(const bool tail) {
-  uint32_t roundNum;
   PublicKey mainNode;
-
-  istream_ >> roundNum;
-  if (roundNum <= roundNum_) {
-    LOG_NOTICE("Old round info received: " << roundNum_ << " >= " << roundNum
-               << ". Ignoring...");
-    return false;
-  }
 
   uint8_t confSize = 0;
   istream_ >> confSize;
@@ -436,7 +435,6 @@ inline bool Node::readRoundData(const bool tail) {
     return false;
   }
 
-  roundNum_ = roundNum;
   mainNode_ = mainNode;
   std::swap(confidants, confidantNodes_);
 

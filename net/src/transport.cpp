@@ -41,6 +41,8 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
   }
   else if (config.hasTwoSockets())
     stream << (uint8_t)0 << config.getInputEndpoint().port;
+  else
+    stream << (uint8_t)0;
 
   *flagChar|= initFlagValue | regFlag;
 }
@@ -171,20 +173,17 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
     LOG_EVENT("Ping from " << task->sender);
     break;
   case NetworkCommand::SSRegistration:
-    //if (task->sender != ssEp_) { result = false; break; }
     gotSSRegistration(task, sender);
     break;
   case NetworkCommand::SSFirstRound:
-    //if (task->sender != ssEp_) { result = false; break; }
     gotSSDispatch(task);
     break;
   case NetworkCommand::SSRegistrationRefused:
-    //if (task->sender != ssEp_) { result = false; break; }
     gotSSRefusal(task);
     break;
   case NetworkCommand::SSPingWhiteNode:
-	  gotSSPingWhiteNode(task);
-	  break;
+    gotSSPingWhiteNode(task);
+    break;
   default:
     result = false;
     LOG_WARN("Unexpected network command");
@@ -224,6 +223,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
+  RoundNum rNum;
+  iPackStream_ >> rNum;
+
   auto trStart = iPackStream_.getCurrPtr();
   iPackStream_.safeSkip<uint32_t>();
 
@@ -234,7 +236,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.safeSkip<PublicKey>(numConf + 1);
 
   auto trFinish = iPackStream_.getCurrPtr();
-  node_->getRoundTable(trStart, (trFinish - trStart));
+  node_->getRoundTable(trStart, (trFinish - trStart), rNum);
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
@@ -263,17 +265,69 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
+constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
 void Transport::processNodeMessage(const Message& msg) {
-  dispatchNodeMessage(msg.getFirstPack(),
-                      msg.getFullData(),
-                      msg.getFullSize());
+  auto type = msg.getFirstPack().getType();
+  auto rNum = msg.getFirstPack().getRoundNum();
+
+  switch(node_->chooseMessageAction(rNum, type)) {
+  case Node::MessageActions::Process:
+    return dispatchNodeMessage(type,
+                               rNum,
+                               msg.getFirstPack(),
+                               msg.getFullData() + StrippedDataSize,
+                               msg.getFullSize() - StrippedDataSize);
+  case Node::MessageActions::Postpone:
+    return postponePacket(rNum, type, msg.extractData());
+  case Node::MessageActions::Drop:
+    return;
+  }
 }
 
 void Transport::processNodeMessage(const Packet& pack) {
-  dispatchNodeMessage(pack, pack.getMsgData(), pack.getMsgSize());
+  auto type = pack.getType();
+  auto rNum = pack.getRoundNum();
+
+  switch(node_->chooseMessageAction(rNum, type)) {
+  case Node::MessageActions::Process:
+    return dispatchNodeMessage(type,
+                               rNum,
+                               pack,
+                               pack.getMsgData() + StrippedDataSize,
+                               pack.getMsgSize() - StrippedDataSize);
+  case Node::MessageActions::Postpone:
+    return postponePacket(rNum, type, pack);
+  case Node::MessageActions::Drop:
+    return;
+  }
 }
 
-void Transport::dispatchNodeMessage(const Packet& firstPack,
+inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, const Packet& pack) {
+  (*postponed_)->emplace(rNum, type, pack);
+}
+
+void Transport::processPostponed(const RoundNum rNum) {
+  auto& ppBuf = *postponed_[1];
+  for (auto& pp : **postponed_) {
+    if (pp.round > rNum)
+      ppBuf.emplace(std::move(pp));
+    else if (pp.round == rNum)
+      dispatchNodeMessage(pp.type,
+                          pp.round,
+                          pp.pack,
+                          pp.pack.getMsgData() + StrippedDataSize,
+                          pp.pack.getMsgSize() - StrippedDataSize);
+  }
+
+  (*postponed_)->clear();
+
+  postponed_[1] = *postponed_;
+  postponed_[0] = &ppBuf;
+}
+
+void Transport::dispatchNodeMessage(const MsgTypes type,
+                                    const RoundNum rNum,
+                                    const Packet& firstPack,
                                     const uint8_t* data,
                                     size_t size) {
   if (!size) {
@@ -281,12 +335,9 @@ void Transport::dispatchNodeMessage(const Packet& firstPack,
     return;
   }
 
-  ++data;
-  --size;
-
-  switch(firstPack.getType()) {
+  switch(type) {
   case MsgTypes::RoundTable:
-    return node_->getRoundTable(data, size);
+    return node_->getRoundTable(data, size, rNum);
   case MsgTypes::Transactions:
     return node_->getTransaction(data, size);
   case MsgTypes::FirstTransaction:
@@ -478,9 +529,9 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
-	Connection conn;
-	conn.in = task->sender;
-	conn.specialOut = false;
-	sendDirect(&task->pack, conn);
-	return true;
+  Connection conn;
+  conn.in = task->sender;
+  conn.specialOut = false;
+  sendDirect(&task->pack, conn);
+  return true;
 }
