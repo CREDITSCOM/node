@@ -23,7 +23,7 @@ namespace csstats
 	namespace detail
 	{
 		std::thread thread;
-
+		
 		std::mutex mutex;
 		using ScopedLock = std::lock_guard<std::mutex>;
 
@@ -125,7 +125,7 @@ namespace csstats
                     for (size_t i = 0; i < transactionsCount; ++i)
 					{
                         const auto& transaction = pool.transaction( csdb::TransactionID(pool.hash(), i) );
-
+						
 						if (transaction.user_field(0).is_valid())
 							++periodStats.smartContractsCount;
 
@@ -180,7 +180,6 @@ namespace csstats
 
 	void start(Credits::BlockChain* blockchain, const Config& config /* = Config{}*/)
 	{
-          return;
 		Log("csstats start ", "update interval is ", config.updateIntervalSec, " sec");
 
 		ScopedLock lock(mutex);

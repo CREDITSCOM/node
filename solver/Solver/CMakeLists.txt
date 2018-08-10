@@ -24,6 +24,8 @@ add_library(Solver
 target_include_directories(csnode PUBLIC
   ../csnode/include
   ../net/include
+  ../lib/include
+  ${CMAKE_BINARY_DIR}/api/executor_gen
 )
 
 set (BOOST_ROOT ${BOOST_ROOT})
@@ -43,7 +45,7 @@ target_link_libraries(Solver
 
 target_include_directories(Solver PUBLIC Include)
 
-target_link_libraries (Solver csnode)
+target_link_libraries (Solver csconnector csdb csnode)
 
 if(SOLVER_TEST_BUILD)
     add_subdirectory(Tests)

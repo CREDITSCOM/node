@@ -16,8 +16,6 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TSocket.h>
 
-const uint32_t MAX_BLOCKS_TO_KEEP = 100;
-
 class APIHandlerBase
 {
   public:
@@ -41,6 +39,117 @@ struct APIHandlerInterface
   , public APIHandlerBase
 {};
 
+template<typename T>
+struct LockedRef;
+
+template<typename T>
+struct Lockable
+{
+    using LockedType = T;
+
+    template<typename... Args>
+    Lockable(Args&&... args)
+      : t(std::forward<Args>(args)...)
+    {}
+
+  private:
+    std::mutex m;
+    T t;
+
+    friend struct LockedRef<T>;
+};
+
+template<typename T>
+struct LockedRef
+{
+  private:
+    Lockable<T> *l;
+
+  public:
+    LockedRef(Lockable<T>& l)
+      : l(&l)
+    {
+        this->l->m.lock();
+    }
+    ~LockedRef() { if (l) l->m.unlock(); }
+
+    LockedRef(const LockedRef&) = delete;
+	LockedRef(LockedRef&& other)
+		: l(other.l)
+	{
+            other.l = nullptr;
+	}
+
+        operator T*()
+    {
+        return &(l->t);
+    }
+    T* operator->() { return *this; }
+    T& operator*() { return l->t; }
+};
+
+template<typename T>
+struct SpinLockedRef;
+
+template<typename T>
+struct SpinLockable
+{
+    using LockedType = T;
+
+    template<typename... Args>
+    SpinLockable(Args&&... args)
+      : t(std::forward<Args>(args)...)
+    {}
+
+  private:
+    std::atomic_flag af;
+    T t;
+
+    friend struct SpinLockedRef<T>;
+};
+
+template<typename T>
+struct SpinLockedRef
+{
+  private:
+    SpinLockable<T> *l;
+
+  public:
+    SpinLockedRef(SpinLockable<T>& l)
+      : l(&l)
+    {
+        while (this->l->af.test_and_set(std::memory_order_acquire))
+            ;
+    }
+    ~SpinLockedRef() { if (l) l->af.clear(std::memory_order_release); }
+
+    SpinLockedRef(const SpinLockedRef&) = delete;
+    SpinLockedRef(SpinLockedRef&& other)
+      : l(other.l)
+    {
+        other.l = nullptr;
+    }
+
+    operator T*() { return &(l->t); }
+    T* operator->() { return *this; }
+    T& operator*() { return l->t; }
+};
+
+template<typename T>
+LockedRef<T>
+locked_ref(Lockable<T>& l)
+{
+    LockedRef<T> r(l);
+    return r;
+}
+
+template<typename T>
+SpinLockedRef<T>
+locked_ref(SpinLockable<T>& l)
+{
+    return SpinLockedRef<T>(l);
+}
+
 using namespace ::apache;
 
 class APIHandler : public APIHandlerInterface
@@ -48,6 +157,8 @@ class APIHandler : public APIHandlerInterface
   public:
     APIHandler(BlockChain& blockchain, Credits::ISolver& _solver);
     ~APIHandler() override = default;
+
+    APIHandler(const APIHandler&) = delete;
 
     void BalanceGet(api::BalanceGetResult& _return,
                     const api::Address& address,
@@ -73,12 +184,9 @@ class APIHandler : public APIHandlerInterface
                      const int64_t index) override;
     void PoolTransactionsGet(api::PoolTransactionsGetResult& _return,
                              const api::PoolHash& hash,
-                             const int64_t index,
                              const int64_t offset,
                              const int64_t limit) override;
     void StatsGet(api::StatsGetResult& _return) override;
-
-    void NodesInfoGet(api::NodesInfoGetResult& _return) override;
 
     void SmartContractGet(api::SmartContractGetResult& _return,
                           const api::Address& address) override;
@@ -90,27 +198,26 @@ class APIHandler : public APIHandlerInterface
       api::SmartContractAddressesListGetResult& _return,
       const api::Address& deployer) override;
 
-    void logNewBlock(const csdb::Pool&);
+    void GetLastHash(api::PoolHash& _return) override;
+    void PoolListGetStable(api::PoolListGetResult& _return,
+                           const api::PoolHash& hash,
+                           const int64_t limit) override;
+
+    void WaitForSmartTransaction(api::TransactionId& _return,
+                                 const api::Address& smart_public) override;
+
+    void SmartContractsAllListGet(api::SmartContractsListGetResult& _return,
+                                  const int64_t offset,
+                                  const int64_t limit) override;
 
   private:
-    bool GetTransaction(const api::TransactionId& transactionId,
-                        api::Transaction& transaction);
     BlockChain& s_blockchain;
 
     api::Pool convertPool(const csdb::Pool& pool);
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    api::SmartContract convertStringToContract(const std::string& data);
-
-    void GetSmartContractAddress(const std::string& data,
-                                 std::string& smartContractAddress);
-
-    std::mutex lbMut_;
-    std::list<api::Pool> lastBlocks_;
-
     Credits::ISolver& solver;
-
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<
@@ -119,21 +226,16 @@ class APIHandler : public APIHandlerInterface
 
     ::executor::ContractExecutorClient executor;
 
-    template<typename MapperT, typename Set>
-    void map_smart_contracts_of_deployer(const csdb::Address& deployer,
-                                         MapperT mapper,
-                                         Set& result);
+    Lockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
+    Lockable<std::map<csdb::Address, SpinLockable<std::string>>> smart_state;
+    Lockable<
+      std::map<csdb::Address, std::pair<std::atomic_int, csdb::TransactionID>>>
+      smart_last_trxn;
 
-    template<typename Filter>
-    api::SmartContract get_smart_contract(api::SmartContract& slim_contract,
-                                          Filter f);
+    Lockable<std::map<csdb::Address, std::list<csdb::TransactionID>>>
+      deployed_by_creator;
 
-    std::map<decltype(api::SmartContract::address), csdb::TransactionID>
-      smart_origin, smart_state;
-
-    std::map<csdb::Address, std::list<csdb::TransactionID>> deployed_by_creator;
-
-    csdb::PoolHash last_seen_contract_block;
+    size_t last_seen_contract_block;
 
     template<typename Mapper>
     void get_mapped_deployer_smart(

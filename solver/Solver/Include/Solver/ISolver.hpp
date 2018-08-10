@@ -13,13 +13,12 @@
 #include <mutex>
 
 #include <boost/asio.hpp>
-//#include <api_types.h>
+#include <api_types.h>
 #include <csdb/transaction.h>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 
 namespace Credits{
-    typedef boost::asio::ip::address NodeId;
     typedef std::string Vector;
     typedef std::string Matrix;
 
@@ -36,7 +35,6 @@ namespace Credits{
 		virtual void gotBlock(csdb::Pool&&, const PublicKey&) = 0;
 		virtual void gotHash(Hash&&, const PublicKey&) = 0;
 
-		virtual void initApi() = 0;
 		virtual void nextRound() = 0;
 
 		virtual void addInitialBalance() = 0;

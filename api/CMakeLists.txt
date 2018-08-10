@@ -4,24 +4,7 @@ project(csconnector)
 
 add_subdirectory(api_gen)
 add_subdirectory(executor_gen)
-
-set(THRIFT_EXECUTOR_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
-set(THRIFT_EXECUTOR_GENERATED_FILES
-  ${THRIFT_GEN_DIR}/API.cpp
-  ${THRIFT_GEN_DIR}/api_constants.cpp
-  ${THRIFT_GEN_DIR}/api_types.cpp
-  ${THRIFT_GEN_DIR}/API.h
-  ${THRIFT_GEN_DIR}/api_constants.h
-  ${THRIFT_GEN_DIR}/api_types.h
-  )
-add_custom_command(
-  OUTPUT ${THRIFT_EXECUTOR_GENERATED_FILES}
-  COMMAND thrift-compiler -r -gen cpp:no_skeleton,pure_enums,moveable_types
-    -out ${THRIFT_EXECUTOR_GEN_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/api.thrift
-  MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/api.thrift
-  # DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/api.thrift
-  )
+add_subdirectory(variant_gen)
 
 # Не рекомендуется использовать file(GLOB, поскольку он вызывается только на стадии
 # генератора Cmake. При добавлении файлов в папку он вызван не будет - и список файлов
@@ -36,7 +19,7 @@ add_library(csconnector
     include/DebugLog.h
     )
 
-target_link_libraries (csconnector PUBLIC csdb csnode csconnector_gen csconnector_executor_gen)
+target_link_libraries (csconnector PUBLIC csdb csnode csconnector_gen csconnector_executor_gen variant_gen)
 
 # INCLUDE DIRECTORIES лучше задавать не глобально, а для конкретного проекта.
 # INCLUDE DIRECTORIES из подключаемых библиотек (в данном случае thrift и csdb)

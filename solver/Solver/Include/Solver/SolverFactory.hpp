@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 class Node;
+
 namespace Credits{
 
     enum class solver_type{

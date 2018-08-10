@@ -15,6 +15,10 @@ set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/API.h
   ${THRIFT_GEN_DIR}/api_constants.h
   ${THRIFT_GEN_DIR}/api_types.h
+  ${THRIFT_GEN_DIR}/variant_constants.cpp
+  ${THRIFT_GEN_DIR}/variant_types.cpp
+  ${THRIFT_GEN_DIR}/variant_constants.h
+  ${THRIFT_GEN_DIR}/variant_types.h
   )
 
 # Вызов thrift compiler лучше добавлять в фазу сборки - иначе

@@ -2,16 +2,18 @@
 #include <APIHandler.h>
 #include <DebugLog.h>
 
-#include <thread>
 #include <memory>
+#include <thread>
 
 #include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TBufferTransports.h>
 #include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TServerSocket.h>
 
-#include <csdb/storage.h>
 #include <Solver/ISolver.hpp>
+#include <csdb/storage.h>
+
+#include <client/params.hpp>
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -20,28 +22,35 @@ using namespace ::apache::thrift::server;
 
 using namespace api;
 
-class APIHandler;
-
 namespace csconnector {
 
-    struct Config {
-        int port = 9090;
-    };
+struct Config
+{
+    int port = 9090;
+#ifdef AJAX_IFACE
+    int ajax_port = 80;
+#endif
+};
 
-    class csconnector {
-    public:
+class csconnector
+{
+  public:
+    csconnector(BlockChain& m_blockchain,
+                Credits::ISolver* solver,
+                const Config& config = Config{});
+    ~csconnector();
 
-        csconnector(BlockChain &m_blockchain, Credits::ISolver* solver, const Config &config = Config{});
-        ~csconnector();
+    csconnector(const csconnector&) = delete;
+    csconnector& operator=(const csconnector&) = delete;
 
-        auto getApi() { return api_; }
-
-
-        csconnector(const csconnector &) = delete;
-        csconnector &operator=(const csconnector &)= delete;
-    private:
-        std::shared_ptr<APIHandler> api_;
-        TThreadedServer server;
-        std::thread thread;
-    };
+  private:
+    stdcxx::shared_ptr<APIIf> api_handler;
+    stdcxx::shared_ptr<APIProcessor> api_processor;
+    TThreadedServer server;
+    std::thread thread;
+#ifdef AJAX_IFACE
+    TThreadedServer ajax_server;
+    std::thread ajax_thread;
+#endif
+};
 }

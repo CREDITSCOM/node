@@ -6,8 +6,10 @@ add_library(csnode
   include/csnode/blockchain.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
+  include/csnode/wallets_cache.hpp
   src/blockchain.cpp
   src/node.cpp
+  src/wallets_cache.cpp
 )
 
 target_link_libraries (csnode net csdb Solver)

@@ -16,104 +16,98 @@
 #include <thread>
 // #include "cstimer.h"
 
+#include <api_types.h>
 #include <functional>
-//#include <api_types.h>
 
-#include <csnode/node.hpp>
+#include "csnode/node.hpp"
 
-//#define MONITOR_NODE
-//#define SPAMMER
-//#define SPAM_MAIN
-//#define STARTER
+#include <client/params.hpp>
 
-namespace Credits{
+namespace Credits {
 
-    class Fake_Generals;
+class Fake_Generals;
 
-    class Fake_Solver: public ISolver {
-    public:
-        Fake_Solver(Node*);
-        ~Fake_Solver();
+class Fake_Solver : public ISolver
+{
+  public:
+    Fake_Solver(Node*);
+    ~Fake_Solver();
 
-        Fake_Solver(const Fake_Solver &) = delete;
-        Fake_Solver &operator=(const Fake_Solver &) = delete;
+    Fake_Solver(const Fake_Solver&) = delete;
+    Fake_Solver& operator=(const Fake_Solver&) = delete;
 
-		// Solver solves stuff (even the fake one)...
+    // Solver solves stuff (even the fake one)...
 
-		void gotTransaction(csdb::Transaction&&) override;
-		void gotTransactionList(csdb::Transaction&&) override;
-		void gotBlockCandidate(csdb::Pool&&) override;
-		void gotVector(Vector&&, const PublicKey&) override;
-		void gotMatrix(Matrix&&, const PublicKey&) override;
-		void gotBlock(csdb::Pool&&, const PublicKey&) override;
-		void gotHash(Hash&&, const PublicKey&) override;
+    void gotTransaction(csdb::Transaction&&) override;
+    void gotTransactionList(csdb::Transaction&&) override;
+    void gotBlockCandidate(csdb::Pool&&) override;
+    void gotVector(Vector&&, const PublicKey&) override;
+    void gotMatrix(Matrix&&, const PublicKey&) override;
+    void gotBlock(csdb::Pool&&, const PublicKey&) override;
+    void gotHash(Hash&&, const PublicKey&) override;
 
-		// API methods
+    // API methods
 
-		void initApi() override;
+    void addInitialBalance() override;
 
-		void addInitialBalance() override;
+    void send_wallet_transaction(const csdb::Transaction& transaction);
 
-        void send_wallet_transaction(const csdb::Transaction& transaction);
+    void nextRound() override;
 
-		void nextRound() override;
+  private:
+    void _initApi();
 
-	private:
-        void _initApi();
+    void runMainRound();
+    void closeMainRound();
 
-#ifdef STARTER
-      void startRounds();
-#endif
+    void flushTransactions();
 
-		void runMainRound();
-		void closeMainRound();
-
-		void flushTransactions();
-
-		void writeNewBlock();
+    void writeNewBlock();
 
 #ifdef SPAM_MAIN
-		void createPool();
+    void createPool();
 
-		std::atomic_bool createSpam;
-		std::thread spamThread;
+    std::atomic_bool createSpam;
+    std::thread spamThread;
 
-		csdb::Pool testPool;
-#endif //SPAM_MAIN
+    csdb::Pool testPool;
+#endif // SPAM_MAIN
 
-		static void sign_transaction(const void* buffer, const size_t buffer_size);
-		static void verify_transaction(const void* buffer, const size_t buffer_size);
+    static void sign_transaction(const void* buffer, const size_t buffer_size);
+    static void verify_transaction(const void* buffer,
+                                   const size_t buffer_size);
 
-		Node* node_;
-        std::unique_ptr<Fake_Generals> generals;
+    Node* node_;
+    std::unique_ptr<Fake_Generals> generals;
 
-		std::set<PublicKey> receivedVec_ips;
-		std::set<PublicKey> receivedMat_ips;
+    std::set<PublicKey> receivedVec_ips;
+    std::set<PublicKey> receivedMat_ips;
 
-		std::vector<Hash> hashes;
-                std::vector<PublicKey> ips;
+    std::vector<Hash> hashes;
+    std::vector<PublicKey> ips;
 
-		std::vector<std::string> vector_datas;
+    std::vector<std::string> vector_datas;
 
-        csdb::Pool m_pool;
-		bool m_pool_closed = true;
+    csdb::Pool m_pool;
+    bool m_pool_closed = true;
 
-		bool sentTransLastRound = false;
+    bool sentTransLastRound = false;
 
-		bool vectorComplete = false;
-		bool consensusAchieved = false;
-		bool blockCandidateArrived = false;
+    bool vectorComplete = false;
+    bool consensusAchieved = false;
+    bool blockCandidateArrived = false;
 
-		std::mutex m_trans_mut;
-		std::vector<csdb::Transaction> m_transactions;
+    std::mutex m_trans_mut;
+    std::vector<csdb::Transaction> m_transactions;
 
-#ifdef SPAMMER
-		std::atomic_bool spamRunning{ false };
-		std::thread spamThread;
-		void spamWithTransactions();
+#ifdef MAIN_RESENDER
+    std::vector<csdb::Transaction> m_late_trxns;
 #endif
 
-	};
-
-
+#ifdef SPAMMER
+    std::atomic_bool spamRunning{ false };
+    std::thread spamThread;
+    void spamWithTransactions();
+#endif
+};
 }

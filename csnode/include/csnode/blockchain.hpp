@@ -1,6 +1,7 @@
-#ifndef __BLOCKCHAIN_HPP__
-#define __BLOCKCHAIN_HPP__
+#pragma once
+
 #include <map>
+#include <memory>
 #include <mutex>
 
 #include <csdb/address.h>
@@ -8,32 +9,48 @@
 #include <csdb/pool.h>
 #include <csdb/storage.h>
 
+#include <csnode/wallets_cache.hpp>
+
+#include <condition_variable>
+#include <mutex>
+
 class BlockChain {
 public:
-  BlockChain(const char* path);
+    using Transactions = std::vector<csdb::Transaction>;
 
-  void writeLastBlock(csdb::Pool& pool);
+	BlockChain(const char* path);
 
-  csdb::PoolHash getLastHash();
-  size_t getSize();
+    void writeLastBlock(csdb::Pool& pool);
 
-  csdb::Pool loadBlock(const csdb::PoolHash&);
-  csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt);
-  csdb::Transaction loadTransaction(const csdb::TransactionID&);
+	csdb::PoolHash getLastHash() const;
+	size_t getSize() const;
 
-  csdb::Amount getBalance(const csdb::Address&);
+	csdb::Pool loadBlock(const csdb::PoolHash&) const;
+	csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
+	csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
 
-  bool isGood() const { return good_; }
+	csdb::Amount getBalance(const csdb::Address&) const;
+    void getTransactions(Transactions& transactions, csdb::Address address, int64_t offset, const int64_t limit) const;
 
-  static csdb::Address getAddressFromKey(const char*);
+    bool isGood() const { return good_; }
+
+    void wait_for_block();
+
+    static csdb::Address getAddressFromKey(const std::string &);
 
 private:
-  bool good_ = false;
+    bool loadCache();
+    bool updateCache(csdb::Pool& pool);
+    csdb::Amount calcBalance(csdb::Address) const;
 
-  std::map<csdb::Address, std::pair<csdb::PoolHash, csdb::Amount>> balancesCache_;
+private:
+	bool good_ = false;
 
-  std::mutex dbLock_;
-  csdb::Storage storage_;
+	mutable std::mutex dbLock_;
+	csdb::Storage storage_;
+
+    std::unique_ptr<Credits::WalletsCache> walletsCache_;
+    mutable std::mutex cacheMutex_;
+
+    std::condition_variable new_block_cv;
 };
-
-#endif // __BLOCKCHAIN_HPP__

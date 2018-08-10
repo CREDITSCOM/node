@@ -75,6 +75,8 @@ public:
 
   csconnector::csconnector& getConnector() { return api_; }
 
+  PublicKey writerId;
+
 private:
   bool init();
 
