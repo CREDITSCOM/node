@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <type_traits>
-#include <experimental/type_traits>
+#include <type_traits>
 
 #include <api_types.h>
 
@@ -151,7 +151,7 @@ deserialize(std::string s)
 {
     // https://stackoverflow.com/a/16261758/2016154
     static_assert(
-                  CHAR_BIT == 8 && std::experimental::is_same_v<std::uint8_t, unsigned char>,
+                  CHAR_BIT == 8 && std::is_same<std::uint8_t, unsigned char>::value,
       "This code requires std::uint8_t to be implemented as unsigned char.");
 
     auto buffer = stdcxx::make_shared<TMemoryBuffer>(
