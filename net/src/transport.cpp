@@ -227,7 +227,6 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
-  iPackStream_.safeSkip<uint32_t>();
 
   uint8_t numConf;
   iPackStream_ >> numConf;
