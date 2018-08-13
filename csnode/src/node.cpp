@@ -388,14 +388,13 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
   if (rNum == roundNum_ ||
-      type == MsgTypes::NewBlock ||
-      type == MsgTypes::RoundTable)
+      type == MsgTypes::NewBlock)
     return MessageActions::Process;
 
   if (rNum < roundNum_)
     return MessageActions::Drop;
 
-  return MessageActions::Postpone;
+  return (type == MsgTypes::RoundTable ? MessageActions::Process : MessageActions::Postpone);
 }
 
 inline bool Node::readRoundData(const bool tail) {

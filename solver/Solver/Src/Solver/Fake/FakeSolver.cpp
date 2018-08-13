@@ -328,63 +328,44 @@ randFT(int min, int max)
 void
 Fake_Solver::createPool()
 {
-    std::string mp = "0123456789abcdef";
-    const unsigned int cmd = 6;
+  std::string mp = "0123456789abcdef";
+  const unsigned int cmd = 6;
 
-    struct timeb tt;
-    ftime(&tt);
-    srand(tt.time * 1000 + tt.millitm);
+  struct timeb tt;
+  ftime(&tt);
+  srand(tt.time * 1000 + tt.millitm);
 
-    testPool = csdb::Pool();
+  std::string aStr(64, '0');
+  std::string bStr(64, '0');
 
-    std::string aStr(64, '0');
-    std::string bStr(64, '0');
-
-    uint32_t limit = randFT(1000, 2000);
-
-    /*if (randFT(0, 150) == 42) {
-        csdb::Transaction smart_trans;
-        smart_trans.set_currency(csdb::Currency("CS"));
-
-        smart_trans.set_target(BlockChain::getAddressFromKey(
-          "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
-        smart_trans.set_source(csdb::Address::from_string(
-          "0000000000000000000000000000000000000000000000000000000000000001"));
-
-        smart_trans.set_amount(csdb::Amount(1, 0));
-        smart_trans.set_balance(csdb::Amount(100, 0));
-
-        api::SmartContract sm;
-        sm.address = "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb";
-        sm.method = "store_sum";
-        sm.params = { "123", "456" };
-
-        smart_trans.add_user_field(0, serialize(sm));
-
-        testPool.add_transaction(smart_trans);
-        }*/
+  static csdb::Pool pizd;
+  static bool pizdFlag = false;
+  if (!pizdFlag) {
+    pizdFlag = true;
 
     csdb::Transaction transaction;
     transaction.set_currency(csdb::Currency("CS"));
 
-    while (createSpam && limit > 0) {
-        for (size_t i = 0; i < 64; ++i) {
-            aStr[i] = mp[randFT(0, 15)];
-            bStr[i] = mp[randFT(0, 15)];
-        }
-
-        transaction.set_target(csdb::Address::from_string(aStr));
-        transaction.set_source(csdb::Address::from_string(bStr));
-
-        transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-        transaction.set_balance(
-          csdb::Amount(transaction.balance().integral() + 1, 0));
-
-        testPool.add_transaction(transaction);
-        --limit;
+    for (size_t i = 0; i < 64; ++i) {
+      aStr[i] = mp[randFT(0, 15)];
+      bStr[i] = mp[randFT(0, 15)];
     }
 
-    addTimestampToPool(testPool);
+    transaction.set_target(csdb::Address::from_string(aStr));
+    transaction.set_source(csdb::Address::from_string(bStr));
+
+    transaction.set_amount(csdb::Amount(1, 0));
+    transaction.set_balance(csdb::Amount(2, 0));
+
+    for (uint32_t i = 0; i < 50000; ++i) {
+      pizd.add_transaction(transaction);
+    }
+  }
+
+  testPool = pizd;
+
+  uint32_t limit = randFT(20000, 50000);
+  testPool.transactions().resize(limit);
 }
 #endif
 

@@ -101,6 +101,7 @@ void Transport::run() {
     if (checkSilent) nh_.checkSilent();
 
     if (resendPacks) {
+      SpinLock l(sendPacksFlag_);
       for (auto& c : sendPacks_)
         sendBroadcast(&c);
     }

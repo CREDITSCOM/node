@@ -49,42 +49,25 @@ uint32_t Packet::getHeadersLength() const {
 }
 
 Message& PacketCollector::getMessage(const Packet& pack) {
-  //LOG_EVENT("Getting message...");
-  if (pack.isFragmented()) {
-    //LOG_EVENT("Has a fragmented pack");
-    Message& msg = map_.tryStore(pack.getHeaderHash());
-    if (!msg.packets_) { // First time
-      //LOG_EVENT("No packets");
-      msg.packets_ = activePtr_;
-      msg.packetsLeft_ = pack.getFragmentsNum();
-      msg.packetsTotal_ = pack.getFragmentsNum();
+  Message& msg = map_.tryStore(pack.getHeaderHash());
+  if (!msg.packets_) { // First time
+    msg.packets_ = activePtr_;
+    msg.packetsLeft_ = pack.getFragmentsNum();
+    msg.packetsTotal_ = pack.getFragmentsNum();
 
-      //LOG_EVENT("TT " << msg.packetsLeft_ << ", " << msg.packetsTotal_);
+    memset(msg.packets_, 0, msg.packetsLeft_ * sizeof(Packet));
 
-      memset(msg.packets_, 0, msg.packetsLeft_ * sizeof(Packet));
-
-      activePtr_+= MaxFragments;
-      if (activePtr_ == ptrsEnd_) activePtr_ = ptrs_;
-    }
-
-    auto goodPlace = msg.packets_ + pack.getFragmentId();
-    if (!*goodPlace) {
-      --msg.packetsLeft_;
-      //LOG_WARN("Not a good place: " << msg.packetsLeft_);
-      *goodPlace = pack;
-    }
-    //else
-    //  LOG_WARN("good place");
-
-    return msg;
+    activePtr_+= MaxFragments;
+    if (activePtr_ == ptrsEnd_) activePtr_ = ptrs_;
   }
 
-  lastMessage_ = Message();
-  lastMessage_.packetsLeft_ = 0;
-  lastMessage_.packetsTotal_ = 1;
-  lastMessage_.packets_[0] = pack;
+  auto goodPlace = msg.packets_ + pack.getFragmentId();
+  if (!*goodPlace) {
+    --msg.packetsLeft_;
+    *goodPlace = pack;
+  }
 
-  return lastMessage_;
+  return msg;
 }
 
 void Message::composeFullData() const {
