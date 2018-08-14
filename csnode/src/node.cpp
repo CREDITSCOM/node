@@ -1,5 +1,4 @@
-#include <Solver/ISolver.hpp>
-#include <Solver/SolverFactory.hpp>
+#include <Solver/Fake/Solver.hpp>
 
 #include <csnode/node.hpp>
 #include <lib/system/logger.hpp>

@@ -37,6 +37,9 @@ public:
   template<class K, class T, class C, class A>
   void put(const ::std::map<K, T, C, A>& value);
 
+  template<class K, class T, class C, class A>
+  void put_smart(const ::std::map<K, T, C, A>& value);
+
   inline const internal::byte_array &buffer() const { return buffer_; }
 
 private:
@@ -91,15 +94,15 @@ template<typename T>
 typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value, void>::type
 inline obstream::put(T value)
 {
-  uint8_t buf[::csdb::priv::MAX_INTEGRAL_ENCODED_SIZE];
-  buffer_.insert(buffer_.end(), buf, buf + ::csdb::priv::encode(buf, value));
+  buffer_.insert(buffer_.end(), reinterpret_cast<uint8_t *>(&value),
+    reinterpret_cast<uint8_t *>(&value) + sizeof(value));
 }
 
 template<typename T>
 decltype(std::declval<T>().put(std::declval<obstream&>()))
 inline obstream::put(const T& value)
 {
-  value.put(*this);
+	value.put(*this);
 }
 
 template<class K, class T, class C, class A>
@@ -112,16 +115,28 @@ void obstream::put(const ::std::map<K, T, C, A>& value)
   }
 }
 
+template<class K, class T, class C, class A>
+void obstream::put_smart(const ::std::map<K, T, C, A>& value)
+{
+	put(static_cast<uint32_t>(value.size()));
+	for (const auto& it : value) {
+		//put(it.first);
+		put(it.second);
+	}
+}
+
 template<typename T>
 typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value, bool>::type
 inline ibstream::get(T& value)
 {
-  std::size_t res = ::csdb::priv::decode(data_, size_, value);
-  if (0 != res) {
-    data_ = static_cast<const uint8_t*>(data_) + res;
-    size_ -= res;
+  if (size_ >= sizeof(T))
+  {
+    value = *(reinterpret_cast<const T*>(data_));
+    data_ = static_cast<const uint8_t*>(data_) + sizeof(T);
+    size_ -= sizeof(T);
+    return true;
   }
-  return (0 != res);
+  return false;
 }
 
 template<typename T>

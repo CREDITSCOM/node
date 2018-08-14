@@ -10,7 +10,7 @@ namespace csconnector {
 using namespace stdcxx;
 
 csconnector::csconnector(BlockChain& m_blockchain,
-                         Credits::ISolver* solver,
+                         Credits::Solver* solver,
                          const Config& config)
   : api_handler(make_shared<APIHandler>(m_blockchain, *solver))
   , api_processor(make_shared<APIProcessor>(api_handler))

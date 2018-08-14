@@ -10,7 +10,7 @@
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TServerSocket.h>
 
-#include <Solver/ISolver.hpp>
+#include <Solver/Fake/Solver.hpp>
 #include <csdb/storage.h>
 
 #include <client/params.hpp>
@@ -36,7 +36,7 @@ class csconnector
 {
   public:
     csconnector(BlockChain& m_blockchain,
-                Credits::ISolver* solver,
+                Credits::Solver* solver,
                 const Config& config = Config{});
     ~csconnector();
 

@@ -59,6 +59,6 @@ add_subdirectory(csdb)
 add_subdirectory(client)
 
 if (NOT MSVC)
-  enable_testing()
-  add_subdirectory(tests)
+#  enable_testing()
+#  add_subdirectory(tests)
 endif()

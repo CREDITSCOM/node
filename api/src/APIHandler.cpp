@@ -34,7 +34,7 @@ using namespace api;
 #define TRACE()
 
 APIHandler::APIHandler(BlockChain& blockchain,
-                       Credits::ISolver& _solver)
+                       Credits::Solver& _solver)
   : s_blockchain(blockchain)
   , solver(_solver)
   , stats(blockchain)

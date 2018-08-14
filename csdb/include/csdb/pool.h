@@ -85,6 +85,7 @@ public:
 
   static Pool from_byte_stream(const char* data, size_t size);
   char* to_byte_stream(size_t& size);
+  ::csdb::internal::byte_array to_byte_stream_for_sig();
 
   bool clear()  noexcept;
 
@@ -94,10 +95,14 @@ public:
   sequence_t sequence() const noexcept;
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
+  std::string signature() const noexcept;
+  std::vector<uint8_t> writer_public_key() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(sequence_t sequence) noexcept;
   void set_storage(Storage storage) noexcept;
+  void set_signature(std::string signature) noexcept;
+  void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
   std::vector<csdb::Transaction>& transactions();
   /**
    * @brief Добавляет транзакцию в пул.
@@ -217,6 +222,9 @@ public:
   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
   */
   Transaction get_last_by_target(Address target) const noexcept;
+
+  void sign_pool(std::vector<uint8_t> private_key);
+  bool verify_pool_signature();
 
   friend class Storage;
 };

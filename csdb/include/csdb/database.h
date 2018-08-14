@@ -39,7 +39,7 @@ public:
   virtual ~Database();
 
   virtual bool is_open() const = 0;
-  virtual bool put(const byte_array &key, const byte_array &value) = 0;
+  virtual bool put(const byte_array &key, uint32_t seq_no, const byte_array &value) = 0;
   virtual bool get(const byte_array &key, byte_array *value = nullptr) = 0;
   virtual bool remove(const byte_array &key) = 0;
 
@@ -67,14 +67,11 @@ public:
   virtual IteratorPtr new_iterator() = 0;
 
 public:
-  Error last_error() const { return last_error_; }
+  Error last_error() const;
   std::string last_error_message() const;
 protected:
   void set_last_error(Error error = NoError, const std::string& message = std::string());
   void set_last_error(Error error, const char* message, ...);
-private:
-  Error last_error_;
-  std::string last_error_message_;
 };
 
 } // namespace csdb

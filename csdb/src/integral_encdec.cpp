@@ -1,6 +1,11 @@
 #include "integral_encdec.h"
 
 #include <cstring>
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
 
 #include "csdb/internal/endian.h"
 
@@ -18,14 +23,16 @@ template<>
 std::size_t encode(void *buf, uint64_t value)
 {
   value = ::csdb::internal::to_little_endian(value);
-  uint8_t bits = (sizeof(uint64_t) * 8);
-  uint64_t mask = (static_cast<uint64_t>(1) << (bits - 1));
-  bool new_bit = (0 != (mask & value)), bit;
-  do {
-    bit = new_bit;
-    mask >>= 1;
-    new_bit = (0 != (mask & value));
-  } while ((bit == new_bit) && (7 < (--bits)));
+
+  uint64_t copy = value & 0x8000000000000000 ? ~value : value;
+#ifdef _MSC_VER
+  unsigned long bits;
+  _BitScanReverse64(&bits, copy);
+  bits += 2;
+#else
+  uint64_t bits = (__builtin_clzl(copy) ^ 63) + 2;
+#endif
+  if (bits < 7) bits = 7;
 
   uint8_t bytes = 8;
   uint8_t first = '\xFF';

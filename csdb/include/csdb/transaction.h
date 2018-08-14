@@ -92,24 +92,29 @@ class Transaction
   SHARED_DATA_CLASS_DECLARE(Transaction)
 
 public:
-  Transaction(Address source, Address target, Currency currency, Amount amount);
-  Transaction(Address source, Address target, Currency currency, Amount amount, Amount balance);
+  Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature);
+  Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature, Amount balance);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
 
   TransactionID id() const noexcept;
-
+  int64_t innerID() const noexcept;
   Address source() const noexcept;
   Address target() const noexcept;
   Currency currency() const noexcept;
   Amount amount() const noexcept;
+  Amount comission() const noexcept;
+  std::string signature() const noexcept;
   Amount balance() const noexcept;
 
+  void set_innerID(int64_t innerID);
   void set_source(Address source);
   void set_target(Address target);
   void set_currency(Currency currency);
   void set_amount(Amount amount);
+  void set_comission(Amount comission);
+  void set_signature(std::string signature);
   void set_balance(Amount balance);
 
   ::csdb::internal::byte_array to_binary();
@@ -117,6 +122,7 @@ public:
 
   static Transaction from_byte_stream(const char* data, size_t m_size);
   std::vector<uint8_t> to_byte_stream() const;
+  std::vector<uint8_t> to_byte_stream_for_sig() const;
 
   /**
    * @brief Добавляет дополнительное произвольное поле к транзакции

@@ -13,7 +13,7 @@ void obstream::put(const void *buf, size_t size)
 
 void obstream::put(const std::string &value)
 {
-  put(value.size());
+  put(static_cast<uint32_t>(value.size()));
   buffer_.insert(buffer_.end(), value.begin(), value.end());
 }
 
@@ -38,7 +38,7 @@ bool ibstream::get(void *buf, size_t size)
 
 bool ibstream::get(std::string &value)
 {
-  size_t size;
+  uint32_t size;
   if (!get(size)) {
     return false;
   }
