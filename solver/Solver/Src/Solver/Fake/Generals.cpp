@@ -245,7 +245,7 @@ namespace Credits{
 		int result0 = nodes_amount;
 		uint16_t result =0;
 		result = k % (int)result0;
-		std::cout << "Writing node : " << confidantNodes.at(result) << std::endl;
+		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
 		return result;
 		//if (myId != confidantNodes[write_id]) return 0;
         //return 100;

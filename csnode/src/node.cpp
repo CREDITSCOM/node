@@ -7,15 +7,15 @@
 #include <base58.h>
 #include <sodium.h>
 
-#include <snappy/snappy.h>
+#include <snappy.h>
 
-const unsigned MIN_CONFIDANTS = 3;
-const unsigned MAX_CONFIDANTS = 3;
+const unsigned MIN_CONFIDANTS = 4;
+const unsigned MAX_CONFIDANTS = 4;
 
 Node::Node(const Config& config):
   myPublicKey_(config.getMyPublicKey()),
   bc_(config.getPathToDB().c_str()),
-  solver_(Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
+  solver_(new Credits::Solver(this)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
   transport_(new Transport(config, this)),
   stats_(bc_),
   api_(bc_, solver_),
@@ -260,9 +260,11 @@ void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
     LOG_WARN("Bad transaction packet format");
     return;
   }
+  csdb::Pool pool_;
+  pool_.add_transaction(trans);
 
   LOG_EVENT("Got first transaction, initializing consensus...");
-  solver_->gotTransactionList(std::move(trans));
+  solver_->gotTransactionList(std::move(pool_));
 }
 
 void Node::sendFirstTransaction(const csdb::Transaction& trans) {
@@ -317,7 +319,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
 
   istream_.init(data, size);
 
-  Vector vec;
+  Credits::HashVector vec;
   istream_ >> vec;
 
   if (!istream_.good() || !istream_.end()) {
@@ -326,10 +328,10 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
   }
 
   LOG_EVENT("Got vector");
-  solver_->gotVector(std::move(vec), sender);
+  solver_->gotVector(std::move(vec));
 }
 
-void Node::sendVector(const Vector& vector) {
+void Node::sendVector(const Credits::HashVector& vector) {
   if (myLevel_ != NodeLevel::Confidant) {
     LOG_ERROR("Only confidant nodes can send vectors");
     return;
@@ -348,7 +350,7 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
 
   istream_.init(data, size);
 
-  Matrix mat;
+  Credits::HashMatrix mat;
   istream_ >> mat;
 
   if (!istream_.good() || !istream_.end()) {
@@ -357,10 +359,10 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
   }
 
   LOG_EVENT("Got matrix");
-  solver_->gotMatrix(std::move(mat), sender);
+  solver_->gotMatrix(std::move(mat));
 }
 
-void Node::sendMatrix(const Matrix& matrix) {
+void Node::sendMatrix(const Credits::HashMatrix& matrix) {
   if (myLevel_ != NodeLevel::Confidant) {
     LOG_ERROR("Only confidant nodes can send matrices");
     return;
@@ -427,7 +429,7 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
 
   istream_.init(data, size);
 
-  Hash hash;
+  csdb::PoolHash hash;
   istream_ >> hash;
 
   if (!istream_.good() || !istream_.end()) {
@@ -439,7 +441,7 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
   solver_->gotHash(std::move(hash), sender);
 }
 
-void Node::sendHash(const Hash& hash, const PublicKey& target) {
+void Node::sendHash(const csdb::PoolHash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer) {
     LOG_ERROR("Writer node shouldn't send hashes");
     return;
@@ -542,12 +544,16 @@ void Node::onRoundStart() {
     myLevel_ = NodeLevel::Main;
   else {
     bool found = false;
+    uint8_t conf_no = 0;
+
     for (auto& conf : confidantNodes_) {
       if (conf == myPublicKey_) {
         myLevel_ = NodeLevel::Confidant;
+        myConfNumber = conf_no;
         found = true;
         break;
       }
+      conf_no++;
     }
 
     if (!found)
@@ -565,7 +571,6 @@ void Node::onRoundStart() {
     std::cerr << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
     i++;
    }
-
 
   std::cout << "Last written sequence = " << getBlockChain().getLastWrittenSequence() << std::endl;
   if (awaitingSyncroBlock) std::cout << "Get Status> AwaitingSyncroBlock" << std::endl;
@@ -587,6 +592,11 @@ void Node::onRoundStart() {
 
   solver_->nextRound();
   transport_->processPostponed(roundNum_);
+}
+
+uint8_t Node::getMyConfNumber()
+{
+  return myConfNumber;
 }
 
 void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes) {

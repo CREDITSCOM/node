@@ -6,6 +6,8 @@
 
 #include <vector>
 #include <string>
+#include <blake2.h>
+#include <blake2-impl.h>
 
 #include <csdb/csdb.h>
 #include <csdb/pool.h>

@@ -5,7 +5,7 @@
 
 #include <csstats.h>
 #include <csconnector/csconnector.h>
-
+#include <Solver/Fake/Solver.hpp>
 #include <client/config.hpp>
 
 #include "blockchain.hpp"
@@ -52,10 +52,10 @@ public:
   void sendTransaction(std::vector<csdb::Transaction>&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&, const PublicKey&);
-  void sendVector(const Vector&);
-  void sendMatrix(const Matrix&);
+  void sendVector(const Credits::HashVector&);
+  void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
-  void sendHash(const Hash&, const PublicKey&);
+  void sendHash(const csdb::PoolHash&, const PublicKey&);
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const PublicKey&);
@@ -74,7 +74,8 @@ public:
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
   NodeLevel getMyLevel() const { return myLevel_; }
   uint32_t getRoundNumber();
-  bool getSyncroStarted();
+  //bool getSyncroStarted();
+  uint8_t getMyConfNumber();
 
   const std::vector<PublicKey>& getConfidants() const { return confidantNodes_; }
 
@@ -105,9 +106,14 @@ private:
   uint32_t sendBlockRequestSequence;
   bool awaitingSyncroBlock;
 
+
+
+
   //signature variables
   std::vector<uint8_t> myPublicForSig;
   std::vector<uint8_t> myPrivateForSig;
+
+
 
   // Current round state
   RoundNum roundNum_ = 0;
@@ -115,6 +121,8 @@ private:
 
   PublicKey mainNode_;
   std::vector<PublicKey> confidantNodes_;
+
+  uint8_t myConfNumber;
 
   // Resources
   BlockChain bc_;

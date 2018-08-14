@@ -69,6 +69,16 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
 }
 
+inline void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
+  const auto tp = std::chrono::system_clock::now() + ms;
+  std::thread tr([tp, cb]() {
+    std::this_thread::sleep_until(tp);
+    LOG_WARN("Inserting callback");
+    CallsQueue::instance().insert(cb);
+  });
+  tr.detach();
+}
+
 void Solver::closeMainRound()
 {
   if (v_pool.transactions_count() > 0)
@@ -77,7 +87,7 @@ void Solver::closeMainRound()
 	 
 	  for (auto& it : node_->getConfidants())
 	  { 
-		  std::cout << "Solver -> Sending TransactionList to " << it.to_string() << std::endl;
+		  std::cout << "Solver -> Sending TransactionList to " << byteStreamToHex(it.str,32) << std::endl;
 		  node_->sendTransactionList(std::move(v_pool), it); // Correct sending, better if to all one time
 	  }
   }
@@ -109,8 +119,8 @@ void Solver::closeMainRound()
 void Solver::runMainRound()
 {
   m_pool_closed = false;
-  node_->runAfter(std::chrono::milliseconds(5000),
-                  [this]() { closeMainRound(); });
+  runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+    [this]() { closeMainRound(); });
 }
 
 void Solver::flushTransactions()
@@ -127,7 +137,7 @@ void Solver::flushTransactions()
       return;
     }
   }
-  node_->runAfter(std::chrono::milliseconds(50),
+  runAfter(std::chrono::milliseconds(50),
                   [this]() { flushTransactions(); });
 }
 
@@ -369,7 +379,7 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender)
 	{
 		//node_->initNextRound(node_->getMyId(), std::move(ips));
 		std::cout << "Solver -> sending NEW ROUND table" << std::endl;
-		node_->sendRoundTable(node_->getMyPublicKey(), std::move(ips));
+		node_->sendRoundTable();//node_->getMyPublicKey(), std::move(ips),
 		round_table_sent = true;
 		
 	}
