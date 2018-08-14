@@ -35,7 +35,10 @@ enum MsgTypes: uint8_t {
   ConsVector,
   ConsMatrix,
   NewBlock,
-  BlockHash
+  BlockHash,
+  BlockRequest,
+  RequestedBlock
+
 };
 
 typedef uint32_t RoundNum;

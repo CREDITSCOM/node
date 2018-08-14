@@ -27,6 +27,41 @@ namespace Credits {
 
 class Fake_Generals;
 
+typedef struct Hash_
+{
+  Hash_::Hash_(uint8_t* a)
+  {
+    memcpy(val, a, 32);
+  }
+  Hash_::Hash_() {}
+  uint8_t val[32];
+
+};
+typedef struct Signature
+{
+  Signature::Signature(void* a)
+  {
+    memcpy(val, a, 64);
+  }
+  Signature::Signature() {}
+  uint8_t val[64];
+
+};
+typedef struct HashVector
+{
+  uint8_t Sender;
+  uint32_t roundNum;
+  Hash_ hash;
+  Signature sig;
+};
+typedef struct HashMatrix
+{
+  uint8_t Sender;
+  uint32_t roundNum;
+  HashVector hmatr[100];
+  Signature sig;
+};
+
 class Fake_Solver : public ISolver
 {
   public:
@@ -35,6 +70,10 @@ class Fake_Solver : public ISolver
 
     Fake_Solver(const Fake_Solver&) = delete;
     Fake_Solver& operator=(const Fake_Solver&) = delete;
+
+    //signature methods
+    void set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv);
+
 
     // Solver solves stuff (even the fake one)...
 
@@ -77,6 +116,12 @@ class Fake_Solver : public ISolver
     csdb::Pool testPool;
 #endif // SPAM_MAIN
 
+//signature verification
+    bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
+    std::vector<uint8_t> myPublicKey;
+    std::vector<uint8_t> myPrivateKey;
+
+
     static void sign_transaction(const void* buffer, const size_t buffer_size);
     static void verify_transaction(const void* buffer,
                                    const size_t buffer_size);
@@ -90,9 +135,18 @@ class Fake_Solver : public ISolver
     std::vector<Hash> hashes;
     std::vector<PublicKey> ips;
 
+    bool receivedVecFrom[100];
+    uint8_t trustedCounterVector;
+    bool receivedMatFrom[100];
+    uint8_t trustedCounterMatrix;
+
+    HashVector hvector;
+
     std::vector<std::string> vector_datas;
 
-    csdb::Pool m_pool;
+    csdb::Pool m_pool;//pool to write to db
+    csdb::Pool v_pool;//poot lo write transactions when the node has MAIN status
+
     bool m_pool_closed = true;
 
     bool sentTransLastRound = false;

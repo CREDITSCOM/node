@@ -44,6 +44,12 @@ Fake_Solver::~Fake_Solver()
     //		csstats::stop();
 }
 
+void Fake_Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv)
+{
+  myPublicKey = pub;
+  myPrivateKey = priv;
+}
+
 static void
 addTimestampToPool(csdb::Pool& pool)
 {

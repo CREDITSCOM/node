@@ -42,6 +42,9 @@ public:
   void getMatrix(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const PublicKey& sender);
+  /*syncro get functions*/
+  void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
+  void getBlockReply(const uint8_t*, const size_t);
 
   /* Outcoming requests forming */
   void sendRoundTable();
@@ -53,6 +56,9 @@ public:
   void sendMatrix(const Matrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
+  /*syncro send functions*/
+  void sendBlockRequest(uint32_t seq);
+  void sendBlockReply(const csdb::Pool&, const PublicKey&);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -67,6 +73,8 @@ public:
 
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
   NodeLevel getMyLevel() const { return myLevel_; }
+  uint32_t getRoundNumber();
+  bool getSyncroStarted();
 
   const std::vector<PublicKey>& getConfidants() const { return confidantNodes_; }
 
@@ -80,12 +88,26 @@ public:
 private:
   bool init();
 
+  //signature verification
+  bool checkKeysFile();
+  void generateKeys();
+  bool checkKeysForSig();
+
   inline bool readRoundData(bool);
   void onRoundStart();
 
   // Info
   const PublicKey myPublicKey_;
   bool good_ = true;
+
+  //syncro variables
+  bool syncro_started = false;
+  uint32_t sendBlockRequestSequence;
+  bool awaitingSyncroBlock;
+
+  //signature variables
+  std::vector<uint8_t> myPublicForSig;
+  std::vector<uint8_t> myPrivateForSig;
 
   // Current round state
   RoundNum roundNum_ = 0;

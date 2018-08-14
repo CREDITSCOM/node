@@ -352,6 +352,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getBlock(data, size, firstPack.getSender());
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, firstPack.getSender());
+  case MsgTypes::BlockRequest:
+    return node_->getBlockRequest(data, size, firstPack.getSender());
+  case MsgTypes::RequestedBlock:
+    return node_->getBlockReply(data, size);
   default:
     LOG_ERROR("Unknown type");
     break;
