@@ -28,7 +28,7 @@ add_library(${PROJECT_NAME} STATIC
   src/priv_crypto.cpp
   src/priv_crypto.h
   src/database.cpp
-  src/database_leveldb.cpp
+  src/database_berkeleydb.cpp
   src/user_field.cpp
   include/csdb/internal/shared_data.h
   include/csdb/internal/shared_data_ptr_implementation.h
@@ -46,12 +46,29 @@ add_library(${PROJECT_NAME} STATIC
   include/csdb/wallet.h
   include/csdb/storage.h
   include/csdb/database.h
-  include/csdb/database_leveldb.h
+  include/csdb/database_berkeleydb.h
   include/csdb/user_field.h
   )
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(${PROJECT_NAME} leveldb cscrypto)
+set (Boost_USE_MULTITHREADED ON)
+set (Boost_USE_STATIC_LIBS ON)
+set (Boost_USE_STATIC_RUNTIME ON)
+
+find_package (Boost REQUIRED COMPONENTS system filesystem)
+
+target_include_directories(
+  ${PROJECT_NAME} PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(
+  ${PROJECT_NAME}
+  cscrypto
+  libsodium
+  Boost::system
+  Boost::filesystem
+  Boost::disable_autolinking
+  BerkeleyDB
+)
 if (CSDB_PLATFORM_IS_BIG_ENDIAN)
   target_compile_definitions(${PROJECT_NAME} PUBLIC -DCSDB_PLATFORM_IS_BIG_ENDIAN)
 else()
@@ -67,6 +84,3 @@ endif()
 if(CSDB_BUILD_BENCHMARK)
   add_subdirectory(benchmark)
 endif()
-
-add_subdirectory(snappy)
-add_subdirectory(leveldb)

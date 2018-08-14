@@ -4,7 +4,7 @@
 #include <mutex>
 
 #include <API.h>
-#include <Solver/ISolver.hpp>
+#include <Solver/Fake/Solver.hpp>
 #include <csconnector/csconnector.h>
 #include <csstats.h>
 
@@ -155,7 +155,7 @@ using namespace ::apache;
 class APIHandler : public APIHandlerInterface
 {
   public:
-    APIHandler(BlockChain& blockchain, Credits::ISolver& _solver);
+    APIHandler(BlockChain& blockchain, Credits::Solver& _solver);
     ~APIHandler() override = default;
 
     APIHandler(const APIHandler&) = delete;
@@ -217,7 +217,7 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    Credits::ISolver& solver;
+    Credits::Solver& solver;
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<

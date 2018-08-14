@@ -1,10 +1,12 @@
-#include "csdb/pool.h"
-
+#include <iostream>
 #include <sstream>
 #include <iomanip>
 #include <map>
 #include <algorithm>
 
+#include <sodium.h>
+
+#include "csdb/pool.h"
 #include "csdb/csdb.h"
 
 #include "csdb/internal/shared_data_ptr_implementation.h"
@@ -105,6 +107,7 @@ class Pool::priv : public ::csdb::internal::shared_data
     storage_(storage)
   {}
 
+private:
   void put(::csdb::priv::obstream& os) const
   {
     os.put(previous_hash_);
@@ -116,6 +119,22 @@ class Pool::priv : public ::csdb::internal::shared_data
     }
 
     os.put(user_fields_);
+	os.put(writer_public_key_);
+	os.put(signature_);
+  }
+
+  void put_for_sig(::csdb::priv::obstream& os)
+  {
+	  os.put(previous_hash_);
+	  os.put(sequence_);
+
+	  os.put(transactions_.size());
+	  for (const auto& it : transactions_) {
+		  os.put(it);
+	  }
+
+	  os.put(user_fields_);
+	  os.put(writer_public_key_);
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
@@ -152,6 +171,12 @@ class Pool::priv : public ::csdb::internal::shared_data
     if(!is.get(user_fields_)) {
       return false;
     }
+
+    if (!is.get(writer_public_key_))
+      return false;
+
+    if (!is.get(signature_))
+      return false;
 
     is_valid_ = true;
     return true;
@@ -206,6 +231,8 @@ class Pool::priv : public ::csdb::internal::shared_data
   Pool::sequence_t sequence_;
   std::vector<Transaction> transactions_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
+  ::std::string signature_;
+  ::std::vector<uint8_t> writer_public_key_;
   ::csdb::internal::byte_array binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
@@ -339,6 +366,16 @@ Pool::sequence_t Pool::sequence() const noexcept
   return d->sequence_;
 }
 
+std::string Pool::signature() const noexcept
+{
+	return d->signature_;
+}
+
+std::vector<uint8_t> Pool::writer_public_key() const noexcept
+{
+	return d->writer_public_key_;
+}
+
 void Pool::set_sequence(Pool::sequence_t seq) noexcept
 {
   if (d.constData()->read_only_) {
@@ -359,6 +396,28 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept
   priv* data = d.data();
   data->is_valid_ = true;
   data->previous_hash_ = previous_hash;
+}
+
+void Pool::set_signature(std::string signature) noexcept
+{
+	if (d.constData()->read_only_) {
+		return;
+	}
+
+	priv* data = d.data();
+	data->is_valid_ = true;
+	data->signature_ = signature;
+}
+
+void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept
+{
+	if (d.constData()->read_only_) {
+		return;
+	}
+
+	priv* data = d.data();
+	data->is_valid_ = true;
+	data->writer_public_key_ = writer_public_key;
 }
 
 void Pool::set_storage(Storage storage) noexcept
@@ -473,9 +532,17 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
 	  return (char*)(d->binary_representation_.data());
   }
 
+  ::csdb::internal::byte_array Pool::to_byte_stream_for_sig()
+  {
+	  ::csdb::priv::obstream os;
+	  d->put_for_sig(os);
+	  ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+	  return result;
+  }
+
   bool Pool::save(Storage storage)
 {
-  if ((!d.constData()->is_valid_) || ((!d.constData()->read_only_))) {
+  if ((!d.constData()->is_valid_)) {
     return false;
   }
 
@@ -490,6 +557,48 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
   }
 
   return false;
+}
+
+void Pool::sign_pool(std::vector<uint8_t> private_key)
+{
+	uint8_t signature[64], priv_key[64];
+	std::vector<uint8_t> pool_bytes = this->to_byte_stream_for_sig();
+	uint64_t msg_len = pool_bytes.size();
+	uint8_t* msg = new uint8_t[msg_len];
+	for (int i = 0; i < msg_len; i++)
+		msg[i] = pool_bytes[i];
+	for (int i = 0; i < 64; i++)
+		priv_key[i] = private_key[i];
+	uint64_t sig_len;
+	crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_len),
+	  msg, msg_len, priv_key);
+	delete[] msg;
+	std::string sig_to_pool((char *)signature, sizeof(signature));
+	this->set_signature(sig_to_pool);
+}
+
+bool Pool::verify_pool_signature()
+{
+	if (this->writer_public_key().size() != 32 || this->signature().size() != 64)
+		return false;
+	uint8_t public_key[32];
+	std::vector<uint8_t> my_pub = this->writer_public_key();
+	for (int i = 0; i < 32; i++)
+		public_key[i] = my_pub[i];
+	uint8_t signature[64];
+	std::string str_sig = this->signature();
+	for (int i = 0; i < 64; i++)
+		signature[i] = str_sig[i];
+	std::vector<uint8_t> pool_bytes = this->to_byte_stream_for_sig();
+	uint64_t msg_len = pool_bytes.size();
+	uint8_t* msg = new uint8_t[msg_len];
+	for (int i = 0; i < msg_len; i++)
+		msg[i] = pool_bytes[i];
+	int ver_ok = crypto_sign_ed25519_verify_detached(signature, msg, msg_len, public_key);
+	delete[]msg;
+	if (ver_ok == 0)
+		return true;
+	else return false;
 }
 
 Pool Pool::load(PoolHash hash, Storage storage)

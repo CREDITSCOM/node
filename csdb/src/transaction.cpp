@@ -94,13 +94,13 @@ bool TransactionID::get(::csdb::priv::ibstream &is)
 
 SHARED_DATA_CLASS_IMPLEMENTATION(Transaction)
 
-Transaction::Transaction(Address source, Address target, Currency currency, Amount amount) :
-  d(new priv(source, target, currency, amount, amount))
+Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature) :
+  d(new priv(innerID, source, target, currency, comission, amount, signature, amount))
 {
 }
 
-Transaction::Transaction(Address source, Address target, Currency currency, Amount amount, Amount balance) :
-  d(new priv(source, target, currency, amount, balance))
+Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount comission, Amount amount, std::string signature, Amount balance) :
+  d(new priv(innerID, source, target, currency, comission, amount, signature, balance))
 {
 }
 
@@ -110,7 +110,7 @@ bool Transaction::is_valid() const noexcept
   return data->source_.is_valid()
       && data->target_.is_valid()
       && data->currency_.is_valid()
-      && (data->amount_ > 0_c)
+      && (data->amount_ >= 0_c)
       && (data->source_ != data->target_);
 }
 
@@ -122,6 +122,11 @@ bool Transaction::is_read_only() const noexcept
 TransactionID Transaction::id() const noexcept
 {
   return d->id_;
+}
+
+int64_t Transaction::innerID() const noexcept
+{
+	return d->innerID_;
 }
 
 Address Transaction::source() const noexcept
@@ -144,9 +149,26 @@ Amount Transaction::amount() const noexcept
   return d->amount_;
 }
 
+Amount Transaction::comission() const noexcept
+{
+	return d->comission_;
+}
+
+std::string Transaction::signature() const noexcept
+{
+	return d->signature_;
+}
+
 Amount Transaction::balance() const noexcept
 {
   return d->balance_;
+}
+
+void Transaction::set_innerID(int64_t innerID)
+{
+	if (!d.constData()->read_only_) {
+		d->innerID_ = innerID;
+	}
 }
 
 void Transaction::set_source(Address source)
@@ -175,6 +197,20 @@ void Transaction::set_amount(Amount amount)
   if (!d.constData()->read_only_) {
     d->amount_ = amount;
   }
+}
+
+void Transaction::set_comission(Amount comission)
+{
+	if (!d.constData()->read_only_) {
+		d->comission_ = comission;
+	}
+}
+
+void Transaction::set_signature(std::string signature)
+{
+	if (!d.constData()->read_only_) {
+		d->signature_ = signature;
+	}
 }
 
 void Transaction::set_balance(Amount balance)
@@ -249,27 +285,62 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
 	return os.buffer();
 }
 
+std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const
+{
+	::csdb::priv::obstream os;
+	int8_t currency;
+	const priv* data = d.constData();
+	os.put(data->innerID_);
+	os.put(data->source_.public_key().data(), 32);
+	os.put(data->target_.public_key().data(), 32);
+	if (data->currency_.to_string() == "CS")
+		currency = 1;
+	else
+		currency = 0;
+	os.put(data->amount_);
+	os.put(data->comission_);
+	os.put(currency);
+	if (data->user_fields_.size())
+	{
+		os.put_smart(data->user_fields_);
+		auto buf = os.buffer();
+		buf.erase(buf.begin() + 101);
+		return buf;
+	}
+	else
+	{
+		uint32_t num_user_fields = 0;
+		os.put(num_user_fields);
+		return os.buffer();
+	}
+}
 
 void Transaction::put(::csdb::priv::obstream &os) const
 {
   const priv* data = d.constData();
+  os.put(data->innerID_);
   os.put(data->source_);
   os.put(data->target_);
   os.put(data->currency_);
   os.put(data->amount_);
-  os.put(data->balance_);
+  os.put(data->comission_);
   os.put(data->user_fields_);
+  os.put(data->signature_);
+  os.put(data->balance_);
 }
 
 bool Transaction::get(::csdb::priv::ibstream &is)
 {
   priv* data = d.data();
-  return is.get(data->source_)
+  return is.get(data->innerID_)
+	  && is.get(data->source_)
       && is.get(data->target_)
       && is.get(data->currency_)
       && is.get(data->amount_)
-      && is.get(data->balance_)
-      && is.get(data->user_fields_);
+	  && is.get(data->comission_)
+      && is.get(data->user_fields_)
+	  && is.get(data->signature_)
+	  && is.get(data->balance_);
 }
 
 } // namespace csdb

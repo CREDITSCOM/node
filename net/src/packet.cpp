@@ -1,5 +1,5 @@
 /* Send blaming letters to @yrtimd */
-#include <snappy/snappy.h>
+#include <snappy.h>
 
 #include "packet.hpp"
 

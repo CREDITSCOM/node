@@ -7,25 +7,16 @@ set(SOLVER_TEST_BUILD FALSE)
 set(SOLVER_DOC_BUILD FALSE)
 
 add_library(Solver
-	Include/Solver/csdbApi/csdbApi.hpp
-	Include/Solver/csdbApi/csdbApiUtils.hpp
-	Include/Solver/Fake/Fake_Generals.hpp
-	Include/Solver/Fake/Fake_Solver.hpp
-	Include/Solver/ISolver.hpp
-	Include/Solver/SolverFactory.hpp
-        Src/Solver/SolverFactory.cpp
-        Src/Solver/Fake/FakeSolver.cpp
-        Src/Solver/Fake/Fake_Generals.cpp
-        Src/Solver/csdbApi/csdbApi.cpp
-        Src/Solver/csdbApi/csdbApiUtils.cpp
+	Include/Solver/Fake/Generals.hpp
+	Include/Solver/Fake/Solver.hpp
+        Src/Solver/Fake/Solver.cpp
+        Src/Solver/Fake/Generals.cpp
 	${THRIFT_GENERATED_FILES}
 )
 
 target_include_directories(csnode PUBLIC
   ../csnode/include
   ../net/include
-  ../lib/include
-  ${CMAKE_BINARY_DIR}/api/executor_gen
 )
 
 set (BOOST_ROOT ${BOOST_ROOT})
@@ -45,7 +36,7 @@ target_link_libraries(Solver
 
 target_include_directories(Solver PUBLIC Include)
 
-target_link_libraries (Solver csconnector csdb csnode)
+target_link_libraries (Solver csconnector csdb csnode base58 libsodium)
 
 if(SOLVER_TEST_BUILD)
     add_subdirectory(Tests)

@@ -22,7 +22,7 @@ typedef std::string Vector;
 typedef std::string Matrix;
 
 class Transport;
-namespace Credits { class ISolver; }
+namespace Credits { class Solver; }
 
 class Node {
 public:
@@ -119,7 +119,7 @@ private:
   // Resources
   BlockChain bc_;
 
-  Credits::ISolver* solver_;
+  Credits::Solver* solver_;
   Transport* transport_;
 
   csstats::csstats stats_;

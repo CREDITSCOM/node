@@ -49,25 +49,33 @@ class Transaction::priv : public ::csdb::internal::shared_data
   inline priv() :
     read_only_(false),
     amount_(0_c),
+	comission_(0_c),
+	signature_(),
     balance_(0_c)
   {}
 
   inline priv(const priv& other) :
     read_only_(false),
+	innerID_(other.innerID_),
     source_(other.source_),
     target_(other.target_),
     currency_(other.currency_),
+	comission_(other.comission_),
     amount_(other.amount_),
+	signature_(other.signature_),
     balance_(other.balance_),
     user_fields_(other.user_fields_)
   {}
 
-  inline priv(Address source, Address target, Currency currency, Amount amount, Amount balance) :
+  inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature, Amount balance) :
     read_only_(false),
+	innerID_(innerID),
     source_(source),
     target_(target),
     currency_(currency),
     amount_(amount),
+	comission_(comission),
+	signature_(signature),
     balance_(balance)
   {}
 
@@ -79,10 +87,13 @@ class Transaction::priv : public ::csdb::internal::shared_data
 
   bool read_only_;
   TransactionID id_;
+  int64_t innerID_;
   Address source_;
   Address target_;
   Currency currency_;
   Amount amount_;
+  Amount comission_;
+  std::string signature_;
   Amount balance_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
 

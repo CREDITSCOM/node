@@ -74,7 +74,7 @@ private:
     bool updateCache(csdb::Pool& pool);
     csdb::Amount calcBalance(csdb::Address) const;
     void writeBlock(csdb::Pool& pool);
-    void BlockChain::onBlockReceived(csdb::Pool& pool);
+    void onBlockReceived(csdb::Pool& pool);
     void writeGenesisBlock();
 
 private:
