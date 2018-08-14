@@ -164,24 +164,25 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum) {
+  
   istream_.init(data, size);
-
   if (!readRoundData(false))
     return;
 
   roundNum_ = rNum;
-
+  
   if (!istream_.good()) {
     LOG_WARN("Bad round table format, ignoring");
     return;
   }
-
+  
   onRoundStart();
   transport_->clearTasks();
 
   transport_->processPostponed(rNum);
 }
 
+//the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
 void Node::sendRoundTable() {
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTable
@@ -192,8 +193,15 @@ void Node::sendRoundTable() {
   for (auto& conf : confidantNodes_)
     ostream_ << conf;
 
-  LOG_EVENT("Sending round table");
-
+  //LOG_EVENT("Sending round table");
+  std::cout << "------------------------------------------  SendRoundTable  ---------------------------------------" << std::endl;
+  std::cerr << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
+  int i = 0;
+  for (auto& e : confidantNodes_)
+  {
+    std::cerr << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
+    i++;
+  }
   transport_->clearTasks();
   flushCurrentTasks();
 }
@@ -528,6 +536,9 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
+
+  std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
+  std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
   if (mainNode_ == myPublicKey_)
     myLevel_ = NodeLevel::Main;
   else {
@@ -544,16 +555,38 @@ void Node::onRoundStart() {
       myLevel_ = NodeLevel::Normal;
   }
 
-  solver_->nextRound();
+  
 
   // Pretty printing...
   std::cerr << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
-            << ", General: " << byteStreamToHex(mainNode_.str, 32) << ", Confidants: ";
+            << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
+            int i = 0 ;
   for (auto& e : confidantNodes_)
-    std::cerr << byteStreamToHex(e.str, 32) << " ";
+  {
+    std::cerr << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
+    i++;
+   }
 
-  std::cerr << std::endl;
 
+  std::cout << "Last written sequence = " << getBlockChain().getLastWrittenSequence() << std::endl;
+  if (awaitingSyncroBlock) std::cout << "Get Status> AwaitingSyncroBlock" << std::endl;
+  //else std::cout << "Get Status> We still don't wait for a missed block" << std::endl;
+  if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
+  //else  std::cout << "Get Status> SYNCRO NOT STARTED ... YET" << std::endl;
+
+  if ((((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || getBlockChain().getBlockRequestNeed()) && (!awaitingSyncroBlock) && (!syncro_started)))
+  {
+    std::cout << "Starting SYNCRO" << std::endl;
+    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
+    syncro_started = true;
+  }
+  if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1)
+  {
+    syncro_started = false;
+    awaitingSyncroBlock = false;
+  }
+
+  solver_->nextRound();
   transport_->processPostponed(roundNum_);
 }
 
@@ -573,7 +606,7 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
   if (rNum == roundNum_ ||
       type == MsgTypes::NewBlock)
-    return MessageActions::Process;
+    return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;
 
   if (rNum < roundNum_)
     return MessageActions::Drop;
@@ -582,8 +615,8 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
 }
 
 inline bool Node::readRoundData(const bool tail) {
+  
   PublicKey mainNode;
-
   uint8_t confSize = 0;
   istream_ >> confSize;
 

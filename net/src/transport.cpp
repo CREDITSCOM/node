@@ -266,6 +266,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 }
 
 constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
+
 void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
