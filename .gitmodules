@@ -13,3 +13,6 @@
 [submodule "third-party/libsodium.git"]
 	path = third-party/libsodium
 	url = https://gitlab.com/main-credits-dev/libsodium.git
+[submodule "third-party/berkeleydb_prebuilt"]
+	path = third-party/berkeleydb_prebuilt
+	url = https://gitlab.com/credits_bc/third_party/berkeleydb_prebuilt.git
