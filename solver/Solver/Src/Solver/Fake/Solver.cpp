@@ -5,8 +5,7 @@
 #include <iostream>
 #include <random>
 #include <sstream>
-
-#include <sys/timeb.h>
+#include <chrono>
 
 #include <csdb/address.h>
 #include <csdb/currency.h>
@@ -21,13 +20,38 @@
 #include <lib/system/logger.hpp>
 
 #include <base58.h>
-
 #include <sodium.h>
 
+namespace {
+void addTimestampToPool(csdb::Pool& pool)
+{
+  auto now_time = std::chrono::system_clock::now();
+  pool.add_user_field(0, std::to_string(
+    std::chrono::duration_cast<std::chrono::milliseconds>(
+      now_time.time_since_epoch()).count()));
+}
 
+void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
+{
+  const auto tp = std::chrono::system_clock::now() + ms;
+  std::thread tr([tp, cb]() {
+    std::this_thread::sleep_until(tp);
+    LOG_WARN("Inserting callback");
+    CallsQueue::instance().insert(cb);
+  });
+  tr.detach();
+}
+
+#if defined(SPAM_MAIN) || defined(SPAMMER)
+static int
+randFT(int min, int max)
+{
+  return rand() % (max - min + 1) + min;
+}
+#endif
+} // anonimous namespace
 
 namespace Credits {
-
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
@@ -50,22 +74,14 @@ void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t
 	myPrivateKey = priv;
 }
 
-static void addTimestampToPool(csdb::Pool& pool)
-{
-
-}
-
 void Solver::prepareBlockForSend(csdb::Pool& block)
 {
-  struct timeb t;
-  ftime(&t);
-  //addTimestampToPool(block);
+  std::cout << "SOLVER> Before time stamp" << std::endl;
+  addTimestampToPool(block);
   std::cout << "SOLVER> Before write pub key" << std::endl;
   block.set_writer_public_key(myPublicKey);
-  std::cout << "SOLVER> Before time stamp" << std::endl;
-  block.add_user_field(0, std::to_string((uint64_t)((uint64_t)(t.time) * 1000ll) + t.millitm));
-  std::cout << "SOLVER> Before write last sequence" << std::endl;
-  block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+   std::cout << "SOLVER> Before write last sequence" << std::endl;
+    block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
   std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
@@ -73,15 +89,6 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
 }
 
-inline void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
-  const auto tp = std::chrono::system_clock::now() + ms;
-  std::thread tr([tp, cb]() {
-    std::this_thread::sleep_until(tp);
-    LOG_WARN("Inserting callback");
-    CallsQueue::instance().insert(cb);
-  });
-  tr.detach();
-}
 
 void Solver::closeMainRound()
 {
@@ -100,8 +107,6 @@ void Solver::closeMainRound()
   //node_->sendFirstTransaction();
     node_->becomeWriter();
 	std::cout << "Solver -> Node Level changed 2 -> 3" << std::endl;
-
-    //addTimestampToPool(m_pool);
 
 #ifdef SPAM_MAIN
     createSpam = false;
@@ -159,7 +164,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
 			uint8_t* message = new uint8_t[msg_len];
-			for (int i = 0; i < msg_len; i++)
+			for (size_t i = 0; i < msg_len; i++)
 				message[i] = v[i];
 
 			auto vec = transaction.source().public_key();
@@ -285,10 +290,8 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	}
 }
 
-
 void Solver::composeBlock()
 {
-
 }
 
 //what block does this function write???
@@ -347,7 +350,7 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
 	std::cout << "Solver -> getBlockCanditate" << std::endl;
   if (blockCandidateArrived)
     return;
-  
+
   //m_pool = std::move(block);
 
   blockCandidateArrived = true;
@@ -407,12 +410,6 @@ void Solver::_initApi()
   /////////////////////////////
 
 #ifdef SPAM_MAIN
-static int
-randFT(int min, int max)
-{
-  return rand() % (max - min + 1) + min;
-}
-
 void
 Solver::createPool()
 {
@@ -477,13 +474,6 @@ Solver::createPool()
 #endif
 
 #ifdef SPAMMER
-
-static inline int
-randFT(int min, int max)
-{
-  return rand() % (max - min) + min;
-}
-
 void
 Solver::spamWithTransactions()
 {
@@ -629,5 +619,4 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 	else
 		return false;
 }
-
-}
+} // namespace Credits

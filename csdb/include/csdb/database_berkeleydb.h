@@ -28,7 +28,6 @@ public:
 
 public:
   bool open(const std::string& path);
-  bool open(const std::string& path, uint32_t options);
 
 private:
   bool is_open() const override final;

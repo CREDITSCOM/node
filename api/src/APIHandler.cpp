@@ -218,7 +218,7 @@ convertTransaction(const csdb::Transaction& transaction)
     result.trxn.target = fromByteArray(target.public_key());
 
     auto uf = transaction.user_field(0);
-    if (result.trxn.__isset.smartContract = uf.is_valid()) { // non-bug
+    if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
         result.trxn.smartContract =
           deserialize<api::SmartContractInvocation>(uf.value<std::string>());
     }
@@ -462,7 +462,7 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
         decltype(auto) smart_origin = locked_ref(this->smart_origin);
         TRACE();
         auto it = smart_origin->find(smart_addr);
-        if (present = it != smart_origin->end()) {
+        if ((present = (it != smart_origin->end()))) {
             origin_bytecode =
               fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
         }
@@ -513,7 +513,7 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
         TRACE();
     }
     auto sg =
-      scopeGuard([this, &contract_state, &fresh_contract_state, amnesia]() {
+      scopeGuard([&contract_state, &fresh_contract_state, amnesia]() {
           TRACE();
           if (amnesia) {
               return;
@@ -559,8 +559,8 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
         return;
     }
 
-    if (_return.__isset.smart_contract_result =
-          api_resp.__isset.ret_val) { // non-bug = instead of ==
+    if ((_return.__isset.smart_contract_result =
+          api_resp.__isset.ret_val)) { // non-bug = instead of ==
         TRACE();
         _return.smart_contract_result = api_resp.ret_val;
     }

@@ -94,15 +94,13 @@ bool TransactionID::get(::csdb::priv::ibstream &is)
 
 SHARED_DATA_CLASS_IMPLEMENTATION(Transaction)
 
-Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency,
-	Amount amount, Amount max_fee, std::string signature, Amount counted_fee) :
-  d(new priv(innerID, source, target, currency, max_fee, amount, signature, amount, counted_fee))
+Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature) :
+  d(new priv(innerID, source, target, currency, comission, amount, signature, amount))
 {
 }
 
-Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency,
-	Amount amount, Amount max_fee, std::string signature, Amount balance, Amount counted_fee) :
-  d(new priv(innerID, source, target, currency, max_fee, amount, signature, balance, counted_fee))
+Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount comission, Amount amount, std::string signature, Amount balance) :
+  d(new priv(innerID, source, target, currency, comission, amount, signature, balance))
 {
 }
 
@@ -151,9 +149,9 @@ Amount Transaction::amount() const noexcept
   return d->amount_;
 }
 
-Amount Transaction::max_fee() const noexcept
+Amount Transaction::comission() const noexcept
 {
-	return d->max_fee_;
+	return d->comission_;
 }
 
 std::string Transaction::signature() const noexcept
@@ -164,11 +162,6 @@ std::string Transaction::signature() const noexcept
 Amount Transaction::balance() const noexcept
 {
   return d->balance_;
-}
-
-Amount Transaction::counted_fee() const noexcept
-{
-	return d->counted_fee_;
 }
 
 void Transaction::set_innerID(int64_t innerID)
@@ -206,10 +199,10 @@ void Transaction::set_amount(Amount amount)
   }
 }
 
-void Transaction::set_max_fee(Amount max_fee)
+void Transaction::set_comission(Amount comission)
 {
 	if (!d.constData()->read_only_) {
-		d->max_fee_ = max_fee;
+		d->comission_ = comission;
 	}
 }
 
@@ -225,14 +218,6 @@ void Transaction::set_balance(Amount balance)
   if (!d.constData()->read_only_) {
     d->balance_ = balance;
   }
-}
-
-void Transaction::set_counted_fee(Amount counted_fee)
-{
-	if (!d.constData()->read_only_)
-	{
-		d->counted_fee_ = counted_fee;
-	}
 }
 
 bool Transaction::add_user_field(user_field_id_t id, UserField field) noexcept
@@ -313,7 +298,7 @@ std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const
 	else
 		currency = 0;
 	os.put(data->amount_);
-	os.put(data->max_fee_);
+	os.put(data->comission_);
 	os.put(currency);
 	if (data->user_fields_.size())
 	{
@@ -338,11 +323,10 @@ void Transaction::put(::csdb::priv::obstream &os) const
   os.put(data->target_);
   os.put(data->currency_);
   os.put(data->amount_);
-  os.put(data->max_fee_);
+  os.put(data->comission_);
   os.put(data->user_fields_);
   os.put(data->signature_);
   os.put(data->balance_);
-  os.put(data->counted_fee_);
 }
 
 bool Transaction::get(::csdb::priv::ibstream &is)
@@ -350,14 +334,13 @@ bool Transaction::get(::csdb::priv::ibstream &is)
   priv* data = d.data();
   return is.get(data->innerID_)
 	  && is.get(data->source_)
-	  && is.get(data->target_)
-	  && is.get(data->currency_)
-	  && is.get(data->amount_)
-	  && is.get(data->max_fee_)
-	  && is.get(data->user_fields_)
+      && is.get(data->target_)
+      && is.get(data->currency_)
+      && is.get(data->amount_)
+	  && is.get(data->comission_)
+      && is.get(data->user_fields_)
 	  && is.get(data->signature_)
-	  && is.get(data->balance_)
-	  && is.get(data->counted_fee_);
+	  && is.get(data->balance_);
 }
 
 } // namespace csdb
