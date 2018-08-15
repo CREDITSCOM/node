@@ -49,10 +49,9 @@ class Transaction::priv : public ::csdb::internal::shared_data
   inline priv() :
     read_only_(false),
     amount_(0_c),
-	max_fee_(0_c),
+	comission_(0_c),
 	signature_(),
-    balance_(0_c),
-	counted_fee_(0_c)
+    balance_(0_c)
   {}
 
   inline priv(const priv& other) :
@@ -61,26 +60,23 @@ class Transaction::priv : public ::csdb::internal::shared_data
     source_(other.source_),
     target_(other.target_),
     currency_(other.currency_),
-	max_fee_(other.max_fee_),
+	comission_(other.comission_),
     amount_(other.amount_),
 	signature_(other.signature_),
     balance_(other.balance_),
-	counted_fee_(other.counted_fee_),
     user_fields_(other.user_fields_)
   {}
 
-  inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-	  Amount max_fee, std::string signature, Amount balance, Amount counted_fee) :
+  inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature, Amount balance) :
     read_only_(false),
 	innerID_(innerID),
     source_(source),
     target_(target),
     currency_(currency),
     amount_(amount),
-	max_fee_(max_fee),
+	comission_(comission),
 	signature_(signature),
-	balance_(balance),
-	counted_fee_(counted_fee)
+    balance_(balance)
   {}
 
   inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index)
@@ -96,10 +92,9 @@ class Transaction::priv : public ::csdb::internal::shared_data
   Address target_;
   Currency currency_;
   Amount amount_;
-  Amount max_fee_;
+  Amount comission_;
   std::string signature_;
   Amount balance_;
-  Amount counted_fee_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
 
   friend class Transaction;
