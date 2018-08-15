@@ -28,6 +28,10 @@ using namespace Credits;
 //}
 
 BlockChain::BlockChain(const char* path) {
+
+  if (!loadCache())
+     return;
+
   std::cout << "Trying to open DB..." << std::endl;
   char  kk[14];
   std::vector <uint8_t> v_hash(32);
