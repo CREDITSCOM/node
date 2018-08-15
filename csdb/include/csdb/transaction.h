@@ -92,8 +92,10 @@ class Transaction
   SHARED_DATA_CLASS_DECLARE(Transaction)
 
 public:
-  Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature);
-  Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature, Amount balance);
+  Transaction(int64_t innerID, Address source, Address target, Currency currency,
+	  Amount amount, Amount max_fee, std::string signature, Amount counted_fee);
+  Transaction(int64_t innerID, Address source, Address target, Currency currency,
+	  Amount amount, Amount max_fee, std::string signature, Amount balance, Amount counted_fee);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -104,18 +106,20 @@ public:
   Address target() const noexcept;
   Currency currency() const noexcept;
   Amount amount() const noexcept;
-  Amount comission() const noexcept;
+  Amount max_fee() const noexcept;
   std::string signature() const noexcept;
   Amount balance() const noexcept;
+  Amount counted_fee() const noexcept;
 
   void set_innerID(int64_t innerID);
   void set_source(Address source);
   void set_target(Address target);
   void set_currency(Currency currency);
   void set_amount(Amount amount);
-  void set_comission(Amount comission);
+  void set_max_fee(Amount max_fee);
   void set_signature(std::string signature);
   void set_balance(Amount balance);
+  void set_counted_fee(Amount counted_fee);
 
   ::csdb::internal::byte_array to_binary();
   static Transaction from_binary(const ::csdb::internal::byte_array data);

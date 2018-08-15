@@ -366,11 +366,6 @@ Pool::sequence_t Pool::sequence() const noexcept
   return d->sequence_;
 }
 
-std::string Pool::signature() const noexcept
-{
-	return d->signature_;
-}
-
 std::vector<uint8_t> Pool::writer_public_key() const noexcept
 {
 	return d->writer_public_key_;
@@ -396,17 +391,6 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept
   priv* data = d.data();
   data->is_valid_ = true;
   data->previous_hash_ = previous_hash;
-}
-
-void Pool::set_signature(std::string signature) noexcept
-{
-	if (d.constData()->read_only_) {
-		return;
-	}
-
-	priv* data = d.data();
-	data->is_valid_ = true;
-	data->signature_ = signature;
 }
 
 void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept
@@ -559,46 +543,27 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
   return false;
 }
 
-void Pool::sign_pool(std::vector<uint8_t> private_key)
+void Pool::sign(std::vector<uint8_t> private_key)
 {
-	uint8_t signature[64], priv_key[64];
-	std::vector<uint8_t> pool_bytes = this->to_byte_stream_for_sig();
-	uint64_t msg_len = pool_bytes.size();
-	uint8_t* msg = new uint8_t[msg_len];
-	for (int i = 0; i < msg_len; i++)
-		msg[i] = pool_bytes[i];
-	for (int i = 0; i < 64; i++)
-		priv_key[i] = private_key[i];
+	uint8_t signature[64];
+	auto pool_bytes = this->to_byte_stream_for_sig();
 	uint64_t sig_len;
 	crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_len),
-	  msg, msg_len, priv_key);
-	delete[] msg;
-	std::string sig_to_pool((char *)signature, sizeof(signature));
-	this->set_signature(sig_to_pool);
+	  pool_bytes.data(), pool_bytes.size(), private_key.data());
+	d->signature_.assign((char *)signature, sizeof(signature));
 }
 
-bool Pool::verify_pool_signature()
+bool Pool::verify_signature()
 {
-	if (this->writer_public_key().size() != 32 || this->signature().size() != 64)
+	if (this->writer_public_key().size() != 32 || d->signature_.size() != 64)
 		return false;
-	uint8_t public_key[32];
-	std::vector<uint8_t> my_pub = this->writer_public_key();
-	for (int i = 0; i < 32; i++)
-		public_key[i] = my_pub[i];
-	uint8_t signature[64];
-	std::string str_sig = this->signature();
-	for (int i = 0; i < 64; i++)
-		signature[i] = str_sig[i];
-	std::vector<uint8_t> pool_bytes = this->to_byte_stream_for_sig();
-	uint64_t msg_len = pool_bytes.size();
-	uint8_t* msg = new uint8_t[msg_len];
-	for (int i = 0; i < msg_len; i++)
-		msg[i] = pool_bytes[i];
-	int ver_ok = crypto_sign_ed25519_verify_detached(signature, msg, msg_len, public_key);
-	delete[]msg;
-	if (ver_ok == 0)
+
+	const auto& pool_bytes = this->to_byte_stream_for_sig();
+	if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
+		pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
 		return true;
-	else return false;
+	}
+	return false;
 }
 
 Pool Pool::load(PoolHash hash, Storage storage)

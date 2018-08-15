@@ -63,7 +63,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   block.set_writer_public_key(myPublicKey);
   block.add_user_field(0, std::to_string((uint64_t)((uint64_t)(t.time) * 1000ll) + t.millitm));
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
-  block.sign_pool(myPrivateKey);
+  block.sign(myPrivateKey);
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
   std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
@@ -314,7 +314,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
-		if(block.verify_pool_signature())
+		if(block.verify_signature())
 			node_->getBlockChain().putBlock(block);
 		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{

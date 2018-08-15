@@ -95,13 +95,11 @@ public:
   sequence_t sequence() const noexcept;
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
-  std::string signature() const noexcept;
   std::vector<uint8_t> writer_public_key() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(sequence_t sequence) noexcept;
   void set_storage(Storage storage) noexcept;
-  void set_signature(std::string signature) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
   std::vector<csdb::Transaction>& transactions();
   /**
@@ -223,8 +221,8 @@ public:
   */
   Transaction get_last_by_target(Address target) const noexcept;
 
-  void sign_pool(std::vector<uint8_t> private_key);
-  bool verify_pool_signature();
+  void sign(std::vector<uint8_t> private_key);
+  bool verify_signature();
 
   friend class Storage;
 };
