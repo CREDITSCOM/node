@@ -105,6 +105,7 @@ private:
   bool syncro_started = false;
   uint32_t sendBlockRequestSequence;
   bool awaitingSyncroBlock;
+  uint32_t awaitingRecBlockCount = 0;
 
 
 

@@ -484,11 +484,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (awaitingSyncroBlock)
+  if (awaitingSyncroBlock && awaitingRecBlockCount<3)
   {
     std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence << std::endl;
+    awaitingRecBlockCount++;
     return;
   }
+
 
   //ostream_.init();
   //ostream_ << seq;
@@ -499,6 +501,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   std::cout << "SENDBLOCKREQUEST>" << std::endl;
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock = true;
+  awaitingRecBlockCount=0;
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::BlockRequest
     << roundNum_
@@ -590,7 +593,7 @@ void Node::onRoundStart() {
   if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
   //else  std::cout << "Get Status> SYNCRO NOT STARTED ... YET" << std::endl;
 
-  if ((((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || getBlockChain().getBlockRequestNeed()) && (!awaitingSyncroBlock) && (!syncro_started)))
+  if (((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || getBlockChain().getBlockRequestNeed()))// && (!awaitingSyncroBlock))// && (!syncro_started)))
   {
     std::cout << "Starting SYNCRO" << std::endl;
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
