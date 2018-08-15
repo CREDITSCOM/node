@@ -60,9 +60,13 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   struct timeb t;
   ftime(&t);
   //addTimestampToPool(block);
+  std::cout << "SOLVER> Before write pub key" << std::endl;
   block.set_writer_public_key(myPublicKey);
+  std::cout << "SOLVER> Before time stamp" << std::endl;
   block.add_user_field(0, std::to_string((uint64_t)((uint64_t)(t.time) * 1000ll) + t.millitm));
+  std::cout << "SOLVER> Before write last sequence" << std::endl;
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+  std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
   std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
@@ -93,8 +97,10 @@ void Solver::closeMainRound()
   }
   else
   {
+  //node_->sendFirstTransaction();
     node_->becomeWriter();
 	std::cout << "Solver -> Node Level changed 2 -> 3" << std::endl;
+
     //addTimestampToPool(m_pool);
 
 #ifdef SPAM_MAIN
@@ -314,14 +320,15 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
-		if(block.verify_signature())
+		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 			node_->getBlockChain().putBlock(block);
 		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{
 			//std::cout << "Solver -> before sending hash to writer" << std::endl;
-			csdb::PoolHash test_hash = node_->getBlockChain().getLastHash();//SENDING HASH!!!
+			Hash test_hash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));//SENDING HASH!!!
+
 			node_->sendHash(test_hash, sender);
-			
+      std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
 		}
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
@@ -347,12 +354,12 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
  // writeNewBlock();
 }
 
-void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender)
+void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
 	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
-	csdb::PoolHash myHash(node_->getBlockChain().getLastHash());
-	std::cout << "Solver -> My Hash: " << myHash.to_string() << std::endl;
+	Hash myHash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));
+	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
  
 	if (ips.size() <= min_nodes) 
 	{
@@ -379,7 +386,7 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender)
 	{
 		//node_->initNextRound(node_->getMyId(), std::move(ips));
 		std::cout << "Solver -> sending NEW ROUND table" << std::endl;
-		node_->sendRoundTable();//node_->getMyPublicKey(), std::move(ips),
+		node_->initNextRound(node_->getMyPublicKey(), std::move(ips));
 		round_table_sent = true;
 		
 	}
@@ -536,7 +543,7 @@ void Solver::addInitialBalance()
   csdb::Pool pool;
   csdb::Transaction transaction;
   transaction.set_target(
-    csdb::Address::from_public_key(node_->getMyPublicKey().str));
+    csdb::Address::from_public_key((char*)myPublicKey.data()));
   transaction.set_source(csdb::Address::from_string(start_address));
 
   transaction.set_currency(csdb::Currency("CS"));

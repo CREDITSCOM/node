@@ -35,7 +35,8 @@ void Neighbourhood::checkPending() {
   // If the connection cannot be established, retry it
   for (auto conn = pendingConnections_.begin();
        conn != pendingConnections_.end();
-       ++conn) {
+       ++conn) 
+       {
     // Attempt to reconnect if the connection hasn't been established yet
     if (((*conn)->node &&
          (*conn)->node->connection.load(std::memory_order_relaxed) != **conn) ||
@@ -47,18 +48,19 @@ void Neighbourhood::checkPending() {
       transport_->sendRegistrationRequest(***conn);
   }
 
-  LOG_EVENT("PENDING: ");
-  for (auto conn = pendingConnections_.begin();
-       conn != pendingConnections_.end();
-       ++conn)
-    LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
+ //LOG_EVENT("PENDING: ");
+  //for (auto conn = pendingConnections_.begin();
+  //     conn != pendingConnections_.end();
+  //     ++conn)
+  //  LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
   }
+
   SpinLock ll(nLockFlag_);
-  LOG_EVENT("NEIGH: ");
-  for (auto conn = neighbours_.begin();
-       conn != neighbours_.end();
-       ++conn)
-    LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
+  //LOG_EVENT("NEIGH: ");
+  //for (auto conn = neighbours_.begin();
+   //    conn != neighbours_.end();
+   //    ++conn)
+   // LOG_EVENT("- " << ((*conn)->specialOut ? "1" : "0") << " " << (*conn)->id << ", " << (*conn)->in << ", " << ((*conn)->specialOut ? (*conn)->out : (*conn)->in));
 }
 
 void Neighbourhood::checkSilent() {
@@ -72,7 +74,7 @@ void Neighbourhood::checkSilent() {
         load(std::memory_order_relaxed);
 
       if (packetsCount == (*conn)->lastPacketsCount) {
-        LOG_WARN("Node " << (*conn)->in << " stopped responding");
+       // LOG_WARN("Node " << (*conn)->in << " stopped responding");
         ConnectionPtr tc = *conn;
         neighbours_.remove(conn);
         --conn;

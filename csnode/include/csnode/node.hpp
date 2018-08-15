@@ -55,7 +55,7 @@ public:
   void sendVector(const Credits::HashVector&);
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
-  void sendHash(const csdb::PoolHash&, const PublicKey&);
+  void sendHash(const Hash&, const PublicKey&);
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const PublicKey&);
