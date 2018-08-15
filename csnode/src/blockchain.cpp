@@ -83,7 +83,7 @@ BlockChain::BlockChain(const char* path) {
         f.read(kk, 14);
         f.close();
       }
-      uint16_t hash_num;
+
       char* s_beg = kk;
       char* s_end = strchr(kk, '-');
       *s_end = '\0';
@@ -458,7 +458,7 @@ namespace
             : addr_(addr), blockchain_(blockchain), transactions_(transactions)
         {}
 
-        bool load(const csdb::PoolHash& poolHash, int64_t& offset, int64_t limit, csdb::PoolHash& prevPoolHash)
+        bool load(const csdb::PoolHash& poolHash, int64_t& offset, size_t limit, csdb::PoolHash& prevPoolHash)
         {
             csdb::Pool curr = blockchain_.loadBlock(poolHash);
             if (!curr.is_valid())

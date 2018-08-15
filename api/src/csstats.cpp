@@ -43,11 +43,7 @@ csstats::collectStats(const Periods& periods)
         typedef std::vector<csdb::Transaction> Transactions;
         Transactions transactions;
 
-        time_t timeMs = 0;
-
         const csdb::Pool pool = blockchain.loadBlock(blockHash);
-
-        time_t timeSec = timeMs / 1000;
 
         auto now = std::chrono::system_clock::now();
         auto poolTime_t =

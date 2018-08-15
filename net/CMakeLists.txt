@@ -15,6 +15,7 @@ add_library(net
   src/transport.cpp
 )
 
+add_dependencies(${PROJECT_NAME} csconnector)
 target_include_directories(net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/include/net
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../api/include

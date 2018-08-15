@@ -97,10 +97,8 @@ namespace Credits{
 		uint8_t i_max;
 		bool found = false;
 
-		uint8_t max_freq;
-		uint8_t ii;
 		uint8_t max_frec_position;
-		uint8_t j_max, jj;
+		uint8_t j_max;
 		j_max = 0;
 
 		for (uint8_t i = 0; i < nodes_amount; i++)
@@ -173,7 +171,6 @@ namespace Credits{
 		//hash_weight *hw_total = new hash_weight[nodes_amount];
 
 		unsigned char *mtr = new unsigned char[nodes_amount * 97];
-		uint8_t ii;
 
 		uint8_t max_frec_position;
 		uint8_t j_max, jj;

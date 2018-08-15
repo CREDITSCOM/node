@@ -59,7 +59,7 @@ namespace csstats {
         inline void Log() {  }
 
                         template <typename T, typename... Args>
-                        inline void Log(T t, Args... args)
+                        inline void Log(T, Args...)
                         {
                         }
 #else
