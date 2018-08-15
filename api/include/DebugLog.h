@@ -30,7 +30,7 @@ inline void Log(Args&&... args) {}
 
 #ifdef NDEBUG
 template <typename T, typename... Args>
-inline void DebugLog(T t, Args&&... args)
+inline void DebugLog(T, Args&&...)
 {
 
 }

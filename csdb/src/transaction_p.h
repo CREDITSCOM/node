@@ -49,33 +49,33 @@ class Transaction::priv : public ::csdb::internal::shared_data
   inline priv() :
     read_only_(false),
     amount_(0_c),
-	comission_(0_c),
-	signature_(),
+    comission_(0_c),
+    signature_(),
     balance_(0_c)
   {}
 
   inline priv(const priv& other) :
     read_only_(false),
-	innerID_(other.innerID_),
+    innerID_(other.innerID_),
     source_(other.source_),
     target_(other.target_),
     currency_(other.currency_),
-	comission_(other.comission_),
     amount_(other.amount_),
-	signature_(other.signature_),
+    comission_(other.comission_),
+    signature_(other.signature_),
     balance_(other.balance_),
     user_fields_(other.user_fields_)
   {}
 
   inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount, Amount comission, std::string signature, Amount balance) :
     read_only_(false),
-	innerID_(innerID),
+    innerID_(innerID),
     source_(source),
     target_(target),
     currency_(currency),
     amount_(amount),
-	comission_(comission),
-	signature_(signature),
+    comission_(comission),
+    signature_(signature),
     balance_(balance)
   {}
 

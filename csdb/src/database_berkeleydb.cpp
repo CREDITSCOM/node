@@ -100,8 +100,17 @@ void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status)
   }
 }
 
-bool DatabaseBerkeleyDB::open(const std::string& path, uint32_t flags)
+bool DatabaseBerkeleyDB::open(const std::string& path)
 {
+  boost::filesystem::path direc(path);
+  if (boost::filesystem::exists(direc)) {
+    if (!boost::filesystem::is_directory(direc))
+      return false;
+  } else {
+    if (!boost::filesystem::create_directories(direc))
+      return false;
+  }
+
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
 
@@ -127,21 +136,6 @@ bool DatabaseBerkeleyDB::open(const std::string& path, uint32_t flags)
 
   set_last_error();
   return true;
-}
-
-bool DatabaseBerkeleyDB::open(const std::string& path)
-{
-  boost::filesystem::path direc(path);
-  if (boost::filesystem::exists(direc)) {
-    if (!boost::filesystem::is_directory(direc))
-      return false;
-  } else {
-    if (!boost::filesystem::create_directories(direc))
-      return false;
-  }
-
-  uint32_t flags = 0;
-  return open(path, flags);
 }
 
 bool DatabaseBerkeleyDB::is_open() const
