@@ -431,6 +431,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
 
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
   if (myLevel_ != NodeLevel::Writer) {
+    std::cout << "Non-Writers cannot get hashes" << std::endl;
     return;
   }
   std::cout << " Getting hash from " << byteStreamToHex(sender.str,32) << std::endl;
@@ -454,7 +455,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
     return;
   }
 
-  LOG_WARN("Sending hash");
+  LOG_WARN("Sending hash of " << roundNum_ << " to " << byteStreamToHex(target.str, 32));
 
   ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
   ostream_ << MsgTypes::BlockHash
@@ -638,12 +639,11 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
-  if (rNum == roundNum_ ||
-      type == MsgTypes::NewBlock)
+  if (rNum == roundNum_)
     return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;
 
   if (rNum < roundNum_)
-    return MessageActions::Drop;
+    return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
 
   return (type == MsgTypes::RoundTable ? MessageActions::Process : MessageActions::Postpone);
 }

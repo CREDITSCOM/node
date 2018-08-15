@@ -157,7 +157,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
     SpinLock l(nLockFlag_);
     if (auto nh = findInVec(conn.id, neighbours_)) {
       if (node->connection.load(std::memory_order_relaxed) != **nh) {
-        LOG_WARN("RemoteNode has a different connection" << node->connection.load(std::memory_order_relaxed)->in << " vs " << (**nh)->in);
+        LOG_WARN("RemoteNode has a different connection");
         return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
       }
       return transport_->sendRegistrationConfirmation(conn);

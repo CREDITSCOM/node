@@ -41,6 +41,7 @@ namespace Credits{
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
 		csdb::Amount comission = 0.1_c;
+    csdb::Transaction tempTransaction;
 	  size_t transactionsNumber = _pool.transactions_count();
 	  real_deltas.reserve(transactionsNumber);
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
@@ -57,9 +58,8 @@ namespace Credits{
 	#endif
 		  if (delta.integral() < 0) *(del1 + i) = -bitcnt;
 		  else *(del1 + i) = bitcnt;
-		  real_deltas.push_back(delta); 
-		  
-			i++;
+      real_deltas.push_back(delta);
+  		i++;
 	  }
 	  
 		uint8_t* hash_s = new uint8_t[32];
@@ -74,6 +74,11 @@ namespace Credits{
 		Hash_ hash_(hash_s);
 		return hash_;
 	  
+    }
+
+    std::vector<csdb::Amount> Generals::getDeltas()
+    {
+      return real_deltas;
     }
 
     void Generals::addvector(HashVector vector) {

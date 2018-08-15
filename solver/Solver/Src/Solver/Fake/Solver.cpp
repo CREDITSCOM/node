@@ -292,6 +292,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 
 void Solver::composeBlock()
 {
+  //for(auto& it : generals->getDeltas())
 }
 
 //what block does this function write???
