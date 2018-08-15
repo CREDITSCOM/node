@@ -471,9 +471,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
   uint32_t requested_seq;
   istream_.init(data, size);
   istream_ >> requested_seq;
-  std::cout << "///////////////////////////////////////////////////////////////////////////////////////////////////////////////" << std::endl;
+
   std::cout << "GETBLOCKREQUEST> Getting the request for block: " << requested_seq << std::endl;
-  std::cout << "///////////////////////////////////////////////////////////////////////////////////////////////////////////////" << std::endl;
+
   if (requested_seq > getBlockChain().getLastWrittenSequence())
   {
     std::cout << "GETBLOCKREQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN" << std::endl;
@@ -501,6 +501,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingSyncroBlock = true;
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::BlockRequest
+    << roundNum_
     << seq;
   flushCurrentTasks();
   
@@ -535,6 +536,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const  PublicKey& sender) {
    std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
    ostream_.init(BaseFlags::Signed, sender);
    ostream_ << MsgTypes::RequestedBlock
+      << roundNum_
       << pool;
     flushCurrentTasks();
   }

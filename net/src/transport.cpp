@@ -354,7 +354,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockRequest:
-    std::cout << "///////////////////////////////////////////////////////////////////////////////////////////////////////////////" << std::endl;
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
     return node_->getBlockReply(data, size);
