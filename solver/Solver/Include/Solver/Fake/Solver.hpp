@@ -108,7 +108,7 @@ typedef std::string Matrix;
         void send_wallet_transaction(const csdb::Transaction& transaction);
 
 		void nextRound();
-		void composeBlock();
+
 	private:
         void _initApi();
 
