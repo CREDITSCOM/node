@@ -32,7 +32,7 @@ namespace Credits{
         void chooseHeadAndTrusted(std::map<std::string, std::string>);
         void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
 
-        Hash_ buildvector(csdb::Pool& _pool);
+        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
 
         void addvector(HashVector vector);
         void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
@@ -41,8 +41,8 @@ namespace Credits{
         uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
 		
         HashMatrix getMatrix();
-        std::vector<csdb::Amount> getDeltas();
-		void addSenderToMatrix(uint8_t myConfNum);
+
+		    void addSenderToMatrix(uint8_t myConfNum);
 
         void fake_block(std::string);
     private:	
@@ -69,6 +69,5 @@ namespace Credits{
         //std::vector<std::string> vector_datas;
         //std::vector<std::string> matrix_data;
 
-		std::vector<csdb::Amount> real_deltas;
     };
 }

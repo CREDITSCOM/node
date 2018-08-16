@@ -67,7 +67,7 @@ public:
     bool getBlockRequestNeed();
 
     csdb::PoolHash getHashBySequence(uint32_t seq);
-
+    csdb::PoolHash getLastWrittenHash();
 private:
     Headtag ht;
     bool loadCache();
