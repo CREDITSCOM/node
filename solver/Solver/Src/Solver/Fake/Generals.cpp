@@ -33,7 +33,7 @@ namespace Credits{
     Generals::Generals() { }
     Generals::~Generals() { }
 
-    Hash_ Generals::buildvector(csdb::Pool& _pool) {
+    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
       ////////////////////////////////////////////////////////////////////////
       //    This function was modified to calculate deltas for concensus    //
       ////////////////////////////////////////////////////////////////////////
@@ -43,9 +43,9 @@ namespace Credits{
 		csdb::Amount comission = 0.1_c;
     csdb::Transaction tempTransaction;
 	  size_t transactionsNumber = _pool.transactions_count();
-	  real_deltas.reserve(transactionsNumber);
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
+    const csdb::Amount zero_balance = 0.0_c;
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
 	  {
@@ -56,10 +56,14 @@ namespace Credits{
 	#else
 		  int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
 	#endif
-		  if (delta.integral() < 0) *(del1 + i) = -bitcnt;
-		  else *(del1 + i) = bitcnt;
-      real_deltas.push_back(delta);
-  		i++;
+		  if (delta > zero_balance)
+      {
+        *(del1 + i) = bitcnt;
+        new_pool.add_transaction(it);
+      }
+
+		  else *(del1 + i) = -bitcnt;
+     	i++;
 	  }
 	  
 		uint8_t* hash_s = new uint8_t[32];
@@ -74,11 +78,6 @@ namespace Credits{
 		Hash_ hash_(hash_s);
 		return hash_;
 	  
-    }
-
-    std::vector<csdb::Amount> Generals::getDeltas()
-    {
-      return real_deltas;
     }
 
     void Generals::addvector(HashVector vector) {

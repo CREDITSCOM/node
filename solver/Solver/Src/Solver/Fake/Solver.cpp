@@ -205,7 +205,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 	trustedCounterVector = 0;
 
 	trustedCounterMatrix = 0;
-	Hash_ result = generals->buildvector(_pool);
+	Hash_ result = generals->buildvector(_pool, m_pool);
 
 	receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
@@ -282,7 +282,6 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 		  if (wTrusted == node_->getMyConfNumber())
 		  {
 			  node_->becomeWriter();
-			  composeBlock();
 			  writeNewBlock();
 		  }
 
@@ -290,21 +289,14 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	}
 }
 
-void Solver::composeBlock()
-{
-  //for(auto& it : generals->getDeltas())
-}
 
 //what block does this function write???
 void Solver::writeNewBlock()
 {
 	std::cout << "Solver -> writeNewBlock ... start";
   if (consensusAchieved &&
-      node_->getMyLevel() == NodeLevel::Writer) {
-    //m_pool.set_writer_public_key(myPublicKey);
-	prepareBlockForSend(m_pool);
-	//m_pool.set_sequence(node_->getBlockChain().getLastWrittenSequence()+1);
-    //m_pool.sign_pool(myPrivateKey);
+    node_->getMyLevel() == NodeLevel::Writer) {
+    prepareBlockForSend(m_pool);
     node_->sendBlock(std::move(m_pool));
     node_->getBlockChain().putBlock(m_pool);
     
@@ -329,7 +321,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{
 			//std::cout << "Solver -> before sending hash to writer" << std::endl;
-			Hash test_hash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));//SENDING HASH!!!
+			Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 
 			node_->sendHash(test_hash, sender);
       std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
@@ -362,7 +354,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
 	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
-	Hash myHash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));
+	Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
 	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
  
 	if (ips.size() <= min_nodes) 

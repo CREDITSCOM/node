@@ -412,6 +412,10 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   blockRequestIsNeeded = true;
 }
 
+csdb::PoolHash BlockChain::getLastWrittenHash()
+{
+  return lastHash_;
+}
 
 void
 BlockChain::wait_for_block()
