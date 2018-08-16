@@ -432,6 +432,11 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
     send_transaction.set_target(
       BlockChain::getAddressFromKey(transaction.target));
 
+	send_transaction.set_comission(csdb::Amount(
+		transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
+	send_transaction.set_innerID(transaction.id);
+	send_transaction.set_signature(transaction.signature);
+
     TRACE();
 
     if (!transaction.__isset.smartContract) {
