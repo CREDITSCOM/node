@@ -98,19 +98,21 @@ typedef std::string Matrix;
 		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
 		void gotBlockReply(csdb::Pool&&);
 
-
+    void sendTL();
 		// API methods
 
 		void initApi();
-
+    uint32_t getTLsize();
 		void addInitialBalance();
 
-        void send_wallet_transaction(const csdb::Transaction& transaction);
+    void send_wallet_transaction(const csdb::Transaction& transaction);
 
 		void nextRound();
+    bool mPoolClosed();
+    void setLastRoundTransactionsGot(size_t trNum);
 
 	private:
-        void _initApi();
+    void _initApi();
 
 		void runMainRound();
 		void closeMainRound();
@@ -118,7 +120,7 @@ typedef std::string Matrix;
 		void flushTransactions();
 
 		void writeNewBlock();
-        void prepareBlockForSend(csdb::Pool& block);
+    void prepareBlockForSend(csdb::Pool& block);
 
 #ifdef SPAM_MAIN
 		void createPool();
@@ -140,7 +142,7 @@ typedef std::string Matrix;
 		HashVector hvector;
 		
 		
-
+    size_t lastRoundTransactionsGot;
 		std::set<PublicKey> receivedVec_ips;
 		bool receivedVecFrom[100];
 		uint8_t trustedCounterVector;

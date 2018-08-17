@@ -37,7 +37,8 @@ enum MsgTypes: uint8_t {
   NewBlock,
   BlockHash,
   BlockRequest,
-  RequestedBlock
+  RequestedBlock,
+  TLConfirmation
 
 };
 

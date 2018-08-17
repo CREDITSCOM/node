@@ -270,7 +270,7 @@ constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
 void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
-
+  std::cout << "TRANSPORT> Process Node Package MSG" << std::endl;
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -288,7 +288,15 @@ void Transport::processNodeMessage(const Message& msg) {
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
-
+ /*
+  if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
+  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
+  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
+  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
+  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
+  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
+  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+*/
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -357,6 +365,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
     return node_->getBlockReply(data, size);
+  case MsgTypes::TLConfirmation:
+    return node_->getTLConfirmation(data, size);
   default:
     LOG_ERROR("Unknown type");
     break;
@@ -381,7 +391,7 @@ void Transport::clearTasks() {
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
-  LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
+  //LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
   Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
@@ -391,7 +401,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 }
 
 void Transport::sendRegistrationConfirmation(const Connection& conn) {
-  LOG_EVENT("Confirming registration with " << conn.in);
+  //LOG_EVENT("Confirming registration with " << conn.in);
 
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::RegistrationConfirmed << conn.id << myPublicKey_;

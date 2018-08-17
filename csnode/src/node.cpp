@@ -172,7 +172,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     return;
 
   roundNum_ = rNum;
-  
+  if(myLevel_==NodeLevel::Main)
   if (!istream_.good()) {
     LOG_WARN("Bad round table format, ignoring");
     return;
@@ -213,17 +213,22 @@ void Node::sendRoundTable() {
 }
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
+  std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+  std::cout << "|            NODE> Get Transactions          |" << std::endl;
+  std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
   if (myLevel_ != NodeLevel::Main &&
       myLevel_ != NodeLevel::Writer) {
     return;
   }
 
   istream_.init(data, size);
-
+  int i=1;
   while (istream_.good() && !istream_.end()) {
+  std::cout << "NODE> Get transaction #:" << i << std::endl;
     csdb::Transaction trans;
     istream_ >> trans;
     solver_->gotTransaction(std::move(trans));
+    i++;
   }
 
   if (!istream_.good()) {
@@ -237,19 +242,19 @@ void Node::sendTransaction(const csdb::Transaction& trans) {
   ostream_ << MsgTypes::Transactions
            << roundNum_
            << trans;
-
+  std::cout << "Sending transactions" << std::endl;
   LOG_EVENT("Sending transaction");
   flushCurrentTasks();
 }
 
 void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented, mainNode_);
+  ostream_.init(BaseFlags::Broadcast);// | BaseFlags::Fragmented, mainNode_);
   ostream_ << MsgTypes::Transactions << roundNum_;
 
   for (auto& tr : transactions)
     ostream_ << tr;
-
-  LOG_EVENT("Sending transactions");
+    std::cout << "Sending transactions = " << transactions.size() << std::endl;
+  //LOG_EVENT("Sending transactions");
   flushCurrentTasks();
 }
 
@@ -302,7 +307,37 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
   }
 
   LOG_EVENT("Got full transactions list of " << pool.transactions_count());
-  solver_->gotTransactionList(std::move(pool));
+  if (pool.transactions_count()>0)
+  {
+    solver_->gotTransactionList(std::move(pool));
+    }
+}
+
+void Node::sendTLConfirmation(size_t tcount )
+{
+  if (myLevel_ != NodeLevel::Main) {
+    LOG_ERROR("Only previous main nodes can send Transaction Lists ");
+    return;
+  }
+  
+  ostream_.init(BaseFlags::Signed, mainNode_);
+  ostream_ << MsgTypes::TLConfirmation
+    << roundNum_
+    << tcount;
+  std::cout << "NODE> Transactions amount sent " << std::endl;
+}
+
+void Node::getTLConfirmation(const uint8_t* data, const size_t size)
+{
+  if (myLevel_ != NodeLevel::Main) {
+    LOG_ERROR("Only main nodes can receive TLSend confirmations");
+    return;
+  }
+  istream_.init(data, size);
+  std::cout << "NODE> Transactions amount got " << std::endl;
+  size_t trNum;
+  istream_ >> trNum;
+  solver_->setLastRoundTransactionsGot(trNum);
 }
 
 void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) {
@@ -315,7 +350,7 @@ void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) 
   ostream_ << MsgTypes::TransactionList
            << roundNum_
            << pool;
-
+std::cout << "NODE> Sending " << pool.transactions_count() << " transaction(s)" << std::endl;
   flushCurrentTasks();
 }
 
@@ -525,7 +560,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
   }
-  if (getBlockChain().getGlobalSequence() >= getBlockChain().getLastWrittenSequence())
+  if ((getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   else
   {
@@ -627,12 +662,20 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
   size_t nTrusted = confidantNodes.size()-1;
   uint8_t i = rand() % nTrusted;
   //std::cout << "Main Number = " << (int)i << std::endl;
-  std::cout << "Number of Trusted : " << nTrusted << std::endl;
+  //std::cout << "Number of Trusted : " << nTrusted << std::endl;
   mainNode_ = confidantNodes.at(i);
   confidantNodes_.clear();
   for (auto& conf : confidantNodes)
     if(mainNode_!=conf) confidantNodes_.push_back(conf);
+
   sendRoundTable();
+  
+  if(!(solver_->mPoolClosed()))
+ {
+    solver_->sendTL();
+ 
+ }
+
   //mainNode_ = mainNode;
   //std::swap(confidantNodes, confidantNodes_);
   onRoundStart();
@@ -685,8 +728,16 @@ inline bool Node::readRoundData(const bool tail) {
     return false;
   }
 
+
+std::swap(confidants, confidantNodes_);
+if (!solver_->mPoolClosed())
+{
+  solver_->sendTL();
+}
+
+
   mainNode_ = mainNode;
-  std::swap(confidants, confidantNodes_);
+  
 
   return true;
 }

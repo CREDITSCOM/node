@@ -45,6 +45,7 @@ public:
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
+  void getTLConfirmation(const uint8_t* data, const size_t size);
 
   /* Outcoming requests forming */
   void sendRoundTable();
@@ -63,6 +64,7 @@ public:
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
+  void sendTLConfirmation(size_t tcount);
 
   enum MessageActions {
     Process,
