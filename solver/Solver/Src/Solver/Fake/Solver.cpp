@@ -133,13 +133,13 @@ std::cout << "==================================================================
   //if (v_pool.transactions_count() > 0)
   //{
     std::cout << "Solver -> Sending " << v_pool.transactions_count() << " transactions " << std::endl;
-    for (auto& it : node_->getConfidants())
-    {
-      std::cout << "Solver -> Sending TransactionList to " << byteStreamToHex(it.str, 32) << std::endl;
+   // for (auto& it : node_->getConfidants())
+   // {
+      std::cout << "Solver -> Sending TransactionList to ALL" << std::endl;//<< byteStreamToHex(it.str, 32)  //<< 
 
-      node_->sendTransactionList(std::move(v_pool), it); // Correct sending, better if to all one time
-    }
- // }
+      node_->sendTransactionList(std::move(v_pool)); // Correct sending, better if to all one time
+   // }
+  
  // node_->sendTLConfirmation(v_pool.transactions_count());
 
 
@@ -377,6 +377,8 @@ void Solver::gotVector(HashVector&& vector)
         runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
           [this]() { writeNewBlock(); });
       }
+      else
+        LOG_WARN("This should NEVER happen, NEVER");
 
     }
   }
@@ -436,6 +438,8 @@ void Solver::gotMatrix(HashMatrix&& matrix)
         runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
           [this]() { writeNewBlock(); });
 		  }
+      else
+        LOG_WARN("This should NEVER happen, NEVER");
 
 	  }
 	}
@@ -454,6 +458,9 @@ void Solver::writeNewBlock()
     
 	std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
 	consensusAchieved = false;
+  }
+  else {
+    LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
   }
 }
 
@@ -687,7 +694,7 @@ void Solver::addInitialBalance()
 
   {
 	  std::lock_guard<std::mutex> l(m_trans_mut);
-	 // m_transactions.push_back(transaction);
+	  //m_transactions.push_back(transaction);
   }
 
 #ifdef SPAMMER

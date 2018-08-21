@@ -178,9 +178,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     LOG_WARN("Bad round table format, ignoring");
     return;
   }
-  
-  onRoundStart();
+
   transport_->clearTasks();
+  onRoundStart();
 
   transport_->processPostponed(rNum);
 }
@@ -320,13 +320,13 @@ std::cout << "NODE> Transactions amount got " <<pool.transactions_count() << std
    // }
 }
 
-void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) {
+void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& target) {
   if ((myLevel_ == NodeLevel::Confidant)|| (myLevel_ == NodeLevel::Normal)) {
     LOG_ERROR("Only main nodes can send transaction lists");
     return;
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
   size_t bSize;
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
 
@@ -592,8 +592,8 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
 }
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
-  if (myLevel_ == NodeLevel::Writer) {
-    LOG_ERROR("Writer node shouldn't send hashes");
+  if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
+    LOG_ERROR("Writer and Main node shouldn't send hashes");
     return;
   }
 
@@ -695,7 +695,10 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-
+  if (!solver_->mPoolClosed())
+  {
+    solver_->sendTL();
+  }
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
   
@@ -840,10 +843,7 @@ inline bool Node::readRoundData(const bool tail) {
 
 std::swap(confidants, confidantNodes_);
 std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
-if (!solver_->mPoolClosed())
-{
-  solver_->sendTL();
-}
+
 
 
   mainNode_ = mainNode;
