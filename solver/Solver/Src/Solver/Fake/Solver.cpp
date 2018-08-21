@@ -233,10 +233,12 @@ void Solver::flushTransactions()
 
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
-	
-	if (m_pool_closed) return;
-	// LOG_EVENT("m_pool_closed already, cannot accept your transactions");
-	std::cout << "SOLVER> Got Transaction" << std::endl;
+  std::cout << "SOLVER> Got Transaction" << std::endl;
+	if (m_pool_closed) {
+
+	  LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+    return;
+  }
 
 	if (transaction.is_valid())
 		{
@@ -277,25 +279,44 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 		}
 }
 
+void Solver::initConfRound()
+{
+  memset(receivedVecFrom, 0, 100);
+  memset(receivedMatFrom, 0, 100);
+  trustedCounterVector = 0;
+  trustedCounterMatrix = 0;
+}
+
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
-
+  uint8_t numGen = node_->getConfidants().size();
 	std::cout << "SOLVER> GotTransactionList" << std::endl;
-	memset(receivedVecFrom, 0, 100);
-	memset(receivedMatFrom, 0, 100);
   m_pool = csdb::Pool{};
-	trustedCounterVector = 0;
-
-	trustedCounterMatrix = 0;
-	Hash_ result = generals->buildvector(_pool, m_pool);
-
-	receivedVecFrom[node_->getMyConfNumber()] = true;
+  Hash_ result = generals->buildvector(_pool, m_pool);
+  receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
 	hvector.hash = result;
 	receivedVecFrom[node_->getMyConfNumber()] = true;
 	generals->addvector(hvector);
 	node_->sendVector(std::move(hvector));
 	trustedCounterVector++;
+  if(trustedCounterVector==numGen) 
+  {
+    vectorComplete = true;
+
+    memset(receivedVecFrom, 0, 100);
+    trustedCounterVector = 0;
+    //compose and send matrix!!!
+    //receivedMat_ips.insert(node_->getMyId());
+    generals->addSenderToMatrix(node_->getMyConfNumber());
+    receivedMatFrom[node_->getMyConfNumber()] = true;
+    trustedCounterMatrix++;
+    node_->sendMatrix(generals->getMatrix());
+    generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
+    std::cout << "SOLVER> Matrix added" << std::endl;
+
+  }
+
 
 }
 
@@ -331,16 +352,55 @@ void Solver::gotVector(HashVector&& vector)
 	trustedCounterMatrix++;
 	node_->sendMatrix(generals->getMatrix());
 	generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
+  std::cout << "SOLVER> Matrix added" << std::endl;
+
+  if (trustedCounterMatrix == numGen)
+  {
+    memset(receivedMatFrom, 0, 100);
+    trustedCounterMatrix = 0;
+    uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getLastHash()));
+
+    if (wTrusted == 100)
+    {
+      std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
+      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+        [this]() { writeNewBlock(); });
+
+    }
+
+    else
+    {
+      consensusAchieved = true;
+      if (wTrusted == node_->getMyConfNumber())
+      {
+        node_->becomeWriter();
+        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+          [this]() { writeNewBlock(); });
+      }
+
+    }
   }
+
+  }
+}
+
+void Solver::checkMatrixCame()
+{
+if (trustedCounterMatrix<2) node_->sendMatrix(generals->getMatrix());
 }
 
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
 	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
-  //for(uint8_t i=0; i<numGen; i++)
- // {
-  //  if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
+  /*for(uint8_t i=0; i<numGen; i++)
+  {
+    if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
+  }*/
+  //if(trustedCounterMatrix==0)
+  //{
+  //      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS/5),
+  //      [this]() { writeNewBlock();});
   //}
 
 

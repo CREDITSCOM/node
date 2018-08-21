@@ -698,7 +698,7 @@ void Node::onRoundStart() {
 
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
- 
+  
   if (mainNode_ == myPublicKey_)
     myLevel_ = NodeLevel::Main;
   else {
@@ -710,6 +710,7 @@ void Node::onRoundStart() {
         myLevel_ = NodeLevel::Confidant;
         myConfNumber = conf_no;
         found = true;
+        solver_->initConfRound();
         break;
       }
       conf_no++;

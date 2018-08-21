@@ -115,7 +115,7 @@ typedef std::string Matrix;
 
     HashVector getMyVector();
     HashMatrix getMyMatrix();
-
+    void initConfRound();
 
 	private:
     void _initApi();
@@ -156,6 +156,7 @@ typedef std::string Matrix;
 		std::set<PublicKey> receivedMat_ips;
 		bool receivedMatFrom[100];
 		uint8_t trustedCounterMatrix;
+    void checkMatrixCame();
 
 
 		std::vector<Hash> hashes;
