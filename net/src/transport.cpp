@@ -185,6 +185,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
   case NetworkCommand::SSPingWhiteNode:
     gotSSPingWhiteNode(task);
     break;
+  case NetworkCommand::SSLastBlock:
+	gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence());
+	break;
   default:
     result = false;
     LOG_WARN("Unexpected network command");
@@ -553,4 +556,17 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   conn.specialOut = false;
   sendDirect(&task->pack, conn);
   return true;
+}
+
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+	Connection conn;
+	conn.in = task->sender;
+	conn.specialOut = false;
+
+	oPackStream_.init(BaseFlags::NetworkMsg);
+	oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
+	oPackStream_ << lastBlock << myPublicKey_;
+
+	sendDirect(oPackStream_.getPackets(), conn);
+	return true;
 }
