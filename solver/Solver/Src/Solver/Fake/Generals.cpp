@@ -255,11 +255,11 @@ namespace Credits{
 
 		uint8_t trusted_limit;
 		trusted_limit = nodes_amount / 2 + 1;
-		for (int i = 0; i < nodes_amount; i++)
-		{
-			if (*(new_trusted + i) < trusted_limit)
-				std::cout << "Liar nodes : " << i << std::endl;
-		}
+		//for (int i = 0; i < nodes_amount; i++)
+		//{
+		//	if (*(new_trusted + i) < trusted_limit)
+				//std::cout << "Liar nodes : " << i << std::endl;
+	//	}
 		std::cout << "Hash : " << lasthash.to_string() << std::endl;
 		auto hash_t = lasthash.to_binary();
 		int k= *(hash_t.begin());

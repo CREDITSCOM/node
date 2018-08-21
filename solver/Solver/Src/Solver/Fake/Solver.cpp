@@ -338,10 +338,10 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 {
 	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
-  for(uint8_t i=0; i<numGen; i++)
-  {
-    if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
-  }
+  //for(uint8_t i=0; i<numGen; i++)
+ // {
+  //  if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
+  //}
 
 
 	if (receivedMatFrom[matrix.Sender])
