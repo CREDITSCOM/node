@@ -221,7 +221,7 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 
 template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  pool = csdb::Pool::from_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_);
+  pool = csdb::Pool::from_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_);  
   ptr_ = end_;
   return *this;
 }
@@ -286,6 +286,7 @@ inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   size_t bSize;
   auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes((char*)dataPtr, bSize);
+  std::cout << "GB: " << byteStreamToHex(dataPtr, bSize) << std::endl;
   return *this;
 }
 

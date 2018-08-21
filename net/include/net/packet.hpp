@@ -38,7 +38,9 @@ enum MsgTypes: uint8_t {
   BlockHash,
   BlockRequest,
   RequestedBlock,
-  TLConfirmation
+  TLConfirmation,
+  ConsVectorRequest,
+  ConsMatrixRequest
 
 };
 

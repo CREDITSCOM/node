@@ -168,10 +168,11 @@ void Node::flushCurrentTasks() {
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum) {
   
   istream_.init(data, size);
+  roundNum_ = rNum;
   if (!readRoundData(false))
     return;
 
-  roundNum_ = rNum;
+
   if(myLevel_==NodeLevel::Main)
   if (!istream_.good()) {
     LOG_WARN("Bad round table format, ignoring");
@@ -224,9 +225,9 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
   istream_.init(data, size);
   int i=1;
   while (istream_.good() && !istream_.end()) {
-  std::cout << "NODE> Get transaction #:" << i << std::endl;
     csdb::Transaction trans;
     istream_ >> trans;
+    std::cout << "NODE> Get transaction #:" << i << " from " << trans.source().to_string() <<  std::endl;
     solver_->gotTransaction(std::move(trans));
     i++;
   }
@@ -292,14 +293,20 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
 }
 
 void Node::getTransactionsList(const uint8_t* data, const size_t size) {
+std::cout << "GL: " << byteStreamToHex((char*)data,size) << std::endl;
+
+  std::cout << __func__ << std::endl;
+
   if (myLevel_ != NodeLevel::Confidant && myLevel_ != NodeLevel::Writer) {
     return;
   }
-
+  
   istream_.init(data, size);
 
   csdb::Pool pool;
   istream_ >> pool;
+
+std::cout << "NODE> Transactions amount got " <<pool.transactions_count() << std::endl;
 
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad transactions list packet format");
@@ -307,58 +314,143 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
   }
 
   LOG_EVENT("Got full transactions list of " << pool.transactions_count());
-  if (pool.transactions_count()>0)
-  {
+ // if (pool.transactions_count()>0)
+ // {
     solver_->gotTransactionList(std::move(pool));
-    }
+   // }
 }
 
-void Node::sendTLConfirmation(size_t tcount )
+void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) {
+  if ((myLevel_ == NodeLevel::Confidant)|| (myLevel_ == NodeLevel::Normal)) {
+    LOG_ERROR("Only main nodes can send transaction lists");
+    return;
+  }
+
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
+  size_t bSize;
+  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+
+  std::string compressed;
+  snappy::Compress((const char*)data, bSize, &compressed);
+
+  ostream_ << MsgTypes::TransactionList
+           << roundNum_
+           << compressed;
+
+  //const char* bl = pool.to_byte_stream(size);
+  //void* tmp = ostream_.getPackets()->data();
+  std::cout << "Data from TList: " << byteStreamToHex((const char*)data, bSize) << std::endl;
+  std::cout << "NODE> Sending " << pool.transactions_count() << " transaction(s)" << std::endl;
+  flushCurrentTasks();
+}
+
+void Node::sendTLConfirmation(size_t tcount)
 {
-  if (myLevel_ != NodeLevel::Main) {
+  if ((myLevel_ == NodeLevel::Confidant) || (myLevel_ == NodeLevel::Normal)) {
     LOG_ERROR("Only previous main nodes can send Transaction Lists ");
     return;
   }
-  
+
   ostream_.init(BaseFlags::Signed, mainNode_);
   ostream_ << MsgTypes::TLConfirmation
     << roundNum_
     << tcount;
-  std::cout << "NODE> Transactions amount sent " << std::endl;
+  std::cout << "NODE> Transactions amount sent " << tcount << " to " << byteStreamToHex(mainNode_.str, 32) << std::endl;
+  flushCurrentTasks();
 }
 
 void Node::getTLConfirmation(const uint8_t* data, const size_t size)
 {
+  std::cout << "NODE> Transactions amount got " << std::endl;
   if (myLevel_ != NodeLevel::Main) {
     LOG_ERROR("Only main nodes can receive TLSend confirmations");
     return;
   }
   istream_.init(data, size);
-  std::cout << "NODE> Transactions amount got " << std::endl;
+
   size_t trNum;
   istream_ >> trNum;
+  std::cout << "NODE> Transactions amount got " << trNum << std::endl;
   solver_->setLastRoundTransactionsGot(trNum);
 }
 
-void Node::sendTransactionList(const csdb::Pool& pool, const PublicKey& target) {
-  if (myLevel_ != NodeLevel::Main) {
-    LOG_ERROR("Only main nodes can send transaction lists");
+void Node::sendVectorRequest(const PublicKey& node)
+{
+   if (myLevel_ != NodeLevel::Confidant) {
+    LOG_ERROR("Only confidant nodes can send vectors");
     return;
   }
-
-  ostream_.init(BaseFlags::Fragmented, target);
-  ostream_ << MsgTypes::TransactionList
-           << roundNum_
-           << pool;
-std::cout << "NODE> Sending " << pool.transactions_count() << " transaction(s)" << std::endl;
+  std::cout << "NODE> Sending vector request to  " << byteStreamToHex(node.str, 32)<< std::endl;
+  ostream_.init(BaseFlags::Signed, node);
+  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ <<1;
   flushCurrentTasks();
 }
 
-void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
+void Node::getVectorRequest(const uint8_t* data, const size_t size)//, const PublicKey& sender) {
+{
+  // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
+ // if (myPublicKey_ == sender) return;
+  std::cout << "NODE> Getting vector Request from " <<  std::endl;//byteStreamToHex(sender.str, 32) <<
+  istream_.init(data, size);
 
+  int num;
+  istream_ >> num;
+  if(num==1) sendVector(solver_->getMyVector());
+
+  if (!istream_.good() || !istream_.end()) {
+    LOG_WARN("Bad vector packet format");
+    return;
+    
+  }
+}
+
+
+
+
+void Node::sendMatrixRequest(const PublicKey& node)
+{
+  if (myLevel_ != NodeLevel::Confidant) {
+    LOG_ERROR("Only confidant nodes can send vectors");
+    return;
+  }
+  std::cout << "NODE> Sending vector request to  " << byteStreamToHex(node.str, 32) << std::endl;
+  ostream_.init(BaseFlags::Signed, node);
+  ostream_ << MsgTypes::ConsMatrixRequest << roundNum_ << 1;
+  flushCurrentTasks();
+}
+
+void Node::getMatrixRequest(const uint8_t* data, const size_t size)//, const PublicKey& sender) {
+{
+
+  // std::cout << "NODE> Getting vector" << std::endl;
+  if (myLevel_ != NodeLevel::Confidant) {
+    return;
+  }
+  //if (myPublicKey_ == sender) return;
+  std::cout << "NODE> Getting matrix Request from " <<  std::endl;//byteStreamToHex(sender.str, 32) <<
+  istream_.init(data, size);
+
+  int num;
+  istream_ >> num;
+  if (num == 1) sendMatrix(solver_->getMyMatrix());
+
+  if (!istream_.good() || !istream_.end()) {
+    LOG_WARN("Bad vector packet format");
+    return;
+
+  }
+}
+
+void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
+ // std::cout << "NODE> Getting vector" << std::endl;
+  if (myLevel_ != NodeLevel::Confidant) {
+    return;
+  }
+  if (myPublicKey_ == sender) return;
+  std::cout << "NODE> Getting vector from " << byteStreamToHex(sender.str, 32) << std::endl;
   istream_.init(data, size);
 
   Credits::HashVector vec;
@@ -374,27 +466,35 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
 }
 
 void Node::sendVector(const Credits::HashVector& vector) {
+  std::cout << "NODE> 0 Sending vector to " << std::endl;
+
   if (myLevel_ != NodeLevel::Confidant) {
     LOG_ERROR("Only confidant nodes can send vectors");
     return;
   }
+  //std::cout << "NODE> Sending vector " << std::endl;
+  //for (auto& it : confidantNodes_)
+ // {
+  //if(it==myPublicKey_) continue;
+    std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32) 
+    ostream_.init(BaseFlags::Broadcast);//, it);
+    ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
 
-  ostream_.init(BaseFlags::Signed);
-  ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
+    flushCurrentTasks();
+ // }
 
-  flushCurrentTasks();
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
-
+  if(myPublicKey_==sender) return;
   istream_.init(data, size);
 
   Credits::HashMatrix mat;
   istream_ >> mat;
-
+  std::cout << "NODE> Getting matrix from " << byteStreamToHex(sender.str, 32) << std::endl;
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad matrix packet format");
     return;
@@ -405,15 +505,22 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
 }
 
 void Node::sendMatrix(const Credits::HashMatrix& matrix) {
+  std::cout << "NODE> 0 Sending matrix to " << std::endl;
+
   if (myLevel_ != NodeLevel::Confidant) {
     LOG_ERROR("Only confidant nodes can send matrices");
     return;
   }
+ 
+  //for (auto& it : confidantNodes_)
+ // {
+  //  if (it == myPublicKey_) continue;
+    std::cout << "NODE> 1 Sending matrix to " << std::endl;//<< byteStreamToHex(it.str, 32) 
+    ostream_.init(BaseFlags::Broadcast);//, it);
+    ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
 
-  ostream_.init(BaseFlags::Signed);
-  ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
-
-  flushCurrentTasks();
+    flushCurrentTasks();
+ // }
 }
 
 
@@ -428,7 +535,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     return;
   }
 
-  myLevel_ = NodeLevel::Normal;
+  //myLevel_ = NodeLevel::Normal; //test feature
   istream_.init(data, size);
 
   csdb::Pool pool;
@@ -439,7 +546,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     return;
   }
 
-  LOG_EVENT("Got block of " << pool.transactions_count());
+  LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
 
   solver_->gotBlock(std::move(pool), sender);
 }
@@ -460,7 +567,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
            << roundNum_
            << compressed;
 
-  LOG_EVENT("Sending block of " << pool.transactions_count());
+  LOG_EVENT("Sending block of " << pool.transactions_count() << " transactions");
   flushCurrentTasks();
 }
 
@@ -591,6 +698,7 @@ void Node::onRoundStart() {
 
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
+ 
   if (mainNode_ == myPublicKey_)
     myLevel_ = NodeLevel::Main;
   else {
@@ -669,7 +777,7 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
     if(mainNode_!=conf) confidantNodes_.push_back(conf);
 
   sendRoundTable();
-  
+  std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
   if(!(solver_->mPoolClosed()))
  {
     solver_->sendTL();
@@ -730,6 +838,7 @@ inline bool Node::readRoundData(const bool tail) {
 
 
 std::swap(confidants, confidantNodes_);
+std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
 if (!solver_->mPoolClosed())
 {
   solver_->sendTL();

@@ -207,8 +207,8 @@ void BlockChain::writeGenesisBlock() {
   csdb::Transaction transaction;
   std::vector<unsigned char> vchRet;
 
-  transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001"));
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001"));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(100000000, 0));

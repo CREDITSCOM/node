@@ -46,6 +46,8 @@ namespace Credits{
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
     const csdb::Amount zero_balance = 0.0_c;
+    if (_pool.transactions_count() > 0) {
+
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
 	  {
@@ -75,8 +77,22 @@ namespace Credits{
 		memset(new_trusted, 0, 100);
 		memset(hw_total, 0, 3300);
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
+
 		Hash_ hash_(hash_s);
 		return hash_;
+    }
+    else
+    {
+      uint8_t* hash_s = new uint8_t[32];
+      blake2s(hash_s, 32, 0, 1, "", 0);
+      memset(find_untrusted, 0, 10000);
+      memset(new_trusted, 0, 100);
+      memset(hw_total, 0, 3300);
+      Hash_ hash_(hash_s);
+      return hash_;
+
+    }
+
 	  
     }
 
@@ -110,7 +126,7 @@ namespace Credits{
 			if (i == 0)
 			{
 				memcpy(hw[0].a_hash, mtr + 2, 32);
-				(hw[0].a_weight) = 1;
+				hw[0].a_weight = 1;
 				*(find_untrusted + j * 100) = 0;
 				i_max = 1;
 			}
@@ -140,17 +156,24 @@ namespace Credits{
 			}
 		}
 
-		max_frec_position = 0;
+		
+
+   uint8_t hw_max;
+   hw_max=0;
+   max_frec_position = 0;
 	
 		for (int i = 0; i < i_max; i++)
 		{
-			//
-			if (hw[i].a_weight > hw_total[j].a_weight)
+			if (hw[i].a_weight > hw_max)
 			{
-				hw_total[j].a_weight = hw[i].a_weight;
+				hw_max = hw[i].a_weight;
 				max_frec_position = i;
 			}
 		}
+
+    j = matrix.Sender;
+    hw_total[j].a_weight=max_frec_position;
+    memcpy(hw_total[j].a_hash, hw[max_frec_position].a_hash,32);
 
 		for (int i = 0; i < nodes_amount; i++)
 		{
@@ -187,25 +210,23 @@ namespace Credits{
 		//clock_t time_begin, time_end, time_begin1, time_end1;
 		//time_begin = clock();
 
-		
+      memset(mtr, 0, nodes_amount * 97);		
 		for (int j = 0; j < nodes_amount; j++)
 		{
 			//time_begin1 = clock();
-
-			memset(mtr, 0, nodes_amount * 97);// matrix init
-											  //create_matrix(mtr, nodes_amount);// matrix generation
-											  //time_end1 = clock();
-											  //duration1 += time_end1 - time_begin1;
-
-
+// matrix init
+			//create_matrix(mtr, nodes_amount);// matrix generation
+			//time_end1 = clock();
+			//duration1 += time_end1 - time_begin1;
+      
 			//primary matrix check
 			//hw_total[j].a_weight = 0;
 			//final check
 
 			if (j == 0)
 			{
-				memcpy(hw_total[0].a_hash, hw[max_frec_position].a_hash, 32);
-				(hw_total[0].a_weight) = 1;
+				memcpy(hw[0].a_hash, hw_total[0].a_hash, 32);
+				(hw[0].a_weight) = 1;
 				j_max = 1;
 			}
 			else
@@ -213,9 +234,9 @@ namespace Credits{
 				found = false;
 				for (jj = 0; jj < j_max; jj++)
 				{
-					if (memcmp(hw_total[jj].a_hash, hw[max_frec_position].a_hash, 32) == 0)
+					if (memcmp(hw[jj].a_hash, hw_total[j].a_hash, 32) == 0)
 					{
-						(hw_total[jj].a_weight)++;
+						(hw[jj].a_weight)++;
 						found = true;
 						break;
 					}
@@ -223,7 +244,7 @@ namespace Credits{
 
 				if (!found)
 				{
-					memcpy(hw_total[j_max].a_hash, hw[max_frec_position].a_hash, 32);
+					memcpy(hw[j_max].a_hash, hw_total[j].a_hash, 32);
 					(hw_total[j_max].a_weight) = 1;
 					j_max++;
 				}

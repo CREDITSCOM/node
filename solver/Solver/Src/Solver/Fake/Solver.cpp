@@ -74,9 +74,40 @@ void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t
 	myPrivateKey = priv;
 }
 
+void Solver::buildBlock(csdb::Pool& block)
+{
+  csdb::Transaction transaction;
+
+  transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003"));
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(10, 0));
+  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_innerID(0);
+
+  block.add_transaction(transaction);
+
+  transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000004"));
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(10, 0));
+  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_innerID(0);
+
+  block.add_transaction(transaction);
+
+}
+
+
 void Solver::prepareBlockForSend(csdb::Pool& block)
 {
   //std::cout << "SOLVER> Before time stamp" << std::endl;
+ /* for (int i=0;i<10;i++)
+  {
+    buildBlock(block);
+  }*/
   addTimestampToPool(block);
   //std::cout << "SOLVER> Before write pub key" << std::endl;
   block.set_writer_public_key(myPublicKey);
@@ -93,26 +124,26 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
 void Solver::sendTL()
 {
 std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
-std::cout << "                          Total received " << m_transactions.size() << " transactions" << std::endl;
+std::cout << "                          Total received " << v_pool.transactions_count() << " transactions" << std::endl;
 std::cout << "========================================================================================" << std::endl;
 
    
    
     m_pool_closed = true;  
-  if (v_pool.transactions_count() > 0)
-  {
-
+  //if (v_pool.transactions_count() > 0)
+  //{
     std::cout << "Solver -> Sending " << v_pool.transactions_count() << " transactions " << std::endl;
     for (auto& it : node_->getConfidants())
     {
       std::cout << "Solver -> Sending TransactionList to " << byteStreamToHex(it.str, 32) << std::endl;
+
       node_->sendTransactionList(std::move(v_pool), it); // Correct sending, better if to all one time
     }
-   }
-   node_->sendTLConfirmation(v_pool.transactions_count());
+ // }
+ // node_->sendTLConfirmation(v_pool.transactions_count());
 
 
-    v_pool = csdb::Pool{};
+  v_pool = csdb::Pool{};
 
 }
 
@@ -129,7 +160,7 @@ void Solver::setLastRoundTransactionsGot(size_t trNum)
 
 void Solver::closeMainRound()
 {
-  if ((node_->getRoundNumber()==1) || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by previous main node should be added!!!!!!!!!!!!!!!!!!!!!
+  if (node_->getRoundNumber()==1)// || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by previous main node should be added!!!!!!!!!!!!!!!!!!!!!
   //node_->sendFirstTransaction();
   
   {
@@ -169,6 +200,18 @@ void Solver::runMainRound()
   runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
     [this]() { closeMainRound(); });
 }
+
+HashVector Solver::getMyVector()
+{
+  return hvector;
+}
+
+HashMatrix Solver::getMyMatrix()
+{
+ return (generals->getMatrix());
+}
+
+
 
 void Solver::flushTransactions()
 {
@@ -295,15 +338,21 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 {
 	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
-	if (receivedMatFrom[matrix.Sender] == true)
+  for(uint8_t i=0; i<numGen; i++)
+  {
+    if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
+  }
+
+
+	if (receivedMatFrom[matrix.Sender])
 	{
 		std::cout << "SOLVER> I've already got the matrix from this Node" << std::endl;
 		return;
 	}
 	receivedMatFrom[matrix.Sender] = true;
 	trustedCounterMatrix++;
-	generals->addmatrix(matrix, node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
-	
+	generals->addmatrix(matrix, node_->getConfidants());
+  std::cout << "SOLVER> Matrix added" << std::endl;
   if (trustedCounterMatrix == numGen)
   {
 	  memset(receivedMatFrom, 0, 100);
@@ -313,7 +362,9 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	  if (wTrusted == 100)
 	  {
 		  std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-		  writeNewBlock();
+      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+        [this]() { writeNewBlock();});
+		  
 	  }
 
 	  else
@@ -322,7 +373,8 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 		  if (wTrusted == node_->getMyConfNumber())
 		  {
 			  node_->becomeWriter();
-			  writeNewBlock();
+        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+          [this]() { writeNewBlock(); });
 		  }
 
 	  }
@@ -571,11 +623,11 @@ void Solver::addInitialBalance()
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10000, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_balance(csdb::Amount(10000000, 0));
 
   {
 	  std::lock_guard<std::mutex> l(m_trans_mut);
-	  m_transactions.push_back(transaction);
+	 // m_transactions.push_back(transaction);
   }
 
 #ifdef SPAMMER

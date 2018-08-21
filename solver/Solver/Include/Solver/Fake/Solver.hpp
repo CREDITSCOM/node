@@ -110,6 +110,12 @@ typedef std::string Matrix;
 		void nextRound();
     bool mPoolClosed();
     void setLastRoundTransactionsGot(size_t trNum);
+    //remove it!!!
+    void buildBlock(csdb::Pool& block);
+
+    HashVector getMyVector();
+    HashMatrix getMyMatrix();
+
 
 	private:
     void _initApi();

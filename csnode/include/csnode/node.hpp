@@ -61,6 +61,12 @@ public:
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const PublicKey&);
 
+  void sendVectorRequest(const PublicKey&);
+  void sendMatrixRequest(const PublicKey&);
+
+  void getVectorRequest(const uint8_t* data, const size_t size);
+  void getMatrixRequest(const uint8_t* data, const size_t size);
+
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
