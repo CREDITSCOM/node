@@ -118,6 +118,8 @@ typedef std::string Matrix;
     HashVector getMyVector();
     HashMatrix getMyMatrix();
     void initConfRound();
+    void sendZeroVector();
+    void checkVectorsReceived();
 
 	private:
     void _initApi();
@@ -179,6 +181,8 @@ typedef std::string Matrix;
 		bool consensusAchieved = false;
 		bool blockCandidateArrived = false;
 		bool round_table_sent = false;
+    bool transactionListReceived = false;
+    bool vectorReceived = false;
 
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;

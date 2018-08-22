@@ -197,8 +197,18 @@ void Solver::runMainRound()
   std::cout << "========================================================================================" << std::endl;
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV" << std::endl;
  
+  if(node_->getRoundNumber()==1) 
+  {
+    runAfter(std::chrono::milliseconds(20000),
+      [this]() { closeMainRound(); });
+  }
+  else
+  {
+
   runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
     [this]() { closeMainRound(); });
+ }
+
 }
 
 HashVector Solver::getMyVector()
@@ -289,6 +299,7 @@ void Solver::initConfRound()
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
+  transactionListReceived = true;
   uint8_t numGen = node_->getConfidants().size();
 	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
@@ -320,9 +331,21 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 
 }
 
+void Solver::sendZeroVector()
+{
+  if (transactionListReceived) return;
+  csdb::Pool test_pool = csdb::Pool{};
+  gotTransactionList(std::move(test_pool));
+
+}
+
+
 void Solver::gotVector(HashVector&& vector)
 {
 	//std::cout << "SOLVER> GotVector" << std::endl;
+ // runAfter(std::chrono::milliseconds(200),
+  //  [this]() { sendZeroVector(); });
+
   uint8_t numGen = node_->getConfidants().size();
   if (vector.roundNum==node_->getRoundNumber())
   {
@@ -340,6 +363,7 @@ void Solver::gotVector(HashVector&& vector)
 
   if (trustedCounterVector == numGen)
   {
+    
 	  //std::cout << "SOLVER> GotVector : " << std::endl;
     vectorComplete = true;
 
@@ -356,6 +380,7 @@ void Solver::gotVector(HashVector&& vector)
 
     if (trustedCounterMatrix == numGen)
     {
+
       memset(receivedMatFrom, 0, 100);
       trustedCounterMatrix = 0;
       uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getLastHash()));
@@ -389,8 +414,17 @@ void Solver::checkMatrixCame()
 if (trustedCounterMatrix<2) node_->sendMatrix(generals->getMatrix());
 }
 
+void Solver::checkVectorsReceived()
+{
+  uint8_t numGen = node_->getConfidants().size();
+  if (trustedCounterVector == numGen) return;
+
+}
+
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
+ // runAfter(std::chrono::milliseconds(500),
+ //   [this]() { checkVectorsReceived(); });
 	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
   /*for(uint8_t i=0; i<numGen; i++)
@@ -736,6 +770,8 @@ void Solver::nextRound()
   vectorComplete = false;
   consensusAchieved = false;
   blockCandidateArrived = false;
+  transactionListReceived = false;
+  vectorReceived = false;
 
   round_table_sent = false;
   sentTransLastRound = false;
