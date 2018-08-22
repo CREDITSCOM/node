@@ -61,6 +61,7 @@ typedef std::string Matrix;
 		uint8_t val[64];
 
 	};
+ #pragma pack(push, 1)
 	struct HashVector
 	{
 		uint8_t Sender;
@@ -75,6 +76,7 @@ typedef std::string Matrix;
 		HashVector hmatr[100];
 		Signature sig;
 	};
+#pragma pack(pop)
 
     class Solver {
     public:

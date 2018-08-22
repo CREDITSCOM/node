@@ -37,7 +37,7 @@ namespace Credits{
       ////////////////////////////////////////////////////////////////////////
       //    This function was modified to calculate deltas for concensus    //
       ////////////////////////////////////////////////////////////////////////
-		std::cout << "GENERALS> Build vector: " << _pool.transactions_count() << " transactions"  << std::endl;
+		std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
 		csdb::Amount comission = 0.1_c;
@@ -70,7 +70,9 @@ namespace Credits{
 	  
 		uint8_t* hash_s = new uint8_t[32];
 		//std::cout << "GENERALS> Build vector : before blake" << std::endl;
-		blake2s(hash_s, 32, del1, transactionsNumber, "", 0);
+    std::cout << "GENERALS> buildVector: before blake" << std::endl;
+		blake2s(hash_s, 32, del1, transactionsNumber, "1234", 4);
+    std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
 		//initializing for taking decision
 		//std::cout << "GENERALS> Build vector : before initializing" << std::endl;
 		memset(find_untrusted, 0, 10000);
@@ -79,16 +81,20 @@ namespace Credits{
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
 
 		Hash_ hash_(hash_s);
+    std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
 		return hash_;
     }
     else
     {
       uint8_t* hash_s = new uint8_t[32];
-      blake2s(hash_s, 32, 0, 1, "", 0);
+      uint32_t a=0;
+      blake2s(hash_s, 32, (const void*)&a, 4, "1234", 4);
+      std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
       memset(find_untrusted, 0, 10000);
       memset(new_trusted, 0, 100);
       memset(hw_total, 0, 3300);
       Hash_ hash_(hash_s);
+      std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
       return hash_;
 
     }
@@ -96,36 +102,37 @@ namespace Credits{
 	  
     }
 
-    void Generals::addvector(HashVector vector) {
+  void Generals::addvector(HashVector vector) {
 		std::cout << "GENERALS> Add vector" << std::endl;
 		hMatrix.hmatr[vector.Sender] = vector;
-    }
+    std::cout << "GENERALS> Vector succesfully added" << std::endl;
+  }
 
 	void Generals::addSenderToMatrix(uint8_t myConfNum)
 	{
 		hMatrix.Sender = myConfNum;
 	}
 
-    void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
+  void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
 		std::cout << "GENERALS> Add matrix" << std::endl;
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
-		uint8_t *mtr = new uint8_t[nodes_amount * 97+65];
-		memcpy(mtr,(void*)&matrix, nodes_amount*97+65);
-		
-		uint8_t j = *mtr;
+    Hash_ temp_hash;
+		uint8_t j = matrix.Sender;
 		uint8_t i_max;
 		bool found = false;
 
 		uint8_t max_frec_position;
 		uint8_t j_max;
 		j_max = 0;
-
+    
+ //   std::cout << "GENERALS> HW OUT: nodes amount = " << (int)nodes_amount <<  std::endl;
 		for (uint8_t i = 0; i < nodes_amount; i++)
 		{
 			if (i == 0)
 			{
-				memcpy(hw[0].a_hash, mtr + 2, 32);
+				memcpy(hw[0].a_hash, matrix.hmatr[0].hash.val, 32);
+  //      std::cout << "GENERALS> HW OUT: writing initial hash " << byteStreamToHex(hw[i].a_hash, 32) << std::endl;
 				hw[0].a_weight = 1;
 				*(find_untrusted + j * 100) = 0;
 				i_max = 1;
@@ -135,9 +142,13 @@ namespace Credits{
 				found = false;
 				for (uint8_t ii = 0; ii < i_max; ii++)
 				{
-					if (memcmp(hw[ii].a_hash, mtr + 2 + i * 97, 32) == 0)
+          memcpy(temp_hash.val, matrix.hmatr[i].hash.val, 32);
+   //      std::cout << "GENERALS> HW OUT: hash " << byteStreamToHex((const char*)temp_hash.val, 32) << " from " << (int)i << std::endl;
+					if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.val, 32) == 0)
 					{
+  //          std::cout << "GENERALS> HW OUT: hash found" ;
 						(hw[ii].a_weight)++;
+  //         std::cout << " ... now h_weight = " << (int)(hw[ii].a_weight) << std::endl;
 						found = true;
 						*(find_untrusted + j * 100 + i) = ii;
 						break;
@@ -145,32 +156,32 @@ namespace Credits{
 				}
 				if (!found)
 				{
-
-					memcpy(hw[i_max].a_hash, mtr + 2 + i * 97, 32);
+    //      std::cout << "GENERALS> HW OUT: hash not found!!!";
+					memcpy(hw[i_max].a_hash, matrix.hmatr[i].hash.val, 32);
 					(hw[i_max].a_weight) = 1;
 					*(find_untrusted + j * 100 + i) = i_max;
 					i_max++;
+    //      std::cout << " ... i_max = "<< (int) i_max << std::endl;;
 
 
 				}
 			}
 		}
 
-		
-
-   uint8_t hw_max;
+	 uint8_t hw_max;
    hw_max=0;
    max_frec_position = 0;
-	
+
 		for (int i = 0; i < i_max; i++)
 		{
 			if (hw[i].a_weight > hw_max)
 			{
 				hw_max = hw[i].a_weight;
 				max_frec_position = i;
+   //     std::cout << "GENERALS> HW OUT:" << i << " : " << byteStreamToHex(hw[i].a_hash, 32) << " - > " << (int)(hw[i].a_weight) << std::endl;
+
 			}
 		}
-
     j = matrix.Sender;
     hw_total[j].a_weight=max_frec_position;
     memcpy(hw_total[j].a_hash, hw[max_frec_position].a_hash,32);
@@ -186,7 +197,7 @@ namespace Credits{
     }
 
     uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash lasthash) {
-		std::cout << "GENERALS> Take decision " << std::endl;
+		std::cout << "GENERALS> Take decision: starting " << std::endl;
 		//Hash_ ha;// = ;
 		//memcpy( ha, lasthash.to_binary(),32);
         //decode_matrix(matrix_data[0]);
@@ -255,15 +266,18 @@ namespace Credits{
 
 		uint8_t trusted_limit;
 		trusted_limit = nodes_amount / 2 + 1;
-		//for (int i = 0; i < nodes_amount; i++)
-		//{
-		//	if (*(new_trusted + i) < trusted_limit)
-				//std::cout << "Liar nodes : " << i << std::endl;
-	//	}
-		std::cout << "Hash : " << lasthash.to_string() << std::endl;
+    uint8_t j=0;
+		for (int i = 0; i < nodes_amount; i++)
+		{
+			if (*(new_trusted + i) < trusted_limit)
+		  std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
+      else j++;
+		}
+    if (j==nodes_amount) std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
+		//std::cout << "Hash : " << lasthash.to_string() << std::endl;
 		auto hash_t = lasthash.to_binary();
 		int k= *(hash_t.begin());
-		std::cout << "K : " << k << std::endl;
+		//std::cout << "K : " << k << std::endl;
 		int result0 = nodes_amount;
 		uint16_t result =0;
 		result = k % (int)result0;
