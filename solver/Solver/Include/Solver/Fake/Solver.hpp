@@ -65,14 +65,14 @@ typedef std::string Matrix;
 	struct HashVector
 	{
 		uint8_t Sender;
-		uint32_t roundNum;
+		//uint32_t roundNum;
 		Hash_ hash;
 		Signature sig;
 	};
 	struct HashMatrix
 	{
 		uint8_t Sender;
-		uint32_t roundNum;
+		//uint32_t roundNum;
 		HashVector hmatr[100];
 		Signature sig;
 	};

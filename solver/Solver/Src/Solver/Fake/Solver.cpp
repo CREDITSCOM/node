@@ -350,11 +350,11 @@ void Solver::gotVector(HashVector&& vector)
  //   [this]() { sendZeroVector(); });
 
   uint8_t numGen = node_->getConfidants().size();
-  if (vector.roundNum==node_->getRoundNumber())
-  {
-	  std::cout << "SOLVER> This is not the information of this round" << std::endl;
-	  return;
-  }
+  //if (vector.roundNum==node_->getRoundNumber())
+  //{
+	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
+	 // return;
+  //}
   if (receivedVecFrom[vector.Sender]==true) 
   {
 		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
@@ -508,6 +508,8 @@ gotBlockThisRound = true;
 #endif
   uint32_t g_seq = block.sequence();
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
+  if(g_seq != node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
+
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
