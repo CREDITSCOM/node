@@ -517,7 +517,7 @@ gotBlockThisRound = true;
 		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{
 			//std::cout << "Solver -> before sending hash to writer" << std::endl;
-			Hash test_hash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
+			Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 
 			node_->sendHash(test_hash, sender);
       std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
