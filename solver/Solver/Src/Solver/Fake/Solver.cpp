@@ -112,7 +112,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   //std::cout << "SOLVER> Before write pub key" << std::endl;
   block.set_writer_public_key(myPublicKey);
    //std::cout << "SOLVER> Before write last sequence" << std::endl;
-    block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+  block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
  // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
@@ -333,7 +333,10 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 
 void Solver::sendZeroVector()
 {
+
+
   if (transactionListReceived) return;
+
   csdb::Pool test_pool = csdb::Pool{};
   gotTransactionList(std::move(test_pool));
 
@@ -344,7 +347,7 @@ void Solver::gotVector(HashVector&& vector)
 {
 	//std::cout << "SOLVER> GotVector" << std::endl;
  // runAfter(std::chrono::milliseconds(200),
-  //  [this]() { sendZeroVector(); });
+ //   [this]() { sendZeroVector(); });
 
   uint8_t numGen = node_->getConfidants().size();
   if (vector.roundNum==node_->getRoundNumber())
@@ -409,9 +412,10 @@ void Solver::gotVector(HashVector&& vector)
   std::cout << "Solver>  VECTOR GOT SUCCESSFULLY!!!" << std::endl;
 }
 
-void Solver::checkMatrixCame()
+void Solver::checkMatrixReceived()
 {
-if (trustedCounterMatrix<2) node_->sendMatrix(generals->getMatrix());
+  if (trustedCounterMatrix < 2) node_->sendMatrix(generals->getMatrix());
+  
 }
 
 void Solver::checkVectorsReceived()
@@ -423,8 +427,8 @@ void Solver::checkVectorsReceived()
 
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
- // runAfter(std::chrono::milliseconds(500),
- //   [this]() { checkVectorsReceived(); });
+  //runAfter(std::chrono::milliseconds(500),
+  //  [this]() { checkVectorsReceived(); });
 	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
   /*for(uint8_t i=0; i<numGen; i++)
@@ -437,7 +441,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
   //      [this]() { writeNewBlock();});
   //}
 
-
+  if(gotBlockThisRound) return;
 	if (receivedMatFrom[matrix.Sender])
 	{
 		std::cout << "SOLVER> I've already got the matrix from this Node" << std::endl;
@@ -498,6 +502,7 @@ void Solver::writeNewBlock()
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
+gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
@@ -512,7 +517,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{
 			//std::cout << "Solver -> before sending hash to writer" << std::endl;
-			Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
+			Hash test_hash((char*)(node_->getBlockChain().getLastHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 
 			node_->sendHash(test_hash, sender);
       std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
@@ -772,6 +777,7 @@ void Solver::nextRound()
   blockCandidateArrived = false;
   transactionListReceived = false;
   vectorReceived = false;
+  gotBlockThisRound=false;
 
   round_table_sent = false;
   sentTransLastRound = false;

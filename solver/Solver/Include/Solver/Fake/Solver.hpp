@@ -78,6 +78,10 @@ typedef std::string Matrix;
 	};
 #pragma pack(pop)
 
+  class State {
+
+};
+
     class Solver {
     public:
         Solver(Node*);
@@ -120,7 +124,7 @@ typedef std::string Matrix;
     void initConfRound();
     void sendZeroVector();
     void checkVectorsReceived();
-
+    void checkMatrixReceived();
 	private:
     void _initApi();
 
@@ -183,6 +187,7 @@ typedef std::string Matrix;
 		bool round_table_sent = false;
     bool transactionListReceived = false;
     bool vectorReceived = false;
+    bool gotBlockThisRound = false;
 
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
