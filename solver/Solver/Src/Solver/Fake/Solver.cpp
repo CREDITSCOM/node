@@ -502,6 +502,9 @@ void Solver::writeNewBlock()
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
+	if (node_->getMyLevel() == NodeLevel::Writer)
+		return;
+
 gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
