@@ -386,7 +386,9 @@ void Solver::gotVector(HashVector&& vector)
 
       memset(receivedMatFrom, 0, 100);
       trustedCounterMatrix = 0;
-      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getLastHash()));
+      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber()));
+
+      if (wTrusted == 100)
 
       if (wTrusted == 100)
       {
@@ -455,7 +457,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
   {
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
-	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getLastHash()));
+	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()));
  
 	  if (wTrusted == 100)
 	  {
