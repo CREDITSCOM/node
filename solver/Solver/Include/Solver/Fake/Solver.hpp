@@ -76,6 +76,57 @@ typedef std::string Matrix;
 		HashVector hmatr[100];
 		Signature sig;
 	};
+  struct NormalState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool transactionSend;
+    bool newBlockReceived;
+    bool hashSent;
+  };
+  struct MainState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool transactinReceived;
+    bool newBlockReceived;
+    bool rtFinishReceived;
+    bool tlSent;
+  };
+  struct TrustedState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool tlReceived;
+    bool vectorSent;
+    bool allVectorsReceived;
+    bool matrixSent;
+    bool allMatricesReceived;
+    bool writerConfirmationSent;
+    bool newBlockReceived;
+    bool hashSent;
+  };
+  struct WriterState
+  {
+    bool isOn;
+    bool writerConfirmationReceived;
+    bool newBlockSent;
+    bool hashesReceived;
+    bool trSent;
+  };
+
+  struct SolverStates
+  {
+    NormalState normal;
+    MainState main;
+    TrustedState trusted;
+    WriterState writer;
+
+  };
+
+
+
+
 #pragma pack(pop)
 
   class State {

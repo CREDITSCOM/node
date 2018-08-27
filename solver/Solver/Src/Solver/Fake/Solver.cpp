@@ -267,19 +267,19 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 			uint8_t* signature;
 			signature = (uint8_t*)sig_str.c_str();
 
-			//if (verify_signature(signature, public_key, message, msg_len))
-			//{
+	//		if (verify_signature(signature, public_key, message, msg_len))
+	//		{
 
 			//if (v_pool.size() == 0)
 			//node_->sendFirstTransaction(transaction);
 
 					v_pool.add_transaction(transaction);
           std::cout << "SOLVER> Transaction added to pool" << std::endl;
-			//}
-			/*else
-			{
-				LOG_EVENT("Wrong signature");
-			}*/
+		//	}
+		//	else
+		//	{
+	//			LOG_EVENT("Wrong signature");
+	//		}
 
 			delete[]message;
 		}
@@ -327,8 +327,6 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
     std::cout << "SOLVER> Matrix added" << std::endl;
 
   }
-
-
 }
 
 void Solver::sendZeroVector()
@@ -383,23 +381,20 @@ void Solver::gotVector(HashVector&& vector)
 
     if (trustedCounterMatrix == numGen)
     {
-
       memset(receivedMatFrom, 0, 100);
       trustedCounterMatrix = 0;
-      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber())));
-
-      if (wTrusted == 100)
+      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
 
       if (wTrusted == 100)
       {
         std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
         runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-          [this]() { writeNewBlock(); });
+        [this]() { writeNewBlock(); });
       }
-
       else
       {
         consensusAchieved = true;
+        std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
         if (wTrusted == node_->getMyConfNumber())
         {
           node_->becomeWriter();
@@ -457,7 +452,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
   {
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
-	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber())));
+	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
  
 	  if (wTrusted == 100)
 	  {
@@ -520,15 +515,17 @@ gotBlockThisRound = true;
   {
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
 		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
-			node_->getBlockChain().putBlock(block);
-		if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		{
-			//std::cout << "Solver -> before sending hash to writer" << std::endl;
-			Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
+      node_->getBlockChain().putBlock(block);
+		  if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
+		  {
+			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
+			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
+			  node_->sendHash(test_hash, sender);
+        std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
+		  }
+    }
 
-			node_->sendHash(test_hash, sender);
-      std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
-		}
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
 #ifndef SPAMMER

@@ -142,7 +142,7 @@ namespace Credits{
 				found = false;
 				for (uint8_t ii = 0; ii < i_max; ii++)
 				{
-          memcpy(temp_hash.val, matrix.hmatr[i].hash.val, 32);
+   //       memcpy(temp_hash.val, matrix.hmatr[i].hash.val, 32);
    //      std::cout << "GENERALS> HW OUT: hash " << byteStreamToHex((const char*)temp_hash.val, 32) << " from " << (int)i << std::endl;
 					if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.val, 32) == 0)
 					{
@@ -225,7 +225,7 @@ namespace Credits{
 		for (int j = 0; j < nodes_amount; j++)
 		{
 			//time_begin1 = clock();
-// matrix init
+      // matrix init
 			//create_matrix(mtr, nodes_amount);// matrix generation
 			//time_end1 = clock();
 			//duration1 += time_end1 - time_begin1;

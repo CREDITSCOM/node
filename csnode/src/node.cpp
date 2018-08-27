@@ -562,7 +562,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
 
-  solver_->gotBlock(std::move(pool), sender);
+  if(pool.sequence() == roundNum_) solver_->gotBlock(std::move(pool), sender);
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
