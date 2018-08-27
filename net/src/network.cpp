@@ -15,6 +15,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     sock.set_option(ip::udp::socket::reuse_address(true));
     sock.set_option(ip::udp::socket::send_buffer_size(Packet::MaxSize));
 
+#ifdef WIN32
+    BOOL bNewBehavior = FALSE;
+    DWORD dwBytesReturned = 0;
+    WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned, NULL, NULL);
+#endif
+
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
       sock.bind(ep);

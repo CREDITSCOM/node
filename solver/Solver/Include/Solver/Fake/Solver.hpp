@@ -61,20 +61,77 @@ typedef std::string Matrix;
 		uint8_t val[64];
 
 	};
+ #pragma pack(push, 1)
 	struct HashVector
 	{
 		uint8_t Sender;
-		uint32_t roundNum;
+		//uint32_t roundNum;
 		Hash_ hash;
 		Signature sig;
 	};
 	struct HashMatrix
 	{
 		uint8_t Sender;
-		uint32_t roundNum;
+		//uint32_t roundNum;
 		HashVector hmatr[100];
 		Signature sig;
 	};
+  struct NormalState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool transactionSend;
+    bool newBlockReceived;
+    bool hashSent;
+  };
+  struct MainState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool transactinReceived;
+    bool newBlockReceived;
+    bool rtFinishReceived;
+    bool tlSent;
+  };
+  struct TrustedState
+  {
+    bool isOn;
+    bool rtStartReceived;
+    bool tlReceived;
+    bool vectorSent;
+    bool allVectorsReceived;
+    bool matrixSent;
+    bool allMatricesReceived;
+    bool writerConfirmationSent;
+    bool newBlockReceived;
+    bool hashSent;
+  };
+  struct WriterState
+  {
+    bool isOn;
+    bool writerConfirmationReceived;
+    bool newBlockSent;
+    bool hashesReceived;
+    bool trSent;
+  };
+
+  struct SolverStates
+  {
+    NormalState normal;
+    MainState main;
+    TrustedState trusted;
+    WriterState writer;
+
+  };
+
+
+
+
+#pragma pack(pop)
+
+  class State {
+
+};
 
     class Solver {
     public:
@@ -116,7 +173,9 @@ typedef std::string Matrix;
     HashVector getMyVector();
     HashMatrix getMyMatrix();
     void initConfRound();
-
+    void sendZeroVector();
+    void checkVectorsReceived();
+    void checkMatrixReceived();
 	private:
     void _initApi();
 
@@ -177,6 +236,9 @@ typedef std::string Matrix;
 		bool consensusAchieved = false;
 		bool blockCandidateArrived = false;
 		bool round_table_sent = false;
+    bool transactionListReceived = false;
+    bool vectorReceived = false;
+    bool gotBlockThisRound = false;
 
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;

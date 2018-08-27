@@ -16,6 +16,7 @@ namespace {
 // Packets formation
 
 void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagValue = 0) {
+
   uint8_t regFlag = 0;
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -76,6 +77,7 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKe
 }
 
 void Transport::run() {
+ 
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
   formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_);
@@ -115,6 +117,7 @@ void Transport::run() {
 
 template <>
 inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
+
   uint16_t result = ep.port();
 
   if (ep.protocol() == ip::udp::v4()) {
@@ -135,6 +138,7 @@ inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
 }
 
 RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
+
   auto& rn = remoteNodesMap_.tryStore(ep);
 
   if (!rn)  // Newcomer
@@ -148,6 +152,7 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 
 void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
                                    RemoteNodePtr& sender) {
+ 
   iPackStream_.init(task->pack.getMsgData(),
                     task->pack.getMsgSize());
 
@@ -198,6 +203,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
 }
 
 void Transport::refillNeighbourhood() {
+
   if (config_.getBootstrapType() == BootstrapType::IpList) {
     for (auto& ep : config_.getIpList()) {
       if (!nh_.canHaveNewConnection()) {
@@ -224,6 +230,7 @@ void Transport::refillNeighbourhood() {
 }
 
 bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
+  
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
@@ -271,6 +278,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
 
 void Transport::processNodeMessage(const Message& msg) {
+ 
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
   std::cout << "TRANSPORT> Process Node Package MSG" << std::endl;
@@ -289,6 +297,7 @@ void Transport::processNodeMessage(const Message& msg) {
 }
 
 void Transport::processNodeMessage(const Packet& pack) {
+
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
  
@@ -316,10 +325,15 @@ void Transport::processNodeMessage(const Packet& pack) {
 }
 
 inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, const Packet& pack) {
+ 
   (*postponed_)->emplace(rNum, type, pack);
 }
 
 void Transport::processPostponed(const RoundNum rNum) {
+  
+
+  std::cout << "TRANSPORT> POSTPHONED PROCESSES!!!" << std::endl;
+
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {
     if (pp.round > rNum)
@@ -343,6 +357,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
                                     const Packet& firstPack,
                                     const uint8_t* data,
                                     size_t size) {
+ 
   if (!size) {
     LOG_ERROR("Bad packet size, why is it zero?");
     return;
@@ -384,6 +399,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
 }
 
 void Transport::addTask(Packet* pack, const uint32_t packNum) {
+
   auto end = pack + packNum;
   for (auto ptr = pack; ptr != end; ++ptr) {
     sendBroadcast(ptr);
@@ -395,12 +411,14 @@ void Transport::addTask(Packet* pack, const uint32_t packNum) {
 }
 
 void Transport::clearTasks() {
+ 
   SpinLock l(sendPacksFlag_);
   sendPacks_.clear();
 }
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
+  
   //LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
   Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
   *regPackConnId_ = conn.id;
@@ -411,6 +429,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 }
 
 void Transport::sendRegistrationConfirmation(const Connection& conn) {
+ 
   //LOG_EVENT("Confirming registration with " << conn.in);
 
   oPackStream_.init(BaseFlags::NetworkMsg);
@@ -422,6 +441,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn) {
 
 void Transport::sendRegistrationRefusal(const Connection& conn,
                                         const RegistrationRefuseReasons reason) {
+ 
     LOG_EVENT("Refusing registration with " << conn.in);
 
   oPackStream_.init(BaseFlags::NetworkMsg);
@@ -435,6 +455,7 @@ void Transport::sendRegistrationRefusal(const Connection& conn,
 
 bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task,
                                        RemoteNodePtr& sender) {
+ 
   LOG_EVENT("Got registration request from " << task->sender);
 
   NodeVersion vers;
@@ -488,6 +509,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task,
 
 bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task,
                                             RemoteNodePtr& sender) {
+
   ConnectionId cId;
   PublicKey key;
   iPackStream_ >> cId >> key;
@@ -501,6 +523,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task,
 
 bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task,
                                        RemoteNodePtr&) {
+
   RegistrationRefuseReasons reason;
   Connection::Id id;
   iPackStream_ >> id >> reason;
@@ -517,6 +540,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task,
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
   if (ssStatus_ != SSBootstrapStatus::Requested) {
+
     LOG_WARN("Unexpected Signal Server response");
     return false;
   }
@@ -535,6 +559,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 }
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
+
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait)
     LOG_WARN("Unexpected Signal Server response");
 
@@ -545,6 +570,7 @@ bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSRefusal(const TaskPtr<IPacMan>& task) {
+
   uint16_t expectedVersion;
   iPackStream_ >> expectedVersion;
 
@@ -554,6 +580,7 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+
   Connection conn;
   conn.in = task->sender;
   conn.specialOut = false;

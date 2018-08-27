@@ -53,7 +53,7 @@ public:
   void sendTransaction(const csdb::Transaction&);
   void sendTransaction(std::vector<csdb::Transaction>&&);
   void sendFirstTransaction(const csdb::Transaction&);
-  void sendTransactionList(const csdb::Pool&, const PublicKey&);
+  void sendTransactionList(const csdb::Pool&);//, const PublicKey&);
   void sendVector(const Credits::HashVector&);
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);

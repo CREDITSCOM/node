@@ -221,7 +221,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("mmM3sXYkK5m12R7NiwcS3ExAocJxuN8BVfmgtyhioUS", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
   transaction.set_balance(csdb::Amount(1000, 0));
@@ -232,7 +232,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
   transaction.set_balance(csdb::Amount(1000, 0));
@@ -243,7 +243,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("H5ptdUUfjJBGiK2X3gN2EzNYxituCUUnXv2tiMdQKP3b", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -255,7 +255,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("FuvGENwrCY2M6hCeWhCUMEx5uWg71q1oY3TuxDtGcMnN", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -267,7 +267,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("4qVXL76hqkvxh3jZKGZjbxMvBirWRibb2zRdS5TrwJga", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -279,7 +279,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("J7w1j8XsRNEMS1UfMYCpgGTaRyoF4r8TwHTDFPanR9jS", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -291,7 +291,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("cB8hBUm19Pw47sg222PhxvKPcxJQm8rntBi1h7H7jn6", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -303,7 +303,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("AFQHxGmvkjHEc5Jb1fmvhGwjMBkSGnuusXve8zmCPhHk", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -315,7 +315,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("3ZaqQbawNgFcuL6REkuu6MeLepufRaWHhgXxiCTKx4FJ", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));
@@ -327,7 +327,7 @@ void BlockChain::writeGenesisBlock() {
 
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("793LHWckjjoTjkQYnHABgQFkX3VbdBtksQujVtEruX2E", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((char*)vchRet.data(), 32)));
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(1000, 0));

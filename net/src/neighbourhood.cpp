@@ -64,6 +64,7 @@ void Neighbourhood::checkPending() {
 }
 
 void Neighbourhood::checkSilent() {
+  std::cout << __func__ << std::endl;
   bool needRefill = false;
   {
     SpinLock l(nLockFlag_);
