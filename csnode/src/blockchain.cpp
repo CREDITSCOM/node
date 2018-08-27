@@ -496,8 +496,6 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   std::cout << " Last      hash: " << getLastHash().to_string() << std::endl;
   std::cout << "Checking Sequence ... ";
   if (pool.sequence() == getLastWrittenSequence() + 1) {
-
-
     std::cout << "OK" << std::endl;
     pool.set_previous_hash(getLastHash());
 

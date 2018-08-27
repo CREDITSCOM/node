@@ -299,6 +299,7 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+  if (type == MsgTypes::BigBang) std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -374,6 +375,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getVectorRequest(data, size);
   case MsgTypes::ConsMatrixRequest:
     return node_->getMatrixRequest(data, size);
+  case MsgTypes::BigBang:
+	return node_->getBigBang(data, size, rNum);
   default:
     LOG_ERROR("Unknown type");
     break;
@@ -560,7 +563,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
 	Connection conn;
-	conn.in = task->sender;
+	conn.in = net_->resolve(config_.getSignalServerEndpoint());
 	conn.specialOut = false;
 
 	oPackStream_.init(BaseFlags::NetworkMsg);

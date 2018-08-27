@@ -185,9 +185,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   transport_->processPostponed(rNum);
 }
 
+void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum) {
+	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+	if (rNum > lastBlock && rNum >= roundNum_)
+		getRoundTable(data, size, rNum);
+	else
+		std::cerr << "BigBang else" << std::endl;
+}
+
 //the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
 void Node::sendRoundTable() {
-
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTable
            << roundNum_
@@ -793,6 +800,9 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
   if (rNum == roundNum_)
     return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;
+
+  if (rNum > getBlockChain().getLastWrittenSequence() && type == MsgTypes::BigBang)
+	  return MessageActions::Process;
 
   if (rNum < roundNum_)
     return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
