@@ -100,7 +100,7 @@ void Transport::run() {
     bool checkSilent = ctr % 150 == 0;
 
     if (checkPending) nh_.checkPending();
-    if (checkSilent) nh_.checkSilent();
+    //if (checkSilent) nh_.checkSilent();
 
     if (resendPacks) {
       SpinLock l(sendPacksFlag_);
@@ -190,6 +190,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task,
   case NetworkCommand::SSPingWhiteNode:
     gotSSPingWhiteNode(task);
     break;
+  case NetworkCommand::SSLastBlock:
+	gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence());
+	break;
   default:
     result = false;
     LOG_WARN("Unexpected network command");
@@ -305,6 +308,9 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+  if (type == MsgTypes::BigBang) {
+	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+  }
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -386,6 +392,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getVectorRequest(data, size);
   case MsgTypes::ConsMatrixRequest:
     return node_->getMatrixRequest(data, size);
+  case MsgTypes::BigBang:
+	return node_->getBigBang(data, size, rNum, type);
   default:
     LOG_ERROR("Unknown type");
     break;
@@ -580,4 +588,17 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   conn.specialOut = false;
   sendDirect(&task->pack, conn);
   return true;
+}
+
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+	Connection conn;
+	conn.in = net_->resolve(config_.getSignalServerEndpoint());
+	conn.specialOut = false;
+
+	oPackStream_.init(BaseFlags::NetworkMsg);
+	oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
+	oPackStream_ << lastBlock << myPublicKey_;
+
+	sendDirect(oPackStream_.getPackets(), conn);
+	return true;
 }

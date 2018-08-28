@@ -165,11 +165,11 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum) {
+void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   std::cout << __func__ << std::endl;
   istream_.init(data, size);
   std::cout << "NODE> Get Round Table" << std::endl;
-  if(roundNum_ < rNum) roundNum_ = rNum;
+  if(roundNum_ < rNum || type == MsgTypes::BigBang) roundNum_ = rNum;
   else {
     LOG_WARN("Bad round number, ignoring");
     return;
@@ -190,9 +190,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   transport_->processPostponed(rNum);
 }
 
+void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
+	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+	if (rNum > lastBlock && rNum >= roundNum_)
+		getRoundTable(data, size, rNum, type);
+	else
+		std::cerr << "BigBang else" << std::endl;
+}
+
 //the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
 void Node::sendRoundTable() {
-
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTable
            << roundNum_
@@ -842,6 +849,8 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
+if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence())
+	return MessageActions::Process;
   if (rNum == roundNum_)
     return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;
 

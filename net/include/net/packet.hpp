@@ -40,8 +40,8 @@ enum MsgTypes: uint8_t {
   RequestedBlock,
   TLConfirmation,
   ConsVectorRequest,
-  ConsMatrixRequest
-
+  ConsMatrixRequest,
+  BigBang = 35
 };
 
 typedef uint32_t RoundNum;

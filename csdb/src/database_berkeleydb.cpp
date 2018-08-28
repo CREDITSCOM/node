@@ -66,7 +66,8 @@ struct Dbt_safe : public Dbt
   {
     void* buf = get_data();
     if (buf != NULL) {
-      free(buf);//comment when use debug
+      //free(buf);
+
     }
   }
 };
