@@ -34,8 +34,8 @@ public:
 
   /* Incoming requests processing */
   void getInitRing(const uint8_t*, const size_t);
-  void getRoundTable(const uint8_t*, const size_t, const RoundNum);
-  void getBigBang(const uint8_t*, const size_t, const RoundNum);
+  void getRoundTable(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
+  void getBigBang(const uint8_t*, const size_t, const RoundNum, uint8_t type);
   void getTransaction(const uint8_t*, const size_t);
   void getFirstTransaction(const uint8_t*, const size_t);
   void getTransactionsList(const uint8_t*, const size_t);

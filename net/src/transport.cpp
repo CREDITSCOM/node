@@ -100,7 +100,7 @@ void Transport::run() {
     bool checkSilent = ctr % 150 == 0;
 
     if (checkPending) nh_.checkPending();
-    if (checkSilent) nh_.checkSilent();
+    //if (checkSilent) nh_.checkSilent();
 
     if (resendPacks) {
       SpinLock l(sendPacksFlag_);
@@ -308,7 +308,9 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
-  if (type == MsgTypes::BigBang) std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+  if (type == MsgTypes::BigBang) {
+	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+  }
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -391,7 +393,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
   case MsgTypes::ConsMatrixRequest:
     return node_->getMatrixRequest(data, size);
   case MsgTypes::BigBang:
-	return node_->getBigBang(data, size, rNum);
+	return node_->getBigBang(data, size, rNum, type);
   default:
     LOG_ERROR("Unknown type");
     break;
