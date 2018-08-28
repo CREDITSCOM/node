@@ -46,6 +46,7 @@ public:
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
   void getTLConfirmation(const uint8_t* data, const size_t size);
+  void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   /* Outcoming requests forming */
   void sendRoundTable();
@@ -60,6 +61,7 @@ public:
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const PublicKey&);
+  void sendWritingConfirmation(const PublicKey& node);
 
   void sendVectorRequest(const PublicKey&);
   void sendMatrixRequest(const PublicKey&);

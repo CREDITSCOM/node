@@ -113,6 +113,9 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   block.set_writer_public_key(myPublicKey);
    //std::cout << "SOLVER> Before write last sequence" << std::endl;
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+  csdb::PoolHash prev_hash;
+  prev_hash.from_string("");
+  block.set_previous_hash(prev_hash);
  // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
@@ -696,7 +699,7 @@ Solver::spamWithTransactions()
         transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
         transaction.set_balance(
           csdb::Amount(transaction.amount().integral() + 1, 0));
-
+        transaction.set_innerID(1);
         std::lock_guard<std::mutex> l(m_trans_mut);
         m_transactions.push_back(transaction);
       }
@@ -732,6 +735,7 @@ void Solver::addInitialBalance()
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10000, 0));
   transaction.set_balance(csdb::Amount(10000000, 0));
+  transaction.set_innerID(1);
 
   {
 	  std::lock_guard<std::mutex> l(m_trans_mut);
@@ -764,6 +768,19 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
 		node_->getBlockChain().putBlock(pool);
 	
 
+}
+
+void Solver::addConfirmation(uint8_t confNumber_) {
+  if(writingConfGotFrom[confNumber_]) return;
+  writingConfGotFrom[confNumber_]=true;
+  writingCongGotCurrent++;
+  if(writingCongGotCurrent==2)
+  {
+    node_->becomeWriter();
+    runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+      [this]() { writeNewBlock(); });
+  } 
+  
 }
 
 void Solver::nextRound()

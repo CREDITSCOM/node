@@ -204,13 +204,13 @@ void Node::sendRoundTable() {
 
   //LOG_EVENT("Sending round table");
   std::cout << "------------------------------------------  SendRoundTable  ---------------------------------------" << std::endl;
-  std::cerr << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
+  std::cout << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
   int i = 0;
   for (auto& e : confidantNodes_)
   {
     if (e != mainNode_) 
     {
-      std::cerr << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
+      std::cout << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
       i++;
     }
   }
@@ -417,7 +417,36 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size)//, const Pub
   }
 }
 
+void Node::sendWritingConfirmation(const PublicKey& node)
+{
+  if (myLevel_ != NodeLevel::Confidant) {
+    LOG_ERROR("Only confidant nodes can send confirmation of the Writer");
+    return;
+  }
+  std::cout << "NODE> Sending writing confirmation to  " << byteStreamToHex(node.str, 32) << std::endl;
+  ostream_.init(BaseFlags::Signed, node);
+  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
+  flushCurrentTasks();
+}
 
+
+void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender) {
+  std::cout << __func__ << std::endl;
+  if (myLevel_ != NodeLevel::Confidant) {
+    return;
+  }
+  // if (myPublicKey_ == sender) return;
+  std::cout << "NODE> Getting WRITING CONFIRMATION from " << byteStreamToHex(sender.str, 32) << std::endl;
+  istream_.init(data, size);
+
+  uint8_t confNumber_;
+  istream_ >> confNumber_;
+  if (!istream_.good() || !istream_.end()) {
+    LOG_WARN("Bad vector packet format");
+    return;
+  }
+  if (confNumber_<3) solver_->addConfirmation(confNumber_);
+}
 
 
 void Node::sendMatrixRequest(const PublicKey& node)
@@ -704,6 +733,8 @@ void Node::sendBlockReply(const csdb::Pool& pool, const  PublicKey& sender) {
     flushCurrentTasks();
   }
 
+
+
 void Node::becomeWriter() {
   //if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Confidant)
   //  LOG_WARN("Logically impossible to become a writer right now");
@@ -743,12 +774,12 @@ void Node::onRoundStart() {
   
 
   // Pretty printing...
-  std::cerr << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
+  std::cout << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
             << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
             int i = 0 ;
   for (auto& e : confidantNodes_)
   {
-    std::cerr << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
+    std::cout << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
     i++;
    }
 
@@ -825,7 +856,7 @@ inline bool Node::readRoundData(const bool tail) {
   PublicKey mainNode;
   uint8_t confSize = 0;
   istream_ >> confSize;
-  std::cout << "NODE> Number of confidants :" << std::dec << confSize << std::endl;
+  std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
   if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
     LOG_WARN("Bad confidants num");
     return false;

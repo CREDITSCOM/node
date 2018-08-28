@@ -176,6 +176,9 @@ typedef std::string Matrix;
     void sendZeroVector();
     void checkVectorsReceived();
     void checkMatrixReceived();
+    void addConfirmation(uint8_t confNumber_);
+
+
 	private:
     void _initApi();
 
@@ -223,7 +226,7 @@ typedef std::string Matrix;
 
 		std::vector<std::string> vector_datas;
 
-        csdb::Pool m_pool;
+    csdb::Pool m_pool;
 		
 		//std::vector<csdb::Transaction> v_pool;
 
@@ -239,6 +242,10 @@ typedef std::string Matrix;
     bool transactionListReceived = false;
     bool vectorReceived = false;
     bool gotBlockThisRound = false;
+    bool writingConfirmationGot = false;
+
+    bool writingConfGotFrom[100];
+    uint8_t writingCongGotCurrent;
 
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
