@@ -172,7 +172,9 @@ BlockChain::BlockChain(const char* path) {
 }
 
 void BlockChain::putBlock(csdb::Pool& pool) {
+#ifdef MYLOG
   std::cout << "Put block is running" << std::endl;
+  #endif
   onBlockReceived(pool);
 }
 
@@ -491,13 +493,15 @@ csdb::Amount BlockChain::calcBalance(csdb::Address address) const {
 void BlockChain::onBlockReceived(csdb::Pool& pool)
 {
   // Put on top
-  std::cout << "-----------------------------------  Write New Block: " << pool.sequence() << " -----------------------------------" << std::endl;
+  std::cout << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions"<<" --------------------------------" << std::endl;
+#ifdef MYLOG
   std::cout << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str() << std::endl;
-  std::cout << " Last      hash: " << getLastHash().to_string() << std::endl;
+  std::cout << " Last      hash: " << lastHash_.to_string() << std::endl;
   std::cout << "Checking Sequence ... ";
+  #endif
   if (pool.sequence() == getLastWrittenSequence() + 1) {
     std::cout << "OK" << std::endl;
-    pool.set_previous_hash(getLastHash());
+    pool.set_previous_hash(lastHash_);
 
     std::ofstream f(dbs_fname, std::ios::out);
     ht.head = 0;
@@ -507,8 +511,10 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
     {
 
       f << ht.head << "->" << ht.tag << std::endl;
+#ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
       //std::cout << "DB structure is written succesfully" << std::endl;
+#endif
       f.close();
     }
     else std::cout << "Error writing DB structure" << std::endl;
@@ -521,9 +527,10 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
     //std::cout << "Hash inserted into the hash-vector" << std::endl;
 
     setLastWrittenSequence(pool.sequence());
-
+#ifdef MYLOG
     std::cout << "New last hash: " << lastHash_.to_string() << std::endl;
     std::cout << "New last storage size: " << storage_.size() << std::endl;
+#endif
     if (global_sequence == getLastWrittenSequence())
     {
       blockRequestIsNeeded = false;

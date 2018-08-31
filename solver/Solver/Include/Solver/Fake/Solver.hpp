@@ -29,9 +29,10 @@
 //#include <csnode/node.hpp>
 //#include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
+#include <client/params.hpp>
 
 //#define MONITOR_NODE
-//#define SPAMMER
+
 //#define SPAM_MAIN
 
 class Node;
@@ -177,7 +178,7 @@ typedef std::string Matrix;
     void checkVectorsReceived();
     void checkMatrixReceived();
     void addConfirmation(uint8_t confNumber_);
-
+    bool getIPoolClosed();
 
 	private:
     void _initApi();
@@ -249,6 +250,7 @@ typedef std::string Matrix;
 
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
+    csdb::Pool m_transactions_;
 		
 
 #ifdef SPAMMER

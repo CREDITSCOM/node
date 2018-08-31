@@ -46,26 +46,32 @@ public:
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getTLConfirmation(const uint8_t* data, const size_t size);
+  //void getTLConfirmation(const uint8_t* data, const size_t size);
   void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
+  void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   /* Outcoming requests forming */
   void sendRoundTable();
   void sendTransaction(const csdb::Transaction&);
-  void sendTransaction(std::vector<csdb::Transaction>&&);
+  void sendTransaction(const csdb::Pool&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);//, const PublicKey&);
   void sendVector(const Credits::HashVector&);
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
+
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const PublicKey&);
   void sendWritingConfirmation(const PublicKey& node);
+  void sendRoundTableRequest(size_t rNum);
 
   void sendVectorRequest(const PublicKey&);
   void sendMatrixRequest(const PublicKey&);
+
+  void sendTLRequest();
+  void getTlRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   void getVectorRequest(const uint8_t* data, const size_t size);
   void getMatrixRequest(const uint8_t* data, const size_t size);
@@ -73,7 +79,8 @@ public:
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
-  void sendTLConfirmation(size_t tcount);
+  //void sendTLConfirmation(size_t tcount);
+  bool getSyncroStarted();
 
   enum MessageActions {
     Process,
@@ -94,7 +101,6 @@ public:
   const BlockChain& getBlockChain() const { return bc_; }
 
   csconnector::csconnector& getConnector() { return api_; }
-
   PublicKey writerId;
 
 private:

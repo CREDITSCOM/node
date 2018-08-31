@@ -168,7 +168,6 @@ void Network::processorRoutine() {
 
 void Network::sendDirect(const Packet p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
-
   qePtr->element.endpoint = ep;
   qePtr->element.pack = p;
 

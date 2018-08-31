@@ -70,9 +70,9 @@ namespace Credits{
 	  
 		uint8_t* hash_s = new uint8_t[32];
 		//std::cout << "GENERALS> Build vector : before blake" << std::endl;
-    std::cout << "GENERALS> buildVector: before blake" << std::endl;
+  //  std::cout << "GENERALS> buildVector: before blake, total " << new_pool.transactions_count() << "transactions in block" << std::endl;
 		blake2s(hash_s, 32, del1, transactionsNumber, "1234", 4);
-    std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
+//    std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
 		//initializing for taking decision
 		//std::cout << "GENERALS> Build vector : before initializing" << std::endl;
 		memset(find_untrusted, 0, 10000);
@@ -81,7 +81,7 @@ namespace Credits{
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
 
 		Hash_ hash_(hash_s);
-    std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
+ //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
 		return hash_;
     }
     else
@@ -89,12 +89,12 @@ namespace Credits{
       uint8_t* hash_s = new uint8_t[32];
       uint32_t a=0;
       blake2s(hash_s, 32, (const void*)&a, 4, "1234", 4);
-      std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
+//      std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
       memset(find_untrusted, 0, 10000);
       memset(new_trusted, 0, 100);
       memset(hw_total, 0, 3300);
       Hash_ hash_(hash_s);
-      std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
+ //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
       return hash_;
 
     }
@@ -103,9 +103,9 @@ namespace Credits{
     }
 
   void Generals::addvector(HashVector vector) {
-		std::cout << "GENERALS> Add vector" << std::endl;
+	//	std::cout << "GENERALS> Add vector" << std::endl;
 		hMatrix.hmatr[vector.Sender] = vector;
-    std::cout << "GENERALS> Vector succesfully added" << std::endl;
+ //   std::cout << "GENERALS> Vector succesfully added" << std::endl;
   }
 
 	void Generals::addSenderToMatrix(uint8_t myConfNum)
@@ -114,7 +114,7 @@ namespace Credits{
 	}
 
   void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
-		std::cout << "GENERALS> Add matrix" << std::endl;
+//		std::cout << "GENERALS> Add matrix" << std::endl;
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
     Hash_ temp_hash;

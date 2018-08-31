@@ -281,7 +281,7 @@ void Transport::processNodeMessage(const Message& msg) {
  
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
-  std::cout << "TRANSPORT> Process Node Package MSG" << std::endl;
+ // std::cout << "TRANSPORT> Process Node Package MSG" << std::endl;
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -301,16 +301,16 @@ void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
  
-  if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
-  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
-  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
-  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
-  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
-  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
-  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
-  if (type == MsgTypes::BigBang) {
-	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
-  }
+  //if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
+  //if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
+  //if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
+  //if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
+  //if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
+  //if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
+  //if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+  //if (type == MsgTypes::BigBang) {
+	 // std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+  //}
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -386,12 +386,14 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
     return node_->getBlockReply(data, size);
-  case MsgTypes::TLConfirmation:
-    return node_->getTLConfirmation(data, size);
   case MsgTypes::ConsVectorRequest:
     return node_->getVectorRequest(data, size);
   case MsgTypes::ConsMatrixRequest:
     return node_->getMatrixRequest(data, size);
+  case MsgTypes::RoundTableRequest:
+    return node_->getRoundTableRequest(data, size, firstPack.getSender());
+  case MsgTypes::ConsTLRequest:
+    return node_->getTlRequest(data, size, firstPack.getSender());
   case MsgTypes::BigBang:
 	return node_->getBigBang(data, size, rNum, type);
   default:

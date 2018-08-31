@@ -42,7 +42,7 @@
 #define LOG_EVENT(TEXT)
 #endif
 
-#if (false && LOG_LEVEL & FLAG_LOG_PACKETS)
+#if ( LOG_LEVEL & FLAG_LOG_PACKETS) //false &&
 #define LOG_IN_PACK(DATA, SIZE) std::cout << "-!> " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
 #define LOG_OUT_PACK(DATA, SIZE) std::cout << "<!- " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
 #else

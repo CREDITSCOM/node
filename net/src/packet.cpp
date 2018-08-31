@@ -34,9 +34,11 @@ bool Packet::isHeaderValid() const {
 uint32_t Packet::getHeadersLength() const {
   if (!headersLength_) {
     headersLength_ = 1;  // Flags
-
+    
     if (isFragmented())
       headersLength_+= 4;  // Min fragments & all fragments
+
+
 
     if (!isNetwork()) {
       headersLength_+= 40;  // Sender key + ID

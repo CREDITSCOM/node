@@ -41,6 +41,8 @@ enum MsgTypes: uint8_t {
   TLConfirmation,
   ConsVectorRequest,
   ConsMatrixRequest,
+  ConsTLRequest,
+  RoundTableRequest,
   BigBang = 35
 };
 
