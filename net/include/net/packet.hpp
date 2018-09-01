@@ -94,7 +94,10 @@ public:
   size_t size() const { return data_.size(); }
 
   const uint8_t* getMsgData() const { return static_cast<const uint8_t*>(data_.get()) + getHeadersLength(); }
-  size_t getMsgSize() const { return size() - getHeadersLength(); }
+  size_t getMsgSize() const { 
+  
+    if (size() - getHeadersLength() == 4) std::cout << "//////////////////////////////////PACKET> size = " << size() << ", HeadersLength = " << getHeadersLength() << std::endl;
+  return size() - getHeadersLength(); }
 
   uint32_t getHeadersLength() const;
 
@@ -141,6 +144,7 @@ public:
 
   size_t getFullSize() const {
     if (!fullData_) composeFullData();
+    if (fullData_.size() == 4) std::cout << "//////////////////////////////////PACKET> FULL Data size = " << fullData_.size() << std::endl;
     return fullData_.size();
   }
 

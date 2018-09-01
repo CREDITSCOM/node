@@ -60,6 +60,7 @@ Solver::Solver(Node* node)
   , generals(std::unique_ptr<Generals>(new Generals()))
   , vector_datas()
   , m_pool()
+  , v_pool()
 {}
 
 Solver::~Solver()
@@ -225,13 +226,13 @@ void Solver::flushTransactions()
 	if (node_->getMyLevel() != NodeLevel::Normal) { return; }
 	{
     std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions_.transactions_count()) {
-      node_->sendTransaction(std::move(m_transactions_));
+    if (m_transactions.size()) {
+      node_->sendTransaction(std::move(m_transactions));
       sentTransLastRound = true;
 #ifdef MYLOG
 	  std::cout << "FlushTransaction ..." << std::endl;
     #endif
-      m_transactions_= csdb::Pool{};
+      m_transactions.clear();
     } else {
       return;
     }
@@ -247,11 +248,11 @@ bool Solver::getIPoolClosed() {
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
 #ifdef MYLOG
-  std::cout << "SOLVER> Got Transaction" << std::endl;
+  //std::cout << "SOLVER> Got Transaction" << std::endl;
   #endif
 	if (m_pool_closed) {
 
-	  LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+	  //LOG_EVENT("m_pool_closed already, cannot accept your transactions");
     return;
   }
 
@@ -280,7 +281,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 					v_pool.add_transaction(transaction);
 #ifdef MYLOG
-          std::cout << "SOLVER> Transaction added to pool" << std::endl;
+         // std::cout << "SOLVER> Transaction added to pool" << std::endl;
           #endif
 		//	}
 		//	else
@@ -533,7 +534,7 @@ gotBlockThisRound = true;
 #endif
   uint32_t g_seq = block.sequence();
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
-  if(g_seq != node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
+  if(g_seq > node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
 
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
@@ -729,24 +730,26 @@ Solver::spamWithTransactions()
   transaction.set_currency(csdb::Currency("CS"));
 
   while (true) {
-    if (spamRunning && (node_->getMyLevel() == Normal)) 
+    if (spamRunning && (node_->getMyLevel() == Normal))
     {
+      if ((node_->getRoundNumber()<10) || (node_->getRoundNumber() > 20) )
+      {
       
 
-        transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-        transaction.set_comission(csdb::Amount(0, 1,10));
-        transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
-        transaction.set_innerID(iid);
-#ifdef MYLOG
-        std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
-        #endif
-        {
-        std::lock_guard<std::mutex> l(m_trans_mut);
-        m_transactions_.add_transaction(transaction);
-        }
+          transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+          transaction.set_comission(csdb::Amount(0, 1,10));
+          transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
+          transaction.set_innerID(iid);
+  #ifdef MYLOG
+          std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
+          #endif
+          {
+          std::lock_guard<std::mutex> l(m_trans_mut);
+          m_transactions.push_back(transaction);
+          }
 
-        iid++;
-      
+          iid++;
+      }
     }
 
     std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
@@ -761,7 +764,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
   SUPER_TIC();
   std::lock_guard<std::mutex> l(m_trans_mut);
   SUPER_TIC();
-  m_transactions_.add_transaction(transaction);
+  m_transactions.push_back(transaction);
 }
 
 void Solver::addInitialBalance()
@@ -783,7 +786,7 @@ void Solver::addInitialBalance()
 
   {
 	  std::lock_guard<std::mutex> l(m_trans_mut);
-	  m_transactions_.add_transaction(transaction);
+	  m_transactions.push_back(transaction);
   }
 
 #ifdef SPAMMER

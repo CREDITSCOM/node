@@ -178,6 +178,7 @@ private:
                                       pack(p) { }
   };
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
+  
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = { &postponedPacketsFirst_, &postponedPacketsSecond_ };

@@ -278,10 +278,19 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
 
 void Transport::processNodeMessage(const Message& msg) {
- 
+
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
- // std::cout << "TRANSPORT> Process Node Package MSG" << std::endl;
+  //if (type == MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message MSG: Transactions " << std::endl;
+  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::BigBang) {
+    std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
+  }
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -289,6 +298,9 @@ void Transport::processNodeMessage(const Message& msg) {
                                msg.getFirstPack(),
                                msg.getFullData() + StrippedDataSize,
                                msg.getFullSize() - StrippedDataSize);
+ /*   msg.getFirstPack(),
+      msg.getFullData() + StrippedDataSize,
+      msg.getFullSize() - StrippedDataSize);*/
   case Node::MessageActions::Postpone:
     return postponePacket(rNum, type, msg.extractData());
   case Node::MessageActions::Drop:
@@ -301,16 +313,16 @@ void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
  
-  //if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
-  //if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
-  //if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
-  //if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
-  //if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
-  //if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
-  //if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
-  //if (type == MsgTypes::BigBang) {
-	 // std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
-  //}
+ // if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
+  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
+  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
+  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
+  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
+  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
+  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+  if (type == MsgTypes::BigBang) {
+	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+  }
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -341,6 +353,8 @@ void Transport::processPostponed(const RoundNum rNum) {
     if (pp.round > rNum)
       ppBuf.emplace(std::move(pp));
     else if (pp.round == rNum)
+
+      if(pp.pack.getMsgSize() < StrippedDataSize) std::cout << "+++++++++++++++++++++++++++ACHTUNG!!! SIZE IS BELOW ZERO!!!" << std::endl;
       dispatchNodeMessage(pp.type,
                           pp.round,
                           pp.pack,
@@ -361,7 +375,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
                                     size_t size) {
  
   if (!size) {
-    LOG_ERROR("Bad packet size, why is it zero?");
+    LOG_ERROR("Bad packet size, why is it zero or too big?");
     return;
   }
 
