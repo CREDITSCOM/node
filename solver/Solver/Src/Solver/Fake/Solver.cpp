@@ -761,9 +761,9 @@ Solver::spamWithTransactions()
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
-  SUPER_TIC();
+  TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
-  SUPER_TIC();
+  TRACE("");
   m_transactions.push_back(transaction);
 }
 

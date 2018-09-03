@@ -64,7 +64,36 @@
 #define LOG_DEBUG(TEXT)
 #endif
 
-#define SUPER_TIC()
+#ifdef TRACE_ENABLER
+#define TRACE_ENABLED 1
+#else
+#define TRACE_ENABLED 0
+#endif
+
+extern thread_local bool trace;
+#if LOG_LEVEL & FLAG_TRACE & -TRACE_ENABLED
+#define TRACE(PRINT_ARGS)                                                      \
+  do {                                                                         \
+    if (!trace)                                                                \
+      break;                                                                   \
+    std::ostringstream strstream;                                              \
+    std::clock_t uptime = std::clock() / (CLOCKS_PER_SEC / 1000);              \
+    std::clock_t ss = uptime / 1000;                                           \
+    std::clock_t ms = uptime % 1000;                                           \
+    std::clock_t mins = ss / 60;                                               \
+    ss %= 60;                                                                  \
+    std::clock_t hh = mins / 60;                                               \
+    mins %= 60;                                                                \
+    char buf[16];                                                              \
+    snprintf(buf, sizeof(buf), "[%02d:%02d:%02d.%03d]", hh, mins, ss, ms);     \
+    strstream << buf << " " << std::this_thread::get_id() << "|\t" << __FILE__ \
+              << ":" << __func__ << ":" << __LINE__;                           \
+    strstream << " " << PRINT_ARGS << std::endl;                               \
+    std::clog << strstream.str();                                              \
+  } while (0)
+#else
+#define TRACE(PRINT_ARGS) [&]() -> decltype(auto) {}()
+#endif
 
 static inline std::string byteStreamToHex(const char* stream, const size_t length) {
   static std::string map = "0123456789ABCDEF";

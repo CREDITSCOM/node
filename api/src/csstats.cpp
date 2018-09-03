@@ -2,6 +2,7 @@
 #include <cassert>
 #include <csdb/currency.h>
 #include <csstats.h>
+#include <client/params.hpp>
 
 namespace csstats {
 
@@ -68,7 +69,7 @@ csstats::collectStats(const Periods& periods)
                   if (transaction.user_field(0).is_valid())
                       ++periodStats.smartContractsCount;
 
-                  Currency currency = transaction.currency().to_string();
+                  Currency currency = DEFAULT_CURRENCY;
 
                   const auto& amount = transaction.amount();
 
@@ -96,6 +97,10 @@ csstats::collectStats(const Periods& periods)
 csstats::csstats(BlockChain& blockchain, const Config& config)
   : blockchain(blockchain)
 {
+#ifndef STATS
+    return;
+#endif
+
     Log("csstats start ",
         "update interval is ",
         config.updateIntervalSec,

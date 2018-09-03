@@ -1,11 +1,14 @@
 #pragma once
 #include <APIHandler.h>
+
 #include <DebugLog.h>
 
 #include <memory>
 #include <thread>
 
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TSimpleServer.h>
+#include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TServerSocket.h>
@@ -15,42 +18,44 @@
 
 #include <client/params.hpp>
 
-using namespace ::apache::thrift;
-using namespace ::apache::thrift::protocol;
-using namespace ::apache::thrift::transport;
-using namespace ::apache::thrift::server;
-
-using namespace api;
+namespace api {
+class APIhandler;
+}
 
 namespace csconnector {
 
 struct Config
 {
-    int port = 9090;
+  int port = 9090;
 #ifdef AJAX_IFACE
-    int ajax_port = 80;
+  int ajax_port = 80;
 #endif
 };
 
-class csconnector
+class connector
 {
-  public:
-    csconnector(BlockChain& m_blockchain,
-                Credits::Solver* solver,
-                const Config& config = Config{});
-    ~csconnector();
+public:
+  connector(BlockChain& m_blockchain,
+            Credits::Solver* solver,
+            const Config& config = Config{});
+  ~connector();
 
-    csconnector(const csconnector&) = delete;
-    csconnector& operator=(const csconnector&) = delete;
+  connector(const connector&) = delete;
+  connector& operator=(const connector&) = delete;
 
-  private:
-    stdcxx::shared_ptr<APIIf> api_handler;
-    stdcxx::shared_ptr<APIProcessor> api_processor;
-    TThreadedServer server;
-    std::thread thread;
-#ifdef AJAX_IFACE
-    TThreadedServer ajax_server;
-    std::thread ajax_thread;
+private:
+  ::apache::thrift::stdcxx::shared_ptr<::api::APIHandler> api_handler;
+  ::api::custom::APIProcessor api_processor;
+  ::apache::thrift::stdcxx::shared_ptr<api::SequentialProcessorFactory>
+    p_api_processor_factory;
+#ifdef BINARY_TCP_API
+  ::apache::thrift::server::TThreadedServer server;
+  std::thread thread;
 #endif
+#ifdef AJAX_IFACE
+  ::apache::thrift::server::TThreadedServer ajax_server;
+  std::thread ajax_thread;
+#endif
+  friend class ::api::custom::APIProcessor;
 };
 }

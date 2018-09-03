@@ -100,7 +100,7 @@ public:
   BlockChain& getBlockChain() { return bc_; }
   const BlockChain& getBlockChain() const { return bc_; }
 
-  csconnector::csconnector& getConnector() { return api_; }
+  csconnector::connector& getConnector() { return api_; }
   PublicKey writerId;
 
 private:
@@ -149,7 +149,7 @@ private:
   Transport* transport_;
 
   csstats::csstats stats_;
-  csconnector::csconnector api_;
+  csconnector::connector api_;
 
   RegionAllocator allocator_;
 
