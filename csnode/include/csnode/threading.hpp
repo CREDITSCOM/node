@@ -5,6 +5,7 @@
 
 #define BOTTLENECKED_SMARTS
 
+#include <thread>
 #include <unordered_map>
 #include <list>
 
@@ -59,7 +60,7 @@ struct worker_queue
     }
 
     template<typename J>
-    void wait_till_front(J& j)
+    void wait_till_front(const J& j)
     {
         //TRACE("");
         std::unique_lock<decltype(lock)> l(lock);
@@ -123,7 +124,7 @@ struct worker_queue
 #endif
     }
     template<typename J>
-    void update_state(J& j)
+    void update_state(const J& j)
     {
         //TRACE("");
         std::lock_guard<decltype(lock)> l(lock);
