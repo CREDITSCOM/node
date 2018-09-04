@@ -2,6 +2,8 @@
 #define __LOGGER_HPP__
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <ctime>
 
 #define FLAG_LOG_NOTICE 1
 #define FLAG_LOG_WARN 2
