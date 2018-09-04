@@ -185,7 +185,7 @@ class APIHandler : public APIHandlerInterface
     ::csdb::Transaction make_transaction(const ::api::Transaction&);
     void dumb_transaction_flow(api::TransactionFlowResult& _return,
                                const ::api::Transaction&);
-    void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
+    void smart_transaction_flow(api::TransactionFlowResult& _return,
                                             const ::api::Transaction&);
 
     std::map<std::string, Credits::worker_queue<std::tuple<>>> work_queues;

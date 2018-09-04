@@ -8,7 +8,7 @@
 #include <thread>
 #include <condition_variable>
 
-#include <csnode/Blockchain.hpp>
+#include <csnode/blockchain.hpp>
 
 namespace csstats {
     struct Config
