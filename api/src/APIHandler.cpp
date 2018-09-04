@@ -34,7 +34,7 @@ using namespace ::apache;
 using namespace Credits;
 
 api::custom::APIProcessor::APIProcessor(
-  ::apache::thrift::stdcxx::shared_ptr<APIHandlerImpl> iface)
+  ::apache::thrift::stdcxx::shared_ptr<APIHandler> iface)
   : api::APIProcessor(iface)
   , ss()
 {}
@@ -183,7 +183,7 @@ APIHandler::BalanceGet(BalanceGetResult& _return,
 {
     csdb::Address addr;
     // if (address.size() != 64)
-    addr = Credits::BlockChain::getAddressFromKey(address);
+    addr = BlockChain::getAddressFromKey(address);
     // else
     //    addr = csdb::Address::from_string(address);
 
@@ -474,7 +474,7 @@ APIHandler::make_transaction(const Transaction& transaction)
     send_transaction.set_currency(csdb::Currency("CS"));
     send_transaction.set_source(source);
     send_transaction.set_target(
-      Credits::BlockChain::getAddressFromKey(transaction.target));
+      BlockChain::getAddressFromKey(transaction.target));
     send_transaction.set_comission(csdb::Amount(
       transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
     send_transaction.set_innerID(transaction.id);
@@ -797,7 +797,7 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
         TRACE("");
         auto smart_origin = locked_ref(this->smart_origin);
         TRACE("");
-        return (*smart_origin)[Credits::BlockChain::getAddressFromKey(address)];
+        return (*smart_origin)[BlockChain::getAddressFromKey(address)];
     }();
     auto tr = s_blockchain.loadTransaction(trid);
     _return.smartContract = fetch_smart_body(tr);
@@ -922,7 +922,7 @@ APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return,
 
     TRACE("");
 
-    csdb::Address addr = Credits::BlockChain::getAddressFromKey(deployer);
+    csdb::Address addr = BlockChain::getAddressFromKey(deployer);
 
     // std::cerr << "Input address: " << deployer << std::endl;
 
@@ -949,7 +949,7 @@ APIHandler::SmartContractAddressesListGet(
 {
     // Log("SmartContractAddressesListGet");
 
-    csdb::Address addr = Credits::BlockChain::getAddressFromKey(deployer);
+    csdb::Address addr = BlockChain::getAddressFromKey(deployer);
 
     get_mapped_deployer_smart(
       addr,
@@ -1010,7 +1010,7 @@ APIHandler::WaitForSmartTransaction(api::TransactionId& _return,
                                     const api::Address& smart_public)
 {
     TRACE(smart_public);
-    csdb::Address key = Credits::BlockChain::getAddressFromKey(smart_public);
+    csdb::Address key = BlockChain::getAddressFromKey(smart_public);
 
     decltype(smart_last_trxn)::LockedType::iterator it;
 

@@ -8,7 +8,7 @@
 
 #include <API.h>
 #include <Solver/Fake/Solver.hpp>
-#include <csconnector/csconnector.h>
+//#include <csconnector/csconnector.h>
 #include <csstats.h>
 
 #include <ContractExecutor.h>

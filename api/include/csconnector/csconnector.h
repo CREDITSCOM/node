@@ -18,9 +18,9 @@
 
 #include <client/params.hpp>
 
-namespace api {
-class APIhandler;
-}
+//namespace api {
+//class APIHandler;
+//}
 
 namespace csconnector {
 
@@ -44,7 +44,7 @@ public:
   connector& operator=(const connector&) = delete;
 
 private:
-  ::apache::thrift::stdcxx::shared_ptr<::api::APIHandler> api_handler;
+  ::apache::thrift::stdcxx::shared_ptr<api::APIHandler> api_handler;
   ::api::custom::APIProcessor api_processor;
   ::apache::thrift::stdcxx::shared_ptr<api::SequentialProcessorFactory>
     p_api_processor_factory;
