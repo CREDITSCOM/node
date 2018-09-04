@@ -287,31 +287,27 @@ private:
 
 inline void CallsQueue::callAll() {
   Call* startHead = head_.load(std::memory_order_relaxed);
+  if (!startHead) return;
+  Call* newHead = startHead;
+  head_.compare_exchange_strong(newHead,
+                                nullptr,
+                                std::memory_order_relaxed,
+                                std::memory_order_relaxed);
   Call* elt = startHead;
-  while (elt) {
+  do {
     elt->func();
-    if (head_.compare_exchange_strong(startHead,
-                                      nullptr,
-                                      std::memory_order_relaxed,
-                                      std::memory_order_relaxed))
-      startHead = nullptr;
-
     Call* rem = elt;
     elt = rem->next.load(std::memory_order_relaxed);
     delete rem;
-  }
+  } while (elt);
 
-  if (startHead) {
-    Call* newHead = head_.load(std::memory_order_relaxed);
-    Call* toChange = startHead;
-    while (!newHead->next.
-           compare_exchange_strong(toChange,
-                                   nullptr,
-                                   std::memory_order_relaxed,
-                                   std::memory_order_relaxed)) {
-      newHead = toChange;
-      toChange = startHead;
-    }
+  if (newHead != startHead) {
+    do {
+      Call *next = newHead->next.load(std::memory_order_relaxed);
+      if (next == startHead) break;
+      newHead = next;
+    } while (true);
+    newHead->next.store(nullptr, std::memory_order_relaxed);
   }
 }
 
@@ -321,9 +317,8 @@ inline void CallsQueue::insert(std::function<void()> f) {
 
   Call* head = head_.load(std::memory_order_relaxed);
   do {
-    newElt->next.store(head);
-  }
-  while (!head_.compare_exchange_strong(head,
+    newElt->next.store(head, std::memory_order_relaxed);
+  } while (!head_.compare_exchange_weak(head,
                                         newElt,
                                         std::memory_order_acquire,
                                         std::memory_order_relaxed));
