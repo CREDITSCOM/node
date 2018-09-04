@@ -617,7 +617,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
     if ((_return.__isset.smart_contract_result =
           api_resp.__isset.ret_val)) { // non-bug = instead of ==
-        TRACE();
+        TRACE("");
         _return.smart_contract_result = api_resp.ret_val;
     }
 

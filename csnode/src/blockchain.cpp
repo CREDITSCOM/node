@@ -180,7 +180,7 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
   {
-    std::lock_guard<std::mutex> l(dbLock_);
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
     pool.set_storage(storage_);
   }
 
@@ -581,13 +581,13 @@ csdb::PoolHash BlockChain::getLastWrittenHash()
   return lastHash_;
 }
 
-void
-BlockChain::wait_for_block()
-{
-  std::unique_lock<std::mutex> l(dbLock_);
-  auto ls = storage_.size();
-  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
-}
+//void
+//BlockChain::wait_for_block()
+//{
+//  std::unique_lock<std::mutex> l(dbLock_);
+//  auto ls = storage_.size();
+//  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
+//}
 
 
 uint32_t BlockChain::getGlobalSequence()
@@ -667,7 +667,7 @@ namespace
 
   private:
     csdb::Address addr_;
-    const Credits::BlockChain& blockchain_;
+    const BlockChain& blockchain_;
     Transaction& transactions_;
 };
 }
@@ -719,5 +719,4 @@ BlockChain::getTransactions(Transactions& transactions,
         if (!trxLoader.load(currHash, offset, limit, prevHash))
             break;
     }
-}
 }
