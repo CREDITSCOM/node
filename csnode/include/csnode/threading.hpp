@@ -36,8 +36,9 @@ struct worker_queue
 {
   private:
 #ifdef BOTTLENECKED_SMARTS
-    std::list<std::tuple<>> tids;
-    std::unordered_map<std::thread::id, decltype(tids)::iterator> tid_map;
+	typedef std::list<std::tuple<>> tids_t;
+    tids_t tids;
+    std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
 #endif
     std::condition_variable_any w;
     Credits::spinlock lock;
