@@ -29,6 +29,8 @@
 #include <iomanip>
 #include <scope_guard.h>
 
+constexpr csdb::user_field_id_t smart_state_idx = ~1;
+
 using namespace api;
 using namespace ::apache;
 using namespace Credits;
@@ -631,9 +633,8 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
     TRACE("");
 
-    send_transaction.set_amount(csdb::Amount(1));
     send_transaction.add_user_field(0, serialize(input_smart));
-    send_transaction.add_user_field(1, api_resp.contractState);
+    send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
     solver.send_wallet_transaction(send_transaction);
 
     trxn_sent = true;
@@ -876,7 +877,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
                 return (*smart_state)[address];
             }();
             e.update_state(
-              [&]() { return tr.user_field(1).value<std::string>(); });
+              [&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
         }
 
         if (is_smart_deploy(smart)) {
