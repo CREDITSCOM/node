@@ -366,7 +366,7 @@ Transaction::to_byte_stream_for_sig() const
   if (custom_user_fields.size()) {
     os.put_smart(custom_user_fields);
     auto buf = os.buffer();
-    buf.erase(buf.begin() + fixed_prefix_length);
+    buf.erase(buf.begin() + (fixed_prefix_length + sizeof(uint32_t)));
     return buf;
   } else {
     uint32_t num_user_fields = 0;
