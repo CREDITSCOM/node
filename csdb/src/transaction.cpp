@@ -360,10 +360,13 @@ Transaction::to_byte_stream_for_sig() const
   os.put(data->amount_);
   os.put(data->comission_);
   os.put(currency);
-  if (data->user_fields_.size()) {
-    os.put_smart(data->user_fields_);
+  const size_t fixed_prefix_length = os.buffer().size();
+  decltype(data->user_fields_) custom_user_fields(
+    data->user_fields_.lower_bound(0), data->user_fields_.end());
+  if (custom_user_fields.size()) {
+    os.put_smart(custom_user_fields);
     auto buf = os.buffer();
-    buf.erase(buf.begin() + 101);
+    buf.erase(buf.begin() + fixed_prefix_length);
     return buf;
   } else {
     uint32_t num_user_fields = 0;
