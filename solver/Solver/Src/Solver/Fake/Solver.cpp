@@ -248,16 +248,19 @@ bool Solver::getIPoolClosed() {
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
 #ifdef MYLOG
-  //std::cout << "SOLVER> Got Transaction" << std::endl;
-  #endif
-	if (m_pool_closed) {
-
-	  //LOG_EVENT("m_pool_closed already, cannot accept your transactions");
-    return;
-  }
+	std::cout << "SOLVER> Got Transaction" << std::endl;
+#endif
+	if (m_pool_closed)
+	{
+#ifdef MYLOG
+		LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+#endif
+		return;
+	}
 
 	if (transaction.is_valid())
 		{
+#ifndef SPAMMER
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
 			uint8_t* message = new uint8_t[msg_len];
@@ -273,27 +276,24 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 			uint8_t* signature;
 			signature = (uint8_t*)sig_str.c_str();
 
-	//		if (verify_signature(signature, public_key, message, msg_len))
-	//		{
-
-			//if (v_pool.size() == 0)
-			//node_->sendFirstTransaction(transaction);
-
+			if (verify_signature(signature, public_key, message, msg_len))
+			{
+#endif
 					v_pool.add_transaction(transaction);
-#ifdef MYLOG
-         // std::cout << "SOLVER> Transaction added to pool" << std::endl;
-          #endif
-		//	}
-		//	else
-		//	{
-	//			LOG_EVENT("Wrong signature");
-	//		}
-
+#ifndef SPAMMER
+			}
+			else
+			{
+				LOG_EVENT("Wrong signature");
+			}
 			delete[]message;
+#endif
 		}
 		else
 		{
-		// LOG_EVENT("Invalid transaction received");
+#ifdef MYLOG
+			LOG_EVENT("Invalid transaction received");
+#endif
 		}
 }
 
