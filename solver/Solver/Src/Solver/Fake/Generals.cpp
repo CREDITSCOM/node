@@ -62,6 +62,9 @@ namespace Credits{
       {
         *(del1 + i) = bitcnt;
         new_pool.add_transaction(it);
+		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+		printf("TRANSACTION ACCEPTED\n");
+		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
       }
 
 		  else *(del1 + i) = -bitcnt;
