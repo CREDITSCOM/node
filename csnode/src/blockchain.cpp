@@ -179,17 +179,39 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
-  {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    pool.set_storage(storage_);
-  }
+	TRACE("");
+	
+	{
+		std::lock_guard<decltype(dbLock_)> l(dbLock_);
+		pool.set_storage(storage_);
+	}
 
-  //	std::cout << "OK" << std::endl << "Pool is composing ... ";
-  if (!pool.compose())
-    LOG_ERROR("Couldn't compose block");
-  if (!pool.save())
-    LOG_ERROR("Couldn't save block");
-  std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
+	if (!pool.compose())
+		 if (!pool.compose()) {
+		LOG_ERROR("Couldn't compose block");
+		if (!pool.save())
+			 return;
+		
+	}
+	
+		if (!pool.save()) {
+		LOG_ERROR("Couldn't save block");
+		return;
+		
+	}
+	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+	{
+		TRACE("");
+		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
+		TRACE("");
+		new_block_cv.notify_all();
+		TRACE("");
+	}
+	
+	if (!updateCache(pool)) {
+		LOG_ERROR("Couldn't update cache");
+	}
 }
 
 void BlockChain::setLastWrittenSequence(uint32_t seq) {
