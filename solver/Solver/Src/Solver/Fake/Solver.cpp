@@ -128,6 +128,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
 
 void Solver::sendTL()
 {
+  if (gotBigBang) return;
   uint32_t tNum = v_pool.transactions_count();
   std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
   std::cout << "                          Total received " << tNum << " transactions" << std::endl;
@@ -303,8 +304,10 @@ void Solver::initConfRound()
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
+  size_t _rNum = rNum;
+  if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-  //  [this]() { if(!transactionListReceived) node_->sendTLRequest(); });
+  //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
@@ -431,8 +434,15 @@ void Solver::checkMatrixReceived()
   
 }
 
-void Solver::checkVectorsReceived()
+void Solver::setRNum(size_t _rNum)
 {
+  rNum = _rNum;
+}
+
+
+void Solver::checkVectorsReceived(size_t _rNum)
+{
+  if (_rNum < rNum) return;
   uint8_t numGen = node_->getConfidants().size();
   if (trustedCounterVector == numGen) return;
 
@@ -527,8 +537,8 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
 	if (node_->getMyLevel() == NodeLevel::Writer)
 		return;
-
-gotBlockThisRound = true;
+  gotBigBang = false;
+  gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
@@ -554,7 +564,7 @@ gotBlockThisRound = true;
 
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
-  size_t rNum = node_->getRoundNumber();
+  size_t _rNum = rNum;
  // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 
@@ -567,6 +577,16 @@ gotBlockThisRound = true;
 #endif
 #endif
 }
+bool Solver::getBigBangStatus()
+{
+  return gotBigBang;
+}
+
+void Solver::setBigBangStatus(bool _status)
+{
+  gotBigBang = _status;
+}
+
 
 void Solver::gotBlockCandidate(csdb::Pool&& block)
 {
@@ -615,7 +635,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 	}
 
 	
-	if ((ips.size() == min_nodes + 1) && (!round_table_sent)) 
+	if ((ips.size() == min_nodes) && (!round_table_sent)) 
 	{
 		
 		std::cout << "Solver -> sending NEW ROUND table" << std::endl;
