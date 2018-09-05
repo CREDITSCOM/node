@@ -104,17 +104,17 @@ void Message::composeFullData() const {
                                     fullData_.size(),
                                     &uncompressedSize);
 
-      RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize + MsgHeaderSize);
+      RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize + MsgHeaderSize + headersLength);
 
       //LOG_WARN("Uncomressed block will be " << uncompressedSize);
 
       snappy::RawUncompress((const char*)fullData_.get(),
                             (size_t)fullData_.size(),
-                            (char*)uncompressedData.get() + MsgHeaderSize);
+                            (char*)uncompressedData.get() + MsgHeaderSize + headersLength);
 
       //LOG_WARN("Unpresult " << (t1 ? 1 : 0) << ", " << (t2 ? 1 : 0));
 
-      memcpy(uncompressedData.get(), packets_->getMsgData(), MsgHeaderSize);
+      memcpy(uncompressedData.get(), packets_->getMsgData(), MsgHeaderSize + headersLength);
       fullData_ = uncompressedData;
     }
   }
