@@ -139,13 +139,13 @@ public:
 
   const uint8_t* getFullData() const {
     if (!fullData_) composeFullData();
-    return static_cast<const uint8_t*>(fullData_.get());
+    return static_cast<const uint8_t*>(fullData_.get()) + packets_->getHeadersLength();
   }
 
   size_t getFullSize() const {
     if (!fullData_) composeFullData();
     if (fullData_.size() == 4) std::cout << "//////////////////////////////////PACKET> FULL Data size = " << fullData_.size() << std::endl;
-    return fullData_.size();
+    return fullData_.size() - packets_->getHeadersLength();
   }
 
   Packet extractData() const {

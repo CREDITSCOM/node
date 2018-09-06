@@ -175,10 +175,13 @@ typedef std::string Matrix;
     HashMatrix getMyMatrix();
     void initConfRound();
     void sendZeroVector();
-    void checkVectorsReceived();
+    void checkVectorsReceived(size_t _rNum);
     void checkMatrixReceived();
     void addConfirmation(uint8_t confNumber_);
     bool getIPoolClosed();
+    bool getBigBangStatus();
+    void setBigBangStatus(bool _status);
+    void setRNum(size_t _rNum);
 
 	private:
     void _initApi();
@@ -244,10 +247,12 @@ typedef std::string Matrix;
     bool vectorReceived = false;
     bool gotBlockThisRound = false;
     bool writingConfirmationGot = false;
+    bool gotBigBang = false;
 
     bool writingConfGotFrom[100];
     uint8_t writingCongGotCurrent;
 
+    size_t rNum = 0;
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;

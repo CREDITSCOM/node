@@ -12,6 +12,12 @@ enum RegFlags: uint8_t {
   RedirectPort = 1 << 2
 };
 
+enum Platform : uint8_t {
+  Linux,
+  MacOS,
+  Windows
+};
+
 namespace {
 // Packets formation
 
@@ -68,7 +74,12 @@ void formRegPack(const Config& config,
 void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
-         << NODE_VERSION;
+#ifdef WIN32
+    << Platform::Windows
+#else
+    << Platform::Linux
+#endif
+    << NODE_VERSION;
 
   addMyOut(config, stream, (uint8_t)(config.getNodeType() == NodeType::Router ? 8 : 0));
 

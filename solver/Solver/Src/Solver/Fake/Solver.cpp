@@ -130,6 +130,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
 
 void Solver::sendTL()
 {
+  if (gotBigBang) return;
   uint32_t tNum = v_pool.transactions_count();
   std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
   std::cout << "                          Total received " << tNum << " transactions" << std::endl;
@@ -258,18 +259,22 @@ bool Solver::getIPoolClosed() {
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
 #ifdef MYLOG
-  //std::cout << "SOLVER> Got Transaction" << std::endl;
-  #endif
-	if (m_pool_closed) {
-
-	  //LOG_EVENT("m_pool_closed already, cannot accept your transactions");
-    return;
-  }
+	std::cout << "SOLVER> Got Transaction" << std::endl;
+#endif
+	if (m_pool_closed)
+	{
+#ifdef MYLOG
+		LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+#endif
+		return;
+	}
 
 	if (transaction.is_valid())
 		{
+#ifndef SPAMMER
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
+			TRACE(msg_len);
 			uint8_t* message = new uint8_t[msg_len];
 			for (size_t i = 0; i < msg_len; i++)
 				message[i] = v[i];
@@ -283,27 +288,24 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 			uint8_t* signature;
 			signature = (uint8_t*)sig_str.c_str();
 
-	//		if (verify_signature(signature, public_key, message, msg_len))
-	//		{
-
-			//if (v_pool.size() == 0)
-			//node_->sendFirstTransaction(transaction);
-
+			if (verify_signature(signature, public_key, message, msg_len))
+			{
+#endif
 					v_pool.add_transaction(transaction);
-#ifdef MYLOG
-         // std::cout << "SOLVER> Transaction added to pool" << std::endl;
-          #endif
-		//	}
-		//	else
-		//	{
-	//			LOG_EVENT("Wrong signature");
-	//		}
-
+#ifndef SPAMMER
+			}
+			else
+			{
+				LOG_EVENT("Wrong signature");
+			}
 			delete[]message;
+#endif
 		}
 		else
 		{
-		// LOG_EVENT("Invalid transaction received");
+#ifdef MYLOG
+			LOG_EVENT("Invalid transaction received");
+#endif
 		}
 }
 
@@ -314,8 +316,10 @@ void Solver::initConfRound()
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
+  size_t _rNum = rNum;
+  if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-  //  [this]() { if(!transactionListReceived) node_->sendTLRequest(); });
+  //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
@@ -448,8 +452,15 @@ void Solver::checkMatrixReceived()
   
 }
 
-void Solver::checkVectorsReceived()
+void Solver::setRNum(size_t _rNum)
 {
+  rNum = _rNum;
+}
+
+
+void Solver::checkVectorsReceived(size_t _rNum)
+{
+  if (_rNum < rNum) return;
   uint8_t numGen = node_->getConfidants().size();
   if (trustedCounterVector == numGen) return;
 
@@ -552,9 +563,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
 	if (node_->getMyLevel() == NodeLevel::Writer)
 		return;
-
-	timer_service.Mark("gotBlock()", node_->getRoundNumber());
-gotBlockThisRound = true;
+  timer_service.Mark("gotBlock()", node_->getRoundNumber());
+  gotBigBang = false;
+  gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
@@ -607,6 +618,16 @@ gotBlockThisRound = true;
 #endif
 #endif
 }
+bool Solver::getBigBangStatus()
+{
+  return gotBigBang;
+}
+
+void Solver::setBigBangStatus(bool _status)
+{
+  gotBigBang = _status;
+}
+
 
 void Solver::gotBlockCandidate(csdb::Pool&& block)
 {
@@ -658,7 +679,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 	}
 
 	
-	if ((ips.size() == min_nodes + 1) && (!round_table_sent)) 
+	if ((ips.size() == min_nodes) && (!round_table_sent)) 
 	{
 		
 		std::cout << "Solver -> sending NEW ROUND table" << std::endl;
@@ -804,14 +825,15 @@ Solver::spamWithTransactions()
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
-  SUPER_TIC();
+  TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
-  SUPER_TIC();
+  TRACE("");
   m_transactions.push_back(transaction);
 }
 
 void Solver::addInitialBalance()
 {
+#ifdef ADD_INITIAL_BALANCE
   std::cout << "===SETTING DB===" << std::endl;
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
@@ -831,6 +853,7 @@ void Solver::addInitialBalance()
 	  std::lock_guard<std::mutex> l(m_trans_mut);
 	  m_transactions.push_back(transaction);
   }
+#endif
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);

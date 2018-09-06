@@ -10,7 +10,6 @@
 
 #include "sys/timeb.h"
 
-#define TRACE()
 using namespace Credits;
 
 //BlockChain::BlockChain(const char* path)
@@ -180,17 +179,39 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
-  {
-    std::lock_guard<std::mutex> l(dbLock_);
-    pool.set_storage(storage_);
-  }
+	TRACE("");
+	
+	{
+		std::lock_guard<decltype(dbLock_)> l(dbLock_);
+		pool.set_storage(storage_);
+	}
 
-  //	std::cout << "OK" << std::endl << "Pool is composing ... ";
-  if (!pool.compose())
-    LOG_ERROR("Couldn't compose block");
-  if (!pool.save())
-    LOG_ERROR("Couldn't save block");
-  std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
+	if (!pool.compose())
+		 if (!pool.compose()) {
+		LOG_ERROR("Couldn't compose block");
+		if (!pool.save())
+			 return;
+		
+	}
+	
+		if (!pool.save()) {
+		LOG_ERROR("Couldn't save block");
+		return;
+		
+	}
+	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+	{
+		TRACE("");
+		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
+		TRACE("");
+		new_block_cv.notify_all();
+		TRACE("");
+	}
+	
+	if (!updateCache(pool)) {
+		LOG_ERROR("Couldn't update cache");
+	}
 }
 
 void BlockChain::setLastWrittenSequence(uint32_t seq) {
@@ -209,135 +230,15 @@ void BlockChain::writeGenesisBlock() {
   csdb::Transaction transaction;
   std::vector<unsigned char> vchRet;
 
-  transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001"));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(100000000, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
-  transaction.set_innerID(0);
-
-
-  genesis.add_transaction(transaction);
-
-
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("mmM3sXYkK5m12R7NiwcS3ExAocJxuN8BVfmgtyhioUS", vchRet);
+  DecodeBase58("5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe", vchRet); // 4 3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
+  transaction.set_amount(csdb::Amount(std::numeric_limits<int32_t>::max(), 0));
+  transaction.set_balance(csdb::Amount(0, 0));
   transaction.set_innerID(0);
   vchRet.clear();
   genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(1);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("H5ptdUUfjJBGiK2X3gN2EzNYxituCUUnXv2tiMdQKP3b", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(2);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("FuvGENwrCY2M6hCeWhCUMEx5uWg71q1oY3TuxDtGcMnN", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(3);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("4qVXL76hqkvxh3jZKGZjbxMvBirWRibb2zRdS5TrwJga", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(4);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("J7w1j8XsRNEMS1UfMYCpgGTaRyoF4r8TwHTDFPanR9jS", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(5);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("cB8hBUm19Pw47sg222PhxvKPcxJQm8rntBi1h7H7jn6", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(6);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("AFQHxGmvkjHEc5Jb1fmvhGwjMBkSGnuusXve8zmCPhHk", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(7);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("3ZaqQbawNgFcuL6REkuu6MeLepufRaWHhgXxiCTKx4FJ", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(8);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("793LHWckjjoTjkQYnHABgQFkX3VbdBtksQujVtEruX2E", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(9);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
 
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(0);
@@ -356,51 +257,46 @@ void BlockChain::writeGenesisBlock() {
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
 }
 
-
-bool BlockChain::loadCache()
+bool
+BlockChain::loadCache()
 {
-    try
-    {
-        std::lock_guard<std::mutex> lock(cacheMutex_);
+    try {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         walletsCache_.reset(new WalletsCache(WalletsCache::Config()));
         walletsCache_->load(*this);
-    }
-    catch (std::exception& e)
-    {
-        LOG_ERROR("Exc=" << e.what());
+    } catch (std::exception& e) {
+        auto msg = e.what();
+        LOG_ERROR("Exc=" << msg);
         return false;
-    }
-    catch (...)
-    {
+    } catch (...) {
         LOG_ERROR("Exc=...");
         return false;
     }
     return true;
 }
 
-bool BlockChain::updateCache(csdb::Pool& pool)
+bool
+BlockChain::updateCache(csdb::Pool& pool)
 {
-    try
-    {
-        std::lock_guard<std::mutex> lock(cacheMutex_);
+    try {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         walletsCache_->updateFrom(pool);
-    }
-    catch (std::exception& e)
-    {
-        LOG_ERROR("Exc=" << e.what());
+    } catch (std::exception& e) {
+        auto msg = e.what();
+        LOG_ERROR("Exc=" << msg);
         return false;
-    }
-    catch (...)
-    {
+    } catch (...) {
         LOG_ERROR("Exc=...");
         return false;
     }
     return true;
 }
 
-//this function should be avoided in the current logic of sequence syncro
-void BlockChain::writeLastBlock(csdb::Pool& pool) {
-	std::lock_guard<std::mutex> l(dbLock_);
+void
+BlockChain::writeLastBlock(csdb::Pool& pool)
+{
+    TRACE("");
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     pool.set_storage(storage_);
     pool.set_previous_hash(storage_.last_hash());
@@ -415,78 +311,114 @@ void BlockChain::writeLastBlock(csdb::Pool& pool) {
         LOG_ERROR("Couldn't save block");
         return;
     }
-
-    new_block_cv.notify_all();
+    {
+        TRACE("");
+        std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
+        TRACE("");
+        new_block_cv.notify_all();
+        TRACE("");
+    }
 
     if (!updateCache(pool)) {
-      LOG_ERROR("Couldn't update cache");
+        LOG_ERROR("Couldn't update cache");
     }
 }
 
-csdb::PoolHash BlockChain::getLastHash() const {
-	std::lock_guard<std::mutex> l(dbLock_);
-	return storage_.last_hash();
-}
-
-size_t BlockChain::getSize() const {
-	std::lock_guard<std::mutex> l(dbLock_);
-	return storage_.size();
-}
-
-csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
-	std::lock_guard<std::mutex> l(dbLock_);
-	auto pool = storage_.pool_load(ph);
-	return pool;
-}
-
-csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
-	std::lock_guard<std::mutex> l(dbLock_);
-	return storage_.pool_load_meta(ph, cnt);
-}
-
-csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
-	std::lock_guard<std::mutex> l(dbLock_);
-	return storage_.transaction(transId);
-}
-
-csdb::Address
-BlockChain::getAddressFromKey(const std::string &key)
+csdb::PoolHash
+BlockChain::getLastHash() const
 {
-    TRACE();
-    std::string pk(static_cast<size_t>(PUBLIC_KEY_LENGTH), '\0');
-    TRACE();
-    std::copy(key.rbegin(), std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()), pk.rbegin());
-    TRACE();
-    csdb::Address res = csdb::Address::from_public_key(pk.data());
-    TRACE();
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    return storage_.last_hash();
+}
+
+size_t
+BlockChain::getSize() const
+{
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    return storage_.size();
+}
+
+csdb::Pool
+BlockChain::loadBlock(const csdb::PoolHash& ph) const
+{
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    auto pool = storage_.pool_load(ph);
+    return pool;
+}
+
+csdb::Pool
+BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const
+{
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    return storage_.pool_load_meta(ph, cnt);
+}
+
+csdb::Transaction
+BlockChain::loadTransaction(const csdb::TransactionID& transId) const
+{
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    return storage_.transaction(transId);
+}
+
+csdb::PoolHash
+BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
+{
+    TRACE("");
+    std::unique_lock<decltype(dbLock_)> l(dbLock_);
+    TRACE("");
+    csdb::PoolHash res;
+    TRACE("");
+    new_block_cv.wait(l, [this, &obsolete_block, &res]() {
+        TRACE("");
+        res = storage_.last_hash();
+        TRACE("");
+        return obsolete_block != res;
+    });
+    TRACE("");
     return res;
 }
 
-csdb::Amount BlockChain::getBalance(const csdb::Address& address) const {
+csdb::Address
+BlockChain::getAddressFromKey(const std::string& key)
+{
+  std::string pk(static_cast<size_t>(PUBLIC_KEY_LENGTH), '\0');
+    std::copy(key.rbegin(),
+            std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()),
+              pk.rbegin());
+    csdb::Address res = csdb::Address::from_public_key(pk.data());
+    return res;
+}
+
+csdb::Amount
+BlockChain::getBalance(const csdb::Address& address) const
+{
     {
-        std::lock_guard<std::mutex> lock(cacheMutex_);
-        const WalletsCache::WalletData* walData = walletsCache_->findWallet(address.public_key());
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        const WalletsCache::WalletData* walData =
+          walletsCache_->findWallet(address.public_key());
         if (walData)
             return walData->balance_;
     }
     return calcBalance(address);
 }
 
-csdb::Amount BlockChain::calcBalance(csdb::Address address) const {
-	csdb::Amount result(0);
+csdb::Amount
+BlockChain::calcBalance(csdb::Address address) const
+{
+    csdb::Amount result(0);
 
     csdb::Pool curr = loadBlock(getLastHash());
     while (curr.is_valid()) {
-		for (size_t i = 0; i < curr.transactions_count(); i++) {
-			csdb::Transaction tr = curr.transaction(i);
-			if (tr.source() == address)
+        for (size_t i = 0; i < curr.transactions_count(); i++) {
+            csdb::Transaction tr = curr.transaction(i);
+            if (tr.source() == address)
                 result -= tr.amount();
-			else if (tr.target() == address)
-				result += tr.amount();
-		}
-		curr = loadBlock(curr.previous_hash());
-	}
-	return result;
+            else if (tr.target() == address)
+                result += tr.amount();
+        }
+        curr = loadBlock(curr.previous_hash());
+    }
+    return result;
 }
 
 
@@ -551,13 +483,13 @@ csdb::PoolHash BlockChain::getLastWrittenHash()
   return lastHash_;
 }
 
-void
-BlockChain::wait_for_block()
-{
-  std::unique_lock<std::mutex> l(dbLock_);
-  auto ls = storage_.size();
-  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
-}
+//void
+//BlockChain::wait_for_block()
+//{
+//  std::unique_lock<std::mutex> l(dbLock_);
+//  auto ls = storage_.size();
+//  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
+//}
 
 
 uint32_t BlockChain::getGlobalSequence()
@@ -596,74 +528,80 @@ namespace
             : addr_(addr), blockchain_(blockchain), transactions_(transactions)
         {}
 
-        bool load(const csdb::PoolHash& poolHash, int64_t& offset, size_t limit, csdb::PoolHash& prevPoolHash)
-        {
-            csdb::Pool curr = blockchain_.loadBlock(poolHash);
-            if (!curr.is_valid())
-                return false;
+    bool load(const csdb::PoolHash& poolHash,
+              int64_t& offset,
+              int64_t limit,
+              csdb::PoolHash& prevPoolHash)
+    {
+        csdb::Pool curr = blockchain_.loadBlock(poolHash);
+        if (!curr.is_valid())
+            return false;
 
-            if (curr.transactions_count())
-            {
-                auto curIdx = static_cast<csdb::TransactionID::sequence_t>(curr.transactions_count() - 1);
+        if (curr.transactions_count()) {
+            auto curIdx = static_cast<csdb::TransactionID::sequence_t>(
+              curr.transactions_count() - 1);
 
-                while (true)
-                {
-                    auto trans = curr.transaction(curIdx);
-                    //std::cerr << "Ladder: " << trans.target().to_string() << " <- "
-                    //          << trans.source().to_string() << " of "
-                    //          << trans.amount().integral() << std::endl;
-                    if (trans.target() == addr_ || trans.source() == addr_)
-                    {
-                        if (offset == 0)
-                            transactions_.push_back(trans);
-                        else
-                            --offset;
-                    }
-
-                    if (transactions_.size() == limit)
-                        break;
-
-                    if (curIdx == 0)
-                        break;
-                    --curIdx;
+            while (true) {
+                auto trans = curr.transaction(curIdx);
+                // std::cerr << "Ladder: " << trans.target().to_string() << " <-
+                // "
+                //          << trans.source().to_string() << " of "
+                //          << trans.amount().integral() << std::endl;
+                if (trans.target() == addr_ || trans.source() == addr_) {
+                    if (offset == 0)
+                        transactions_.push_back(trans);
+                    else
+                        --offset;
                 }
-            }
 
-            prevPoolHash = curr.previous_hash();
-            return true;
+                if (transactions_.size() == limit)
+                    break;
+
+                if (curIdx == 0)
+                    break;
+                --curIdx;
+            }
         }
 
-    private:
-        csdb::Address addr_;
-        const BlockChain& blockchain_;
-        Transaction & transactions_;
-    };
+        prevPoolHash = curr.previous_hash();
+        return true;
+    }
+
+  private:
+    csdb::Address addr_;
+    const BlockChain& blockchain_;
+    Transaction& transactions_;
+};
 }
 
-void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, int64_t offset, const int64_t limit) const
+void
+BlockChain::getTransactions(Transactions& transactions,
+                            csdb::Address address,
+                            int64_t offset,
+                            const int64_t limit) const
 {
     TrxLoader trxLoader(address, *this, transactions);
 
     WalletsCache::WalletData::PoolsHashes hashesArray;
     {
-        std::lock_guard<std::mutex> lock(cacheMutex_);
-        const WalletsCache::WalletData* walData = walletsCache_->findWallet(address.public_key());
-        if (walData)
-        {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        const WalletsCache::WalletData* walData =
+          walletsCache_->findWallet(address.public_key());
+        if (walData) {
             hashesArray = walData->poolsHashes_;
         }
     }
 
     csdb::PoolHash prevHash = getLastHash();
-    if (!hashesArray.empty())
-    {
-        for (size_t i = hashesArray.size() - 1; i != std::numeric_limits<decltype(i)>::max(); --i)
-        {
+    if (!hashesArray.empty()) {
+        for (size_t i = hashesArray.size() - 1;
+             i != std::numeric_limits<decltype(i)>::max();
+             --i) {
             const auto& poolHashData = hashesArray[i];
 
-            if (poolHashData.trxNum < WalletsCache::WalletData::PoolHashData::maxTrxNum  &&
-                poolHashData.trxNum <= offset)
-            {
+            if (poolHashData.trxNum <
+                  WalletsCache::WalletData::PoolHashData::maxTrxNum &&
+                poolHashData.trxNum <= offset) {
                 offset -= poolHashData.trxNum;
                 continue;
             }
@@ -678,8 +616,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
         }
     }
 
-    while (true)
-    {
+    while (true) {
         csdb::PoolHash currHash = prevHash;
         if (!trxLoader.load(currHash, offset, limit, prevHash))
             break;

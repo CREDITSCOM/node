@@ -201,7 +201,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
 	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
 	if (rNum > lastBlock && rNum >= roundNum_)
-		getRoundTable(data, size, rNum, type);
+  {
+  		getRoundTable(data, size, rNum, type);
+      solver_->setBigBangStatus(true);
+  }
 	else
 		std::cerr << "BigBang else" << std::endl;
 }
@@ -1001,14 +1004,14 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 
   ++roundNum_;
 
-  size_t nTrusted = confidantNodes.size()-1;
-  uint8_t i = rand() % nTrusted;
+  size_t nTrusted = confidantNodes.size();//-1;
+  //uint8_t i = rand() % nTrusted;
   //std::cout << "Main Number = " << (int)i << std::endl;
   //std::cout << "Number of Trusted : " << nTrusted << std::endl;
-  mainNode_ = confidantNodes.at(i);
+  mainNode_ = myPublicKey_;   //confidantNodes.at(i);
   confidantNodes_.clear();
-  for (auto& conf : confidantNodes)
-    if(mainNode_!=conf) confidantNodes_.push_back(conf);
+  for (auto& conf : confidantNodes) confidantNodes_.push_back(conf);
+    //if(mainNode_!=conf) 
 
   sendRoundTable();
   #ifdef MYLOG 
@@ -1027,9 +1030,10 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
-    if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence())	return MessageActions::Process;
+  if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence())	return MessageActions::Process;
   if (type == MsgTypes::RoundTableRequest) return (rNum < roundNum_? MessageActions::Process : MessageActions::Drop);
   if (type == MsgTypes::RoundTable) return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   if (rNum < roundNum_) return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   return (rNum == roundNum_ ? MessageActions::Process : MessageActions::Postpone);
   //return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;

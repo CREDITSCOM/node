@@ -5,9 +5,10 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include <csnode/blockchain.hpp>
 #include <thread>
 #include <condition_variable>
+
+#include <csnode/blockchain.hpp>
 
 namespace csstats {
     struct Config
@@ -31,7 +32,7 @@ namespace csstats {
 
     using Balance = Amount;
 
-    using Currency = std::string;
+    using Currency = int8_t;
 
     struct TotalAmount
     {
