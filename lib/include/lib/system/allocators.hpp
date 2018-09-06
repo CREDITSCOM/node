@@ -172,6 +172,7 @@ public:
    - shrinkLast is called before the last allocation gets unuse()d */
   RegionPtr allocateNext(const uint32_t size) {
     uint32_t regSize = size + sizeof(Region);
+    regSize += (-(int)size) & 0x3f;
 
     if (!activePage_->usedSize.load(std::memory_order_acquire)) {
       activePage_->sizeLeft = PageSize;
@@ -203,7 +204,7 @@ public:
 
   void shrinkLast(const uint32_t size) {
     assert(lastReg_->size_ >= size);
-    auto diff = lastReg_->size_ - size;
+    auto diff = lastReg_->size_ - (size + ((-(int)size) & 0x3f));
 
     lastReg_->size_ = size;
     lastReg_->page_->sizeLeft += diff;
