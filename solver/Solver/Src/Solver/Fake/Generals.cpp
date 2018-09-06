@@ -45,6 +45,7 @@ namespace Credits{
 	  size_t transactionsNumber = _pool.transactions_count();
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
+  
     const csdb::Amount zero_balance = 0.0_c;
     if (_pool.transactions_count() > 0) {
 
@@ -113,7 +114,9 @@ namespace Credits{
     }
 
   void Generals::addvector(HashVector vector) {
-	//	std::cout << "GENERALS> Add vector" << std::endl;
+  #ifdef MYLOG
+  	std::cout << "GENERALS> Add vector" << std::endl;
+  #endif
 		hMatrix.hmatr[vector.Sender] = vector;
  //   std::cout << "GENERALS> Vector succesfully added" << std::endl;
   }

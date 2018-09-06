@@ -12,9 +12,9 @@
 #define TIME_TO_AWAIT_ACTIVITY 300
 #define TRX_SLEEP_TIME 500 //microseconds
 #define FAKE_BLOCKS
-#define SPAMMER
+//#define SPAMMER
 #define SYNCRO
-//#define MYLOG
+#define MYLOG
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX

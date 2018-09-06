@@ -179,7 +179,7 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
-	TRACE("");
+	//TRACE("");
 	
 	{
 		std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -202,11 +202,11 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 	{
-		TRACE("");
+		//TRACE("");
 		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-		TRACE("");
+		//TRACE("");
 		new_block_cv.notify_all();
-		TRACE("");
+		//TRACE("");
 	}
 	
 	if (!updateCache(pool)) {
@@ -415,7 +415,7 @@ BlockChain::updateCache(csdb::Pool& pool)
 void
 BlockChain::writeLastBlock(csdb::Pool& pool)
 {
-    TRACE("");
+    //TRACE("");
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     pool.set_storage(storage_);
@@ -432,11 +432,11 @@ BlockChain::writeLastBlock(csdb::Pool& pool)
         return;
     }
     {
-        TRACE("");
+        //TRACE("");
         std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-        TRACE("");
+        //TRACE("");
         new_block_cv.notify_all();
-        TRACE("");
+        //TRACE("");
     }
 
     if (!updateCache(pool)) {
@@ -483,18 +483,18 @@ BlockChain::loadTransaction(const csdb::TransactionID& transId) const
 csdb::PoolHash
 BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
 {
-    TRACE("");
+    //TRACE("");
     std::unique_lock<decltype(dbLock_)> l(dbLock_);
-    TRACE("");
+  //  TRACE("");
     csdb::PoolHash res;
-    TRACE("");
+  //  TRACE("");
     new_block_cv.wait(l, [this, &obsolete_block, &res]() {
-        TRACE("");
+   //     TRACE("");
         res = storage_.last_hash();
-        TRACE("");
+     //   TRACE("");
         return obsolete_block != res;
     });
-    TRACE("");
+  //  TRACE("");
     return res;
 }
 

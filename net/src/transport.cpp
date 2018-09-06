@@ -357,7 +357,7 @@ inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, 
 void Transport::processPostponed(const RoundNum rNum) {
   
 
-  std::cout << "TRANSPORT> POSTPHONED PROCESSES!!!" << std::endl;
+  std::cout << "TRANSPORT> POSTPHONED PROCESSES BEGIN" << std::endl;
 
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {

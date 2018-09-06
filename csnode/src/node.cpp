@@ -816,7 +816,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
   std::cout << __func__ << std::endl;
-  if (myLevel_ != NodeLevel::Normal)
+  if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
     return;
   if (sender == myPublicKey_) return;
   uint32_t requested_seq;
@@ -868,7 +868,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   istream_.init(data, size);
   istream_ >> pool;
-  std::cout << "GETBLOCKREPLY> Getting block" << std::endl;
+  std::cout << "GETBLOCKREPLY> Getting block " << pool.sequence() << std::endl;
   if (pool.sequence() == sendBlockRequestSequence)
   {
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
@@ -876,6 +876,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
   }
+  else return;
   if ((getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   else
@@ -907,7 +908,7 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-  if (!solver_->mPoolClosed())
+  if ((!solver_->mPoolClosed())&&(!solver_->getBigBangStatus()))
   {
     solver_->sendTL();
   }

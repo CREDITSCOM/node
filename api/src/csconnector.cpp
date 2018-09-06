@@ -1,4 +1,4 @@
-#define TRACE_ENABLER
+//#define TRACE_ENABLER
 
 #include "csconnector/csconnector.h"
 #include <csdb/currency.h>
@@ -36,7 +36,7 @@ connector::connector(BlockChain& m_blockchain,
 #ifdef BINARY_TCP_API
     thread = std::thread([this, config]() {
         try {
-            TRACE("csconnector started on port " << config.port);
+            //TRACE("csconnector started on port " << config.port);
             server.run();
         } catch (...) {
             std::cerr << "Oh no! I'm dead :'-(" << std::endl;
@@ -47,7 +47,7 @@ connector::connector(BlockChain& m_blockchain,
     ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
     ajax_thread = std::thread([this, config]() {
         try {
-            TRACE("csconnector for AJAX started on port " << config.ajax_port);
+          //  TRACE("csconnector for AJAX started on port " << config.ajax_port);
             ajax_server.run();
         } catch (...) {
             std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
@@ -73,6 +73,6 @@ connector::~connector()
     }
 #endif
 
-    TRACE("csconnector stopped");
+    //TRACE("csconnector stopped");
 }
 }

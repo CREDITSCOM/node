@@ -32,13 +32,16 @@ void addTimestampToPool(csdb::Pool& pool)
 }
 
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
-{
+{    
+  std::cout << "SOLVER> Before calback" << std::endl;
   const auto tp = std::chrono::system_clock::now() + ms;
   std::thread tr([tp, cb]() {
+
     std::this_thread::sleep_until(tp);
     LOG_WARN("Inserting callback");
     CallsQueue::instance().insert(cb);
   });
+  std::cout << "SOLVER> After calback" << std::endl;
   tr.detach();
 }
 
@@ -305,7 +308,8 @@ void Solver::initConfRound()
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
   size_t _rNum = rNum;
-  if (gotBigBang) sendZeroVector();
+  if (gotBigBang) runAfter(std::chrono::milliseconds(200),
+    [this]() { sendZeroVector(); });
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
@@ -348,7 +352,7 @@ void Solver::sendZeroVector()
 
 
   if (transactionListReceived) return;
-
+  std::cout << "SOLVER> Generating ZERO TransactionList" << std::endl;
   csdb::Pool test_pool = csdb::Pool{};
   gotTransactionList(std::move(test_pool));
 
@@ -549,11 +553,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
-		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
-		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
+		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
       node_->getBlockChain().putBlock(block);
-		  if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
+		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
 			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
@@ -781,7 +784,7 @@ Solver::spamWithTransactions()
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
-  TRACE("");
+  //TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   TRACE("");
   m_transactions.push_back(transaction);
