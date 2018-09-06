@@ -62,6 +62,11 @@ namespace Credits{
       {
         *(del1 + i) = bitcnt;
         new_pool.add_transaction(it);
+
+	/*	std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+		printf("TRANSACTION ACCEPTED\n");
+		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";*/
+
       }
 
 		  else *(del1 + i) = -bitcnt;
@@ -80,7 +85,9 @@ namespace Credits{
 		memset(hw_total, 0, 3300);
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
 
-		Hash_ hash_(hash_s);
+		Hash_ hash_(hash_s);	
+    delete hash_s; 
+    delete del1;
  //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
 		return hash_;
     }
@@ -94,12 +101,15 @@ namespace Credits{
       memset(new_trusted, 0, 100);
       memset(hw_total, 0, 3300);
       Hash_ hash_(hash_s);
+      delete hash_s;
  //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
+      delete del1;
       return hash_;
 
     }
 
-	  
+
+    
     }
 
   void Generals::addvector(HashVector vector) {
@@ -193,28 +203,19 @@ namespace Credits{
 				*(new_trusted + i) += 1;
 			}
 		}
-
+    delete hw;
     }
 
     uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash lasthash) {
 		std::cout << "GENERALS> Take decision: starting " << std::endl;
-		//Hash_ ha;// = ;
-		//memcpy( ha, lasthash.to_binary(),32);
-        //decode_matrix(matrix_data[0]);
-		//const int write_id = 2;//for the sake of simplicity/ real value should be stand
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
-
-		//hash_weight *hw = new hash_weight[nodes_amount];
-		//hash_weight *hw_total = new hash_weight[nodes_amount];
-
 		unsigned char *mtr = new unsigned char[nodes_amount * 97];
 
 		uint8_t max_frec_position;
 		uint8_t j_max, jj;
 		j_max = 0;
-
-		bool found;
+    bool found;
 		
 		//double duration, duration1;
 		//duration1 = 0;
@@ -282,6 +283,8 @@ namespace Credits{
 		uint16_t result =0;
 		result = k % (int)result0;
 		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
+    delete hw;
+    delete mtr;
 		return result;
 		//if (myId != confidantNodes[write_id]) return 0;
         //return 100;

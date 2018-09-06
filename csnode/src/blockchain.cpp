@@ -196,10 +196,9 @@ bool BlockChain::initCaches()
             walletsPools_->loadPrevBlock(prev);
 
             prev = loadBlock(prev.previous_hash());
-    }
+        }
         res = true;
-
-}
+    }
     catch (std::exception& e) {
         auto msg = e.what();
         LOG_ERROR("Exc=" << msg);
@@ -444,16 +443,26 @@ void BlockChain::putBlock(csdb::Pool& pool)
 
 void BlockChain::writeBlock(csdb::Pool& pool)
 {
-    {
-        std::lock_guard<decltype(dbLock_)> l(dbLock_);
-        pool.set_storage(storage_);
+	TRACE("");
+	
+	{
+		std::lock_guard<decltype(dbLock_)> l(dbLock_);
+		pool.set_storage(storage_);
+	}
+
+    if (!pool.compose())
+             if (!pool.compose()) {
+            LOG_ERROR("Couldn't compose block");
+            if (!pool.save())
+                     return;
+
     }
 
-    //	std::cout << "OK" << std::endl << "Pool is composing ... ";
-    if (!pool.compose())
-        LOG_ERROR("Couldn't compose block");
-    if (!pool.save())
-        LOG_ERROR("Couldn't save block");
+            if (!pool.save()) {
+            LOG_ERROR("Couldn't save block");
+            return;
+
+    }
     std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 
     if (!updateWalletsCache(pool))
