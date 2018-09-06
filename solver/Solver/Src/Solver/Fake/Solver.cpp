@@ -264,6 +264,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 #ifndef SPAMMER
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
+			TRACE(msg_len);
 			uint8_t* message = new uint8_t[msg_len];
 			for (size_t i = 0; i < msg_len; i++)
 				message[i] = v[i];
@@ -789,6 +790,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 
 void Solver::addInitialBalance()
 {
+#ifdef ADD_INITIAL_BALANCE
   std::cout << "===SETTING DB===" << std::endl;
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
@@ -808,6 +810,7 @@ void Solver::addInitialBalance()
 	  std::lock_guard<std::mutex> l(m_trans_mut);
 	  m_transactions.push_back(transaction);
   }
+#endif
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
