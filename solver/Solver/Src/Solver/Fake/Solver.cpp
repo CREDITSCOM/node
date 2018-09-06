@@ -55,9 +55,11 @@ namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node)
+Solver::Solver(Node* node, csdb::Address genesisAddress, csdb::Address startAddress)
   : node_(node)
   , generals(std::unique_ptr<Generals>(new Generals()))
+  , genesisAddress_(genesisAddress)
+  , startAddress_(startAddress)
   , vector_datas()
   , m_pool()
   , v_pool()
@@ -80,7 +82,7 @@ void Solver::buildBlock(csdb::Pool& block)
   csdb::Transaction transaction;
 
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003"));
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  transaction.set_source(startAddress_);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10, 0));
@@ -90,7 +92,7 @@ void Solver::buildBlock(csdb::Pool& block)
   block.add_transaction(transaction);
 
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000004"));
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  transaction.set_source(startAddress_);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10, 0));
@@ -107,10 +109,10 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   //std::cout << "SOLVER> Before time stamp" << std::endl;
 //block is build in buildvector
   addTimestampToPool(block);
+  //std::cout << "SOLVER> Before write last sequence" << std::endl;
+  node_->getBlockChain().finishNewBlock(block);
   //std::cout << "SOLVER> Before write pub key" << std::endl;
   block.set_writer_public_key(myPublicKey);
-   //std::cout << "SOLVER> Before write last sequence" << std::endl;
-  block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
   csdb::PoolHash prev_hash;
   prev_hash.from_string("");
   block.set_previous_hash(prev_hash);
@@ -180,7 +182,7 @@ void Solver::closeMainRound()
 	std::cout << "Solver -> Global Sequence: "  << node_->getBlockChain().getGlobalSequence() << std::endl;
 	std::cout << "Solver -> Writing New Block"<< std::endl;
   #endif
-    node_->getBlockChain().putBlock(m_pool);
+    node_->getBlockChain().writeNewBlock(m_pool);
     }
 }
 
@@ -522,7 +524,7 @@ void Solver::writeNewBlock()
     node_->getMyLevel() == NodeLevel::Writer) {
     prepareBlockForSend(m_pool);
     node_->sendBlock(std::move(m_pool));
-    node_->getBlockChain().putBlock(m_pool);
+    node_->getBlockChain().writeNewBlock(m_pool);
 #ifdef MYLOG
 	std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
   #endif
@@ -552,13 +554,13 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
 		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
-      node_->getBlockChain().putBlock(block);
+          node_->getBlockChain().onBlockReceived(block);
 		  if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
 			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 			  node_->sendHash(test_hash, sender);
-        std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
+              std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
 		  }
     }
 
@@ -683,8 +685,7 @@ Solver::createPool()
 
     smart_trans.set_target(Credits::BlockChain::getAddressFromKey(
       "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
-    smart_trans.set_source(csdb::Address::from_string(
-      "0000000000000000000000000000000000000000000000000000000000000001"));
+    smart_trans.set_source(genesisAddress_);
 
     smart_trans.set_amount(csdb::Amount(1, 0));
     smart_trans.set_balance(csdb::Amount(100, 0));
@@ -736,10 +737,8 @@ Solver::spamWithTransactions()
   uint64_t iid=0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  auto aaa = csdb::Address::from_string(
-    "0000000000000000000000000000000000000000000000000000000000000001");
-  auto bbb = csdb::Address::from_string(
-    "0000000000000000000000000000000000000000000000000000000000000002");
+  auto aaa = genesisAddress_;
+  auto bbb = startAddress_;
 
   csdb::Transaction transaction;
   transaction.set_target(aaa);
@@ -790,14 +789,12 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 void Solver::addInitialBalance()
 {
   std::cout << "===SETTING DB===" << std::endl;
-  const std::string start_address =
-    "0000000000000000000000000000000000000000000000000000000000000002";
 
   csdb::Pool pool;
   csdb::Transaction transaction;
   transaction.set_target(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
-  transaction.set_source(csdb::Address::from_string(start_address));
+  transaction.set_source(startAddress_);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10000, 0));
@@ -832,7 +829,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 void Solver::gotBlockReply(csdb::Pool&& pool) {
 	std::cout << "Solver -> Got Block for my Request: " << pool.sequence() << std::endl;
 	if (pool.sequence() == node_->getBlockChain().getLastWrittenSequence() + 1)
-		node_->getBlockChain().putBlock(pool);
+		node_->getBlockChain().onBlockReceived(pool);
 	
 
 }

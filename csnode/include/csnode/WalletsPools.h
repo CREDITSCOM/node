@@ -1,0 +1,62 @@
+#ifndef WALLETS_POOLS_H
+#define WALLETS_POOLS_H
+
+#include <array>
+#include <limits>
+#include <memory>
+#include <vector>
+#include <csdb/address.h>
+#include <csdb/amount.h>
+#include <csdb/internal/types.h>
+#include <csdb/pool.h>
+#include <csnode/CyclicBuffer.hpp>
+
+namespace csdb
+{
+    class Pool;
+    class Transaction;
+}
+
+namespace Credits
+{
+    class WalletsIds;
+
+    class WalletsPools
+    {
+    public:
+        using WalletId = csdb::internal::WalletId;
+        using PoolHash = std::array<uint8_t, 32>;
+    public:
+        struct WalletData
+        {
+            struct PoolHashData
+            {
+                PoolHash poolHash;
+                uint32_t trxNum;
+                static constexpr size_t maxTrxNum = std::numeric_limits<uint32_t>::max();
+            };
+            static constexpr size_t maxPoolsHashesNum_ = 100;
+            using PoolsHashes = CyclicBuffer<PoolHashData, maxPoolsHashesNum_>;
+
+            PoolsHashes poolsHashes_;
+        };
+
+    public:
+        static void convert(const csdb::PoolHash& poolHashDb, PoolHash& poolHashCache);
+        static void convert(const PoolHash& poolHashCache, csdb::PoolHash& poolHashDb);
+    public:
+        WalletsPools(csdb::Address genesisAddress, csdb::Address startAddress, const WalletsIds& walletsIds);
+        ~WalletsPools();
+
+        void loadPrevBlock(csdb::Pool& curr);
+        void loadNextBlock(csdb::Pool& curr);
+
+        const WalletData* findWallet(const WalletId& id) const;
+
+    private:
+        void* impl_;
+    };
+
+} // namespace Credits
+
+#endif

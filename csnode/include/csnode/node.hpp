@@ -2,6 +2,7 @@
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
 #include <memory>
+#include <string>
 
 #include <csstats.h>
 #include <csconnector/csconnector.h>
@@ -25,6 +26,8 @@ class Transport;
 namespace Credits { class Solver; }
 
 class Node {
+public:
+  static const std::string start_address_;
 public:
   Node(const Config&);
   ~Node();
@@ -115,6 +118,8 @@ private:
   void onRoundStart();
 
   // Info
+  static const csdb::Address genesisAddress_;
+  static const csdb::Address startAddress_;
   const PublicKey myPublicKey_;
   bool good_ = true;
 

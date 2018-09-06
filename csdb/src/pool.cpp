@@ -118,6 +118,11 @@ private:
       os.put(it);
     }
 
+    os.put(newWallets_.size());
+    for (const auto& wall : newWallets_) {
+        os.put(wall);
+    }
+
     os.put(user_fields_);
 	os.put(writer_public_key_);
 	os.put(signature_);
@@ -132,6 +137,11 @@ private:
 	  for (const auto& it : transactions_) {
 		  os.put(it);
 	  }
+
+      os.put(newWallets_.size());
+      for (const auto& wall : newWallets_) {
+          os.put(wall);
+      }
 
 	  os.put(user_fields_);
 	  os.put(writer_public_key_);
@@ -152,25 +162,51 @@ private:
 	  return true;
   }
 
+  bool getTransactions(::csdb::priv::ibstream& is, size_t cnt)
+   {
+      transactions_.clear();
+      transactions_.reserve(cnt);
+      for (size_t i = 0; i < cnt; ++i)
+      {
+          Transaction tran;
+          if (!is.get(tran))
+              return false;
+          transactions_.emplace_back(tran);
+      }
+      return true;
+  }
+
+  bool getNewWallets(::csdb::priv::ibstream& is)
+   {
+      size_t cnt = 0;
+      if (!is.get(cnt))
+          return false;
+
+      newWallets_.clear();
+      newWallets_.reserve(cnt);
+      for (size_t i = 0; i < cnt; ++i)
+      {
+          NewWalletInfo wall;
+          if (!is.get(wall))
+              return false;
+          newWallets_.emplace_back(wall);
+      }
+      return true;
+  }
   bool get(::csdb::priv::ibstream& is)
   {
 	size_t cnt;
 	if (!get_meta(is, cnt))
 		return false;
 
-    transactions_.clear();
-    transactions_.reserve(cnt);
-    for(size_t i = 0; i < cnt; ++i )
-    {
-      Transaction tran;
-      if(!is.get(tran))
+    if (!getTransactions(is, cnt))
         return false;
-      transactions_.emplace_back(tran);
-    }
 
-    if(!is.get(user_fields_)) {
+    if (!getNewWallets(is))
+        return false;
+
+    if(!is.get(user_fields_))
       return false;
-    }
 
     if (!is.get(writer_public_key_))
       return false;
@@ -230,6 +266,7 @@ private:
   PoolHash previous_hash_;
   Pool::sequence_t sequence_;
   std::vector<Transaction> transactions_;
+  NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   ::std::vector<uint8_t> writer_public_key_;
@@ -412,12 +449,29 @@ void Pool::set_storage(Storage storage) noexcept
   data->storage_ = storage.weak_ptr();
 }
 
-std::vector<csdb::Transaction>& Pool::transactions()
+Pool::Transactions& Pool::transactions()
 {
 	return d->transactions_;
 }
 
-  bool Pool::add_user_field(user_field_id_t id, UserField field) noexcept
+const Pool::Transactions& Pool::transactions() const
+{
+    return d->transactions_;
+}
+
+Pool::NewWallets* Pool::newWallets() noexcept
+{
+    if (d.constData()->read_only_)
+        return nullptr;
+    return &d->newWallets_;
+}
+ 
+const Pool::NewWallets& Pool::newWallets() const noexcept
+{
+    return d->newWallets_;
+}
+
+bool Pool::add_user_field(user_field_id_t id, UserField field) noexcept
 {
   if (d.constData()->read_only_ || (!field.is_valid())) {
     return false;
@@ -579,12 +633,15 @@ Pool Pool::load(PoolHash hash, Storage storage)
   return res;
 }
 
-  bool Pool::clear() noexcept
-  {
-    d->transactions_.clear();
+void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const
+{
+    os.put(*(size_t*)(&addressId_));
+    os.put(walletId_);
+}
 
-    if (!d->transactions_.empty())
-      return false;
-    return true;
-  }
+bool Pool::NewWalletInfo::get(::csdb::priv::ibstream& is)
+{
+    return is.get(*(size_t*)(&addressId_))  &&  is.get(walletId_);
+}
+
 } // namespace csdb

@@ -136,7 +136,7 @@ typedef std::string Matrix;
 
     class Solver {
     public:
-        Solver(Node*);
+        Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres);
         ~Solver();
 
         Solver(const Solver &) = delete;
@@ -211,7 +211,10 @@ typedef std::string Matrix;
 		Node* node_;
         std::unique_ptr<Generals> generals;
 
-		HashVector hvector;
+        const csdb::Address genesisAddress_;
+        const csdb::Address startAddress_;
+
+        HashVector hvector;
 		
 		
     size_t lastRoundTransactionsGot;
