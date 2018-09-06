@@ -22,6 +22,8 @@
 #include <base58.h>
 #include <sodium.h>
 
+#include <timer_service.h>
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -31,12 +33,12 @@ void addTimestampToPool(csdb::Pool& pool)
       now_time.time_since_epoch()).count()));
 }
 
-void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
+void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb, const char * msg)
 {
   const auto tp = std::chrono::system_clock::now() + ms;
-  std::thread tr([tp, cb]() {
+  std::thread tr([tp, cb, msg]() {
     std::this_thread::sleep_until(tp);
-    LOG_WARN("Inserting callback");
+    LOG_WARN("Inserting callback " << msg);
     CallsQueue::instance().insert(cb);
   });
   tr.detach();
@@ -191,20 +193,22 @@ bool Solver::mPoolClosed()
 
 void Solver::runMainRound()
 {
+	timer_service.Mark( "runMainRound()", node_->getRoundNumber());
   m_pool_closed = false;
   std::cout << "========================================================================================" << std::endl;
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV" << std::endl;
  
   if(node_->getRoundNumber()==1) 
   {
+	  timer_service.Mark("schedule (2000) closeMainRound()", node_->getRoundNumber());
     runAfter(std::chrono::milliseconds(2000),
-      [this]() { closeMainRound(); });
+      [this]() { timer_service.Mark("call closeMainRound()", node_->getRoundNumber()); closeMainRound(); }, "closeMainRound()");
   }
   else
   {
-
+	  timer_service.Mark("schedule (500) closeMainRound()", node_->getRoundNumber());
   runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-    [this]() { closeMainRound(); });
+    [this]() { timer_service.Mark("call closeMainRound()", node_->getRoundNumber()); closeMainRound(); }, "closeMainRound()");
  }
 
 }
@@ -223,22 +227,28 @@ HashMatrix Solver::getMyMatrix()
 
 void Solver::flushTransactions()
 {
-	if (node_->getMyLevel() != NodeLevel::Normal) { return; }
+	if (node_->getMyLevel() != NodeLevel::Normal) {
+		return;
+	}
 	{
-    std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
-      sentTransLastRound = true;
+		std::lock_guard<std::mutex> l(m_trans_mut);
+		if (m_transactions.size()) {
+			node_->sendTransaction(std::move(m_transactions));
+			sentTransLastRound = true;
 #ifdef MYLOG
-	  std::cout << "FlushTransaction ..." << std::endl;
-    #endif
-      m_transactions.clear();
-    } else {
-      return;
-    }
-  }
-  runAfter(std::chrono::milliseconds(50),
-                  [this]() { flushTransactions(); });
+			std::cout << "FlushTransaction ..." << std::endl;
+#endif
+			m_transactions.clear();
+			timer_service.Mark("flushTransactions(): done", node_->getRoundNumber());
+		}
+		else {
+			timer_service.Mark("flushTransactions(): nothing to do", node_->getRoundNumber());
+			return;
+		}
+	}
+	timer_service.Mark("schedule (50) flushTransactions()", node_->getRoundNumber());
+	runAfter(std::chrono::milliseconds(50),
+		[this]() { timer_service.Mark("call flushTransactions()", node_->getRoundNumber()); flushTransactions(); }, "flushTransactions()");
 }
 
 bool Solver::getIPoolClosed() {
@@ -299,6 +309,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 void Solver::initConfRound()
 {
+	timer_service.Mark("initConfRound()", node_->getRoundNumber());
   memset(receivedVecFrom, 0, 100);
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
@@ -309,6 +320,7 @@ void Solver::initConfRound()
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
+	timer_service.Mark("gotTransactionList()", node_->getRoundNumber());
   transactionListReceived = true;
   uint8_t numGen = node_->getConfidants().size();
 	std::cout << "SOLVER> GotTransactionList" << std::endl;
@@ -337,6 +349,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 #ifdef MYLOG
     std::cout << "SOLVER> Matrix added" << std::endl;
     #endif
+	timer_service.Mark("gotTransactionList(): matrix added", node_->getRoundNumber());
   }
 }
 
@@ -345,7 +358,7 @@ void Solver::sendZeroVector()
 
 
   if (transactionListReceived) return;
-
+  timer_service.Mark("sendZeroVector()", node_->getRoundNumber());
   csdb::Pool test_pool = csdb::Pool{};
   gotTransactionList(std::move(test_pool));
 
@@ -377,9 +390,11 @@ void Solver::gotVector(HashVector&& vector)
   generals->addvector(vector);//building matrix
   trustedCounterVector++;
 
+  timer_service.Mark("gotVector(): useful", node_->getRoundNumber());
   if (trustedCounterVector == numGen)
   {
-    
+	  timer_service.Mark("gotVector(): all received", node_->getRoundNumber());
+
 	  //std::cout << "SOLVER> GotVector : " << std::endl;
     vectorComplete = true;
 
@@ -403,8 +418,9 @@ void Solver::gotVector(HashVector&& vector)
       if (wTrusted == 100)
       {
         std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock(); });
+		timer_service.Mark("schedule (500) writeNewBlock()", node_->getRoundNumber());
+		runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+        [this]() { timer_service.Mark("call writeNewBlock()", node_->getRoundNumber()); writeNewBlock(); }, "writeNewBlock()");
       }
       else
       {
@@ -413,8 +429,9 @@ void Solver::gotVector(HashVector&& vector)
         if (wTrusted == node_->getMyConfNumber())
         {
           node_->becomeWriter();
+		  timer_service.Mark("schedule (500) writeNewBlock()", node_->getRoundNumber());
           runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-            [this]() { writeNewBlock(); });
+            [this]() { timer_service.Mark("call writeNewBlock()", node_->getRoundNumber()); writeNewBlock(); }, "writeNewBlock()");
         }
           //LOG_WARN("This should NEVER happen, NEVER");
       }
@@ -466,11 +483,15 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	trustedCounterMatrix++;
 	generals->addmatrix(matrix, node_->getConfidants());
   std::cout << "SOLVER> Matrix added" << std::endl;
+
+	timer_service.Mark("gotMatrix(): useful", node_->getRoundNumber());
+
   if (trustedCounterMatrix == numGen)
   {
 #ifdef MYLOG
     std::cout << "SOLVER> We are going to take decision" << std::endl;
     #endif
+		timer_service.Mark("gotMatrix(): all received", node_->getRoundNumber());
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
 	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
@@ -480,8 +501,9 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 #ifdef MYLOG
 		  std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
       #endif
+		  timer_service.Mark("schedule (500) writeNewBlock()", node_->getRoundNumber());
       runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock();});
+        [this]() { timer_service.Mark("call writeNewBlock()", node_->getRoundNumber()); writeNewBlock();}, "writeNewBlock()");
 		  
 	  }
 
@@ -491,8 +513,9 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 		  if (wTrusted == node_->getMyConfNumber())
 		  {
 			  node_->becomeWriter();
+			  timer_service.Mark("schedule (500) writeNewBlock()", node_->getRoundNumber());
         runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-          [this]() { writeNewBlock(); });
+          [this]() { timer_service.Mark("call writeNewBlock()", node_->getRoundNumber()); writeNewBlock(); }, "writeNewBlock()");
 		  }
       else
         LOG_WARN("This should NEVER happen, NEVER");
@@ -517,6 +540,8 @@ void Solver::writeNewBlock()
 	std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
   #endif
 	consensusAchieved = false;
+
+	timer_service.Mark("writeNewBlock(): really done", node_->getRoundNumber());
   }
   else {
     LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
@@ -528,6 +553,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 	if (node_->getMyLevel() == NodeLevel::Writer)
 		return;
 
+	timer_service.Mark("gotBlock()", node_->getRoundNumber());
 gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
@@ -543,8 +569,9 @@ gotBlockThisRound = true;
 		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
       node_->getBlockChain().putBlock(block);
-		  if ((node_->getMyLevel() != NodeLevel::Writer) || (node_->getMyLevel() != NodeLevel::Main))
+		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
+				timer_service.Mark("gotBlock(): send hash", node_->getRoundNumber());
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
 			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 			  node_->sendHash(test_hash, sender);
@@ -554,9 +581,22 @@ gotBlockThisRound = true;
 
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
+
+  // the last round when request for RoundTable was sent
+  // it helps to prevent extra duplicated requests during the same round
+  // it is used only here, so it is placed here not to pollute header file
+  static size_t roundReqRoundTable = 0;
+
   size_t rNum = node_->getRoundNumber();
- // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-  //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
+  if (rNum > roundReqRoundTable) {
+	  roundReqRoundTable = rNum;
+	  timer_service.Mark("schedule (300) sendRoundTableRequest()", rNum);
+	  runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
+		[this, rNum]() {timer_service.Mark("call sendRoundTableRequest()", rNum); node_->sendRoundTableRequest(rNum);}, "sendRoundTableRequest()");
+  }
+  else {
+	  timer_service.Mark("prevent extra sendRoundTableRequest()", rNum);
+  }
 
 #ifndef SPAMMER
 #ifndef MONITOR_NODE
@@ -583,6 +623,9 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
 void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
+
+	timer_service.Mark("gotHash(): accept", node_->getRoundNumber());
+
 	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
 	Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
 #ifdef MYLOG
@@ -824,14 +867,16 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   if(writingCongGotCurrent==2)
   {
     node_->becomeWriter();
+	timer_service.Mark("schedule (500) writeNewBlock()", node_->getRoundNumber());
     runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-      [this]() { writeNewBlock(); });
+      [this]() { timer_service.Mark("call writeNewBlock()", node_->getRoundNumber()); writeNewBlock(); }, "writeNewBlock()");
   } 
   
 }
 
 void Solver::nextRound()
 {
+	timer_service.Mark("nextRound()", node_->getRoundNumber());
 	std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
   receivedVec_ips.clear();
   receivedMat_ips.clear();
