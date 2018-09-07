@@ -234,127 +234,127 @@ void BlockChain::writeGenesisBlock() {
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001"));
 
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(100000000, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_amount(csdb::Amount(1000000000, 0));
+  transaction.set_balance(csdb::Amount(0, 0));
   transaction.set_innerID(0);
 
 
   genesis.add_transaction(transaction);
 
+  //key1
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("nDJKdm29yibmNwGfwKpdEh1xMnPQic2NRMBNd33RfVg", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(0);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
 
+  //key2
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("mmM3sXYkK5m12R7NiwcS3ExAocJxuN8BVfmgtyhioUS", vchRet);
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(0);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
+  transaction.set_amount(csdb::Amount(1000000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
   transaction.set_innerID(1);
   vchRet.clear();
   genesis.add_transaction(transaction);
 
+  //key3
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("BRQaq2v7PP95YXCu4qfSFkwszTzvQFQsYZSA72bXExaN", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(2);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
+
+  //key4
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("8jP98VUhiB3NQ9SQA4DKjkTrqDhVq26D6AjvwLekWVU9", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(3);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
+
+  //key5
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("ESi7fZAuRmRmYSr57zT7o2sDkyxQo5wg5vSUvqb6MsTG", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(4);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
+
+  //key6
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(5);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
+
+  //key7
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("H5ptdUUfjJBGiK2X3gN2EzNYxituCUUnXv2tiMdQKP3b", vchRet);
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(2);
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(6);
   vchRet.clear();
   genesis.add_transaction(transaction);
 
-
+  //key8
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("FuvGENwrCY2M6hCeWhCUMEx5uWg71q1oY3TuxDtGcMnN", vchRet);
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(3);
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(7);
   vchRet.clear();
   genesis.add_transaction(transaction);
 
-
+  //key9
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
   DecodeBase58("4qVXL76hqkvxh3jZKGZjbxMvBirWRibb2zRdS5TrwJga", vchRet);
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(4);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("J7w1j8XsRNEMS1UfMYCpgGTaRyoF4r8TwHTDFPanR9jS", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(5);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("cB8hBUm19Pw47sg222PhxvKPcxJQm8rntBi1h7H7jn6", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(6);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("AFQHxGmvkjHEc5Jb1fmvhGwjMBkSGnuusXve8zmCPhHk", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
-  transaction.set_innerID(7);
-  vchRet.clear();
-  genesis.add_transaction(transaction);
-
-
-  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("3ZaqQbawNgFcuL6REkuu6MeLepufRaWHhgXxiCTKx4FJ", vchRet);
-  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
   transaction.set_innerID(8);
   vchRet.clear();
   genesis.add_transaction(transaction);
 
-
+  //key10
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-  DecodeBase58("793LHWckjjoTjkQYnHABgQFkX3VbdBtksQujVtEruX2E", vchRet);
+  DecodeBase58("7DmZqQhMjPR7ptJUQh4sRsyERgbK8DeFE3F5vbJFpu1D", vchRet);
   transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
 
   transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(1000, 0));
-  transaction.set_balance(csdb::Amount(1000, 0));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
   transaction.set_innerID(9);
   vchRet.clear();
   genesis.add_transaction(transaction);
