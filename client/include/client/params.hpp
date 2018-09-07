@@ -12,7 +12,11 @@
 #define TIME_TO_AWAIT_ACTIVITY 300
 #define TRX_SLEEP_TIME 20000 //microseconds
 #define FAKE_BLOCKS
+
+#if ! defined(DEBUG)
 #define SPAMMER
+#endif
+
 #define SYNCRO
 //#define MYLOG
 

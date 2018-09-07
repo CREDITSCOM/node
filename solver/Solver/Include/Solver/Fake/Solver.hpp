@@ -35,6 +35,8 @@
 
 //#define SPAM_MAIN
 
+#include <RunAfter.h>
+
 class Node;
 
 namespace Credits{
@@ -264,5 +266,6 @@ typedef std::string Matrix;
 		void spamWithTransactions();
 #endif
 
+		RunAfterEx<CustomProcIntArg> sendRoundTableRequestLauncher;
 	};
 }

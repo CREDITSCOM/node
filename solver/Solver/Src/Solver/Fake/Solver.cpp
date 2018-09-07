@@ -63,6 +63,7 @@ Solver::Solver(Node* node)
   , vector_datas()
   , m_pool()
   , v_pool()
+	, sendRoundTableRequestLauncher([this](int cur_rNum) { timer_service.Mark("RunAfterEx::sendRoundTableRequest()", cur_rNum); node_->sendRoundTableRequest(cur_rNum); }, "sendRoundTableRequest")
 {}
 
 Solver::~Solver()
@@ -316,8 +317,8 @@ void Solver::initConfRound()
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
-  size_t _rNum = rNum;
   if (gotBigBang) sendZeroVector();
+  //size_t _rNum = rNum;
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
@@ -593,21 +594,27 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
 
+  timer_service.Mark("schedule (300) sendRoundTableRequest()", node_->getRoundNumber());
+  sendRoundTableRequestLauncher.Schedule(
+	  std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
+	  RunAfterEx<CustomProcIntArg>::Launch::single,
+	  (int) node_->getRoundNumber());
+
   // the last round when request for RoundTable was sent
   // it helps to prevent extra duplicated requests during the same round
   // it is used only here, so it is placed here not to pollute header file
-  static size_t roundReqRoundTable = 0;
+  //static size_t roundReqRoundTable = 0;
 
-  size_t rNum = node_->getRoundNumber();
-  if (rNum > roundReqRoundTable) {
-	  roundReqRoundTable = rNum;
-	  timer_service.Mark("schedule (300) sendRoundTableRequest()", rNum);
-	  runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-		[this, rNum]() {timer_service.Mark("call sendRoundTableRequest()", rNum); node_->sendRoundTableRequest(rNum);}, "sendRoundTableRequest()");
-  }
-  else {
-	  timer_service.Mark("prevent extra sendRoundTableRequest()", rNum);
-  }
+  //size_t cur_rNum = node_->getRoundNumber();
+  //if (cur_rNum > roundReqRoundTable) {
+	 // roundReqRoundTable = cur_rNum;
+	 // timer_service.Mark("schedule (300) sendRoundTableRequest()", cur_rNum);
+	 // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
+		//[this, cur_rNum]() {timer_service.Mark("call sendRoundTableRequest()", cur_rNum); node_->sendRoundTableRequest(cur_rNum);}, "sendRoundTableRequest()");
+  //}
+  //else {
+	 // timer_service.Mark("prevent extra sendRoundTableRequest()", cur_rNum);
+  //}
 
 #ifndef SPAMMER
 #ifndef MONITOR_NODE
