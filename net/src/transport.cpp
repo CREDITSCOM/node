@@ -356,15 +356,15 @@ inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, 
 
 void Transport::processPostponed(const RoundNum rNum) {
   
-
   std::cout << "TRANSPORT> POSTPHONED PROCESSES BEGIN" << std::endl;
+
 
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {
     if (pp.round > rNum)
       ppBuf.emplace(std::move(pp));
     else if (pp.round == rNum)
-
+      std::cout << "TRANSPORT> POSTPHONED inside 1" << std::endl;
       if(pp.pack.getMsgSize() < StrippedDataSize) std::cout << "+++++++++++++++++++++++++++ACHTUNG!!! SIZE IS BELOW ZERO!!!" << std::endl;
       dispatchNodeMessage(pp.type,
                           pp.round,
@@ -372,11 +372,12 @@ void Transport::processPostponed(const RoundNum rNum) {
                           pp.pack.getMsgData() + StrippedDataSize,
                           pp.pack.getMsgSize() - StrippedDataSize);
   }
-
+  std::cout << "TRANSPORT> POSTPHONED inside 2" << std::endl;
   (*postponed_)->clear();
 
   postponed_[1] = *postponed_;
   postponed_[0] = &ppBuf;
+  //std::cout << "TRANSPORT> POSTPHONED finish" << std::endl;
 }
 
 void Transport::dispatchNodeMessage(const MsgTypes type,

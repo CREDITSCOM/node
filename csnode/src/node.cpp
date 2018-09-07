@@ -841,19 +841,12 @@ void Node::sendBlockRequest(uint32_t seq) {
     awaitingRecBlockCount++;
     return;
   }
-
-
-  //ostream_.init();
-  //ostream_ << seq;
- 
-  //Packet* pack;
-  
- // transport_->sendBroadcast()
-  std::cout << "SENDBLOCKREQUEST>" << std::endl;
+  std::cout << "SENDBLOCKREQUEST> Composing the request" << std::endl;
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock = true;
   awaitingRecBlockCount=0;
-  ostream_.init(BaseFlags::Broadcast);
+  uint8_t requestTo = rand()%(int)(MIN_CONFIDANTS);
+  ostream_.init(BaseFlags::Signed, confidantNodes_[requestTo]);
   ostream_ << MsgTypes::BlockRequest
     << roundNum_
     << seq;

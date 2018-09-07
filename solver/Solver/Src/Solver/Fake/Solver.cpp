@@ -120,7 +120,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
  // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
 #ifdef MYLOG
-  std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() << std::endl;
+  std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
   std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
   #endif
@@ -786,7 +786,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
   //TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
-  TRACE("");
+  //TRACE("");
   m_transactions.push_back(transaction);
 }
 
