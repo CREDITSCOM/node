@@ -364,6 +364,7 @@ void Transport::processPostponed(const RoundNum rNum) {
     if (pp.round > rNum)
       ppBuf.emplace(std::move(pp));
     else if (pp.round == rNum)
+    {
       std::cout << "TRANSPORT> POSTPHONED inside 1" << std::endl;
       if(pp.pack.getMsgSize() < StrippedDataSize) std::cout << "+++++++++++++++++++++++++++ACHTUNG!!! SIZE IS BELOW ZERO!!!" << std::endl;
       dispatchNodeMessage(pp.type,
@@ -371,6 +372,7 @@ void Transport::processPostponed(const RoundNum rNum) {
                           pp.pack,
                           pp.pack.getMsgData() + StrippedDataSize,
                           pp.pack.getMsgSize() - StrippedDataSize);
+     }
   }
   std::cout << "TRANSPORT> POSTPHONED inside 2" << std::endl;
   (*postponed_)->clear();

@@ -308,8 +308,7 @@ void Solver::initConfRound()
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
   size_t _rNum = rNum;
-  if (gotBigBang) runAfter(std::chrono::milliseconds(200),
-    [this]() { sendZeroVector(); });
+  if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
@@ -350,8 +349,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 void Solver::sendZeroVector()
 {
 
-
-  if (transactionListReceived) return;
+  if (transactionListReceived && !getBigBangStatus()) return;
   std::cout << "SOLVER> Generating ZERO TransactionList" << std::endl;
   csdb::Pool test_pool = csdb::Pool{};
   gotTransactionList(std::move(test_pool));

@@ -870,7 +870,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     awaitingSyncroBlock = false;
   }
   else return;
-  if ((getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())//&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   else
   {
