@@ -1,7 +1,6 @@
-//
-// Created by alexraag on 04.05.2018.
-//
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                    Created by Analytical Solytions Core Team 07.09.2018                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <iostream>
 #include <random>
 #include <sstream>
@@ -13,8 +12,8 @@
 
 #include <csnode/node.hpp>
 
-#include "Solver/Fake/Generals.hpp"
-#include "Solver/Fake/Solver.hpp"
+#include "Solver/Generals.hpp"
+#include "Solver/Solver.hpp"
 #include <algorithm>
 
 #include <lib/system/logger.hpp>

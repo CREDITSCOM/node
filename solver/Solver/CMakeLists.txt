@@ -7,10 +7,10 @@ set(SOLVER_TEST_BUILD FALSE)
 set(SOLVER_DOC_BUILD FALSE)
 
 add_library(Solver
-	Include/Solver/Fake/Generals.hpp
-	Include/Solver/Fake/Solver.hpp
-        Src/Solver/Fake/Solver.cpp
-        Src/Solver/Fake/Generals.cpp
+	Include/Solver/Generals.hpp
+	Include/Solver/Solver.hpp
+        Src/Solver/Solver.cpp
+        Src/Solver/Generals.cpp
 	${THRIFT_GENERATED_FILES}
 )
 

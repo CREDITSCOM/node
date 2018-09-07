@@ -1,11 +1,6 @@
-//
-// Created by alexraag on 08.05.2018.
-//
-
-
-
-//#include <Solver/Fake/Fake_Generals.hpp>
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                    Created by Analytical Solytions Core Team 07.09.2018                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
 #include <sstream>
@@ -16,8 +11,8 @@
 #include <x86intrin.h>
 #endif
 
-#include "../../../Include/Solver/Fake/Generals.hpp"
-//#include "../../../Include/Solver/Fake/Fake_Solver.hpp"
+#include "Solver/Generals.hpp"
+//#include "../../../Include/Solver/Fake_Solver.hpp"
 
 #include <algorithm>
 #include <csdb/currency.h>
