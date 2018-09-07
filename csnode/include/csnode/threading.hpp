@@ -241,7 +241,7 @@ struct SpinLockable
     {}
 
 private:
-    std::atomic_flag af;
+    std::atomic_flag af = ATOMIC_FLAG_INIT;
     T t;
 
     friend struct SpinLockedRef<T>;
