@@ -83,10 +83,10 @@ enum class LaunchScheme {
 
 
 /** @brief	The custom procedure */
-using CustomProc = std::function<void ()>;
+using CustomProc = std::function<void()>;
 
 /** @brief	The custom procedure int argument */
-using CustomProcIntArg = std::function<void (int)>;
+using CustomProcIntArg = std::function<void(int)>;
 
 /**
  * @class	RunAfterEx
@@ -105,8 +105,8 @@ class RunAfterEx
 {
 public:
 
-	RunAfterEx () = delete;
-	RunAfterEx (const RunAfterEx&) = delete;
+	RunAfterEx() = delete;
+	RunAfterEx(const RunAfterEx&) = delete;
 	void operator =(const RunAfterEx&) = delete;
 
 	/**
@@ -121,9 +121,9 @@ public:
 	 * @param [in,out]	comment	The comment.
 	 */
 
-	RunAfterEx (TProc&& proc, std::string&& comment)
-		: _proc (std::forward<TProc> (proc))
-		, _comment (std::forward<std::string> (comment))
+	RunAfterEx(TProc&& proc, std::string&& comment)
+		: _proc(std::forward<TProc>(proc))
+		, _comment(std::forward<std::string>(comment))
 	{
 	}
 
@@ -142,59 +142,59 @@ public:
 	 */
 
 	template<typename... Args>
-	void Schedule (TRes&& wait_for, LaunchScheme scheme, Args... args)
+	void Schedule(TRes&& wait_for, LaunchScheme scheme, Args... args)
 	{
 
 #if defined(TIMER_SERVICE_LOG)
 		std::ostringstream os;
-		os << "RunAfterEx: schedule (" << wait_for.count () << ") " << _comment;
-		timer_service.Mark (os.str (), -1);
+		os << "RunAfterEx: schedule (" << wait_for.count() << ") " << _comment;
+		timer_service.Mark(os.str(), -1);
 #endif
 
 		// test has not already launched in single cases
-		if (_launched)
+		if(_launched)
 		{
 #if defined(TIMER_SERVICE_LOG)
-				timer_service.Mark (os.str () + " canceled (already running)", -1);
+			timer_service.Mark(os.str() + " canceled (already running)", -1);
 #endif
-				return;
+			return;
 		}
 
 		_cancel = false;
 		_launched = true;
-		std::thread ([this, wait_for, scheme, args...] () {
+		std::thread([this, wait_for, scheme, args...]() {
 
-			std::this_thread::sleep_for (wait_for);
+			std::this_thread::sleep_for(wait_for);
 
 			// test cancel condition after waiting finished
-			if (_cancel) {
+			if(_cancel) {
 				_launched = false;
 #if defined(TIMER_SERVICE_LOG)
 				std::ostringstream os;
-				os << "RunAfterEx: schedule (" << wait_for.count () << ") " << _comment;
-				timer_service.Mark (os.str () + " canceled (while waiting)", -1);
+				os << "RunAfterEx: schedule (" << wait_for.count() << ") " << _comment;
+				timer_service.Mark(os.str() + " canceled (while waiting)", -1);
 #endif
 				return;
 			}
 
-			switch (scheme) {
+			switch(scheme) {
 			case LaunchScheme::single:
-				ExecuteProc (std::forward<TProc> (_proc), args...);
+				ExecuteProc(std::forward<TProc>(_proc), args...);
 				break;
 			case LaunchScheme::periodic:
 				// launch periodically until external stop
 				do {
-					ExecuteProc (std::forward<TProc> (_proc), args...);
-					if (_cancel) {
+					ExecuteProc(std::forward<TProc>(_proc), args...);
+					if(_cancel) {
 						break;
 					}
-					std::this_thread::sleep_for (wait_for);
+					std::this_thread::sleep_for(wait_for);
 					// test stop condition
-				} while (!_cancel);
+				} while(!_cancel);
 				break;
 			}
 			_launched = false;
-		}).detach ();
+		}).detach();
 	}
 
 	/**
@@ -206,12 +206,12 @@ public:
 	 * @date	07.09.2018
 	 */
 
-	void Cancel ()
+	void Cancel()
 	{
 		_cancel = true;
 	}
 
-	bool IsScheduled () const
+	bool IsScheduled() const
 	{
 		return _launched;
 	}
@@ -225,13 +225,13 @@ private:
 
 	// Special 1-arg variant writes more detailed log (with argument value)
 #if defined(TIMER_SERVICE_LOG)
-	void ExecuteProc (CustomProcIntArg&& proc, int arg)
+	void ExecuteProc(CustomProcIntArg&& proc, int arg)
 	{
 		std::ostringstream os;
 		os << "RunAfterEx: launching " << _comment;
-		timer_service.Mark (os.str (), arg);
+		timer_service.Mark(os.str(), arg);
 		//auto _p = std::forward<TProc>(proc);
-		CallsQueue::instance ().insert ([proc, arg] () { proc (arg); });
+		CallsQueue::instance().insert([proc, arg]() { proc(arg); });
 	}
 #endif
 
@@ -249,13 +249,13 @@ private:
 	 */
 
 	template<typename... Args>
-	void ExecuteProc (std::function<void (Args...)>&& proc, Args... args)
+	void ExecuteProc(std::function<void(Args...)>&& proc, Args... args)
 	{
 #if defined(TIMER_SERVICE_LOG)
 		std::ostringstream os;
 		os << "RunAfterEx: launching " << _comment;
-		timer_service.Mark (os.str ());
+		timer_service.Mark(os.str());
 #endif
-		CallsQueue::instance ().insert ([proc, args...] () { proc (args...); });
+		CallsQueue::instance().insert([proc, args...]() { proc(args...); });
 	}
 };
