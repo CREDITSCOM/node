@@ -597,7 +597,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   timer_service.Mark("schedule (300) sendRoundTableRequest()", node_->getRoundNumber());
   sendRoundTableRequestLauncher.Schedule(
 	  std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-	  RunAfterEx<CustomProcIntArg>::Launch::single,
+	  LaunchScheme::single,
 	  (int) node_->getRoundNumber());
 
   // the last round when request for RoundTable was sent

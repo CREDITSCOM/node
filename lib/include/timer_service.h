@@ -140,6 +140,11 @@ public:
 		return std::chrono::duration_cast<TRes>(tp - _t_start).count();
 	}
 
+	long long Time ()
+	{
+		return std::chrono::duration_cast<TRes>(Now() - _t_start).count ();
+	}
+
 	/**
 	 * @fn	void TimerService::Launch(TRes&& wait_for, Callback&& proc)
 	 *
@@ -352,36 +357,3 @@ public:
 __declspec(selectany) TimerService<> timer_service;
 
 //extern TimerService<> timer_service;
-
-//namespace std
-//{
-//	inline bool operator ==(const TimerService::MarkData & lhs, const int & group_id)
-//	{
-//		return std::get<TimerService::GroupIdValue>(lhs) == group_id;
-//	}
-//}
-
-// inline
-// void TimerService<typename TRes>::ConsoleOut(const MarkData & d)
-//{
-//	using std::cout;
-//	using std::endl;
-//	using namespace std::chrono;
-//
-//	bool has_previous = false;
-//	milliseconds dt;
-//	auto posd = std::find(_data.crbegin(), _data.crend(), d);
-//	if (posd != _data.crend()) {
-//		int group_id = GroupIdFrom(d);
-//		auto found = std::find(posd + 1, _data.crend(), group_id);
-//		if (found != _data.crend()) {
-//			dt = duration_cast<milliseconds>(TimePointFrom(d) - TimePointFrom(*found));
-//			has_previous = true;
-//		}
-//	}
-//	cout << duration_cast<milliseconds>(TimePointFrom(d) - _t_start).count() << "ms: " << InfoFrom(d);
-//	if (has_previous) {
-//		cout << " (dt = " << dt.count() << "ms)";
-//	}
-//	cout << endl;
-//}

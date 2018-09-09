@@ -15,7 +15,7 @@
  *				d) call MethodName() once with delay of 1 second
  *	@code		method_name_caller.Schedule( std::chrono::milliseconds(1000), LaunchScheme::single )
  *				d) call MethodName() periodically with delay of 200 milliseconds
- *	@code		method_name_caller.Schedule( std::chrono::milliseconds(200), LaunchScheme::periodic_single )
+ *	@code		method_name_caller.Schedule( std::chrono::milliseconds(200), LaunchScheme::periodic )
  *				e) stop periodic calling or cancel scheduled call
  *	@code		method_name_caller.Cancel();
  * 			2. Declare a class member to call 2-args method:
@@ -77,14 +77,8 @@ enum class LaunchScheme {
 	///< An enum constant representing the single option: launch once, cancel if previous schedule call still is not done
 	single,
 
-	///< An enum constant representing the multi option: launch once for every schedule call, allow schedule multiple calls
-	multi,
-
 	///< An enum constant representing the periodic single option: launch periodically, schedule call cancels if already running one cycle
-	periodic_single,
-
-	///< An enum constant representing the periodic multi option: launch periodically, every schedule call adds new periodic cycle
-	periodic_multi
+	periodic
 };
 
 
@@ -160,56 +154,74 @@ public:
 		// test has not already launched in single cases
 		if (_launched)
 		{
-			switch (scheme) {
-			case LaunchScheme::single:
-			case LaunchScheme::periodic_single:
-
 #if defined(TIMER_SERVICE_LOG)
 				timer_service.Mark(os.str() + " canceled (already running)", -1);
 #endif
-				return;
+			return;
+		}
+
+		_launched = true;
+
+		// obtain launch count depending on scheme (-1 - forever)
+		{
+			Lock l (_mtx);
+			switch (scheme) {
+			case LaunchScheme::single:
+				_remains = 1;
+				break;
+			case LaunchScheme::periodic:
+				_remains = -1;
+				break;
 			default:
-				break; // launch allowed
+				_remains = 0;
+				break;
 			}
 		}
 
-		_cancel = false;
-		_launched = true;
 		std::thread([this, wait_for, scheme, args...]() {
 
 			std::this_thread::sleep_for(wait_for);
 			
-			// test cancel condition after waiting finished
-			if (_cancel) {
-				_launched = false;
-#if defined(TIMER_SERVICE_LOG)
-				std::ostringstream os;
-				os << "RunAfterEx: schedule (" << wait_for.count() << ") " << _comment;
-				timer_service.Mark(os.str() + " canceled (while waiting)", -1);
-#endif
-				return;
-			}
+			// launch until _remains != 0
+			do {
+				// test stop condition
+				if (HandleStopCondition ()) {
+					break;
+				}
+				ExecuteProc (std::forward<TProc> (_proc), args...);
+				if (HandleStopCondition ()) {
+					break;
+				}
+				std::this_thread::sleep_for (wait_for);
+			} while (true);
 
-			switch (scheme) {
-			case LaunchScheme::single:
-			case LaunchScheme::multi:
-				ExecuteProc(std::forward<TProc>(_proc), args...);
-				break;
-			case LaunchScheme::periodic_single:
-			case LaunchScheme::periodic_multi:
-				// launch periodically until external stop
-				do {
-					ExecuteProc(std::forward<TProc>(_proc), args...);
-					if (_cancel) {
-						break;
-					}
-					std::this_thread::sleep_for(wait_for);
-					// test stop condition
-				} while (! _cancel);
-				break;
-			}
 			_launched = false;
+#if defined(TIMER_SERVICE_LOG)
+			std::ostringstream os2;
+			os2 << "RunAfterEx: " << _comment << " is finished";
+			timer_service.Mark (os2.str (), -1);
+#endif
 		}).detach();
+	}
+
+	/**
+	 * @fn	void CancelAfter()
+	 *
+	 * @brief	Cancels this object
+	 *
+	 * @author	User
+	 * @date	07.09.2018
+	 */
+
+	void CancelAfter( int count_calls )
+	{
+		Lock l (_mtx);
+		if (count_calls < 0 || ( _remains > 0 && _remains <= count_calls ) ) {
+			// should not schedule periodic calls using CancelAfter()
+			// should not re-schedule more calls using CancelAfter()
+			return;
+		}
+		_remains = count_calls;
 	}
 
 	/**
@@ -223,7 +235,13 @@ public:
 
 	void Cancel()
 	{
-		_cancel = true;
+		Lock l (_mtx);
+		_remains = 0;
+	}
+
+	bool IsScheduled () const
+	{
+		return _launched;
 	}
 
 private:
@@ -231,7 +249,9 @@ private:
 	TProc _proc;
 	std::string _comment;
 	std::atomic_bool _launched{ false };
-	std::atomic_bool _cancel{ false };
+	int _remains = 0;
+	std::mutex _mtx;
+	using Lock = std::lock_guard<std::mutex>;
 
 	// Special 1-arg variant writes more detailed log (with argument value)
 #if defined(TIMER_SERVICE_LOG)
@@ -267,5 +287,17 @@ private:
 		timer_service.Mark(os.str());
 #endif
 		CallsQueue::instance().insert([proc, args...]() { proc(args...); });
+	}
+
+	bool HandleStopCondition ()
+	{
+		Lock l (_mtx);
+		if (_remains > 0) {
+			_remains--;
+		}
+		if (_remains == 0) {
+			return true;
+		}
+		return false;
 	}
 };
