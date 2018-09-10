@@ -52,8 +52,8 @@
 
 #pragma once
 
- // Uncomment to activate detailed log using timer_service (header 'timer_service.h' required>
-#define TIMER_SERVICE_LOG
+// Uncomment to activate detailed log using timer_service (header 'timer_service.h' required>
+//#define TIMER_SERVICE_LOG
 
 #include <chrono>
 #include <thread>

@@ -266,7 +266,14 @@ typedef std::string Matrix;
 		void spamWithTransactions();
 #endif
 
+		// проверка состояния по истечении нормальной длительности раунда
+		void onRoundExpired();
+
 		RunAfterEx<std::function<void(int)>> sendRoundTableRequestCall;
 		RunAfterEx<> flushTransactionsCall;
+		RunAfterEx<> writeNewBlockCall;
+		RunAfterEx<> closeMainRoundCall;
+
+		RunAfterEx<> onRoundExpiredCall;
 	};
 }
