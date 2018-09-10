@@ -63,7 +63,12 @@ Solver::Solver(Node* node)
   , vector_datas()
   , m_pool()
   , v_pool()
-	, sendRoundTableRequestLauncher([this](int cur_rNum) { timer_service.Mark("RunAfterEx::sendRoundTableRequest()", cur_rNum); node_->sendRoundTableRequest(cur_rNum); }, "sendRoundTableRequest")
+	, sendRoundTableRequestCall([this](int cur_rNum) {
+		/*timer_service.Mark("sendRoundTableRequest()", cur_rNum);*/ node_->sendRoundTableRequest(cur_rNum);
+	}, "sendRoundTableRequest()")
+	, flushTransactionsCall([this]() {
+		/*timer_service.Mark("flushTransactions()", node_->getRoundNumber());*/ flushTransactions();
+	}, "flushTransactions()")
 {}
 
 Solver::~Solver()
@@ -248,9 +253,6 @@ void Solver::flushTransactions()
 			return;
 		}
 	}
-	timer_service.Mark("schedule (50) flushTransactions()", node_->getRoundNumber());
-	runAfter(std::chrono::milliseconds(50),
-		[this]() { timer_service.Mark("call flushTransactions()", node_->getRoundNumber()); flushTransactions(); }, "flushTransactions()");
 }
 
 bool Solver::getIPoolClosed() {
@@ -595,8 +597,8 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   }
 
   timer_service.Mark("schedule (300) sendRoundTableRequest()", node_->getRoundNumber());
-  sendRoundTableRequestLauncher.Schedule(
-	  std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
+  sendRoundTableRequestCall.Schedule(
+	  TIME_TO_AWAIT_ACTIVITY,
 	  LaunchScheme::single,
 	  (int) node_->getRoundNumber());
 
@@ -927,7 +929,8 @@ void Solver::nextRound()
   m_pool = csdb::Pool{};
   if (m_pool_closed) v_pool = csdb::Pool{};
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
-  if (node_->getMyLevel() == NodeLevel::Main) {
+  auto lvl = node_->getMyLevel();
+  if (lvl == NodeLevel::Main) {
     runMainRound();
 #ifdef SPAM_MAIN
     createSpam = true;
@@ -942,7 +945,13 @@ void Solver::nextRound()
 #endif
     std::cout << "SOLVER> next Round : before flush transactions" << std::endl;
     m_pool_closed = true;
-    flushTransactions();
+  }
+  if (lvl == NodeLevel::Normal) {
+	  // TODO: define constant for flushTransactions() period
+	  flushTransactionsCall.Schedule(50, LaunchScheme::periodic );
+  }
+  else {
+	  flushTransactionsCall.Cancel();
   }
 }
 

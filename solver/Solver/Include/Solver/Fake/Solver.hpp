@@ -266,6 +266,7 @@ typedef std::string Matrix;
 		void spamWithTransactions();
 #endif
 
-		RunAfterEx<CustomProcIntArg> sendRoundTableRequestLauncher;
+		RunAfterEx<std::function<void(int)>> sendRoundTableRequestCall;
+		RunAfterEx<> flushTransactionsCall;
 	};
 }
