@@ -430,6 +430,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getRoundTableRequest(data, size, firstPack.getSender());
   case MsgTypes::ConsTLRequest:
     return node_->getTlRequest(data, size, firstPack.getSender());
+  case MsgTypes::NewBadBlock:
+    return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::BigBang:
 	return node_->getBigBang(data, size, rNum, type);
   default:
