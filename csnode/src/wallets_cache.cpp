@@ -62,20 +62,23 @@ void WalletsCache::load(csdb::Pool& curr, Mode mode)
     convert(curr.hash(), poolHash);
     //LOG_NOTICE(__FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count());
 
+	auto* walDataPtr = getWalletData(curr.writer_public_key());
+	WalletsCache::WalletData& walWriter = *walDataPtr;
+
     for (size_t i = 0; i < curr.transactions_count(); i++)
     {
         csdb::Transaction tr = curr.transaction(i);
-        load(tr, mode, poolHash);
+        load(tr, mode, poolHash, walWriter);
     }
 }
 
-void WalletsCache::load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash)
+void WalletsCache::load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter)
 {
-    loadTrxForSource(tr, mode, poolHash);
+    loadTrxForSource(tr, mode, poolHash, walWriter);
     loadTrxForTarget(tr, mode, poolHash);
 }
 
-void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash)
+void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter)
 {
     //LOG_NOTICE(__FUNCTION__);
     auto* walDataPtr = getWalletData(tr.source().public_key());
@@ -85,6 +88,7 @@ void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const Pool
 
     walData.balance_ -= tr.amount();
 	walData.balance_ -= tr.counted_fee();
+	walWriter.balance_ += tr.counted_fee();
     addPoolHash(walData, mode, poolHash);
 }
 
