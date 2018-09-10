@@ -22,4 +22,4 @@
 #define DEFAULT_CURRENCY 1
 
 constexpr auto SIZE_OF_COMMON_TRANSACTION = 190;
-constexpr auto COST_OF_ONE_TRUSTED_PER_DAY = 17;
+constexpr auto COST_OF_ONE_TRUSTED_PER_DAY = 17.;

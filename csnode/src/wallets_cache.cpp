@@ -84,6 +84,7 @@ void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const Pool
     WalletsCache::WalletData& walData = *walDataPtr;
 
     walData.balance_ -= tr.amount();
+	walData.balance_ -= tr.counted_fee();
     addPoolHash(walData, mode, poolHash);
 }
 
