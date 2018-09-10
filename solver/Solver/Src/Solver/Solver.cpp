@@ -745,7 +745,7 @@ Solver::spamWithTransactions()
   transaction.set_target(aaa);
   transaction.set_source(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
-  //transaction.set_comission();
+  //transaction.set_max_fee();
 
   transaction.set_currency(csdb::Currency("CS"));
 
@@ -757,7 +757,7 @@ Solver::spamWithTransactions()
       
 
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-          transaction.set_comission(csdb::Amount(0, 1,10));
+          transaction.set_max_fee(csdb::Amount(0, 1,10));
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
   #ifdef MYLOG

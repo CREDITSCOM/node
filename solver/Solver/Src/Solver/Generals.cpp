@@ -35,7 +35,7 @@ namespace Credits{
 		std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
-		csdb::Amount comission = 0.1_c;
+		csdb::Amount max_fee = 0.1_c;
     csdb::Transaction tempTransaction;
 	  size_t transactionsNumber = _pool.transactions_count();
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
@@ -47,7 +47,7 @@ namespace Credits{
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
 	  {
-		  auto delta = it.balance() - it.amount() - comission;
+		  auto delta = it.balance() - it.amount() - max_fee;
 
 	#ifdef _MSC_VER
 		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
