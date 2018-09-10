@@ -10,9 +10,9 @@
 //#define FOREVER_ALONE
 #define TIME_TO_COLLECT_TRXNS 500
 #define TIME_TO_AWAIT_ACTIVITY 300
-#define TRX_SLEEP_TIME 500 //microseconds
+#define TRX_SLEEP_TIME 100000 //microseconds
 #define FAKE_BLOCKS
-//#define SPAMMER
+#define SPAMMER
 #define SYNCRO
 //#define MYLOG
 

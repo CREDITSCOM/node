@@ -50,6 +50,9 @@ public:
   void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
+  void getBadBlock(const uint8_t*, const size_t, const PublicKey& sender);
+
+
   /* Outcoming requests forming */
   void sendRoundTable();
   void sendTransaction(const csdb::Transaction&);
@@ -60,6 +63,8 @@ public:
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
+
+  void sendBadBlock(const csdb::Pool& pool);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
@@ -131,6 +136,8 @@ private:
   std::vector<uint8_t> myPublicForSig;
   std::vector<uint8_t> myPrivateForSig;
 
+  std::string rcvd_trx_fname = "rcvd.txt";
+  std::string sent_trx_fname = "sent.txt";
 
 
   // Current round state

@@ -17,7 +17,7 @@
 #define FLAG_LOG_DEBUG 64
 
 ///////////////////
-#define LOG_LEVEL (FLAG_LOG_NOTICE | 0 | FLAG_LOG_ERROR | 0 | FLAG_LOG_PACKETS | (FLAG_LOG_NODES_BUFFER & 0)) | LOG_DEBUG //(FLAG_LOG_PACKETS & 0)
+#define LOG_LEVEL (FLAG_LOG_NOTICE | 0 | 0 | 0 | FLAG_LOG_PACKETS | (FLAG_LOG_NODES_BUFFER & 0)) | LOG_DEBUG //(FLAG_LOG_PACKETS & 0)
 ///////////////////
 
 #if LOG_LEVEL & FLAG_LOG_NOTICE
@@ -26,7 +26,7 @@
 #define LOG_NOTICE(TEXT)
 #endif
 
-#if LOG_LEVEL & FLAG_LOG_WARN
+#if LOG_LEVEL & FLAG_LOG_WARN 
 #define LOG_WARN(TEXT) std::cout << "[WARNING] " << TEXT << std::endl
 #else
 #define LOG_WARN(TEXT)
@@ -38,7 +38,7 @@
 #define LOG_ERROR(TEXT)
 #endif
 
-#if LOG_LEVEL & FLAG_LOG_EVENTS
+#if (LOG_LEVEL & FLAG_LOG_EVENTS && false)
 #define LOG_EVENT(TEXT) std::cout << TEXT << std::endl
 #else
 #define LOG_EVENT(TEXT)

@@ -28,11 +28,13 @@ namespace Credits{
     Generals::Generals() { }
     Generals::~Generals() { }
 
-    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
+    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool) {
       ////////////////////////////////////////////////////////////////////////
       //    This function was modified to calculate deltas for concensus    //
       ////////////////////////////////////////////////////////////////////////
+      #ifdef MYLOG
 		std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
+    #endif
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
 		csdb::Amount comission = 0.1_c;
@@ -66,6 +68,7 @@ namespace Credits{
       }
 
 		  else *(del1 + i) = -bitcnt;
+      new_bpool.add_transaction(it);
      	i++;
 	  }
 	  
@@ -205,7 +208,9 @@ namespace Credits{
     }
 
     uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash lasthash) {
+    #ifdef MYLOG
 		std::cout << "GENERALS> Take decision: starting " << std::endl;
+    #endif
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
 		unsigned char *mtr = new unsigned char[nodes_amount * 97];
@@ -268,19 +273,32 @@ namespace Credits{
     uint8_t j=0;
 		for (int i = 0; i < nodes_amount; i++)
 		{
-			if (*(new_trusted + i) < trusted_limit)
+      if (*(new_trusted + i) < trusted_limit)
+      {
+      #ifdef MYLOG
 		  std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
+      #endif
+      }
       else j++;
 		}
-    if (j==nodes_amount) std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
-		//std::cout << "Hash : " << lasthash.to_string() << std::endl;
+    if (j==nodes_amount) 
+    { 
+      #ifdef MYLOG
+      std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
+      #endif
+    }
+#ifdef MYLOG
+    std::cout << "Hash : " << lasthash.to_string() << std::endl;
+    #endif
 		auto hash_t = lasthash.to_binary();
 		int k= *(hash_t.begin());
 		//std::cout << "K : " << k << std::endl;
 		int result0 = nodes_amount;
 		uint16_t result =0;
 		result = k % (int)result0;
+#ifdef MYLOG
 		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
+    #endif
     delete hw;
     delete mtr;
 		return result;

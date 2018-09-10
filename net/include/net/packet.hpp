@@ -43,6 +43,7 @@ enum MsgTypes: uint8_t {
   ConsMatrixRequest,
   ConsTLRequest,
   RoundTableRequest,
+  NewBadBlock,
   BigBang = 35
 };
 
