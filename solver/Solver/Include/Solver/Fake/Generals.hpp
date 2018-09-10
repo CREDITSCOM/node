@@ -18,11 +18,12 @@
 
 namespace Credits{
 
+    class WalletsState;
 	class Solver;
 
     class Generals{
     public:
-        Generals();
+        Generals(WalletsState& walletsState);
         ~Generals();
 
         Generals(const Generals&)= delete;
@@ -47,6 +48,7 @@ namespace Credits{
         void fake_block(std::string);
     private:	
 
+        WalletsState& walletsState;
 
 		struct hash_weight {
 			char a_hash[32];

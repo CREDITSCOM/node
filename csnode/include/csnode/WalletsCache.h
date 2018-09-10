@@ -1,9 +1,8 @@
 #ifndef WALLETS_CACHE_H
 #define WALLETS_CACHE_H
 
-#include <ostream>
-#include <string>
 #include <vector>
+#include <boost/dynamic_bitset.hpp>
 #include <csdb/address.h>
 #include <csdb/amount.h>
 #include <csdb/pool.h>
@@ -24,6 +23,7 @@ namespace Credits
     {
     public:
         using WalletId = csdb::internal::WalletId;
+        using Mask = boost::dynamic_bitset<uint64_t>;
 
         struct Config
         {
@@ -46,11 +46,16 @@ namespace Credits
     public:
         WalletsCache(const Config& config, csdb::Address genesisAddress, csdb::Address startAddress, const WalletsIds& walletsIds);
         ~WalletsCache();
+        WalletsCache(const WalletsCache&) = delete;
+        WalletsCache& operator=(const WalletsCache&) = delete;
+        WalletsCache(const WalletsCache&&) = delete;
+        WalletsCache& operator=(const WalletsCache&&) = delete;
 
         void loadPrevBlock(csdb::Pool& curr);
         void loadNextBlock(csdb::Pool& curr);
 
         const WalletData* findWallet(const WalletId& id) const;
+        const Mask& getModified() const {return modified_; }
 
     private:
         void load(csdb::Pool& curr);
@@ -68,6 +73,7 @@ namespace Credits
 
         using Data = std::vector<WalletData*>;
         Data data_;
+        Mask modified_;
     };
 
 } // namespace Credits

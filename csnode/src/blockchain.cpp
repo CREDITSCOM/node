@@ -585,6 +585,35 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key)
     return res;
 }
 
+csdb::Amount BlockChain::getBalance(const csdb::Address& address) const
+{
+    if (address.is_wallet_id())
+        return getBalance(address.wallet_id());
+
+    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+
+    WalletId id{};
+    if (!walletIds_->find(address, id))
+        return csdb::Amount{};
+
+    return getBalance_Unsafe(id);
+}
+
+csdb::Amount BlockChain::getBalance(const WalletId& id) const
+{
+    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+
+    return getBalance_Unsafe(id);
+}
+
+csdb::Amount BlockChain::getBalance_Unsafe(const WalletId& id) const
+{
+    const WalletsCache::WalletData* walData = walletsCache_->findWallet(id);
+    if (!walData)
+        return csdb::Amount{};
+    return walData->balance_;
+}
+
 bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const
 {
     if (address.is_wallet_id())
@@ -616,33 +645,17 @@ bool BlockChain::findWalletData_Unsafe(const WalletId& id, WalletData& wallData)
     return false;
 }
 
-csdb::Amount BlockChain::getBalance(const csdb::Address& address) const
-{
-    if (address.is_wallet_id())
-        return getBalance(address.wallet_id());
-
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
-    WalletId id{};
-    if (!walletIds_->find(address, id))
-        return csdb::Amount{};
-
-    return getBalance_Unsafe(id);
-}
-
-csdb::Amount BlockChain::getBalance(const WalletId& id) const
+bool BlockChain::getModifiedWallets(Mask& dest) const
 {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
-    return getBalance_Unsafe(id);
-}
+    bool isNewModified =
+        (walletsCache_->getModified().size() != dest.size()) ||
+        walletsCache_->getModified().any();
 
-csdb::Amount BlockChain::getBalance_Unsafe(const WalletId& id) const
-{
-    const WalletsCache::WalletData* walData = walletsCache_->findWallet(id);
-    if (!walData)
-        return csdb::Amount{};
-    return walData->balance_;
+    dest.resize(walletsCache_->getModified().size(), true);
+    dest |= walletsCache_->getModified();
+    return isNewModified;
 }
 
 namespace
@@ -797,18 +810,47 @@ void BlockChain::getTransactions(Transactions& transactions,
 
 bool BlockChain::insertWalletId(const WalletAddress& address, WalletId id)
 {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-    return walletIds_->insert(address, id);
+    if (address.is_wallet_id())
+    {
+        id = address.wallet_id();
+        return false;
+    }
+    else if (address.is_public_key())
+    {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        return walletIds_->insert(address, id);
+    }
+    LOG_ERROR("Wrong address");
+    return false;
 }
 
 bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const
 {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-    return walletIds_->find(address, id);
+    if (address.is_wallet_id())
+    {
+        id = address.wallet_id();
+        return true;
+    }
+    else if (address.is_public_key())
+    {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        return walletIds_->find(address, id);
+    }
+    return false;
 }
 
 bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id)
 {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-    return walletIds_->get(address, id);
+    if (address.is_wallet_id())
+    {
+        id = address.wallet_id();
+        return true;
+    }
+    else if (address.is_public_key())
+    {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        return walletIds_->get(address, id);
+    }
+    LOG_ERROR("Wrong address");
+    return false;
 }

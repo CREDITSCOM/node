@@ -10,6 +10,8 @@
 #include <iostream>
 #include <string>
 
+#include <boost/dynamic_bitset.hpp>
+
 #include <csdb/address.h>
 #include <csdb/amount.h>
 #include <csdb/pool.h>
@@ -44,6 +46,7 @@ public:
   using WalletId = csdb::internal::WalletId;
   using WalletAddress = csdb::Address;
   using WalletData = Credits::WalletsCache::WalletData;
+  using Mask = boost::dynamic_bitset<uint64_t>;
 
   BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
 
@@ -81,22 +84,23 @@ public:
   csdb::Amount getBalance(const csdb::Address&) const;
   csdb::Amount getBalance(const WalletId&) const;
  
-  // all wallet cache data
+  // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData) const;
   bool findWalletData(const WalletId&, WalletData& wallData) const;
 
   // wallet transactions: pools cache + db search
   void getTransactions(
-  Transactions& transactions,
-  csdb::Address address,
-  uint64_t offset,
-  uint64_t limit) const;
+      Transactions& transactions,
+      csdb::Address address,
+      uint64_t offset,
+      uint64_t limit) const;
 
-  static csdb::Address getAddressFromKey(const char*);
+  // wallets modified by last new block
+  bool getModifiedWallets(Mask& dest) const;
 
   // wallet id interface
  
-  // returns true if wallet address was absent
+  // returns false if wallet address already existed
   bool insertWalletId(const WalletAddress& address, WalletId id);
   // searches for existing wallet id
   // returns true if found

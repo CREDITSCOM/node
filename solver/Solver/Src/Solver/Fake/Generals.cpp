@@ -18,6 +18,7 @@
 
 #include "../../../Include/Solver/Fake/Generals.hpp"
 //#include "../../../Include/Solver/Fake/Fake_Solver.hpp"
+#include <Solver/Fake/WalletsState.h>
 
 #include <algorithm>
 #include <csdb/currency.h>
@@ -30,89 +31,98 @@
 
 namespace Credits{
 
-    Generals::Generals() { }
+    Generals::Generals(WalletsState& _walletsState)
+        : walletsState(_walletsState)
+    { }
     Generals::~Generals() { }
 
-    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
-      ////////////////////////////////////////////////////////////////////////
-      //    This function was modified to calculate deltas for concensus    //
-      ////////////////////////////////////////////////////////////////////////
-		std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
-      //comission is let to be constant, otherwise comission should be sent to this function
-		memset(&hMatrix, 0, 9700);
-		csdb::Amount comission = 0.1_c;
-    csdb::Transaction tempTransaction;
-	  size_t transactionsNumber = _pool.transactions_count();
-	  uint8_t* del1 = new uint8_t[transactionsNumber];
-	  uint32_t i = 0;
-    const csdb::Amount zero_balance = 0.0_c;
-    if (_pool.transactions_count() > 0) {
-
-	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
-	  for (auto& it : t_pool)
-	  {
-		  auto delta = it.balance() - it.amount() - comission;
-
-	#ifdef _MSC_VER
-		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
-	#else
-		  int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
-	#endif
-		  if (delta > zero_balance)
-      {
-        *(del1 + i) = bitcnt;
-        new_pool.add_transaction(it);
-
-	/*	std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-		printf("TRANSACTION ACCEPTED\n");
-		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";*/
-
-      }
-
-		  else *(del1 + i) = -bitcnt;
-     	i++;
-	  }
-	  
-		uint8_t* hash_s = new uint8_t[32];
-		//std::cout << "GENERALS> Build vector : before blake" << std::endl;
-  //  std::cout << "GENERALS> buildVector: before blake, total " << new_pool.transactions_count() << "transactions in block" << std::endl;
-		blake2s(hash_s, 32, del1, transactionsNumber, "1234", 4);
-//    std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
-		//initializing for taking decision
-		//std::cout << "GENERALS> Build vector : before initializing" << std::endl;
-		memset(find_untrusted, 0, 10000);
-		memset(new_trusted, 0, 100);
-		memset(hw_total, 0, 3300);
-		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
-
-		Hash_ hash_(hash_s);	
-    delete hash_s; 
-    delete del1;
- //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
-		return hash_;
-    }
-    else
+    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool)
     {
-      uint8_t* hash_s = new uint8_t[32];
-      uint32_t a=0;
-      blake2s(hash_s, 32, (const void*)&a, 4, "1234", 4);
-//      std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
-      memset(find_untrusted, 0, 10000);
-      memset(new_trusted, 0, 100);
-      memset(hw_total, 0, 3300);
-      Hash_ hash_(hash_s);
-      delete hash_s;
- //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
-      delete del1;
-      return hash_;
+        ////////////////////////////////////////////////////////////////////////
+        //    This function was modified to calculate deltas for concensus    //
+        ////////////////////////////////////////////////////////////////////////
+        std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
+        //comission is let to be constant, otherwise comission should be sent to this function
+        memset(&hMatrix, 0, 9700);
+        csdb::Amount comission = 0.1_c;
+        csdb::Transaction tempTransaction;
+        size_t transactionsNumber = _pool.transactions_count();
+        uint8_t* del1 = new uint8_t[transactionsNumber];
+        const csdb::Amount zero_balance = 0.0_c;
+        if (_pool.transactions_count() > 0)
+        {
+            walletsState.updateFromSource();
 
+            std::vector <csdb::Transaction> t_pool(_pool.transactions());
+            for (size_t i = 0; i < t_pool.size(); i++)
+            {
+                const csdb::Transaction& trx = t_pool[i];
+
+		        auto delta = trx.balance() - trx.amount() - comission;
+
+#ifdef _MSC_VER
+	    	    int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
+#else
+    		    int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
+#endif
+                if (delta <= zero_balance)
+                {
+                    *(del1 + i) = -bitcnt;
+                    continue;
+                }
+
+                WalletsState::WalletId walletId{};
+                WalletsState::WalletData& wallState = walletsState.getData(trx.source(), walletId);
+                if (!wallState.trxTail_.isAllowed(trx.innerID()))
+                    continue;
+
+                *(del1 + i) = bitcnt;
+                wallState.trxTail_.push(trx.innerID());
+                walletsState.setModified(walletId);
+
+                new_pool.add_transaction(trx);
+
+                /*	std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+                printf("TRANSACTION ACCEPTED\n");
+                std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";*/
+	        }
+	  
+		    uint8_t* hash_s = new uint8_t[32];
+		    //std::cout << "GENERALS> Build vector : before blake" << std::endl;
+      //  std::cout << "GENERALS> buildVector: before blake, total " << new_pool.transactions_count() << "transactions in block" << std::endl;
+		    blake2s(hash_s, 32, del1, transactionsNumber, "1234", 4);
+    //    std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
+		    //initializing for taking decision
+		    //std::cout << "GENERALS> Build vector : before initializing" << std::endl;
+		    memset(find_untrusted, 0, 10000);
+		    memset(new_trusted, 0, 100);
+		    memset(hw_total, 0, 3300);
+		    //std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
+
+		    Hash_ hash_(hash_s);	
+            delete hash_s; 
+            delete del1;
+     //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
+		    return hash_;
+        }
+        else
+        {
+            uint8_t* hash_s = new uint8_t[32];
+            uint32_t a=0;
+            blake2s(hash_s, 32, (const void*)&a, 4, "1234", 4);
+            //      std::cout << "GENERALS> buildVector: hash: " << byteStreamToHex((const char*)hash_s, 32) << " from " << (int)i << std::endl;
+            memset(find_untrusted, 0, 10000);
+            memset(new_trusted, 0, 100);
+            memset(hw_total, 0, 3300);
+            Hash_ hash_(hash_s);
+            delete hash_s;
+            //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
+            delete del1;
+            return hash_;
+        }
     }
 
-
-    
-    }
-
-  void Generals::addvector(HashVector vector) {
+    void Generals::addvector(HashVector vector) {
 	//	std::cout << "GENERALS> Add vector" << std::endl;
 		hMatrix.hmatr[vector.Sender] = vector;
  //   std::cout << "GENERALS> Vector succesfully added" << std::endl;

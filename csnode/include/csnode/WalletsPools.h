@@ -47,6 +47,10 @@ namespace Credits
     public:
         WalletsPools(csdb::Address genesisAddress, csdb::Address startAddress, const WalletsIds& walletsIds);
         ~WalletsPools();
+        WalletsPools(const WalletsPools&) = delete;
+        WalletsPools& operator=(const WalletsPools&) = delete;
+        WalletsPools(const WalletsPools&&) = delete;
+        WalletsPools& operator=(const WalletsPools&&) = delete;
 
         void loadPrevBlock(csdb::Pool& curr);
         void loadNextBlock(csdb::Pool& curr);

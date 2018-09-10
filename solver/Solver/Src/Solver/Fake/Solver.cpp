@@ -15,6 +15,7 @@
 
 #include "Solver/Fake/Generals.hpp"
 #include "Solver/Fake/Solver.hpp"
+#include "Solver/Fake/WalletsState.h"
 #include <algorithm>
 
 #include <lib/system/logger.hpp>
@@ -55,11 +56,12 @@ namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node, csdb::Address genesisAddress, csdb::Address startAddress)
+Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress)
   : node_(node)
-  , generals(std::unique_ptr<Generals>(new Generals()))
-  , genesisAddress_(genesisAddress)
-  , startAddress_(startAddress)
+  , walletsState(new WalletsState(node->getBlockChain()))
+  , generals(std::unique_ptr<Generals>(new Generals(*walletsState)))
+  , genesisAddress(_genesisAddress)
+  , startAddress(_startAddress)
   , vector_datas()
   , m_pool()
   , v_pool()
@@ -82,7 +84,7 @@ void Solver::buildBlock(csdb::Pool& block)
   csdb::Transaction transaction;
 
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003"));
-  transaction.set_source(startAddress_);
+  transaction.set_source(startAddress);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10, 0));
@@ -92,7 +94,7 @@ void Solver::buildBlock(csdb::Pool& block)
   block.add_transaction(transaction);
 
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000004"));
-  transaction.set_source(startAddress_);
+  transaction.set_source(startAddress);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10, 0));
@@ -685,7 +687,7 @@ Solver::createPool()
 
     smart_trans.set_target(Credits::BlockChain::getAddressFromKey(
       "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
-    smart_trans.set_source(genesisAddress_);
+    smart_trans.set_source(genesisAddress);
 
     smart_trans.set_amount(csdb::Amount(1, 0));
     smart_trans.set_balance(csdb::Amount(100, 0));
@@ -737,8 +739,8 @@ Solver::spamWithTransactions()
   uint64_t iid=0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  auto aaa = genesisAddress_;
-  auto bbb = startAddress_;
+  auto aaa = genesisAddress;
+  auto bbb = startAddress;
 
   csdb::Transaction transaction;
   transaction.set_target(aaa);
@@ -794,7 +796,7 @@ void Solver::addInitialBalance()
   csdb::Transaction transaction;
   transaction.set_target(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
-  transaction.set_source(startAddress_);
+  transaction.set_source(startAddress);
 
   transaction.set_currency(csdb::Currency("CS"));
   transaction.set_amount(csdb::Amount(10000, 0));

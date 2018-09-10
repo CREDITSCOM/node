@@ -47,6 +47,8 @@ void WalletsCache::loadNextBlock(csdb::Pool& curr)
 
 void WalletsCache::load(csdb::Pool& pool)
 {
+    modified_.reset();
+
     const csdb::Pool::Transactions& transactions = pool.transactions();
 
     for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx)
@@ -78,6 +80,7 @@ void WalletsCache::loadTrxForSource(const csdb::Transaction& tr)
 
     wallData.balance_ -= tr.amount();
     wallData.trxTail_.push(tr.innerID());
+    modified_.set(id);
 }
 
 void WalletsCache::loadTrxForTarget(const csdb::Transaction& tr)
@@ -96,6 +99,7 @@ void WalletsCache::loadTrxForTarget(const csdb::Transaction& tr)
     WalletData& wallData = getWalletData(id, tr.target());
 
     wallData.balance_ += tr.amount();
+    modified_.set(id);
 }
 
 bool WalletsCache::findWalletId(const csdb::Address& address, WalletId& id) const
