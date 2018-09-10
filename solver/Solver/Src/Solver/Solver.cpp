@@ -15,6 +15,7 @@
 #include "Solver/Generals.hpp"
 #include "Solver/Solver.hpp"
 #include <algorithm>
+#include <cmath>
 
 #include <lib/system/logger.hpp>
 
@@ -889,6 +890,24 @@ void Solver::nextRound()
     m_pool_closed = true;
     flushTransactions();
   }
+}
+
+csdb::Amount Solver::countFee(csdb::Transaction& transaction, uint16_t numOfTrustedNodesInRound,
+	uint32_t numOfTransactionsInRound)
+{
+	const int NUM_OF_ROUDS_PER_SECOND = 5;
+	double tmp = (numOfTrustedNodesInRound * COST_OF_ONE_TRUSTED_PER_DAY) / (24 * 3600 * NUM_OF_ROUDS_PER_SECOND); // cost of trusted node per round
+	tmp /= numOfTransactionsInRound;
+	if (transaction.to_byte_stream().size() > SIZE_OF_COMMON_TRANSACTION)
+	{
+		double lengthCoef = sqrt(transaction.to_byte_stream().size() / SIZE_OF_COMMON_TRANSACTION);
+		lengthCoef = pow(lengthCoef, 3);
+		tmp *= lengthCoef;
+	}
+
+	csdb::Amount countedFee(tmp);
+	transaction.set_counted_fee(countedFee);
+	return countedFee;
 }
 
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],

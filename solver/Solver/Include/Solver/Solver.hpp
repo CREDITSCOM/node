@@ -194,6 +194,10 @@ typedef std::string Matrix;
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
 
+	csdb::Amount countFee(csdb::Transaction& transation, uint16_t numOfTrustedNodesInRound,
+		uint32_t numOfTransactionsInRound);
+
+
 #ifdef SPAM_MAIN
 		void createPool();
 
