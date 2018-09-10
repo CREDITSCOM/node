@@ -46,6 +46,8 @@ namespace Credits{
         void fake_block(std::string);
     private:	
 
+		csdb::Amount countFee(csdb::Transaction& transation, uint16_t numOfTrustedNodesInRound,
+			uint32_t numOfTransactionsInRound);
 
 		struct hash_weight {
 			char a_hash[32];
