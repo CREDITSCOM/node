@@ -31,7 +31,7 @@ namespace Credits{
         void chooseHeadAndTrusted(std::map<std::string, std::string>);
         void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
 
-        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
+        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_of_trusted);
 
         void addvector(HashVector vector);
         void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
@@ -46,8 +46,8 @@ namespace Credits{
         void fake_block(std::string);
     private:	
 
-		csdb::Amount countFee(csdb::Transaction& transation, uint16_t numOfTrustedNodesInRound,
-			uint32_t numOfTransactionsInRound);
+		csdb::Amount countFee(csdb::Transaction& transation, size_t numOfTrustedNodesInRound,
+			size_t numOfTransactionsInRound);
 
 		struct hash_weight {
 			char a_hash[32];

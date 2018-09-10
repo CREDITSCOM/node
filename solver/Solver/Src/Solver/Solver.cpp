@@ -319,7 +319,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
-  Hash_ result = generals->buildvector(_pool, m_pool);
+  Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size());
   receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
 	hvector.hash = result;
