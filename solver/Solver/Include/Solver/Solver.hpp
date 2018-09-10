@@ -235,6 +235,7 @@ typedef std::string Matrix;
 		//std::vector<csdb::Transaction> v_pool;
 
 		csdb::Pool v_pool;
+    csdb::Pool b_pool;
 		bool m_pool_closed = true;
 
 		bool sentTransLastRound = false;
@@ -251,6 +252,7 @@ typedef std::string Matrix;
 
     bool writingConfGotFrom[100];
     uint8_t writingCongGotCurrent;
+
 
     size_t rNum = 0;
 		std::mutex m_trans_mut;

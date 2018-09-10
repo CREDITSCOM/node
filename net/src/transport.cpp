@@ -292,6 +292,7 @@ void Transport::processNodeMessage(const Message& msg) {
 
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
+#ifdef MYLOG
   //if (type == MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message MSG: Transactions " << std::endl;
   if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum << std::endl;
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
@@ -302,6 +303,8 @@ void Transport::processNodeMessage(const Message& msg) {
   if (type == MsgTypes::BigBang) {
     std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
   }
+  #endif
+
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -323,7 +326,7 @@ void Transport::processNodeMessage(const Packet& pack) {
 
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
- 
+#ifdef MYLOG
  // if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
   if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
@@ -334,6 +337,7 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::BigBang) {
 	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
   }
+  #endif
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -355,9 +359,9 @@ inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, 
 }
 
 void Transport::processPostponed(const RoundNum rNum) {
-  
+#ifdef MYLOG
   std::cout << "TRANSPORT> POSTPHONED PROCESSES BEGIN" << std::endl;
-
+  #endif
 
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {
@@ -365,8 +369,10 @@ void Transport::processPostponed(const RoundNum rNum) {
       ppBuf.emplace(std::move(pp));
     else if (pp.round == rNum)
     {
+#ifdef MYLOG
       std::cout << "TRANSPORT> POSTPHONED inside 1" << std::endl;
       if(pp.pack.getMsgSize() < StrippedDataSize) std::cout << "+++++++++++++++++++++++++++ACHTUNG!!! SIZE IS BELOW ZERO!!!" << std::endl;
+      #endif
       dispatchNodeMessage(pp.type,
                           pp.round,
                           pp.pack,
@@ -374,7 +380,9 @@ void Transport::processPostponed(const RoundNum rNum) {
                           pp.pack.getMsgSize() - StrippedDataSize);
      }
   }
+#ifdef MYLOG
   std::cout << "TRANSPORT> POSTPHONED inside 2" << std::endl;
+  #endif
   (*postponed_)->clear();
 
   postponed_[1] = *postponed_;

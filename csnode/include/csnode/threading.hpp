@@ -100,7 +100,7 @@ struct worker_queue
     {
 #ifdef BOTTLENECKED_SMARTS
         //TRACE("");
-        std::lock_guard<decltype(lock)> l(lock);
+        std::unique_lock<decltype(lock)> l(lock);
         //TRACE("");
         auto tid = std::this_thread::get_id();
         //TRACE("");
@@ -111,17 +111,21 @@ struct worker_queue
             return;
         }
         //TRACE("");
-        if (tit->second == tids.begin()) {
-            //TRACE("");
-            w.notify_all();
-            //TRACE("");
-        }
+        
         //TRACE("");
+        bool needNotifyAll = tit->second == tids.begin();
         tids.erase(tit->second);
         //TRACE("");
         tid_map.erase(tit);
-        //TRACE("");
-#endif
+        //TRACE("");       
+
+        if (needNotifyAll) {
+          //TRACE("");          
+          w.notify_all();
+          //TRACE("");
+        }
+         
+#endif     
     }
     template<typename J>
     void update_state(const J& j)

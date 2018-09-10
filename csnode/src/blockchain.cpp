@@ -31,8 +31,9 @@ BlockChain::BlockChain(const char* path) {
 
   if (!loadCache())
      return;
-
+#ifdef MYLOG
   std::cout << "Trying to open DB..." << std::endl;
+  #endif
   char  kk[14];
   std::vector <uint8_t> v_hash(32);
   std::vector <csdb::PoolHash> tempHashes;
@@ -50,7 +51,9 @@ BlockChain::BlockChain(const char* path) {
     std::cout << "DB is opened" << std::endl;
     if (storage_.last_hash().is_empty())
     {
+#ifdef MYLOG
       std::cout << "Last hash is empty..." << std::endl;
+      #endif
       if (!storage_.size())
       {
         //std::cout << "Storage is empty... writing genesis block" << std::endl;
@@ -67,19 +70,24 @@ BlockChain::BlockChain(const char* path) {
       else
       {
         good_ = false;
+#ifdef MYLOG
         std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
+        #endif
       }
     }
     else
     {
-
+#ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
+      #endif
       std::ifstream f(dbs_fname);
 
 
       if (f.is_open())
       {
+#ifdef MYLOG
         std::cout << "File is opened ... reading" << std::endl;
+        #endif
         f.read(kk, 14);
         f.close();
       }
@@ -90,7 +98,9 @@ BlockChain::BlockChain(const char* path) {
       ht.head = atoi(s_beg);
       s_beg = s_end + 2;
       ht.tag = atoi(s_beg);
+#ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
+      #endif
       setLastWrittenSequence(ht.tag);
 
       if (loadBlock(storage_.last_hash()).sequence() == ht.tag)
@@ -105,17 +115,21 @@ BlockChain::BlockChain(const char* path) {
           temp_hash = loadBlock(temp_hash).previous_hash();
           if (temp_hash.is_empty()) break;
         }
+#ifdef MYLOG
         std::cout << "Hashes read from DB" << std::endl;
+        #endif
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
 
           blockHashes_.push_back(*iter);
         }
+#ifdef MYLOG
         std::cout << "Hashes vector converted" << std::endl;
-        for (uint32_t i = 0; i <= ht.tag; i++)
-        {
-          std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
-        }
+        #endif
+        //for (uint32_t i = 0; i <= ht.tag; i++)
+        //{
+        //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
+        //}
         tempHashes.clear();
         lastHash_ = storage_.last_hash();
         good_ = true;
@@ -132,9 +146,11 @@ BlockChain::BlockChain(const char* path) {
         if (file_is)
         {
 
+#ifdef MYLOG
           f << ht.head << "->" << ht.tag << std::endl;
           std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
           std::cout << "DB structure is written succesfully" << std::endl;
+          #endif
           f.close();
         }
         else std::cout << "Error writing DB structure" << std::endl;
@@ -150,10 +166,10 @@ BlockChain::BlockChain(const char* path) {
         {
           blockHashes_.push_back(*iter);
         }
-        for (uint32_t i = 0; i <= ht.tag; i++)
-        {
-          std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
-        }
+        //for (uint32_t i = 0; i <= ht.tag; i++)
+        //{
+        //  std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
+        //}
         tempHashes.clear();
 
         lastHash_ = storage_.last_hash();
@@ -200,6 +216,7 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 		return;
 		
 	}
+
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 	{
 		//TRACE("");
@@ -363,15 +380,17 @@ void BlockChain::writeGenesisBlock() {
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(0);
   setLastWrittenSequence(0);
+#ifdef MYLOG
   std::cout << "Genesis block completed ... trying to save" << std::endl;
-
+#endif
   writeBlock(genesis);
   global_sequence = 0;
   std::cout << genesis.hash().to_string() << std::endl;
   lastHash_ = genesis.hash();
   blockHashes_.push_back(lastHash_);
+#ifdef MYLOG
   std::cout << "Hash inserted into the hash-vector" << std::endl;
-  
+  #endif
   size_t bSize;
   const char* bl = genesis.to_byte_stream(bSize);
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
@@ -552,7 +571,7 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   std::cout << "Checking Sequence ... ";
   #endif
   if (pool.sequence() == getLastWrittenSequence() + 1) {
-    std::cout << "OK" << std::endl;
+   // std::cout << "OK" << std::endl;
     pool.set_previous_hash(lastHash_);
 
     std::ofstream f(dbs_fname, std::ios::out);
@@ -569,7 +588,10 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
 #endif
       f.close();
     }
-    else std::cout << "Error writing DB structure" << std::endl;
+    else
+    {
+    // std::cout << "Error writing DB structure" << std::endl;
+     }
 
     writeBlock(pool);
     //std::cout << "Preparing to calculate last hash" << std::endl;
@@ -590,10 +612,10 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
 
     return;
   }
-  std::cout << "Failed" << std::endl;
+ // std::cout << "Failed" << std::endl;
 
   ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
-  std::cout << "Chain syncro part ... start " << std::endl;
+ // std::cout << "Chain syncro part ... start " << std::endl;
   global_sequence = pool.sequence();
   blockRequestIsNeeded = true;
 }

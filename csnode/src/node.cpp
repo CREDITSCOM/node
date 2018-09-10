@@ -58,7 +58,7 @@ bool Node::checkKeysFile()
 {
   std::ifstream pub("NodePublic.txt"); //44
   std::ifstream priv("NodePrivate.txt"); //88
-    std::cout << "//////////////////////////////////////////////////////////////////////////////////////////////////" << std::endl;
+   // std::cout << "//////////////////////////////////////////////////////////////////////////////////////////////////" << std::endl;
 
   if (!pub.is_open() || !priv.is_open())
   {
@@ -166,9 +166,11 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   istream_.init(data, size);
+#ifdef MYLOG
   std::cout << "NODE> Get Round Table" << std::endl;
+  #endif
   if(roundNum_ < rNum || type == MsgTypes::BigBang) roundNum_ = rNum;
   else {
     LOG_WARN("Bad round number, ignoring");
@@ -197,8 +199,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   		getRoundTable(data, size, rNum, type);
       solver_->setBigBangStatus(true);
   }
-	else
-		std::cerr << "BigBang else" << std::endl;
+  else
+  {
+#ifdef MYLOG
+		std::cout << "BigBang else" << std::endl;
+    #endif
+  }
+
 }
 
 //the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
@@ -231,11 +238,15 @@ void Node::sendRoundTable() {
 void Node::sendRoundTableRequest(size_t rNum)
 {
   if(rNum < roundNum_) return;
+#ifdef MYLOG
   std::cout << "rNum = " << rNum << ", real RoundNumber = " << roundNum_ << std::endl;
+  #endif
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTableRequest
     << roundNum_;
+#ifdef MYLOG
   std::cout << "Sending RoundTable request" << std::endl;
+  #endif
   LOG_EVENT("Sending RoundTable request");
   flushCurrentTasks();
 }
@@ -246,7 +257,9 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   size_t rNum;
   istream_ >> rNum;
   if(rNum >= roundNum_) return;
+#ifdef MYLOG
   std::cout << "NODE> Get RT request from " << byteStreamToHex(sender.str, 32) << std::endl;
+  #endif
   if (!istream_.good()) {
     LOG_WARN("Bad RoundTableRequest format");
     return;
@@ -296,23 +309,29 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
 //}
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
-  if (myLevel_ != NodeLevel::Main &&
-    myLevel_ != NodeLevel::Writer) {
-    return;
-  }
+  bool file_is;
+  std::fstream f;
+
 
   istream_.init(data, size);
 
   while (istream_.good() && !istream_.end()) {
     csdb::Transaction trans;
     istream_ >> trans;
+  f.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
+  f << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
+  f.close();
   //  std::cout << "NODE> Get transaction #: " << trans.innerID() << " from " << trans.source().to_string()  << std::endl;
-    solver_->gotTransaction(std::move(trans));
+  if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer)
+  {
+        solver_->gotTransaction(std::move(trans));
   }
+
 
   if (!istream_.good()) {
     LOG_WARN("Bad transaction packet format");
     return;
+  }
   }
 }
 
@@ -352,6 +371,11 @@ void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
       ostream_ << tr;
   //LOG_EVENT("Sending transaction");
   flushCurrentTasks();
+  bool file_is;
+  std::fstream f;
+  f.open(sent_trx_fname, std::fstream::out | std::fstream::app);
+  f << tr.source().to_string().c_str() << " " << tr.innerID() << std::endl;
+  f.close();
   }
 }
 
@@ -373,7 +397,7 @@ void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
 //}
 
 void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+ // std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -407,13 +431,15 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
 }
 
 void Node::getTransactionsList(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+ // std::cout << __func__ << std::endl;
    if (myLevel_ != NodeLevel::Confidant) {
     return;
   } 
    csdb::Pool pool;
    pool = csdb::Pool{};
+#ifdef MYLOG
   std::cout << "Getting List: list size: " << size << std::endl;
+  #endif
  // std::cout << "Getting List: " << byteStreamToHex((const char*)data,size) << std::endl;
  if(!((size==0) || (size >2000000000))){
 
@@ -427,7 +453,9 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
     LOG_WARN("Bad transactions list packet format");
     pool = csdb::Pool{};
   }
+#ifdef MYLOG
 std::cout << "NODE> Transactions amount got " <<pool.transactions_count() << std::endl;
+#endif
 
   LOG_EVENT("Got full transactions list of " << pool.transactions_count());
  // if (pool.transactions_count()>0)
@@ -448,7 +476,9 @@ void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& targ
   size_t bSize;
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   //  std::cout << "Sending List: " << byteStreamToHex((const char*)data, bSize) << std::endl;
+#ifdef MYLOG
   std::cout << "Sending List: list size: " << bSize << std::endl;
+  #endif
   Hash listHash;
 
   std::string compressed;
@@ -457,12 +487,15 @@ void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& targ
   ostream_ << MsgTypes::TransactionList
            << roundNum_
            << compressed;
+#ifdef MYLOG
   std::cout << "Sending List: compressed size: " << compressed.size() << std::endl;
-
+  #endif
   //const char* bl = pool.to_byte_stream(size);
   //void* tmp = ostream_.getPackets()->data();
   //std::cout << "Data from TList: " << byteStreamToHex((const char*)data, bSize) << std::endl;
+#ifdef MYLOG
   std::cout << "NODE> Sending " << pool.transactions_count() << " transaction(s)" << std::endl;
+  #endif
   flushCurrentTasks();
 }
 
@@ -503,7 +536,9 @@ void Node::sendVectorRequest(const PublicKey& node)
     LOG_ERROR("Only confidant nodes can send vectors");
     return;
   }
+#ifdef MYLOG
   std::cout << "NODE> Sending vector request to  " << byteStreamToHex(node.str, 32)<< std::endl;
+  #endif
   ostream_.init(BaseFlags::Signed, node);
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ <<1;
   flushCurrentTasks();
@@ -517,7 +552,9 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size)//, const Pub
     return;
   }
  // if (myPublicKey_ == sender) return;
+#ifdef MYLOG
   std::cout << "NODE> Getting vector Request from " <<  std::endl;//byteStreamToHex(sender.str, 32) <<
+  #endif
   istream_.init(data, size);
 
   int num;
@@ -537,7 +574,9 @@ void Node::sendWritingConfirmation(const PublicKey& node)
     LOG_ERROR("Only confidant nodes can send confirmation of the Writer");
     return;
   }
+#ifdef MYLOG
   std::cout << "NODE> Sending writing confirmation to  " << byteStreamToHex(node.str, 32) << std::endl;
+  #endif
   ostream_.init(BaseFlags::Signed, node);
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
   flushCurrentTasks();
@@ -545,12 +584,14 @@ void Node::sendWritingConfirmation(const PublicKey& node)
 
 
 void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+ // std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
   // if (myPublicKey_ == sender) return;
+#ifdef MYLOG
   std::cout << "NODE> Getting WRITING CONFIRMATION from " << byteStreamToHex(sender.str, 32) << std::endl;
+  #endif
   istream_.init(data, size);
 
   uint8_t confNumber_;
@@ -568,7 +609,9 @@ void Node::sendTLRequest()
     LOG_ERROR("Only confidant nodes need TransactionList");
     return;
   }
+#ifdef MYLOG
   std::cout << "NODE> Sending TransactionList request to  " << byteStreamToHex(mainNode_.str, 32) << std::endl;
+  #endif
   ostream_.init(BaseFlags::Signed, mainNode_);
   ostream_ << MsgTypes::ConsTLRequest << getMyConfNumber();
   flushCurrentTasks();
@@ -577,21 +620,23 @@ void Node::sendTLRequest()
 
 void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey& sender)
 {
-  std::cout << __func__ << std::endl;
+ // std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Main) {
     LOG_ERROR("Only main nodes can send TransactionList");
     return;
   }
   //if (myPublicKey_ == sender) return;
+#ifdef MYLOG
   std::cout << "NODE> Getting TransactionList request" << std::endl;//byteStreamToHex(sender.str, 32) <<
+  #endif
   istream_.init(data, size);
 
   uint8_t num;
   istream_ >> num;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+   // LOG_WARN("Bad vector packet format");
     return;
 
   }
@@ -602,7 +647,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey&
 void Node::sendMatrixRequest(const PublicKey& node)
 {
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send vectors");
+  //  LOG_ERROR("Only confidant nodes can send vectors");
     return;
   }
 #ifdef MYLOG
@@ -615,7 +660,7 @@ void Node::sendMatrixRequest(const PublicKey& node)
 
 void Node::getMatrixRequest(const uint8_t* data, const size_t size)//, const PublicKey& sender) {
 {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -637,7 +682,7 @@ void Node::getMatrixRequest(const uint8_t* data, const size_t size)//, const Pub
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+ // std::cout << __func__ << std::endl;
  // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -675,7 +720,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
   //for (auto& it : confidantNodes_)
  // {
   //if(it==myPublicKey_) continue;
-    std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32) 
+   // std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32) 
     ostream_.init(BaseFlags::Broadcast);//, it);
     ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
 
@@ -685,7 +730,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -735,7 +780,7 @@ uint32_t Node::getRoundNumber()
 }
 
 void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get blocks");
     return;
@@ -777,13 +822,56 @@ void Node::sendBlock(const csdb::Pool& pool) {
   flushCurrentTasks();
 }
 
-void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
-  if (myLevel_ != NodeLevel::Writer) {
-    std::cout << "Non-Writers cannot get hashes" << std::endl;
+
+void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
+  //std::cout << __func__ << std::endl;
+  if (myLevel_ == NodeLevel::Writer) {
+    LOG_WARN("Writer cannot get bad blocks");
     return;
   }
-  std::cout << " Getting hash from " << byteStreamToHex(sender.str,32) << std::endl;
+
+  //myLevel_ = NodeLevel::Normal; //test feature
+  istream_.init(data, size);
+
+  csdb::Pool pool;
+  istream_ >> pool;
+
+  if (!istream_.good() || !istream_.end()) {
+    LOG_WARN("Bad block packet format");
+    return;
+  }
+
+  LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
+  if (pool.sequence() <= roundNum_) solver_->gotBlock(std::move(pool), sender);
+}
+
+void Node::sendBadBlock(const csdb::Pool& pool) {
+  if (myLevel_ != NodeLevel::Writer) {
+    LOG_ERROR("Only writer nodes can send bad blocks");
+    return;
+  }
+
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  size_t bSize;
+  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+
+  std::string compressed;
+  snappy::Compress((const char*)data, bSize, &compressed);
+  ostream_ << MsgTypes::NewBadBlock
+    << roundNum_
+    << compressed;
+
+  LOG_EVENT("Sending bad block of " << pool.transactions_count() << " transactions");
+  flushCurrentTasks();
+}
+
+void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
+  //std::cout << __func__ << std::endl;
+  if (myLevel_ != NodeLevel::Writer) {
+    // std::cout << "Non-Writers cannot get hashes" << std::endl;
+    return;
+  }
+  // std::cout << " Getting hash from " << byteStreamToHex(sender.str,32) << std::endl;
   istream_.init(data, size);
 
   Hash hash;
@@ -797,6 +885,7 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
   LOG_EVENT("Got hash");
   solver_->gotHash(hash, sender);
 }
+
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
@@ -815,19 +904,21 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
     return;
   if (sender == myPublicKey_) return;
   uint32_t requested_seq;
   istream_.init(data, size);
   istream_ >> requested_seq;
-
+#ifdef MYLOG
   std::cout << "GETBLOCKREQUEST> Getting the request for block: " << requested_seq << std::endl;
-
+  #endif
   if (requested_seq > getBlockChain().getLastWrittenSequence())
   {
+#ifdef MYLOG
     std::cout << "GETBLOCKREQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN" << std::endl;
+    #endif
     return;
   }
   
@@ -837,11 +928,15 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 void Node::sendBlockRequest(uint32_t seq) {
   if (awaitingSyncroBlock && awaitingRecBlockCount<3)
   {
+#ifdef MYLOG
     std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence << std::endl;
+    #endif
     awaitingRecBlockCount++;
     return;
   }
+#ifdef MYLOG
   std::cout << "SENDBLOCKREQUEST> Composing the request" << std::endl;
+#endif
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock = true;
   awaitingRecBlockCount=0;
@@ -851,8 +946,9 @@ void Node::sendBlockRequest(uint32_t seq) {
     << roundNum_
     << seq;
   flushCurrentTasks();
-  
+#ifdef MYLOG
   std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
+  #endif
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
@@ -861,11 +957,14 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   istream_.init(data, size);
   istream_ >> pool;
+#ifdef MYLOG
   std::cout << "GETBLOCKREPLY> Getting block " << pool.sequence() << std::endl;
+  #endif
   if (pool.sequence() == sendBlockRequestSequence)
   {
+#ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
-
+    #endif
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
   }
@@ -875,7 +974,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   else
   {
     syncro_started = false;
+#ifdef MYLOG
     std::cout << "SYNCRO FINISHED!!!" << std::endl;
+    #endif
   }
 
 }
@@ -941,15 +1042,15 @@ void Node::onRoundStart() {
     i++;
    }
 #ifdef SYNCRO
-  std::cout << "Last written sequence = " << getBlockChain().getLastWrittenSequence() << std::endl;
-  if (awaitingSyncroBlock) std::cout << "Get Status> AwaitingSyncroBlock" << std::endl;
+ // std::cout << "Last written sequence = " << getBlockChain().getLastWrittenSequence() << std::endl;
+//  if (awaitingSyncroBlock) std::cout << "Get Status> AwaitingSyncroBlock" << std::endl;
   //else std::cout << "Get Status> We still don't wait for a missed block" << std::endl;
-  if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
+ // if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
   //else  std::cout << "Get Status> SYNCRO NOT STARTED ... YET" << std::endl;
 
   if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||(getBlockChain().getBlockRequestNeed()))// && (!awaitingSyncroBlock))// && (!syncro_started))) vvv 
   {
-    std::cout << "Starting SYNCRO" << std::endl;
+  //  std::cout << "Starting SYNCRO" << std::endl;
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
     syncro_started = true;
   }
@@ -1025,7 +1126,9 @@ inline bool Node::readRoundData(const bool tail) {
   PublicKey mainNode;
   uint8_t confSize = 0;
   istream_ >> confSize;
+#ifdef MYLOG
   std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
+  #endif
   if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
     LOG_WARN("Bad confidants num");
     return false;
@@ -1059,7 +1162,9 @@ inline bool Node::readRoundData(const bool tail) {
 
 
 std::swap(confidants, confidantNodes_);
+#ifdef MYLOG
 std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
+#endif
 
 
 
