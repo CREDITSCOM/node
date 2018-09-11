@@ -168,7 +168,7 @@ public:
 			uint32_t wait_count = wait_for / wait_granularity;
 
 			// wait number of wait_granularity portions
-			for (int i = 0; i < wait_count; ++i) {
+			for (uint32_t i = 0; i < wait_count; ++i) {
 				std::this_thread::sleep_for(TRes(wait_granularity));
 				// test cancel condition after portion of waiting finished
 				if (_cancel) {
