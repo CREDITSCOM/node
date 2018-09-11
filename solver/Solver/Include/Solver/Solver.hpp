@@ -194,6 +194,7 @@ typedef std::string Matrix;
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
 
+
 #ifdef SPAM_MAIN
 		void createPool();
 

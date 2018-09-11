@@ -477,7 +477,7 @@ APIHandler::make_transaction(const Transaction& transaction)
     send_transaction.set_source(source);
     send_transaction.set_target(
       BlockChain::getAddressFromKey(transaction.target));
-    send_transaction.set_comission(csdb::Amount(
+    send_transaction.set_max_fee(csdb::Amount(
       transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
     send_transaction.set_innerID(transaction.id);
     send_transaction.set_signature(transaction.signature);
