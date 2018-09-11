@@ -1002,10 +1002,8 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-  if ((!solver_->mPoolClosed())&&(!solver_->getBigBangStatus()))
-  {
-    solver_->sendTL();
-  }
+	// replaces direct conditional call to solver_->sendTL()
+	solver_->beforeNextRound();
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
   

@@ -23,6 +23,12 @@
 #include <base58.h>
 #include <sodium.h>
 
+#include <Solver/timer_service.h>
+
+#if !defined(_MSC_VER)
+extern TimerService<> timer_service;
+#endif
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -32,6 +38,7 @@ void addTimestampToPool(csdb::Pool& pool)
       now_time.time_since_epoch()).count()));
 }
 
+#if 0
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
 {    
  // std::cout << "SOLVER> Before calback" << std::endl;
@@ -45,6 +52,7 @@ void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
  // std::cout << "SOLVER> After calback" << std::endl;
   tr.detach();
 }
+#endif // 0
 
 #if defined(SPAM_MAIN) || defined(SPAMMER)
 static int
@@ -66,11 +74,37 @@ Solver::Solver(Node* node)
   , m_pool()
   , v_pool()
   , b_pool()
+	, sendRoundTableRequestCall([this](int cur_rNum) {
+		timer_service.Mark("sendRoundTableRequest()", cur_rNum);
+		node_->sendRoundTableRequest(cur_rNum);
+	}, "sendRoundTableRequest()")
+	, flushTransactionsCall([this]() {
+		//timer_service.Mark("flushTransactions()", currentRound);
+		flushTransactions();
+	}, "flushTransactions()")
+	, writeNewBlockCall([this]() {
+		timer_service.Mark("writeNewBlock()", currentRound);
+		writeNewBlock();
+	}, "writeNewBlock()")
+	, onRoundExpiredCall([this]() {
+		timer_service.Mark("onRoundExpired()", currentRound);
+		onRoundExpired();
+	}, "onRoundExpired()")
+	, closeMainRoundCall([this]() {
+		timer_service.Mark("closeMainRound()", currentRound);
+		closeMainRound();
+	}, "closeMainRound()")
 {}
 
 Solver::~Solver()
 {
-  //		csconnector::stop();
+	// stop possible calls
+	sendRoundTableRequestCall.WaitCancel(40); // msec
+	flushTransactionsCall.WaitCancel(40); // msec
+	writeNewBlockCall.WaitCancel(40); // msec
+	onRoundExpiredCall.WaitCancel(40); // msec
+	closeMainRoundCall.WaitCancel(40); // msec
+	//		csconnector::stop();
   //		csstats::stop();
 }
 
@@ -200,23 +234,27 @@ bool Solver::mPoolClosed()
   return m_pool_closed;
 }
 
+// aav: as we use #define so I can do that:
+#define STRINGIFY2(X) #X
+#define STRINGIFY(X) STRINGIFY2(X)
 
 void Solver::runMainRound()
 {
+	timer_service.Mark( "runMainRound()", node_->getRoundNumber());
   m_pool_closed = false;
   std::cout << "========================================================================================" << std::endl;
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV" << std::endl;
  
   if(node_->getRoundNumber()==1) 
   {
-    runAfter(std::chrono::milliseconds(2000),
-      [this]() { closeMainRound(); });
+	  // original logic: 2000 msec for 1st round
+	  timer_service.Mark("schedule (2000) closeMainRound()", node_->getRoundNumber());
+	  closeMainRoundCall.Schedule(2000, LaunchScheme::single);
   }
   else
   {
-
-  runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-    [this]() { closeMainRound(); });
+	  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") closeMainRound()", node_->getRoundNumber());
+	  closeMainRoundCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
  }
 
 }
@@ -235,22 +273,27 @@ HashMatrix Solver::getMyMatrix()
 
 void Solver::flushTransactions()
 {
-	if (node_->getMyLevel() != NodeLevel::Normal) { return; }
+	if (node_->getMyLevel() != NodeLevel::Normal) {
+		return;
+	}
 	{
-    std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
-      sentTransLastRound = true;
+		std::lock_guard<std::mutex> l(m_trans_mut);
+		if (m_transactions.size()) {
+			node_->sendTransaction(std::move(m_transactions));
+			sentTransLastRound = true;
 #ifdef MYLOG
-	  std::cout << "FlushTransaction ..." << std::endl;
-    #endif
-      m_transactions.clear();
-    } else {
-      return;
-    }
-  }
-  runAfter(std::chrono::milliseconds(50),
-                  [this]() { flushTransactions(); });
+			std::cout << "FlushTransaction ..." << std::endl;
+#endif
+			std::ostringstream os;
+			os << "flushTransactions(): " << m_transactions.size();
+			m_transactions.clear();
+			timer_service.Mark(os.str(), node_->getRoundNumber());
+		}
+		else {
+			timer_service.Mark("flushTransactions(): nothing to do", node_->getRoundNumber());
+			return;
+		}
+	}
 }
 
 bool Solver::getIPoolClosed() {
@@ -275,6 +318,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 #ifndef SPAMMER
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
+			TRACE(msg_len);
 			uint8_t* message = new uint8_t[msg_len];
 			for (size_t i = 0; i < msg_len; i++)
 				message[i] = v[i];
@@ -311,18 +355,20 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 void Solver::initConfRound()
 {
+	timer_service.Mark("initConfRound()", node_->getRoundNumber());
   memset(receivedVecFrom, 0, 100);
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
-  size_t _rNum = rNum;
   if (gotBigBang) sendZeroVector();
+  //size_t _rNum = rNum;
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
+	timer_service.Mark("gotTransactionList()", node_->getRoundNumber());
   transactionListReceived = true;
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
@@ -351,6 +397,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 #ifdef MYLOG
     std::cout << "SOLVER> Matrix added" << std::endl;
     #endif
+	timer_service.Mark("gotTransactionList(): matrix added", node_->getRoundNumber());
   }
 }
 
@@ -359,6 +406,7 @@ void Solver::sendZeroVector()
 
   if (transactionListReceived && !getBigBangStatus()) return;
 //  std::cout << "SOLVER> Generating ZERO TransactionList" << std::endl;
+  timer_service.Mark("sendZeroVector()", currentRound);
   csdb::Pool test_pool = csdb::Pool{};
   gotTransactionList(std::move(test_pool));
 
@@ -390,9 +438,11 @@ void Solver::gotVector(HashVector&& vector)
   generals->addvector(vector);//building matrix
   trustedCounterVector++;
 
+  timer_service.Mark("gotVector(): useful", node_->getRoundNumber());
   if (trustedCounterVector == numGen)
   {
-    
+	  timer_service.Mark("gotVector(): all received", node_->getRoundNumber());
+
 	  //std::cout << "SOLVER> GotVector : " << std::endl;
     vectorComplete = true;
 
@@ -416,8 +466,8 @@ void Solver::gotVector(HashVector&& vector)
       if (wTrusted == 100)
       {
 //        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock(); });
+		timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
+		writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
       }
       else
       {
@@ -426,8 +476,8 @@ void Solver::gotVector(HashVector&& vector)
         if (wTrusted == node_->getMyConfNumber())
         {
           node_->becomeWriter();
-          runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-            [this]() { writeNewBlock(); });
+		  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
+		  writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
         }
           //LOG_WARN("This should NEVER happen, NEVER");
       }
@@ -487,12 +537,15 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	generals->addmatrix(matrix, node_->getConfidants());
 #ifdef MYLOG
   std::cout << "SOLVER> Matrix added" << std::endl;
+//<<<<<<< HEAD:solver/Solver/Src/Solver/Solver.cpp
 #endif
+  timer_service.Mark("gotMatrix(): useful", currentRound);
   if (trustedCounterMatrix == numGen)
   {
 
  //   std::cout << "SOLVER> We are going to take decision" << std::endl;
- 
+	  timer_service.Mark("gotMatrix(): all received", currentRound);
+
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
 	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
@@ -502,9 +555,8 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 #ifdef MYLOG
 		  std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
       #endif
-      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock();});
-		  
+		  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
+		  writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
 	  }
 
 	  else
@@ -513,13 +565,13 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 		  if (wTrusted == node_->getMyConfNumber())
 		  {
 			  node_->becomeWriter();
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-          [this]() { writeNewBlock(); });
+			  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
+			  writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
 		  }
-      else
-      { 
-        //LOG_WARN("This should NEVER happen, NEVER");
-      }
+		  else
+		  {
+			  //LOG_WARN("This should NEVER happen, NEVER");
+		  }
      }
 	}
 }
@@ -546,6 +598,8 @@ void Solver::writeNewBlock()
 	std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
   #endif
 	consensusAchieved = false;
+
+	timer_service.Mark("writeNewBlock(): really done", node_->getRoundNumber());
   }
   else {
     //LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
@@ -556,6 +610,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
 	if (node_->getMyLevel() == NodeLevel::Writer)
 		return;
+  timer_service.Mark("gotBlock()", node_->getRoundNumber());
   gotBigBang = false;
   gotBlockThisRound = true;
 #ifdef MONITOR_NODE
@@ -575,6 +630,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
       node_->getBlockChain().putBlock(block);
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
+				timer_service.Mark("gotBlock(): send hash", node_->getRoundNumber());
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
 			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 			  node_->sendHash(test_hash, sender);
@@ -586,9 +642,14 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
-  size_t _rNum = rNum;
- // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-  //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
+
+  // the last round when request for RoundTable was sent
+  // it helps to prevent extra duplicated requests during the same round
+  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_AWAIT_ACTIVITY) ") sendRoundTableRequest()", node_->getRoundNumber());
+  sendRoundTableRequestCall.Schedule(
+	  TIME_TO_AWAIT_ACTIVITY,
+	  LaunchScheme::single,
+	  (int) node_->getRoundNumber());
 
 #ifndef SPAMMER
 #ifndef MONITOR_NODE
@@ -632,6 +693,7 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
 void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
+
 	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
 	Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
 #ifdef MYLOG
@@ -646,7 +708,9 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #endif
 			//hashes.push_back(hash);
 			ips.push_back(sender);
-		} 
+
+			timer_service.Mark("gotHash(): accept", currentRound);
+		}
 		else
 		{
 #ifdef MYLOG
@@ -819,6 +883,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 
 void Solver::addInitialBalance()
 {
+#ifdef ADD_INITIAL_BALANCE
   std::cout << "===SETTING DB===" << std::endl;
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
@@ -838,6 +903,7 @@ void Solver::addInitialBalance()
 	  std::lock_guard<std::mutex> l(m_trans_mut);
 	  m_transactions.push_back(transaction);
   }
+#endif
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
@@ -876,14 +942,56 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   if(writingCongGotCurrent==2)
   {
     node_->becomeWriter();
-    runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-      [this]() { writeNewBlock(); });
+	timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
+	writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
   } 
   
 }
 
+void Solver::beforeNextRound()
+{
+	if (currentRound == 0) {
+		// actual before the first round
+		timer_service.Reset();
+		return;
+	}
+
+	timer_service.Mark("beforeNextRound()", currentRound);
+
+	// moved from begin of node::onRoundStart() from where this method called
+	if ((!mPoolClosed()) && (!getBigBangStatus()))
+	{
+		sendTL();
+	}
+
+	if (onRoundExpiredCall.IsScheduled()) {
+		timer_service.Mark("cancel onRoundExpiredCall", currentRound);
+		onRoundExpiredCall.Cancel();
+	}
+	if (sendRoundTableRequestCall.IsScheduled()) {
+		timer_service.Mark("cancel sendRoundTableRequestCall", currentRound);
+		sendRoundTableRequestCall.Cancel();
+	}
+	if (closeMainRoundCall.IsScheduled()) {
+		timer_service.Mark("cancel closeMainRoundCall", currentRound);
+		closeMainRoundCall.Cancel();
+	}
+
+	doSelfTest();
+
+	// get duration of finishing round
+	passedRoundsDuration += timer_service.Time();
+	passedRoundsCount++;
+
+	timer_service.ConsoleOut();
+	timer_service.Reset();
+}
+
 void Solver::nextRound()
 {
+	currentRound = node_->getRoundNumber();
+	timer_service.Mark("nextRound()", currentRound);
+
 #ifdef MYLOG
 	std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
   #endif
@@ -909,7 +1017,8 @@ void Solver::nextRound()
 #ifdef MYLOG
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
   #endif
-  if (node_->getMyLevel() == NodeLevel::Main) {
+  auto lvl = node_->getMyLevel();
+  if (lvl == NodeLevel::Main) {
     runMainRound();
 #ifdef SPAM_MAIN
     createSpam = true;
@@ -924,8 +1033,33 @@ void Solver::nextRound()
 #endif
   //  std::cout << "SOLVER> next Round : before flush transactions" << std::endl;
     m_pool_closed = true;
-    flushTransactions();
   }
+  // original logic: only normal nodes call flushTRansactions()
+  if (lvl == NodeLevel::Normal) {
+	  // TODO: define constant for flushTransactions() period
+	  flushTransactionsCall.Schedule(50, LaunchScheme::periodic );
+  }
+  else {
+	  flushTransactionsCall.Cancel();
+  }
+  // calculate new desired round duration as average duration of previous ones
+  uint32_t desired_round_duration = TIME_TO_COLLECT_TRXNS;
+  if (passedRoundsCount > 0) {
+	  desired_round_duration = passedRoundsDuration / passedRoundsCount;
+	  if (desired_round_duration < TIME_TO_COLLECT_TRXNS) {
+		  // duration too small
+		  desired_round_duration = TIME_TO_COLLECT_TRXNS;
+	  }
+  }
+  // ensure onRoundExpiredCall already canceled
+  if (onRoundExpiredCall.IsScheduled()) {
+	  timer_service.Mark("cancel onRoundExpiredCall", currentRound);
+	  onRoundExpiredCall.WaitCancel(20);
+  }
+  std::ostringstream os;
+  os << "Shedule (" << desired_round_duration << ") onRoundExpired()";
+  timer_service.Mark(os.str(), node_->getRoundNumber());
+  onRoundExpiredCall.Schedule(desired_round_duration, LaunchScheme::single);
 }
 
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
@@ -937,4 +1071,57 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 	else
 		return false;
 }
+
+void Solver::onRoundExpired()
+{
+	doSelfTest();
+}
+
+void Solver::doSelfTest()
+{
+	timer_service.Mark("doSelfTest()", currentRound);
+
+	LOG_EVENT("+-- doSelfTest() output begin");
+	LOG_EVENT("|   Round " << currentRound);
+
+	auto lvl = node_->getMyLevel();
+	bool test_block = true;
+	bool test_rt = true;
+	bool test_hashes = (lvl == NodeLevel::Writer);
+	bool test_tl = (lvl == NodeLevel::Confidant);
+	bool test_vect = (lvl == NodeLevel::Confidant);
+	bool test_matr = (lvl == NodeLevel::Confidant);
+	bool test_consensus = true;
+
+	if (test_block) {
+		LOG_EVENT("|   gotBlockThisRound: " << (gotBlockThisRound ? "yes" : "no"));
+	}
+	if (test_tl) {
+		LOG_EVENT("|   transactionListReceived: " << (transactionListReceived ? "yes" : "no"));
+	}
+	if (test_vect) {
+		LOG_EVENT("|   vectorComplete: " << (vectorComplete ? "yes" : "no"));
+	}
+	if (test_matr) {
+		bool mat_complete = (node_->getConfidants().size() == trustedCounterMatrix);
+		LOG_EVENT("|   matrixes complete: " << (mat_complete ? "yes" : "no"));
+	}
+	if (test_consensus) {
+		LOG_EVENT("|   consensusAchieved: " << (consensusAchieved ? "yes" : "no"));
+	}
+	if (test_hashes) {
+		size_t cnt = ips.size();
+		LOG_EVENT("|   hashes received: " << cnt);
+		if (cnt < min_nodes) {
+			LOG_EVENT("|   hashes desired: " << min_nodes);
+		}
+	}
+	if (test_rt) {
+		bool rt_received = (node_->getRoundNumber() != currentRound);
+		LOG_EVENT("|   round table received: " << (rt_received ? "yes" : "no"));
+	}
+
+	LOG_EVENT("+-- doSelfTest output end");
+}
+
 } // namespace Credits
