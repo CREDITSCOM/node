@@ -348,7 +348,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 		else
 		{
 #ifdef MYLOG
-			LOG_EVENT("Invalid transaction received");
+		LOG_EVENT("Invalid transaction received");
 #endif
 		}
 }
@@ -545,6 +545,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 
  //   std::cout << "SOLVER> We are going to take decision" << std::endl;
 	  timer_service.Mark("gotMatrix(): all received", currentRound);
+	  allMatricesReceived = true;
 
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
@@ -1008,6 +1009,7 @@ void Solver::nextRound()
   transactionListReceived = false;
   vectorReceived = false;
   gotBlockThisRound=false;
+  allMatricesReceived = false;
 
   round_table_sent = false;
   sentTransLastRound = false;
@@ -1081,8 +1083,8 @@ void Solver::doSelfTest()
 {
 	timer_service.Mark("doSelfTest()", currentRound);
 
-	LOG_EVENT("+-- doSelfTest() output begin");
-	LOG_EVENT("|   Round " << currentRound);
+	std::cout << "+-- doSelfTest() output begin" << std::endl;
+	std::cout << "|   Round " << currentRound << std::endl;
 
 	auto lvl = node_->getMyLevel();
 	bool test_block = true;
@@ -1094,34 +1096,33 @@ void Solver::doSelfTest()
 	bool test_consensus = true;
 
 	if (test_block) {
-		LOG_EVENT("|   gotBlockThisRound: " << (gotBlockThisRound ? "yes" : "no"));
+		std::cout << "|   gotBlockThisRound: " << (gotBlockThisRound ? "yes" : "no") << std::endl;
 	}
 	if (test_tl) {
-		LOG_EVENT("|   transactionListReceived: " << (transactionListReceived ? "yes" : "no"));
+		std::cout << "|   transactionListReceived: " << (transactionListReceived ? "yes" : "no") << std::endl;
 	}
 	if (test_vect) {
-		LOG_EVENT("|   vectorComplete: " << (vectorComplete ? "yes" : "no"));
+		std::cout << "|   vectorComplete: " << (vectorComplete ? "yes" : "no") << std::endl;
 	}
 	if (test_matr) {
-		bool mat_complete = (node_->getConfidants().size() == trustedCounterMatrix);
-		LOG_EVENT("|   matrixes complete: " << (mat_complete ? "yes" : "no"));
+		std::cout << "|   matrixes complete: " << (allMatricesReceived ? "yes" : "no") << std::endl;
 	}
 	if (test_consensus) {
-		LOG_EVENT("|   consensusAchieved: " << (consensusAchieved ? "yes" : "no"));
+		std::cout << "|   consensusAchieved: " << (consensusAchieved ? "yes" : "no") << std::endl;
 	}
 	if (test_hashes) {
 		size_t cnt = ips.size();
-		LOG_EVENT("|   hashes received: " << cnt);
+		std::cout << "|   hashes received: " << cnt << std::endl;
 		if (cnt < min_nodes) {
-			LOG_EVENT("|   hashes desired: " << min_nodes);
+			std::cout << "|   hashes desired: " << min_nodes << std::endl;
 		}
 	}
 	if (test_rt) {
 		bool rt_received = (node_->getRoundNumber() != currentRound);
-		LOG_EVENT("|   round table received: " << (rt_received ? "yes" : "no"));
+		std::cout << "|   round table received: " << (rt_received ? "yes" : "no") << std::endl;
 	}
 
-	LOG_EVENT("+-- doSelfTest output end");
+	std::cout << "+-- doSelfTest output end" << std::endl;
 }
 
 } // namespace Credits

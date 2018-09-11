@@ -285,6 +285,8 @@ typedef std::string Matrix;
 		uint32_t passedRoundsCount = 0;
 		// current round number
 		uint32_t currentRound = 0;
+		// flag: all matrices are received
+		bool allMatricesReceived = false;
 
 		RunAfterEx<std::function<void(int)>> sendRoundTableRequestCall;
 		RunAfterEx<> flushTransactionsCall;
