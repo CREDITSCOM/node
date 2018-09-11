@@ -35,7 +35,7 @@
 
 //#define SPAM_MAIN
 
-#include <RunAfter.h>
+#include "RunAfter.h"
 
 class Node;
 
@@ -185,6 +185,10 @@ typedef std::string Matrix;
     void setBigBangStatus(bool _status);
     void setRNum(size_t _rNum);
 
+	// to be called from node upon receive new RoundTable just before next round start
+	// (instead of conditional call to SendTL())
+	void beforeNextRound();
+
 	private:
     void _initApi();
 
@@ -266,14 +270,23 @@ typedef std::string Matrix;
 		void spamWithTransactions();
 #endif
 
-		// проверка состояния по истечении нормальной длительности раунда
+		// do self-test of current state
+		void doSelfTest();
+		
+		// do self-test on planned round duration expire
 		void onRoundExpired();
+
+		// total duration of rounds passed
+		uint32_t passedRoundsDuration = 0;
+		// count of rounds passed
+		uint32_t passedRoundsCount = 0;
+		// current round number
+		uint32_t currentRound = 0;
 
 		RunAfterEx<std::function<void(int)>> sendRoundTableRequestCall;
 		RunAfterEx<> flushTransactionsCall;
 		RunAfterEx<> writeNewBlockCall;
 		RunAfterEx<> closeMainRoundCall;
-
 		RunAfterEx<> onRoundExpiredCall;
 	};
 }

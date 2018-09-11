@@ -9,9 +9,6 @@
 
 #include <snappy.h>
 
-#include <timer_service.h>
-#include <sstream>
-
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 4;
 
@@ -169,11 +166,6 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-
-	std::ostringstream os;
-	os << "node::getRoundTable(..., rNum = " << rNum << ", ...)";
-	timer_service.Mark(os.str().c_str(), roundNum_);
-
   std::cout << __func__ << std::endl;
   istream_.init(data, size);
   std::cout << "NODE> Get Round Table" << std::endl;
@@ -239,10 +231,8 @@ void Node::sendRoundTable() {
 void Node::sendRoundTableRequest(size_t rNum)
 {
 	if (rNum < roundNum_) {
-		timer_service.Mark("sendRoundTableRequest(): cancel (obsolete)", roundNum_);
 		return;
 	}
-	timer_service.Mark("sendRoundTableRequest(): sending", roundNum_);
 	std::cout << "rNum = " << rNum << ", real RoundNumber = " << roundNum_ << std::endl;
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::RoundTableRequest
@@ -919,13 +909,8 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-  if (!solver_->mPoolClosed())
-  {
-    solver_->sendTL();
-  }
-
-  timer_service.ConsoleOut();
-  timer_service.Reset();
+	// replaces direct conditional call to solver_->mPoolClosed()
+	solver_->beforeNextRound();
 
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;

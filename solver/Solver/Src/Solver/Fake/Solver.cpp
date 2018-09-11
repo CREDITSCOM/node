@@ -22,7 +22,11 @@
 #include <base58.h>
 #include <sodium.h>
 
-#include <timer_service.h>
+#include <Solver/Fake/timer_service.h>
+
+#if !defined(_MSC_VER)
+extern TimerService<> timer_service;
+#endif
 
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
@@ -64,7 +68,7 @@ Solver::Solver(Node* node)
   , m_pool()
   , v_pool()
 	, sendRoundTableRequestCall([this](int cur_rNum) {
-		//timer_service.Mark("sendRoundTableRequest()", cur_rNum);
+		timer_service.Mark("sendRoundTableRequest()", cur_rNum);
 		node_->sendRoundTableRequest(cur_rNum);
 	}, "sendRoundTableRequest()")
 	, flushTransactionsCall([this]() {
@@ -72,15 +76,15 @@ Solver::Solver(Node* node)
 		flushTransactions();
 	}, "flushTransactions()")
 	, writeNewBlockCall([this]() {
-		timer_service.Mark("writeNewBlock()", node_->getRoundNumber());
+		timer_service.Mark("writeNewBlock()", currentRound);
 		writeNewBlock();
 	}, "writeNewBlock()")
 	, onRoundExpiredCall([this]() {
-		timer_service.Mark("onRoundExpired()", node_->getRoundNumber());
+		timer_service.Mark("onRoundExpired()", currentRound);
 		onRoundExpired();
 	}, "onRoundExpired()")
 	, closeMainRoundCall([this]() {
-		timer_service.Mark("closeMainRound()", node_->getRoundNumber());
+		timer_service.Mark("closeMainRound()", currentRound);
 		closeMainRound();
 	}, "closeMainRound()")
 {}
@@ -264,8 +268,10 @@ void Solver::flushTransactions()
 #ifdef MYLOG
 			std::cout << "FlushTransaction ..." << std::endl;
 #endif
+			std::ostringstream os;
+			os << "flushTransactions(): " << m_transactions.size();
 			m_transactions.clear();
-			timer_service.Mark("flushTransactions(): done", node_->getRoundNumber());
+			timer_service.Mark(os.str(), node_->getRoundNumber());
 		}
 		else {
 			timer_service.Mark("flushTransactions(): nothing to do", node_->getRoundNumber());
@@ -654,8 +660,6 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
 
-	timer_service.Mark("gotHash(): accept", node_->getRoundNumber());
-
 	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
 	Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
 #ifdef MYLOG
@@ -670,7 +674,9 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #endif
 			//hashes.push_back(hash);
 			ips.push_back(sender);
-		} 
+
+			timer_service.Mark("gotHash(): accept", currentRound);
+		}
 		else
 		{
 #ifdef MYLOG
@@ -905,18 +911,49 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   
 }
 
-void Solver::nextRound()
+void Solver::beforeNextRound()
 {
-	timer_service.Mark("nextRound()", node_->getRoundNumber());
+	if (currentRound == 0) {
+		// actual before the first round
+		timer_service.Reset();
+		return;
+	}
+
+	timer_service.Mark("beforeNextRound()", currentRound);
+
+	// moved from begin of node::onRoundStart() from where this method called
+	if (!mPoolClosed())
+	{
+		sendTL();
+	}
+
 	if (onRoundExpiredCall.IsScheduled()) {
-		onRoundExpiredCall.WaitCancel(100); //TODO: Это ожиданеи - времянка, нужно разрешить новый запуск метода при (_cancel == true, _launched == _true)
+		timer_service.Mark("cancel onRoundExpiredCall", currentRound);
+		onRoundExpiredCall.Cancel();
 	}
 	if (sendRoundTableRequestCall.IsScheduled()) {
+		timer_service.Mark("cancel sendRoundTableRequestCall", currentRound);
 		sendRoundTableRequestCall.Cancel();
 	}
 	if (closeMainRoundCall.IsScheduled()) {
+		timer_service.Mark("cancel closeMainRoundCall", currentRound);
 		closeMainRoundCall.Cancel();
 	}
+
+	doSelfTest();
+
+	// get duration of finishing round
+	passedRoundsDuration += timer_service.Time();
+	passedRoundsCount++;
+
+	timer_service.ConsoleOut();
+	timer_service.Reset();
+}
+
+void Solver::nextRound()
+{
+	currentRound = node_->getRoundNumber();
+	timer_service.Mark("nextRound()", currentRound);
 
 	std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
   receivedVec_ips.clear();
@@ -963,9 +1000,24 @@ void Solver::nextRound()
   else {
 	  flushTransactionsCall.Cancel();
   }
-  // TODO: define constant for maximum normal round duration
-  timer_service.Mark("Shedule (1000) onRoundExpired()", node_->getRoundNumber());
-  onRoundExpiredCall.Schedule(1000, LaunchScheme::single);
+  // calculate new desired round duration as average duration of previous ones
+  uint32_t desired_round_duration = TIME_TO_COLLECT_TRXNS;
+  if (passedRoundsCount > 0) {
+	  desired_round_duration = passedRoundsDuration / passedRoundsCount;
+	  if (desired_round_duration < TIME_TO_COLLECT_TRXNS) {
+		  // duration too small
+		  desired_round_duration = TIME_TO_COLLECT_TRXNS;
+	  }
+  }
+  // ensure onRoundExpiredCall already canceled
+  if (onRoundExpiredCall.IsScheduled()) {
+	  timer_service.Mark("cancel onRoundExpiredCall", currentRound);
+	  onRoundExpiredCall.WaitCancel(20);
+  }
+  std::ostringstream os;
+  os << "Shedule (" << desired_round_duration << ") onRoundExpired()";
+  timer_service.Mark(os.str(), node_->getRoundNumber());
+  onRoundExpiredCall.Schedule(desired_round_duration, LaunchScheme::single);
 }
 
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
@@ -980,10 +1032,15 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 
 void Solver::onRoundExpired()
 {
-	timer_service.Mark("Testing round results (see details above)", node_->getRoundNumber());
+	doSelfTest();
+}
 
-	bool mat_complete = (node_->getConfidants().size() == trustedCounterMatrix );
-	LOG_EVENT("+-- It is time to close round " << node_->getRoundNumber() << ", current status:");
+void Solver::doSelfTest()
+{
+	timer_service.Mark("doSelfTest()", currentRound);
+
+	LOG_EVENT("+-- doSelfTest() output begin");
+	LOG_EVENT("|   Round " << currentRound);
 
 	auto lvl = node_->getMyLevel();
 	bool test_block = true;
@@ -1004,19 +1061,25 @@ void Solver::onRoundExpired()
 		LOG_EVENT("|   vectorComplete: " << (vectorComplete ? "yes" : "no"));
 	}
 	if (test_matr) {
+		bool mat_complete = (node_->getConfidants().size() == trustedCounterMatrix);
 		LOG_EVENT("|   matrixes complete: " << (mat_complete ? "yes" : "no"));
 	}
 	if (test_consensus) {
 		LOG_EVENT("|   consensusAchieved: " << (consensusAchieved ? "yes" : "no"));
 	}
 	if (test_hashes) {
-		LOG_EVENT("|   how to test hashes???");
+		size_t cnt = ips.size();
+		LOG_EVENT("|   hashes received: " << cnt);
+		if (cnt < min_nodes) {
+			LOG_EVENT("|   hashes desired: " << min_nodes);
+		}
 	}
 	if (test_rt) {
-		LOG_EVENT("|   round table still is not received");
+		bool rt_received = (node_->getRoundNumber() != currentRound);
+		LOG_EVENT("|   round table received: " << (rt_received ? "yes" : "no"));
 	}
-	LOG_EVENT("+-- current status end");
 
+	LOG_EVENT("+-- doSelfTest output end");
 }
 
 } // namespace Credits
