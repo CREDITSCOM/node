@@ -29,6 +29,9 @@
 extern TimerService<> timer_service;
 #endif
 
+// comment next line to block console output of timer_service content on end of every round
+#define TIMER_SERVICE_TO_CONSOLE
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -248,13 +251,15 @@ void Solver::runMainRound()
   if(node_->getRoundNumber()==1) 
   {
 	  // original logic: 2000 msec for 1st round
+	  constexpr uint32_t delay1st = 2000;
 	  timer_service.Mark("schedule (2000) closeMainRound()", node_->getRoundNumber());
-	  closeMainRoundCall.Schedule(2000, LaunchScheme::single);
+	  closeMainRoundCall.Schedule(delay1st, LaunchScheme::single);
   }
   else
   {
+	  constexpr uint32_t delay = TIME_TO_COLLECT_TRXNS;
 	  timer_service.Mark("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") closeMainRound()", node_->getRoundNumber());
-	  closeMainRoundCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
+	  closeMainRoundCall.Schedule(delay, LaunchScheme::single);
  }
 
 }
@@ -984,7 +989,9 @@ void Solver::beforeNextRound()
 	passedRoundsDuration += timer_service.Time();
 	passedRoundsCount++;
 
+#if defined(TIMER_SERVICE_TO_CONSOLE)
 	timer_service.ConsoleOut();
+#endif
 	timer_service.Reset();
 }
 
@@ -1083,9 +1090,6 @@ void Solver::doSelfTest()
 {
 	timer_service.Mark("doSelfTest()", currentRound);
 
-	std::cout << "+-- doSelfTest() output begin" << std::endl;
-	std::cout << "|   Round " << currentRound << std::endl;
-
 	auto lvl = node_->getMyLevel();
 	bool test_block = true;
 	bool test_rt = true;
@@ -1094,6 +1098,9 @@ void Solver::doSelfTest()
 	bool test_vect = (lvl == NodeLevel::Confidant);
 	bool test_matr = (lvl == NodeLevel::Confidant);
 	bool test_consensus = true;
+
+	std::cout << "+-- doSelfTest() output begin, " << (int)timer_service.Time() << " ms from round start" << std::endl;
+	std::cout << "|   Round " << currentRound << std::endl;
 
 	if (test_block) {
 		std::cout << "|   gotBlockThisRound: " << (gotBlockThisRound ? "yes" : "no") << std::endl;
@@ -1118,8 +1125,7 @@ void Solver::doSelfTest()
 		}
 	}
 	if (test_rt) {
-		bool rt_received = (node_->getRoundNumber() != currentRound);
-		std::cout << "|   round table received: " << (rt_received ? "yes" : "no") << std::endl;
+		std::cout << "|   round table received: " << (node_->getRoundNumber() != currentRound ? "yes" : "no") << std::endl;
 	}
 
 	std::cout << "+-- doSelfTest output end" << std::endl;
