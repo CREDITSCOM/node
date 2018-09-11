@@ -353,7 +353,9 @@ public:
 	}
 };
 
-// Windows specific:
+#if !defined(_MSC_VER)
+extern TimerService<> timer_service;
+#else
+// MS specific:
 __declspec(selectany) TimerService<> timer_service;
-
-//extern TimerService<> timer_service;
+#endif

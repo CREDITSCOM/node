@@ -164,7 +164,29 @@ public:
 		_launched = true;
 		std::thread([this, wait_for, scheme, args...]() {
 
-			std::this_thread::sleep_for(TRes(wait_for));
+			constexpr TNumeric wait_granularity = 20;
+			uint32_t wait_count = wait_for / wait_granularity;
+
+			// wait number of wait_granularity portions
+			for (int i = 0; i < wait_count; ++i) {
+				std::this_thread::sleep_for(TRes(wait_granularity));
+				// test cancel condition after portion of waiting finished
+				if (_cancel) {
+					_launched = false;
+#if defined(TIMER_SERVICE_LOG)
+					std::ostringstream os;
+					os << "RunAfterEx: " << _comment << " is canceled (while waiting)";
+					timer_service.Mark(os.str(), -1);
+#endif
+					return;
+				}
+			}
+
+			// wait remains if it is
+			TNumeric wait_remains = wait_for % wait_granularity;
+			if (wait_remains > 0) {
+				std::this_thread::sleep_for(TRes(wait_remains));
+			}
 
 			// test cancel condition after waiting finished
 			if (_cancel) {
@@ -249,7 +271,8 @@ public:
 	{
 		if (_launched) {
 			_cancel = true;
-			const TNumeric wait_min = wait_for < 20 ? wait_for : 20;
+			constexpr TNumeric wait_granularity = 20;
+			const TNumeric wait_min = wait_for < wait_granularity ? wait_for : wait_granularity;
 			TNumeric wait_remains = wait_for;
 			while (_launched) {
 				if (wait_remains < wait_min) {
