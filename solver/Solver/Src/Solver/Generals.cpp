@@ -28,7 +28,7 @@ namespace Credits{
     Generals::Generals() { }
     Generals::~Generals() { }
 
-    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool) {
+    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_of_trusted, csdb::Pool& new_bpool) {
       ////////////////////////////////////////////////////////////////////////
       //    This function was modified to calculate deltas for concensus    //
       ////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,6 @@ namespace Credits{
     #endif
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
-		csdb::Amount comission = 0.1_c;
     csdb::Transaction tempTransaction;
 	  size_t transactionsNumber = _pool.transactions_count();
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
@@ -49,7 +48,8 @@ namespace Credits{
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
 	  {
-		  auto delta = it.balance() - it.amount() - comission;
+		  countFee(it, num_of_trusted, t_pool.size());
+		  auto delta = it.balance() - it.amount() - it.counted_fee();
 
 	#ifdef _MSC_VER
 		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
@@ -60,11 +60,6 @@ namespace Credits{
       {
         *(del1 + i) = bitcnt;
         new_pool.add_transaction(it);
-
-	/*	std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-		printf("TRANSACTION ACCEPTED\n");
-		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";*/
-
       }
 
 		  else *(del1 + i) = -bitcnt;
@@ -313,4 +308,23 @@ namespace Credits{
 	void Generals::chooseHeadAndTrusted(std::map<std::string, std::string>) { }
     void Generals::chooseHeadAndTrustedFake(std::vector<std::string>& hashes) { }
     void Generals::fake_block(std::string m_public_key) { }
+
+csdb::Amount Generals::countFee(csdb::Transaction& transaction, size_t numOfTrustedNodesInRound,
+	size_t numOfTransactionsInRound)
+{
+	const int NUM_OF_ROUDS_PER_SECOND = 5;
+	double tmp = (numOfTrustedNodesInRound * COST_OF_ONE_TRUSTED_PER_DAY) / (24 * 3600 * NUM_OF_ROUDS_PER_SECOND); // cost of trusted node per round
+	tmp /= numOfTransactionsInRound;
+	if (transaction.to_byte_stream().size() > SIZE_OF_COMMON_TRANSACTION)
+	{
+		double lengthCoef = sqrt(transaction.to_byte_stream().size() / SIZE_OF_COMMON_TRANSACTION);
+		lengthCoef = pow(lengthCoef, 3);
+		tmp *= lengthCoef;
+	}
+
+	csdb::Amount countedFee(tmp);
+	transaction.set_counted_fee(countedFee);
+	return countedFee;
+}
+
 }
