@@ -842,7 +842,7 @@ void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& 
   }
 
   LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
-  if (pool.sequence() <= roundNum_) solver_->gotBlock(std::move(pool), sender);
+  solver_->gotBadBlockHandler(std::move(pool), sender);
 }
 
 void Node::sendBadBlock(const csdb::Pool& pool) {
@@ -926,7 +926,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (awaitingSyncroBlock && awaitingRecBlockCount<3)
+  if (awaitingSyncroBlock && awaitingRecBlockCount<1)
   {
 #ifdef MYLOG
     std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence << std::endl;

@@ -155,7 +155,7 @@ typedef std::string Matrix;
 		void gotHash(Hash&, const PublicKey&);
 		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
 		void gotBlockReply(csdb::Pool&&);
-
+    void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
     void sendTL();
 		// API methods
 

@@ -609,6 +609,11 @@ void Solver::setBigBangStatus(bool _status)
 }
 
 
+void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender)
+{
+  //insert code here
+}
+
 void Solver::gotBlockCandidate(csdb::Pool&& block)
 {
 #ifdef MYLOG
