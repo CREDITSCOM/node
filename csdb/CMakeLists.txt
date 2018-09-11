@@ -13,6 +13,7 @@ TEST_BIG_ENDIAN(CSDB_PLATFORM_IS_BIG_ENDIAN)
 add_library(${PROJECT_NAME} STATIC
   src/csdb.cpp
   src/amount.cpp
+  src/amount_commission.cpp
   src/transaction.cpp
   src/transaction_p.h
   src/pool.cpp
@@ -39,6 +40,7 @@ add_library(${PROJECT_NAME} STATIC
   include/csdb/internal/endian.h
   include/csdb/csdb.h
   include/csdb/amount.h
+  include/csdb/amount_commission.h
   include/csdb/transaction.h
   include/csdb/pool.h
   include/csdb/address.h
