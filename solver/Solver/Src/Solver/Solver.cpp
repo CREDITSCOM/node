@@ -29,6 +29,10 @@
 extern TimerService<> timer_service;
 #endif
 
+// aav: as we use #define so I can do that:
+#define STRINGIFY2(X) #X
+#define STRINGIFY(X) STRINGIFY2(X)
+
 // comment next line to block console output of timer_service content on end of every round
 #define TIMER_SERVICE_TO_CONSOLE
 
@@ -236,10 +240,6 @@ bool Solver::mPoolClosed()
 {
   return m_pool_closed;
 }
-
-// aav: as we use #define so I can do that:
-#define STRINGIFY2(X) #X
-#define STRINGIFY(X) STRINGIFY2(X)
 
 void Solver::runMainRound()
 {
