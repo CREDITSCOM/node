@@ -319,17 +319,19 @@ namespace Credits{
 csdb::Amount Generals::countFee(csdb::Transaction& transaction, size_t numOfTrustedNodesInRound,
 	size_t numOfTransactionsInRound)
 {
-	const int NUM_OF_ROUDS_PER_SECOND = 5;
-	double tmp = (numOfTrustedNodesInRound * COST_OF_ONE_TRUSTED_PER_DAY) / (24 * 3600 * NUM_OF_ROUDS_PER_SECOND); // cost of trusted node per round
-	tmp /= numOfTransactionsInRound;
-	if (transaction.to_byte_stream().size() > SIZE_OF_COMMON_TRANSACTION)
+	constexpr int NUM_OF_ROUDS_PER_SECOND = 5;
+	constexpr double k = COST_OF_ONE_TRUSTED_PER_DAY / (24 * 3600 * NUM_OF_ROUDS_PER_SECOND);
+	double fee = numOfTrustedNodesInRound * k / numOfTransactionsInRound;
+
+	if (size_t transaction_size = transaction.to_byte_stream().size() > SIZE_OF_COMMON_TRANSACTION)
 	{
-		double lengthCoef = sqrt(transaction.to_byte_stream().size() / SIZE_OF_COMMON_TRANSACTION);
-		lengthCoef = pow(lengthCoef, 3);
-		tmp *= lengthCoef;
+		double l = 1. / SIZE_OF_COMMON_TRANSACTION;
+		double lengthCoef = sqrt(transaction_size * l);
+		lengthCoef = lengthCoef * lengthCoef * lengthCoef;
+		fee *= lengthCoef;
 	}
 
-	csdb::Amount countedFee(tmp);
+	csdb::Amount countedFee(fee);
 	transaction.set_counted_fee(countedFee);
 	return countedFee;
 }
