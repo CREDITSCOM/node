@@ -10,8 +10,8 @@ AmountCommission::AmountCommission(double value)
 {
   fIEEE_.sign = value < 0. ? 1 : 0;
   value = std::fabs(value);
-  double expf = std::log10(value);
-  int expi = expf >= 0 ? expf + 0.5 : expf - 0.5;
+  double expf = value == 0. ? 0. : std::log10(value);
+  int expi = expf >= 0. ? expf + 0.5 : expf - 0.5;
   value /= std::pow(10, expi);
   if (value >= 1.) {
     value *= 0.1; ++expi;
