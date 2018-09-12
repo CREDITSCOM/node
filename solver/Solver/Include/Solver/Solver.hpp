@@ -31,7 +31,7 @@
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
 
-//#define MONITOR_NODE
+#define MONITOR_NODE
 
 //#define SPAM_MAIN
 

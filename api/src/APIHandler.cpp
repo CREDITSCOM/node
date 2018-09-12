@@ -296,6 +296,8 @@ convertTransaction(const csdb::Transaction& transaction)
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
 
+  result.trxn.fee = convertAmount(transaction.counted_fee());
+
   auto uf = transaction.user_field(0);
   if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
     result.trxn.smartContract =
