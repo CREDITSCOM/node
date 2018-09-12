@@ -12,10 +12,13 @@
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 4;
 
+const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
+const csdb::Address Node::startAddress_   = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
+
 Node::Node(const Config& config):
   myPublicKey_(config.getMyPublicKey()),
-  bc_(config.getPathToDB().c_str()),
-  solver_(new Credits::Solver(this)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
+  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_),
+  solver_(new Credits::Solver(this, genesisAddress_, startAddress_)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
   transport_(new Transport(config, this)),
   stats_(bc_),
   api_(bc_, solver_),

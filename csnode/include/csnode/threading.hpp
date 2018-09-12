@@ -1,10 +1,12 @@
 #pragma once
 
+#include <assert.h>
 #include <lib/system/logger.hpp>
 #include <client/params.hpp>
 
 #define BOTTLENECKED_SMARTS
 
+#include <condition_variable>
 #include <thread>
 #include <unordered_map>
 #include <list>

@@ -8,10 +8,12 @@
 #define _CREDITS_CSDB_POOL_H_INCLUDED_
 
 #include <cinttypes>
+#include <climits>
 #include <vector>
 #include <array>
 #include <string>
 
+#include "csdb/address.h"
 #include "csdb/transaction.h"
 #include "csdb/storage.h"
 #include "csdb/user_field.h"
@@ -74,7 +76,41 @@ class Pool
 {
   SHARED_DATA_CLASS_DECLARE(Pool)
 public:
-  typedef uint64_t sequence_t;
+  using sequence_t = uint64_t;
+  using Transactions = std::vector<csdb::Transaction>;
+  class NewWalletInfo
+  {
+  public:
+      using WalletId = csdb::internal::WalletId;
+
+      enum AddressType
+      {
+          AddressIsSource,
+          AddressIsTarget
+      };
+      struct AddressId
+      {
+          size_t trxInd_ : sizeof(size_t) * CHAR_BIT - 1;
+          size_t addressType_ : 1;
+
+          bool operator==(const AddressId& rh) const { return trxInd_ == rh.trxInd_  &&  addressType_ == rh.addressType_; }
+          bool operator!=(const AddressId& rh) const { return !operator==(rh); }
+      };
+  public:
+      NewWalletInfo() : addressId_(), walletId_()
+      {}
+      NewWalletInfo(AddressId addressId, csdb::internal::WalletId walletId) : addressId_(addressId), walletId_(walletId)
+      {}
+      void put(::csdb::priv::obstream&) const;
+      bool get(::csdb::priv::ibstream&);
+
+      bool operator==(const NewWalletInfo& rh) const { return addressId_ == rh.addressId_  &&  walletId_ == rh.walletId_; }
+      bool operator!=(const NewWalletInfo& rh) const { return !operator==(rh); }
+  public:
+      AddressId addressId_;
+      WalletId walletId_;
+  };
+  using NewWallets = std::vector<NewWalletInfo>;
 
 public:
   Pool(PoolHash previous_hash, sequence_t sequence, Storage storage = Storage());
@@ -101,7 +137,12 @@ public:
   void set_sequence(sequence_t sequence) noexcept;
   void set_storage(Storage storage) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
-  std::vector<csdb::Transaction>& transactions();
+  Transactions& transactions();
+  const Transactions& transactions() const;
+
+  NewWallets* newWallets() noexcept;
+  const NewWallets& newWallets() const noexcept;
+
   /**
    * @brief Добавляет транзакцию в пул.
    * @param[in] transaction Транзакция для добавления

@@ -400,7 +400,7 @@ APIHandler::TransactionGet(TransactionGetResult& _return,
 void
 APIHandler::TransactionsGet(TransactionsGetResult& _return,
                             const Address& address,
-                            int64_t offset,
+                            const int64_t _offset,
                             const int64_t limit)
 {
     // Log("TransactionsGet");
@@ -413,7 +413,11 @@ APIHandler::TransactionsGet(TransactionsGetResult& _return,
 
     BlockChain::Transactions transactions;
 
-    s_blockchain.getTransactions(transactions, addr, offset, limit);
+    if (limit > 0)
+    {
+        int64_t offset = (_offset < 0) ? 0 : _offset;
+        s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
+    }
 
     _return.transactions = convertTransactions(transactions);
 

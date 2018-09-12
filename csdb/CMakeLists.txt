@@ -62,6 +62,8 @@ target_include_directories(
   ${PROJECT_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+include_directories(${Boost_INCLUDE_DIR})
 target_link_libraries(
   ${PROJECT_NAME}
   cscrypto

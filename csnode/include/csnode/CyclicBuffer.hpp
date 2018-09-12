@@ -1,7 +1,7 @@
 #ifndef CYCLIC_BUFFER_H
 #define CYCLIC_BUFFER_H
 
-template<typename T, size_t N>
+template<typename T, uint32_t N>
 class CyclicBuffer
 {
 public:
@@ -55,8 +55,8 @@ private:
     }
 private:
     T data_[N];
-    size_t size_;
-    size_t back_;
+    decltype(N) size_;
+    decltype(N) back_;
 };
 
 #endif

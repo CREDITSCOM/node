@@ -12,7 +12,7 @@
 #endif
 
 #include "Solver/Generals.hpp"
-//#include "../../../Include/Solver/Fake_Solver.hpp"
+#include "Solver/WalletsState.h"
 
 #include <algorithm>
 #include <csdb/currency.h>
@@ -25,7 +25,9 @@
 
 namespace Credits{
 
-    Generals::Generals() { }
+    Generals::Generals(WalletsState& _walletsState)
+        : walletsState(_walletsState)
+    { }
     Generals::~Generals() { }
 
     Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool) {
@@ -45,6 +47,7 @@ namespace Credits{
   
     const csdb::Amount zero_balance = 0.0_c;
     if (_pool.transactions_count() > 0) {
+//      walletsState.updateFromSource();
 
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
@@ -56,20 +59,28 @@ namespace Credits{
 	#else
 		  int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
 	#endif
-		  if (delta > zero_balance)
+      if (delta <= zero_balance)
       {
-        *(del1 + i) = bitcnt;
-        new_pool.add_transaction(it);
-
-	/*	std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-		printf("TRANSACTION ACCEPTED\n");
-		std::cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";*/
-
+        *(del1 + i) = -bitcnt;
+        new_bpool.add_transaction(it);
+        ++i;
+        continue;
       }
-
-		  else *(del1 + i) = -bitcnt;
-      new_bpool.add_transaction(it);
-     	i++;
+/*
+      WalletsState::WalletId walletId{};
+      WalletsState::WalletData& wallState = walletsState.getData(it.source(), walletId);
+      if (!wallState.trxTail_.isAllowed(it.innerID())) {
+        *(del1 + i) = -bitcnt;
+        new_bpool.add_transaction(it);
+        ++i;
+        continue;
+      }
+*/
+      *(del1 + i) = bitcnt;
+//      wallState.trxTail_.push(it.innerID());
+//      walletsState.setModified(walletId);
+      new_pool.add_transaction(it);
+      ++i;
 	  }
 	  
 		uint8_t* hash_s = new uint8_t[32];

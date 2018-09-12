@@ -15,6 +15,7 @@ namespace csdb {
 namespace internal {
 
 using byte_array = std::vector<std::uint8_t>;
+using WalletId = uint32_t;
 
 } // namespace internal
 } // namespace csdb

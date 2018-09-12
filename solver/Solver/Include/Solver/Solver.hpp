@@ -41,6 +41,7 @@ namespace Credits{
 typedef std::string Vector;
 typedef std::string Matrix;
 
+    class WalletsState;
     class Generals;
 	struct Hash_
 	{
@@ -136,7 +137,7 @@ typedef std::string Matrix;
 
     class Solver {
     public:
-        Solver(Node*);
+        Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres);
         ~Solver();
 
         Solver(const Solver &) = delete;
@@ -209,9 +210,13 @@ typedef std::string Matrix;
 		std::vector<uint8_t> myPrivateKey;
 
 		Node* node_;
+        std::unique_ptr<WalletsState> walletsState;
         std::unique_ptr<Generals> generals;
 
-		HashVector hvector;
+        const csdb::Address genesisAddress;
+        const csdb::Address startAddress;
+
+        HashVector hvector;
 		
 		
     size_t lastRoundTransactionsGot;
@@ -258,7 +263,7 @@ typedef std::string Matrix;
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;
-		
+
 
 #ifdef SPAMMER
 		std::atomic_bool spamRunning{ false };

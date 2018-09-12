@@ -15,6 +15,7 @@
 
 #include "Solver/Generals.hpp"
 #include "Solver/Solver.hpp"
+#include "Solver/WalletsState.h"
 #include <algorithm>
 
 #include <lib/system/logger.hpp>
@@ -58,9 +59,12 @@ namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node)
+Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress)
   : node_(node)
-  , generals(std::unique_ptr<Generals>(new Generals()))
+  , walletsState(new WalletsState(node->getBlockChain()))
+  , generals(std::unique_ptr<Generals>(new Generals(*walletsState)))
+  , genesisAddress(_genesisAddress)
+  , startAddress(_startAddress)
   , vector_datas()
   , m_pool()
   , v_pool()
