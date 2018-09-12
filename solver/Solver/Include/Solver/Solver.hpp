@@ -35,6 +35,7 @@
 
 //#define SPAM_MAIN
 
+#include "timer_service.h"
 #include "RunAfter.h"
 
 class Node;
@@ -293,5 +294,8 @@ typedef std::string Matrix;
 		RunAfterEx<> writeNewBlockCall;
 		RunAfterEx<> closeMainRoundCall;
 		RunAfterEx<> onRoundExpiredCall;
+
+		// used for time measurement (in msec) from every round start and to accumulate time marks every round
+		TimerService<> timer_service;
 	};
 }

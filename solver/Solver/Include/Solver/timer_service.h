@@ -105,6 +105,20 @@ public:
 	}
 
 	/**
+	 * @fn	~TimerService()
+	 *
+	 * @brief	To prevent unjoined threads from access to data stops them if any
+	 *
+	 * @author	User
+	 * @date	12.09.2018
+	 */
+
+	~TimerService()
+	{
+		WaitLaunchedJobs();
+	}
+
+	/**
 	 * @fn	void Reset()
 	 *
 	 * @brief	Resets this object. Sets current time as start time and clears stored time marks
@@ -161,7 +175,7 @@ public:
 	 * @return	A long.
 	 */
 
-	long long Time ()
+	long long Time () const
 	{
 		return std::chrono::duration_cast<TRes>(Now() - _t_start).count ();
 	}
@@ -241,10 +255,14 @@ public:
 		int cnt = 0;
 		if (!_launched.empty()) {
 			Lock lock(_mtx_jobs);
-			for (auto& t : _launched) {
-				if (t.joinable()) {
-					cnt++;
-					t.join();
+			for(auto& t : _launched) {
+				if(t.joinable()) {
+					++cnt;
+					try {
+						t.join();
+					}
+					catch(const std::system_error&) {
+					}
 				}
 			}
 			_launched.clear();
@@ -373,12 +391,12 @@ private:
 	std::mutex _mtx_data;
 	std::mutex _mtx_jobs;
 
-	TimePoint Now()
+	TimePoint Now() const
 	{
 		return Clock::now();
 	}
 
-	void ConsoleOut(const MarkData & d)
+	void ConsoleOut(const MarkData & d) const
 	{
 		using namespace std::chrono;
 		std::cout << "TS: " << duration_cast<milliseconds>(TimePointFrom(d) - _t_start).count() << ": [" << GroupIdFrom(d) << "] " << InfoFrom(d) << std::endl;
@@ -386,9 +404,9 @@ private:
 
 };
 
-#if !defined(_MSC_VER)
-extern TimerService<> timer_service;
-#else
-// MS specific:
-__declspec(selectany) TimerService<> timer_service;
-#endif
+//#if !defined(_MSC_VER)
+//extern TimerService<> timer_service;
+//#else
+//// MS specific:
+//__declspec(selectany) TimerService<> timer_service;
+//#endif

@@ -82,9 +82,6 @@ enum class LaunchScheme {
 };
 
 
-/** @brief	The custom procedure */
-using CustomVoidProc = std::function<void()>;
-
 /**
  * @class	RunAfterEx
  *
@@ -104,7 +101,7 @@ public:
 
 	RunAfterEx() = delete;
 	RunAfterEx(const RunAfterEx&) = delete;
-	void operator =(const RunAfterEx&) = delete;
+	RunAfterEx& operator =(const RunAfterEx&) = delete;
 
 	/**
 	 * @fn	RunAfterEx(TProc&& proc, std::string&& comment) : _proc(std::forward<TProc>(proc)) , _comment(std::forward<std::string>(comment))

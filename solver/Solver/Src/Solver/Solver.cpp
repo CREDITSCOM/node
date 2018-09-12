@@ -23,12 +23,6 @@
 #include <base58.h>
 #include <sodium.h>
 
-#include <Solver/timer_service.h>
-
-#if !defined(_MSC_VER)
-extern TimerService<> timer_service;
-#endif
-
 // aav: as we use #define so I can do that:
 #define STRINGIFY2(X) #X
 #define STRINGIFY(X) STRINGIFY2(X)
@@ -45,6 +39,7 @@ void addTimestampToPool(csdb::Pool& pool)
       now_time.time_since_epoch()).count()));
 }
 
+// method is replaced with RunAfterEx instances:
 #if 0
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
 {    
