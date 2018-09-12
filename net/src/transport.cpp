@@ -400,7 +400,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     LOG_ERROR("Bad packet size, why is it zero or too big?");
     return;
   }
-
+  //std::cout << __func__ << std::endl;
   switch(type) {
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum);

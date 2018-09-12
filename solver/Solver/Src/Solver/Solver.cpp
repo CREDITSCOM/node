@@ -180,7 +180,7 @@ void Solver::closeMainRound()
     prev_hash.from_string("");
     b_pool.set_previous_hash(prev_hash);
 	
-  std::cout << "Solver -> new sequence: " << m_pool.sequence() << ", new time:" << m_pool.user_field(0).value<std::string>().c_str() << std::endl;
+    std::cout << "Solver -> new sequence: " << m_pool.sequence() << ", new time:" << m_pool.user_field(0).value<std::string>().c_str() << std::endl;
  
     node_->sendBlock(std::move(m_pool));
     node_->sendBadBlock(std::move(b_pool));
@@ -260,7 +260,7 @@ bool Solver::getIPoolClosed() {
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
 #ifdef MYLOG
-	std::cout << "SOLVER> Got Transaction" << std::endl;
+	//std::cout << "SOLVER> Got Transaction" << std::endl;
 #endif
 	if (m_pool_closed)
 	{
@@ -407,36 +407,40 @@ void Solver::gotVector(HashVector&& vector)
 	  generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
  //   std::cout << "SOLVER> Matrix added" << std::endl;
 
-    if (trustedCounterMatrix == numGen)
-    {
-      memset(receivedMatFrom, 0, 100);
-      trustedCounterMatrix = 0;
-      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
-
-      if (wTrusted == 100)
-      {
-//        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock(); });
-      }
-      else
-      {
-        consensusAchieved = true;
- //       std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
-        if (wTrusted == node_->getMyConfNumber())
-        {
-          node_->becomeWriter();
-          runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-            [this]() { writeNewBlock(); });
-        }
-          //LOG_WARN("This should NEVER happen, NEVER");
-      }
-    }
+    if (trustedCounterMatrix == numGen) takeDecWorkaround();
   }
 #ifdef MYLOG
   std::cout << "Solver>  VECTOR GOT SUCCESSFULLY!!!" << std::endl;
   #endif
 }
+
+void Solver::takeDecWorkaround()
+{
+  memset(receivedMatFrom, 0, 100);
+  trustedCounterMatrix = 0;
+  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+
+  if (wTrusted == 100)
+  {
+    //        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
+    runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+      [this]() { writeNewBlock(); });
+  }
+  else
+  {
+    consensusAchieved = true;
+    //       std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
+    if (wTrusted == node_->getMyConfNumber())
+    {
+      node_->becomeWriter();
+      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
+        [this]() { writeNewBlock(); });
+    }
+    //LOG_WARN("This should NEVER happen, NEVER");
+  }
+}
+
+
 
 void Solver::checkMatrixReceived()
 {
@@ -488,40 +492,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 #ifdef MYLOG
   std::cout << "SOLVER> Matrix added" << std::endl;
 #endif
-  if (trustedCounterMatrix == numGen)
-  {
-
- //   std::cout << "SOLVER> We are going to take decision" << std::endl;
- 
-	  memset(receivedMatFrom, 0, 100);
-	  trustedCounterMatrix = 0;
-	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
- 
-	  if (wTrusted == 100)
-	  {
-#ifdef MYLOG
-		  std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-      #endif
-      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock();});
-		  
-	  }
-
-	  else
-	  {
-		  consensusAchieved = true;
-		  if (wTrusted == node_->getMyConfNumber())
-		  {
-			  node_->becomeWriter();
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-          [this]() { writeNewBlock(); });
-		  }
-      else
-      { 
-        //LOG_WARN("This should NEVER happen, NEVER");
-      }
-     }
-	}
+  if (trustedCounterMatrix == numGen) takeDecWorkaround();
 }
 
 
@@ -536,16 +507,16 @@ void Solver::writeNewBlock()
     prepareBlockForSend(m_pool);
     node_->sendBlock(std::move(m_pool));
     node_->getBlockChain().putBlock(m_pool);
-
+    node_->getBlockChain().setGlobalSequence(m_pool.sequence());
     b_pool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
     csdb::PoolHash prev_hash;
     prev_hash.from_string("");
     b_pool.set_previous_hash(prev_hash);
 
 #ifdef MYLOG
-	std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
-  #endif
-	consensusAchieved = false;
+	  std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
+#endif
+	  consensusAchieved = false;
   }
   else {
     //LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
@@ -792,7 +763,7 @@ Solver::spamWithTransactions()
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
   #ifdef MYLOG
-          std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
+         // std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
           {
           std::lock_guard<std::mutex> l(m_trans_mut);

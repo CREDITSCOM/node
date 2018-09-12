@@ -186,6 +186,7 @@ typedef std::string Matrix;
 	private:
     void _initApi();
 
+    void takeDecWorkaround();
 		void runMainRound();
 		void closeMainRound();
 
