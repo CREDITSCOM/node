@@ -33,8 +33,6 @@
 
 //#define MONITOR_NODE
 
-//#define SPAM_MAIN
-
 class Node;
 
 namespace Credits{
@@ -194,16 +192,6 @@ typedef std::string Matrix;
 
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
-
-
-#ifdef SPAM_MAIN
-		void createPool();
-
-		std::atomic_bool createSpam;
-		std::thread spamThread;
-
-		csdb::Pool testPool;
-#endif //SPAM_MAIN
 
 		bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 		

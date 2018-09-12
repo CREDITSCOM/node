@@ -47,7 +47,7 @@ void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
   tr.detach();
 }
 
-#if defined(SPAM_MAIN) || defined(SPAMMER)
+#if defined(SPAMMER)
 static int
 randFT(int min, int max)
 {
@@ -170,13 +170,8 @@ void Solver::closeMainRound()
       node_->becomeWriter();
 #ifdef MYLOG
 	std::cout << "Solver -> Node Level changed 2 -> 3" << std::endl;
-  #endif
-#ifdef SPAM_MAIN
-    createSpam = false;
-    spamThread.join();
-    prepareBlockForSend(testPool);
-    node_->sendBlock(testPool);
-#else
+#endif
+
     prepareBlockForSend(m_pool);
 
     b_pool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
@@ -184,19 +179,20 @@ void Solver::closeMainRound()
     prev_hash.from_string("");
     b_pool.set_previous_hash(prev_hash);
 	
-  std::cout << "Solver -> new sequence: " << m_pool.sequence() << ", new time:" << m_pool.user_field(0).value<std::string>().c_str() << std::endl;
+    std::cout << "Solver -> new sequence: " << m_pool.sequence() << ", new time:" << m_pool.user_field(0).value<std::string>().c_str() << std::endl;
  
     node_->sendBlock(std::move(m_pool));
     node_->sendBadBlock(std::move(b_pool));
-	std::cout << "Solver -> Block is sent ... awaiting hashes" << std::endl;
-#endif
-	node_->getBlockChain().setGlobalSequence(m_pool.sequence());
+	  std::cout << "Solver -> Block is sent ... awaiting hashes" << std::endl;
+
+	  node_->getBlockChain().setGlobalSequence(m_pool.sequence());
+
 #ifdef MYLOG
 	std::cout << "Solver -> Global Sequence: "  << node_->getBlockChain().getGlobalSequence() << std::endl;
 	std::cout << "Solver -> Writing New Block"<< std::endl;
-  #endif
+#endif
     node_->getBlockChain().putBlock(m_pool);
-    }
+  }
 }
 
 bool Solver::mPoolClosed()
@@ -694,70 +690,6 @@ void Solver::_initApi()
 
   /////////////////////////////
 
-#ifdef SPAM_MAIN
-void
-Solver::createPool()
-{
-  std::string mp = "0123456789abcdef";
-  const unsigned int cmd = 6;
-
-  struct timeb tt;
-  ftime(&tt);
-  srand(tt.time * 1000 + tt.millitm);
-
-  testPool = csdb::Pool();
-
-  std::string aStr(64, '0');
-  std::string bStr(64, '0');
-
-  uint32_t limit = randFT(5, 15);
-
-  if (randFT(0, 150) == 42) {
-    csdb::Transaction smart_trans;
-    smart_trans.set_currency(csdb::Currency("CS"));
-
-    smart_trans.set_target(Credits::BlockChain::getAddressFromKey(
-      "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
-    smart_trans.set_source(csdb::Address::from_string(
-      "0000000000000000000000000000000000000000000000000000000000000001"));
-
-    smart_trans.set_amount(csdb::Amount(1, 0));
-    smart_trans.set_balance(csdb::Amount(100, 0));
-
-    api::SmartContract sm;
-    sm.address = "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb";
-    sm.method = "store_sum";
-    sm.params = { "123", "456" };
-
-    smart_trans.add_user_field(0, serialize(sm));
-
-    testPool.add_transaction(smart_trans);
-  }
-
-  csdb::Transaction transaction;
-  transaction.set_currency(csdb::Currency("CS"));
-
-  while (createSpam && limit > 0) {
-    for (size_t i = 0; i < 64; ++i) {
-      aStr[i] = mp[randFT(0, 15)];
-      bStr[i] = mp[randFT(0, 15)];
-    }
-
-    transaction.set_target(csdb::Address::from_string(aStr));
-    transaction.set_source(csdb::Address::from_string(bStr));
-
-    transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-    transaction.set_balance(
-      csdb::Amount(transaction.balance().integral() + 1, 0));
-
-    testPool.add_transaction(transaction);
-    --limit;
-  }
-
-  addTimestampToPool(testPool);
-}
-#endif
-
 #ifdef SPAMMER
 void
 Solver::spamWithTransactions()
@@ -915,10 +847,7 @@ void Solver::nextRound()
   #endif
   if (node_->getMyLevel() == NodeLevel::Main) {
     runMainRound();
-#ifdef SPAM_MAIN
-    createSpam = true;
-    spamThread = std::thread(&Solver::createPool, this);
-#endif
+
 #ifdef SPAMMER
     spamRunning = false;
 #endif
