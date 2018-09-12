@@ -209,7 +209,7 @@ namespace Credits{
     delete hw;
     }
 
-    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash lasthash) {
+    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash) {
     #ifdef MYLOG
 		std::cout << "GENERALS> Take decision: starting " << std::endl;
     #endif
@@ -270,8 +270,7 @@ namespace Credits{
 		}
 
 
-		uint8_t trusted_limit;
-		trusted_limit = nodes_amount / 2 + 1;
+		uint8_t trusted_limit = nodes_amount * 0.5f + 1;
     uint8_t j=0;
 		for (int i = 0; i < nodes_amount; i++)
 		{

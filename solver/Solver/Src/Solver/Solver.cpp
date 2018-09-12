@@ -275,30 +275,35 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 #ifndef SPAMMER
 			auto v = transaction.to_byte_stream_for_sig();
 			size_t msg_len = v.size();
-			uint8_t* message = new uint8_t[msg_len];
-			for (size_t i = 0; i < msg_len; i++)
-				message[i] = v[i];
+			uint8_t* message = (uint8_t *)malloc(msg_len);
+			memcpy(message, v.data(), msg_len);
+
+			/*for (size_t i = 0; i < msg_len; i++)
+				message[i] = v[i];*/
 
 			auto vec = transaction.source().public_key();
 			uint8_t public_key[32];
-			for (int i = 0; i < 32; i++)
-				public_key[i] = vec[i];
+			memcpy(public_key, vec.data(), 32);
 
+			/*for (int i = 0; i < 32; i++)
+				public_key[i] = vec[i];*/
+
+			// vkaryagin: todo: need direct data pointer
 			std::string sig_str = transaction.signature();
-			uint8_t* signature;
-			signature = (uint8_t*)sig_str.c_str();
+
+			uint8_t* signature = (uint8_t*)sig_str.c_str();
 
 			if (verify_signature(signature, public_key, message, msg_len))
 			{
 #endif
-					v_pool.add_transaction(transaction);
+				v_pool.add_transaction(transaction);
 #ifndef SPAMMER
 			}
 			else
 			{
 				LOG_EVENT("Wrong signature");
 			}
-			delete[]message;
+			free(message);
 #endif
 		}
 		else
@@ -902,10 +907,7 @@ void Solver::nextRound()
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 									uint8_t* message, size_t message_len)
 {
-	int ver_ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
-	if (ver_ok == 0)
-		return true;
-	else
-		return false;
+	// if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
+	return !crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
 }
 } // namespace Credits
