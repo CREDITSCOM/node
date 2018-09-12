@@ -12,7 +12,7 @@
 #define TIME_TO_AWAIT_ACTIVITY 300
 #define TRX_SLEEP_TIME 100000 //microseconds
 #define FAKE_BLOCKS
-#define SPAMMER
+//#define SPAMMER
 #define SYNCRO
 //#define MYLOG
 
@@ -20,3 +20,6 @@
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
 #define BINARY_TCP_API
 #define DEFAULT_CURRENCY 1
+
+constexpr auto SIZE_OF_COMMON_TRANSACTION = 190;
+constexpr double COST_OF_ONE_TRUSTED_PER_DAY = 17;

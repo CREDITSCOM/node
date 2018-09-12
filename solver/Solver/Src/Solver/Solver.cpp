@@ -17,6 +17,7 @@
 #include "Solver/Solver.hpp"
 #include "Solver/WalletsState.h"
 #include <algorithm>
+#include <cmath>
 
 #include <lib/system/logger.hpp>
 
@@ -330,7 +331,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
-  Hash_ result = generals->buildvector(_pool, m_pool, b_pool);
+  Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
 	hvector.hash = result;
@@ -778,8 +779,8 @@ Solver::spamWithTransactions()
   csdb::Transaction transaction;
   transaction.set_target(aaa);
   transaction.set_source(
-  csdb::Address::from_public_key((char*)myPublicKey.data()));
-  //transaction.set_comission();
+    csdb::Address::from_public_key((char*)myPublicKey.data()));
+  //transaction.set_max_fee();
 
   transaction.set_currency(csdb::Currency("CS"));
 
@@ -791,7 +792,7 @@ Solver::spamWithTransactions()
       
 
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-          transaction.set_comission(csdb::Amount(0, 1,10));
+          transaction.set_max_fee(csdb::Amount(0, 1,10));
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
   #ifdef MYLOG
