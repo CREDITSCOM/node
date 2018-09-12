@@ -12,11 +12,19 @@
 /**
  * @class	TimerService
  *
- * @brief	A service for accessing timer information. Использование. Удобнее всего объявить один
- * 			экземпляр, можно глобально. Например, TimerService&lt;&gt; timer_service объявляет
- * 			экземпляр сервиса, измеряющего время в миллисекундах. Для получения текущего времени
- * 			необходимо вызвать
- * 			@code auto dt = timer_service.Mark( text );
+ * @brief	A service for accessing and accumulating timer information. Also, it may be used
+ * 			for delayed launch of custom method
+ * 			Использование. Удобнее всего объявить один экземпляр, можно глобально.
+ * 			Например,
+ * @code	TimerService<> timer_service
+ * 			объявляет экземпляр сервиса, измеряющего время в миллисекундах. Время измеряется
+ * 			от начала работы (т.е. создания экземпляра сервиса) или от последнего вызова Reset(),
+ * 			если они будут выполнены.
+ * 			Для получения текущего времени необходимо вызвать:
+ * @code	auto dt = timer_service.Time();
+ * 			Для одновременного получения времени и запоминания его сервисом во внутреннем хранилище с
+ * 			пользовательской текстовой меткой:
+ * @code	auto dt = timer_service.Mark( text );
  * 			В данном примере сервис сохраняет метку времени с комментарием, а переменная dt
  * 			получает значение текущего времени. Вторым необязательным аргументом можно передать
  * 			произвольный целочисленный идентификатор, для сохранения с меткой времени. При помощи
@@ -24,22 +32,24 @@
  * 			прочих меток, также сохраненных сервисом. Вызовы можно выполнять из любого потока.
  * 			
  * 			Другой возможностью, предоставляемой сервисом, является отложенный на заданное время
- * 			асинхронный вызов переданной пользоваетльской процедуры. Например,
- * 			@code timer_service.Launch( std::chrono::milliseconds(500), []() { job(1000); } )
- * 			инициирует запуск job(1000) через 500 мсек в отдельном потоке и сразу возвращает
- * 			управление в точку вызова.
+ * 			асинхронный вызов переданной пользовательской процедуры. Можно передать на отложенное
+ * 			выполнение пользовательскую функцию типа void() или лямбда-выражение [](){}. Например,
+ * @code	timer_service.Launch( 500, []() { job(1000); } )
+ * 			инициирует запуск job(1000) через 500 (по-умолчанию, мсек) в отдельном потоке и сразу возвращает
+ * 			управление в точку вызова. Переданный метод будет вызван из отдельного потока, не того,
+ * 			в котором был запланирован вызов! Т.е. метод должен быть потокобезопасным в отношении
+ * 			используемых им данных
  * 			
- * 			Можно одновременно передать на отложенное выполнение пользовательскую функцию типа
- * 			void() или [](){} и сохранить метку времени. Это делается вызовом метода
- * 			MarkAndLaunch(), например dt = timer_service.MarkAndLaunch(
- * 			@code std::chrono::milliseconds(500), []() { job(1000); }, text );
+ * 			Одновремнно с планированием вызова метода можно сохранить метку времени. Это делается вызовом
+ * 			MarkAndLaunch(), например
+ * @code	dt = timer_service.MarkAndLaunch(500, []() { job(1000); }, "some info" );
  * 			Здесь первый параметр задает время ожидания до вызова функции, переданной вторым
- * 			параметром, а text (третий параметр) сохраняется с меткой времени
+ * 			параметром, а текст (третий параметр) сохраняется с меткой времени
  * 			
  * 			В любое время при помощи метода Data() можно получить доступ к накопленным меткам
  * 			времени с комментариями. Поскольку каждый элемент списка меток времени имеет тип
- * 			std::tuple&lt;&gt; для извлечения непосредственно данных предусмотрены методы
- * 			TimePointFrom(), GroupIdFrom(), InfoFrom()
+ * 			std::tuple<> для извлечения непосредственно данных предусмотрены сервисные методы
+ * 			TimePointFrom(data), GroupIdFrom(data), InfoFrom(data), где data - элемент списка меток времени
  * 			
  * 			В конце использования сервиса, если были запланированы отложенные вызовы
  * 			пользовательских процедур, необходимом вызвать метод WaitLaunchedJobs(), который
@@ -113,14 +123,14 @@ public:
 	}
 
 	/**
-	 * @fn	template<typename TS> long long TimerService::Mark(TS && info, int group_id = 0)
+	 * @fn	template<typename TText> long long TimerService::Mark(TText && info, int group_id = 0)
 	 *
 	 * @brief	Stores a current time mark with group_id and text info attached
 	 *
 	 * @author	aae
 	 * @date	05.09.2018
 	 *
-	 * @tparam	TS	Type of the info (text type).
+	 * @tparam	TText	Text type of the info.
 	 * @param [in,out]	info		The custom text information stored with time mark.
 	 * @param 		  	group_id	(Optional) Identifier for the group of time marks to set logic
 	 * 								relations between some marks.
@@ -128,17 +138,28 @@ public:
 	 * @return	Current time measured in resolution units (milliseconds by default).
 	 */
 
-	template<typename TS>
-	long long Mark(TS && info, int group_id = 0)
+	template<typename TText>
+	long long Mark(TText && info, int group_id = 0)
 	{
 		TimePoint tp = Now();
 		MarkData d = std::make_tuple(tp, group_id, info);
 		{
-			Lock lock(_mtx);
+			Lock lock(_mtx_data);
 			this->_data.push_back(d);
 		}
 		return std::chrono::duration_cast<TRes>(tp - _t_start).count();
 	}
+
+	/**
+	 * @fn	long long TimerService::Time ()
+	 *
+	 * @brief	Gets the current time measured from last Reset() or constructing of the TimerService object
+	 *
+	 * @author	User
+	 * @date	12.09.2018
+	 *
+	 * @return	A long.
+	 */
 
 	long long Time ()
 	{
@@ -146,27 +167,29 @@ public:
 	}
 
 	/**
-	 * @fn	void TimerService::Launch(TRes&& wait_for, Callback&& proc)
+	 * @fn	template<typename TNumeric> void TimerService::Launch(TNumeric wait_for, Callback&& proc)
 	 *
 	 * @brief	Launches 'proc' (async) after 'wait_for' expired
 	 *
 	 * @author	aae
 	 * @date	05.09.2018
 	 *
-	 * @param [in,out]	wait_for	The time period to wait before launch 'proc' async. Measured in
-	 * 								timer resolution units (TRes is param of TimeService template, default
-	 * 								is milliseconds)
+	 * @tparam	TNumeric	Numeric type of wait_for.
+	 * @param 		  	wait_for	The time period to wait before launch 'proc' async. Measured in
+	 * 								timer resolution units (TRes is param of TimeService template,
+	 * 								default is milliseconds)
 	 * @param [in,out]	proc		The procedure to launch async after 'wait_for' expire.
 	 */
 
-	void Launch(TRes&& wait_for, Callback&& proc)
+	template<typename TNumeric>
+	void Launch(TNumeric wait_for, Callback&& proc)
 	{
 		try {
 			std::thread thr([wait_for, proc]() {
-				std::this_thread::sleep_for(wait_for);
+				std::this_thread::sleep_for(TRes(wait_for));
 				proc();
 			});
-			Lock lock(_mtx);
+			Lock lock(_mtx_jobs);
 			_launched.push_back(std::move(thr));
 		}
 		catch (...) {
@@ -174,7 +197,7 @@ public:
 	}
 
 	/**
-	 * @fn	template<typename TS> long long TimerService::MarkAndLaunch(TRes&& wait_for, Callback&& proc, TS && info, int group_id = 0)
+	 * @fn	template<typename TNumeric, typename TText> long long TimerService::MarkAndLaunch(TNumeric wait_for, Callback&& proc, TText && info, int group_id = 0)
 	 *
 	 * @brief	Stores a current time mark with group_id and text info attached, then launches 'proc'
 	 * 			(async) after 'wait_for' expired
@@ -182,25 +205,24 @@ public:
 	 * @author	aae
 	 * @date	05.09.2018
 	 *
-	 * @tparam	TS	Type of the info (text).
-	 * @param [in,out]	wait_for	The time period to wait before launch 'proc' async. Measured in
-	 * 								timer resolution units (TRes is param of TimeService template, default
-	 * 								is milliseconds)
+	 * @tparam	TNumeric	Numeric type of the wait_for.
+	 * @tparam	TText   	Text type of the info.
+	 * @param 		  	wait_for	The time period to wait before launch 'proc' async. Measured in
+	 * 								timer resolution units (TRes is param of TimeService template,
+	 * 								default is milliseconds)
 	 * @param [in,out]	proc		The procedure to launch async after 'wait_for' expire.
 	 * @param [in,out]	info		The custom text information stored with time mark.
 	 * @param 		  	group_id	(Optional) Identifier for the group of time marks to set logic
 	 * 								relations between some marks.
 	 *
 	 * @return	Current time measured in resolution units (milliseconds by default).
-	 *
-	 * ### tparam	TS	Type of the info (text type).
 	 */
 
-	template<typename TS>
-	long long MarkAndLaunch(TRes&& wait_for, Callback&& proc, TS && info, int group_id = 0)
+	template<typename TNumeric, typename TText>
+	long long MarkAndLaunch(TNumeric wait_for, Callback&& proc, TText && info, int group_id = 0)
 	{
-		Launch(std::forward<TRes>(wait_for), std::forward<Callback>(proc));
-		return Mark(std::forward<TS>(info), group_id);
+		Launch(wait_for, std::forward<Callback>(proc));
+		return Mark(std::forward<TText>(info), group_id);
 	}
 
 	/**
@@ -218,7 +240,7 @@ public:
 	{
 		int cnt = 0;
 		if (!_launched.empty()) {
-			Lock lock(_mtx);
+			Lock lock(_mtx_jobs);
 			for (auto& t : _launched) {
 				if (t.joinable()) {
 					cnt++;
@@ -257,7 +279,7 @@ public:
 
 	void ClearData()
 	{
-		Lock lock(_mtx);
+		Lock lock(_mtx_data);
 		if (!_data.empty()) {
 			this->_data.clear();
 		}
@@ -317,6 +339,28 @@ public:
 		return std::get<TimerService::InfoValue>(data);
 	}
 
+	/**
+	 * @fn	void TimerService::ConsoleOut()
+	 *
+	 * @brief	Perform output to console (std::cout) of all content. Method is thread-safe relatively own data
+	 * 			but unsafe relatively std::cout
+	 *
+	 * @author	aae
+	 * @date	12.09.2018
+	 */
+
+	void ConsoleOut()
+	{
+		std::cout << "TS: -- begin content --" << std::endl;
+		if(!_data.empty()) {
+			Lock lock(_mtx_data);
+			for(const auto& it : _data) {
+				ConsoleOut(it);
+			}
+		}
+		std::cout << "TS: -- end content --" << std::endl;
+	}
+
 private:
 
 	static const int TimePointValue = 0;
@@ -326,7 +370,8 @@ private:
 	std::vector<MarkData> _data;
 	std::vector<std::thread> _launched;
 	TimePoint _t_start;
-	std::mutex _mtx;
+	std::mutex _mtx_data;
+	std::mutex _mtx_jobs;
 
 	TimePoint Now()
 	{
@@ -339,18 +384,6 @@ private:
 		std::cout << "TS: " << duration_cast<milliseconds>(TimePointFrom(d) - _t_start).count() << ": [" << GroupIdFrom(d) << "] " << InfoFrom(d) << std::endl;
 	}
 
-public:
-	void ConsoleOut()
-	{
-		std::cout << "TS: -- begin content --" << std::endl;
-		if (!_data.empty()) {
-			Lock lock(_mtx);
-			for (const auto& it : _data) {
-				ConsoleOut(it);
-			}
-		}
-		std::cout << "TS: -- end content --" << std::endl;
-	}
 };
 
 #if !defined(_MSC_VER)
