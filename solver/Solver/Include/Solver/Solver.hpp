@@ -258,6 +258,7 @@ typedef std::string Matrix;
 		std::atomic_bool spamRunning{ false };
 		std::thread spamThread;
 		void spamWithTransactions();
+    std::vector<csdb::Address> spam_keys;
 #endif
 
 	};

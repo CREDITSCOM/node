@@ -24,6 +24,10 @@
 #include <base58.h>
 #include <sodium.h>
 
+#ifdef SPAMMER
+  static const int NUM_OF_SPAM_KEYS = 1000;
+#endif
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -70,7 +74,19 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
   , m_pool()
   , v_pool()
   , b_pool()
-{}
+{
+#ifdef SPAMMER
+  uint8_t sk[64];
+  uint8_t pk[32];
+  csdb::Address pub;
+  for (int i = 0; i < NUM_OF_SPAM_KEYS; i++)
+  {
+    crypto_sign_keypair(pk, sk);
+    pub = pub.from_public_key((const char*)pk);
+    spam_keys.push_back(pub);
+  }
+#endif
+}
 
 Solver::~Solver()
 {
@@ -703,15 +719,7 @@ Solver::spamWithTransactions()
   uint64_t iid=0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  auto aaa = csdb::Address::from_string(
-    "0000000000000000000000000000000000000000000000000000000000000001");
-  auto bbb = csdb::Address::from_string(
-    "0000000000000000000000000000000000000000000000000000000000000002");
-
   csdb::Transaction transaction;
-  transaction.set_target(aaa);
-  transaction.set_source(
-    csdb::Address::from_public_key((char*)myPublicKey.data()));
   //transaction.set_max_fee();
 
   transaction.set_currency(csdb::Currency("CS"));
@@ -721,8 +729,8 @@ Solver::spamWithTransactions()
     {
       if ((node_->getRoundNumber()<10) || (node_->getRoundNumber() > 20) )
       {
-      
-
+          transaction.set_source(spam_keys[iid]);
+          transaction.set_target(spam_keys[iid + 1]);
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
           transaction.set_max_fee(csdb::Amount(0, 1,10));
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
@@ -735,6 +743,8 @@ Solver::spamWithTransactions()
           m_transactions.push_back(transaction);
           }
           iid++;
+          if (iid == NUM_OF_SPAM_KEYS - 1)
+            iid = 0;
       }
     }
 
