@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
+#include <map>
 #ifdef _MSC_VER
 #include <intrin.h>
 #else
@@ -38,18 +39,32 @@ namespace Credits{
       //comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
     csdb::Transaction tempTransaction;
-	  size_t transactionsNumber = _pool.transactions_count();
+    std::map <PublicKey, csdb::Amount> tempBalance;
+    size_t transactionsNumber = _pool.transactions_count();
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
-  
+    
     const csdb::Amount zero_balance = 0.0_c;
+    csdb::Amount delta;
     if (_pool.transactions_count() > 0) {
 
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)
 	  {
 		  countFee(it, num_of_trusted, t_pool.size());
-		  auto delta = it.balance() - it.amount() - it.counted_fee();
+
+      delta = it.balance() - it.amount() - it.counted_fee();
+      //if (tempBalance.empty()) 
+      //{
+      //  
+      //  tempBalance.emplace(it.source(), delta);
+      //}
+      //else
+      //{
+      //  if(tempBalance.at(it.source))it.set_balance()
+      //}
+
+
 
 	#ifdef _MSC_VER
 		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
@@ -62,8 +77,11 @@ namespace Credits{
         new_pool.add_transaction(it);
       }
 
-		  else *(del1 + i) = -bitcnt;
-      new_bpool.add_transaction(it);
+		  else
+      {
+        *(del1 + i) = -bitcnt;
+        new_bpool.add_transaction(it);
+      }
      	i++;
 	  }
 	  
@@ -202,7 +220,7 @@ namespace Credits{
     delete hw;
     }
 
-    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash lasthash) {
+    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash) {
     #ifdef MYLOG
 		std::cout << "GENERALS> Take decision: starting " << std::endl;
     #endif
@@ -263,8 +281,7 @@ namespace Credits{
 		}
 
 
-		uint8_t trusted_limit;
-		trusted_limit = nodes_amount / 2 + 1;
+		uint8_t trusted_limit = nodes_amount * 0.5f + 1;
     uint8_t j=0;
 		for (int i = 0; i < nodes_amount; i++)
 		{
