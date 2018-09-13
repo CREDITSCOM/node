@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <csdb/currency.h>
 #include <csdb/address.h>
+#include <csdb/amount_commission.h>
 #include <csdb/pool.h>
 #include <csdb/transaction.h>
 
@@ -325,7 +326,7 @@ namespace Credits{
     void Generals::chooseHeadAndTrustedFake(std::vector<std::string>& hashes) { }
     void Generals::fake_block(std::string m_public_key) { }
 
-csdb::Amount Generals::countFee(csdb::Transaction& transaction, size_t numOfTrustedNodesInRound,
+void Generals::countFee(csdb::Transaction& transaction, size_t numOfTrustedNodesInRound,
 	size_t numOfTransactionsInRound)
 {
 	constexpr int NUM_OF_ROUDS_PER_SECOND = 5;
@@ -340,9 +341,7 @@ csdb::Amount Generals::countFee(csdb::Transaction& transaction, size_t numOfTrus
 		fee *= lengthCoef;
 	}
 
-	csdb::Amount countedFee(fee);
-	transaction.set_counted_fee(countedFee);
-	return countedFee;
+	transaction.set_counted_fee(csdb::AmountCommission(fee));
 }
 
 }

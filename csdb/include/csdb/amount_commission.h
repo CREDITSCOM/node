@@ -9,6 +9,7 @@
 
 #include <cinttypes>
 #include <type_traits>
+#include <cmath>
 
 #include <boost/endian/conversion.hpp>
 
@@ -26,6 +27,7 @@ class ibstream;
 class AmountCommission {
  public:
   inline AmountCommission() = default;
+  AmountCommission(uint16_t value);
   AmountCommission(double value);
 
   // Получение значений

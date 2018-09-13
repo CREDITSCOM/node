@@ -150,7 +150,7 @@ private:
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
 	  if (!is.get(previous_hash_)) {
 		  return false;
-	  }
+      }
 
 	  if (!is.get(sequence_))
 		  return false;

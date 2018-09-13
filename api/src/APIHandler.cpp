@@ -8,6 +8,7 @@
 // csdb
 #include <csdb/address.h>
 #include <csdb/amount.h>
+#include <csdb/amount_commission.h>
 #include <csdb/csdb.h>
 #include <csdb/currency.h>
 #include <csdb/pool.h>
@@ -17,6 +18,7 @@
 
 #include <stack>
 
+#include <cinttypes>
 #include <algorithm>
 #include <cassert>
 #include <type_traits>
@@ -479,8 +481,7 @@ APIHandler::make_transaction(const Transaction& transaction)
     send_transaction.set_source(source);
     send_transaction.set_target(
       BlockChain::getAddressFromKey(transaction.target));
-    send_transaction.set_max_fee(csdb::Amount(
-      transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
+    send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
     send_transaction.set_innerID(transaction.id);
     send_transaction.set_signature(transaction.signature);
     return send_transaction;

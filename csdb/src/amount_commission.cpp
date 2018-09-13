@@ -6,6 +6,10 @@
 
 namespace csdb {
 
+AmountCommission::AmountCommission(uint16_t value)
+  : bits_(value)
+{}
+
 AmountCommission::AmountCommission(double value)
 {
   fIEEE_.sign = value < 0. ? 1 : 0;

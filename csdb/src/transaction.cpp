@@ -10,6 +10,9 @@
 #include "csdb/amount.h"
 #include "csdb/currency.h"
 #include "csdb/pool.h"
+#include "csdb/internal/types.h"
+
+#include "priv_crypto.h"
 
 namespace csdb {
 
@@ -109,16 +112,16 @@ Transaction::Transaction(int64_t innerID,
                          Address target,
                          Currency currency,
                          Amount amount,
-                         Amount max_fee,
-                         Amount counted_fee,
+                         AmountCommission max_fee,
+                         AmountCommission counted_fee,
                          std::string signature)
   : d(new priv(innerID,
                source,
                target,
                currency,
+               amount,
                max_fee,
                counted_fee,
-               amount,
                signature,
                amount))
 {}
@@ -127,18 +130,18 @@ Transaction::Transaction(int64_t innerID,
                          Address source,
                          Address target,
                          Currency currency,
-                         Amount max_fee,
-                         Amount counted_fee,
                          Amount amount,
+                         AmountCommission max_fee,
+                         AmountCommission counted_fee,
                          std::string signature,
                          Amount balance)
   : d(new priv(innerID,
                source,
                target,
                currency,
+               amount,
                max_fee,
                counted_fee,
-               amount,
                signature,
                balance))
 {}
@@ -194,13 +197,13 @@ Transaction::amount() const noexcept
   return d->amount_;
 }
 
-Amount
+AmountCommission
 Transaction::max_fee() const noexcept
 {
   return d->max_fee_;
 }
 
-Amount
+AmountCommission
 Transaction::counted_fee() const noexcept
 {
 	return d->counted_fee_;
@@ -259,7 +262,7 @@ Transaction::set_amount(Amount amount)
 }
 
 void
-Transaction::set_max_fee(Amount max_fee)
+Transaction::set_max_fee(AmountCommission max_fee)
 {
   if (!d.constData()->read_only_) {
     d->max_fee_ = max_fee;
@@ -267,7 +270,7 @@ Transaction::set_max_fee(Amount max_fee)
 }
 
 void
-Transaction::set_counted_fee(Amount counted_fee)
+Transaction::set_counted_fee(AmountCommission counted_fee)
 {
 	if (!d.constData()->read_only_) {
 		d->counted_fee_ = counted_fee;
@@ -397,27 +400,96 @@ void
 Transaction::put(::csdb::priv::obstream& os) const
 {
   const priv* data = d.constData();
-  os.put(data->innerID_);
-  os.put(data->source_);
-  os.put(data->target_);
-  os.put(data->currency_);
+  uint8_t innerID[6];
+  {
+    auto ptr = reinterpret_cast<const uint8_t *>(&data->innerID_);
+    std::copy(ptr, ptr + sizeof(innerID), innerID); // only for little endian machines
+  }
+  innerID[0] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
+  os.put(*reinterpret_cast<uint16_t *>(innerID));
+  os.put(*reinterpret_cast<uint32_t *>(innerID + sizeof(uint16_t)));
+  if (data->source_.is_wallet_id()) {
+    os.put(data->source_.wallet_id());
+  } else {
+    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+  }
+  if (data->target_.is_wallet_id()) {
+    os.put(data->target_.wallet_id());
+  } else {
+    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+  }
   os.put(data->amount_);
   os.put(data->max_fee_);
-  os.put(data->counted_fee_);
-  os.put(data->user_fields_);
+  os.put(data->currency_.to_string() == "CS" ? (uint8_t)1 : (uint8_t)0);
+  {
+    uint8_t size = data->user_fields_.size();
+    os.put(size);
+    if (size) {
+      os.put(data->user_fields_);
+    }
+  }
   os.put(data->signature_);
-  os.put(data->balance_);
+  os.put(data->counted_fee_);
 }
 
 bool
 Transaction::get(::csdb::priv::ibstream& is)
 {
   priv* data = d.data();
-  return is.get(data->innerID_) && is.get(data->source_) &&
-         is.get(data->target_) && is.get(data->currency_) &&
-         is.get(data->amount_) && is.get(data->max_fee_) &&
-         is.get(data->counted_fee_) && is.get(data->user_fields_) &&
-         is.get(data->signature_) && is.get(data->balance_);
+  bool res;
+
+  {
+    uint16_t lo;
+    uint32_t hi;
+    res = is.get(lo) && is.get(hi);
+    if (!res) return res;
+    data->innerID_ = (((uint64_t)lo & 0x3fff) << 32) | hi;
+    if (lo & 0x8000) {
+      internal::WalletId id;
+      res = is.get(id);
+      if (!res) return res;
+      data->source_ = Address::from_wallet_id(id);
+    } else {
+      char key[::csdb::priv::crypto::public_key_size];
+      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      if (!res) return res;
+      data->source_ = Address::from_public_key(key);
+    }
+
+    if (lo & 0x4000) {
+      internal::WalletId id;
+      res = is.get(id);
+      if (!res) return res;
+      data->target_ = Address::from_wallet_id(id);
+    } else {
+      char key[::csdb::priv::crypto::public_key_size];
+      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      if (!res) return res;
+      data->target_ = Address::from_public_key(key);
+    }
+  }
+
+  res = is.get(data->amount_);
+  if (!res) return res;
+
+  res = is.get(data->max_fee_);
+  if (!res) return res;
+
+  uint8_t d;
+  res = is.get(d);
+  if (!res) return res;
+
+  data->currency_ = d == 1 ? Currency("CS") : Currency("");
+
+  res = is.get(d);
+  if (!res) return res;
+
+  if (d) {
+    res = is.get(data->user_fields_);
+    if (!res) return res;
+  }
+
+  return is.get(data->signature_) && is.get(data->counted_fee_);
 }
 
 } // namespace csdb
