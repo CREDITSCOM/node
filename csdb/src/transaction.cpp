@@ -371,26 +371,43 @@ Transaction::to_byte_stream_for_sig() const
   ::csdb::priv::obstream os;
   int8_t currency;
   const priv* data = d.constData();
-  os.put(data->innerID_);
-  os.put(data->source_.public_key().data(), 32);
-  os.put(data->target_.public_key().data(), 32);
-  if (data->currency_.to_string() == "CS")
-    currency = 1;
-  else
-    currency = 0;
+  uint8_t innerID[6];
+  {
+    auto ptr = reinterpret_cast<const uint8_t *>(&data->innerID_);
+    std::copy(ptr, ptr + sizeof(innerID), innerID); // only for little endian machines
+  }
+  innerID[0] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
+  os.put(*reinterpret_cast<uint16_t*>(innerID));
+  os.put(*reinterpret_cast<uint32_t *>(innerID + sizeof(uint16_t)));
+  if (data->source_.is_wallet_id()) {
+    os.put(data->source_.wallet_id());
+  } else {
+    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+  }
+  if (data->target_.is_wallet_id()) {
+    os.put(data->target_.wallet_id());
+  } else {
+    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+  }
   os.put(data->amount_);
   os.put(data->max_fee_);
+  if (data->currency_.to_string() == "CS") {
+    currency = 1;
+  } else {
+    currency = 0;
+  }
   os.put(currency);
+
   const size_t fixed_prefix_length = os.buffer().size();
   decltype(data->user_fields_) custom_user_fields(
     data->user_fields_.lower_bound(0), data->user_fields_.end());
   if (custom_user_fields.size()) {
     os.put_smart(custom_user_fields);
     auto buf = os.buffer();
-    buf.erase(buf.begin() + (fixed_prefix_length + sizeof(uint32_t)));
+    buf.erase(buf.begin() + (fixed_prefix_length + sizeof(uint8_t)));
     return buf;
   } else {
-    uint32_t num_user_fields = 0;
+    uint8_t num_user_fields = 0;
     os.put(num_user_fields);
     return os.buffer();
   }

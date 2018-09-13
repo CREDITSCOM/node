@@ -118,7 +118,7 @@ void obstream::put(const ::std::map<K, T, C, A>& value)
 template<class K, class T, class C, class A>
 void obstream::put_smart(const ::std::map<K, T, C, A>& value)
 {
-	put(static_cast<uint32_t>(value.size()));
+	put(static_cast<uint8_t>(value.size()));
 	for (const auto& it : value) {
 		//put(it.first);
 		put(it.second);

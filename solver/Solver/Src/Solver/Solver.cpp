@@ -10,6 +10,7 @@
 #include <csdb/address.h>
 #include <csdb/currency.h>
 #include <csdb/wallet.h>
+#include <csdb/amount_commission.h>
 
 #include <csnode/node.hpp>
 
@@ -732,7 +733,7 @@ Solver::spamWithTransactions()
           transaction.set_source(spam_keys[iid]);
           transaction.set_target(spam_keys[iid + 1]);
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-          transaction.set_max_fee(csdb::Amount(0, 1,10));
+          transaction.set_max_fee(csdb::AmountCommission(0.1));
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
   #ifdef MYLOG
