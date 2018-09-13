@@ -35,10 +35,12 @@ public:
     WalletsPoolsImpl(csdb::Address genesisAddress, csdb::Address startAddress, const WalletsIds& walletsIds);
     ~WalletsPoolsImpl();
 
+    void addWallet(WalletId id);
+
     template<Direction Dir>
     void load(csdb::Pool& curr);
 
-    const WalletData* findWallet(const WalletId& id) const;
+    const WalletData* findWallet(WalletId id) const;
 
 private:
     template<Direction Dir>
@@ -51,7 +53,7 @@ private:
     void loadTrxForTarget(csdb::Transaction& tr, const PoolHash& poolHash);
 
     bool findWalletId(const csdb::Address& address, WalletId& id) const;
-    WalletData& getWalletData(const WalletId& id);
+    WalletData* findWalletData(WalletId id);
 
     template<Direction Dir>
     void addPoolHash(WalletData& walData, const PoolHash& poolHash);
@@ -114,9 +116,11 @@ void WalletsPoolsImpl::loadTrxForSource(csdb::Transaction& tr, const PoolHash& p
         LOG_ERROR("Cannot find source wallet");
         return;
     }
-    auto& walData = getWalletData(id);
+    auto* walData = findWalletData(id);
+    if (!walData)
+        return;
 
-    addPoolHash<Dir>(walData, poolHash);
+    addPoolHash<Dir>(*walData, poolHash);
 }
 
 template<Direction Dir>
@@ -132,22 +136,31 @@ void WalletsPoolsImpl::loadTrxForTarget(csdb::Transaction& tr, const PoolHash& p
         LOG_ERROR("Cannot find target wallet");
         return;
     }
-    auto& walData = getWalletData(id);
+    auto* walData = findWalletData(id);
+    if (!walData)
+        return;
 
-    addPoolHash<Dir>(walData, poolHash);
+    addPoolHash<Dir>(*walData, poolHash);
 }
 
 bool WalletsPoolsImpl::findWalletId(const csdb::Address& address, WalletId& id) const
 {
-    if (!walletsIds_.find(address, id))
+    if (!walletsIds_.normal().find(address, id))
         return false;
     return true;
 }
 
-WalletsPoolsImpl::WalletData& WalletsPoolsImpl::getWalletData(const WalletId& id)
+WalletsPoolsImpl::WalletData* WalletsPoolsImpl::findWalletData(WalletId id)
 {
-    auto res = data_.emplace(id, WalletData());
-    return res.first->second;
+    auto it = data_.find(id);
+    if (it == data_.end())
+        return nullptr;
+    return &it->second;
+}
+
+void WalletsPoolsImpl::addWallet(WalletId id)
+{
+    (void)data_.emplace(id, WalletData());
 }
 
 template<>
@@ -186,7 +199,7 @@ void WalletsPoolsImpl::addPoolHash<Direction::NextBlock>(WalletData& walData, co
     }
 }
 
-const WalletsPoolsImpl::WalletData* WalletsPoolsImpl::findWallet(const WalletId& id) const
+const WalletsPoolsImpl::WalletData* WalletsPoolsImpl::findWallet(WalletId id) const
 {
     auto itWalData = data_.find(id);
     if (itWalData == data_.end())
@@ -207,6 +220,12 @@ WalletsPools::~WalletsPools()
     delete impl;
 }
 
+void WalletsPools::addWallet(WalletId id)
+{
+    WalletsPoolsImpl* impl = (WalletsPoolsImpl*)impl_;
+    impl->addWallet(id);
+}
+
 void WalletsPools::loadPrevBlock(csdb::Pool& curr)
 {
     WalletsPoolsImpl* impl = (WalletsPoolsImpl*)impl_;
@@ -219,7 +238,7 @@ void WalletsPools::loadNextBlock(csdb::Pool& curr)
     impl->load<Direction::NextBlock>(curr);
 }
 
-const WalletsPools::WalletData* WalletsPools::findWallet(const WalletId& id) const
+const WalletsPools::WalletData* WalletsPools::findWallet(WalletId id) const
 {
     WalletsPoolsImpl* impl = (WalletsPoolsImpl*)impl_;
     return impl->findWallet(id);

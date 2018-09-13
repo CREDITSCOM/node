@@ -633,6 +633,22 @@ Pool Pool::load(PoolHash hash, Storage storage)
   return res;
 }
 
+bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const
+{
+    const csdb::Pool::Transactions& transactions = this->transactions();
+
+    size_t idx = info.addressId_.trxInd_;
+    if (idx >= transactions.size())
+    {
+        return false;
+    }
+
+    csdb::Transaction trx = transactions[idx];
+    const bool isSource = (info.addressId_.addressType_ == NewWalletInfo::AddressType::AddressIsSource);
+    wallAddress = (isSource) ? trx.source() : trx.target();
+    return true;
+}
+
 void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const
 {
     os.put(*(size_t*)(&addressId_));

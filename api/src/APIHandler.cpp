@@ -91,6 +91,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
     return;
   }
   TRACE("");
+
   work_queues["TransactionFlow"]; // init value with default
                                   // constructors
   TRACE("");
@@ -154,16 +155,11 @@ APIHandlerBase::SetResponseStatus(APIResponse& response,
 
   APIRequestStatus
     statuses[static_cast<size_t>(APIHandlerBase::APIRequestStatusType::MAX)] = {
-      {
-        0,
-        "Success",
-      },
-      {
-        1,
-        "Failure",
-      },
+      { 0, "Success" },
+      { 1, "Failure" },
       { 2, "Not Implemented" },
-    };
+      { 3, "Not found" },
+  };
   response.code = statuses[static_cast<uint8_t>(status)].code;
   response.message = statuses[static_cast<uint8_t>(status)].message + details;
 }
@@ -178,9 +174,7 @@ APIHandlerBase::SetResponseStatus(APIResponse& response, bool commandWasHandled)
 }
 
 void
-APIHandler::BalanceGet(BalanceGetResult& _return,
-                       const Address& address,
-                       const Currency currency)
+APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
 {
   csdb::Address addr;
   // if (address.size() != 64)
@@ -188,10 +182,26 @@ APIHandler::BalanceGet(BalanceGetResult& _return,
   // else
   //    addr = csdb::Address::from_string(address);
 
-  csdb::Amount result = s_blockchain.getBalance(addr);
+  BlockChain::WalletId wallId{};
+  if (!s_blockchain.findWalletId(addr, wallId))
+  {
+      SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+      return;
+  }
 
-  _return.amount.integral = result.integral();
-  _return.amount.fraction = result.fraction();
+  BlockChain::WalletData wallData{};
+  if (!s_blockchain.findWalletData(wallId, wallData))
+  {
+      SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+      return;
+  }
+
+  _return.walletData.walletId = wallId;
+  _return.walletData.balance.integral = wallData.balance_.integral();
+  _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
+
+  const Credits::TransactionsTail& tail = wallData.trxTail_;
+  _return.walletData.lastTransactionId = tail.empty() ? 0 : tail.getLastTransactionId();
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

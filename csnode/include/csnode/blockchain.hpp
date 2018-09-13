@@ -82,18 +82,18 @@ public:
 
   // slightly faster than findWalletData
   csdb::Amount getBalance(const csdb::Address&) const;
-  csdb::Amount getBalance(const WalletId&) const;
+  csdb::Amount getBalance(WalletId) const;
  
   // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData) const;
-  bool findWalletData(const WalletId&, WalletData& wallData) const;
+  bool findWalletData(WalletId id, WalletData& wallData) const;
 
   // wallet transactions: pools cache + db search
   void getTransactions(
       Transactions& transactions,
       csdb::Address address,
       uint64_t offset,
-      uint64_t limit) const;
+      uint64_t limit);
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
@@ -117,28 +117,35 @@ private:
   void putBlock(csdb::Pool& pool);
   void writeBlock(csdb::Pool& pool);
 
-  bool initCaches();
+  bool initCaches(Credits::WalletsCache::Initer& initer);
 
-  bool updateWalletIds(const csdb::Pool& pool);
-  bool updateWalletsCache(csdb::Pool& pool);
-  bool updateWalletsPools(csdb::Pool& pool);
+  template<typename WalletCacheProcessor>
+  bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, Credits::WalletsCache::Initer& initer);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, Credits::WalletsCache::Updater& updater);
+
   void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
 
-  bool findWalletData_Unsafe(const WalletId& id, WalletData& wallData) const;
-  csdb::Amount getBalance_Unsafe(const WalletId& id) const;
+  bool updateWalletsCacheAndPools(csdb::Pool& pool);
 
+  bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
+  csdb::Amount getBalance_Unsafe(WalletId id) const;
+
+  class TrxLoader;
   bool findDataForTransactions(
       csdb::Address address,
       csdb::Address& wallPubKey,
+      WalletId& id,
       Credits::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
   void getTransactions(
       Transactions & transactions,
       csdb::Address wallPubKey,
+      WalletId id,
       const Credits::WalletsPools::WalletData::PoolsHashes& hashesArray,
       uint64_t offset,
-      uint64_t limit) const;
+      uint64_t limit);
 
 private:
   bool good_;
@@ -156,7 +163,8 @@ private:
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
   std::unique_ptr<Credits::WalletsIds> walletIds_;
-  std::unique_ptr<Credits::WalletsCache> walletsCache_;
+  std::unique_ptr<Credits::WalletsCache> walletsCacheStorage_;
+  std::unique_ptr<Credits::WalletsCache::Updater> walletsCacheUpdater_;
   std::unique_ptr<Credits::WalletsPools> walletsPools_;
   mutable Credits::spinlock cacheMutex_;
 

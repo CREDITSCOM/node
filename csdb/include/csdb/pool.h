@@ -142,6 +142,7 @@ public:
 
   NewWallets* newWallets() noexcept;
   const NewWallets& newWallets() const noexcept;
+  bool getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const;
 
   /**
    * @brief Добавляет транзакцию в пул.

@@ -11,9 +11,17 @@ namespace Credits
         static constexpr size_t BitSize = 32;
         using TransactionId = int64_t;
     public:
+
+        bool empty() const { return heap_.empty(); }
+
         void push(TransactionId trxId)
         {
             heap_.push(trxId);
+        }
+
+        TransactionId getLastTransactionId() const
+        {
+            return heap_.minMaxRange().second;
         }
 
         bool isAllowed(TransactionId trxId) const

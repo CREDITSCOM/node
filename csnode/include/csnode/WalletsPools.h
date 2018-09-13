@@ -52,10 +52,11 @@ namespace Credits
         WalletsPools(const WalletsPools&&) = delete;
         WalletsPools& operator=(const WalletsPools&&) = delete;
 
+        void addWallet(WalletId id);
         void loadPrevBlock(csdb::Pool& curr);
         void loadNextBlock(csdb::Pool& curr);
 
-        const WalletData* findWallet(const WalletId& id) const;
+        const WalletData* findWallet(WalletId id) const;
 
     private:
         void* impl_;

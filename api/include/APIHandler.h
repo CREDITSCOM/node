@@ -29,6 +29,7 @@ class APIHandlerBase
         SUCCESS,
         FAILURE,
         NOT_IMPLEMENTED,
+        NOT_FOUND,
         MAX
     };
 
@@ -70,9 +71,8 @@ class APIHandler : public APIHandlerInterface
 
     APIHandler(const APIHandler&) = delete;
 
-    void BalanceGet(api::BalanceGetResult& _return,
-                    const api::Address& address,
-                    const api::Currency currency) override;
+    void WalletDataGet(api::WalletDataGetResult& _return,
+                       const api::Address& address) override;
 
     void TransactionGet(api::TransactionGetResult& _return,
                         const api::TransactionId& transactionId) override;

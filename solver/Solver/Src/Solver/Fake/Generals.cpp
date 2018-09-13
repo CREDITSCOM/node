@@ -74,7 +74,10 @@ namespace Credits{
                 WalletsState::WalletId walletId{};
                 WalletsState::WalletData& wallState = walletsState.getData(trx.source(), walletId);
                 if (!wallState.trxTail_.isAllowed(trx.innerID()))
+                {
+                    *(del1 + i) = bitcnt;
                     continue;
+                }
 
                 *(del1 + i) = bitcnt;
                 wallState.trxTail_.push(trx.innerID());

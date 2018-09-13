@@ -32,15 +32,21 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
   , genesisAddress_(genesisAddress)
   , startAddress_(startAddress)
   , walletIds_(new WalletsIds)
-  , walletsCache_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
+  , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 {
   bool wasJustCreated = false;
   if (!initFromDB(path, wasJustCreated))
       return;
  
-  if (!wasJustCreated  &&  !initCaches())
-      return;
+  if (!wasJustCreated)
+  {
+      std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
+      if (!initCaches(*initer))
+          return;
+  }
+
+  walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
  
   good_ = true;
 }
@@ -213,10 +219,8 @@ void BlockChain::writeBlock(csdb::Pool& pool)
     }
     std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 
-    if (!updateWalletsCache(pool))
-        LOG_ERROR("Couldn't update cache");
-    if (!updateWalletsPools(pool))
-        LOG_ERROR("Couldn't update cache for wallets pools");
+    if (!updateWalletsCacheAndPools(pool))
+        LOG_ERROR("Couldn't update wallets cache and pools");
 
     {
         TRACE("");
@@ -339,22 +343,22 @@ csdb::Amount BlockChain::getBalance(const csdb::Address& address) const
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
     WalletId id{};
-    if (!walletIds_->find(address, id))
+    if (!walletIds_->normal().find(address, id))
         return csdb::Amount{};
 
     return getBalance_Unsafe(id);
 }
 
-csdb::Amount BlockChain::getBalance(const WalletId& id) const
+csdb::Amount BlockChain::getBalance(WalletId id) const
 {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
     return getBalance_Unsafe(id);
 }
 
-csdb::Amount BlockChain::getBalance_Unsafe(const WalletId& id) const
+csdb::Amount BlockChain::getBalance_Unsafe(WalletId id) const
 {
-    const WalletsCache::WalletData* walData = walletsCache_->findWallet(id);
+    const WalletsCache::WalletData* walData = walletsCacheUpdater_->findWallet(id);
     if (!walData)
         return csdb::Amount{};
     return walData->balance_;
@@ -371,7 +375,7 @@ void BlockChain::onBlockReceived(csdb::Pool& pool) {
     std::cout << "onBlockReceived is running" << std::endl;
 #endif
 
-    if (!updateWalletIds(pool))
+    if (!updateWalletIds(pool, *walletsCacheUpdater_))
         LOG_ERROR("Couldn't update wallet ids");
     putBlock(pool);
 }
@@ -469,106 +473,122 @@ bool BlockChain::getBlockRequestNeed() const
     return blockRequestIsNeeded;
 }
 
-namespace
+class BlockChain::TrxLoader
 {
-    class TrxLoader
+public:
+    using Transactions = std::vector<csdb::Transaction>;
+
+public:
+    TrxLoader(
+        csdb::Address wallPubKey,
+        BlockChain::WalletId id,
+        bool isToLoadWalletsPoolsCache,
+        BlockChain& blockchain,
+        Transactions& transactions)
+        : wallPubKey_(wallPubKey)
+        , id_(id)
+        , isToLoadWalletsPoolsCache_(isToLoadWalletsPoolsCache)
+        , blockchain_(blockchain)
+        , transactions_(transactions)
     {
-    public:
-        using Transaction = std::vector<csdb::Transaction>;
-
-    public:
-        TrxLoader(csdb::Address addr,
-            const BlockChain& blockchain,
-            Transaction& transactions)
-            : addr_(addr)
-            , blockchain_(blockchain)
-            , transactions_(transactions)
-        {}
-
-        bool load(const csdb::PoolHash& poolHash,
-            uint64_t& offset,
-            uint64_t limit,
-            csdb::PoolHash& prevPoolHash)
+        if (isToLoadWalletsPoolsCache_)
         {
-            csdb::Pool curr = blockchain_.loadBlock(poolHash);
-            if (!curr.is_valid())
-                return false;
+            std::lock_guard<decltype(cacheMutex_)> lock(blockchain_.cacheMutex_);
+            blockchain.walletsPools_->addWallet(id);
+        }
+    }
 
-            if (curr.transactions_count()) {
-                auto curIdx = static_cast<csdb::TransactionID::sequence_t>(
-                    curr.transactions_count() - 1);
+    bool load(const csdb::PoolHash& poolHash,
+        uint64_t& offset,
+        uint64_t limit,
+        csdb::PoolHash& prevPoolHash)
+    {
+        csdb::Pool curr = blockchain_.loadBlock(poolHash);
+        if (!curr.is_valid())
+            return false;
 
-                while (true) {
-                    auto trans = curr.transaction(curIdx);
-                    // std::cerr << "Ladder: " << trans.target().to_string() << " <-
-                    // "
-                    //          << trans.source().to_string() << " of "
-                    //          << trans.amount().integral() << std::endl;
-                    if (trans.target() == addr_ || trans.source() == addr_) {
-                        if (offset == 0)
-                            transactions_.push_back(trans);
-                        else
-                            --offset;
-                    }
+        if (curr.transactions_count())
+        {
+            bool hasMyTransactions = false;
 
-                    if (transactions_.size() == limit)
-                        break;
+            for(auto trans : curr.transactions())
+            {
+                if (transactions_.size() == limit)
+                    break;
 
-                    if (curIdx == 0)
-                        break;
-                    --curIdx;
+                // std::cerr << "Ladder: " << trans.target().to_string() << " <-
+                // "
+                //          << trans.source().to_string() << " of "
+                //          << trans.amount().integral() << std::endl;
+                if (trans.target() == wallPubKey_ || trans.source() == wallPubKey_)
+                {
+                    hasMyTransactions = true;
+
+                    if (offset == 0)
+                        transactions_.push_back(trans);
+                    else
+                        --offset;
                 }
             }
 
-            prevPoolHash = curr.previous_hash();
-            return true;
+            if (hasMyTransactions  &&  isToLoadWalletsPoolsCache_)
+            {
+                std::lock_guard<decltype(cacheMutex_)> lock(blockchain_.cacheMutex_);
+                blockchain_.walletsPools_->loadPrevBlock(curr);
+            }
         }
 
-    private:
-        csdb::Address addr_;
-        const BlockChain& blockchain_;
-        Transaction& transactions_;
-    };
-}
+        prevPoolHash = curr.previous_hash();
+        return true;
+    }
+
+private:
+    csdb::Address wallPubKey_;
+    BlockChain::WalletId id_;
+    const bool isToLoadWalletsPoolsCache_;
+    BlockChain& blockchain_;
+    Transactions& transactions_;
+};
 
 void BlockChain::getTransactions(Transactions& transactions,
     csdb::Address address,
     uint64_t offset,
-    uint64_t limit) const
+    uint64_t limit)
 {
     if (offset >= getSize())
         return;
     if (!limit)
         return;
+    WalletId id{};
     csdb::Address wallPubKey;
     WalletsPools::WalletData::PoolsHashes hashesArray;
 
-    if (!findDataForTransactions(address, wallPubKey, hashesArray))
+    if (!findDataForTransactions(address, wallPubKey, id, hashesArray))
         return;
 
-    getTransactions(transactions, wallPubKey, hashesArray, offset, limit);
+    getTransactions(transactions, wallPubKey, id, hashesArray, offset, limit);
 }
 
 bool BlockChain::findDataForTransactions(
     csdb::Address address,
     csdb::Address& wallPubKey,
+    WalletId& id,
     WalletsPools::WalletData::PoolsHashes& hashesArray) const
 {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
-    WalletId id{};
     if (address.is_wallet_id())
     {
         id = address.wallet_id();
 
-        const WalletData* wallDataPtr = walletsCache_->findWallet(id);
+        const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
         if (!wallDataPtr)
             return false;
         WalletsCache::convert(wallDataPtr->address_, wallPubKey);
     }
     else //if (address.is_public_key())
     {
-        if (!walletIds_->find(address, id))
+        if (!walletIds_->normal().find(address, id))
             return false;
         wallPubKey = address;
     }
@@ -579,13 +599,17 @@ bool BlockChain::findDataForTransactions(
     return true;
 }
 
-void BlockChain::getTransactions(Transactions& transactions,
+void BlockChain::getTransactions(
+    Transactions& transactions,
     csdb::Address wallPubKey,
+    WalletId id,
     const WalletsPools::WalletData::PoolsHashes& hashesArray,
     uint64_t offset,
-    uint64_t limit) const
+    uint64_t limit)
 {
-    TrxLoader trxLoader(wallPubKey, *this, transactions);
+    bool isToLoadWalletsPoolsCache = 
+        hashesArray.empty()  && wallPubKey != genesisAddress_  && wallPubKey != startAddress_;
+    TrxLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
 
     csdb::PoolHash prevHash = getLastHash();
 
@@ -619,7 +643,7 @@ void BlockChain::getTransactions(Transactions& transactions,
     }
 }
 
-bool BlockChain::initCaches()
+bool BlockChain::initCaches(WalletsCache::Initer& initer)
 {
     bool res = false;
     try
@@ -627,10 +651,9 @@ bool BlockChain::initCaches()
         csdb::Pool prev = loadBlock(getLastHash());
         while (prev.is_valid())
         {
-            if (!updateWalletIds(prev))
+            if (!updateWalletIds(prev, initer))
                 return false;
-            walletsCache_->loadPrevBlock(prev);
-            walletsPools_->loadPrevBlock(prev);
+            initer.loadPrevBlock(prev);
 
             prev = loadBlock(prev.previous_hash());
         }
@@ -647,27 +670,23 @@ bool BlockChain::initCaches()
     return res;
 }
 
-bool BlockChain::updateWalletIds(const csdb::Pool& pool)
+template<typename WalletCacheProcessor>
+bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc)
 {
     try {
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
         const csdb::Pool::NewWallets& newWallets = pool.newWallets();
-        const csdb::Pool::Transactions& transactions = pool.transactions();
-        for (const auto& wall : newWallets)
+        for (const auto& newWall : newWallets)
         {
-            size_t idx = wall.addressId_.trxInd_;
-            if (idx >= transactions.size())
+            csdb::Address newWallAddress;
+            if (!pool.getWalletAddress(newWall, newWallAddress))
             {
                 LOG_ERROR("Wrong new wallet data");
                 return false;
             }
 
-            csdb::Transaction trx = transactions[idx];
-            const bool isSource = (wall.addressId_.addressType_ == csdb::Pool::NewWalletInfo::AddressType::AddressIsSource);
-            csdb::Address wallAddress = (isSource) ? trx.source() : trx.target();
-
-            if (!walletIds_->insert(wallAddress, wall.walletId_))
+            if (!insertNewWalletId(newWallAddress, newWall.walletId_, proc))
             {
                 LOG_ERROR("Wallet was already added as new");
                 return false;
@@ -686,39 +705,30 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool)
     return true;
 }
 
-bool BlockChain::updateWalletsCache(csdb::Pool& nextPool)
+bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, WalletsCache::Initer& initer)
 {
-    try {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
-        walletsCache_->loadNextBlock(nextPool);
-    }
-    catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+    WalletId idSpecial{};
+    if (!walletIds_->special().insertNormal(newWallAddress, newWalletId, idSpecial))
+    {
+        LOG_ERROR("Cannot add new wallet");
         return false;
     }
-    catch (...) {
-        LOG_ERROR("Exc=...");
-        return false;
+    if (WalletsIds::Special::isSpecial(idSpecial))
+    {
+        if (!initer.moveData(idSpecial, newWalletId))
+        {
+            LOG_ERROR("Cannot move special wallet id data to newWalletId: idSpecial=" << idSpecial << " newWalletId=" << newWalletId);
+            return false;
+        }
     }
     return true;
 }
 
-bool BlockChain::updateWalletsPools(csdb::Pool& nextPool)
+bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, WalletsCache::Updater&)
 {
-    try {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
-        walletsPools_->loadNextBlock(nextPool);
-    }
-    catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
-        return false;
-    }
-    catch (...) {
-        LOG_ERROR("Exc=...");
+    if (!walletIds_->normal().insert(newWallAddress, newWalletId))
+    {
+        LOG_ERROR("Cannot add new wallet");
         return false;
     }
     return true;
@@ -762,6 +772,32 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
     }
 }
 
+bool BlockChain::updateWalletsCacheAndPools(csdb::Pool& nextPool)
+{
+    if (!walletsCacheUpdater_)
+    {
+        LOG_ERROR("!walletsCacheUpdater");
+        return false;
+    }
+
+    try {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+
+        walletsCacheUpdater_->loadNextBlock(nextPool);
+        walletsPools_->loadNextBlock(nextPool);
+    }
+    catch (std::exception& e) {
+        auto msg = e.what();
+        LOG_ERROR("Exc=" << msg);
+        return false;
+    }
+    catch (...) {
+        LOG_ERROR("Exc=...");
+        return false;
+    }
+    return true;
+}
+
 bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const
 {
     if (address.is_wallet_id())
@@ -770,21 +806,21 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
     WalletId id{};
-    if (!walletIds_->find(address, id))
+    if (!walletIds_->normal().find(address, id))
         return false;
 
     return findWalletData_Unsafe(id, wallData);
 }
 
-bool BlockChain::findWalletData(const WalletId& id, WalletData& wallData) const
+bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const
 {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
     return findWalletData_Unsafe(id, wallData);
 }
 
-bool BlockChain::findWalletData_Unsafe(const WalletId& id, WalletData& wallData) const
+bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const
 {
-    const WalletData* wallDataPtr = walletsCache_->findWallet(id);
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
     if (wallDataPtr)
     {
         wallData = *wallDataPtr;
@@ -798,11 +834,11 @@ bool BlockChain::getModifiedWallets(Mask& dest) const
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
     bool isNewModified =
-        (walletsCache_->getModified().size() != dest.size()) ||
-        walletsCache_->getModified().any();
+        (walletsCacheUpdater_->getModified().size() != dest.size()) ||
+        walletsCacheUpdater_->getModified().any();
 
-    dest.resize(walletsCache_->getModified().size(), true);
-    dest |= walletsCache_->getModified();
+    dest.resize(walletsCacheUpdater_->getModified().size(), true);
+    dest |= walletsCacheUpdater_->getModified();
     return isNewModified;
 }
 
@@ -811,12 +847,12 @@ bool BlockChain::insertWalletId(const WalletAddress& address, WalletId id)
     if (address.is_wallet_id())
     {
         id = address.wallet_id();
-        return false;
+        return true;
     }
     else if (address.is_public_key())
     {
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        return walletIds_->insert(address, id);
+        return walletIds_->normal().insert(address, id);
     }
     LOG_ERROR("Wrong address");
     return false;
@@ -832,8 +868,9 @@ bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const
     else if (address.is_public_key())
     {
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        return walletIds_->find(address, id);
+        return walletIds_->normal().find(address, id);
     }
+    LOG_ERROR("Wrong address");
     return false;
 }
 
@@ -847,7 +884,7 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id)
     else if (address.is_public_key())
     {
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        return walletIds_->get(address, id);
+        return walletIds_->normal().get(address, id);
     }
     LOG_ERROR("Wrong address");
     return false;
