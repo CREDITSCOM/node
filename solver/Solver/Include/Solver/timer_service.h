@@ -24,7 +24,7 @@
  * @code	auto dt = timer_service.Time();
  * 			Для одновременного получения времени и запоминания его сервисом во внутреннем хранилище с
  * 			пользовательской текстовой меткой:
- * @code	auto dt = timer_service.Mark( text );
+ * @code	auto dt = timer_service.TimeStore( text );
  * 			В данном примере сервис сохраняет метку времени с комментарием, а переменная dt
  * 			получает значение текущего времени. Вторым необязательным аргументом можно передать
  * 			произвольный целочисленный идентификатор, для сохранения с меткой времени. При помощи
@@ -137,7 +137,7 @@ public:
 	}
 
 	/**
-	 * @fn	template<typename TText> long long TimerService::Mark(TText && info, int group_id = 0)
+	 * @fn	template<typename TText> long long TimerService::TimeStore(TText && info, int group_id = 0)
 	 *
 	 * @brief	Stores a current time mark with group_id and text info attached
 	 *
@@ -153,7 +153,7 @@ public:
 	 */
 
 	template<typename TText>
-	long long Mark(TText && info, int group_id = 0)
+	long long TimeStore(TText && info, int group_id = 0)
 	{
 		TimePoint tp = Now();
 		MarkData d = std::make_tuple(tp, group_id, info);
@@ -164,7 +164,30 @@ public:
 		return std::chrono::duration_cast<TRes>(tp - _t_start).count();
 	}
 
-	/**
+    /**
+     * @fn  template<typename TText> long long TimeConsoleOut(TText && info, int group_id = 0)
+     *
+     * @brief   Time console out
+     *
+     * @author  User
+     * @date    13.09.2018
+     *
+     * @tparam  TText   Type of the text.
+     * @param [in,out]  info        The information.
+     * @param           group_id    (Optional) Identifier for the group.
+     *
+     * @return  A long.
+     */
+
+    template<typename TText>
+    long long TimeConsoleOut(TText && info, int group_id = 0)
+    {
+        TimePoint tp = Now();
+        ConsoleOut( std::make_tuple(tp, group_id, info) );
+        return std::chrono::duration_cast<TRes>(tp - _t_start).count();
+    }
+
+    /**
 	 * @fn	long long TimerService::Time ()
 	 *
 	 * @brief	Gets the current time measured from last Reset() or constructing of the TimerService object
@@ -208,35 +231,6 @@ public:
 		}
 		catch (...) {
 		}
-	}
-
-	/**
-	 * @fn	template<typename TNumeric, typename TText> long long TimerService::MarkAndLaunch(TNumeric wait_for, Callback&& proc, TText && info, int group_id = 0)
-	 *
-	 * @brief	Stores a current time mark with group_id and text info attached, then launches 'proc'
-	 * 			(async) after 'wait_for' expired
-	 *
-	 * @author	aae
-	 * @date	05.09.2018
-	 *
-	 * @tparam	TNumeric	Numeric type of the wait_for.
-	 * @tparam	TText   	Text type of the info.
-	 * @param 		  	wait_for	The time period to wait before launch 'proc' async. Measured in
-	 * 								timer resolution units (TRes is param of TimeService template,
-	 * 								default is milliseconds)
-	 * @param [in,out]	proc		The procedure to launch async after 'wait_for' expire.
-	 * @param [in,out]	info		The custom text information stored with time mark.
-	 * @param 		  	group_id	(Optional) Identifier for the group of time marks to set logic
-	 * 								relations between some marks.
-	 *
-	 * @return	Current time measured in resolution units (milliseconds by default).
-	 */
-
-	template<typename TNumeric, typename TText>
-	long long MarkAndLaunch(TNumeric wait_for, Callback&& proc, TText && info, int group_id = 0)
-	{
-		Launch(wait_for, std::forward<Callback>(proc));
-		return Mark(std::forward<TText>(info), group_id);
 	}
 
 	/**

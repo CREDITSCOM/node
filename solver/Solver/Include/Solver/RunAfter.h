@@ -145,14 +145,14 @@ public:
 #if defined(TIMER_SERVICE_LOG)
 		std::ostringstream os;
 		os << "RunAfterEx: schedule (" << wait_for << ") " << _comment;
-		timer_service.Mark(os.str(), -1);
+		timer_service.TimeStore(os.str(), -1);
 #endif
 
 		// test has not already launched in single cases
 		if (_launched)
 		{
 #if defined(TIMER_SERVICE_LOG)
-			timer_service.Mark(os.str() + " is canceled (already running)", -1);
+			timer_service.TimeStore(os.str() + " is canceled (already running)", -1);
 #endif
 			return;
 		}
@@ -173,7 +173,7 @@ public:
 #if defined(TIMER_SERVICE_LOG)
 					std::ostringstream os;
 					os << "RunAfterEx: " << _comment << " is canceled (while waiting)";
-					timer_service.Mark(os.str(), -1);
+					timer_service.TimeStore(os.str(), -1);
 #endif
 					return;
 				}
@@ -191,7 +191,7 @@ public:
 #if defined(TIMER_SERVICE_LOG)
 				std::ostringstream os;
 				os << "RunAfterEx: " << _comment << " is canceled (while waiting)";
-				timer_service.Mark(os.str(), -1);
+				timer_service.TimeStore(os.str(), -1);
 #endif
 				return;
 			}
@@ -215,7 +215,7 @@ public:
 #if defined(TIMER_SERVICE_LOG)
 			std::ostringstream os2;
 			os2 << "RunAfterEx: " << _comment << " is finished";
-			timer_service.Mark(os2.str(), -1);
+			timer_service.TimeStore(os2.str(), -1);
 #endif
 			_launched = false;
 		}).detach();
@@ -316,7 +316,7 @@ private:
 //#if defined(TIMER_SERVICE_LOG)
 //			std::ostringstream os;
 //			os << "RunAfterEx: " << _comment << " rejected: queued " << queued << ", done " << done;
-//			timer_service.Mark(os.str(), -1);
+//			timer_service.TimeStore(os.str(), -1);
 //#endif
 			return;
 		}
@@ -330,7 +330,7 @@ private:
 #if defined(TIMER_SERVICE_LOG)
 		std::ostringstream os;
 		os << "RunAfterEx: " << _comment << " ...queued ok";
-		timer_service.Mark(os.str(), -1);
+		timer_service.TimeStore(os.str(), -1);
 #endif
 	}
 };
