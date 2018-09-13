@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <thread>
 
 #include "logger.hpp"
 
@@ -277,7 +278,9 @@ struct SpinLock {
 public:
   SpinLock(std::atomic_flag& flag):
     flag_(flag) {
-    while (flag_.test_and_set(std::memory_order_acquire));
+    while (flag_.test_and_set(std::memory_order_acquire)) {
+      std::this_thread::yield();
+	}
   }
 
   ~SpinLock() {

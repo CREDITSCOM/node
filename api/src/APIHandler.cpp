@@ -1,4 +1,4 @@
-//#define TRACE_ENABLER
+#define TRACE_ENABLER
 
 #include <APIHandler.h>
 //#include <DebugLog.h>
@@ -49,17 +49,17 @@ custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
                                    void* callContext)
 {
 #ifndef FAKE_API_HANDLING
-  // TRACE("");
+  TRACE("");
   auto custom_iface_ = std::dynamic_pointer_cast<APIHandler>(iface_);
-  // TRACE("");
+  TRACE("");
   auto it = custom_iface_->work_queues.find(fname);
-  // TRACE("");
+  TRACE("");
   if (it != custom_iface_->work_queues.end()) {
     //   TRACE("");
     it->second.get_position();
     //   TRACE("");
   }
-  // TRACE("");
+  TRACE("");
   ss.leave();
 #else
   using namespace std::chrono_literals;
@@ -82,7 +82,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
   , executor(::apache::thrift::stdcxx::make_shared<
              ::apache::thrift::protocol::TBinaryProtocol>(executor_transport))
 {
-  // TRACE("");
+  TRACE("");
   std::cerr << (s_blockchain.isGood() ? "Storage is opened normal"
                                       : "Storage is not opened")
             << std::endl;
@@ -93,7 +93,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
   //  TRACE("");
   work_queues["TransactionFlow"]; // init value with default
                                   // constructors
-                                  // TRACE("");
+                                  TRACE("");
   auto lapooh = s_blockchain.getLastHash();
   trace = false;
   while (update_smart_caches_once(lapooh, true)) {
@@ -457,7 +457,7 @@ is_smart(const csdb::Transaction& tr)
 bool
 is_smart_deploy(const api::SmartContractInvocation& smart)
 {
-  return !smart.byteCode.empty();
+  return smart.method.empty();
 }
 
 csdb::Transaction
@@ -497,8 +497,10 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
 {
   work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
+  TRACE("");
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
+  TRACE("");
 }
 
 template<typename T>
@@ -515,19 +517,19 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                                    const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
-  // TRACE(std::endl << "transaction = " << transaction);
+  TRACE(std::endl << "transaction = " << transaction);
 
   csdb::Transaction send_transaction = make_transaction(transaction);
 
   const auto smart_addr = send_transaction.target();
 
-  bool deploy = input_smart.method.empty();
+  bool deploy = is_smart_deploy(input_smart);
   if (!deploy) {
     input_smart.byteCode = std::string();
     input_smart.sourceCode = std::string();
   }
 
-  // TRACE("");
+  TRACE("");
 
   bool present = false;
   std::string origin_bytecode;
@@ -557,36 +559,36 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   bool amnesia = input_smart.forgetNewState;
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
-    // TRACE("");
+    TRACE("");
     auto smart_state(locked_ref(this->smart_state));
-    // TRACE("");
+    TRACE("");
 
     return (*smart_state)[smart_addr];
   }();
 
   std::string contract_state;
 
-  // TRACE("");
+  TRACE("");
 
   work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
-    // TRACE("");
+    TRACE("");
     contract_state_entry.get_position();
-    // TRACE("");
+    TRACE("");
     return true;
   });
 
-  // TRACE("");
+  TRACE("");
   if (!deploy) {
-    // TRACE("");
+    TRACE("");
     contract_state_entry.wait_till_front([&](std::string& state) {
       //  TRACE("");
       auto res = !state.empty();
       if (res) {
-        // TRACE("");
+        TRACE("");
         contract_state = std::move(state);
         state.clear();
       }
-      // TRACE("");
+      TRACE("");
 
       return res;
     });
@@ -595,9 +597,9 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   bool trxn_sent = false;
   auto sg = scopeGuard([&]() {
     if (!trxn_sent) {
-      // TRACE("");
+      TRACE("");
       auto fun = [&]() -> decltype(auto) {
-        // TRACE("");
+        TRACE("");
 
         return std::move(contract_state);
       };
@@ -607,13 +609,13 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   executor::APIResponse api_resp;
 
-  // TRACE("");
+  TRACE("");
 
   while (!executor_transport->isOpen()) {
     executor_transport->open();
   }
 
-  // TRACE("");
+  TRACE("");
   executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
@@ -621,10 +623,10 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                            input_smart.method,
                            input_smart.params);
 
-  // TRACE("");
+  TRACE("");
 
   if (api_resp.code) {
-    // TRACE("");
+    TRACE("");
     _return.status.code = api_resp.code;
     _return.status.message = api_resp.message;
     return;
@@ -632,19 +634,19 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   if ((_return.__isset.smart_contract_result =
          api_resp.__isset.ret_val)) { // non-bug = instead of ==
-    // TRACE("");
+    TRACE("");
     _return.smart_contract_result = api_resp.ret_val;
   }
 
-  // TRACE("");
+  TRACE("");
 
   if (amnesia) {
-    // TRACE("");
+    TRACE("");
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
   }
 
-  // TRACE("");
+  TRACE("");
 
   send_transaction.add_user_field(0, serialize(input_smart));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
@@ -652,16 +654,16 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   trxn_sent = true;
 
-  // TRACE("");
+  TRACE("");
 
   if (deploy) {
-    // TRACE("");
+    TRACE("");
     contract_state_entry.wait_till_front([&](std::string& state) {
-      // TRACE("");
+      TRACE("");
       return !state.empty();
     });
   }
-  // TRACE("");
+  TRACE("");
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
 
@@ -674,7 +676,7 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
     return;
   }
 
-  // TRACE("");
+  TRACE("");
 
   if (!transaction.__isset.smartContract) {
     dumb_transaction_flow(_return, transaction);
@@ -692,7 +694,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
   ///<<
   /// const_limit << std::endl;
 
-  // TRACE(offset << " " << const_limit);
+  TRACE(offset << " " << const_limit);
 
   if (offset > 100)
     const_cast<int64_t&>(offset) = 100;
@@ -894,7 +896,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     }
 
     if (is_smart_deploy(smart)) {
-      // TRACE("");
+      TRACE("");
       {
         auto smart_origin = locked_ref(this->smart_origin);
         (*smart_origin)[address] = tr.id();
@@ -906,7 +908,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     }
     return true;
   }
-  // TRACE("");
+  TRACE("");
   return false;
 }
 
@@ -940,14 +942,14 @@ APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return,
 
   // std::cerr << "Input address: " << deployer << std::endl;
 
-  // TRACE("");
+  TRACE("");
 
   get_mapped_deployer_smart(
     addr,
     [](const api::SmartContract& smart) { return smart; },
     _return.smartContractsList);
 
-  // TRACE("");
+  TRACE("");
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
@@ -1021,7 +1023,7 @@ void
 APIHandler::WaitForSmartTransaction(api::TransactionId& _return,
                                     const api::Address& smart_public)
 {
-  // TRACE(smart_public);
+  TRACE(smart_public);
   csdb::Address key = BlockChain::getAddressFromKey(smart_public);
 
   decltype(smart_last_trxn)::LockedType::iterator it;
@@ -1035,7 +1037,7 @@ APIHandler::WaitForSmartTransaction(api::TransactionId& _return,
                                std::forward_as_tuple());
     return std::ref(it->second).get();
   }();
-  // TRACE("");
+  TRACE("");
 
   {
     std::unique_lock<decltype(entry.lock)> l(entry.lock);
