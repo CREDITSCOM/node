@@ -137,11 +137,12 @@ namespace Credits{
 		hMatrix.Sender = myConfNum;
 	}
 
-  void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
+  void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes)
+  {
 //		std::cout << "GENERALS> Add matrix" << std::endl;
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
-    Hash_ temp_hash;
+		Hash_ temp_hash;
 		uint8_t j = matrix.Sender;
 		uint8_t i_max;
 		bool found = false;
@@ -192,9 +193,9 @@ namespace Credits{
 			}
 		}
 
-	 uint8_t hw_max;
-   hw_max=0;
-   max_frec_position = 0;
+		uint8_t hw_max;
+		hw_max = 0;
+		max_frec_position = 0;
 
 		for (int i = 0; i < i_max; i++)
 		{
@@ -202,13 +203,13 @@ namespace Credits{
 			{
 				hw_max = hw[i].a_weight;
 				max_frec_position = i;
-   //     std::cout << "GENERALS> HW OUT:" << i << " : " << byteStreamToHex(hw[i].a_hash, 32) << " - > " << (int)(hw[i].a_weight) << std::endl;
-
+				//std::cout << "GENERALS> HW OUT:" << i << " : " << byteStreamToHex(hw[i].a_hash, 32) << " - > " << (int)(hw[i].a_weight) << std::endl;
 			}
 		}
-    j = matrix.Sender;
-    hw_total[j].a_weight=max_frec_position;
-    memcpy(hw_total[j].a_hash, hw[max_frec_position].a_hash,32);
+
+		j = matrix.Sender;
+		hw_total[j].a_weight=max_frec_position;
+		memcpy(hw_total[j].a_hash, hw[max_frec_position].a_hash,32);
 
 		for (int i = 0; i < nodes_amount; i++)
 		{
@@ -220,29 +221,32 @@ namespace Credits{
     delete hw;
     }
 
-    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash) {
+    uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash)
+	{
     #ifdef MYLOG
 		std::cout << "GENERALS> Take decision: starting " << std::endl;
     #endif
-		const uint8_t nodes_amount = confidantNodes.size();
-		hash_weight *hw = new hash_weight[nodes_amount];
-		unsigned char *mtr = new unsigned char[nodes_amount * 97];
+		const size_t nodes_amount = confidantNodes.size();
+		hash_weight *hw = (hash_weight *)malloc(nodes_amount * sizeof(hash_weight));
+
+		// not used now?
+		//const size_t mtr_size = nodes_amount * 97;
+		//uint8_t *mtr = (uint8_t *)malloc(mtr_size);
+		//memset(mtr, 0, mtr_size);
 
 		uint8_t max_frec_position;
-		uint8_t j_max, jj;
-		j_max = 0;
-    bool found;
+		uint8_t j_max = 0, jj;
+		bool found;
 		
 		//double duration, duration1;
 		//duration1 = 0;
 		//clock_t time_begin, time_end, time_begin1, time_end1;
 		//time_begin = clock();
-
-      memset(mtr, 0, nodes_amount * 97);		
-		for (int j = 0; j < nodes_amount; j++)
+		
+		for (size_t j = 0; j < nodes_amount; ++j)
 		{
 			//time_begin1 = clock();
-      // matrix init
+			//matrix init
 			//create_matrix(mtr, nodes_amount);// matrix generation
 			//time_end1 = clock();
 			//duration1 += time_end1 - time_begin1;
@@ -260,7 +264,7 @@ namespace Credits{
 			else
 			{
 				found = false;
-				for (jj = 0; jj < j_max; jj++)
+				for (jj = 0; jj < j_max; ++jj)
 				{
 					if (memcmp(hw[jj].a_hash, hw_total[j].a_hash, 32) == 0)
 					{
@@ -277,42 +281,40 @@ namespace Credits{
 					j_max++;
 				}
 			}
-
 		}
-
 
 		uint8_t trusted_limit = nodes_amount * 0.5f + 1;
-    uint8_t j=0;
-		for (int i = 0; i < nodes_amount; i++)
+		uint8_t j = 0;
+		for (size_t i = 0; i < nodes_amount; ++i)
 		{
-      if (*(new_trusted + i) < trusted_limit)
-      {
-      #ifdef MYLOG
-		  std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
-      #endif
-      }
-      else j++;
+			if (*(new_trusted + i) < trusted_limit)
+			{
+			#ifdef MYLOG
+				std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
+			#endif
+			}
+			else ++j;
 		}
-    if (j==nodes_amount) 
-    { 
-      #ifdef MYLOG
-      std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
-      #endif
-    }
+		if (j == nodes_amount)
+		{
+			#ifdef MYLOG
+			std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
+			#endif
+		}
 #ifdef MYLOG
-    std::cout << "Hash : " << lasthash.to_string() << std::endl;
+		std::cout << "Hash : " << lasthash.to_string() << std::endl;
     #endif
 		auto hash_t = lasthash.to_binary();
-		int k= *(hash_t.begin());
+		int k = *(hash_t.begin());
 		//std::cout << "K : " << k << std::endl;
 		int result0 = nodes_amount;
-		uint16_t result =0;
+		uint16_t result = 0;
 		result = k % (int)result0;
 #ifdef MYLOG
-		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
+		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
     #endif
-    delete hw;
-    delete mtr;
+		free(hw);
+		//free(mtr);
 		return result;
 		//if (myId != confidantNodes[write_id]) return 0;
         //return 100;

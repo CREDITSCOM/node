@@ -271,47 +271,30 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 	}
 
 	if (transaction.is_valid())
+	{
+#ifndef SPAMMER
+		std::vector<uint8_t>	message		= transaction.to_byte_stream_for_sig();
+		std::vector<uint8_t>	public_key	= transaction.source().public_key();
+		std::string				signature	= transaction.signature();
+
+		if (verify_signature((uint8_t *)signature.data(), public_key.data(), message.data(), message.size()))
 		{
-#ifndef SPAMMER
-			auto v = transaction.to_byte_stream_for_sig();
-			size_t msg_len = v.size();
-			uint8_t* message = (uint8_t *)malloc(msg_len);
-			memcpy(message, v.data(), msg_len);
-
-			/*for (size_t i = 0; i < msg_len; i++)
-				message[i] = v[i];*/
-
-			auto vec = transaction.source().public_key();
-			uint8_t public_key[32];
-			memcpy(public_key, vec.data(), 32);
-
-			/*for (int i = 0; i < 32; i++)
-				public_key[i] = vec[i];*/
-
-			// vkaryagin: todo: need direct data pointer
-			std::string sig_str = transaction.signature();
-
-			uint8_t* signature = (uint8_t*)sig_str.c_str();
-
-			if (verify_signature(signature, public_key, message, msg_len))
-			{
 #endif
-				v_pool.add_transaction(transaction);
+			v_pool.add_transaction(transaction);
 #ifndef SPAMMER
-			}
-			else
-			{
-				LOG_EVENT("Wrong signature");
-			}
-			free(message);
-#endif
 		}
 		else
 		{
-#ifdef MYLOG
-			LOG_EVENT("Invalid transaction received");
-#endif
+			LOG_EVENT("Wrong signature");
 		}
+#endif
+	}
+#ifdef MYLOG
+	else
+	{
+		LOG_EVENT("Invalid transaction received");
+	}
+#endif
 }
 
 void Solver::initConfRound()
