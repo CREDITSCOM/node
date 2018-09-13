@@ -1,10 +1,8 @@
 #pragma once
 
-//#define MONITOR_NODE
-//#define SPAMMER
+#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
-
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE
@@ -12,7 +10,9 @@
 #define TIME_TO_AWAIT_ACTIVITY 300
 #define TRX_SLEEP_TIME 50000 //microseconds
 #define FAKE_BLOCKS
-//#define SPAMMER
+#ifndef MONITOR_NODE 
+#define SPAMMER
+#endif
 #define SYNCRO
 #define MYLOG
 //#define LOG_TRANSACTIONS

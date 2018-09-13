@@ -31,8 +31,6 @@
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
 
-//#define MONITOR_NODE
-
 //#define SPAM_MAIN
 
 class Node;
@@ -260,7 +258,11 @@ typedef std::string Matrix;
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;
-		
+    
+    /*to store new blocks*/
+    std::map <size_t, csdb::Pool> tmpStorage;
+    /*to store unrequested syncro blocks*/
+    std::map <size_t, csdb::Pool> rndStorage;
 
 #ifdef SPAMMER
 		std::atomic_bool spamRunning{ false };

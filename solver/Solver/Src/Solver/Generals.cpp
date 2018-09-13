@@ -52,7 +52,8 @@ namespace Credits{
 	  for (auto& it : t_pool)
 	  {
 		  countFee(it, num_of_trusted, t_pool.size());
-		  delta = it.balance() - it.amount() - it.counted_fee();
+
+
 
 
 	#ifdef _MSC_VER

@@ -29,8 +29,7 @@ using namespace Credits;
 
 BlockChain::BlockChain(const char* path) {
 
-  if (!loadCache())
-     return;
+  if (!loadCache()) return;
 #ifdef MYLOG
   std::cout << "Trying to open DB..." << std::endl;
   #endif
@@ -72,22 +71,20 @@ BlockChain::BlockChain(const char* path) {
         good_ = false;
 #ifdef MYLOG
         std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
-        #endif
+#endif
       }
     }
     else
     {
 #ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
-      #endif
+#endif
       std::ifstream f(dbs_fname);
-
-
       if (f.is_open())
       {
 #ifdef MYLOG
         std::cout << "File is opened ... reading" << std::endl;
-        #endif
+#endif
         f.read(kk, 14);
         f.close();
       }
@@ -100,9 +97,8 @@ BlockChain::BlockChain(const char* path) {
       ht.tag = atoi(s_beg);
 #ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-      #endif
+#endif
       setLastWrittenSequence(ht.tag);
-
       if (loadBlock(storage_.last_hash()).sequence() == ht.tag)
       {
         tempHashes.reserve(ht.tag + 1);
@@ -117,15 +113,14 @@ BlockChain::BlockChain(const char* path) {
         }
 #ifdef MYLOG
         std::cout << "Hashes read from DB" << std::endl;
-        #endif
+#endif
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
-
           blockHashes_.push_back(*iter);
         }
 #ifdef MYLOG
         std::cout << "Hashes vector converted" << std::endl;
-        #endif
+#endif
         //for (uint32_t i = 0; i <= ht.tag; i++)
         //{
         //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
@@ -171,7 +166,6 @@ BlockChain::BlockChain(const char* path) {
         //  std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
         //}
         tempHashes.clear();
-
         lastHash_ = storage_.last_hash();
         good_ = true;
         return;

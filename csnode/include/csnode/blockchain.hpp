@@ -89,8 +89,6 @@ private:
   mutable Credits::spinlock dbLock_;
   csdb::Storage storage_;
 
-  csdb::Storage syncStorage_;
-
   csdb::PoolHash lastHash_;
   uint32_t last_written_sequence;
   uint32_t global_sequence;

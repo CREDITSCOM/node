@@ -323,6 +323,7 @@ void Solver::initConfRound()
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
+  if(transactionListReceived) return;
   transactionListReceived = true;
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
@@ -536,7 +537,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #ifdef MYLOG
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
   #endif
-  if(g_seq > node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
+  if(g_seq > rNum) return; // remove this line when the block candidate signing of all trusted will be implemented
 
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
@@ -544,6 +545,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
       node_->getBlockChain().putBlock(block);
+#ifdef MONITOR_NODE
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
@@ -551,8 +553,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 			  node_->sendHash(test_hash, sender);
 #ifdef MYLOG
         std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str,32) << std::endl;
-        #endif
+#endif
 		  }
+#endif
     }
 
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
@@ -561,15 +564,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
  // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 
-#ifndef SPAMMER
-#ifndef MONITOR_NODE
-  //if (!sentTransLastRound) {
-  //  Hash test_hash = "zpa02824qsltp";
-  //  node_->sendHash(test_hash, sender);
-  //}
-#endif
-#endif
 }
+
+
 bool Solver::getBigBangStatus()
 {
   return gotBigBang;
@@ -836,6 +833,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
   #endif
 	if (pool.sequence() == node_->getBlockChain().getLastWrittenSequence() + 1)
 		node_->getBlockChain().putBlock(pool);
+    
 	
 
 }
