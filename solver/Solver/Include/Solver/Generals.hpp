@@ -37,7 +37,7 @@ namespace Credits{
         void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
 
         //take desision
-        uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
+        uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
 		
         HashMatrix getMatrix();
 

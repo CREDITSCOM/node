@@ -296,6 +296,8 @@ convertTransaction(const csdb::Transaction& transaction)
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
 
+  result.trxn.fee = convertAmount(transaction.counted_fee());
+
   auto uf = transaction.user_field(0);
   if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
     result.trxn.smartContract =
@@ -482,13 +484,21 @@ APIHandler::make_transaction(const Transaction& transaction)
     return send_transaction;
 }
 
+std::string
+get_delimited_transaction_sighex(const csdb::Transaction& tr)
+{
+  auto bs = fromByteArray(tr.to_byte_stream_for_sig());
+  return std::string({ ' ' }) + byteStreamToHex(bs.data(), bs.length());
+}
+
 void
 APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
                                   const Transaction& transaction)
 {
   work_queues["TransactionFlow"].yield();
-  solver.send_wallet_transaction(make_transaction(transaction));
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  auto tr = make_transaction(transaction);
+  solver.send_wallet_transaction(tr);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
 template<typename T>
@@ -652,7 +662,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     });
   }
   // TRACE("");
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
 
 void
