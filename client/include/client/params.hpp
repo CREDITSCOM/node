@@ -11,7 +11,7 @@
 #define TRX_SLEEP_TIME 50000 //microseconds
 #define FAKE_BLOCKS
 #ifndef MONITOR_NODE 
-#define SPAMMER
+//#define SPAMMER
 #endif
 #define SYNCRO
 #define MYLOG

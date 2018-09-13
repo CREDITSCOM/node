@@ -53,6 +53,16 @@ namespace Credits{
 	  {
 		  countFee(it, num_of_trusted, t_pool.size());
 
+      delta = it.balance() - it.amount() - it.counted_fee();
+      //if (tempBalance.empty()) 
+      //{
+      //  
+      //  tempBalance.emplace(it.source(), delta);
+      //}
+      //else
+      //{
+      //  if(tempBalance.at(it.source))it.set_balance()
+      //}
 
 
 

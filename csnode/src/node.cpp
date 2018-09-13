@@ -197,8 +197,9 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
 	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
 	if (rNum > lastBlock && rNum >= roundNum_)
   {
-  		getRoundTable(data, size, rNum, type);
-      solver_->setBigBangStatus(true);
+    solver_->setBigBangStatus(true);
+  	getRoundTable(data, size, rNum, type);
+
   }
   else
   {
@@ -295,7 +296,8 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
 //    LOG_WARN("Bad transactions packet format");
 //    return;
 //  }
-//
+//   const char* bl = pool.to_byte_stream(size);
+//  std::cout << "GotBlock: " << byteStreamToHex(bl, size) << std::endl;
 //  //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
 //
 //  auto _transactions = pool.transactions();
@@ -389,7 +391,7 @@ void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
   }
 }
 
-
+//
 //void Node::sendTransaction(const csdb::Pool& m_transactions_) {
 //  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
 //  size_t bSize;
@@ -733,7 +735,10 @@ void Node::sendVector(const Credits::HashVector& vector) {
   //if(it==myPublicKey_) continue;
    // std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32) 
     ostream_.init(BaseFlags::Broadcast);//, it);
-    ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
+    ostream_ 
+    << MsgTypes::ConsVector 
+    << roundNum_ 
+    << vector;
 
     flushCurrentTasks();
  // }
@@ -873,7 +878,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
     << compressed;
 
   LOG_EVENT("Sending bad block of " << pool.transactions_count() << " transactions");
-  flushCurrentTasks();
+ // flushCurrentTasks();
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
@@ -1094,36 +1099,17 @@ uint8_t Node::getMyConfNumber()
 }
 
 void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes) {
-  /*if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR(
-              "Trying to initialize a new round without the required privileges");
-    return;
-    }*/
 
   ++roundNum_;
-
   size_t nTrusted = confidantNodes.size();//-1;
-  //uint8_t i = rand() % nTrusted;
-  //std::cout << "Main Number = " << (int)i << std::endl;
-  //std::cout << "Number of Trusted : " << nTrusted << std::endl;
   mainNode_ = myPublicKey_;   //confidantNodes.at(i);
   confidantNodes_.clear();
   for (auto& conf : confidantNodes) confidantNodes_.push_back(conf);
-    //if(mainNode_!=conf) 
 
   sendRoundTable();
-  #ifdef MYLOG 
+#ifdef MYLOG 
   std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
-  #endif
-
-  /*if(!(solver_->mPoolClosed()))
- {
-    solver_->sendTL();
- 
- }*/
-
-  //mainNode_ = mainNode;
-  //std::swap(confidantNodes, confidantNodes_);
+#endif
   onRoundStart();
 }
 
@@ -1134,10 +1120,6 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   if (rNum < roundNum_) return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   return (rNum == roundNum_ ? MessageActions::Process : MessageActions::Postpone);
-  //return type == MsgTypes::RoundTable ? MessageActions::Drop : MessageActions::Process;
-  //return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
-  //if (rNum < roundNum_) return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
-  //return type == MsgTypes::RoundTable ? MessageActions::Process : MessageActions::Postpone;
 }
 
 inline bool Node::readRoundData(const bool tail) {

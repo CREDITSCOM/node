@@ -387,7 +387,7 @@ void Transport::processPostponed(const RoundNum rNum) {
 
   postponed_[1] = *postponed_;
   postponed_[0] = &ppBuf;
-  //std::cout << "TRANSPORT> POSTPHONED finish" << std::endl;
+  std::cout << "TRANSPORT> POSTPHONED finish" << std::endl;
 }
 
 void Transport::dispatchNodeMessage(const MsgTypes type,
