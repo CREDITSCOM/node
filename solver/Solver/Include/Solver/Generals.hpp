@@ -39,7 +39,7 @@ namespace Credits{
         //take desision
         uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
 		
-        HashMatrix getMatrix();
+        const HashMatrix& getMatrix() const;
 
 		    void addSenderToMatrix(uint8_t myConfNum);
 

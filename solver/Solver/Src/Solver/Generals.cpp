@@ -137,7 +137,7 @@ namespace Credits{
 		hMatrix.Sender = myConfNum;
 	}
 
-  void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes)
+  void Generals::addmatrix(const HashMatrix& matrix, const std::vector<PublicKey>& confidantNodes)
   {
 //		std::cout << "GENERALS> Add matrix" << std::endl;
 		const uint8_t nodes_amount = confidantNodes.size();
@@ -320,7 +320,8 @@ namespace Credits{
         //return 100;
     }
 
-    HashMatrix Generals::getMatrix() {
+    const HashMatrix& Generals::getMatrix() const
+    {
        return hMatrix;
     }
 
