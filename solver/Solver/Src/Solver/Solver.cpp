@@ -308,6 +308,17 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
     }
 }
 
+void Solver::gotTransactionsPacket(csdb::TransactionsPacket&& packet)
+{
+#ifdef MYLOG
+    LOG_EVENT("Got transaction packet");
+#endif
+    auto hash = packet.hash();
+
+    if (!mHashTable.count(hash))
+        mHashTable.emplace(hash, std::move(packet));
+}
+
 void Solver::initConfRound()
 {
   memset(receivedVecFrom, 0, 100);

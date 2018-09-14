@@ -48,6 +48,8 @@ public:
   void getMatrix(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const PublicKey& sender);
+  void getTransactionsPacket(const uint8_t*, const std::size_t, const PublicKey& sender);
+
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
@@ -68,7 +70,7 @@ public:
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
-  void sendTransactionPacket(const csdb::TransactionsPacket& packet);
+  void sendTransactionsPacket(const csdb::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
 

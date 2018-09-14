@@ -877,6 +877,31 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
   solver_->gotHash(hash, sender);
 }
 
+void Node::getTransactionsPacket(const uint8_t* data , const std::size_t size, const PublicKey& sender)
+{
+    istream_.init(data, size);
+
+    csdb::TransactionsPacket packet;
+    istream_ >> packet;
+
+#ifdef MYLOG
+    std::cout << "NODE> Transactions amount got " << packet.transactions_count() << std::endl;
+#endif
+
+    if (!istream_.good() || !istream_.end())
+    {
+        LOG_WARN("Bad transactions packet format");
+        return;
+    }
+
+    if (packet.hash().is_empty())
+    {
+        LOG_ERROR("Received transaction packet hash is empty");
+        return;
+    }
+
+    solver_->gotTransactionsPacket(std::move(packet));
+}
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
@@ -893,10 +918,18 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
   flushCurrentTasks();
 }
 
-void Node::sendTransactionPacket(const csdb::TransactionsPacket& packet)
+void Node::sendTransactionsPacket(const csdb::TransactionsPacket& packet)
 {
     if (myLevel_ != NodeLevel::Normal)
         return;
+
+    if (packet.hash().is_empty())
+    {
+#ifdef MYLOG
+        std::cout << "Send transaction packet with empty hash failed" << std::endl;
+#endif
+        return;
+    }
 
     ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
 

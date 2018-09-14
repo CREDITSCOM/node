@@ -146,6 +146,7 @@ typedef std::string Matrix;
         // Solver solves stuff
 
         void gotTransaction(csdb::Transaction&&);
+        void gotTransactionsPacket(csdb::TransactionsPacket&& packet);
         void gotTransactionList(csdb::Pool&&);
         void gotBlockCandidate(csdb::Pool&&);
         void gotVector(HashVector&&);
