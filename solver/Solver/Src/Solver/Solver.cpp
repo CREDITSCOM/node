@@ -259,12 +259,12 @@ void Solver::runMainRound()
 
 }
 
-HashVector Solver::getMyVector()
+const HashVector& Solver::getMyVector() const
 {
   return hvector;
 }
 
-HashMatrix Solver::getMyMatrix()
+const HashMatrix& Solver::getMyMatrix() const
 {
  return (generals->getMatrix());
 }
