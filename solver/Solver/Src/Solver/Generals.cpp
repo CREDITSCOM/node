@@ -124,7 +124,7 @@ namespace Credits{
     
     }
 
-  void Generals::addvector(HashVector vector) {
+  void Generals::addvector(const HashVector& vector) {
   #ifdef MYLOG
   	std::cout << "GENERALS> Add vector" << std::endl;
   #endif
@@ -137,7 +137,7 @@ namespace Credits{
 		hMatrix.Sender = myConfNum;
 	}
 
-  void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
+  void Generals::addmatrix(const HashMatrix& matrix, const std::vector<PublicKey>& confidantNodes) {
 //		std::cout << "GENERALS> Add matrix" << std::endl;
 		const uint8_t nodes_amount = confidantNodes.size();
 		hash_weight *hw = new hash_weight[nodes_amount];
@@ -318,11 +318,11 @@ namespace Credits{
         //return 100;
     }
 
-    HashMatrix Generals::getMatrix() {
+    const HashMatrix& Generals::getMatrix() {
        return hMatrix;
     }
 
-	void Generals::chooseHeadAndTrusted(std::map<std::string, std::string>) { }
+	//void Generals::chooseHeadAndTrusted(std::map<std::string, std::string>) { }
     void Generals::chooseHeadAndTrustedFake(std::vector<std::string>& hashes) { }
     void Generals::fake_block(std::string m_public_key) { }
 
