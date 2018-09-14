@@ -12,6 +12,7 @@ add_library(Solver
 	Include/Solver/WalletsState.h
         Src/Solver/Solver.cpp
         Src/Solver/Generals.cpp
+        Src/Solver/WalletState.cpp
 	${THRIFT_GENERATED_FILES}
 )
 

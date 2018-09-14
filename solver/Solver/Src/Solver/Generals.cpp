@@ -67,7 +67,7 @@ namespace Credits{
         ++i;
         continue;
       }
-/*
+
       WalletsState::WalletId walletId{};
       WalletsState::WalletData& wallState = walletsState.getData(it.source(), walletId);
       if (!wallState.trxTail_.isAllowed(it.innerID())) {
@@ -76,10 +76,10 @@ namespace Credits{
         ++i;
         continue;
       }
-*/
+
       *(del1 + i) = bitcnt;
-//      wallState.trxTail_.push(it.innerID());
-//      walletsState.setModified(walletId);
+      wallState.trxTail_.push(it.innerID());
+      walletsState.setModified(walletId);
       new_pool.add_transaction(it);
       ++i;
 	  }
@@ -118,9 +118,6 @@ namespace Credits{
       return hash_;
 
     }
-
-
-    
     }
 
   void Generals::addvector(HashVector vector) {
