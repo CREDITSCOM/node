@@ -422,7 +422,7 @@ Transaction::put(::csdb::priv::obstream& os) const
     auto ptr = reinterpret_cast<const uint8_t *>(&data->innerID_);
     std::copy(ptr, ptr + sizeof(innerID), innerID); // only for little endian machines
   }
-  innerID[0] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
+  innerID[5] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
   os.put(*reinterpret_cast<uint16_t *>(innerID));
   os.put(*reinterpret_cast<uint32_t *>(innerID + sizeof(uint16_t)));
   if (data->source_.is_wallet_id()) {
@@ -460,8 +460,8 @@ Transaction::get(::csdb::priv::ibstream& is)
     uint32_t hi;
     res = is.get(lo) && is.get(hi);
     if (!res) return res;
-    data->innerID_ = (((uint64_t)lo & 0x3fff) << 32) | hi;
-    if (lo & 0x8000) {
+    data->innerID_ = (((uint64_t)hi & 0x3fffffff) << 16) | lo;
+    if (hi & 0x80000000) {
       internal::WalletId id;
       res = is.get(id);
       if (!res) return res;
@@ -473,7 +473,7 @@ Transaction::get(::csdb::priv::ibstream& is)
       data->source_ = Address::from_public_key(key);
     }
 
-    if (lo & 0x4000) {
+    if (hi & 0x40000000) {
       internal::WalletId id;
       res = is.get(id);
       if (!res) return res;
