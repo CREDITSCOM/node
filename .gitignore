@@ -1,6 +1,6 @@
 build/
 build64/
 .dir-locals.el
-/local
 /.vs
+/local
 /CMakeSettings.json
