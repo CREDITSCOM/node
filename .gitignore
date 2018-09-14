@@ -1,3 +1,4 @@
 build/
 build64/
 .dir-locals.el
+js-client/js/*
