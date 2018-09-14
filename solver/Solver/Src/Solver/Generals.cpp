@@ -124,7 +124,7 @@ namespace Credits{
     
     }
 
-  void Generals::addvector(HashVector vector) {
+  void Generals::addvector(const HashVector& vector) {
   #ifdef MYLOG
   	std::cout << "GENERALS> Add vector" << std::endl;
   #endif
