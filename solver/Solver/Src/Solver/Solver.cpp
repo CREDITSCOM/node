@@ -1014,7 +1014,7 @@ void Solver::nextRound()
 	  flushTransactionsCall.Cancel();
   }
   // calculate new desired round duration as average duration of previous ones
-  uint32_t desired_round_duration = TIME_TO_COLLECT_TRXNS;
+  uint32_t desired_round_duration = 2000;
   if (passedRoundsCount > 0) {
 	  desired_round_duration = passedRoundsDuration / passedRoundsCount;
 	  if (desired_round_duration < TIME_TO_COLLECT_TRXNS) {
