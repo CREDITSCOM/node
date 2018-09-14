@@ -5,7 +5,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include "sys/timeb.h"
-#include "blockchain.hpp"
+#include <csnode/blockchain.hpp>
 
 using namespace Credits;
 
