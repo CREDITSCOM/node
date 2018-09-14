@@ -9,8 +9,10 @@ set(SOLVER_DOC_BUILD FALSE)
 add_library(Solver
 	Include/Solver/Fake/Generals.hpp
 	Include/Solver/Fake/Solver.hpp
+	Include/Solver/Fake/WalletsState.h
         Src/Solver/Fake/Solver.cpp
         Src/Solver/Fake/Generals.cpp
+        Src/Solver/Fake/WalletState.cpp
 	${THRIFT_GENERATED_FILES}
 )
 
