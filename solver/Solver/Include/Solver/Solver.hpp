@@ -32,7 +32,6 @@
 #include <client/params.hpp>
 
 //#define MONITOR_NODE
-
 //#define SPAM_MAIN
 
 class Node;
@@ -142,129 +141,126 @@ typedef std::string Matrix;
         Solver(const Solver &) = delete;
         Solver &operator=(const Solver &) = delete;
 
-		void set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv);
+        void set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv);
 
-		// Solver solves stuff
+        // Solver solves stuff
 
-		void gotTransaction(csdb::Transaction&&);
-		void gotTransactionList(csdb::Pool&&);
-		void gotBlockCandidate(csdb::Pool&&);
-		void gotVector(HashVector&&);
-		void gotMatrix(HashMatrix&&);
-		void gotBlock(csdb::Pool&&, const PublicKey&);
-		void gotHash(Hash&, const PublicKey&);
-		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
-		void gotBlockReply(csdb::Pool&&);
-    void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
-    void sendTL();
-		// API methods
+        void gotTransaction(csdb::Transaction&&);
+        void gotTransactionList(csdb::Pool&&);
+        void gotBlockCandidate(csdb::Pool&&);
+        void gotVector(HashVector&&);
+        void gotMatrix(HashMatrix&&);
+        void gotBlock(csdb::Pool&&, const PublicKey&);
+        void gotHash(Hash&, const PublicKey&);
+        void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
+        void gotBlockReply(csdb::Pool&&);
+        void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+        void sendTL();
+        // API methods
 
-		void initApi();
-    uint32_t getTLsize();
-		void addInitialBalance();
+        void initApi();
+        uint32_t getTLsize();
+        void addInitialBalance();
 
-    void send_wallet_transaction(const csdb::Transaction& transaction);
+        void send_wallet_transaction(const csdb::Transaction& transaction);
 
-		void nextRound();
-    bool mPoolClosed();
-    void setLastRoundTransactionsGot(size_t trNum);
-    //remove it!!!
-    void buildBlock(csdb::Pool& block);
+        void nextRound();
+        bool mPoolClosed();
+        void setLastRoundTransactionsGot(size_t trNum);
+        //remove it!!!
+        void buildBlock(csdb::Pool& block);
 
-    HashVector getMyVector();
-    HashMatrix getMyMatrix();
-    void initConfRound();
-    void sendZeroVector();
-    void checkVectorsReceived(size_t _rNum);
-    void checkMatrixReceived();
-    void addConfirmation(uint8_t confNumber_);
-    bool getIPoolClosed();
-    bool getBigBangStatus();
-    void setBigBangStatus(bool _status);
-    void setRNum(size_t _rNum);
+        HashVector getMyVector();
+        HashMatrix getMyMatrix();
+        void initConfRound();
+        void sendZeroVector();
+        void checkVectorsReceived(size_t _rNum);
+        void checkMatrixReceived();
+        void addConfirmation(uint8_t confNumber_);
+        bool getIPoolClosed();
+        bool getBigBangStatus();
+        void setBigBangStatus(bool _status);
+        void setRNum(size_t _rNum);
 
-	private:
-    void _initApi();
+    private:
+        void _initApi();
 
-		void runMainRound();
-		void closeMainRound();
+        void runMainRound();
+        void closeMainRound();
 
-		void flushTransactions();
+        void flushTransactions();
 
-		void writeNewBlock();
-    void prepareBlockForSend(csdb::Pool& block);
+        void writeNewBlock();
+        void prepareBlockForSend(csdb::Pool& block);
 
 #ifdef SPAM_MAIN
-		void createPool();
+        void createPool();
 
-		std::atomic_bool createSpam;
-		std::thread spamThread;
+        std::atomic_bool createSpam;
+        std::thread spamThread;
 
-		csdb::Pool testPool;
+        csdb::Pool testPool;
 #endif //SPAM_MAIN
 
-		bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
-		
-		std::vector<uint8_t> myPublicKey;
-		std::vector<uint8_t> myPrivateKey;
+        bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 
-		Node* node_;
+        std::vector<uint8_t> myPublicKey;
+        std::vector<uint8_t> myPrivateKey;
+
+        Node* node_;
         std::unique_ptr<Generals> generals;
 
-		HashVector hvector;
-		
-		
-    size_t lastRoundTransactionsGot;
-		std::set<PublicKey> receivedVec_ips;
-		bool receivedVecFrom[100];
-		uint8_t trustedCounterVector;
-
-		std::set<PublicKey> receivedMat_ips;
-		bool receivedMatFrom[100];
-		uint8_t trustedCounterMatrix;
-    void checkMatrixCame();
+        HashVector hvector;
 
 
-		std::vector<Hash> hashes;
-		std::vector<PublicKey> ips;
+        size_t lastRoundTransactionsGot;
+        std::set<PublicKey> receivedVec_ips;
+        bool receivedVecFrom[100];
+        uint8_t trustedCounterVector;
 
-		std::vector<std::string> vector_datas;
-
-    csdb::Pool m_pool;
-		
-		//std::vector<csdb::Transaction> v_pool;
-
-		csdb::Pool v_pool;
-    csdb::Pool b_pool;
-		bool m_pool_closed = true;
-
-		bool sentTransLastRound = false;
-
-		bool vectorComplete = false;
-		bool consensusAchieved = false;
-		bool blockCandidateArrived = false;
-		bool round_table_sent = false;
-    bool transactionListReceived = false;
-    bool vectorReceived = false;
-    bool gotBlockThisRound = false;
-    bool writingConfirmationGot = false;
-    bool gotBigBang = false;
-
-    bool writingConfGotFrom[100];
-    uint8_t writingCongGotCurrent;
+        std::set<PublicKey> receivedMat_ips;
+        bool receivedMatFrom[100];
+        uint8_t trustedCounterMatrix;
+        void checkMatrixCame();
 
 
-    size_t rNum = 0;
-		std::mutex m_trans_mut;
-		std::vector<csdb::Transaction> m_transactions;
-    csdb::Pool m_transactions_;
-		
+        std::vector<Hash> hashes;
+        std::vector<PublicKey> ips;
+
+        std::vector<std::string> vector_datas;
+
+        csdb::Pool m_pool;
+
+        //std::vector<csdb::Transaction> v_pool;
+
+        csdb::Pool v_pool;
+        csdb::Pool b_pool;
+        bool m_pool_closed = true;
+
+        bool sentTransLastRound = false;
+
+        bool vectorComplete = false;
+        bool consensusAchieved = false;
+        bool blockCandidateArrived = false;
+        bool round_table_sent = false;
+        bool transactionListReceived = false;
+        bool vectorReceived = false;
+        bool gotBlockThisRound = false;
+        bool writingConfirmationGot = false;
+        bool gotBigBang = false;
+
+        bool writingConfGotFrom[100];
+        uint8_t writingCongGotCurrent;
+        size_t rNum = 0;
+        std::mutex m_trans_mut;
+        std::vector<csdb::Transaction> m_transactions;
+        csdb::Pool m_transactions_;
+        csdb::TransactionsPacketHashTable mHashTable;
 
 #ifdef SPAMMER
-		std::atomic_bool spamRunning{ false };
-		std::thread spamThread;
-		void spamWithTransactions();
+        std::atomic_bool spamRunning{ false };
+        std::thread spamThread;
+        void spamWithTransactions();
 #endif
-
-	};
+    };
 }

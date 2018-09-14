@@ -269,43 +269,43 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 		return;
 	}
 
-	if (transaction.is_valid())
-		{
+    if (transaction.is_valid())
+    {
 #ifndef SPAMMER
-			auto v = transaction.to_byte_stream_for_sig();
-			size_t msg_len = v.size();
-			uint8_t* message = new uint8_t[msg_len];
-			for (size_t i = 0; i < msg_len; i++)
-				message[i] = v[i];
+        auto v = transaction.to_byte_stream_for_sig();
+        size_t msg_len = v.size();
+        uint8_t* message = new uint8_t[msg_len];
+        for (size_t i = 0; i < msg_len; i++)
+            message[i] = v[i];
 
-			auto vec = transaction.source().public_key();
-			uint8_t public_key[32];
-			for (int i = 0; i < 32; i++)
-				public_key[i] = vec[i];
+        auto vec = transaction.source().public_key();
+        uint8_t public_key[32];
+        for (int i = 0; i < 32; i++)
+            public_key[i] = vec[i];
 
-			std::string sig_str = transaction.signature();
-			uint8_t* signature;
-			signature = (uint8_t*)sig_str.c_str();
+        std::string sig_str = transaction.signature();
+        uint8_t* signature;
+        signature = (uint8_t*)sig_str.c_str();
 
-			if (verify_signature(signature, public_key, message, msg_len))
-			{
+        if (verify_signature(signature, public_key, message, msg_len))
+        {
 #endif
-					v_pool.add_transaction(transaction);
+            v_pool.add_transaction(transaction);
 #ifndef SPAMMER
-			}
-			else
-			{
-				LOG_EVENT("Wrong signature");
-			}
-			delete[]message;
+        }
+        else
+        {
+            LOG_EVENT("Wrong signature");
+        }
+        delete[]message;
 #endif
-		}
-		else
-		{
+    }
+    else
+    {
 #ifdef MYLOG
-			LOG_EVENT("Invalid transaction received");
+        LOG_EVENT("Invalid transaction received");
 #endif
-		}
+    }
 }
 
 void Solver::initConfRound()

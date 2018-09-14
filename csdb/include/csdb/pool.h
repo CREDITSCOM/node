@@ -11,6 +11,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <unordered_map>
 
 #include "csdb/transaction.h"
 #include "csdb/storage.h"
@@ -232,6 +233,29 @@ inline bool PoolHash::operator !=(const PoolHash &other) const noexcept
   return !operator ==(other);
 }
 
+    /*
+    *   Transaction packet storage
+    */
+    using TransactionsPacket = csdb::Pool;
+    using TransactionsPacketHash = csdb::PoolHash;
+
+    /**
+    *   Hash table for fast transactions storage
+    */
+    using TransactionsPacketHashTable = std::unordered_map<TransactionsPacketHash, TransactionsPacket>;
+
 } // namespace csdb
+
+namespace std
+{
+    /**
+    *   PoolHash hash specialization
+    */ 
+    template<>
+    struct hash<csdb::TransactionsPacketHash>
+    {
+        std::size_t operator()(const csdb::TransactionsPacketHash& packetHash) const noexcept;
+    };
+}
 
 #endif // _CREDITS_CSDB_POOL_H_INCLUDED_

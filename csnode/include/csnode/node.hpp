@@ -22,9 +22,14 @@ typedef std::string Vector;
 typedef std::string Matrix;
 
 class Transport;
-namespace Credits { class Solver; }
 
-class Node {
+namespace Credits
+{
+    class Solver;
+}
+
+class Node
+{
 public:
   Node(const Config&);
   ~Node();
@@ -63,6 +68,7 @@ public:
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
+  void sendTransactionPacket(const csdb::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
 
@@ -129,16 +135,12 @@ private:
   bool awaitingSyncroBlock = false;
   uint32_t awaitingRecBlockCount = 0;
 
-
-
-
   //signature variables
   std::vector<uint8_t> myPublicForSig;
   std::vector<uint8_t> myPrivateForSig;
 
   std::string rcvd_trx_fname = "rcvd.txt";
   std::string sent_trx_fname = "sent.txt";
-
 
   // Current round state
   RoundNum roundNum_ = 0;

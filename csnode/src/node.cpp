@@ -268,72 +268,67 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
 
 }
 
+void Node::getTransaction(const uint8_t* data, const size_t size)
+{
+    if (solver_->getIPoolClosed())
+        return;
 
+    if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Writer)
+        return;
 
+    istream_.init(data, size);
+
+    csdb::Pool pool;
+    istream_ >> pool;
+
+    std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
+
+    if (!istream_.good() || !istream_.end()) {
+        LOG_WARN("Bad transactions packet format");
+        return;
+    }
+
+    //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
+
+    decltype(auto) trx = pool.transactions();
+    uint16_t i = 0;
+
+    for (auto& tr : trx)
+    {
+#ifdef MYLOG
+        std::cout << "NODE> Get transaction #:" << i << " from " << tr.source().to_string() << " ID= " << tr.innerID() << std::endl;
+#endif
+        solver_->gotTransaction(std::move(tr));
+        i++;
+    }
+}
 
 //void Node::getTransaction(const uint8_t* data, const size_t size) {
-// // std::cout << __func__ << std::endl;
-// /* std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-//  std::cout << "|            NODE> Get Transactions          |" << std::endl;
-//  std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;*/
-// if(solver_->getIPoolClosed()) return;
+//  bool file_is;
+//  std::fstream f;
 //
-//  if (myLevel_ != NodeLevel::Main &&
-//      myLevel_ != NodeLevel::Writer) {
-//    return;
-//  }
 //
 //  istream_.init(data, size);
-//  csdb::Pool pool;
-//  istream_ >> pool;
 //
-//  std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
+//  while (istream_.good() && !istream_.end()) {
+//    csdb::Transaction trans;
+//    istream_ >> trans;
+//  f.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
+//  f << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
+//  f.close();
+//  //  std::cout << "NODE> Get transaction #: " << trans.innerID() << " from " << trans.source().to_string()  << std::endl;
+//  if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer)
+//  {
+//        solver_->gotTransaction(std::move(trans));
+//  }
 //
-//  if (!istream_.good() || !istream_.end()) {
-//    LOG_WARN("Bad transactions packet format");
+//
+//  if (!istream_.good()) {
+//    LOG_WARN("Bad transaction packet format");
 //    return;
 //  }
-//
-//  //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
-//
-//  auto _transactions = pool.transactions();
-//  uint16_t i=0;
-// for(auto it : _transactions)
-// {
-//#ifdef MYLOG
-//    std::cout << "NODE> Get transaction #:" << i << " from " << it.source().to_string() << " ID= " << it.innerID() <<  std::endl;
-//    #endif
-//    solver_->gotTransaction(std::move(it));
-//    i++;
 //  }
 //}
-
-void Node::getTransaction(const uint8_t* data, const size_t size) {
-  bool file_is;
-  std::fstream f;
-
-
-  istream_.init(data, size);
-
-  while (istream_.good() && !istream_.end()) {
-    csdb::Transaction trans;
-    istream_ >> trans;
-  f.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
-  f << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
-  f.close();
-  //  std::cout << "NODE> Get transaction #: " << trans.innerID() << " from " << trans.source().to_string()  << std::endl;
-  if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer)
-  {
-        solver_->gotTransaction(std::move(trans));
-  }
-
-
-  if (!istream_.good()) {
-    LOG_WARN("Bad transaction packet format");
-    return;
-  }
-  }
-}
 
 void Node::sendTransaction(const csdb::Transaction& trans) {
   ostream_.init(BaseFlags::Broadcast, mainNode_);
@@ -430,40 +425,36 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
   flushCurrentTasks();
 }
 
-void Node::getTransactionsList(const uint8_t* data, const size_t size) {
- // std::cout << __func__ << std::endl;
-   if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  } 
-   csdb::Pool pool;
-   pool = csdb::Pool{};
-#ifdef MYLOG
-  std::cout << "Getting List: list size: " << size << std::endl;
-  #endif
- // std::cout << "Getting List: " << byteStreamToHex((const char*)data,size) << std::endl;
- if(!((size==0) || (size >2000000000))){
+void Node::getTransactionsList(const uint8_t* data, const size_t size)
+{
+    if (myLevel_ != NodeLevel::Confidant)
+        return;
 
-//  std::cout << "NODE> Get transaction list 1 " << std::endl;
-  istream_.init(data, size);
- // std::cout << "NODE> Get transaction list 2 " << std::endl;
-
- // std::cout << "NODE> Get transaction list 3 tNum = " << std::endl;
-  istream_ >> pool;
-  if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transactions list packet format");
+    csdb::Pool pool;
     pool = csdb::Pool{};
-  }
+
 #ifdef MYLOG
-std::cout << "NODE> Transactions amount got " <<pool.transactions_count() << std::endl;
+    std::cout << "Getting List: list size: " << size << std::endl;
 #endif
 
-  LOG_EVENT("Got full transactions list of " << pool.transactions_count());
- // if (pool.transactions_count()>0)
-  }
-    solver_->gotTransactionList(std::move(pool));
-   // }
-  
+    if (!((size == 0) || (size > 2000000000)))
+    {
+        istream_.init(data, size);
+        istream_ >> pool;
 
+        if (!istream_.good() || !istream_.end())
+        {
+            LOG_WARN("Bad transactions list packet format");
+            pool = csdb::Pool{};
+        }
+
+#ifdef MYLOG
+        std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
+#endif
+        LOG_EVENT("Got full transactions list of " << pool.transactions_count());
+    }
+
+    solver_->gotTransactionList(std::move(pool));
 }
 
 void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& target) {
@@ -902,6 +893,35 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
   flushCurrentTasks();
 }
 
+void Node::sendTransactionPacket(const csdb::TransactionsPacket& packet)
+{
+    if (myLevel_ != NodeLevel::Normal)
+        return;
+
+    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+
+    size_t bSize;
+    const void* data = const_cast<csdb::TransactionsPacket&>(packet).to_byte_stream(bSize);
+
+#ifdef MYLOG
+    std::cout << "Sending transaction packet: size: " << bSize << std::endl;
+#endif
+
+    std::string compressed;
+    snappy::Compress((const char*)data, bSize, &compressed);
+
+    ostream_ << MsgTypes::TransactionPacket << compressed;
+
+#ifdef MYLOG
+    std::cout << "Sending transaction packet: compressed size: " << compressed.size() << std::endl;
+#endif
+
+#ifdef MYLOG
+    std::cout << "NODE> Sending " << packet.transactions_count() << " transaction(s)" << std::endl;
+#endif
+
+    flushCurrentTasks();
+}
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
   //std::cout << __func__ << std::endl;
