@@ -1,4 +1,7 @@
 build/
 build64/
 .dir-locals.el
+/.vs
+/local
+/CMakeSettings.json
 js-client/js/*
