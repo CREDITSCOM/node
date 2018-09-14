@@ -10,9 +10,9 @@ add_library(Solver
 	Include/Solver/Generals.hpp
 	Include/Solver/Solver.hpp
 	Include/Solver/WalletsState.h
-        Src/Solver/Solver.cpp
-        Src/Solver/Generals.cpp
-        Src/Solver/WalletState.cpp
+        Src/Solver.cpp
+        Src/Generals.cpp
+        Src/WalletState.cpp
 	${THRIFT_GENERATED_FILES}
 )
 

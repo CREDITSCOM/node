@@ -32,10 +32,7 @@ namespace Credits
         static constexpr WalletId noWalletId = 0;
 
     public:
-        WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024)
-          : blockchain_(blockchain),
-            wallExisting_(blockchain, initialWalletsNum)
-        {}
+        WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
 
         void updateFromSource();
         WalletData& getData(const WalletAddress& address, WalletId& id);
@@ -44,10 +41,8 @@ namespace Credits
         class WalletsExisting
         {
         public:
-            WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024)
-              : blockchain_(blockchain)
-            {}
-            ~WalletsExisting() {};
+            WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
+            ~WalletsExisting();
 
             void updateFromSource();
             WalletData* getData(const WalletId& id);

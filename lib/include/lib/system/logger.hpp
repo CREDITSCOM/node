@@ -87,7 +87,7 @@ extern thread_local bool trace;
     std::clock_t hh = mins / 60;                                               \
     mins %= 60;                                                                \
     char buf[16];                                                              \
-    snprintf(buf, sizeof(buf), "[%02d:%02d:%02d.%03d]", hh, mins, ss, ms);     \
+    snprintf(buf, sizeof(buf), "[%02ld:%02ld:%02ld.%03ld]", hh, mins, ss, ms);     \
     strstream << buf << " " << std::this_thread::get_id() << "|\t" << __FILE__ \
               << ":" << __func__ << ":" << __LINE__;                           \
     strstream << " " << PRINT_ARGS << std::endl;                               \
