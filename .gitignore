@@ -4,3 +4,4 @@ build64/
 /.vs
 /local
 /CMakeSettings.json
+js-client/js/*
