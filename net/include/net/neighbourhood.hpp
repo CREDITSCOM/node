@@ -12,6 +12,10 @@ class Network;
 class Transport;
 class Packet;
 
+class BlockChain;
+
+const uint32_t MaxMessagesToKeep = 512;
+
 struct Connection;
 struct RemoteNode {
   std::atomic<uint64_t> packets = { 0 };
@@ -35,6 +39,13 @@ typedef MemPtr<TypedSlot<RemoteNode>> RemoteNodePtr;
 struct Connection {
   typedef uint64_t Id;
 
+  Connection() = default;
+  Connection(Connection&&) = default;
+
+  Connection(const Connection&) = delete;
+
+  ~Connection() { }
+
   Id id;
 
   uint64_t lastPacketsCount = 0;
@@ -47,6 +58,15 @@ struct Connection {
   ip::udp::endpoint out;
 
   RemoteNodePtr node;
+  bool isSignal = 0;
+
+  struct MsgRel {
+    uint32_t acceptOrder = 0;
+    bool needSend = true;
+  };
+  FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
+
+  uint64_t syncBlock = 0;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
@@ -79,14 +99,27 @@ public:
 
   void gotRefusal(const Connection::Id&);
 
-  void connectNode(RemoteNodePtr, ConnectionPtr);
-
   void checkPending();
   void checkSilent();
 
   bool canHaveNewConnection();
 
+  void neighbourSentPacket(RemoteNodePtr, const Hash&);
+  void neighbourSentRenounce(RemoteNodePtr, const Hash&);
+
+  void redirectByNeighbours(const Packet*);
+  void pourByNeighbours(const Packet*, const uint32_t packNum);
+
+  void pingNeighbours();
+  void validateConnectionId(RemoteNodePtr,
+                            const Connection::Id,
+                            const ip::udp::endpoint&);
+
+  ConnectionPtr getNextRequestee(const Hash&);
+
 private:
+  void connectNode(RemoteNodePtr, ConnectionPtr);
+
   Transport* transport_;
 
   TypedAllocator<Connection> connectionsAllocator_;
@@ -96,6 +129,13 @@ private:
 
   std::atomic_flag pLockFlag_ = ATOMIC_FLAG_INIT;
   FixedVector<ConnectionPtr, MaxConnections> pendingConnections_;
+
+  struct SenderInfo {
+    uint32_t totalSenders = 0;
+    uint32_t reaskTimes = 0;
+    ConnectionPtr prioritySender;
+  };
+  FixedHashMap<Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

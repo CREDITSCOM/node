@@ -1,5 +1,7 @@
+
 /* Send blaming letters to @yrtimd */
 #include <lib/system/logger.hpp>
+#include <sys/timeb.h>
 
 #include "network.hpp"
 #include "transport.hpp"
@@ -13,7 +15,11 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     if (ipv6) sock.set_option(ip::v6_only(false));
 
     sock.set_option(ip::udp::socket::reuse_address(true));
-    sock.set_option(ip::udp::socket::send_buffer_size(Packet::MaxSize));
+
+    sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
+    sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
+
+    sock.non_blocking(true);
 
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
@@ -73,12 +79,21 @@ void Network::readerRoutine(const Config& config) {
 
   for (;;) {
     auto& task = iPacMan_.allocNext();
-    task.size =
-      sock->receive_from(buffer(task.pack.data(),
-                                Packet::MaxSize),
-                         task.sender,
-                         NO_FLAGS,
-                         lastError);
+
+    uint32_t cnt = 0;
+    do {
+      task.size =
+        sock->receive_from(buffer(task.pack.data(),
+                                  Packet::MaxSize),
+                           task.sender,
+                           NO_FLAGS,
+                           lastError);
+      if (++cnt == 10) {
+        cnt = 0;
+        std::this_thread::yield();
+      }
+    }
+    while (lastError == boost::asio::error::would_block);
 
     if (!lastError) {
       iPacMan_.enQueueLast();
@@ -90,13 +105,21 @@ void Network::readerRoutine(const Config& config) {
 
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
   boost::system::error_code lastError;
+  size_t size;
 
-  LOG_OUT_PACK(task->pack.data(), task->pack.size());
+  uint32_t cnt = 0;
+  do {
+    size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
+                        ep,
+                        NO_FLAGS,
+                        lastError);
 
-  auto size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
-                           ep,
-                           NO_FLAGS,
-                           lastError);
+    if (++cnt == 10) {
+      cnt = 0;
+      std::this_thread::yield();
+    }
+  }
+  while (lastError == boost::asio::error::would_block);
 
   if (lastError || size < task->pack.size())
     LOG_ERROR("Cannot send packet. Error " << lastError);
@@ -119,15 +142,14 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 
 void Network::processorRoutine() {
-  FixedHashMap<Hash, uint32_t, uint16_t> packetMap;
-  PacketCollector collector;
+  FixedHashMap<Hash, uint32_t, uint16_t, 1000000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   for (;;) {
     externals.callAll();
 
     auto task = iPacMan_.getNextTask();
-    LOG_IN_PACK(task->pack.data(), task->pack.size());
+    //LOG_IN_PACK(task->pack.data(), task->pack.size());
 
     auto remoteSender = transport_->getPackSenderEntry(task->sender);
     if (remoteSender->isBlackListed()) {
@@ -136,7 +158,7 @@ void Network::processorRoutine() {
     }
 
     if (!(task->pack.isHeaderValid())) {
-      LOG_WARN("Header is not valid");
+      LOG_WARN("Header is not valid: " << byteStreamToHex((const char*)task->pack.data(), 100));
       remoteSender->addStrike();
       continue;
     }
@@ -151,16 +173,22 @@ void Network::processorRoutine() {
     uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
       if (task->pack.isFragmented() || task->pack.isCompressed()) {
-        Message& msg = collector.getMessage(task->pack);
-        if (msg.isComplete())
-          transport_->processNodeMessage(msg);
+        bool newFragmentedMsg;
+        MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
+        transport_->gotPacket(task->pack, remoteSender);
+
+        if (newFragmentedMsg)
+          transport_->registerMessage(msg);
+
+        if (msg->isComplete())
+          transport_->processNodeMessage(**msg);
       }
       else
         transport_->processNodeMessage(task->pack);
     }
 
-    if (recCounter < OPacMan::MaxTimesRedirect)
-      transport_->sendBroadcast(&task->pack);
+    if (recCounter < OPacMan::MaxTimesRedirect && !task->pack.isDirect())
+      transport_->redirectPacket(task->pack);
 
     ++recCounter;
   }
@@ -168,6 +196,7 @@ void Network::processorRoutine() {
 
 void Network::sendDirect(const Packet p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
+
   qePtr->element.endpoint = ep;
   qePtr->element.pack = p;
 
@@ -204,6 +233,55 @@ Network::Network(const Config& config, Transport* transport):
 
   if (!good_)
     LOG_ERROR("Cannot start the network: error binding sockets");
+}
+
+bool Network::resendFragment(const Hash& hash,
+                             const uint16_t id,
+                             const ip::udp::endpoint& ep) {
+  //LOG_WARN("Got resend req " << id << " from " << ep);
+  MessagePtr msg;
+  {
+    SpinLock l(collector_.mLock_);
+    msg = collector_.map_.tryStore(hash);
+  }
+
+  if (!msg) {
+    return false;
+  }
+
+  {
+    SpinLock l(msg->pLock_);
+    if (id < msg->packetsTotal_ && *(msg->packets_ + id)) {
+      sendDirect(*(msg->packets_ + id), ep);
+      return true;
+      //LOG_WARN("Resending " << id);
+    }
+  }
+
+  return false;
+}
+
+void Network::registerMessage(Packet* pack, const uint32_t size) {
+  MessagePtr msg;
+
+  {
+    SpinLock l(collector_.mLock_);
+    msg = collector_.msgAllocator_.emplace();
+  }
+
+  msg->packetsLeft_ = 0;
+  msg->packetsTotal_ = size;
+  msg->headerHash_ = pack->getHeaderHash();
+
+  auto packEnd = msg->packets_ + size;
+  auto rPtr = pack;
+  for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr)
+    *wPtr = *rPtr;
+
+  {
+    SpinLock l(collector_.mLock_);
+    collector_.map_.tryStore(pack->getHeaderHash()) = msg;
+  }
 }
 
 Network::~Network() {

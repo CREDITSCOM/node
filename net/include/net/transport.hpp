@@ -13,6 +13,7 @@
 
 #include "neighbourhood.hpp"
 #include "pacmans.hpp"
+#include "packet.hpp"
 
 using namespace boost::asio;
 
@@ -26,6 +27,10 @@ enum class NetworkCommand: uint8_t {
   RegistrationConfirmed,
   RegistrationRefused,
   Ping,
+  PackInform,
+  PackRequest,
+  PackRenounce,
+  BlockSyncRequest,
   SSRegistration = 1,
   SSFirstRound = 31,
   SSRegistrationRefused = 25,
@@ -80,7 +85,7 @@ public:
   void processNodeMessage(const Message&);
   void processNodeMessage(const Packet&);
 
-  void addTask(Packet*, const uint32_t packNum);
+  void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false, bool sendToNeighbours = true);
   void clearTasks();
 
   const PublicKey& getMyPublicKey() const { return myPublicKey_; }
@@ -97,12 +102,22 @@ public:
                      conn.out : conn.in);
   }
 
+  void gotPacket(const Packet&, RemoteNodePtr&);
+  void redirectPacket(const Packet&);
+
   void refillNeighbourhood();
   void processPostponed(const RoundNum);
 
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&);
   void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
+  void sendPackRenounce(const Hash&, const Connection&);
+
+  void sendPingPack(const Connection&);
+
+  void registerMessage(MessagePtr);
+
+  void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
 private:
   void postponePacket(const RoundNum, const MsgTypes, const Packet&);
@@ -132,6 +147,15 @@ private:
   bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
   bool gotSSLastBlock(const TaskPtr<IPacMan>&, uint32_t lastBlock);
 
+  bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+  bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+  bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+
+  bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+
+  void askForMissingPackages();
+  void requestMissing(const Hash&, const uint16_t, const uint64_t);
+
   /* Actions */
   bool good_;
   Config config_;
@@ -140,7 +164,12 @@ private:
   static const uint32_t MaxRemoteNodes = 4096;
 
   std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
-  FixedCircularBuffer<Packet,
+  struct PackSendTask {
+    Packet pack;
+    uint32_t resendTimes = 0;
+    bool incrementId;
+  };
+  FixedCircularBuffer<PackSendTask,
                       MaxPacksQueue> sendPacks_;
 
   TypedAllocator<RemoteNode> remoteNodes_;
@@ -148,13 +177,14 @@ private:
   FixedHashMap<ip::udp::endpoint,
                RemoteNodePtr,
                uint16_t,
-               MaxRemoteNodes,
-               true> remoteNodesMap_;
+               MaxRemoteNodes> remoteNodesMap_;
 
   RegionAllocator netPacksAllocator_;
   PublicKey myPublicKey_;
 
   IPackStream iPackStream_;
+
+  std::atomic_flag oLock_ = ATOMIC_FLAG_INIT;
   OPackStream oPackStream_;
 
   // SS Data
@@ -178,10 +208,12 @@ private:
                                       pack(p) { }
   };
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
-  
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = { &postponedPacketsFirst_, &postponedPacketsSecond_ };
+
+  std::atomic_flag uLock_ = ATOMIC_FLAG_INIT;
+  FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   Network* net_;
   Node* node_;

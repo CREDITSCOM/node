@@ -86,7 +86,7 @@ public:
     Task& operator=(Task&&) = delete;
   };
 
-  typedef FUQueue<Task, 10000> Queue;
+  typedef FUQueue<Task, 1000000lu> Queue;
 
   Queue::Element* allocNext();
   void enQueueLast(Queue::Element*);
