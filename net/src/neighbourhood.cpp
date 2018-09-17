@@ -97,17 +97,14 @@ void Neighbourhood::checkSilent() {
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
-  ConnectionPtr *conn;
-  {
-    SpinLock ll(pLockFlag_);
-    conn =
-      &pendingConnections_.emplace(connectionsAllocator_.emplace());
+  SpinLock ll(pLockFlag_);
+  ConnectionPtr &conn =
+    pendingConnections_.emplace(connectionsAllocator_.emplace());
 
-    (*conn)->id = getSecureRandom<Connection::Id>();
-    (*conn)->in = ep;
-  }
+  conn->id = getSecureRandom<Connection::Id>();
+  conn->in = ep;
 
-  transport_->sendRegistrationRequest(***conn);
+  transport_->sendRegistrationRequest(**conn);
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
