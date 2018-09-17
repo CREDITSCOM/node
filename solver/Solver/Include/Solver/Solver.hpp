@@ -34,7 +34,8 @@
 //#define SPAM_MAIN
 
 #include "timer_service.h"
-#include "RunAfter.h"
+//#include "RunAfter.h"
+#include "CallsQueueScheduler.h"
 
 class Node;
 
@@ -292,11 +293,19 @@ typedef std::string Matrix;
 		// flag: all matrices are received
 		bool allMatricesReceived = false;
 
-		RunAfterEx<std::function<void(int)>> sendRoundTableRequestCall;
-		RunAfterEx<> flushTransactionsCall;
-		RunAfterEx<> writeNewBlockCall;
-		RunAfterEx<> closeMainRoundCall;
-		RunAfterEx<> onRoundExpiredCall;
+        CallsQueueScheduler calls_scheduler;
+
+        CallsQueueScheduler::ProcId sendRoundTableRequestId { CallsQueueScheduler::no_id };
+        CallsQueueScheduler::ProcId flushTransactionsId { CallsQueueScheduler::no_id };
+        CallsQueueScheduler::ProcId writeNewBlockId { CallsQueueScheduler::no_id };
+        CallsQueueScheduler::ProcId closeMainRoundId { CallsQueueScheduler::no_id };
+        CallsQueueScheduler::ProcId onRoundExpiredId { CallsQueueScheduler::no_id };
+
+        //CallsQueueScheduler::ProcType sendRoundTableRequestCall;
+        CallsQueueScheduler::ProcType flushTransactionsCall;
+        CallsQueueScheduler::ProcType writeNewBlockCall;
+        CallsQueueScheduler::ProcType closeMainRoundCall;
+        CallsQueueScheduler::ProcType onRoundExpiredCall;
 
 		// used for time measurement (in msec) from every round start and to accumulate time marks every round
 		TimerService<> timer_service;

@@ -1,4 +1,4 @@
-#include "CallsQueueScheduler.h"
+#include "Solver/CallsQueueScheduler.h"
 #include <lib/system/structures.hpp> // CallsQueue
 
 void CallsQueueScheduler::Run()
@@ -57,13 +57,22 @@ void CallsQueueScheduler::Run()
                     run = *_queue.cbegin();
                     _queue.erase(_queue.cbegin());
                     ProcType proc = run.proc;
-                    CallsQueue::instance().insert([proc]() {
-                        proc();
-                    });
-                    _count_total.fetch_add(1);
+                    // push to CallsQueue only if there are no any previous calls
+                    if(CanExe(run.id)) {
+                        OnExeQueued(run.id);
+                        CallsQueue::instance().insert([this, run]() {
+                            run.proc();
+                            std::lock_guard<std::mutex> lque(_mtx_queue);
+                            OnExeDone(run.id);
+                        });
+                        _cnt_total += 1;
+                    }
+                    else {
+                        _cnt_block_exe += 1;
+                    }
                     // Launch::periodic -> schedule next item
                     if(run.dt > 0) {
-                        run.tp += std::chrono::milliseconds(run.dt);
+                        run.tp = ClockType::now() + std::chrono::milliseconds(run.dt);
                         auto pos = _queue.insert(run);
                         if(pos == _queue.end()) {
                             // periodic calls aborted due to unexpected problem!
@@ -73,6 +82,34 @@ void CallsQueueScheduler::Run()
             }
         }
     });
+}
+
+void CallsQueueScheduler::OnExeQueued(ProcId id)
+{
+    auto it = _exe_sync.find(id);
+    if(it == _exe_sync.cend()) {
+        _exe_sync.insert({ id, { 1, 0 } });
+    }
+    else {
+        it->second.queued += 1;
+    }
+}
+
+void CallsQueueScheduler::OnExeDone(ProcId id)
+{
+    auto it = _exe_sync.find(id);
+    if(it != _exe_sync.end()) {
+        it->second.done += 1;
+    }
+}
+
+bool CallsQueueScheduler::CanExe(ProcId id)
+{
+    auto it = _exe_sync.find(id);
+    if(it != _exe_sync.end()) {
+        return it->second.done == it->second.queued;
+    }
+    return true;
 }
 
 void CallsQueueScheduler::Stop()
@@ -97,7 +134,8 @@ uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcTy
         std::lock_guard<std::mutex> l(_mtx_queue);
         if(std::find(_queue.cbegin(), _queue.cend(), id) != _queue.cend()) {
             // block already added before
-            return no_id;
+            _cnt_block_que += 1;
+            return id;
         }
         // add new item
         auto result = _queue.insert(CallsQueueScheduler::Context {
@@ -137,14 +175,10 @@ void CallsQueueScheduler::Clear()
 {
     {
         std::lock_guard<std::mutex> l(_mtx_queue);
-        _queue.clear(); 
+        _queue.clear();
+        _exe_sync.clear();
     }
     // awake worker thread to re-schedule its waiting
     _flag = true;
     _signal.notify_one();
-}
-
-uint32_t CallsQueueScheduler::TotalExecutedCalls() const
-{
-    return _count_total;
 }

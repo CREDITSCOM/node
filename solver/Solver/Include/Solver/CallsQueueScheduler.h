@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <set>
+#include <map>
 
 //template<typename TResol = std::chrono::milliseconds>
 class CallsQueueScheduler
@@ -23,6 +24,7 @@ public:
 
     using ClockType = std::chrono::steady_clock;
     using ProcType = std::function<void()>;
+    using ProcId = uintptr_t;
 
     constexpr static uintptr_t no_id = 0;
 
@@ -77,7 +79,7 @@ public:
      * @param   proc        The procedure to be scheduled for call.
      * @param   scheme      The scheme: once - do one call, periodic - repeat calls every wait_for period.
      *
-     * @return  An id that can be used in future to remove scheduled call from queue if any.
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_id
      */
 
     uintptr_t Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
@@ -119,7 +121,42 @@ public:
      * @return  The total number of executed calls during work.
      */
 
-    uint32_t TotalExecutedCalls() const;
+    uint32_t TotalExecutedCalls() const
+    {
+        return _cnt_total;
+    }
+
+    /**
+     * @fn  uint32_t CallsQueueScheduler::TotalBlockedOnQueue() const
+     *
+     * @brief   Total blocked on queue
+     *
+     * @author  aae
+     * @date    17.09.2018
+     *
+     * @return  The total number of calls blocked on queue.
+     */
+
+    uint32_t TotalBlockedOnQueue() const
+    {
+        return _cnt_block_que;
+    }
+
+    /**
+     * @fn  uint32_t CallsQueueScheduler::TotalBlockedOnExecute() const
+     *
+     * @brief   Total blocked on execute
+     *
+     * @author  aae
+     * @date    17.09.2018
+     *
+     * @return  The total number of calls blocked on execute.
+     */
+
+    uint32_t TotalBlockedOnExecute() const
+    {
+        return _cnt_block_exe;
+    }
 
 private:
 
@@ -180,5 +217,25 @@ private:
     std::atomic_bool _stop { false };
 
     // statistics
-    std::atomic_uint32_t _count_total { 0 };
+    uint32_t _cnt_total { 0 };
+    uint32_t _cnt_block_exe { 0 };
+    uint32_t _cnt_block_que { 0 };
+
+    // Syncing with CallsQueue (to block proc execution if this one still in queue)
+
+    struct ExeSync
+    {
+        uint32_t queued;
+        uint32_t done;
+    };
+    std::map<ProcId, ExeSync> _exe_sync;
+
+    // methods below are NOT thread-safe, they must be synced at point of call!
+
+    // must be called when the lambda put in CallsQueue for execution
+    void OnExeQueued(ProcId id);
+    // must be called from within lambda executed by CallsQueue
+    void OnExeDone(ProcId id);
+    // must be called before put lambda in CallsQueue to avoid duplicated lambdas in CallsQueue
+    bool CanExe(ProcId id);
 };

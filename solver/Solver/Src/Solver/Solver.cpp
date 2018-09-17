@@ -39,7 +39,7 @@ void addTimestampToPool(csdb::Pool& pool)
       now_time.time_since_epoch()).count()));
 }
 
-// method is replaced with RunAfterEx instances:
+// method is replaced with CallsQueueScheduler:
 #if 0
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
 {    
@@ -76,36 +76,28 @@ Solver::Solver(Node* node)
   , m_pool()
   , v_pool()
   , b_pool()
-	, sendRoundTableRequestCall([this](int cur_rNum) {
-		timer_service.TimeConsoleOut("sendRoundTableRequest()", cur_rNum);
-		node_->sendRoundTableRequest(cur_rNum);
-	}, "sendRoundTableRequest()")
 	, flushTransactionsCall([this]() {
 		//timer_service.TimeConsoleOut("flushTransactions()", currentRound);
 		flushTransactions();
-	}, "flushTransactions()")
+	})
 	, writeNewBlockCall([this]() {
 		timer_service.TimeConsoleOut("writeNewBlock()", currentRound);
 		writeNewBlock();
-	}, "writeNewBlock()")
+	})
 	, onRoundExpiredCall([this]() {
 		timer_service.TimeConsoleOut("onRoundExpired()", currentRound);
 		onRoundExpired();
-	}, "onRoundExpired()")
+	})
 	, closeMainRoundCall([this]() {
 		timer_service.TimeConsoleOut("closeMainRound()", currentRound);
 		closeMainRound();
-	}, "closeMainRound()")
+	})
 {}
 
 Solver::~Solver()
 {
-	// stop possible calls
-	sendRoundTableRequestCall.WaitCancel(40); // msec
-	flushTransactionsCall.WaitCancel(40); // msec
-	writeNewBlockCall.WaitCancel(40); // msec
-	onRoundExpiredCall.WaitCancel(40); // msec
-	closeMainRoundCall.WaitCancel(40); // msec
+	// stop possible deferred calls
+    calls_scheduler.Stop();
 	//		csconnector::stop();
   //		csstats::stop();
 }
@@ -248,13 +240,13 @@ void Solver::runMainRound()
 	  // original logic: 2000 msec for 1st round
 	  constexpr uint32_t delay1st = 2000;
 	  timer_service.TimeStore("schedule (2000) closeMainRound()", node_->getRoundNumber());
-	  closeMainRoundCall.Schedule(delay1st, LaunchScheme::single);
+      closeMainRoundId = calls_scheduler.Insert(std::chrono::milliseconds(delay1st), closeMainRoundCall, CallsQueueScheduler::Launch::once);
   }
   else
   {
 	  constexpr uint32_t delay = TIME_TO_COLLECT_TRXNS;
 	  timer_service.TimeStore("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") closeMainRound()", node_->getRoundNumber());
-	  closeMainRoundCall.Schedule(delay, LaunchScheme::single);
+      closeMainRoundId = calls_scheduler.Insert(std::chrono::milliseconds(delay), closeMainRoundCall, CallsQueueScheduler::Launch::once);
  }
 
 }
@@ -460,7 +452,7 @@ void Solver::takeDecWorkaround()
   {
       //        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
       timer_service.TimeConsoleOut("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
-      writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
+      writeNewBlockId = calls_scheduler.Insert(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), writeNewBlockCall, CallsQueueScheduler::Launch::once);
   }
   else
   {
@@ -470,7 +462,7 @@ void Solver::takeDecWorkaround()
       {
           node_->becomeWriter();
           timer_service.TimeConsoleOut("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
-          writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
+          writeNewBlockId = calls_scheduler.Insert(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), writeNewBlockCall, CallsQueueScheduler::Launch::once);
       }
       //LOG_WARN("This should NEVER happen, NEVER");
   }
@@ -600,13 +592,13 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   }
 
   // the last round when request for RoundTable was sent
-  // it helps to prevent extra duplicated requests during the same round
+  // it helps to prevent requests "from old round"
+  int curRndNum = currentRound;
   timer_service.TimeConsoleOut("schedule (" STRINGIFY(TIME_TO_AWAIT_ACTIVITY) ") sendRoundTableRequest()", node_->getRoundNumber());
-  sendRoundTableRequestCall.Schedule(
-	  TIME_TO_AWAIT_ACTIVITY,
-	  LaunchScheme::single,
-	  (int) node_->getRoundNumber());
-
+  sendRoundTableRequestId = calls_scheduler.Insert(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY), [this, curRndNum]() {
+    timer_service.TimeConsoleOut("sendRoundTableRequest()", curRndNum);
+    node_->sendRoundTableRequest(curRndNum);
+  }, CallsQueueScheduler::Launch::once);
 }
 
 
@@ -894,7 +886,7 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   {
     node_->becomeWriter();
 	timer_service.TimeConsoleOut("schedule (" STRINGIFY(TIME_TO_COLLECT_TRXNS) ") writeNewBlock()", node_->getRoundNumber());
-	writeNewBlockCall.Schedule(TIME_TO_COLLECT_TRXNS, LaunchScheme::single);
+    writeNewBlockId = calls_scheduler.Insert(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), writeNewBlockCall, CallsQueueScheduler::Launch::once);
   } 
   
 }
@@ -915,17 +907,20 @@ void Solver::beforeNextRound()
 		sendTL();
 	}
 
-	if (onRoundExpiredCall.IsScheduled()) {
-		timer_service.TimeConsoleOut("cancel onRoundExpiredCall", currentRound);
-		onRoundExpiredCall.Cancel();
+	if (onRoundExpiredId != CallsQueueScheduler::no_id) {
+		timer_service.TimeConsoleOut("cancel onRoundExpired()", currentRound);
+        calls_scheduler.Remove(onRoundExpiredId);
+        onRoundExpiredId = CallsQueueScheduler::no_id;
 	}
-	if (sendRoundTableRequestCall.IsScheduled()) {
-		timer_service.TimeConsoleOut("cancel sendRoundTableRequestCall", currentRound);
-		sendRoundTableRequestCall.Cancel();
+	if (sendRoundTableRequestId != CallsQueueScheduler::no_id) {
+		timer_service.TimeConsoleOut("cancel sendRoundTableRequest()", currentRound);
+        calls_scheduler.Remove(sendRoundTableRequestId);
+        sendRoundTableRequestId = CallsQueueScheduler::no_id;
 	}
-	if (closeMainRoundCall.IsScheduled()) {
-		timer_service.TimeConsoleOut("cancel closeMainRoundCall", currentRound);
-		closeMainRoundCall.Cancel();
+	if (closeMainRoundId != CallsQueueScheduler::no_id) {
+		timer_service.TimeConsoleOut("cancel closeMainRound()", currentRound);
+        calls_scheduler.Remove(closeMainRoundId);
+        closeMainRoundId = CallsQueueScheduler::no_id;
 	}
 
 	doSelfTest();
@@ -934,9 +929,6 @@ void Solver::beforeNextRound()
 	passedRoundsDuration += timer_service.Time();
 	passedRoundsCount++;
 
-#if defined(TIMER_SERVICE_TO_CONSOLE)
-	timer_service.ConsoleOut();
-#endif
 	timer_service.Reset();
 }
 
@@ -991,10 +983,15 @@ void Solver::nextRound()
   // original logic: only normal nodes call flushTRansactions()
   if (lvl == NodeLevel::Normal) {
 	  // TODO: define constant for flushTransactions() period
-	  flushTransactionsCall.Schedule(50, LaunchScheme::periodic );
+      timer_service.TimeConsoleOut("schedule (100) flushTransactions() periodic", currentRound);
+      flushTransactionsId = calls_scheduler.Insert(std::chrono::milliseconds(100), flushTransactionsCall, CallsQueueScheduler::Launch::periodic);
   }
   else {
-	  flushTransactionsCall.Cancel();
+      if(flushTransactionsId != CallsQueueScheduler::no_id) {
+          timer_service.TimeConsoleOut("cancel flushTransactions()", currentRound);
+          calls_scheduler.Remove(flushTransactionsId);
+          flushTransactionsId = CallsQueueScheduler::no_id;
+      }
   }
   // calculate new desired round duration as average duration of previous ones
   uint32_t desired_round_duration = 2000;
@@ -1006,14 +1003,15 @@ void Solver::nextRound()
 	  }
   }
   // ensure onRoundExpiredCall already canceled
-  if (onRoundExpiredCall.IsScheduled()) {
-	  timer_service.TimeConsoleOut("cancel onRoundExpiredCall", currentRound);
-	  onRoundExpiredCall.WaitCancel(20);
+  if (onRoundExpiredId != CallsQueueScheduler::no_id) {
+	  timer_service.TimeConsoleOut("cancel onRoundExpired()", currentRound);
+      calls_scheduler.Remove(onRoundExpiredId);
+      onRoundExpiredId = CallsQueueScheduler::no_id;
   }
   std::ostringstream os;
   os << "Shedule (" << desired_round_duration << ") onRoundExpired()";
   timer_service.TimeConsoleOut(os.str(), node_->getRoundNumber());
-  onRoundExpiredCall.Schedule(desired_round_duration, LaunchScheme::single);
+  onRoundExpiredId = calls_scheduler.Insert(std::chrono::milliseconds(desired_round_duration), onRoundExpiredCall, CallsQueueScheduler::Launch::once);
 }
 
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
