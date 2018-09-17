@@ -21,7 +21,7 @@
 #include <csdb/transaction.h>
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
-#include "../../../../csnode/include/csnode/core.h"
+#include "../../../../csnode/include/csnode/nodecore.h"
 
 //#define MONITOR_NODE
 //#define SPAM_MAIN
@@ -132,9 +132,9 @@ namespace Credits {
 
         // Solver solves stuff
         void gotTransaction(csdb::Transaction&&);
-        void gotTransactionsPacket(csdb::TransactionsPacket&& packet);
-        void gotPacketHashesRequest(std::vector<csdb::TransactionsPacketHash>&& hashes);
-        void gotPacketHashesReply(csdb::TransactionsPacket&& packet);
+        void gotTransactionsPacket(cs::TransactionsPacket&& packet);
+        void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes);
+        void gotPacketHashesReply(cs::TransactionsPacket&& packet);
         void gotRound(cs::RoundInfo&& round);
         void gotTransactionList(csdb::Pool&&);
         void gotBlockCandidate(csdb::Pool&&);
@@ -247,7 +247,7 @@ namespace Credits {
         std::mutex m_trans_mut;
         std::vector<csdb::Transaction> m_transactions;
         csdb::Pool m_transactions_;
-        csdb::TransactionsPacketHashTable mHashTable;
+        cs::TransactionsPacketHashTable mHashTable;
 
 #ifdef SPAMMER
         std::atomic_bool spamRunning{ false };

@@ -309,7 +309,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
     }
 }
 
-void Solver::gotTransactionsPacket(csdb::TransactionsPacket&& packet)
+void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet)
 {
 #ifdef MYLOG
     LOG_EVENT("Got transaction packet");
@@ -320,7 +320,7 @@ void Solver::gotTransactionsPacket(csdb::TransactionsPacket&& packet)
         mHashTable.emplace(hash, std::move(packet));
 }
 
-void Solver::gotPacketHashesRequest(std::vector<csdb::TransactionsPacketHash>&& hashes)
+void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes)
 {
 #ifdef MYLOG
     LOG_EVENT("Got transactions hash request, try to find in hash table");
@@ -349,7 +349,7 @@ void Solver::initConfRound()
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
 
-void Solver::gotPacketHashesReply(csdb::TransactionsPacket&& packet)
+void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet)
 {
     // TODO: look at rount table
 }

@@ -887,7 +887,7 @@ void Node::getTransactionsPacket(const uint8_t* data , const std::size_t size, c
 {
     istream_.init(data, size);
 
-    csdb::TransactionsPacket packet;
+    cs::TransactionsPacket packet;
     istream_ >> packet;
 
 #ifdef MYLOG
@@ -916,12 +916,12 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     uint32_t hashesCount = 0;
     istream_ >> hashesCount;
 
-    std::vector<csdb::TransactionsPacketHash> hashes;
+    std::vector<cs::TransactionsPacketHash> hashes;
     hashes.reserve(hashesCount);
 
     for (std::size_t i = 0; i < hashesCount; ++i)
     {
-        csdb::TransactionsPacketHash hash;
+        cs::TransactionsPacketHash hash;
         istream_ >> hash;
 
         hashes.push_back(std::move(hash));
@@ -950,7 +950,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 {
     istream_.init(data, size);
 
-    csdb::TransactionsPacket packet;
+    cs::TransactionsPacket packet;
     istream_ >> packet;
 
 #ifdef MYLOG
@@ -1014,7 +1014,7 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
 
     for (std::size_t i = 0; i < hashesCount; ++i)
     {
-        csdb::TransactionsPacketHash hash;
+        cs::TransactionsPacketHash hash;
         istream_ >> hash;
 
         hashes.push_back(std::move(hash));
@@ -1048,7 +1048,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
   flushCurrentTasks();
 }
 
-void Node::sendTransactionsPacket(const csdb::TransactionsPacket& packet)
+void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet)
 {
     if (myLevel_ != NodeLevel::Normal)
         return;
@@ -1064,7 +1064,7 @@ void Node::sendTransactionsPacket(const csdb::TransactionsPacket& packet)
     ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
 
     size_t bSize;
-    const void* data = const_cast<csdb::TransactionsPacket&>(packet).to_byte_stream(bSize);
+    const void* data = const_cast<cs::TransactionsPacket&>(packet).to_byte_stream(bSize);
 
 #ifdef MYLOG
     std::cout << "Sending transaction packet: size: " << bSize << std::endl;
@@ -1086,7 +1086,7 @@ void Node::sendTransactionsPacket(const csdb::TransactionsPacket& packet)
     flushCurrentTasks();
 }
 
-void Node::sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHash>& hashes)
+void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes)
 {
     if (myLevel_ == NodeLevel::Writer)
     {
@@ -1096,7 +1096,7 @@ void Node::sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHas
 
     ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
 
-    std::size_t dataSize = hashes.size() * sizeof(csdb::TransactionsPacketHash) + sizeof(uint32_t);
+    std::size_t dataSize = hashes.size() * sizeof(cs::TransactionsPacketHash) + sizeof(uint32_t);
 
     cs::DynamicBuffer data(dataSize);
     cs::DataStream stream(*data, data.size());
@@ -1118,7 +1118,7 @@ void Node::sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHas
     flushCurrentTasks();
 }
 
-void Node::sendPacketHashesReply(const csdb::TransactionsPacket& packet)
+void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet)
 {
     if (packet.hash().is_empty())
     {
@@ -1131,7 +1131,7 @@ void Node::sendPacketHashesReply(const csdb::TransactionsPacket& packet)
     ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
 
     size_t bSize;
-    const void* data = const_cast<csdb::TransactionsPacket&>(packet).to_byte_stream(bSize);
+    const void* data = const_cast<cs::TransactionsPacket&>(packet).to_byte_stream(bSize);
 
 #ifdef MYLOG
     std::cout << "Sending transaction packet reply: size: " << bSize << std::endl;

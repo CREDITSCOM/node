@@ -72,9 +72,9 @@ public:
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
-  void sendTransactionsPacket(const csdb::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHash>& hashes);
-  void sendPacketHashesReply(const csdb::TransactionsPacket& packet);
+  void sendTransactionsPacket(const cs::TransactionsPacket& packet);
+  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
+  void sendPacketHashesReply(const cs::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
 
