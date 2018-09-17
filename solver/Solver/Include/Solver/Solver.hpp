@@ -4,19 +4,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include <csdb/csdb.h>
-#include <csdb/pool.h>
 #include <memory>
-
 #include <thread>
-
 #include <functional>
 #include <api_types.h>
-
 #include <functional>
-#include <string>
 #include <set>
 #include <vector>
 #include <atomic>
@@ -26,112 +19,106 @@
 #include <boost/asio.hpp>
 #include <api_types.h>
 #include <csdb/transaction.h>
-//#include <csnode/node.hpp>
-//#include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
+#include "../../../../csnode/include/csnode/core.h"
 
 //#define MONITOR_NODE
 //#define SPAM_MAIN
 
 class Node;
 
-namespace Credits{
-typedef std::string Vector;
-typedef std::string Matrix;
+namespace Credits {
+    typedef std::string Vector;
+    typedef std::string Matrix;
 
     class Generals;
-	struct Hash_
-	{
-		Hash_(uint8_t* a)
-		{
-			memcpy(val, a, 32);
-		}
-		Hash_() {}
-		uint8_t val[32];
+    struct Hash_
+    {
+        Hash_(uint8_t* a)
+        {
+            memcpy(val, a, 32);
+        }
+        Hash_() {}
+        uint8_t val[32];
 
-	};
-	struct Signature
-	{
-		Signature(void* a)
-		{
-			memcpy(val, a, 64);
-		}
-		Signature() {}
-		uint8_t val[64];
+    };
+    struct Signature
+    {
+        Signature(void* a)
+        {
+            memcpy(val, a, 64);
+        }
+        Signature() {}
+        uint8_t val[64];
 
-	};
- #pragma pack(push, 1)
-	struct HashVector
-	{
-		uint8_t Sender;
-		//uint32_t roundNum;
-		Hash_ hash;
-		Signature sig;
-	};
-	struct HashMatrix
-	{
-		uint8_t Sender;
-		//uint32_t roundNum;
-		HashVector hmatr[100];
-		Signature sig;
-	};
-  struct NormalState
-  {
-    bool isOn;
-    bool rtStartReceived;
-    bool transactionSend;
-    bool newBlockReceived;
-    bool hashSent;
-  };
-  struct MainState
-  {
-    bool isOn;
-    bool rtStartReceived;
-    bool transactinReceived;
-    bool newBlockReceived;
-    bool rtFinishReceived;
-    bool tlSent;
-  };
-  struct TrustedState
-  {
-    bool isOn;
-    bool rtStartReceived;
-    bool tlReceived;
-    bool vectorSent;
-    bool allVectorsReceived;
-    bool matrixSent;
-    bool allMatricesReceived;
-    bool writerConfirmationSent;
-    bool newBlockReceived;
-    bool hashSent;
-  };
-  struct WriterState
-  {
-    bool isOn;
-    bool writerConfirmationReceived;
-    bool newBlockSent;
-    bool hashesReceived;
-    bool trSent;
-  };
+    };
+#pragma pack(push, 1)
+    struct HashVector
+    {
+        uint8_t Sender;
+        //uint32_t roundNum;
+        Hash_ hash;
+        Signature sig;
+    };
+    struct HashMatrix
+    {
+        uint8_t Sender;
+        //uint32_t roundNum;
+        HashVector hmatr[100];
+        Signature sig;
+    };
+    struct NormalState
+    {
+        bool isOn;
+        bool rtStartReceived;
+        bool transactionSend;
+        bool newBlockReceived;
+        bool hashSent;
+    };
+    struct MainState
+    {
+        bool isOn;
+        bool rtStartReceived;
+        bool transactinReceived;
+        bool newBlockReceived;
+        bool rtFinishReceived;
+        bool tlSent;
+    };
+    struct TrustedState
+    {
+        bool isOn;
+        bool rtStartReceived;
+        bool tlReceived;
+        bool vectorSent;
+        bool allVectorsReceived;
+        bool matrixSent;
+        bool allMatricesReceived;
+        bool writerConfirmationSent;
+        bool newBlockReceived;
+        bool hashSent;
+    };
+    struct WriterState
+    {
+        bool isOn;
+        bool writerConfirmationReceived;
+        bool newBlockSent;
+        bool hashesReceived;
+        bool trSent;
+    };
 
-  struct SolverStates
-  {
-    NormalState normal;
-    MainState main;
-    TrustedState trusted;
-    WriterState writer;
+    struct SolverStates
+    {
+        NormalState normal;
+        MainState main;
+        TrustedState trusted;
+        WriterState writer;
 
-  };
-
-
-
+    };
 
 #pragma pack(pop)
-
-  class State {
-
-};
+    class State {
+    };
 
     class Solver {
     public:
@@ -144,9 +131,11 @@ typedef std::string Matrix;
         void set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv);
 
         // Solver solves stuff
-
         void gotTransaction(csdb::Transaction&&);
         void gotTransactionsPacket(csdb::TransactionsPacket&& packet);
+        void gotPacketHashesRequest(std::vector<csdb::TransactionsPacketHash>&& hashes);
+        void gotPacketHashesReply(csdb::TransactionsPacket&& packet);
+        void gotRound(cs::RoundInfo&& round);
         void gotTransactionList(csdb::Pool&&);
         void gotBlockCandidate(csdb::Pool&&);
         void gotVector(HashVector&&);
@@ -157,17 +146,19 @@ typedef std::string Matrix;
         void gotBlockReply(csdb::Pool&&);
         void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
         void sendTL();
-        // API methods
 
+        // API methods
         void initApi();
         uint32_t getTLsize();
         void addInitialBalance();
+        cs::RoundNumber currentRoundNumber();
 
         void send_wallet_transaction(const csdb::Transaction& transaction);
 
         void nextRound();
         bool mPoolClosed();
         void setLastRoundTransactionsGot(size_t trNum);
+
         //remove it!!!
         void buildBlock(csdb::Pool& block);
 
@@ -232,7 +223,7 @@ typedef std::string Matrix;
 
         csdb::Pool m_pool;
 
-        //std::vector<csdb::Transaction> v_pool;
+        cs::RoundInfo mRound;
 
         csdb::Pool v_pool;
         csdb::Pool b_pool;

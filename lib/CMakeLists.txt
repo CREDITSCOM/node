@@ -11,4 +11,5 @@ add_library(lib
   include/lib/system/logger.hpp
   include/lib/system/allocators.hpp
 )
+
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)

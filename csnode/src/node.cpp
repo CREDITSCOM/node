@@ -3,10 +3,11 @@
 #include <csnode/node.hpp>
 #include <lib/system/logger.hpp>
 #include <net/transport.hpp>
+#include <dynamicbuffer.h>
+#include <datastream.h>
 
 #include <base58.h>
 #include <sodium.h>
-
 #include <snappy.h>
 
 const unsigned MIN_CONFIDANTS = 3;
@@ -15,7 +16,7 @@ const unsigned MAX_CONFIDANTS = 4;
 Node::Node(const Config& config):
   myPublicKey_(config.getMyPublicKey()),
   bc_(config.getPathToDB().c_str()),
-  solver_(new Credits::Solver(this)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
+  solver_(new Credits::Solver(this)),
   transport_(new Transport(config, this)),
   stats_(bc_),
   api_(bc_, solver_),
@@ -165,31 +166,36 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  //std::cout << __func__ << std::endl;
-  istream_.init(data, size);
+void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type)
+{
+    istream_.init(data, size);
+
 #ifdef MYLOG
-  std::cout << "NODE> Get Round Table" << std::endl;
-  #endif
-  if(roundNum_ < rNum || type == MsgTypes::BigBang) roundNum_ = rNum;
-  else {
-    LOG_WARN("Bad round number, ignoring");
-    return;
-  }
-  if (!readRoundData(false))
-    return;
+    std::cout << "NODE> Get Round Table" << std::endl;
+#endif
 
+    if (roundNum_ < rNum || type == MsgTypes::BigBang)
+        roundNum_ = rNum;
+    else
+    {
+        LOG_WARN("Bad round number, ignoring");
+        return;
+    }
 
-  if(myLevel_==NodeLevel::Main)
-  if (!istream_.good()) {
-    LOG_WARN("Bad round table format, ignoring");
-    return;
-  }
+    if (!readRoundData(false))
+        return;
 
-  transport_->clearTasks();
-  onRoundStart();
+    if (myLevel_ == NodeLevel::Main)
+    {
+        if (!istream_.good())
+        {
+            LOG_WARN("Bad round table format, ignoring");
+            return;
+        }
+    }
 
-  //transport_->processPostponed(rNum);
+    transport_->clearTasks();
+    onRoundStart();
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
@@ -903,6 +909,130 @@ void Node::getTransactionsPacket(const uint8_t* data , const std::size_t size, c
     solver_->gotTransactionsPacket(std::move(packet));
 }
 
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const PublicKey& sender)
+{
+    istream_.init(data, size);
+
+    uint32_t hashesCount = 0;
+    istream_ >> hashesCount;
+
+    std::vector<csdb::TransactionsPacketHash> hashes;
+    hashes.reserve(hashesCount);
+
+    for (std::size_t i = 0; i < hashesCount; ++i)
+    {
+        csdb::TransactionsPacketHash hash;
+        istream_ >> hash;
+
+        hashes.push_back(std::move(hash));
+    }
+
+#ifdef MYLOG
+    std::cout << "NODE> Hashes request got size: " << hashesCount << std::endl;
+#endif
+
+    if (!istream_.good() || !istream_.end())
+    {
+        LOG_WARN("Bad packet request format");
+        return;
+    }
+
+    if (hashesCount != hashes.size())
+    {
+        LOG_ERROR("Bad hashes created");
+        return;
+    }
+
+    solver_->gotPacketHashesRequest(std::move(hashes));
+}
+
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const PublicKey& sender)
+{
+    istream_.init(data, size);
+
+    csdb::TransactionsPacket packet;
+    istream_ >> packet;
+
+#ifdef MYLOG
+    std::cout << "NODE> Transactions hashes answer amount got " << packet.transactions_count() << std::endl;
+#endif
+
+    if (!istream_.good() || !istream_.end())
+    {
+        LOG_WARN("Bad transactions hashes answer packet format");
+        return;
+    }
+
+    if (packet.hash().is_empty())
+    {
+        LOG_ERROR("Received transaction hashes answer packet hash is empty");
+        return;
+    }
+
+    solver_->gotPacketHashesReply(std::move(packet));
+}
+
+void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const RoundNum round)
+{
+    istream_.init(data, size);
+    istream_.skip<RoundNum>();
+
+    if (round <= solver_->currentRoundNumber())
+        return;
+
+    uint8_t confidantsCount = 0;
+    istream_ >> confidantsCount;
+
+    if (!confidantsCount)
+    {
+        LOG_ERROR("Bad confidants count in round table");
+        return;
+    }
+
+    uint16_t hashesCount;
+    istream_ >> hashesCount;
+
+    cs::RoundInfo roundInfo;
+    roundInfo.round = round;
+
+    PublicKey general;
+    istream_ >> general;
+
+    cs::ConfidantsKeys confidants;
+    confidants.reserve(confidantsCount);
+
+    for (std::size_t i = 0; i < confidantsCount; ++i)
+    {
+        PublicKey key;
+        istream_ >> key;
+
+        confidants.push_back(std::move(key));
+    }
+
+    cs::Hashes hashes;
+    hashes.reserve(hashesCount);
+
+    for (std::size_t i = 0; i < hashesCount; ++i)
+    {
+        csdb::TransactionsPacketHash hash;
+        istream_ >> hash;
+
+        hashes.push_back(std::move(hash));
+    }
+
+    if (!istream_.end() || !istream_.good())
+    {
+        LOG_ERROR("Bad round table parsing");
+        return;
+    }
+
+    roundInfo.general = std::move(general);
+    roundInfo.confidants = std::move(confidants);
+    roundInfo.hashes = std::move(hashes);
+
+    solver_->gotRound(std::move(roundInfo));
+}
+
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
     LOG_ERROR("Writer and Main node shouldn't send hashes");
@@ -947,6 +1077,73 @@ void Node::sendTransactionsPacket(const csdb::TransactionsPacket& packet)
 
 #ifdef MYLOG
     std::cout << "Sending transaction packet: compressed size: " << compressed.size() << std::endl;
+#endif
+
+#ifdef MYLOG
+    std::cout << "NODE> Sending " << packet.transactions_count() << " transaction(s)" << std::endl;
+#endif
+
+    flushCurrentTasks();
+}
+
+void Node::sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHash>& hashes)
+{
+    if (myLevel_ == NodeLevel::Writer)
+    {
+        LOG_ERROR("Writer should has all transactions hashes");
+        return;
+    }
+
+    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+
+    std::size_t dataSize = hashes.size() * sizeof(csdb::TransactionsPacketHash) + sizeof(uint32_t);
+
+    cs::DynamicBuffer data(dataSize);
+    cs::DataStream stream(*data, data.size());
+
+    stream << static_cast<uint32_t>(hashes.size());
+
+    for (const auto& hash : hashes)
+        stream << hash;
+
+#ifdef MYLOG
+    std::cout << "Sending transaction packet request: size: " << dataSize << std::endl;
+#endif
+
+    std::string compressed;
+    snappy::Compress(static_cast<const char*>(*data), dataSize, &compressed);
+
+    ostream_ << MsgTypes::TransactionsPacketRequest << compressed;
+
+    flushCurrentTasks();
+}
+
+void Node::sendPacketHashesReply(const csdb::TransactionsPacket& packet)
+{
+    if (packet.hash().is_empty())
+    {
+#ifdef MYLOG
+        std::cout << "Send transaction packet reply with empty hash failed" << std::endl;
+#endif
+        return;
+    }
+
+    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+
+    size_t bSize;
+    const void* data = const_cast<csdb::TransactionsPacket&>(packet).to_byte_stream(bSize);
+
+#ifdef MYLOG
+    std::cout << "Sending transaction packet reply: size: " << bSize << std::endl;
+#endif
+
+    std::string compressed;
+    snappy::Compress(static_cast<const char*>(data), bSize, &compressed);
+
+    ostream_ << MsgTypes::TransactionsPacketReply << compressed;
+
+#ifdef MYLOG
+    std::cout << "Sending transaction packet reply: compressed size: " << compressed.size() << std::endl;
 #endif
 
 #ifdef MYLOG
@@ -1219,10 +1416,7 @@ std::swap(confidants, confidantNodes_);
 std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
 #endif
 
-
-
   mainNode_ = mainNode;
-  
-
+ 
   return true;
 }

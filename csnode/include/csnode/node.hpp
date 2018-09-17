@@ -18,8 +18,8 @@ enum NodeLevel {
   Writer
 };
 
-typedef std::string Vector;
-typedef std::string Matrix;
+using Vector = std::string;
+using Matrix = std::string;
 
 class Transport;
 
@@ -49,6 +49,9 @@ public:
   void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const PublicKey& sender);
   void getTransactionsPacket(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getPacketHashesReply(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
@@ -58,7 +61,6 @@ public:
   void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   void getBadBlock(const uint8_t*, const size_t, const PublicKey& sender);
-
 
   /* Outcoming requests forming */
   void sendRoundTable();
@@ -71,6 +73,8 @@ public:
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
   void sendTransactionsPacket(const csdb::TransactionsPacket& packet);
+  void sendPacketHashesRequest(const std::vector<csdb::TransactionsPacketHash>& hashes);
+  void sendPacketHashesReply(const csdb::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
 

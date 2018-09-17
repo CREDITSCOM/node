@@ -124,32 +124,34 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
   std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
-  #endif
+#endif
 }
-
-
-
 
 void Solver::sendTL()
 {
-  if (gotBigBang) return;
-  uint32_t tNum = v_pool.transactions_count();
-  std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
- // std::cout << "                          Total received " << tNum << " transactions" << std::endl;
-  std::cout << "========================================================================================" << std::endl;
-  m_pool_closed = true;  
-  std::cout << "Solver -> Sending " << tNum << " transactions " << std::endl;
-  v_pool.set_sequence(node_->getRoundNumber());
-  //std::cout << "Solver -> Sending TransactionList to ALL" << std::endl;//<< byteStreamToHex(it.str, 32)  //<< 
-  node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
+    if (gotBigBang)
+        return;
 
+    uint32_t tNum = v_pool.transactions_count();
+
+    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
+#ifdef MYLOG
+    std::cout << "                          Total received " << tNum << " transactions" << std::endl;
+#endif
+    std::cout << "========================================================================================" << std::endl;
+
+    m_pool_closed = true;
+
+    std::cout << "Solver -> Sending " << tNum << " transactions " << std::endl;
+
+    v_pool.set_sequence(node_->getRoundNumber());
+    node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
 }
 
 uint32_t Solver::getTLsize()
 {
   return v_pool.transactions_count();
 }
-
 
 void Solver::setLastRoundTransactionsGot(size_t trNum)
 {
@@ -198,7 +200,6 @@ bool Solver::mPoolClosed()
 {
   return m_pool_closed;
 }
-
 
 void Solver::runMainRound()
 {
@@ -319,6 +320,23 @@ void Solver::gotTransactionsPacket(csdb::TransactionsPacket&& packet)
         mHashTable.emplace(hash, std::move(packet));
 }
 
+void Solver::gotPacketHashesRequest(std::vector<csdb::TransactionsPacketHash>&& hashes)
+{
+#ifdef MYLOG
+    LOG_EVENT("Got transactions hash request, try to find in hash table");
+#endif
+
+    for (const auto& hash : hashes)
+    {
+        if (mHashTable.count(hash))
+            node_->sendPacketHashesReply(mHashTable[hash]);
+
+#ifdef MYLOG
+        LOG_EVENT("Found hash in hash table, send to requester");
+#endif
+    }
+}
+
 void Solver::initConfRound()
 {
   memset(receivedVecFrom, 0, 100);
@@ -329,6 +347,32 @@ void Solver::initConfRound()
   if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
+}
+
+void Solver::gotPacketHashesReply(csdb::TransactionsPacket&& packet)
+{
+    // TODO: look at rount table
+}
+
+void Solver::gotRound(cs::RoundInfo&& round)
+{
+    if (mRound.round < round.round)
+    {
+        LOG_EVENT("Got round table");
+
+        mRound = std::move(round);
+
+        cs::Hashes neededHashes;
+
+        for (const auto& hash : mRound.hashes)
+        {
+            if (!mHashTable.count(hash))
+                neededHashes.push_back(hash);
+        }
+
+        if (!neededHashes.empty())
+            node_->sendPacketHashesRequest(neededHashes);
+    }
 }
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
@@ -765,8 +809,7 @@ Solver::createPool()
 #endif
 
 #ifdef SPAMMER
-void
-Solver::spamWithTransactions()
+void Solver::spamWithTransactions()
 {
 	//if (node_->getMyLevel() != Normal) return;
   std::cout << "STARTING SPAMMER..." << std::endl;
@@ -853,6 +896,11 @@ void Solver::addInitialBalance()
   spamThread = std::thread(&Solver::spamWithTransactions, this);
   spamThread.detach();
 #endif
+}
+
+cs::RoundNumber Solver::currentRoundNumber()
+{
+    return mRound.round;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////// gotBlockRequest

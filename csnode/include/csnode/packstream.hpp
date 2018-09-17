@@ -286,7 +286,6 @@ inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   size_t bSize;
   auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes((char*)dataPtr, bSize);
-  //std::cout << "GB: " << byteStreamToHex(dataPtr, bSize) << std::endl;
   return *this;
 }
 
