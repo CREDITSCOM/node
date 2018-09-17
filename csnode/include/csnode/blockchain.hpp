@@ -49,7 +49,11 @@ public:
   using WalletData = Credits::WalletsCache::WalletData;
   using Mask = boost::dynamic_bitset<uint64_t>;
 
-  BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
+  BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress
+#ifdef SPAMMER
+    , csdb::Address spammerAddress
+#endif
+  );
 
   bool isGood() const { return good_; }
 
@@ -165,6 +169,10 @@ private:
 
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
+#ifdef SPAMMER
+  const csdb::Address spammerAddress_;
+#endif
+
   std::unique_ptr<Credits::WalletsIds> walletIds_;
   std::unique_ptr<Credits::WalletsCache> walletsCacheStorage_;
   std::unique_ptr<Credits::WalletsCache::Updater> walletsCacheUpdater_;

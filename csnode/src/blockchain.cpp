@@ -26,13 +26,20 @@ using namespace Credits;
 //    good_ = true;
 //}
 
-BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
+BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress
+#ifdef SPAMMER
+  , csdb::Address spammerAddress
+#endif
+)
   : good_(false)
   , last_written_sequence(std::numeric_limits<decltype(last_written_sequence)>::max())
   , global_sequence(std::numeric_limits<decltype(last_written_sequence)>::max())
   , blockRequestIsNeeded(false)
   , genesisAddress_(genesisAddress)
   , startAddress_(startAddress)
+#ifdef SPAMMER
+  , spammerAddress_(spammerAddress)
+#endif
   , walletIds_(new WalletsIds)
   , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
@@ -277,6 +284,18 @@ void BlockChain::writeGenesisBlock()
   transaction.set_innerID(0);
 
   genesis.add_transaction(transaction);
+
+#ifdef SPAMMER
+  transaction.set_target(spammerAddress_);
+  transaction.set_source(genesisAddress_);
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_innerID(1);
+
+  genesis.add_transaction(transaction);
+#endif
 
   genesis.set_previous_hash(csdb::PoolHash());
   finishNewBlock(genesis);

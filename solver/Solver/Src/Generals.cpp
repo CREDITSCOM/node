@@ -53,7 +53,8 @@ namespace Credits{
 	  for (auto& it : t_pool)
 	  {
 		  countFee(it, num_of_trusted, t_pool.size());
-		  auto delta = it.balance() - it.amount() - it.counted_fee();
+      WalletsState::WalletId walletId{};
+		  auto delta = walletsState.getData(it.source(), walletId).balance_  - it.amount() - it.counted_fee();
 
 	#ifdef _MSC_VER
 		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
@@ -68,7 +69,6 @@ namespace Credits{
         continue;
       }
 
-      WalletsState::WalletId walletId{};
       WalletsState::WalletData& wallState = walletsState.getData(it.source(), walletId);
       if (!wallState.trxTail_.isAllowed(it.innerID())) {
         *(del1 + i) = -bitcnt;

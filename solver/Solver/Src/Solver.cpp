@@ -26,7 +26,7 @@
 #include <sodium.h>
 
 #ifdef SPAMMER
-  static const int NUM_OF_SPAM_KEYS = 1000;
+  static const int NUM_OF_SPAM_KEYS = 10;
 #endif
 
 namespace {
@@ -65,12 +65,19 @@ namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress)
+Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress
+#ifdef SPAMMER
+  , csdb::Address _spammerAddress
+#endif
+  )
   : node_(node)
   , walletsState(new WalletsState(node->getBlockChain()))
   , generals(std::unique_ptr<Generals>(new Generals(*walletsState)))
   , genesisAddress(_genesisAddress)
   , startAddress(_startAddress)
+#ifdef SPAMMER
+  , spammerAddress(_spammerAddress)
+#endif
   , vector_datas()
   , m_pool()
   , v_pool()
@@ -731,11 +738,15 @@ Solver::spamWithTransactions()
     {
       if ((node_->getRoundNumber()<10) || (node_->getRoundNumber() > 20) )
       {
-          transaction.set_source(spam_keys[iid]);
-          transaction.set_target(spam_keys[iid + 1]);
+          csdb::internal::WalletId id;
+          transaction.set_source(spammerAddress);
+          if (node_->getBlockChain().findWalletId(spam_keys[iid], id)) {
+            transaction.target() = transaction.target().from_wallet_id(id);
+          } else {
+            transaction.set_target(spam_keys[iid]);
+          }
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
           transaction.set_max_fee(csdb::AmountCommission(0.1));
-          transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
   #ifdef MYLOG
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;

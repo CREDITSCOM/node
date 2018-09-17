@@ -135,7 +135,11 @@ typedef std::string Matrix;
 
     class Solver {
     public:
-        Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres);
+        Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres
+#ifdef SPAMMER
+          , csdb::Address spammerAddress
+#endif
+        );
         ~Solver();
 
         Solver(const Solver &) = delete;
@@ -204,6 +208,9 @@ typedef std::string Matrix;
 
         const csdb::Address genesisAddress;
         const csdb::Address startAddress;
+#ifdef SPAMMER
+        const csdb::Address spammerAddress;
+#endif
 
         HashVector hvector;
 		
