@@ -323,7 +323,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 	receivedVecFrom[node_->getMyConfNumber()] = true;
 	generals->addvector(hvector);
 	node_->sendVector(std::move(hvector));
-	trustedCounterVector++;
+	++trustedCounterVector;
   if(trustedCounterVector==numGen) 
   {
     vectorComplete = true;
@@ -334,7 +334,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
     //receivedMat_ips.insert(node_->getMyId());
     generals->addSenderToMatrix(node_->getMyConfNumber());
     receivedMatFrom[node_->getMyConfNumber()] = true;
-    trustedCounterMatrix++;
+    ++trustedCounterMatrix;
     node_->sendMatrix(generals->getMatrix());
     generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
 #ifdef MYLOG
@@ -368,7 +368,7 @@ void Solver::gotVector(HashVector&& vector)
 	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
 	 // return;
   //}
-  if (receivedVecFrom[vector.Sender]==true) 
+  if (receivedVecFrom[vector.Sender]==true)
   {
 #ifdef MYLOG
 		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
@@ -593,7 +593,8 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #ifdef MYLOG
 	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
 #endif
-	if (ips.size() <= min_nodes) 
+	size_t ips_size = ips.size();
+	if (ips_size <= min_nodes)
 	{
 		if (hash == myHash) 
 		{
@@ -620,7 +621,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 	}
 
 	
-	if ((ips.size() == min_nodes) && (!round_table_sent)) 
+	if ((ips_size == min_nodes) && (!round_table_sent))
 	{
 		
 #ifdef MYLOG
@@ -779,7 +780,7 @@ void Solver::addInitialBalance()
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
 
-  csdb::Pool pool;
+  //csdb::Pool pool;
   csdb::Transaction transaction;
   transaction.set_target(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
