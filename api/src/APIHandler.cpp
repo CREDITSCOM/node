@@ -772,9 +772,7 @@ APIHandler::PoolInfoGet(PoolInfoGetResult& _return,
 void
 APIHandler::StatsGet(api::StatsGetResult& _return)
 {
-  //#ifndef FOREVER_ALONE
-  //    Log("StatsGet");
-  //#endif
+  TRACE("StatsGet");
 
   csstats::StatsPerPeriod stats = this->stats.getStats();
 
@@ -808,21 +806,23 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
 
   // smart_rescan();
 
-  auto trid = [&]() -> decltype(auto) {
+  auto smartrid = [&]() -> decltype(auto) {
     //   TRACE("");
     auto smart_origin = locked_ref(this->smart_origin);
     //   TRACE("");
-    return (*smart_origin)[BlockChain::getAddressFromKey(address)];
-  }();
-  auto tr = s_blockchain.loadTransaction(trid);
-  _return.smartContract = fetch_smart_body(tr);
+    auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
 
-  SetResponseStatus(_return.status,
-                    !_return.smartContract.address.empty()
-                      ? APIRequestStatusType::SUCCESS
-                      : APIRequestStatusType::FAILURE);
+    return it == smart_origin->end() ? csdb::TransactionID() : it->second;
+  }();
+  if (!smartrid.is_valid()) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+  _return.smartContract =
+    fetch_smart_body(s_blockchain.loadTransaction(smartrid));
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
   //  TRACE("");
-  return;
 }
 
 bool

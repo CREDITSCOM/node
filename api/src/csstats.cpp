@@ -1,3 +1,5 @@
+#define TRACE_ENABLED
+
 #include <algorithm>
 #include <cassert>
 #include <csdb/currency.h>
@@ -8,7 +10,7 @@ namespace csstats {
 
 template<class F>
 void
-csstats::matchPeriod(const Periods& periods, uint32_t period, F func)
+csstats::matchPeriod(const Periods& periods, period_t period, F func)
 {
     for (size_t i = 0; i < periods.size(); ++i) {
         if (period < periods[i])
@@ -24,7 +26,7 @@ csstats::collectStats(const Periods& periods)
                      std::end(periods),
                      [](const Period& l, const Period& r) { return l < r; }));
 
-    Log("Collecting stats: started");
+    TRACE("Collecting stats: started");
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -51,9 +53,8 @@ csstats::collectStats(const Periods& periods)
           atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
         auto poolTime = std::chrono::system_clock::from_time_t(poolTime_t);
 
-        using Seconds = std::chrono::seconds;
-        Seconds poolAgeSec =
-          std::chrono::duration_cast<Seconds>(now - poolTime);
+        std::chrono::seconds poolAgeSec =
+          std::chrono::duration_cast<std::chrono::seconds>(now - poolTime);
 
         matchPeriod(
           periods, (Period)poolAgeSec.count(), [&](size_t periodIndex) {
@@ -85,11 +86,10 @@ csstats::collectStats(const Periods& periods)
 
     auto finishTime = std::chrono::high_resolution_clock::now();
 
-    using Seconds = std::chrono::seconds;
-    Seconds seconds =
-      std::chrono::duration_cast<Seconds>(finishTime - startTime);
+    std::chrono::seconds seconds =
+      std::chrono::duration_cast<std::chrono::seconds>(finishTime - startTime);
 
-    Log("Collecting stats: finished (took ", (int)seconds.count(), "s)");
+    TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
 
     return stats;
 }
@@ -101,7 +101,7 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
     return;
 #endif
 
-    Log("csstats start ",
+    TRACE("csstats start ",
         "update interval is ",
         config.updateIntervalSec,
         " sec");
@@ -109,7 +109,7 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
     ScopedLock lock(mutex);
 
     thread = std::thread([=]() {
-        Log("csstats thread started");
+        TRACE("csstats thread started");
 
         while (!quit) {
             using namespace std::chrono_literals;
@@ -130,7 +130,7 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
                                  secondsPerDay * 365 * 100 });
 
                 for (auto& s : stats) {
-                    Log("Period ",
+                    TRACE("Period ",
                         s.periodSec,
                         " collected ",
                         s.poolsCount,
@@ -139,7 +139,7 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
                         " transactions");
 
                     for (auto& t : s.balancePerCurrency) {
-                        Log("'",
+                        TRACE("'",
                             t.first,
                             "' = ",
                             std::to_string(t.second.integral),
@@ -157,13 +157,13 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
             }
         }
 
-        Log("csstats thread stopped");
+        TRACE("csstats thread stopped");
     });
 }
 
 csstats::~csstats()
 {
-    Log("csstats stop");
+    TRACE("csstats stop");
 
     ScopedLock lock(mutex);
 
