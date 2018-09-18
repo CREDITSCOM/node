@@ -20,15 +20,14 @@ bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id)
 {
     if (address.is_wallet_id())
     {
-        if (id == address.wallet_id())
-            return true;
-        LOG_ERROR("Wrong address");
+        if (id != address.wallet_id())
+            LOG_ERROR("Wrong address");
         return false;
     }
     else if (address.is_public_key())
     {
         std::pair<Data::const_iterator, bool> res = norm_.data_.insert(std::make_pair(address, id));
-        if (id >= norm_.nextId_)
+        if (res.second  &&  id >= norm_.nextId_)
         {
             if (id >= numeric_limits<WalletId>::max() / 2)
                 throw runtime_error("idNormal >= numeric_limits<WalletId>::max() / 2");
@@ -36,7 +35,7 @@ bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id)
             norm_.nextId_ = id + 1;
             norm_.data_.reserve(norm_.nextId_);
         }
-        return true;
+        return res.second;
     }
     LOG_ERROR("Wrong address");
     return false;
@@ -66,7 +65,7 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id)
     if (address.is_wallet_id())
     {
         id = address.wallet_id();
-        return true;
+        return false;
     }
     else if (address.is_public_key())
     {
@@ -78,7 +77,7 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id)
             ++norm_.nextId_;
         }
         id = res.first->second;
-        return true;
+        return res.second;
     }
     LOG_ERROR("Wrong address");
     return false;
@@ -111,9 +110,8 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
 
     if (address.is_wallet_id())
     {
-        if (idNormal == address.wallet_id())
-            return true;
-        LOG_ERROR("Wrong address");
+        if (idNormal != address.wallet_id())
+            LOG_ERROR("Wrong address");
         return false;
     }
     else if (address.is_public_key())
@@ -126,7 +124,7 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
         if (!isInserted)
         {
             if (!isSpecial(value))
-                return (value == idNormal);
+                return false;
             idSpecial = value;
             value = idNormal;
         }

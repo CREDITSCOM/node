@@ -57,6 +57,12 @@ void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr)
 }
 
 // Updater
+WalletsCache::Updater::Updater(WalletsCache& data)
+    : ProcessorBase(data)
+{
+    modified_.resize(data.wallets_.size(), false);
+}
+
 void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr)
 {
     modified_.reset();

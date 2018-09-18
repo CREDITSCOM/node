@@ -752,7 +752,7 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id)
     if (address.is_wallet_id())
     {
         id = address.wallet_id();
-        return true;
+        return false;
     }
     else if (address.is_public_key())
     {

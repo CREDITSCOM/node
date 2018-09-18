@@ -86,9 +86,7 @@ namespace Credits
         class Updater : protected ProcessorBase
         {
         public:
-            Updater(WalletsCache& data) : ProcessorBase(data)
-            {}
-
+            Updater(WalletsCache& data);
             void loadNextBlock(csdb::Pool& curr);
             const WalletData* findWallet(WalletId id) const;
             const Mask& getModified() const { return modified_; }

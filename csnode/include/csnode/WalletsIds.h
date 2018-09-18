@@ -24,6 +24,7 @@ public:
         static WalletId makeNormal(WalletId id);
     public:
         Special(WalletsIds& norm);
+        // returns true if new id was inserted
         bool insertNormal(const WalletAddress& address, WalletId id, WalletId& idSpecial);
         bool findAnyOrInsertSpecial(const WalletAddress& address, WalletId& id);
     private:
@@ -42,8 +43,10 @@ public:
     public:
         Normal(WalletsIds& norm);
 
+        // returns true if new id was inserted
         bool insert(const WalletAddress& address, WalletId id);
         bool find(const WalletAddress& address, WalletId& id) const;
+        // returns true if new id was inserted
         bool get(const WalletAddress& address, WalletId& id);
     private:
         WalletsIds& norm_;
