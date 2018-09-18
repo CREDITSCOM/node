@@ -128,8 +128,7 @@ public:
   }
   PublicKey writerId;
 
-  void                           addToPackageTemporaryStorage(const csdb::Pool& pool);
-  std::bitset<MAX_PACKETS_COUNT> makeCharacteristicMask() const;
+  void addToPackageTemporaryStorage(const csdb::Pool& pool);
 
  private:
   bool init();
