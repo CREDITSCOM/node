@@ -13,16 +13,20 @@
 
 enum NodeLevel { Normal, Confidant, Main, Writer };
 
-typedef std::string Vector;
-typedef std::string Matrix;
+using Vector = std::string;
+using Matrix = std::string;
 
 class Transport;
-namespace Credits {
-class Solver;
+
+
+namespace Credits
+{
+    class Solver;
 }
 
-class Node {
- public:
+class Node
+{
+public:
   Node(const Config&);
   ~Node();
 
@@ -42,6 +46,11 @@ class Node {
   void getMatrix(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const PublicKey& sender);
+  void getTransactionsPacket(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getPacketHashesReply(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
+
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
@@ -62,6 +71,9 @@ class Node {
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
   void sendHash(const Hash&, const PublicKey&);
+  void sendTransactionsPacket(const cs::TransactionsPacket& packet);
+  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
+  void sendPacketHashesReply(const cs::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
   void sendCharacteristic(csdb::Pool emptyMetaPool, const std::vector<uint8_t>& characteristic);
@@ -139,6 +151,7 @@ class Node {
   uint32_t sendBlockRequestSequence;
   bool     awaitingSyncroBlock   = false;
   uint32_t awaitingRecBlockCount = 0;
+
 
   // signature variables
   std::vector<uint8_t> myPublicForSig;

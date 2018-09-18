@@ -231,7 +231,6 @@ inline bool PoolHash::operator !=(const PoolHash &other) const noexcept
 {
   return !operator ==(other);
 }
-
 } // namespace csdb
 
 #endif // _CREDITS_CSDB_POOL_H_INCLUDED_

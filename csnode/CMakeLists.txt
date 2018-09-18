@@ -7,9 +7,15 @@ add_library(csnode
   include/csnode/node.hpp
   include/csnode/packstream.hpp
   include/csnode/wallets_cache.hpp
+  include/csnode/dynamicbuffer.h
+  include/csnode/datastream.h
+  include/csnode/nodecore.h
   src/blockchain.cpp
   src/node.cpp
   src/wallets_cache.cpp
+  src/dynamicbuffer.cpp
+  src/datastream.cpp
+  src/nodecore.cpp
 )
 
 target_link_libraries (csnode net csdb Solver base58)

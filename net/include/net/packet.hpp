@@ -44,7 +44,10 @@ enum MsgTypes: uint8_t {
   ConsTLRequest,
   RoundTableRequest,
   NewBadBlock,
-  BigBang = 35
+  BigBang = 35,
+  TransactionPacket,
+  TransactionsPacketRequest,
+  TransactionsPacketReply
 };
 
 typedef uint32_t RoundNum;
