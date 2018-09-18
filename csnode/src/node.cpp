@@ -103,58 +103,51 @@ bool Node::checkKeysFile()
 
 void Node::generateKeys()
 {
-  uint8_t private_key[64], public_key[32];
-  crypto_sign_ed25519_keypair(public_key, private_key);
-  myPublicForSig.clear();
-  myPrivateForSig.clear();
-  for (int i = 0; i < 32; i++)
-    myPublicForSig.push_back(public_key[i]);
+	myPublicForSig.resize(32);
+	myPrivateForSig.resize(64);
 
-  for (int i = 0; i < 64; i++)
-    myPrivateForSig.push_back(private_key[i]);
+	crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
 
-  std::string pub58, priv58;
-  pub58 = EncodeBase58(myPublicForSig);
-  priv58 = EncodeBase58(myPrivateForSig);
+	std::ofstream f_pub("NodePublic.txt");
+	f_pub << EncodeBase58(myPublicForSig);
+	f_pub.close();
 
-  std::ofstream f_pub("NodePublic.txt");
-  f_pub << pub58;
-  f_pub.close();
-
-  std::ofstream f_priv("NodePrivate.txt");
-  f_priv << priv58;
-  f_priv.close();
+	std::ofstream f_priv("NodePrivate.txt");
+	f_priv << EncodeBase58(myPrivateForSig);
+	f_priv.close();
 }
 
 bool Node::checkKeysForSig()
 {
-  const uint8_t msg[] = { 255, 0, 0, 0, 255 };
-  uint8_t signature[64], public_key[32], private_key[64];
-  for (int i = 0; i < 32; i++)
-    public_key[i] = myPublicForSig[i];
-  for (int i = 0; i < 64; i++)
-    private_key[i] = myPrivateForSig[i];
-  uint64_t sig_size;
-  crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_size), msg, 5, private_key);
-  int ver_ok = crypto_sign_ed25519_verify_detached(signature, msg, 5, public_key);
-  if (ver_ok == 0)
-    return true;
-  else
-  {
-    std::cout << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit." << std::endl;
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
-    if (gen_flag == 'g')
-    {
-      generateKeys();
-      return true;
-    }
-    else return false;
-  }
+	const uint8_t msg[] = { 255, 0, 0, 0, 255 };
+	uint8_t signature[64], public_key[32], private_key[64];
+
+	memcpy(public_key, myPublicForSig.data(), 32);
+	memcpy(private_key, myPrivateForSig.data(), 64);
+
+	uint64_t sig_size;
+	crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_size), msg, 5, private_key);
+	if (!crypto_sign_ed25519_verify_detached(signature, msg, 5, public_key))
+	{
+		return true;
+	}
+	else
+	{
+		std::cout << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit." << std::endl;
+		char gen_flag = 'a';
+		std::cin >> gen_flag;
+		if (gen_flag == 'g')
+		{
+			generateKeys();
+			return true;
+		}
+		else return false;
+	}
 }
 
-void Node::run(const Config&) {
-  transport_->run();
+void Node::run(const Config&)
+{
+	transport_->run();
 }
 
 /* Requests */
@@ -224,13 +217,13 @@ void Node::sendRoundTable() {
   //LOG_EVENT("Sending round table");
   std::cout << "------------------------------------------  SendRoundTable  ---------------------------------------" << std::endl;
   std::cout << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << std::endl << "Confidants: " << std::endl;
-  int i = 0;
+  size_t i = 0;
   for (auto& e : confidantNodes_)
   {
     if (e != mainNode_) 
     {
       std::cout << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
-      i++;
+      ++i;
     }
   }
   transport_->clearTasks();
@@ -947,7 +940,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 #ifdef MYLOG
     //std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence << std::endl;
     #endif
-    awaitingRecBlockCount++;
+    ++awaitingRecBlockCount;
     return;
   }
 #ifdef MYLOG

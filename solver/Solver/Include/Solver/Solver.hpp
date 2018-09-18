@@ -158,7 +158,7 @@ typedef std::string Matrix;
 		// API methods
 
 		void initApi();
-    uint32_t getTLsize();
+    size_t getTLsize() const;
 		void addInitialBalance();
 
     void send_wallet_transaction(const csdb::Transaction& transaction);

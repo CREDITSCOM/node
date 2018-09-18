@@ -146,7 +146,7 @@ void Solver::sendTL()
 
 }
 
-uint32_t Solver::getTLsize()
+size_t Solver::getTLsize() const
 {
   return v_pool.transactions_count();
 }

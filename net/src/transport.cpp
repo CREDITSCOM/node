@@ -140,9 +140,9 @@ inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
     auto bytes = ep.address().to_v6().to_bytes();
     auto ptr = (uint8_t*)&result;
     auto bytesPtr = bytes.data();
-    for (uint32_t i = 0; i < 8; ++i) *ptr^= *(bytesPtr++);
+    for (size_t i = 0; i < 8; ++i) *ptr^= *(bytesPtr++);
     ++ptr;
-    for (uint32_t i = 8; i < 16; ++i) *ptr^= *(bytesPtr++);
+    for (size_t i = 8; i < 16; ++i) *ptr^= *(bytesPtr++);
   }
 
   return result;
@@ -443,7 +443,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
 void Transport::addTask(Packet* pack, const uint32_t packNum) {
 
   auto end = pack + packNum;
-  for (auto ptr = pack; ptr != end; ++ptr) {
+  for (auto &ptr = pack; ptr != end; ++ptr) {
     sendBroadcast(ptr);
     {
       SpinLock l(sendPacksFlag_);
