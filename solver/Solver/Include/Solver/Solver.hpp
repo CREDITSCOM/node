@@ -174,8 +174,8 @@ typedef std::string Matrix;
     //remove it!!!
     void buildBlock(csdb::Pool& block);
 
-    HashVector getMyVector();
-    HashMatrix getMyMatrix();
+    const HashVector& getMyVector() const;
+    const HashMatrix& getMyMatrix() const;
     void initConfRound();
     void sendZeroVector();
     void checkVectorsReceived(size_t _rNum);

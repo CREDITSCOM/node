@@ -221,12 +221,12 @@ void Solver::runMainRound()
 
 }
 
-HashVector Solver::getMyVector()
+const HashVector& Solver::getMyVector() const
 {
   return hvector;
 }
 
-HashMatrix Solver::getMyMatrix()
+const HashMatrix& Solver::getMyMatrix() const
 {
  return (generals->getMatrix());
 }
@@ -271,47 +271,30 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 	}
 
 	if (transaction.is_valid())
+	{
+#ifndef SPAMMER
+		std::vector<uint8_t>	message		= transaction.to_byte_stream_for_sig();
+		std::vector<uint8_t>	public_key	= transaction.source().public_key();
+		std::string				signature	= transaction.signature();
+
+		if (verify_signature((uint8_t *)signature.data(), public_key.data(), message.data(), message.size()))
 		{
-#ifndef SPAMMER
-			auto v = transaction.to_byte_stream_for_sig();
-			size_t msg_len = v.size();
-			uint8_t* message = (uint8_t *)malloc(msg_len);
-			memcpy(message, v.data(), msg_len);
-
-			/*for (size_t i = 0; i < msg_len; i++)
-				message[i] = v[i];*/
-
-			auto vec = transaction.source().public_key();
-			uint8_t public_key[32];
-			memcpy(public_key, vec.data(), 32);
-
-			/*for (int i = 0; i < 32; i++)
-				public_key[i] = vec[i];*/
-
-			// vkaryagin: todo: need direct data pointer
-			std::string sig_str = transaction.signature();
-
-			uint8_t* signature = (uint8_t*)sig_str.c_str();
-
-			if (verify_signature(signature, public_key, message, msg_len))
-			{
 #endif
-				v_pool.add_transaction(transaction);
+			v_pool.add_transaction(transaction);
 #ifndef SPAMMER
-			}
-			else
-			{
-				LOG_EVENT("Wrong signature");
-			}
-			free(message);
-#endif
 		}
 		else
 		{
-#ifdef MYLOG
-			LOG_EVENT("Invalid transaction received");
-#endif
+			LOG_EVENT("Wrong signature");
 		}
+#endif
+	}
+#ifdef MYLOG
+	else
+	{
+		LOG_EVENT("Invalid transaction received");
+	}
+#endif
 }
 
 void Solver::initConfRound()
@@ -340,7 +323,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 	receivedVecFrom[node_->getMyConfNumber()] = true;
 	generals->addvector(hvector);
 	node_->sendVector(std::move(hvector));
-	trustedCounterVector++;
+	++trustedCounterVector;
   if(trustedCounterVector==numGen) 
   {
     vectorComplete = true;
@@ -351,7 +334,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
     //receivedMat_ips.insert(node_->getMyId());
     generals->addSenderToMatrix(node_->getMyConfNumber());
     receivedMatFrom[node_->getMyConfNumber()] = true;
-    trustedCounterMatrix++;
+    ++trustedCounterMatrix;
     node_->sendMatrix(generals->getMatrix());
     generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
 #ifdef MYLOG
@@ -385,7 +368,7 @@ void Solver::gotVector(HashVector&& vector)
 	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
 	 // return;
   //}
-  if (receivedVecFrom[vector.Sender]==true) 
+  if (receivedVecFrom[vector.Sender]==true)
   {
 #ifdef MYLOG
 		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
@@ -667,7 +650,8 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #ifdef MYLOG
 	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
 #endif
-	if (ips.size() <= min_nodes) 
+	size_t ips_size = ips.size();
+	if (ips_size <= min_nodes)
 	{
 		if (hash == myHash) 
 		{
@@ -694,7 +678,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 	}
 
 	
-	if ((ips.size() == min_nodes) && (!round_table_sent)) 
+	if ((ips_size == min_nodes) && (!round_table_sent))
 	{
 		
 #ifdef MYLOG
@@ -853,7 +837,7 @@ void Solver::addInitialBalance()
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
 
-  csdb::Pool pool;
+  //csdb::Pool pool;
   csdb::Transaction transaction;
   transaction.set_target(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
