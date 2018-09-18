@@ -268,71 +268,53 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
 
 }
 
-
-
-
-//void Node::getTransaction(const uint8_t* data, const size_t size) {
-// // std::cout << __func__ << std::endl;
-// /* std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-//  std::cout << "|            NODE> Get Transactions          |" << std::endl;
-//  std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;*/
-// if(solver_->getIPoolClosed()) return;
-//
-//  if (myLevel_ != NodeLevel::Main &&
-//      myLevel_ != NodeLevel::Writer) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//  csdb::Pool pool;
-//  istream_ >> pool;
-//
-//  std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    LOG_WARN("Bad transactions packet format");
-//    return;
-//  }
-//
-//  //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
-//
-//  auto _transactions = pool.transactions();
-//  uint16_t i=0;
-// for(auto it : _transactions)
-// {
-//#ifdef MYLOG
-//    std::cout << "NODE> Get transaction #:" << i << " from " << it.source().to_string() << " ID= " << it.innerID() <<  std::endl;
-//    #endif
-//    solver_->gotTransaction(std::move(it));
-//    i++;
-//  }
-//}
-
-void Node::getTransaction(const uint8_t* data, const size_t size) {
-  bool file_is;
-  std::fstream f;
-
-
-  istream_.init(data, size);
-
-  while (istream_.good() && !istream_.end()) {
-    csdb::Transaction trans;
-    istream_ >> trans;
-  f.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
-  f << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
-  f.close();
-  //  std::cout << "NODE> Get transaction #: " << trans.innerID() << " from " << trans.source().to_string()  << std::endl;
-  if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer)
-  {
-        solver_->gotTransaction(std::move(trans));
-  }
-
-
-  if (!istream_.good()) {
-    LOG_WARN("Bad transaction packet format");
+void Node::getTransaction(const uint8_t* data, const size_t size)
+{
+  if (solver_->getIPoolClosed()) {
     return;
   }
+
+  if (myLevel_ != NodeLevel::Main &&
+      myLevel_ != NodeLevel::Writer) {
+    return;
   }
+
+  csdb::Pool pool;
+
+  istream_.init(data, size );
+  istream_ >> pool;
+
+  if (!istream_.good() ||
+      !istream_.end()) {
+    LOG_WARN("Bad transactions packet format");
+    return;
+  }
+
+#ifdef MYLOG
+  size_t      blockSize  = 0;
+  const char* byteStream = pool.to_byte_stream(blockSize);
+  std::cout << "GotBlock__> : " << byteStreamToHex(byteStream, blockSize) << std::endl;
+  std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
+#endif
+
+  std::fstream file;
+  uint16_t     transIdx     = 0;
+  auto &       transactions = pool.transactions();
+
+  file.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
+
+  for(auto & trans : transactions)
+  {
+#ifdef MYLOG
+    std::cout << "NODE> Get transaction in block #:" << transIdx++ << "  " << trans.source().to_string().c_str() << " ID: " << trans.innerID() <<  std::endl;
+#endif
+
+    file << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
+
+    solver_->gotTransaction(std::move(trans));
+  }
+
+  file.close();
 }
 
 void Node::sendTransaction(const csdb::Transaction& trans) {
@@ -348,53 +330,58 @@ void Node::sendTransaction(const csdb::Transaction& trans) {
   flushCurrentTasks();
 }
 
-//void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-//    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-//    size_t bSize;
-//    const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-//
-//    std::string compressed;
-//    snappy::Compress((const char*)data, bSize, &compressed);
-//
-//    ostream_ << MsgTypes::Transactions
-//      << roundNum_
-//      << compressed;
-//
-//  //LOG_EVENT("Sending transactions");
-//  flushCurrentTasks();
-//}
+void Node::sendTransaction(csdb::Pool&& poolTransactions) {
 
-void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
-  for (auto& tr : transactions){
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::Transactions << roundNum_;
-      ostream_ << tr;
-  //LOG_EVENT("Sending transaction");
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+
+  size_t      blockSize    = 0;
+  const char* byteStream   = poolTransactions.to_byte_stream(blockSize);
+  auto &      transactions = poolTransactions.transactions();
+
+#ifdef MYLOG
+  std::cout << "<<SIZE>> SentBlock__> : " << blockSize << "  Transactions count: " << poolTransactions.transactions_count() << std::endl;
+  std::cout << "SentBlock__>  : " << byteStreamToHex(byteStream, blockSize) << std::endl;
+
+  size_t transIdx = 0;
+  for (auto & trans : transactions)
+    std::cout << "SentTransaction__>> in block: #" << transIdx++ << " from " << trans.source().to_string() << " ID: " << trans.innerID() << std::endl;
+#endif
+
+  std::string compressed;
+  snappy::Compress(byteStream, blockSize, &compressed);
+
+  ostream_ << MsgTypes::Transactions
+           << roundNum_
+           << compressed;
+
+  //LOG_EVENT("Sending transactions");
   flushCurrentTasks();
-  bool file_is;
-  std::fstream f;
-  f.open(sent_trx_fname, std::fstream::out | std::fstream::app);
-  f << tr.source().to_string().c_str() << " " << tr.innerID() << std::endl;
-  f.close();
-  }
+
+  std::fstream file;
+  file.open(sent_trx_fname, std::fstream::out | std::fstream::app);
+
+  for (auto & trans : transactions)
+    file << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
+
+  file.close();
 }
 
+void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
+  for (auto& tr : transactions) {
+    ostream_.init(BaseFlags::Broadcast);
+    ostream_ << MsgTypes::Transactions
+             << roundNum_
+             << tr;
 
-//void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-//  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-//  size_t bSize;
-//  const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-//
-//  std::string compressed;
-//  snappy::Compress((const char*)data, bSize, &compressed);
-//
-//  ostream_ << MsgTypes::Transactions
-//    << roundNum_
-//    << compressed;
-//
-//  //LOG_EVENT("Sending transactions");
-//  flushCurrentTasks();
-//}
+    //LOG_EVENT("Sending transaction");
+    flushCurrentTasks();
+
+    std::fstream f;
+    f.open(sent_trx_fname, std::fstream::out | std::fstream::app);
+    f << tr.source().to_string().c_str() << " " << tr.innerID() << std::endl;
+    f.close();
+  }
+}
 
 void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
  // std::cout << __func__ << std::endl;

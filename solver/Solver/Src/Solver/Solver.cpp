@@ -22,6 +22,9 @@
 #include <base58.h>
 #include <sodium.h>
 
+const unsigned SENDING_INTERVAL           = 50;  // ms
+const unsigned TRANSACTIONS_COUNT_IN_POOL = 500; // int
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -65,12 +68,17 @@ Solver::Solver(Node* node)
   , m_pool()
   , v_pool()
   , b_pool()
-{}
+  , m_TransactionsPacket()
+{
+  m_SendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
+}
 
 Solver::~Solver()
 {
-  //		csconnector::stop();
-  //		csstats::stop();
+  m_SendingPacketTimer.disconnect();
+  m_SendingPacketTimer.stop();
+  //csconnector::stop();
+  //csstats::stop();
 }
 
 void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv)
@@ -230,26 +238,33 @@ HashMatrix Solver::getMyMatrix()
  return (generals->getMatrix());
 }
 
-
-
 void Solver::flushTransactions()
 {
-	if (node_->getMyLevel() != NodeLevel::Normal) { return; }
-	{
-    std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
+  if (node_->getMyLevel() != NodeLevel::Normal)
+    return;
+
+  std::lock_guard<std::mutex> l(m_trans_mut);
+
+  for (auto& packet : m_TransactionsPacket)
+  {
+    if (packet.transactions_count() != 0)
+    {
+      packet.compose();
+
+      node_->sendTransaction(std::move(packet));
       sentTransLastRound = true;
+
+      packet.clear();
+
+      packet = csdb::Pool{};
+
 #ifdef MYLOG
-	  std::cout << "FlushTransaction ..." << std::endl;
-    #endif
-      m_transactions.clear();
-    } else {
-      return;
+      std::cout << "FlushTransaction ..." << std::endl;
+#endif
     }
-  }
-  runAfter(std::chrono::milliseconds(50),
-                  [this]() { flushTransactions(); });
+    else
+      break;
+  };
 }
 
 bool Solver::getIPoolClosed() {
@@ -793,10 +808,7 @@ Solver::spamWithTransactions()
   #ifdef MYLOG
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
-          {
-          std::lock_guard<std::mutex> l(m_trans_mut);
-          m_transactions.push_back(transaction);
-          }
+          addTransaction(transaction);
           iid++;
       }
     }
@@ -810,10 +822,7 @@ Solver::spamWithTransactions()
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
-  //TRACE("");
-  std::lock_guard<std::mutex> l(m_trans_mut);
-  //TRACE("");
-  m_transactions.push_back(transaction);
+  addTransaction(transaction);
 }
 
 void Solver::addInitialBalance()
@@ -833,10 +842,7 @@ void Solver::addInitialBalance()
   transaction.set_balance(csdb::Amount(10000000, 0));
   transaction.set_innerID(1);
 
-  {
-	  std::lock_guard<std::mutex> l(m_trans_mut);
-	  m_transactions.push_back(transaction);
-  }
+  addTransaction(transaction);
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
@@ -923,7 +929,9 @@ void Solver::nextRound()
 #endif
   //  std::cout << "SOLVER> next Round : before flush transactions" << std::endl;
     m_pool_closed = true;
-    flushTransactions();
+
+    if (!m_SendingPacketTimer.isRunning())
+      m_SendingPacketTimer.start(SENDING_INTERVAL);
   }
 }
 
@@ -936,4 +944,25 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 	else
 		return false;
 }
+
+void Solver::addTransaction(const csdb::Transaction & transaction)
+{
+  std::lock_guard<std::mutex> l(m_trans_mut);
+
+  size_t packetIndex = 0;
+
+  for (auto& packet : m_TransactionsPacket)
+  {
+    if (packet.transactions_count() >= TRANSACTIONS_COUNT_IN_POOL)
+      ++packetIndex;
+    else
+      break;
+  }
+
+  if (m_TransactionsPacket.size() <= packetIndex)
+    m_TransactionsPacket.emplace_back(csdb::Pool{});
+
+  m_TransactionsPacket[packetIndex].add_transaction(transaction);
+}
+
 } // namespace Credits

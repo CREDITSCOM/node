@@ -52,10 +52,10 @@ public:
 
   void getBadBlock(const uint8_t*, const size_t, const PublicKey& sender);
 
-
   /* Outcoming requests forming */
   void sendRoundTable();
   void sendTransaction(const csdb::Transaction&);
+  void sendTransaction(csdb::Pool&&);
   void sendTransaction(std::vector<csdb::Transaction>&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);//, const PublicKey&);
