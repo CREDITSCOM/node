@@ -9,8 +9,12 @@ set(SOLVER_DOC_BUILD FALSE)
 add_library(Solver
 	Include/Solver/Generals.hpp
 	Include/Solver/Solver.hpp
+	Include/Solver/CallsQueueScheduler.h
+	Include/Solver/timer_service.h
         Src/Solver/Solver.cpp
         Src/Solver/Generals.cpp
+	Src/Solver/SolverScheduler.cpp
+	Src/Solver/CallsQueueScheduler.cpp
 	${THRIFT_GENERATED_FILES}
 )
 
