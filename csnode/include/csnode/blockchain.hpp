@@ -50,8 +50,8 @@ public:
 
   csdb::Amount getBalance(const csdb::Address&) const;
 
-  void getTransactions(Transactions& transactions,
-                       csdb::Address address,
+  void getTransactions(Transactions &transactions,
+                       csdb::Address &address,
                        int64_t offset,
                        const int64_t limit) const;
 
@@ -64,21 +64,21 @@ public:
   void setLastWrittenSequence(uint32_t seq);
   uint32_t getLastWrittenSequence();
 
-  uint32_t getRequestedBlockNumber();
+  uint32_t getRequestedBlockNumber() const;
 
   void setGlobalSequence(uint32_t seq);
-  uint32_t getGlobalSequence();
+  uint32_t getGlobalSequence() const;
 
-  bool getBlockRequestNeed();
+  bool getBlockRequestNeed() const;
 
-  csdb::PoolHash getHashBySequence(uint32_t seq);
-  csdb::PoolHash getLastWrittenHash();
+  csdb::PoolHash getHashBySequence(uint32_t seq) const;
+  const csdb::PoolHash & getLastWrittenHash() const;
 
 private:
   Headtag ht;
   bool loadCache();
   bool updateCache(csdb::Pool& pool);
-  csdb::Amount calcBalance(csdb::Address) const;
+  csdb::Amount calcBalance(const csdb::Address &) const;
   void writeBlock(csdb::Pool& pool);
   void onBlockReceived(csdb::Pool& pool);
   void writeGenesisBlock();

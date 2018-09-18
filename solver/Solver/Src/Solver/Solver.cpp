@@ -151,7 +151,7 @@ void Solver::sendTL()
 
 }
 
-uint32_t Solver::getTLsize()
+size_t Solver::getTLsize() const
 {
   return v_pool.transactions_count();
 }
@@ -204,6 +204,7 @@ bool Solver::mPoolClosed()
 {
   return m_pool_closed;
 }
+
 
 void Solver::runMainRound()
 {
@@ -305,8 +306,8 @@ void Solver::initConfRound()
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
+  size_t _rNum = rNum;
   if (gotBigBang) sendZeroVector();
-  //size_t _rNum = rNum;
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
@@ -333,15 +334,15 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
     {
         vectorComplete = true;
 
-        memset(receivedVecFrom, 0, 100);
-        trustedCounterVector = 0;
-        //compose and send matrix!!!
-        //receivedMat_ips.insert(node_->getMyId());
-        generals->addSenderToMatrix(node_->getMyConfNumber());
-        receivedMatFrom [node_->getMyConfNumber()] = true;
-        trustedCounterMatrix++;
-        node_->sendMatrix(generals->getMatrix());
-        generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
+    memset(receivedVecFrom, 0, 100);
+    trustedCounterVector = 0;
+    //compose and send matrix!!!
+    //receivedMat_ips.insert(node_->getMyId());
+    generals->addSenderToMatrix(node_->getMyConfNumber());
+    receivedMatFrom[node_->getMyConfNumber()] = true;
+    ++trustedCounterMatrix;
+    node_->sendMatrix(generals->getMatrix());
+    generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
 #ifdef MYLOG
         std::cout << "SOLVER> Matrix added" << std::endl;
 #endif
@@ -379,7 +380,7 @@ void Solver::gotVector(HashVector&& vector)
 	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
 	 // return;
   //}
-  if (receivedVecFrom[vector.Sender]==true) 
+  if (receivedVecFrom[vector.Sender]==true)
   {
 #ifdef MYLOG
 		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
@@ -619,7 +620,8 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #ifdef MYLOG
 	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
 #endif
-	if (ips.size() <= min_nodes) 
+	size_t ips_size = ips.size();
+	if (ips_size <= min_nodes)
 	{
 		if (hash == myHash) 
 		{
@@ -648,7 +650,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 	}
 
 	
-	if ((ips.size() == min_nodes) && (!round_table_sent)) 
+	if ((ips_size == min_nodes) && (!round_table_sent))
 	{
 		
 #ifdef MYLOG
@@ -804,12 +806,11 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 
 void Solver::addInitialBalance()
 {
-#ifdef ADD_INITIAL_BALANCE
   std::cout << "===SETTING DB===" << std::endl;
   const std::string start_address =
     "0000000000000000000000000000000000000000000000000000000000000002";
 
-  csdb::Pool pool;
+  //csdb::Pool pool;
   csdb::Transaction transaction;
   transaction.set_target(
     csdb::Address::from_public_key((char*)myPublicKey.data()));
@@ -824,7 +825,6 @@ void Solver::addInitialBalance()
 	  std::lock_guard<std::mutex> l(m_trans_mut);
 	  m_transactions.push_back(transaction);
   }
-#endif
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
