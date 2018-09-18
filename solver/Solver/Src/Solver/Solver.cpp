@@ -6,6 +6,8 @@
 #include <sstream>
 #include <fstream>
 #include <chrono>
+#include <algorithm>
+#include <boost/dynamic_bitset.hpp>
 
 #include <csdb/address.h>
 #include <csdb/currency.h>
@@ -15,7 +17,6 @@
 
 #include "Solver/Generals.hpp"
 #include "Solver/Solver.hpp"
-#include <algorithm>
 
 #include <lib/system/logger.hpp>
 
@@ -146,6 +147,23 @@ void Solver::sendTL()
 
     v_pool.set_sequence(node_->getRoundNumber());
     node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
+}
+
+void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, const csdb::Pool& metaInfoPool) {
+  uint64_t    sequence  = metaInfoPool.sequence();
+  std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
+
+  boost::dynamic_bitset<> mask{characteristic.begin(), characteristic.end()};
+  const size_t count = m_uncharacterizedPool.transactions_count();
+
+  for (size_t i = 0; i < count; ++i) {
+    if (true == mask.test(i)) {
+      m_pool.add_transaction(m_uncharacterizedPool.transactions().at(i));
+    }
+  }
+  m_pool.set_sequence(sequence);
+  m_pool.add_user_field(0, timestamp);
+  node_->getBlockChain().putBlock(m_pool);
 }
 
 uint32_t Solver::getTLsize()
@@ -377,6 +395,7 @@ void Solver::gotRound(cs::RoundInfo&& round)
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
+  m_uncharacterizedPool = _pool;
   transactionListReceived = true;
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;

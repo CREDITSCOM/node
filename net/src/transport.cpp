@@ -436,6 +436,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getTransactionsPacket(data, size, firstPack.getSender());
   case MsgTypes::BigBang:
 	return node_->getBigBang(data, size, rNum, type);
+    case MsgTypes::NewCharacteristic:
+      return node_->getCharacteristic(data, size);
   default:
     LOG_ERROR("Unknown type");
     break;
