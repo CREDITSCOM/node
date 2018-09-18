@@ -218,6 +218,7 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+        //LOG_DEBUG("DATA: " << byteStreamToHex((const char*)pool.to_binary().data(), pool.to_binary().size()));
 	{
 		//TRACE("");
 		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);

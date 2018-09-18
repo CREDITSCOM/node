@@ -160,6 +160,7 @@ private:
   csstats::csstats stats_;
   csconnector::connector api_;
 
+  RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
 
   IPackStream istream_;

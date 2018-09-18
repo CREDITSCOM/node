@@ -20,8 +20,9 @@ Node::Node(const Config& config):
   transport_(new Transport(config, this)),
   stats_(bc_),
   api_(bc_, solver_),
-  allocator_(1 << 24, 5),
-  ostream_(&allocator_, myPublicKey_) {
+  allocator_(1 << 26, 3),
+  packStreamAllocator_(1 << 26, 5),
+  ostream_(&packStreamAllocator_, myPublicKey_) {
   good_ = init();
 }
 
@@ -476,9 +477,6 @@ void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& targ
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
   composeMessageWithBlock(pool, MsgTypes::TransactionList);
 
-#ifdef MYLOG
-  std::cout << "Sending List: compressed size: " << compressed.size() << std::endl;
-  #endif
   //const char* bl = pool.to_byte_stream(size);
   //void* tmp = ostream_.getPackets()->data();
   //std::cout << "Data from TList: " << byteStreamToHex((const char*)data, bSize) << std::endl;
@@ -755,7 +753,7 @@ void Node::sendMatrix(const Credits::HashMatrix& matrix) {
 #ifdef MYLOG
     std::cout << "NODE> 1 Sending matrix to " << std::endl;//<< byteStreamToHex(it.str, 32)
 #endif
-    ostream_.init(BaseFlags::Broadcast);//, it);
+    ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);//, it);
     ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
 
     flushCurrentTasks();
@@ -786,7 +784,9 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     return;
   }
 
-  LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
+  LOG_DEBUG("Got block of " << pool.transactions_count() << " transactions of seq " << pool.sequence() << " and hash " << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>());
+
+  //LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
 
   if(pool.sequence() <= roundNum_) solver_->gotBlock(std::move(pool), sender);
 }
@@ -800,7 +800,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::NewBlock);
 
-  LOG_EVENT("Sending block of " << pool.transactions_count() << " transactions");
+  LOG_DEBUG("Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence() << " and hash " << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>());
   flushCurrentTasks();
 }
 
@@ -843,21 +843,20 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
   //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Writer) {
-    // std::cout << "Non-Writers cannot get hashes" << std::endl;
+    std::cout << "Non-Writers cannot get hashes" << std::endl;
     return;
   }
-  // std::cout << " Getting hash from " << byteStreamToHex(sender.str,32) << std::endl;
+  LOG_DEBUG("Getting hash from " << byteStreamToHex(sender.str,32));
   istream_.init(data, size);
 
   Hash hash;
   istream_ >> hash;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad hash packet format");
+    LOG_DEBUG("Bad hash packet format");
     return;
   }
 
-  LOG_EVENT("Got hash");
   solver_->gotHash(hash, sender);
 }
 
@@ -960,12 +959,11 @@ void Node::sendBlockReply(const csdb::Pool& pool, const  PublicKey& sender) {
 #ifdef MYLOG
    std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
    #endif
-   ostream_.init(BaseFlags::Signed, sender);
-   ostream_ << MsgTypes::RequestedBlock
-      << roundNum_
-      << pool;
-    flushCurrentTasks();
-  }
+
+   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
+   flushCurrentTasks();
+}
 
 
 

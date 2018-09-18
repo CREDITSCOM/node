@@ -529,18 +529,21 @@ Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompress
   priv *p = new priv();
   p->binary_representation_.resize(uncompressedSize);
 
-  auto rs = LZ4_decompress_safe(data, (char*)p->binary_representation_.data(), size, uncompressedSize);
+  auto rs = LZ4_decompress_safe(data,
+                                (char*)p->binary_representation_.data(),
+                                size,
+                                uncompressedSize);
 
   ::csdb::priv::ibstream is(p->binary_representation_.data(),
                             p->binary_representation_.size());
 
   size_t t;
-  if (!p->get_meta(is, t)) {
+  if (!p->get(is)) {
     delete p;
     return Pool();
   }
 
-  //p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
+  p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
 
   return Pool(p);
 }

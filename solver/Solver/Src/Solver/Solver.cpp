@@ -32,7 +32,7 @@ void addTimestampToPool(csdb::Pool& pool)
 }
 
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
-{    
+{
  // std::cout << "SOLVER> Before calback" << std::endl;
   const auto tp = std::chrono::system_clock::now() + ms;
   std::thread tr([tp, cb]() {
@@ -121,7 +121,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
  // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
 #ifdef MYLOG
-  std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
+  std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str()
   std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
   std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
   #endif
@@ -137,10 +137,10 @@ void Solver::sendTL()
   std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
  // std::cout << "                          Total received " << tNum << " transactions" << std::endl;
   std::cout << "========================================================================================" << std::endl;
-  m_pool_closed = true;  
+  m_pool_closed = true;
   std::cout << "Solver -> Sending " << tNum << " transactions " << std::endl;
   v_pool.set_sequence(node_->getRoundNumber());
-  //std::cout << "Solver -> Sending TransactionList to ALL" << std::endl;//<< byteStreamToHex(it.str, 32)  //<< 
+  //std::cout << "Solver -> Sending TransactionList to ALL" << std::endl;//<< byteStreamToHex(it.str, 32)  //<<
   node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
 
 }
@@ -160,7 +160,7 @@ void Solver::closeMainRound()
 {
   if (node_->getRoundNumber()==1)// || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by previous main node should be added!!!!!!!!!!!!!!!!!!!!!
   //node_->sendFirstTransaction();
-  
+
   {
       node_->becomeWriter();
 #ifdef MYLOG
@@ -178,9 +178,9 @@ void Solver::closeMainRound()
     csdb::PoolHash prev_hash;
     prev_hash.from_string("");
     b_pool.set_previous_hash(prev_hash);
-	
+
   std::cout << "Solver -> new sequence: " << m_pool.sequence() << ", new time:" << m_pool.user_field(0).value<std::string>().c_str() << std::endl;
- 
+
     node_->sendBlock(std::move(m_pool));
     node_->sendBadBlock(std::move(b_pool));
 	std::cout << "Solver -> Block is sent ... awaiting hashes" << std::endl;
@@ -205,8 +205,8 @@ void Solver::runMainRound()
   m_pool_closed = false;
   std::cout << "========================================================================================" << std::endl;
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV" << std::endl;
- 
-  if(node_->getRoundNumber()==1) 
+
+  if(node_->getRoundNumber()==1)
   {
     runAfter(std::chrono::milliseconds(2000),
       [this]() { closeMainRound(); });
@@ -334,7 +334,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 	generals->addvector(hvector);
 	node_->sendVector(std::move(hvector));
 	trustedCounterVector++;
-  if(trustedCounterVector==numGen) 
+  if(trustedCounterVector==numGen)
   {
     vectorComplete = true;
 
@@ -378,7 +378,7 @@ void Solver::gotVector(HashVector&& vector)
 	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
 	 // return;
   //}
-  if (receivedVecFrom[vector.Sender]==true) 
+  if (receivedVecFrom[vector.Sender]==true)
   {
 #ifdef MYLOG
 		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
@@ -391,7 +391,7 @@ void Solver::gotVector(HashVector&& vector)
 
   if (trustedCounterVector == numGen)
   {
-    
+
 	  //std::cout << "SOLVER> GotVector : " << std::endl;
     vectorComplete = true;
 
@@ -440,7 +440,7 @@ void Solver::gotVector(HashVector&& vector)
 void Solver::checkMatrixReceived()
 {
   if (trustedCounterMatrix < 2) node_->sendMatrix(generals->getMatrix());
-  
+
 }
 
 void Solver::setRNum(size_t _rNum)
@@ -491,11 +491,11 @@ void Solver::gotMatrix(HashMatrix&& matrix)
   {
 
  //   std::cout << "SOLVER> We are going to take decision" << std::endl;
- 
+
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
 	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
- 
+
 	  if (wTrusted == 100)
 	  {
 #ifdef MYLOG
@@ -503,7 +503,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
       #endif
       runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
         [this]() { writeNewBlock();});
-		  
+
 	  }
 
 	  else
@@ -516,7 +516,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
           [this]() { writeNewBlock(); });
 		  }
       else
-      { 
+      {
         //LOG_WARN("This should NEVER happen, NEVER");
       }
      }
@@ -631,21 +631,21 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
 void Solver::gotHash(Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
-	//std::cout << "Solver -> gotHash: " << hash.to_string() << "from sender: " << sender.to_string() << std::endl;//<-debug feature
+	LOG_DEBUG("Solver -> gotHash: " << byteStreamToHex(hash.str, 32) << "from sender: " << byteStreamToHex(sender.str, 32));//<-debug feature
 	Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
 #ifdef MYLOG
-	std::cout << "Solver -> My Hash: " << byteStreamToHex(myHash.str,32) << std::endl;
+	LOG_DEBUG("Solver -> My Hash: " << byteStreamToHex(myHash.str,32));
 #endif
-	if (ips.size() <= min_nodes) 
+	if (ips.size() <= min_nodes)
 	{
-		if (hash == myHash) 
+		if (hash == myHash)
 		{
 #ifdef MYLOG
 			std::cout << "Solver -> Hashes are good" << std::endl;
 #endif
 			//hashes.push_back(hash);
 			ips.push_back(sender);
-		} 
+		}
 		else
 		{
 #ifdef MYLOG
@@ -662,16 +662,16 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 		return;
 	}
 
-	
-	if ((ips.size() == min_nodes) && (!round_table_sent)) 
+
+	if ((ips.size() == min_nodes) && (!round_table_sent))
 	{
-		
+
 #ifdef MYLOG
     std::cout << "Solver -> sending NEW ROUND table" << std::endl;
 #endif
     node_->initNextRound(node_->getMyPublicKey(), std::move(ips));
 		round_table_sent = true;
-		
+
 	}
   }
 
@@ -760,7 +760,7 @@ Solver::spamWithTransactions()
 	//if (node_->getMyLevel() != Normal) return;
   std::cout << "STARTING SPAMMER..." << std::endl;
   std::string mp = "1234567890abcdef";
-  
+
   // std::string cachedBlock;
   // cachedBlock.reserve(64000);
   uint64_t iid=0;
@@ -784,7 +784,7 @@ Solver::spamWithTransactions()
     {
       if ((node_->getRoundNumber()<10) || (node_->getRoundNumber() > 20) )
       {
-      
+
 
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
           transaction.set_comission(csdb::Amount(0, 1,10));
@@ -864,7 +864,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
   #endif
 	if (pool.sequence() == node_->getBlockChain().getLastWrittenSequence() + 1)
 		node_->getBlockChain().putBlock(pool);
-	
+
 
 }
 
@@ -877,8 +877,8 @@ void Solver::addConfirmation(uint8_t confNumber_) {
     node_->becomeWriter();
     runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
       [this]() { writeNewBlock(); });
-  } 
-  
+  }
+
 }
 
 void Solver::nextRound()

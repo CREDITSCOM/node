@@ -17,7 +17,7 @@
 #define FLAG_LOG_DEBUG 64
 
 ///////////////////
-#define LOG_LEVEL (FLAG_LOG_NOTICE | 0 | 0 | 0 | FLAG_LOG_PACKETS | (FLAG_LOG_NODES_BUFFER & 0)) | LOG_DEBUG //(FLAG_LOG_PACKETS & 0)
+#define LOG_LEVEL (FLAG_LOG_NOTICE | 0 | 0 | 0 | FLAG_LOG_PACKETS | (FLAG_LOG_NODES_BUFFER & 0)) | (FLAG_LOG_DEBUG & 0) //(FLAG_LOG_PACKETS & 0)
 ///////////////////
 
 #if LOG_LEVEL & FLAG_LOG_NOTICE
@@ -26,7 +26,7 @@
 #define LOG_NOTICE(TEXT)
 #endif
 
-#if LOG_LEVEL & FLAG_LOG_WARN 
+#if LOG_LEVEL & FLAG_LOG_WARN
 #define LOG_WARN(TEXT) std::cout << "[WARNING] " << TEXT << std::endl
 #else
 #define LOG_WARN(TEXT)
@@ -44,7 +44,7 @@
 #define LOG_EVENT(TEXT)
 #endif
 
-#if (false && LOG_LEVEL & FLAG_LOG_PACKETS) 
+#if (false && LOG_LEVEL & FLAG_LOG_PACKETS)
 #define LOG_IN_PACK(DATA, SIZE) std::cout << "-!> " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
 #define LOG_OUT_PACK(DATA, SIZE) std::cout << "<!- " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
 #else
@@ -60,7 +60,7 @@
 #define LOG_NODESBUF_POP(ENDPOINT)
 #endif
 
-#if LOG_LEVEL & FLAG_LOG_DEBUG
+#if (false && LOG_LEVEL & FLAG_LOG_DEBUG)
 #define LOG_DEBUG(TEXT) std::cout << "##" << TEXT << std::endl
 #else
 #define LOG_DEBUG(TEXT)
