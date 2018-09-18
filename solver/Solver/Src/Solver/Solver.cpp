@@ -23,6 +23,9 @@
 #include <base58.h>
 #include <sodium.h>
 
+const unsigned SENDING_INTERVAL           = 50;  // ms
+const unsigned TRANSACTIONS_COUNT_IN_POOL = 500; // int
+
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -66,12 +69,16 @@ Solver::Solver(Node* node)
   , m_pool()
   , v_pool()
   , b_pool()
-{}
+{
+  m_SendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
+}
 
 Solver::~Solver()
 {
-  //		csconnector::stop();
-  //		csstats::stop();
+  m_SendingPacketTimer.disconnect();
+  m_SendingPacketTimer.stop();
+  //csconnector::stop();
+  //csstats::stop();
 }
 
 void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv)
@@ -249,28 +256,29 @@ HashMatrix Solver::getMyMatrix()
 
 void Solver::flushTransactions()
 {
-	if (node_->getMyLevel() != NodeLevel::Normal)
+    if (node_->getMyLevel() != NodeLevel::Normal)
         return;
 
-	{
-        cs::SpinGuard lock(mSpinLock);
+    cs::SpinGuard l(mSpinLock);
 
-        if (m_transactions.size())
+    for (auto& packet : mTransactionsBlock)
+    {
+        if (packet.transactions_count() != 0)
         {
-            node_->sendTransaction(std::move(m_transactions));
+            packet.compose();
+
+            node_->sendTransactionsPacket(packet);
             sentTransLastRound = true;
 
-            csdebug() << "FlushTransaction ...";
+            packet.clear();
 
-            m_transactions.clear();
+            packet = csdb::Pool{};
+
+            csdebug() << "FlushTransaction ...";
         }
         else
-            return;
-    }
-
-    runAfter(std::chrono::milliseconds(50), [this]() {
-        flushTransactions();
-    });
+            break;
+    };
 }
 
 bool Solver::getIPoolClosed() {
@@ -858,7 +866,7 @@ void Solver::spamWithTransactions()
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
           {
-          cs::Lock lock(mHashTableMutex);
+          cs::SpinGuard lock(mSpinLock);
           m_transactions.push_back(transaction);
           }
           iid++;
@@ -875,7 +883,7 @@ void Solver::spamWithTransactions()
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
   //TRACE("");
-  cs::Lock lock(mHashTableMutex);
+  cs::SpinGuard lock(mSpinLock);
   //TRACE("");
   m_transactions.push_back(transaction);
 }
@@ -992,7 +1000,9 @@ void Solver::nextRound()
 #endif
   //  std::cout << "SOLVER> next Round : before flush transactions" << std::endl;
     m_pool_closed = true;
-    flushTransactions();
+
+    if (!m_SendingPacketTimer.isRunning())
+      m_SendingPacketTimer.start(SENDING_INTERVAL);
   }
 }
 
@@ -1005,4 +1015,24 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 	else
 		return false;
 }
+
+void Solver::addTransaction(const csdb::Transaction& transaction)
+{
+    cs::SpinGuard lock(mSpinLock);
+    std::size_t packetIndex = 0;
+
+    for (auto& packet : mTransactionsBlock)
+    {
+        if (packet.transactions_count() >= TRANSACTIONS_COUNT_IN_POOL)
+            ++packetIndex;
+        else
+            break;
+    }
+
+    if (mTransactionsBlock.size() <= packetIndex)
+        mTransactionsBlock.emplace_back(csdb::Pool{});
+
+    mTransactionsBlock[packetIndex].add_transaction(transaction);
+}
+
 } // namespace Credits

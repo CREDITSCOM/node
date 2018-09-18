@@ -7,11 +7,13 @@ set(SOLVER_TEST_BUILD FALSE)
 set(SOLVER_DOC_BUILD FALSE)
 
 add_library(Solver
-	Include/Solver/Generals.hpp
-	Include/Solver/Solver.hpp
+    Include/Solver/Generals.hpp
+    Include/Solver/Solver.hpp
+    Include/Timer/Timer.h
         Src/Solver/Solver.cpp
         Src/Solver/Generals.cpp
-	${THRIFT_GENERATED_FILES}
+        Src/Timer/Timer.cpp
+    ${THRIFT_GENERATED_FILES}
 )
 
 target_include_directories(csnode PUBLIC
@@ -28,11 +30,11 @@ set (BOOST_ALL_DYN_LINK OFF)
 
 find_package (Boost REQUIRED COMPONENTS system filesystem chrono)
 target_link_libraries(Solver
-		      Boost::system
-		      Boost::filesystem
-		      Boost::chrono
-		      Boost::disable_autolinking
-		      )
+              Boost::system
+              Boost::filesystem
+              Boost::chrono
+              Boost::disable_autolinking
+              )
 
 target_include_directories(Solver PUBLIC Include)
 

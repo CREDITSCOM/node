@@ -26,6 +26,7 @@
 
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
+#include <Timer/Timer.h>
 #include "../../../../csnode/include/csnode/nodecore.h"
 
 //#define MONITOR_NODE
@@ -158,7 +159,9 @@ namespace Credits {
         void initApi();
         uint32_t getTLsize();
         void addInitialBalance();
+
         cs::RoundNumber currentRoundNumber();
+        void addTransaction(const csdb::Transaction& transaction);
 
         void send_wallet_transaction(const csdb::Transaction& transaction);
 
@@ -256,7 +259,11 @@ namespace Credits {
 
         std::vector<csdb::Transaction> m_transactions;
         csdb::Pool m_transactions_;
+
         cs::TransactionsPacketHashTable mHashTable;
+        cs::TransactionsBlock mTransactionsBlock;
+
+        Credits::CTimer m_SendingPacketTimer;
 
 #ifdef SPAMMER
         std::atomic_bool spamRunning{ false };

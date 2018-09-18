@@ -251,7 +251,6 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   sendRoundTable();
 }
 
-
 void Node::getTransaction(const uint8_t* data, const size_t size)
 {
     if (solver_->getIPoolClosed())
@@ -295,47 +294,6 @@ void Node::sendTransaction(const csdb::Transaction& trans) {
 #endif
   LOG_EVENT("Sending transaction");
 
-  flushCurrentTasks();
-}
-
-// void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-//    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-//    size_t bSize;
-//    const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-//
-//    std::string compressed;
-//    snappy::Compress((const char*)data, bSize, &compressed);
-//
-//    ostream_ << MsgTypes::Transactions
-//      << roundNum_
-//      << compressed;
-//
-//  //LOG_EVENT("Sending transactions");
-//  flushCurrentTasks();
-//}
-
-void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
-  for (auto& tr : transactions) {
-    ostream_.init(BaseFlags::Broadcast);
-    ostream_ << MsgTypes::Transactions << roundNum_;
-    ostream_ << tr;
-    // LOG_EVENT("Sending transaction");
-    flushCurrentTasks();
-    bool         file_is;
-    std::fstream f;
-    f.open(sent_trx_fname, std::fstream::out | std::fstream::app);
-    f << tr.source().to_string().c_str() << " " << tr.innerID() << std::endl;
-    f.close();
-  }
-}
-
-void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-  size_t bSize;
-  const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-  std::string compressed;
-  snappy::Compress((const char*)data, bSize, &compressed);
-  ostream_ << MsgTypes::Transactions << roundNum_ << compressed;
   flushCurrentTasks();
 }
 

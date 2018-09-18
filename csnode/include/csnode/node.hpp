@@ -64,8 +64,7 @@ public:
   /* Outcoming requests forming */
   void sendRoundTable();
   void sendTransaction(const csdb::Transaction&);
-  void sendTransaction(std::vector<csdb::Transaction>&&);
-  void sendTransaction(const csdb::Pool& m_transactions_);
+
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);  //, const PublicKey&);
   void sendVector(const Credits::HashVector&);

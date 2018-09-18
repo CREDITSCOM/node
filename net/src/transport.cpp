@@ -397,7 +397,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
                                     size_t size) {
  
   if (!size) {
-    LOG_ERROR("Bad packet size, why is it zero or too big?");
+    LOG_ERROR("Bad packet size, why is it zero?");
     return;
   }
 

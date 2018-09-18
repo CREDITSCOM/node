@@ -24,6 +24,9 @@ namespace cs
     // hash table for fast transactions storage
     using TransactionsPacketHashTable = std::unordered_map<TransactionsPacketHash, TransactionsPacket>;
 
+    // array of packets
+    using TransactionsBlock = std::vector<cs::TransactionsPacket>;
+
     // round data
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
@@ -33,6 +36,7 @@ namespace cs
     using SharedMutex = boost::shared_mutex;    // C++17 compliler std::shared_mutex
     using SpinLock = boost::detail::spinlock;
 
+    // RAII locks
     using Lock = std::lock_guard<SharedMutex>;
     using SharedLock = std::shared_lock<SharedMutex>;
     using SpinGuard = std::lock_guard<SpinLock>;
