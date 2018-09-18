@@ -34,7 +34,6 @@
 //#define SPAM_MAIN
 
 #include "timer_service.h"
-//#include "RunAfter.h"
 #include "CallsQueueScheduler.h"
 
 class Node;
@@ -230,7 +229,7 @@ typedef std::string Matrix;
 		std::set<PublicKey> receivedMat_ips;
 		bool receivedMatFrom[100];
 		uint8_t trustedCounterMatrix;
-    void checkMatrixCame();
+    //void checkMatrixCame();
 
 
 		std::vector<Hash> hashes;
@@ -281,9 +280,6 @@ typedef std::string Matrix;
 		// do self-test of current state
 		void doSelfTest();
 		
-		// do self-test on planned round duration expire
-		void onRoundExpired();
-
 		// total duration of rounds passed
 		uint32_t passedRoundsDuration = 0;
 		// count of rounds passed
@@ -295,19 +291,90 @@ typedef std::string Matrix;
 
         CallsQueueScheduler calls_scheduler;
 
-        CallsQueueScheduler::ProcId sendRoundTableRequestId { CallsQueueScheduler::no_id };
-        CallsQueueScheduler::ProcId flushTransactionsId { CallsQueueScheduler::no_id };
-        CallsQueueScheduler::ProcId writeNewBlockId { CallsQueueScheduler::no_id };
-        CallsQueueScheduler::ProcId closeMainRoundId { CallsQueueScheduler::no_id };
-        CallsQueueScheduler::ProcId onRoundExpiredId { CallsQueueScheduler::no_id };
 
-        //CallsQueueScheduler::ProcType sendRoundTableRequestCall;
-        CallsQueueScheduler::ProcType flushTransactionsCall;
-        CallsQueueScheduler::ProcType writeNewBlockCall;
-        CallsQueueScheduler::ProcType closeMainRoundCall;
-        CallsQueueScheduler::ProcType onRoundExpiredCall;
+        /** @brief   Max duration (msec) of the whole round (N, W, G, T) */
+        constexpr static uint32_t T_round = 2000;
+
+        /** @brief   Max timeout (msec) to wait next round table (N, W, G, T) */
+        constexpr static uint32_t T_rt = TIME_TO_AWAIT_ACTIVITY;
+
+        /** @brief   Max timeout (msec) to wait transaction list (T) */
+        constexpr static uint32_t T_tl = 200;
+
+        /** @brief   Max timeout (msec) to wait all vectors (T) */
+        constexpr static uint32_t T_vec = 200;
+
+        /** @brief   Max timeout (msec) to wait all matrices (T) */
+        constexpr static uint32_t T_mat = 300;
+
+        /** @brief   Max timeout (msec) to wait block (N, G, T) */
+        constexpr static uint32_t T_blk = 200;
+
+        /** @brief   Max timeout (msec) to wait hashes after write & send block (W) */
+        constexpr static uint32_t T_hash = 400;
+
+
+        /** @brief   Max time to collect transactions (G) */
+        constexpr static uint32_t T_coll_trans = TIME_TO_COLLECT_TRXNS;
+
+        /** @brief   Period between flush transactions (N) */
+        constexpr static uint32_t T_flush_trans = 100;
+
+        using Proc = CallsQueueScheduler::ProcType;
+
+        // implement call to writeNewBlock():
+        Proc callWriteNewBlock;
+
+        using CallTag = CallsQueueScheduler::CallTag;
+        constexpr static uint32_t no_tag = CallsQueueScheduler::no_tag;
+        // round logic related tags
+        CallTag tagReqRoundTable { no_tag };
+        CallTag tagReqTransactionList { no_tag };
+        CallTag tagReqVectors { no_tag };
+        CallTag tagReqMatrices { no_tag };
+        CallTag tagReqBlock { no_tag };
+        CallTag tagReqHashes { no_tag };
+        // inner logic related tags
+        CallTag tagFlushTransactions { no_tag };
+        CallTag tagWriteNewBlock { no_tag };
+        CallTag tagCloseMainRound { no_tag };
+        CallTag tagOnRoundExpired { no_tag };
+
+        void scheduleReqRoundTable(uint32_t wait_for_ms, size_t round_num);
+        void scheduleReqTransactionList(uint32_t wait_for_ms);
+        void scheduleReqVectors(uint32_t wait_for_ms);
+        void scheduleReqMatrices(uint32_t wait_for_ms);
+        void scheduleReqBlock(uint32_t wait_for_ms);
+        void scheduleReqHashes(uint32_t wait_for_ms);
+        void scheduleWriteNewBlock(uint32_t wait_for_ms);
+        void scheduleCloseMainRound(uint32_t wait_for_ms);
+        void scheduleOnRoundExpired(uint32_t wait_for_ms);
+        void scheduleFlushTransactions(uint32_t period_ms);
+
+        void cancelReqRoundTable();
+        void cancelReqTransactionList();
+        void cancelReqVectors();
+        void cancelReqMatrices();
+        void cancelReqBlock();
+        void cancelReqHashes();
+        void cancelWriteNewBlock();
+        void cancelCloseMainRound();
+        void cancelOnRoundExpired();
+        void cancelFlushTransactions();
 
 		// used for time measurement (in msec) from every round start and to accumulate time marks every round
 		TimerService<> timer_service;
-	};
+
+        // set this to false to block console output from timer_service
+        constexpr static bool timer_used { true };
+
+        // makes and send request to T-nodes those matrices are still absent this round
+        void requestMissingMatrices();
+
+        // makes and send request to T-nodes those vectors are still absent this round
+        void requestMissingVectors();
+
+        // makes and send request to T-nodes those hashes are still absent this round
+        void requestMissingHashes();
+};
 }

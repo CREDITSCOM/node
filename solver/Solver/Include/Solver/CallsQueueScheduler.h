@@ -24,9 +24,9 @@ public:
 
     using ClockType = std::chrono::steady_clock;
     using ProcType = std::function<void()>;
-    using ProcId = uintptr_t;
+    using CallTag = uintptr_t;
 
-    constexpr static uintptr_t no_id = 0;
+    constexpr static uintptr_t no_tag = 0;
 
     /**
      * @fn  CallsQueueScheduler::CallsQueueScheduler()
@@ -79,10 +79,48 @@ public:
      * @param   proc        The procedure to be scheduled for call.
      * @param   scheme      The scheme: once - do one call, periodic - repeat calls every wait_for period.
      *
-     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_id
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
      */
 
     uintptr_t Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
+
+    /**
+     * @fn  uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+     *
+     * @brief   Schedule proc to be called once
+     *
+     * @author  aae
+     * @date    18.09.2018
+     *
+     * @param   wait_for_ms The wait for in milliseconds.
+     * @param   proc        The procedure to call.
+     *
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
+     */
+
+    uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+    {
+        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once);
+    }
+
+    /**
+     * @fn  uintptr_t InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+     *
+     * @brief   Schedule periodic call of proc
+     *
+     * @author  aae
+     * @date    18.09.2018
+     *
+     * @param   wait_for_ms The wait for the first call in milliseconds and period between calls.
+     * @param   proc        The procedure o call.
+     *
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
+     */
+
+    uintptr_t InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+    {
+        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic);
+    }
 
     /**
      * @fn  bool CallsQueueScheduler::Remove(uintptr_t id);
@@ -98,6 +136,17 @@ public:
      */
 
     bool Remove(uintptr_t id);
+
+    /**
+     * @fn  void RemoveAll();
+     *
+     * @brief   Removes all scheduled calls from queue. Do not concern already initiated calls placed to CallsQueue
+     *
+     * @author  aae
+     * @date    18.09.2018
+     */
+
+    void RemoveAll();
 
     /**
      * @fn  void CallsQueueScheduler::Clear();
@@ -228,14 +277,14 @@ private:
         uint32_t queued;
         uint32_t done;
     };
-    std::map<ProcId, ExeSync> _exe_sync;
+    std::map<CallTag, ExeSync> _exe_sync;
 
     // methods below are NOT thread-safe, they must be synced at point of call!
 
     // must be called when the lambda put in CallsQueue for execution
-    void OnExeQueued(ProcId id);
+    void OnExeQueued(CallTag id);
     // must be called from within lambda executed by CallsQueue
-    void OnExeDone(ProcId id);
+    void OnExeDone(CallTag id);
     // must be called before put lambda in CallsQueue to avoid duplicated lambdas in CallsQueue
-    bool CanExe(ProcId id);
+    bool CanExe(CallTag id);
 };

@@ -46,7 +46,7 @@ void CallsQueueScheduler::Run()
             // awake due timeout: the most probable its time to execute earliest proc
             // test scheduled time (if it was at all)
             Context run;
-            run.id = no_id;
+            run.id = no_tag;
             {
                 std::lock_guard<std::mutex> lque(_mtx_queue);
                 // execute calls until wait time >= min_wait_for
@@ -84,7 +84,7 @@ void CallsQueueScheduler::Run()
     });
 }
 
-void CallsQueueScheduler::OnExeQueued(ProcId id)
+void CallsQueueScheduler::OnExeQueued(CallTag id)
 {
     auto it = _exe_sync.find(id);
     if(it == _exe_sync.cend()) {
@@ -95,7 +95,7 @@ void CallsQueueScheduler::OnExeQueued(ProcId id)
     }
 }
 
-void CallsQueueScheduler::OnExeDone(ProcId id)
+void CallsQueueScheduler::OnExeDone(CallTag id)
 {
     auto it = _exe_sync.find(id);
     if(it != _exe_sync.end()) {
@@ -103,7 +103,7 @@ void CallsQueueScheduler::OnExeDone(ProcId id)
     }
 }
 
-bool CallsQueueScheduler::CanExe(ProcId id)
+bool CallsQueueScheduler::CanExe(CallTag id)
 {
     auto it = _exe_sync.find(id);
     if(it != _exe_sync.end()) {
@@ -130,6 +130,9 @@ uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcTy
         Run();
     }
     uintptr_t id = (uintptr_t) &proc;
+    //TODO: find better way to identify procs (also, in case of "in-place" lambdas when those have really the same address)
+    // the solution requires enable RTTI = Yes (/GR) to compile:
+    id = proc.target_type().hash_code();
     {
         std::lock_guard<std::mutex> l(_mtx_queue);
         if(std::find(_queue.cbegin(), _queue.cend(), id) != _queue.cend()) {
@@ -146,7 +149,7 @@ uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcTy
             //, std::move(comment)
         });
         if(result == _queue.end()) {
-            return no_id;
+            return no_tag;
         }
     }
     // awake worker thread to re-schedule its waiting
@@ -169,6 +172,17 @@ bool CallsQueueScheduler::Remove(uintptr_t id)
     _flag = true;
     _signal.notify_one();
     return true;
+}
+
+void CallsQueueScheduler::RemoveAll()
+{
+    {
+        std::lock_guard<std::mutex> l(_mtx_queue);
+        _queue.clear();
+    }
+    // awake worker thread to re-schedule its waiting
+    _flag = true;
+    _signal.notify_one();
 }
 
 void CallsQueueScheduler::Clear()
