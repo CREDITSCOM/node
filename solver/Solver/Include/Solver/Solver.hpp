@@ -152,6 +152,7 @@ namespace Credits {
         void gotBlockReply(csdb::Pool&&);
         void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
         void sendTL();
+        void applyCharacteristic(const std::vector<uint8_t>& characteristic, const csdb::Pool& metaInfoPool);
 
         // API methods
         void initApi();
@@ -226,6 +227,7 @@ namespace Credits {
         std::vector<std::string> vector_datas;
 
         csdb::Pool m_pool;
+        csdb::Pool m_uncharacterizedPool;
 
         cs::RoundInfo mRound;
 

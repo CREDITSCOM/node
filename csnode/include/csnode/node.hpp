@@ -50,6 +50,7 @@ public:
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const PublicKey& sender);
   void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
+  void getCharacteristic(const uint8_t* data, const size_t size);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);

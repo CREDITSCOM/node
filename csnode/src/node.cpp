@@ -968,6 +968,22 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
     solver_->gotRound(std::move(roundInfo));
 }
 
+void Node::getCharacteristic(const uint8_t* data, const size_t size) {
+  istream_.init(data, size);
+
+  std::string compressed;
+  size_t      compressedSize;
+  csdb::Pool  metaInfoPool;
+
+  istream_ >> compressedSize >> compressed >> metaInfoPool;
+
+  std::string decompressed;
+  snappy::Uncompress(compressed.c_str(), compressedSize, &decompressed);
+
+  std::vector<uint8_t> characteristicMask(decompressed.begin(), decompressed.end());
+  solver_->applyCharacteristic(characteristicMask, metaInfoPool);
+}
+
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
     LOG_ERROR("Writer and Main node shouldn't send hashes");
