@@ -67,6 +67,11 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
           std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
           if (!initFromDB(*initer))
               return;
+          if (!initer->isFinishedOk())
+          {
+              std::cout << "Initialization from DB finished with error" << std::endl;
+              return;
+          }
       }
       walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
   }

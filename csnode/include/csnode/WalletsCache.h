@@ -75,6 +75,7 @@ namespace Credits
             Initer(WalletsCache& data);
             void loadPrevBlock(csdb::Pool& curr);
             bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
+            bool isFinishedOk() const;
         protected:
             bool findWalletId(const csdb::Address& address, WalletId& id) override;
             WalletData& getWalletData(WalletId id, const csdb::Address& address) override;
