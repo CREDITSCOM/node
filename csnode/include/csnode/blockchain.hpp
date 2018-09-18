@@ -77,6 +77,10 @@ public:
   bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
 
+  // searches for existing wallet id
+  // returns true if found
+  bool findWalletId(const WalletAddress& address, WalletId& id) const;
+
   // wallet transactions: pools cache + db search
   void getTransactions(
       Transactions& transactions,
@@ -86,12 +90,6 @@ public:
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
-
-  // wallet id interface
- 
-  // searches for existing wallet id
-  // returns true if found
-  bool findWalletId(const WalletAddress& address, WalletId& id) const;
 
 private:
   bool writeGenesisBlock();
