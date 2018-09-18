@@ -73,6 +73,9 @@ class APIHandler : public APIHandlerInterface
 
     void WalletDataGet(api::WalletDataGetResult& _return,
                        const api::Address& address) override;
+    void WalletIdGet(api::WalletIdGetResult& _return, const Address& address) override;
+    void WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const Address& address) override;
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const Address& address) override;
 
     void TransactionGet(api::TransactionGetResult& _return,
                         const api::TransactionId& transactionId) override;

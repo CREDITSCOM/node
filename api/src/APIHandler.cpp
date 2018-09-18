@@ -200,6 +200,59 @@ APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const Address& address)
+{
+    csdb::Address addr = BlockChain::getAddressFromKey(address);
+
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
+    {
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+        return;
+    }
+
+    _return.walletId = wallId;
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const Address& address)
+{
+    csdb::Address addr = BlockChain::getAddressFromKey(address);
+
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
+    {
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+        return;
+    }
+
+    _return.lastTransactionInnerId = 
+        wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId();
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const Address& address)
+{
+    csdb::Address addr = BlockChain::getAddressFromKey(address);
+
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
+    {
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+        return;
+    }
+
+    _return.balance.integral = wallData.balance_.integral();
+    _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
 std::string
 fromByteArray(const ::csdb::internal::byte_array& bar)
 {
