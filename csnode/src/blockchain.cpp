@@ -258,35 +258,6 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key)
     return res;
 }
 
-csdb::Amount BlockChain::getBalance(const csdb::Address& address) const
-{
-    if (address.is_wallet_id())
-        return getBalance(address.wallet_id());
-
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
-    WalletId id{};
-    if (!walletIds_->normal().find(address, id))
-        return csdb::Amount{};
-
-    return getBalance_Unsafe(id);
-}
-
-csdb::Amount BlockChain::getBalance(WalletId id) const
-{
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
-    return getBalance_Unsafe(id);
-}
-
-csdb::Amount BlockChain::getBalance_Unsafe(WalletId id) const
-{
-    const WalletsCache::WalletData* walData = walletsCacheUpdater_->findWallet(id);
-    if (!walData)
-        return csdb::Amount{};
-    return walData->balance_;
-}
-
 bool BlockChain::finishNewBlock(csdb::Pool& pool)
 {
     pool.set_sequence(getLastWrittenSequence() + 1);
@@ -687,14 +658,16 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool)
     return true;
 }
 
-bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const
+bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData, WalletId& id) const
 {
     if (address.is_wallet_id())
+    {
+        id = address.wallet_id();
         return findWalletData(address.wallet_id(), wallData);
+    }
 
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
-    WalletId id{};
     if (!walletIds_->normal().find(address, id))
         return false;
 

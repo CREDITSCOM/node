@@ -182,15 +182,9 @@ APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
   // else
   //    addr = csdb::Address::from_string(address);
 
-  BlockChain::WalletId wallId{};
-  if (!s_blockchain.findWalletId(addr, wallId))
-  {
-      SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-      return;
-  }
-
   BlockChain::WalletData wallData{};
-  if (!s_blockchain.findWalletData(wallId, wallData))
+  BlockChain::WalletId wallId{};
+  if (!s_blockchain.findWalletData(addr, wallData, wallId))
   {
       SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
       return;
@@ -484,7 +478,12 @@ APIHandler::make_transaction(const Transaction& transaction)
 
   send_transaction.set_amount(csdb::Amount(
     transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
-  send_transaction.set_balance(s_blockchain.getBalance(source));
+
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId id{};
+  if (!s_blockchain.findWalletData(source, wallData, id))
+      return csdb::Transaction{};
+  send_transaction.set_balance(wallData.balance_);
   send_transaction.set_currency(csdb::Currency("CS"));
   send_transaction.set_source(source);
   send_transaction.set_target(
