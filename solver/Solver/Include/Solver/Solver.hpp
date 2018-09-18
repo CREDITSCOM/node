@@ -249,7 +249,9 @@ namespace Credits {
         uint8_t writingCongGotCurrent;
         size_t rNum = 0;
 
-        cs::SharedMutex mSharedMutex;
+        cs::SharedMutex mHashTableMutex;
+        cs::SpinLock mSpinLock;
+
         std::vector<csdb::Transaction> m_transactions;
         csdb::Pool m_transactions_;
         cs::TransactionsPacketHashTable mHashTable;

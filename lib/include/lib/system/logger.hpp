@@ -1,5 +1,6 @@
 #ifndef __LOGGER_HPP__
 #define __LOGGER_HPP__
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -110,5 +111,194 @@ static inline std::string byteStreamToHex(const char* stream, const size_t lengt
 
   return result;
 }
+
+namespace cs
+{
+    // Represents cs async logger to file, singleton realization
+    class Logger
+    {
+        explicit Logger();
+        Logger(const Logger&) = delete;
+        Logger& operator=(const Logger&) = delete;
+
+    public:
+        ~Logger() = default;
+
+        // returns logger single instance
+        static const Logger& instance();
+
+        // adds log
+        template<typename T>
+        inline const cs::Logger& add(const T& log) const noexcept
+        {
+            toFile(log);
+            return *this;
+        }
+
+    private:
+
+        // pimpl
+        struct Impl;
+        std::unique_ptr<Impl> mPimpl;
+
+        // helpers for string/ss/any types
+        void toFile(const std::string& log) const noexcept;
+        void toFile(const std::stringstream& log) const noexcept;
+    };
+
+    // storage of inline static variables
+    struct InlineLoggerStatic
+    {
+        static const std::string error;
+        static const std::string warning;
+        static const std::string info;
+    };
+
+    // logs info and err
+    class InlineLogger
+    {
+    public:
+        enum class Settings : uint8_t
+        {
+            Debug,
+            None
+        };
+
+        inline InlineLogger(const std::string& str) noexcept { std::cout << str; }
+        inline ~InlineLogger() noexcept
+        {
+            if (mSettings == Settings::Debug)
+            {
+#ifndef NDEBUG
+                std::cout << '\n';
+#endif
+            }
+            else
+                std::cout << '\n';
+        }
+
+        inline InlineLogger(cs::InlineLogger::Settings settings, const std::string& str = ""):
+            mSettings(settings)
+        {
+            (void)str;
+#ifndef NDEBUG
+            std::cout << str;
+#endif
+        }
+
+        inline InlineLogger& operator()() noexcept { return *this; }
+
+        template<typename T>
+        inline void log(const T& type) const noexcept
+        {
+            (mSettings == Settings::Debug) ? addDebug(type) : add(type);
+        }
+
+        template<typename T>
+        inline void add(const T& type) const noexcept { std::cout << type; }
+
+        template<typename T>
+        inline void addDebug(const T& type) const noexcept
+        {
+#ifndef NDEBUG
+            std::cout << type;
+#endif
+        }
+
+    private:
+        const Settings mSettings = Settings::None;
+    };
+
+    // operator << for string
+    inline const cs::Logger& operator<<(const cs::Logger& logger, const std::string& log) noexcept
+    {
+        return logger.add(log);
+    }
+
+    // operator << for stringstream
+    inline const cs::Logger& operator<<(const cs::Logger& logger, const std::stringstream& ss) noexcept
+    {
+        return logger.add(ss);
+    }
+
+    // operator << for inline logger
+    template<typename T>
+    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, const T& message) noexcept
+    {
+        logger.log(message);
+        return logger;
+    }
+
+    // operator << for inline logger and string stream
+    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, const std::stringstream& stream) noexcept
+    {
+        logger.log(stream.str());
+        return logger;
+    }
+
+///
+/// Macro csfile writes to file if /log folder exists
+///
+/// @example csfile() << "Hello, world";
+///
+#define csfile cs::Logger::instance
+
+///
+/// Macro cslog ptinys RAII message
+///
+/// @example cslog() << "Some message";
+///
+#define cslog cs::InlineLogger(cs::InlineLogger::Settings::None)
+
+///
+/// Macro csdebug prints message or ss stream only in debug mode
+///
+/// @example csdebug() << "Message sent";
+///
+#define csdebug cs::InlineLogger(cs::InlineLogger::Settings::Debug)
+
+///
+/// Macro cserror prints RAII error message
+///
+/// @example cserror() << "Wrong key";
+///
+#define cserror cs::InlineLogger(cs::InlineLoggerStatic::error)
+
+///
+/// Macro csinfo prints RAII info message
+///
+/// @example csinfo() << "Look at hash table";
+///
+#define csinfo cs::InlineLogger(cs::InlineLoggerStatic::info)
+
+///
+/// Macro cswarning prints RAII warning message
+///
+/// @example cswarning() << "Bad key";
+///
+#define cswarning cs::InlineLogger(cs::InlineLoggerStatic::warning)
+
+///
+/// Macro csderror prints RAII debug mode error message
+///
+/// @example csderror() << "Hello" << ", world!";
+///
+#define csderror cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::error)
+
+///
+/// Macro csdinfo prints RAII debug mode info message
+///
+/// @example csdinfo() << "Hello" << ", world!";
+///
+#define csdinfo cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::info)
+
+///
+/// Macro csdwarning prints RAII debug mode warning message
+///
+/// @example csdwarning() << "Hello" << ", world!";
+///
+#define csdwarning cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::warning)
+}  // namespace cs
+
 
 #endif // __LOGGER_HPP__

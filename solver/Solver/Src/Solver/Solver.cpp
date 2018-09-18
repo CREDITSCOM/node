@@ -235,15 +235,15 @@ void Solver::flushTransactions()
         return;
 
 	{
-        cs::Lock lock(mSharedMutex);
+        cs::SpinGuard lock(mSpinLock);
 
         if (m_transactions.size())
         {
             node_->sendTransaction(std::move(m_transactions));
             sentTransLastRound = true;
-#ifdef MYLOG
-            std::cout << "FlushTransaction ..." << std::endl;
-#endif
+
+            csdebug() << "FlushTransaction ...";
+
             m_transactions.clear();
         }
         else
@@ -313,29 +313,27 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet)
 {
-#ifdef MYLOG
-    LOG_EVENT("Got transaction packet");
-#endif
-    auto hash = packet.hash();
+    csdebug() << "Got transaction packet";
+
+    cs::TransactionsPacketHash hash = packet.hash();
+    cs::Lock lock(mHashTableMutex);
 
     if (!mHashTable.count(hash))
-        mHashTable.emplace(hash, std::move(packet));
+        mHashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
 }
 
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes)
 {
-#ifdef MYLOG
-    LOG_EVENT("Got transactions hash request, try to find in hash table");
-#endif
+    csdebug() << "Got transactions hash request, try to find in hash table";
+
+    cs::SharedLock lock(mHashTableMutex);
 
     for (const auto& hash : hashes)
     {
         if (mHashTable.count(hash))
             node_->sendPacketHashesReply(mHashTable[hash]);
 
-#ifdef MYLOG
-        LOG_EVENT("Found hash in hash table, send to requester");
-#endif
+        csdebug() << "Found hash in hash table, send to requester";
     }
 }
 
@@ -353,24 +351,30 @@ void Solver::initConfRound()
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet)
 {
-    auto hash = packet.hash();
+    csdebug() << "Got packet hash reply";
+
+    cs::TransactionsPacketHash hash = packet.hash();
+    cs::Lock lock(mHashTableMutex);
 
     if (!mHashTable.count(hash))
-    {
-        cs::Lock lock(mSharedMutex);
-        mHashTable.insert(std::make_pair(hash, std::move(packet)));
-    }
+        mHashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
+
+    // TODO: do something when all needed hashes received
 }
 
 void Solver::gotRound(cs::RoundInfo&& round)
 {
     if (mRound.round < round.round)
     {
-        LOG_EVENT("Got round table");
+        cslog() << "Got round table";
 
-        mRound = std::move(round);
+        {
+            cs::SpinGuard lock(mSpinLock);
+            mRound = std::move(round);
+        }
 
         cs::Hashes neededHashes;
+        cs::SharedLock lock(mHashTableMutex);
 
         for (const auto& hash : mRound.hashes)
         {
@@ -564,7 +568,6 @@ void Solver::gotMatrix(HashMatrix&& matrix)
 	}
 }
 
-
 //what block does this function write???
 void Solver::writeNewBlock()
 {
@@ -640,6 +643,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #endif
 #endif
 }
+
 bool Solver::getBigBangStatus()
 {
   return gotBigBang;
@@ -835,7 +839,7 @@ void Solver::spamWithTransactions()
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
           {
-          cs::Lock lock(mSharedMutex);
+          cs::Lock lock(mHashTableMutex);
           m_transactions.push_back(transaction);
           }
           iid++;
@@ -852,7 +856,7 @@ void Solver::spamWithTransactions()
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
   //TRACE("");
-  cs::Lock lock(mSharedMutex);
+  cs::Lock lock(mHashTableMutex);
   //TRACE("");
   m_transactions.push_back(transaction);
 }
@@ -875,7 +879,7 @@ void Solver::addInitialBalance()
   transaction.set_innerID(1);
 
   {
-	  cs::Lock lock(mSharedMutex);
+	  cs::Lock lock(mHashTableMutex);
 	  m_transactions.push_back(transaction);
   }
 

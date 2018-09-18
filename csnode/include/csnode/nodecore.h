@@ -9,6 +9,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <boost/thread/shared_mutex.hpp>
+#include <boost/smart_ptr/detail/spinlock.hpp>
 
 namespace cs
 {
@@ -29,9 +30,12 @@ namespace cs
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 
     // sync types
-    using SharedMutex = boost::shared_mutex;    // TODO: C++17 std::shared_mutex
+    using SharedMutex = boost::shared_mutex;    // C++17 compliler std::shared_mutex
+    using SpinLock = boost::detail::spinlock;
+
     using Lock = std::lock_guard<SharedMutex>;
     using SharedLock = std::shared_lock<SharedMutex>;
+    using SpinGuard = std::lock_guard<SpinLock>;
 
     enum NodeConsts
     {
