@@ -18,7 +18,7 @@ add_library(csnode
   src/nodecore.cpp
 )
 
-target_link_libraries (csnode net csdb Solver base58)
+target_link_libraries (csnode net csdb Solver base58 boost_thread)
 
 target_include_directories(csnode PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
