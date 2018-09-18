@@ -102,9 +102,7 @@ void Solver::buildBlock(csdb::Pool& block)
   transaction.set_innerID(0);
 
   block.add_transaction(transaction);
-
 }
-
 
 void Solver::prepareBlockForSend(csdb::Pool& block)
 {
@@ -231,26 +229,30 @@ HashMatrix Solver::getMyMatrix()
  return (generals->getMatrix());
 }
 
-
-
 void Solver::flushTransactions()
 {
-	if (node_->getMyLevel() != NodeLevel::Normal) { return; }
+	if (node_->getMyLevel() != NodeLevel::Normal)
+        return;
+
 	{
-    std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
-      sentTransLastRound = true;
+        cs::Lock lock(mSharedMutex);
+
+        if (m_transactions.size())
+        {
+            node_->sendTransaction(std::move(m_transactions));
+            sentTransLastRound = true;
 #ifdef MYLOG
-	  std::cout << "FlushTransaction ..." << std::endl;
-    #endif
-      m_transactions.clear();
-    } else {
-      return;
+            std::cout << "FlushTransaction ..." << std::endl;
+#endif
+            m_transactions.clear();
+        }
+        else
+            return;
     }
-  }
-  runAfter(std::chrono::milliseconds(50),
-                  [this]() { flushTransactions(); });
+
+    runAfter(std::chrono::milliseconds(50), [this]() {
+        flushTransactions();
+    });
 }
 
 bool Solver::getIPoolClosed() {
@@ -351,7 +353,13 @@ void Solver::initConfRound()
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet)
 {
-    // TODO: look at rount table
+    auto hash = packet.hash();
+
+    if (!mHashTable.count(hash))
+    {
+        cs::Lock lock(mSharedMutex);
+        mHashTable.insert(std::make_pair(hash, std::move(packet)));
+    }
 }
 
 void Solver::gotRound(cs::RoundInfo&& round)
@@ -481,7 +489,6 @@ void Solver::setRNum(size_t _rNum)
 {
   rNum = _rNum;
 }
-
 
 void Solver::checkVectorsReceived(size_t _rNum)
 {
@@ -828,7 +835,7 @@ void Solver::spamWithTransactions()
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
           {
-          std::lock_guard<std::mutex> l(m_trans_mut);
+          cs::Lock lock(mSharedMutex);
           m_transactions.push_back(transaction);
           }
           iid++;
@@ -845,7 +852,7 @@ void Solver::spamWithTransactions()
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
   //TRACE("");
-  std::lock_guard<std::mutex> l(m_trans_mut);
+  cs::Lock lock(mSharedMutex);
   //TRACE("");
   m_transactions.push_back(transaction);
 }
@@ -868,7 +875,7 @@ void Solver::addInitialBalance()
   transaction.set_innerID(1);
 
   {
-	  std::lock_guard<std::mutex> l(m_trans_mut);
+	  cs::Lock lock(mSharedMutex);
 	  m_transactions.push_back(transaction);
   }
 

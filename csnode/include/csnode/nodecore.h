@@ -6,6 +6,8 @@
 #include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
 #include <boost/thread/shared_mutex.hpp>
 
 namespace cs
@@ -27,7 +29,9 @@ namespace cs
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 
     // sync types
-    using SharedMutex = boost::shared_mutex;   // C++17 std::shared_mutex
+    using SharedMutex = boost::shared_mutex;    // TODO: C++17 std::shared_mutex
+    using Lock = std::lock_guard<SharedMutex>;
+    using SharedLock = std::shared_lock<SharedMutex>;
 
     enum NodeConsts
     {
@@ -47,7 +51,7 @@ namespace cs
 
 namespace std
 {
-    // poolHash hash specialization
+    // transactions packet hash specialization
     template<>
     struct hash<cs::TransactionsPacketHash>
     {

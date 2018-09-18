@@ -13,7 +13,7 @@
 
 #include <atomic>
 #include <functional>
-#include <mutex>
+#include <shared_mutex>
 
 #include <set>
 #include <string>
@@ -219,8 +219,6 @@ namespace Credits {
         std::set<PublicKey> receivedMat_ips;
         bool receivedMatFrom[100];
         uint8_t trustedCounterMatrix;
-        void checkMatrixCame();
-
 
         std::vector<Hash> hashes;
         std::vector<PublicKey> ips;
@@ -250,7 +248,8 @@ namespace Credits {
         bool writingConfGotFrom[100];
         uint8_t writingCongGotCurrent;
         size_t rNum = 0;
-        std::mutex m_trans_mut;
+
+        cs::SharedMutex mSharedMutex;
         std::vector<csdb::Transaction> m_transactions;
         csdb::Pool m_transactions_;
         cs::TransactionsPacketHashTable mHashTable;
