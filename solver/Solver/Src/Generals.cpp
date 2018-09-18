@@ -47,7 +47,7 @@ namespace Credits{
   
     const csdb::Amount zero_balance = 0.0_c;
     if (_pool.transactions_count() > 0) {
-//      walletsState.updateFromSource();
+      walletsState.updateFromSource();
 
 	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
 	  for (auto& it : t_pool)

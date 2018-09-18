@@ -559,7 +559,8 @@ void Solver::writeNewBlock()
   if (consensusAchieved &&
     node_->getMyLevel() == NodeLevel::Writer) {
     prepareBlockForSend(m_pool);
-    node_->sendBlock(std::move(m_pool));
+    node_->getBlockChain().finishNewBlock(m_pool);
+    node_->sendBlock(m_pool);
     node_->getBlockChain().writeNewBlock(m_pool);
 
     b_pool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
@@ -725,7 +726,8 @@ Solver::spamWithTransactions()
   
   // std::string cachedBlock;
   // cachedBlock.reserve(64000);
-  uint64_t iid=0;
+  long counter = 0;
+  uint64_t iid = 0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
   csdb::Transaction transaction;
@@ -740,14 +742,14 @@ Solver::spamWithTransactions()
       {
           csdb::internal::WalletId id;
           transaction.set_source(spammerAddress);
-          if (node_->getBlockChain().findWalletId(spam_keys[iid], id)) {
+          if (node_->getBlockChain().findWalletId(spam_keys[counter], id)) {
             transaction.target() = transaction.target().from_wallet_id(id);
           } else {
-            transaction.set_target(spam_keys[iid]);
+            transaction.set_target(spam_keys[counter]);
           }
           transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
           transaction.set_max_fee(csdb::AmountCommission(0.1));
-          transaction.set_innerID(iid);
+          transaction.set_innerID(iid++);
   #ifdef MYLOG
           std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
           #endif
@@ -755,9 +757,7 @@ Solver::spamWithTransactions()
           std::lock_guard<std::mutex> l(m_trans_mut);
           m_transactions.push_back(transaction);
           }
-          iid++;
-          if (iid == NUM_OF_SPAM_KEYS - 1)
-            iid = 0;
+          if (counter++ == NUM_OF_SPAM_KEYS - 1) counter = 0;
       }
     }
 
