@@ -14,12 +14,14 @@ add_library(csnode
   include/csnode/WalletsCache.h
   include/csnode/WalletsIds.h
   include/csnode/WalletsPools.h
+  include/csnode/BlockHashes.h
   src/blockchain.cpp
   src/node.cpp
   src/utils.cpp
   src/WalletsCache.cpp
   src/WalletsIds.cpp
   src/WalletsPools.cpp
+  src/BlockHashes.cpp
 )
 
 target_link_libraries (csnode net csdb Solver base58)

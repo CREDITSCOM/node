@@ -1,12 +1,11 @@
 #include <limits>
-#include <cstring>
-
 #include <csdb/currency.h> 
 #include <base58.h>
 #include <lib/system/logger.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include "sys/timeb.h"
+#include <csnode/BlockHashes.h>
 #include <csnode/blockchain.hpp>
 
 using namespace Credits;
@@ -32,8 +31,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 #endif
 )
   : good_(false)
-  , last_written_sequence(std::numeric_limits<decltype(last_written_sequence)>::max())
-  , global_sequence(std::numeric_limits<decltype(last_written_sequence)>::max())
+  , global_sequence(static_cast<decltype(global_sequence)>(-1))
   , blockRequestIsNeeded(false)
   , genesisAddress_(genesisAddress)
   , startAddress_(startAddress)
@@ -44,182 +42,93 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
   , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 {
-  bool wasJustCreated = false;
-  if (!initFromDB(path, wasJustCreated))
-      return;
- 
-  if (!wasJustCreated)
-  {
-      std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
-      if (!initCaches(*initer))
-          return;
-  }
-
-  walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
- 
-  good_ = true;
-}
-
-bool BlockChain::initFromDB(const std::string& path, bool& wasJustCreated)
-{
-#ifdef MYLOG
   std::cout << "Trying to open DB..." << std::endl;
-#endif
-  char  kk[14];
-  std::vector <uint8_t> v_hash(32);
-  std::vector <csdb::PoolHash> tempHashes;
-  csdb::PoolHash temp_hash;
-  blockHashes_.reserve(1000000);
-
-  dbs_fname = "test_db/dbs.txt";
-  //	hash_offset = 0;
-  blockRequestIsNeeded = false;
-
-  bool res = false;
-  wasJustCreated = false;
-  if (storage_.open(path))
+  if (!storage_.open(path))
   {
-    std::cout << "DB is opened" << std::endl;
-    if (storage_.last_hash().is_empty())
-    {
-#ifdef MYLOG
+    LOG_ERROR("Couldn't open database at " << path);
+    return;
+  }
+  std::cout << "DB is opened" << std::endl;
+
+  blockHashes_.reset(new Credits::BlockHashes("test_db/dbs.txt"));
+
+  if (storage_.last_hash().is_empty())
+  {
       std::cout << "Last hash is empty..." << std::endl;
-      #endif
-      if (!storage_.size())
+      if (storage_.size())
       {
-        //std::cout << "Storage is empty... writing genesis block" << std::endl;
-        writeGenesisBlock();
-        std::ofstream f(dbs_fname);
-        if (f.is_open())
-        {
-          f << "0->0";
-          f.close();
-          res = true;
-          wasJustCreated = true;
-        }
+          std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
+          return;
       }
-      else
+      walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+      if (!writeGenesisBlock())
       {
-        res = false;
-
-#ifdef MYLOG
-        std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
-#endif
+          std::cout << "failed!!! Cannot write genesis block" << std::endl;
+          return;
       }
-    }
-    else
-    {
-#ifdef MYLOG
-      std::cout << "Last hash is not empty..." << std::endl;
-      #endif
-      std::ifstream f(dbs_fname);
-
-
-      if (f.is_open())
-      {
-#ifdef MYLOG
-        std::cout << "File is opened ... reading" << std::endl;
-        #endif
-        f.read(kk, 14);
-        f.close();
-      }
-
-      char* s_beg = kk;
-      char* s_end = strchr(kk, '-');
-      *s_end = '\0';
-      ht.head = atoi(s_beg);
-      s_beg = s_end + 2;
-      ht.tag = atoi(s_beg);
-#ifdef MYLOG
-      std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-      #endif
-      setLastWrittenSequence(ht.tag);
-
-      if (loadBlock(storage_.last_hash()).sequence() == ht.tag)
-      {
-        tempHashes.reserve(ht.tag + 1);
-        temp_hash = storage_.last_hash();
-
-        for (uint32_t i = 0; i <= ht.tag; i++)
-        {
-          tempHashes.push_back(temp_hash);
-          //std::cout << "READ> " << temp_hash.to_string() << std::endl;
-          temp_hash = loadBlock(temp_hash).previous_hash();
-          if (temp_hash.is_empty()) break;
-        }
-#ifdef MYLOG
-        std::cout << "Hashes read from DB" << std::endl;
-        #endif
-        for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
-        {
-
-          blockHashes_.push_back(*iter);
-        }
-#ifdef MYLOG
-        std::cout << "Hashes vector converted" << std::endl;
-        #endif
-        //for (uint32_t i = 0; i <= ht.tag; i++)
-        //{
-        //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
-        //}
-        tempHashes.clear();
-        lastHash_ = storage_.last_hash();
-        res = true;
-      }
-      else
-      {
-        ht.tag = loadBlock(storage_.last_hash()).sequence();
-        tempHashes.reserve(ht.tag + 1);
-        std::ofstream f(dbs_fname, std::ios::out);
-        ht.head = 0;
-        bool file_is = f.is_open();
-        if (file_is)
-        {
-
-#ifdef MYLOG
-          f << ht.head << "->" << ht.tag << std::endl;
-          std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-          std::cout << "DB structure is written succesfully" << std::endl;
-          #endif
-          f.close();
-        }
-        else std::cout << "Error writing DB structure" << std::endl;
-
-        temp_hash = storage_.last_hash();
-        for (uint32_t i = 0; i <= ht.tag; i++)
-        {
-          tempHashes.push_back(temp_hash);
-          temp_hash = loadBlock(temp_hash).previous_hash();
-          if (temp_hash.is_empty()) break;
-        }
-        for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
-        {
-          blockHashes_.push_back(*iter);
-        }
-        //for (uint32_t i = 0; i <= ht.tag; i++)
-        //{
-        //  std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
-        //}
-        tempHashes.clear();
-
-        lastHash_ = storage_.last_hash();
-        res = true;
-      }
-    }
   }
   else
   {
-    LOG_ERROR("Couldn't open database at " << path);
-    res = false;
+      std::cout << "Last hash is not empty..." << std::endl;
+      {
+          std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
+          if (!initFromDB(*initer))
+              return;
+      }
+      walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
   }
-  return res;
+
+  good_ = true;
 }
 
-void BlockChain::writeNewBlock(csdb::Pool& pool) {
+BlockChain::~BlockChain()
+{
+}
+
+bool BlockChain::initFromDB(Credits::WalletsCache::Initer& initer)
+{
+    bool res = false;
+    try
+    {
+        //blockHashes_->loadDbStructure();
+        blockHashes_->initStart();
+
+        csdb::Pool prev = loadBlock(getLastHash());
+
+        while (prev.is_valid())
+        {
+            if (!updateWalletIds(prev, initer))
+                return false;
+            initer.loadPrevBlock(prev);
+            if (!blockHashes_->initFromPrevBlock(prev))
+                return false;
+
+            prev = loadBlock(prev.previous_hash());
+        }
+
+        blockHashes_->initFinish();
+        blockHashes_->saveDbStructure();
+
+        lastHash_ = getLastHash();
+
+        res = true;
+    }
+    catch (std::exception& e) {
+        auto msg = e.what();
+        LOG_ERROR("Exc=" << msg);
+    }
+    catch (...) {
+        LOG_ERROR("Exc=...");
+    }
+
+    return res;
+}
+
+bool BlockChain::writeNewBlock(csdb::Pool& pool) {
 #ifdef MYLOG
     std::cout << "writeNewBlock is running" << std::endl;
 #endif
-    putBlock(pool);
+    return putBlock(pool);
 }
 
 void BlockChain::writeBlock(csdb::Pool& pool)
@@ -246,8 +155,8 @@ void BlockChain::writeBlock(csdb::Pool& pool)
     }
     std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 
-    if (!updateWalletsCacheAndPools(pool))
-        LOG_ERROR("Couldn't update wallets cache and pools");
+    if (!updateFromNextBlock(pool))
+        LOG_ERROR("Couldn't update from next block");
 
     {
         TRACE("");
@@ -258,16 +167,12 @@ void BlockChain::writeBlock(csdb::Pool& pool)
     }
 }
 
-void BlockChain::setLastWrittenSequence(uint32_t seq) {
-    last_written_sequence = seq;
-}
-
 uint32_t BlockChain::getLastWrittenSequence() const
 {
-    return last_written_sequence;
+    return (blockHashes_->empty()) ? static_cast<uint32_t>(-1) : static_cast<uint32_t>(blockHashes_->getDbStructure().last_);
 }
 
-void BlockChain::writeGenesisBlock()
+bool BlockChain::writeGenesisBlock()
 {
   LOG_EVENT("Adding the genesis block");
 
@@ -301,19 +206,17 @@ void BlockChain::writeGenesisBlock()
   finishNewBlock(genesis);
   std::cout << "Genesis block completed ... trying to save" << std::endl;
 
-  writeNewBlock(genesis);
+  if (!writeNewBlock(genesis))
+      return false;
 
-  setLastWrittenSequence(0);
-  global_sequence = 0;
+  global_sequence = genesis.sequence();
   std::cout << genesis.hash().to_string() << std::endl;
-  lastHash_ = genesis.hash();
-  blockHashes_.push_back(lastHash_);
-  std::cout << "Hash inserted into the hash-vector" << std::endl;
-  
+
   size_t bSize;
   //const char* bl = 
   genesis.to_byte_stream(bSize);
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
+  return true;
 }
 
 csdb::PoolHash BlockChain::getLastHash() const
@@ -403,23 +306,27 @@ csdb::Amount BlockChain::getBalance_Unsafe(WalletId id) const
     return walData->balance_;
 }
 
-void BlockChain::finishNewBlock(csdb::Pool& pool)
+bool BlockChain::finishNewBlock(csdb::Pool& pool)
 {
     pool.set_sequence(getLastWrittenSequence() + 1);
     addNewWalletsToPool(pool);
+    return true;
 }
 
-void BlockChain::onBlockReceived(csdb::Pool& pool) {
+bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 #ifdef MYLOG
     std::cout << "onBlockReceived is running" << std::endl;
 #endif
 
     if (!updateWalletIds(pool, *walletsCacheUpdater_))
+    {
         LOG_ERROR("Couldn't update wallet ids");
-    putBlock(pool);
+        return false;
+    }
+    return putBlock(pool);
 }
 
-void BlockChain::putBlock(csdb::Pool& pool)
+bool BlockChain::putBlock(csdb::Pool& pool)
 {
     // Put on top
     std::cout << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions" << " --------------------------------" << std::endl;
@@ -432,30 +339,11 @@ void BlockChain::putBlock(csdb::Pool& pool)
         std::cout << "OK" << std::endl;
         pool.set_previous_hash(lastHash_);
 
-        std::ofstream f(dbs_fname, std::ios::out);
-        ht.head = 0;
-        ht.tag = getLastWrittenSequence() + 1;
-        bool file_is = f.is_open();
-        if (file_is)
-        {
-
-            f << ht.head << "->" << ht.tag << std::endl;
-#ifdef MYLOG
-            std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-            //std::cout << "DB structure is written succesfully" << std::endl;
-#endif
-            f.close();
-        }
-        else std::cout << "Error writing DB structure" << std::endl;
-
         writeBlock(pool);
         //std::cout << "Preparing to calculate last hash" << std::endl;
+
         lastHash_ = pool.hash();
 
-        blockHashes_.push_back(lastHash_);
-        //std::cout << "Hash inserted into the hash-vector" << std::endl;
-
-        setLastWrittenSequence(pool.sequence());
 #ifdef MYLOG
         std::cout << "New last hash: " << lastHash_.to_string() << std::endl;
         std::cout << "New last storage size: " << storage_.size() << std::endl;
@@ -464,15 +352,18 @@ void BlockChain::putBlock(csdb::Pool& pool)
         {
             blockRequestIsNeeded = false;
         }
-
-        return;
+        return true;
     }
-    std::cout << "Failed" << std::endl;
+    else
+    {
+        std::cout << "Failed" << std::endl;
 
-    ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
-    std::cout << "Chain syncro part ... start " << std::endl;
-    global_sequence = pool.sequence();
-    blockRequestIsNeeded = true;
+        ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
+        std::cout << "Chain syncro part ... start " << std::endl;
+        global_sequence = pool.sequence();
+        blockRequestIsNeeded = true;
+        return false;
+    }
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const
@@ -495,12 +386,12 @@ uint32_t BlockChain::getGlobalSequence() const
 
 csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const
 {
-    return blockHashes_.at(seq);
+    return blockHashes_->find(seq);
 }
 
 uint32_t BlockChain::getRequestedBlockNumber() const
 {
-    return (last_written_sequence + 1);
+    return getLastWrittenSequence() + 1;
 }
 void BlockChain::setGlobalSequence(uint32_t seq)
 {
@@ -682,33 +573,6 @@ void BlockChain::getTransactions(
     }
 }
 
-bool BlockChain::initCaches(WalletsCache::Initer& initer)
-{
-    bool res = false;
-    try
-    {
-        csdb::Pool prev = loadBlock(getLastHash());
-        while (prev.is_valid())
-        {
-            if (!updateWalletIds(prev, initer))
-                return false;
-            initer.loadPrevBlock(prev);
-
-            prev = loadBlock(prev.previous_hash());
-        }
-        res = true;
-    }
-    catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
-    }
-    catch (...) {
-        LOG_ERROR("Exc=...");
-    }
-
-    return res;
-}
-
 template<typename WalletCacheProcessor>
 bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc)
 {
@@ -811,7 +675,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
     }
 }
 
-bool BlockChain::updateWalletsCacheAndPools(csdb::Pool& nextPool)
+bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool)
 {
     if (!walletsCacheUpdater_)
     {
@@ -824,6 +688,11 @@ bool BlockChain::updateWalletsCacheAndPools(csdb::Pool& nextPool)
 
         walletsCacheUpdater_->loadNextBlock(nextPool);
         walletsPools_->loadNextBlock(nextPool);
+
+        blockHashes_->loadNextBlock(nextPool);
+        //std::cout << "Hash inserted into the hash-vector" << std::endl;
+        if (!blockHashes_->saveDbStructure())
+            std::cout << "Error writing DB structure" << std::endl;
     }
     catch (std::exception& e) {
         auto msg = e.what();
@@ -879,22 +748,6 @@ bool BlockChain::getModifiedWallets(Mask& dest) const
     dest.resize(walletsCacheUpdater_->getModified().size(), true);
     dest |= walletsCacheUpdater_->getModified();
     return isNewModified;
-}
-
-bool BlockChain::insertWalletId(const WalletAddress& address, WalletId id)
-{
-    if (address.is_wallet_id())
-    {
-        id = address.wallet_id();
-        return true;
-    }
-    else if (address.is_public_key())
-    {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        return walletIds_->normal().insert(address, id);
-    }
-    LOG_ERROR("Wrong address");
-    return false;
 }
 
 bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const

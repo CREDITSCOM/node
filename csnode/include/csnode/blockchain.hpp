@@ -1,7 +1,5 @@
 #pragma once
 
-#include <boost/dynamic_bitset.hpp>
-
 #include <list>
 #include <map>
 #include <memory>
@@ -12,6 +10,7 @@
 #include <iostream>
 #include <string>
 
+#include <boost/dynamic_bitset.hpp>
 
 #include <csdb/address.h>
 #include <csdb/amount.h>
@@ -29,20 +28,13 @@
 
 namespace Credits
 {
+    class BlockHashes;
     class WalletsIds;
 }
 
 class BlockChain
 {
-
-  struct Headtag
-  {
-    uint32_t head;
-    uint32_t tag;
-  };
-
 public:
-  std::string dbs_fname;
   using Transactions = std::vector<csdb::Transaction>;
   using WalletId = csdb::internal::WalletId;
   using WalletAddress = csdb::Address;
@@ -54,12 +46,13 @@ public:
     , csdb::Address spammerAddress
 #endif
   );
+  ~BlockChain();
 
   bool isGood() const { return good_; }
 
-  void finishNewBlock(csdb::Pool& pool);
-  void writeNewBlock(csdb::Pool& pool);
-  void onBlockReceived(csdb::Pool& pool);
+  bool finishNewBlock(csdb::Pool& pool);
+  bool writeNewBlock(csdb::Pool& pool);
+  bool onBlockReceived(csdb::Pool& pool);
 
   size_t getSize() const;
   csdb::PoolHash getLastHash() const;
@@ -72,7 +65,6 @@ public:
 
   static csdb::Address getAddressFromKey(const std::string&);
 
-  void setLastWrittenSequence(uint32_t seq);
   uint32_t getLastWrittenSequence() const;
 
   uint32_t getRequestedBlockNumber() const;
@@ -105,26 +97,16 @@ public:
 
   // wallet id interface
  
-  // returns false if wallet address already existed
-  bool insertWalletId(const WalletAddress& address, WalletId id);
   // searches for existing wallet id
   // returns true if found
   bool findWalletId(const WalletAddress& address, WalletId& id) const;
-  // finds existing or creates new wallet id
-  // returns true if new wallet id was created
-  bool getWalletId(const WalletAddress& address, WalletId& id);
 
 private:
-  bool initFromDB(const std::string& path, bool& wasJustCreated);
-
-  Headtag ht;
-  void writeGenesisBlock();
-public:
-  void putBlock(csdb::Pool& pool);
+  bool writeGenesisBlock();
+  bool putBlock(csdb::Pool& pool);
   void writeBlock(csdb::Pool& pool);
-private:
 
-  bool initCaches(Credits::WalletsCache::Initer& initer);
+  bool initFromDB(Credits::WalletsCache::Initer& initer);
 
   template<typename WalletCacheProcessor>
   bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
@@ -134,8 +116,9 @@ private:
   void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
 
-  bool updateWalletsCacheAndPools(csdb::Pool& pool);
+  bool updateFromNextBlock(csdb::Pool& pool);
 
+  bool getWalletId(const WalletAddress& address, WalletId& id);
   bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
   csdb::Amount getBalance_Unsafe(WalletId id) const;
 
@@ -161,18 +144,16 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  uint32_t last_written_sequence;
   uint32_t global_sequence;
   bool blockRequestIsNeeded;
 
-  std::vector<csdb::PoolHash> blockHashes_;
+  std::unique_ptr<Credits::BlockHashes> blockHashes_;
 
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
 #ifdef SPAMMER
   const csdb::Address spammerAddress_;
 #endif
-
   std::unique_ptr<Credits::WalletsIds> walletIds_;
   std::unique_ptr<Credits::WalletsCache> walletsCacheStorage_;
   std::unique_ptr<Credits::WalletsCache::Updater> walletsCacheUpdater_;

@@ -215,7 +215,7 @@ void Solver::closeMainRound()
 	std::cout << "Solver -> Global Sequence: "  << node_->getBlockChain().getGlobalSequence() << std::endl;
 	std::cout << "Solver -> Writing New Block"<< std::endl;
 #endif
-    node_->getBlockChain().putBlock(m_pool);
+    node_->getBlockChain().writeNewBlock(m_pool);
   }
 }
 
@@ -560,7 +560,7 @@ void Solver::writeNewBlock()
     node_->getMyLevel() == NodeLevel::Writer) {
     prepareBlockForSend(m_pool);
     node_->sendBlock(std::move(m_pool));
-    node_->getBlockChain().putBlock(m_pool);
+    node_->getBlockChain().writeNewBlock(m_pool);
 
     b_pool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
     csdb::PoolHash prev_hash;
@@ -597,7 +597,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   {
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
-      node_->getBlockChain().putBlock(block);
+      node_->getBlockChain().writeNewBlock(block);
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
@@ -825,7 +825,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
 	std::cout << "Solver -> Got Block for my Request: " << pool.sequence() << std::endl;
   #endif
 	if (pool.sequence() == node_->getBlockChain().getLastWrittenSequence() + 1)
-		node_->getBlockChain().putBlock(pool);
+		node_->getBlockChain().writeNewBlock(pool);
 	
 
 }
