@@ -119,6 +119,8 @@ private:
   inline bool readRoundData(bool);
   void onRoundStart();
 
+  void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
+
   // Info
   const PublicKey myPublicKey_;
   bool good_ = true;

@@ -7,6 +7,8 @@
 #include <csdb/pool.h>
 #include <csdb/transaction.h>
 
+#include <Solver/Solver.hpp>
+
 #include <lib/system/keys.hpp>
 #include <lib/system/hash.hpp>
 #include <net/packet.hpp>
@@ -82,7 +84,7 @@ public:
   OPackStream(RegionAllocator* allocator,
               const PublicKey& myKey):
     allocator_(allocator),
-    packets_(static_cast<Packet*>(calloc(PacketCollector::MaxFragments, sizeof(Packet)))),
+    packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet)))),
     packetsEnd_(packets_),
     senderKey_(myKey)
   { }
@@ -160,6 +162,18 @@ public:
   uint8_t* getCurrPtr() { return ptr_; }
   uint32_t getCurrSize() const { return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data()); }
 
+  void insertBytes(char const* bytes, uint32_t size) {
+    while (size > 0) {
+      if (ptr_ == end_) newPack();
+
+      const auto toPut = std::min((uint32_t)(end_ - ptr_), size);
+      memcpy(ptr_, bytes, toPut);
+      size -= toPut;
+      ptr_ += toPut;
+      bytes += toPut;
+    }
+  }
+
 private:
   void newPack() {
     new(packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
@@ -177,18 +191,6 @@ private:
 
     ++packetsCount_;
     ++packetsEnd_;
-  }
-
-  void insertBytes(char const* bytes, uint32_t size) {
-    while (size > 0) {
-      if (ptr_ == end_) newPack();
-
-      const auto toPut = std::min((uint32_t)(end_ - ptr_), size);
-      memcpy(ptr_, bytes, toPut);
-      size -= toPut;
-      ptr_ += toPut;
-      bytes += toPut;
-    }
   }
 
   uint8_t* ptr_;
@@ -221,7 +223,10 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 
 template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  pool = csdb::Pool::from_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_);  
+  uint32_t uncompressedSize;
+  *this >> uncompressedSize;
+
+  pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
   ptr_ = end_;
   return *this;
 }
@@ -283,10 +288,21 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 
 template <>
 inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
-  size_t bSize;
+  uint32_t bSize;
   auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes((char*)dataPtr, bSize);
-  //std::cout << "GB: " << byteStreamToHex(dataPtr, bSize) << std::endl;
+  return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const Credits::HashVector& vec) {
+  insertBytes((const char*)&vec, sizeof(Credits::HashVector));
+  return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const Credits::HashMatrix& mat) {
+  insertBytes((const char*)&mat, sizeof(Credits::HashMatrix));
   return *this;
 }
 

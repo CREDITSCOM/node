@@ -1,5 +1,5 @@
 #include <limits>
-#include <csdb/currency.h> 
+#include <csdb/currency.h>
 #include <base58.h>
 #include <lib/system/logger.hpp>
 #include <lib/system/hash.hpp>
@@ -196,7 +196,7 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
 	//TRACE("");
-	
+
 	{
 		std::lock_guard<decltype(dbLock_)> l(dbLock_);
 		pool.set_storage(storage_);
@@ -208,13 +208,13 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 		LOG_ERROR("Couldn't compose block");
 		if (!pool.save())
 			 return;
-		
+
 	}
-	
+
 		if (!pool.save()) {
 		LOG_ERROR("Couldn't save block");
 		return;
-		
+
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
@@ -225,7 +225,7 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 		new_block_cv.notify_all();
 		//TRACE("");
 	}
-	
+
 	if (!updateCache(pool)) {
 		LOG_ERROR("Couldn't update cache");
 	}
@@ -391,7 +391,7 @@ void BlockChain::writeGenesisBlock() {
 #ifdef MYLOG
   std::cout << "Hash inserted into the hash-vector" << std::endl;
   #endif
-  size_t bSize;
+  uint32_t bSize;
   const char* bl = genesis.to_byte_stream(bSize);
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
 }

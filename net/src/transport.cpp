@@ -386,7 +386,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
   case MsgTypes::ConsMatrix:
     return node_->getMatrix(data, size, firstPack.getSender());
   case MsgTypes::NewBlock:
-    return node_->getBlock(data, size, firstPack.getSender(), rNum);
+    return node_->getBlock(data, size, firstPack.getSender());
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockRequest:
@@ -403,10 +403,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getTlRequest(data, size, firstPack.getSender());
   case MsgTypes::NewBadBlock:
     return node_->getBadBlock(data, size, firstPack.getSender());
-  case MsgTypes::SyncBlock:
-    return node_->getSyncBlock(data, size);
-  case MsgTypes::SpamSignal:
-    return node_->getSpamSignal(data, size);
   case MsgTypes::BigBang:
     return node_->getBigBang(data, size, rNum, type);
   default:

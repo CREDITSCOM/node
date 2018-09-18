@@ -1,5 +1,4 @@
 /* Send blaming letters to @yrtimd */
-#include <snappy/snappy.h>
 #include <lz4.h>
 
 #include "packet.hpp"

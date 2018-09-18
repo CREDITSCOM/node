@@ -84,8 +84,12 @@ public:
   static Pool load(PoolHash hash, Storage storage = Storage());
 
   static Pool from_byte_stream(const char* data, size_t size);
-  char* to_byte_stream(size_t& size);
+  char* to_byte_stream(uint32_t&);
   ::csdb::internal::byte_array to_byte_stream_for_sig();
+
+  Pool meta_from_byte_stream(const char*, size_t);
+  static Pool from_lz4_byte_stream(const char*, size_t, size_t);
+
 
   bool clear()  noexcept;
 
@@ -138,6 +142,7 @@ public:
    *         случае.
    */
   PoolHash hash() const noexcept;
+  void recount() noexcept;
 
   /**
    * @brief Бинарное представление пула

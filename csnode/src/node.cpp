@@ -4,6 +4,7 @@
 #include <lib/system/logger.hpp>
 #include <net/transport.hpp>
 
+#include <lz4.h>
 #include <base58.h>
 #include <sodium.h>
 
@@ -47,7 +48,7 @@ bool Node::init() {
   if (!checkKeysFile())
     return false;
   solver_->set_keys(myPublicForSig, myPrivateForSig); //DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
-  
+
   solver_->addInitialBalance();
 
   return true;
@@ -225,7 +226,7 @@ void Node::sendRoundTable() {
   int i = 0;
   for (auto& e : confidantNodes_)
   {
-    if (e != mainNode_) 
+    if (e != mainNode_)
     {
       std::cout << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
       i++;
@@ -434,7 +435,7 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
  // std::cout << __func__ << std::endl;
    if (myLevel_ != NodeLevel::Confidant) {
     return;
-  } 
+  }
    csdb::Pool pool;
    pool = csdb::Pool{};
 #ifdef MYLOG
@@ -462,7 +463,7 @@ std::cout << "NODE> Transactions amount got " <<pool.transactions_count() << std
   }
     solver_->gotTransactionList(std::move(pool));
    // }
-  
+
 
 }
 
@@ -473,20 +474,8 @@ void Node::sendTransactionList(const csdb::Pool& pool){//, const PublicKey& targ
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-  size_t bSize;
-  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-  //  std::cout << "Sending List: " << byteStreamToHex((const char*)data, bSize) << std::endl;
-#ifdef MYLOG
-  std::cout << "Sending List: list size: " << bSize << std::endl;
-  #endif
-  Hash listHash;
+  composeMessageWithBlock(pool, MsgTypes::TransactionList);
 
-  std::string compressed;
-  snappy::Compress((const char*)data, bSize, &compressed);
-
-  ostream_ << MsgTypes::TransactionList
-           << roundNum_
-           << compressed;
 #ifdef MYLOG
   std::cout << "Sending List: compressed size: " << compressed.size() << std::endl;
   #endif
@@ -564,7 +553,7 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size)//, const Pub
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad vector packet format");
     return;
-    
+
   }
 }
 
@@ -615,7 +604,7 @@ void Node::sendTLRequest()
   ostream_.init(BaseFlags::Signed, mainNode_);
   ostream_ << MsgTypes::ConsTLRequest << getMyConfNumber();
   flushCurrentTasks();
-  
+
 }
 
 void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey& sender)
@@ -720,7 +709,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
   //for (auto& it : confidantNodes_)
  // {
   //if(it==myPublicKey_) continue;
-   // std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32) 
+   // std::cout << "NODE> 1 Sending vector to " << std::endl;//<< byteStreamToHex(it.str, 32)
     ostream_.init(BaseFlags::Broadcast);//, it);
     ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
 
@@ -759,12 +748,12 @@ void Node::sendMatrix(const Credits::HashMatrix& matrix) {
     LOG_ERROR("Only confidant nodes can send matrices");
     return;
   }
- 
+
   //for (auto& it : confidantNodes_)
  // {
   //  if (it == myPublicKey_) continue;
 #ifdef MYLOG
-    std::cout << "NODE> 1 Sending matrix to " << std::endl;//<< byteStreamToHex(it.str, 32) 
+    std::cout << "NODE> 1 Sending matrix to " << std::endl;//<< byteStreamToHex(it.str, 32)
 #endif
     ostream_.init(BaseFlags::Broadcast);//, it);
     ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
@@ -809,14 +798,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
   }
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  size_t bSize;
-  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-
-  std::string compressed;
-  snappy::Compress((const char*)data, bSize, &compressed);
-  ostream_ << MsgTypes::NewBlock
-           << roundNum_
-           << compressed;
+  composeMessageWithBlock(pool, MsgTypes::NewBlock);
 
   LOG_EVENT("Sending block of " << pool.transactions_count() << " transactions");
   flushCurrentTasks();
@@ -852,14 +834,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
   }
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  size_t bSize;
-  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-
-  std::string compressed;
-  snappy::Compress((const char*)data, bSize, &compressed);
-  ostream_ << MsgTypes::NewBadBlock
-    << roundNum_
-    << compressed;
+  composeMessageWithBlock(pool, MsgTypes::NewBadBlock);
 
   LOG_EVENT("Sending bad block of " << pool.transactions_count() << " transactions");
   flushCurrentTasks();
@@ -921,7 +896,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
     #endif
     return;
   }
-  
+
   solver_->gotBlockRequest(std::move(getBlockChain().getHashBySequence(requested_seq)), sender);
 }
 
@@ -1008,7 +983,7 @@ void Node::onRoundStart() {
   }
   std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
-  
+
   if (mainNode_ == myPublicKey_)
     myLevel_ = NodeLevel::Main;
   else {
@@ -1030,7 +1005,7 @@ void Node::onRoundStart() {
       myLevel_ = NodeLevel::Normal;
   }
 
-  
+
 
   // Pretty printing...
   std::cout << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
@@ -1048,7 +1023,7 @@ void Node::onRoundStart() {
  // if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
   //else  std::cout << "Get Status> SYNCRO NOT STARTED ... YET" << std::endl;
 
-  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||(getBlockChain().getBlockRequestNeed()))// && (!awaitingSyncroBlock))// && (!syncro_started))) vvv 
+  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||(getBlockChain().getBlockRequestNeed()))// && (!awaitingSyncroBlock))// && (!syncro_started))) vvv
   {
   //  std::cout << "Starting SYNCRO" << std::endl;
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
@@ -1090,17 +1065,17 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
   mainNode_ = myPublicKey_;   //confidantNodes.at(i);
   confidantNodes_.clear();
   for (auto& conf : confidantNodes) confidantNodes_.push_back(conf);
-    //if(mainNode_!=conf) 
+    //if(mainNode_!=conf)
 
   sendRoundTable();
-  #ifdef MYLOG 
+  #ifdef MYLOG
   std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
   #endif
 
   /*if(!(solver_->mPoolClosed()))
  {
     solver_->sendTL();
- 
+
  }*/
 
   //mainNode_ = mainNode;
@@ -1122,7 +1097,7 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
 }
 
 inline bool Node::readRoundData(const bool tail) {
-  
+
   PublicKey mainNode;
   uint8_t confSize = 0;
   istream_ >> confSize;
@@ -1169,7 +1144,29 @@ std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
 
 
   mainNode_ = mainNode;
-  
+
 
   return true;
+}
+
+void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) {
+  uint32_t bSize;
+
+  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+
+  auto max = LZ4_compressBound(bSize);
+  auto memPtr = allocator_.allocateNext(max);
+
+  auto realSize = LZ4_compress_default((const char*)data,
+                                       (char*)memPtr.get(),
+                                       bSize,
+                                       memPtr.size());
+
+  allocator_.shrinkLast(realSize);
+
+  ostream_ << type
+           << roundNum_
+           << bSize;
+
+  ostream_.insertBytes((const char*)memPtr.get(), memPtr.size());
 }

@@ -1,12 +1,13 @@
-#include <iostream>
+#include "csdb/pool.h"
+
 #include <sstream>
 #include <iomanip>
 #include <map>
 #include <algorithm>
 
 #include <sodium.h>
+#include <lz4.h>
 
-#include "csdb/pool.h"
 #include "csdb/csdb.h"
 
 #include "csdb/internal/shared_data_ptr_implementation.h"
@@ -107,35 +108,36 @@ class Pool::priv : public ::csdb::internal::shared_data
     storage_(storage)
   {}
 
-private:
   void put(::csdb::priv::obstream& os) const
   {
     os.put(previous_hash_);
     os.put(sequence_);
+
+    os.put(user_fields_);
 
     os.put(transactions_.size());
     for(const auto& it : transactions_) {
       os.put(it);
     }
 
-    os.put(user_fields_);
-	os.put(writer_public_key_);
-	os.put(signature_);
+    os.put(writer_public_key_);
+    os.put(signature_);
   }
 
   void put_for_sig(::csdb::priv::obstream& os)
   {
-	  os.put(previous_hash_);
-	  os.put(sequence_);
+    os.put(previous_hash_);
+    os.put(sequence_);
 
-	  os.put(transactions_.size());
-	  for (const auto& it : transactions_) {
-		  os.put(it);
-	  }
+    os.put(user_fields_);
 
-	  os.put(user_fields_);
-	  os.put(writer_public_key_);
-  }
+    os.put(transactions_.size());
+    for (const auto& it : transactions_) {
+      os.put(it);
+    }
+
+    os.put(writer_public_key_);
+   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
 	  if (!is.get(previous_hash_)) {
@@ -145,9 +147,16 @@ private:
 	  if (!is.get(sequence_))
 		  return false;
 
+          if(!is.get(user_fields_)) {
+            return false;
+          }
+
 	  if (!is.get(cnt)) {
 		  return false;
 	  }
+
+      transactionsCount_ = cnt;
+      is_valid_ = true;
 
 	  return true;
   }
@@ -163,13 +172,11 @@ private:
     for(size_t i = 0; i < cnt; ++i )
     {
       Transaction tran;
-      if(!is.get(tran))
+      if(!is.get(tran)) {
+        is_valid_ = false;
         return false;
+      }
       transactions_.emplace_back(tran);
-    }
-
-    if(!is.get(user_fields_)) {
-      return false;
     }
 
     if (!is.get(writer_public_key_))
@@ -230,6 +237,7 @@ private:
   PoolHash previous_hash_;
   Pool::sequence_t sequence_;
   std::vector<Transaction> transactions_;
+  uint32_t transactionsCount_ = 0;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   ::std::vector<uint8_t> writer_public_key_;
@@ -256,7 +264,10 @@ bool Pool::is_read_only() const noexcept
 
 PoolHash Pool::hash() const noexcept
 {
-  return d->hash_;
+    if (d->hash_.is_empty())
+        const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(d->binary_representation_);
+
+    return d->hash_;
 }
 
 PoolHash Pool::previous_hash() const noexcept
@@ -353,12 +364,18 @@ bool Pool::add_transaction(Transaction transaction
 #endif
 
   d->transactions_.push_back(Transaction(new Transaction::priv(*(transaction.d.constData()))));
+  ++d->transactionsCount_;
   return true;
 }
 
 size_t Pool::transactions_count() const noexcept
 {
-  return d->transactions_.size();
+  return d->transactionsCount_;//transactions_.size();
+}
+
+void Pool::recount() noexcept
+{
+  d->transactionsCount_ = d->transactions_.size();
 }
 
 Pool::sequence_t Pool::sequence() const noexcept
@@ -368,7 +385,7 @@ Pool::sequence_t Pool::sequence() const noexcept
 
 std::vector<uint8_t> Pool::writer_public_key() const noexcept
 {
-	return d->writer_public_key_;
+  return d->writer_public_key_;
 }
 
 void Pool::set_sequence(Pool::sequence_t seq) noexcept
@@ -493,19 +510,42 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
 	return Pool(p);
 }
 
-  Pool Pool::from_byte_stream(const char* data, size_t size) {
-    priv *p = new priv();
-    ::csdb::priv::ibstream is(data, size);
+Pool Pool::meta_from_byte_stream(const char* data, size_t size) {
+  priv *p = new priv();
+  ::csdb::priv::ibstream is(data, size);
 
-    if (!p->get(is)) {
-      delete p;
-      return Pool();
-    }
-
-    return Pool(p);
+  size_t t;
+  if (!p->get_meta(is, t)) {
+    delete p;
+    return Pool();
   }
 
-  char* Pool::to_byte_stream(size_t& size) {
+  //p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
+
+  return Pool(p);
+}
+
+Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompressedSize) {
+  priv *p = new priv();
+  p->binary_representation_.resize(uncompressedSize);
+
+  auto rs = LZ4_decompress_safe(data, (char*)p->binary_representation_.data(), size, uncompressedSize);
+
+  ::csdb::priv::ibstream is(p->binary_representation_.data(),
+                            p->binary_representation_.size());
+
+  size_t t;
+  if (!p->get_meta(is, t)) {
+    delete p;
+    return Pool();
+  }
+
+  //p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
+
+  return Pool(p);
+}
+
+  char* Pool::to_byte_stream(uint32_t& size) {
 	  if (d->binary_representation_.empty()) {
 		  ::csdb::priv::obstream os;
 		  d->put(os);
@@ -516,24 +556,23 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
 	  return (char*)(d->binary_representation_.data());
   }
 
-  ::csdb::internal::byte_array Pool::to_byte_stream_for_sig()
-  {
-	  ::csdb::priv::obstream os;
-	  d->put_for_sig(os);
-	  ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
-	  return result;
-  }
-
   bool Pool::save(Storage storage)
 {
+  //if ((!d.constData()->is_valid_) || ((!d.constData()->read_only_))) {
+  //  return false;
+  //}
+
   if ((!d.constData()->is_valid_)) {
-    return false;
+      return false;
   }
 
   Storage s = d->get_storage(storage);
   if (!s.isOpen()) {
     return false;
   }
+
+  if (d->hash_.is_empty())
+    d->hash_ = PoolHash::calc_from_data(d->binary_representation_);
 
   if (s.pool_save(*this)) {
     d->storage_ = s.weak_ptr();
@@ -542,6 +581,14 @@ Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cn
 
   return false;
 }
+
+  ::csdb::internal::byte_array Pool::to_byte_stream_for_sig()
+  {
+	  ::csdb::priv::obstream os;
+	  d->put_for_sig(os);
+	  ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+	  return result;
+  }
 
 void Pool::sign(std::vector<uint8_t> private_key)
 {
