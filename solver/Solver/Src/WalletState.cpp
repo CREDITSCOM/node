@@ -55,6 +55,7 @@ namespace Credits
         {
             storage_[id] = new WalletData{ walletData.balance_ , walletData.trxTail_ };
         }
+        toCopy_.reset(id);
         return true;
     }
 

@@ -118,6 +118,7 @@ private:
 
   bool updateFromNextBlock(csdb::Pool& pool);
 
+  // returns true if new id was inserted
   bool getWalletId(const WalletAddress& address, WalletId& id);
   bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
   csdb::Amount getBalance_Unsafe(WalletId id) const;
