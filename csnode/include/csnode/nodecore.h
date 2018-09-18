@@ -6,6 +6,7 @@
 #include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
+#include <boost/thread/shared_mutex.hpp>
 
 namespace cs
 {
@@ -24,6 +25,9 @@ namespace cs
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
+
+    // sync types
+    using SharedMutex = boost::shared_mutex;   // C++17 std::shared_mutex
 
     enum NodeConsts
     {

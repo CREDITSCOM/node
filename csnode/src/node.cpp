@@ -296,7 +296,7 @@ void Node::getTransaction(const uint8_t* data, const size_t size)
 
     //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
 
-    decltype(auto) trx = pool.transactions();
+    auto& trx = pool.transactions();
     uint16_t i = 0;
 
     for (auto& tr : trx)

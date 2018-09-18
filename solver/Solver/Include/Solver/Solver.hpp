@@ -120,7 +120,8 @@ namespace Credits {
     class State {
     };
 
-    class Solver {
+    class Solver
+    {
     public:
         Solver(Node*);
         ~Solver();
