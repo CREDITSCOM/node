@@ -5,6 +5,7 @@
 #include <exception>
 #include <string>
 #include <nodecore.h>
+#include <algorithm>
 
 namespace cs
 {

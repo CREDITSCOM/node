@@ -3,25 +3,21 @@
 #define __NODE_HPP__
 #include <memory>
 
-#include <csstats.h>
 #include <csconnector/csconnector.h>
+#include <csstats.h>
 #include <Solver/Solver.hpp>
 #include <client/config.hpp>
 
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
-enum NodeLevel {
-  Normal,
-  Confidant,
-  Main,
-  Writer
-};
+enum NodeLevel { Normal, Confidant, Main, Writer };
 
 using Vector = std::string;
 using Matrix = std::string;
 
 class Transport;
+
 
 namespace Credits
 {
@@ -34,7 +30,9 @@ public:
   Node(const Config&);
   ~Node();
 
-  bool isGood() const { return good_; }
+  bool isGood() const {
+    return good_;
+  }
   void run(const Config&);
 
   /* Incoming requests processing */
@@ -56,7 +54,7 @@ public:
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  //void getTLConfirmation(const uint8_t* data, const size_t size);
+  // void getTLConfirmation(const uint8_t* data, const size_t size);
   void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
@@ -66,8 +64,9 @@ public:
   void sendRoundTable();
   void sendTransaction(const csdb::Transaction&);
   void sendTransaction(std::vector<csdb::Transaction>&&);
+  void sendTransaction(const csdb::Pool& m_transactions_);
   void sendFirstTransaction(const csdb::Transaction&);
-  void sendTransactionList(const csdb::Pool&);//, const PublicKey&);
+  void sendTransactionList(const csdb::Pool&);  //, const PublicKey&);
   void sendVector(const Credits::HashVector&);
   void sendMatrix(const Credits::HashMatrix&);
   void sendBlock(const csdb::Pool&);
@@ -77,6 +76,7 @@ public:
   void sendPacketHashesReply(const cs::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
+  void sendCharacteristic(csdb::Pool emptyMetaPool, const std::vector<uint8_t>& characteristic);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
@@ -96,52 +96,64 @@ public:
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
-  //void sendTLConfirmation(size_t tcount);
+  // void sendTLConfirmation(size_t tcount);
   bool getSyncroStarted();
 
-  enum MessageActions {
-    Process,
-    Postpone,
-    Drop
-  };
+  enum MessageActions { Process, Postpone, Drop };
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
-  const PublicKey& getMyPublicKey() const { return myPublicKey_; }
-  NodeLevel getMyLevel() const { return myLevel_; }
+  const PublicKey& getMyPublicKey() const {
+    return myPublicKey_;
+  }
+  NodeLevel getMyLevel() const {
+    return myLevel_;
+  }
   uint32_t getRoundNumber();
-  //bool getSyncroStarted();
+  // bool getSyncroStarted();
   uint8_t getMyConfNumber();
 
-  const std::vector<PublicKey>& getConfidants() const { return confidantNodes_; }
+  const std::vector<PublicKey>& getConfidants() const {
+    return confidantNodes_;
+  }
 
-  BlockChain& getBlockChain() { return bc_; }
-  const BlockChain& getBlockChain() const { return bc_; }
+  BlockChain& getBlockChain() {
+    return bc_;
+  }
+  const BlockChain& getBlockChain() const {
+    return bc_;
+  }
 
-  csconnector::connector& getConnector() { return api_; }
+  csconnector::connector& getConnector() {
+    return api_;
+  }
   PublicKey writerId;
 
-private:
+  void                           addToPackageTemporaryStorage(const csdb::Pool& pool);
+  std::bitset<MAX_PACKETS_COUNT> makeCharacteristicMask() const;
+
+ private:
   bool init();
 
-  //signature verification
+  // signature verification
   bool checkKeysFile();
   void generateKeys();
   bool checkKeysForSig();
 
   inline bool readRoundData(bool);
-  void onRoundStart();
+  void        onRoundStart();
 
   // Info
   const PublicKey myPublicKey_;
-  bool good_ = true;
+  bool            good_ = true;
 
-  //syncro variables
-  bool syncro_started = false;
+  // syncro variables
+  bool     syncro_started = false;
   uint32_t sendBlockRequestSequence;
-  bool awaitingSyncroBlock = false;
+  bool     awaitingSyncroBlock   = false;
   uint32_t awaitingRecBlockCount = 0;
 
-  //signature variables
+
+  // signature variables
   std::vector<uint8_t> myPublicForSig;
   std::vector<uint8_t> myPrivateForSig;
 
@@ -149,10 +161,10 @@ private:
   std::string sent_trx_fname = "sent.txt";
 
   // Current round state
-  RoundNum roundNum_ = 0;
+  RoundNum  roundNum_ = 0;
   NodeLevel myLevel_;
 
-  PublicKey mainNode_;
+  PublicKey              mainNode_;
   std::vector<PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
@@ -161,15 +173,16 @@ private:
   BlockChain bc_;
 
   Credits::Solver* solver_;
-  Transport* transport_;
+  Transport*       transport_;
 
-  csstats::csstats stats_;
+  csstats::csstats       stats_;
   csconnector::connector api_;
 
   RegionAllocator allocator_;
 
   IPackStream istream_;
   OPackStream ostream_;
-};
 
-#endif // __NODE_HPP__
+  std::vector<csdb::Pool> m_packageTemporaryStorage;
+};
+#endif  // __NODE_HPP__

@@ -3,70 +3,59 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <vector>
-#include <string>
-#include <blake2.h>
 #include <blake2-impl.h>
+#include <blake2.h>
+#include <string>
+#include <vector>
+#include <map>
+
 
 #include <csdb/csdb.h>
 #include <csdb/pool.h>
-#include <map>
 
 #include <csnode/node.hpp>
 #include <lib/system/keys.hpp>
 
-namespace Credits{
+namespace Credits {
 
-	class Solver;
+class Solver;
 
-    class Generals{
-    public:
-        Generals();
-        ~Generals();
+class Generals {
+ public:
+  Generals();
+  ~Generals();
 
-        Generals(const Generals&)= delete;
-        Generals& operator=(const Generals&)= delete;
+  Generals(const Generals&) = delete;
+  Generals& operator=(const Generals&) = delete;
 
-        //Rewrite method//
-        void chooseHeadAndTrusted(std::map<std::string, std::string>);
-        void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
+  // Rewrite method//
+  void chooseHeadAndTrusted(std::map<std::string, std::string>);
+  void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
 
-        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool);
+  Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
 
-        void addvector(HashVector vector);
-        void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
+  void addvector(HashVector vector);
+  void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
 
-        //take desision
-        uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
-		
-        HashMatrix getMatrix();
+  // take desision
+  uint8_t       take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
+  static int8_t extractRaisedBitsCount(const csdb::Amount& amount);
+  HashMatrix    getMatrix() const;
 
-		    void addSenderToMatrix(uint8_t myConfNum);
+  void addSenderToMatrix(uint8_t myConfNum);
+  void fake_block(std::string);
 
-        void fake_block(std::string);
-    private:	
+  std::vector<uint8_t> getCharacteristicMask() const;
 
-
-		struct hash_weight {
-			char a_hash[32];
-			uint8_t a_weight;
-
-		};
-		//unsigned char hash_vector[97];
-		//unsigned char hash_matrix[9700];
-		//unsigned char got_matrix[9700];
-		HashMatrix hMatrix;
-		uint8_t find_untrusted[10000];
-		uint8_t new_trusted[100];
-		hash_weight hw_total[100];
-
-        //void encrypt_vector(std::string& vector_string
-              //  ,std::vector<int64_t>& vector_data);
-
-        //int decode_matrix(std::string& matrix);
-
-        //std::vector<std::string> vector_datas;
-        //std::vector<std::string> matrix_data;
-
-    };
+ private:
+  struct hash_weight {
+    char    a_hash[HASH_LENGTH] = {};
+    uint8_t a_weight = 0;
+  };
+  HashMatrix                   m_hMatrix;
+  std::array<uint8_t, 10000>   m_find_untrusted;
+  std::array<uint8_t, 100>     m_new_trusted;
+  std::array<hash_weight, 100> m_hw_total;
+  std::vector<uint8_t> m_characteristic_mask;
+};
 }

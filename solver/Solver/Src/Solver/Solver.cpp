@@ -381,7 +381,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
-  Hash_ result = generals->buildvector(_pool, m_pool, b_pool);
+  Hash_ result = generals->buildvector(_pool, m_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
 	hvector.hash = result;
@@ -392,7 +392,6 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   if(trustedCounterVector==numGen) 
   {
     vectorComplete = true;
-
     memset(receivedVecFrom, 0, 100);
     trustedCounterVector = 0;
     //compose and send matrix!!!
@@ -418,78 +417,58 @@ void Solver::sendZeroVector()
 
 }
 
-
-void Solver::gotVector(HashVector&& vector)
-{
-#ifdef MYLOG
-	std::cout << "SOLVER> GotVector" << std::endl;
-  #endif
- // runAfter(std::chrono::milliseconds(200),
- //   [this]() { sendZeroVector(); });
-
-  uint8_t numGen = node_->getConfidants().size();
-  //if (vector.roundNum==node_->getRoundNumber())
-  //{
-	 // std::cout << "SOLVER> This is not the information of this round" << std::endl;
-	 // return;
-  //}
-  if (receivedVecFrom[vector.Sender]==true) 
-  {
-#ifdef MYLOG
-		std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
-    #endif
-		return;
+void Solver::gotVector(HashVector&& vector) {
+  std::cout << "SOLVER> GotVector" << std::endl;
+  if (receivedVecFrom[vector.Sender] == true) {
+    std::cout << "SOLVER> I've already got the vector from this Node" << std::endl;
+    return;
   }
+  const std::vector<PublicKey>& confidants = node_->getConfidants();
+  uint8_t numGen = confidants.size();
   receivedVecFrom[vector.Sender] = true;
-  generals->addvector(vector);//building matrix
+  generals->addvector(vector);  // building matrix
   trustedCounterVector++;
 
-  if (trustedCounterVector == numGen)
-  {
-    
-	  //std::cout << "SOLVER> GotVector : " << std::endl;
+  if (trustedCounterVector == numGen) {
     vectorComplete = true;
+    memset(receivedVecFrom, 0, 100);
+    trustedCounterVector = 0;
+    // compose and send matrix!!!
+    uint8_t confNumber = node_->getMyConfNumber();
+    generals->addSenderToMatrix(confNumber);
+    receivedMatFrom[confNumber] = true;
+    trustedCounterMatrix++;
 
-	  memset(receivedVecFrom, 0, 100);
-	  trustedCounterVector = 0;
-	  //compose and send matrix!!!
-      //receivedMat_ips.insert(node_->getMyId());
-	  generals->addSenderToMatrix(node_->getMyConfNumber());
-	  receivedMatFrom[node_->getMyConfNumber()] = true;
-	  trustedCounterMatrix++;
-	  node_->sendMatrix(generals->getMatrix());
-	  generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
- //   std::cout << "SOLVER> Matrix added" << std::endl;
+    HashMatrix matrix = generals->getMatrix();
+    node_->sendMatrix(matrix);
+    generals->addmatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
-    if (trustedCounterMatrix == numGen)
-    {
+    if (trustedCounterMatrix == numGen) {
       memset(receivedMatFrom, 0, 100);
+      uint8_t wTrusted  = (generals->take_decision(
+          confidants, confNumber, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
-      uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
 
-      if (wTrusted == 100)
-      {
-//        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-        [this]() { writeNewBlock(); });
-      }
-      else
-      {
+      if (wTrusted == 100) {
+        std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
+        runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
+      } else {
+        std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
         consensusAchieved = true;
- //       std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
-        if (wTrusted == node_->getMyConfNumber())
-        {
+        if (wTrusted == node_->getMyConfNumber()) {
           node_->becomeWriter();
-          runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-            [this]() { writeNewBlock(); });
+          runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
+            csdb::Pool emptyMetaPool;
+            addTimestampToPool(emptyMetaPool);
+            emptyMetaPool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+            node_->sendCharacteristic(emptyMetaPool, generals->getCharacteristicMask());
+            writeNewBlock();
+          });
         }
-          //LOG_WARN("This should NEVER happen, NEVER");
       }
     }
   }
-#ifdef MYLOG
   std::cout << "Solver>  VECTOR GOT SUCCESSFULLY!!!" << std::endl;
-  #endif
 }
 
 void Solver::checkMatrixReceived()
@@ -588,6 +567,7 @@ void Solver::writeNewBlock()
   if (consensusAchieved &&
     node_->getMyLevel() == NodeLevel::Writer) {
     prepareBlockForSend(m_pool);
+
     node_->sendBlock(std::move(m_pool));
     node_->getBlockChain().putBlock(m_pool);
 
@@ -603,7 +583,7 @@ void Solver::writeNewBlock()
   }
   else {
     //LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
-  }
+    }
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)

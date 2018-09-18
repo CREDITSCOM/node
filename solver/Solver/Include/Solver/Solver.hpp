@@ -7,18 +7,23 @@
 #include <csdb/csdb.h>
 #include <memory>
 #include <thread>
-#include <functional>
+
 #include <api_types.h>
 #include <functional>
-#include <set>
-#include <vector>
+
 #include <atomic>
-#include <thread>
+#include <functional>
 #include <mutex>
 
-#include <boost/asio.hpp>
+#include <set>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include <api_types.h>
 #include <csdb/transaction.h>
+#include <boost/asio.hpp>
+
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
 #include "../../../../csnode/include/csnode/nodecore.h"
