@@ -160,6 +160,9 @@ private:
 
   RegionAllocator allocator_;
 
+  size_t lastStartSequence_;
+  bool blocksReceivingStarted_ = false;
+
   IPackStream istream_;
   OPackStream ostream_;
 };

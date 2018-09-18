@@ -37,9 +37,9 @@ namespace Credits{
 		std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions"  << std::endl;
     #endif
       //comission is let to be constant, otherwise comission should be sent to this function
-		memset(&hMatrix, 0, 9700);
+		memset(&hMatrix, 0, sizeof(HashVector)*100);
     csdb::Transaction tempTransaction;
-    std::map <PublicKey, csdb::Amount> tempBalance;
+    std::map <csdb::Address, csdb::Amount> tempBalance;
     size_t transactionsNumber = _pool.transactions_count();
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
@@ -52,18 +52,16 @@ namespace Credits{
 	  for (auto& it : t_pool)
 	  {
 		  countFee(it, num_of_trusted, t_pool.size());
-
-      delta = it.balance() - it.amount() - it.counted_fee();
-      //if (tempBalance.empty()) 
-      //{
-      //  
-      //  tempBalance.emplace(it.source(), delta);
-      //}
-      //else
-      //{
-      //  if(tempBalance.at(it.source))it.set_balance()
-      //}
-
+      if ((tempBalance.empty()) || (tempBalance.count(it.source()) == 0))
+      {
+        delta = it.balance() - it.amount() - it.counted_fee();        
+        tempBalance.emplace(it.source(), delta);
+      }
+      else
+      {
+        delta = tempBalance.at(it.source())- it.amount() - it.counted_fee();
+        tempBalance.emplace(it.source(), delta);
+      }
 
 
 	#ifdef _MSC_VER
@@ -98,8 +96,8 @@ namespace Credits{
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
 
 		Hash_ hash_(hash_s);	
-    delete hash_s; 
-    delete del1;
+    delete[] hash_s; 
+    delete[] del1;
  //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
 		return hash_;
     }
@@ -113,9 +111,9 @@ namespace Credits{
       memset(new_trusted, 0, 100);
       memset(hw_total, 0, 3300);
       Hash_ hash_(hash_s);
-      delete hash_s;
+      delete[] hash_s;
  //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
-      delete del1;
+      delete[] del1;
       return hash_;
 
     }
@@ -217,7 +215,7 @@ namespace Credits{
 				*(new_trusted + i) += 1;
 			}
 		}
-    delete hw;
+    delete[] hw;
     }
 
     uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash) {
@@ -311,8 +309,8 @@ namespace Credits{
 #ifdef MYLOG
 		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
     #endif
-    delete hw;
-    delete mtr;
+    delete[] hw;
+    delete[] mtr;
 		return result;
 		//if (myId != confidantNodes[write_id]) return 0;
         //return 100;

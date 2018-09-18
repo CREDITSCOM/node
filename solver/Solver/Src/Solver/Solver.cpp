@@ -118,7 +118,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
   csdb::PoolHash prev_hash;
   prev_hash.from_string("");
-  block.set_previous_hash(prev_hash);
+ // block.set_previous_hash(prev_hash);
  // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
 #ifdef MYLOG
@@ -501,7 +501,6 @@ void Solver::gotMatrix(HashMatrix&& matrix)
   if (trustedCounterMatrix == numGen) takeDecWorkaround();
 }
 
-
 //what block does this function write???
 void Solver::writeNewBlock()
 {
@@ -569,6 +568,64 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
  // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 
+}
+
+void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
+{
+  std::cout << __func__ << std::endl;
+  if (tmpStorage.count(block.sequence())==0) 
+  {
+    tmpStorage.emplace(block.sequence(), block);
+    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+
+}
+
+void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
+{
+  std::cout << __func__ << std::endl;
+  if (rndStorage.count(block.sequence())==0) 
+  {
+    rndStorage.emplace(block.sequence(), block);
+    std::cout << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+}
+void Solver::rndStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while(loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (rndStorage.count(newSeq)>0) 
+    {
+      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      rndStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
+void Solver::tmpStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (tmpStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      tmpStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
 }
 
 
@@ -878,8 +935,17 @@ void Solver::nextRound()
   round_table_sent = false;
   sentTransLastRound = false;
   m_pool = csdb::Pool{};
-  v_pool = csdb::Pool{};
+
   if (m_pool_closed) v_pool = csdb::Pool{};
+
+  if(node_->getMyLevel() == NodeLevel::Confidant)
+  {
+    memset(receivedVecFrom, 0, 100);
+    memset(receivedMatFrom, 0, 100);
+    trustedCounterVector = 0;
+    trustedCounterMatrix = 0;
+    if (gotBigBang) sendZeroVector();
+  }
 #ifdef MYLOG
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
   #endif

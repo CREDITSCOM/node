@@ -154,7 +154,11 @@ typedef std::string Matrix;
 		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
 		void gotBlockReply(csdb::Pool&&);
     void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+    void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+    void gotFreeSyncroBlock(csdb::Pool&&);
     void sendTL();
+    void rndStorageProcessing();
+    void tmpStorageProcessing();
 		// API methods
 
 		void initApi();
@@ -162,6 +166,7 @@ typedef std::string Matrix;
 		void addInitialBalance();
 
     void send_wallet_transaction(const csdb::Transaction& transaction);
+
 
 		void nextRound();
     bool mPoolClosed();
