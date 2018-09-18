@@ -783,8 +783,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
   flushCurrentTasks();
 }
 
-void Node::sendCharacteristic(csdb::Pool emptyMetaPool,
-                              const std::vector<uint8_t>& characteristic) {
+void Node::sendCharacteristic(csdb::Pool emptyMetaPool, const std::vector<uint8_t>& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
     LOG_ERROR("Only writer nodes can send blocks");
     return;
@@ -792,10 +791,9 @@ void Node::sendCharacteristic(csdb::Pool emptyMetaPool,
   std::string compressed;
   snappy::Compress(reinterpret_cast<const char*>(characteristic.data()), characteristic.size(), &compressed);
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
-  //   ostream_ << MsgTypes::NewCharacteristic;
-  csdb::Pool pool;
-  ostream_ << compressed.size() << compressed << pool;
+  ostream_ << MsgTypes::NewCharacteristic;
 
+  ostream_ << compressed.size() << compressed << emptyMetaPool;
   flushCurrentTasks();
 }
 

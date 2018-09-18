@@ -47,7 +47,8 @@ enum MsgTypes: uint8_t {
   BigBang = 35,
   TransactionPacket,
   TransactionsPacketRequest,
-  TransactionsPacketReply
+  TransactionsPacketReply,
+  NewCharacteristic
 };
 
 typedef uint32_t RoundNum;
