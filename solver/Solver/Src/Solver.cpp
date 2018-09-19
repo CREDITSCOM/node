@@ -598,7 +598,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   {
 		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
-      node_->getBlockChain().writeNewBlock(block);
+      node_->getBlockChain().onBlockReceived(block);
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
@@ -731,19 +731,21 @@ Solver::spamWithTransactions()
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
   csdb::Transaction transaction;
-  //transaction.set_max_fee();
-
   transaction.set_currency(csdb::Currency("CS"));
 
   while (true) {
     if (spamRunning && (node_->getMyLevel() == Normal))
     {
-      if ((node_->getRoundNumber()<10) || (node_->getRoundNumber() > 20) )
       {
           csdb::internal::WalletId id;
-          transaction.set_source(spammerAddress);
+
+          if (node_->getBlockChain().findWalletId(spammerAddress, id)) {
+            transaction.set_source(csdb::Address::from_wallet_id(id));
+          } else {
+            transaction.set_source(spammerAddress);
+          }
           if (node_->getBlockChain().findWalletId(spam_keys[counter], id)) {
-            transaction.target() = transaction.target().from_wallet_id(id);
+            transaction.set_target(csdb::Address::from_wallet_id(id));
           } else {
             transaction.set_target(spam_keys[counter]);
           }

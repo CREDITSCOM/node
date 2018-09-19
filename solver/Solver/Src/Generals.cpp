@@ -62,6 +62,7 @@ namespace Credits{
 		  int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
 	#endif
       WalletsState::WalletData& wallState = walletsState.getData(it.source(), walletId);
+
       if (!wallState.trxTail_.isAllowed(it.innerID())) {
         *(del1 + i) = -bitcnt;
         new_bpool.add_transaction(it);
