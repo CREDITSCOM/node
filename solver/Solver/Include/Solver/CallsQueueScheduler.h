@@ -26,7 +26,7 @@ public:
     using ProcType = std::function<void()>;
     using CallTag = uintptr_t;
 
-    constexpr static uintptr_t no_tag = 0;
+    constexpr static CallTag no_tag = 0;
 
     /**
      * @fn  CallsQueueScheduler::CallsQueueScheduler()
@@ -68,62 +68,71 @@ public:
     void Stop();
 
     /**
-     * @fn  uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme);
+     * @fn  CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing = false);
      *
-     * @brief   Inserts new call into queue according to wait_for parameter. Do check before insert to avoid queuing of duplicated calls
+     * @brief   Inserts new call into queue according to wait_for parameter. Do check before insert
+     *          to avoid queuing of duplicated calls
      *
      * @author  aae
      * @date    17.09.2018
      *
-     * @param   wait_for    Time to wait before do call a procedure.
-     * @param   proc        The procedure to be scheduled for call.
-     * @param   scheme      The scheme: once - do one call, periodic - repeat calls every wait_for period.
+     * @param   wait_for            Time to wait before do call a procedure.
+     * @param   proc                The procedure to be scheduled for call.
+     * @param   scheme              The scheme: once - do one call, periodic - repeat calls every
+     *                              wait_for period.
+     * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new schedule.
      *
-     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
+     * @return  A tag that can be used in future to remove scheduled call from queue if any, or
+     *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of existing schedule.
      */
 
-    CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
+    CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing = false);
 
     /**
-     * @fn  uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+     * @fn  CallTag CallsQueueScheduler::InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false)
      *
      * @brief   Schedule proc to be called once
      *
      * @author  aae
      * @date    18.09.2018
      *
-     * @param   wait_for_ms The wait for in milliseconds.
-     * @param   proc        The procedure to call.
+     * @param   wait_for_ms         The wait for in milliseconds.
+     * @param   proc                The procedure to call.
+     * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new schedule.
      *
-     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or
+     *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of existing schedule.
      */
 
-    CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+    CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false)
     {
-        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once);
+        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once, replace_existing);
     }
 
     /**
-     * @fn  uintptr_t InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+     * @fn  CallTag CallsQueueScheduler::InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false)
      *
      * @brief   Schedule periodic call of proc
      *
      * @author  aae
      * @date    18.09.2018
      *
-     * @param   wait_for_ms The wait for the first call in milliseconds and period between calls.
-     * @param   proc        The procedure o call.
+     * @param   wait_for_ms         The wait for the first call in milliseconds and period between
+     *                              calls.
+     * @param   proc                The procedure o call.
+     * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new schedule.
      *
-     * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
+     * @return  An id that can be used in future to remove scheduled call from queue if any, or
+     *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of existing schedule.
      */
 
-    CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+    CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false)
     {
-        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic);
+        return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic, replace_existing);
     }
 
     /**
-     * @fn  bool CallsQueueScheduler::Remove(uintptr_t id);
+     * @fn  bool CallsQueueScheduler::Remove(CallTag id);
      *
      * @brief   Removes the scheduled call idenified by id. 
      *
@@ -222,7 +231,7 @@ private:
     {
 
         /** @brief   The identifier: lets find item in queue (e.g. for remove) */
-        uintptr_t id;
+        CallTag id;
 
         /** @brief   The time point for scheduled execution */
         ClockType::time_point tp;
@@ -233,11 +242,8 @@ private:
         /** @brief   The procedure to call*/
         ProcType proc;
         
-        // not used, useful for debug purpose
-        //std::string comment;
-
         // support for std::find() by id
-        bool operator==(uintptr_t rhs) const
+        bool operator==(const CallTag rhs) const
         {
             return id == rhs;
         }
