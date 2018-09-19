@@ -125,7 +125,7 @@ void CallsQueueScheduler::Stop()
     }
 }
 
-CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/)
+CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing /*= false*/)
 {
     if(!_worker.joinable()) {
         Run();
@@ -136,10 +136,17 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
     const CallTag id = proc.target_type().hash_code();
     {
         std::lock_guard<std::mutex> l(_mtx_queue);
-        if(std::find(_queue.cbegin(), _queue.cend(), id) != _queue.cend()) {
-            // block already added before
-            _cnt_block_que += 1;
-            return id;
+        auto it = std::find(_queue.cbegin(), _queue.cend(), id);
+        if( it != _queue.cend()) {
+            if(!replace_existing) {
+                // reject schedule, the one already added before and still in queue
+                _cnt_block_que += 1;
+                return id;
+            }
+            else {
+                // remove from queue, below we will add a new schedule
+                _queue.erase(it);
+            }
         }
         // add new item
         auto result = _queue.insert(CallsQueueScheduler::Context {
