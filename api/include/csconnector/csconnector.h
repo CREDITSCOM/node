@@ -36,7 +36,7 @@ class connector
 {
 public:
   connector(BlockChain& m_blockchain,
-            Credits::Solver* solver,
+            cs::Solver* solver,
             const Config& config = Config{});
   ~connector();
 

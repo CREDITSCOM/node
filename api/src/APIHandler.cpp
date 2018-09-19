@@ -73,7 +73,7 @@ custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
 }
 
 APIHandler::APIHandler(BlockChain& blockchain,
-                       Credits::Solver& _solver)
+                       cs::Solver& _solver)
   : s_blockchain(blockchain)
   , solver(_solver)
   , stats(blockchain)

@@ -5,7 +5,6 @@
 #include <string>
 #include <sstream>
 #include <ctime>
-#include <memory>
 
 #define FLAG_LOG_NOTICE 1
 #define FLAG_LOG_WARN 2

@@ -26,15 +26,16 @@
 
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
-#include <Timer/Timer.h>
-#include "../../../../csnode/include/csnode/nodecore.h"
+#include <lib/system/timer.h>
+#include <csnode/nodecore.h>
 
 //#define MONITOR_NODE
 //#define SPAM_MAIN
 
 class Node;
 
-namespace Credits {
+namespace cs
+{
     typedef std::string Vector;
     typedef std::string Matrix;
 
@@ -129,7 +130,7 @@ namespace Credits {
     class Solver
     {
     public:
-        Solver(Node*);
+        explicit Solver(Node*);
         ~Solver();
 
         Solver(const Solver &) = delete;
@@ -254,7 +255,7 @@ namespace Credits {
         uint8_t writingCongGotCurrent;
         size_t rNum = 0;
 
-        cs::SharedMutex mHashTableMutex;
+        cs::SharedMutex mSharedMutex;
         cs::SpinLock mSpinLock;
 
         std::vector<csdb::Transaction> m_transactions;
@@ -263,7 +264,7 @@ namespace Credits {
         cs::TransactionsPacketHashTable mHashTable;
         cs::TransactionsBlock mTransactionsBlock;
 
-        Credits::CTimer m_SendingPacketTimer;
+        cs::Timer m_SendingPacketTimer;
 
 #ifdef SPAMMER
         std::atomic_bool spamRunning{ false };

@@ -37,14 +37,20 @@ namespace cs
     using SpinLock = boost::detail::spinlock;
 
     // RAII locks
-    using Lock = std::lock_guard<SharedMutex>;
-    using SharedLock = std::shared_lock<SharedMutex>;
+    using Lock = std::lock_guard<cs::SharedMutex>;
+    using SharedLock = std::shared_lock<cs::SharedMutex>;
     using SpinGuard = std::lock_guard<SpinLock>;
 
-    enum NodeConsts
+    enum NodeConsts : uint32_t
     {
         PublicKeyLength = 32,
         Black2HashLength = 32
+    };
+
+    enum SolverConsts : uint32_t
+    {
+        TransactionsPacketInterval = 50,    // ms
+        MaxPacketTransactions = 500
     };
 
     // all info about round
