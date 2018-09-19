@@ -1,5 +1,6 @@
 #include "Solver/CallsQueueScheduler.h"
 #include <lib/system/structures.hpp> // CallsQueue
+#include <algorithm>
 
 void CallsQueueScheduler::Run()
 {
@@ -31,7 +32,7 @@ void CallsQueueScheduler::Run()
                 // awake by direct notification: re-schedule next timeout
                 std::lock_guard<std::mutex> lque(_mtx_queue);
                 if(!_queue.empty()) {
-                    // проверить, не пора ли выполнять сразу
+                    // test whether to call immediately
                     if((_queue.cbegin()->tp - ClockType::now()).count() >= min_wait_for) {
                         // schedule next wait period
                         continue;
@@ -124,15 +125,15 @@ void CallsQueueScheduler::Stop()
     }
 }
 
-uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/)
+CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/)
 {
     if(!_worker.joinable()) {
         Run();
     }
-    uintptr_t id = (uintptr_t) &proc;
+    // uintptr_t id = (uintptr_t) &proc;
     //TODO: find better way to identify procs (also, in case of "in-place" lambdas when those have really the same address)
     // the solution requires enable RTTI = Yes (/GR) to compile:
-    id = proc.target_type().hash_code();
+    const CallTag id = proc.target_type().hash_code();
     {
         std::lock_guard<std::mutex> l(_mtx_queue);
         if(std::find(_queue.cbegin(), _queue.cend(), id) != _queue.cend()) {
@@ -158,7 +159,7 @@ uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcTy
     return id;
 }
 
-bool CallsQueueScheduler::Remove(uintptr_t id)
+bool CallsQueueScheduler::Remove(CallsQueueScheduler::CallTag id)
 {
     {
         std::lock_guard<std::mutex> l(_mtx_queue);

@@ -333,7 +333,7 @@ namespace Credits {
         //auto matrix = generals->getMatrix();
         auto conf = node_->getConfidants();
         size_t cnt = conf.size();
-        for(int i = 0; i < cnt; ++i) {
+        for(size_t i = 0; i < cnt; ++i) {
             //auto sender = matrix.hmatr [i].Sender;
             if(!receivedMatFrom [i]) {
                 node_->sendMatrixRequest(*(conf.cbegin() + i));
@@ -344,12 +344,12 @@ namespace Credits {
     // makes and send request to T-nodes those matrices are still absent this round
     void Solver::requestMissingVectors()
     {
-        auto matrix = generals->getMatrix();
+        //auto matrix = generals->getMatrix();
         auto conf = node_->getConfidants();
         size_t cnt = conf.size();
-        for(int i = 0; i < cnt; ++i) {
-            auto sender = matrix.hmatr [i].Sender;
-            if(!receivedVecFrom [sender]) {
+        for(size_t i = 0; i < cnt; ++i) {
+            //auto sender = matrix.hmatr [i].Sender;
+            if(!receivedVecFrom [i]) {
                 node_->sendVectorRequest(*(conf.cbegin() + i));
             }
         }

@@ -82,7 +82,7 @@ public:
      * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
      */
 
-    uintptr_t Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
+    CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
 
     /**
      * @fn  uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
@@ -98,7 +98,7 @@ public:
      * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
      */
 
-    uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+    CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
     {
         return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once);
     }
@@ -117,7 +117,7 @@ public:
      * @return  An id that can be used in future to remove scheduled call from queue if any, or CallsQueueScheduler::no_tag if schedule failed
      */
 
-    uintptr_t InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+    CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
     {
         return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic);
     }
@@ -135,7 +135,7 @@ public:
      * @return  True if it succeeds, false if it fails.
      */
 
-    bool Remove(uintptr_t id);
+    bool Remove(CallTag id);
 
     /**
      * @fn  void RemoveAll();
