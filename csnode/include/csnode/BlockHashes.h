@@ -22,7 +22,7 @@ public:
     bool loadNextBlock(csdb::Pool nextBlock);
     bool saveDbStructure();
 
-    csdb::PoolHash find(csdb::Pool::sequence_t seq) const;
+    bool find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const;
 private:
     const std::string dbs_fname_;
     std::vector<csdb::PoolHash> hashes_;

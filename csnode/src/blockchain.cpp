@@ -343,7 +343,10 @@ uint32_t BlockChain::getGlobalSequence() const
 
 csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const
 {
-    return blockHashes_->find(seq);
+    csdb::PoolHash res{};
+    if (!blockHashes_->find(seq, res))
+        return csdb::PoolHash{};
+    return res;
 }
 
 uint32_t BlockChain::getRequestedBlockNumber() const
