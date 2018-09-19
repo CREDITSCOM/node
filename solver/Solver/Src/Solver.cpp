@@ -115,7 +115,7 @@ void Solver::buildBlock(csdb::Pool& block)
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003"));
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
 
-  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(10, 0));
   transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
@@ -125,7 +125,7 @@ void Solver::buildBlock(csdb::Pool& block)
   transaction.set_target(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000004"));
   transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
 
-  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(10, 0));
   transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
@@ -731,7 +731,7 @@ Solver::spamWithTransactions()
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
   csdb::Transaction transaction;
-  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_currency(csdb::Currency(1));
 
   while (true) {
     if (spamRunning && (node_->getMyLevel() == Normal))

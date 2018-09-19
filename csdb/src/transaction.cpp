@@ -369,7 +369,6 @@ std::vector<uint8_t>
 Transaction::to_byte_stream_for_sig() const
 {
   ::csdb::priv::obstream os;
-  int8_t currency;
   const priv* data = d.constData();
   uint8_t innerID[6];
   {
@@ -391,12 +390,7 @@ Transaction::to_byte_stream_for_sig() const
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
-  if (data->currency_.to_string() == "CS") {
-    currency = 1;
-  } else {
-    currency = 0;
-  }
-  os.put(currency);
+  os.put(data->currency_);
 
   const size_t fixed_prefix_length = os.buffer().size();
   decltype(data->user_fields_) custom_user_fields(
@@ -437,7 +431,7 @@ Transaction::put(::csdb::priv::obstream& os) const
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
-  os.put(data->currency_.to_string() == "CS" ? (uint8_t)1 : (uint8_t)0);
+  os.put(data->currency_);
   {
     uint8_t size = data->user_fields_.size();
     os.put(size);
@@ -496,7 +490,7 @@ Transaction::get(::csdb::priv::ibstream& is)
   res = is.get(d);
   if (!res) return res;
 
-  data->currency_ = d == 1 ? Currency("CS") : Currency("");
+  data->currency_ = d;
 
   res = is.get(d);
   if (!res) return res;

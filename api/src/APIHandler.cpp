@@ -539,7 +539,7 @@ APIHandler::make_transaction(const Transaction& transaction)
   if (!s_blockchain.findWalletData(source, wallData, id))
       return csdb::Transaction{};
   send_transaction.set_balance(wallData.balance_);
-  send_transaction.set_currency(csdb::Currency("CS"));
+  send_transaction.set_currency(csdb::Currency(1));
   send_transaction.set_source(source);
   send_transaction.set_target(
     BlockChain::getAddressFromKey(transaction.target));

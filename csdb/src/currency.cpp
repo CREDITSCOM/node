@@ -7,29 +7,29 @@ namespace csdb {
 class Currency::priv : public ::csdb::internal::shared_data
 {
 public:
-  std::string name;
+  uint8_t id;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Currency)
 
-Currency::Currency(const std::string &name) :
+Currency::Currency(const uint8_t &id) :
   Currency()
 {
-  d->name = name;
+  d->id = id;
 }
 
 bool Currency::is_valid() const noexcept
 {
-  return !d->name.empty();
+  return d != 0;
 }
 
 std::string Currency::to_string() const noexcept
 {
-  return d->name;
+  return std::to_string(d->id);
 }
 
 bool Currency::operator ==(const Currency &other) const noexcept
 {
-  return d->name == other.d->name;
+  return d->id == other.d->id;
 }
 
 bool Currency::operator !=(const Currency &other) const noexcept
@@ -39,17 +39,17 @@ bool Currency::operator !=(const Currency &other) const noexcept
 
 bool Currency::operator <(const Currency &other) const noexcept
 {
-  return d->name < other.d->name;
+  return d->id < other.d->id;
 }
 
 void Currency::put(::csdb::priv::obstream &os) const
 {
-  os.put(d->name);
+  os.put(d->id);
 }
 
 bool Currency::get(::csdb::priv::ibstream &is)
 {
-  return is.get(d->name);
+  return is.get(d->id);
 }
 
 } // namespace csdb
