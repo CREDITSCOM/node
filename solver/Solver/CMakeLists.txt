@@ -9,10 +9,8 @@ set(SOLVER_DOC_BUILD FALSE)
 add_library(Solver
     Include/Solver/Generals.hpp
     Include/Solver/Solver.hpp
-    Include/Timer/Timer.h
         Src/Solver/Solver.cpp
         Src/Solver/Generals.cpp
-        Src/Timer/Timer.cpp
     ${THRIFT_GENERATED_FILES}
 )
 

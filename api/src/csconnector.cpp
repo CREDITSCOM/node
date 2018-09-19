@@ -15,7 +15,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain,
-                     Credits::Solver* solver,
+                     cs::Solver* solver,
                      const Config& config)
   : api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
   , api_processor(api_handler)

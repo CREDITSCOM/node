@@ -52,7 +52,7 @@ class APIProcessor;
 class APIFaker : public APINull
 {
   public:
-    APIFaker(BlockChain&, Credits::Solver&) {}
+    APIFaker(BlockChain&, cs::Solver&) {}
 };
 //
 //#ifndef FAKE_API_HANDLING
@@ -65,7 +65,7 @@ class APIFaker : public APINull
 class APIHandler : public APIHandlerInterface
 {
   public:
-    APIHandler(BlockChain& blockchain, Credits::Solver& _solver);
+    APIHandler(BlockChain& blockchain, cs::Solver& _solver);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -129,7 +129,7 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    Credits::Solver& solver;
+    cs::Solver& solver;
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<

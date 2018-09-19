@@ -26,15 +26,16 @@
 
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
-#include <Timer/Timer.h>
-#include "../../../../csnode/include/csnode/nodecore.h"
+#include <lib/system/timer.h>
+#include <csnode/nodecore.h>
 
 //#define MONITOR_NODE
 //#define SPAM_MAIN
 
 class Node;
 
-namespace Credits {
+namespace cs
+{
     typedef std::string Vector;
     typedef std::string Matrix;
 
@@ -63,14 +64,12 @@ namespace Credits {
     struct HashVector
     {
         uint8_t Sender;
-        //uint32_t roundNum;
         Hash_ hash;
         Signature sig;
     };
     struct HashMatrix
     {
         uint8_t Sender;
-        //uint32_t roundNum;
         HashVector hmatr[100];
         Signature sig;
     };
@@ -129,7 +128,7 @@ namespace Credits {
     class Solver
     {
     public:
-        Solver(Node*);
+        explicit Solver(Node*);
         ~Solver();
 
         Solver(const Solver &) = delete;
@@ -153,7 +152,8 @@ namespace Credits {
         void gotBlockReply(csdb::Pool&&);
         void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
         void sendTL();
-        void applyCharacteristic(const std::vector<uint8_t>& characteristic, const csdb::Pool& metaInfoPool);
+        void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
+                                 const csdb::Pool& metaInfoPool, const PublicKey& sender);
 
         // API methods
         void initApi();
@@ -237,9 +237,7 @@ namespace Credits {
         csdb::Pool v_pool;
         csdb::Pool b_pool;
         bool m_pool_closed = true;
-
         bool sentTransLastRound = false;
-
         bool vectorComplete = false;
         bool consensusAchieved = false;
         bool blockCandidateArrived = false;
@@ -254,7 +252,7 @@ namespace Credits {
         uint8_t writingCongGotCurrent;
         size_t rNum = 0;
 
-        cs::SharedMutex mHashTableMutex;
+        cs::SharedMutex mSharedMutex;
         cs::SpinLock mSpinLock;
 
         std::vector<csdb::Transaction> m_transactions;
@@ -263,7 +261,7 @@ namespace Credits {
         cs::TransactionsPacketHashTable mHashTable;
         cs::TransactionsBlock mTransactionsBlock;
 
-        Credits::CTimer m_SendingPacketTimer;
+        cs::Timer m_SendingPacketTimer;
 
 #ifdef SPAMMER
         std::atomic_bool spamRunning{ false };

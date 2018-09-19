@@ -403,7 +403,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
 
   switch(type) {
   case MsgTypes::RoundTable:
-    return node_->getRoundTable(data, size, rNum);
+    return node_->getRoundTableUpdated(data, size, rNum);
   case MsgTypes::Transactions:
     return node_->getTransaction(data, size);
   case MsgTypes::FirstTransaction:
@@ -429,15 +429,15 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
   case MsgTypes::RoundTableRequest:
     return node_->getRoundTableRequest(data, size, firstPack.getSender());
   case MsgTypes::ConsTLRequest:
-    return node_->getTlRequest(data, size, firstPack.getSender());
+    return node_->getTlRequest(data, size);
   case MsgTypes::NewBadBlock:
     return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
-    return node_->getTransactionsPacket(data, size, firstPack.getSender());
+    return node_->getTransactionsPacket(data, size);
   case MsgTypes::BigBang:
 	return node_->getBigBang(data, size, rNum, type);
     case MsgTypes::NewCharacteristic:
-      return node_->getCharacteristic(data, size);
+      return node_->getCharacteristic(data, size, firstPack.getSender());
   default:
     LOG_ERROR("Unknown type");
     break;
