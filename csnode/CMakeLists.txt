@@ -5,7 +5,7 @@ project(csnode)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package (Boost 1.67.0 REQUIRED COMPONENTS thread system filesystem thread)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem thread)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,

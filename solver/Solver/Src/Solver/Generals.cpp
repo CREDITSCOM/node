@@ -14,7 +14,6 @@
 
 #include <boost/dynamic_bitset.hpp>
 #include "Solver/Generals.hpp"
-//#include "../../../Include/Solver/Fake_Solver.hpp"
 
 #include <csdb/address.h>
 #include <csdb/currency.h>
@@ -40,9 +39,7 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 }
 
 Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
-  //    This function was modified to calculate deltas for concensus
  std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions" << std::endl;
-  // comission is let to be constant, otherwise comission should be sent to this function
 
   memset(&m_hMatrix, 0, 9700);
   uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
