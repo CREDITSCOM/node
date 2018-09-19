@@ -26,7 +26,7 @@ public:
     using ProcType = std::function<void()>;
     using CallTag = uintptr_t;
 
-    constexpr static uintptr_t no_tag = 0;
+    constexpr static CallTag no_tag = 0;
 
     /**
      * @fn  CallsQueueScheduler::CallsQueueScheduler()
@@ -68,7 +68,7 @@ public:
     void Stop();
 
     /**
-     * @fn  uintptr_t CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme);
+     * @fn  CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme);
      *
      * @brief   Inserts new call into queue according to wait_for parameter. Do check before insert to avoid queuing of duplicated calls
      *
@@ -85,7 +85,7 @@ public:
     CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme/*, const std::string& comment*/);
 
     /**
-     * @fn  uintptr_t InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
+     * @fn  CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc)
      *
      * @brief   Schedule proc to be called once
      *
@@ -104,7 +104,7 @@ public:
     }
 
     /**
-     * @fn  uintptr_t InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
+     * @fn  CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc)
      *
      * @brief   Schedule periodic call of proc
      *
@@ -123,7 +123,7 @@ public:
     }
 
     /**
-     * @fn  bool CallsQueueScheduler::Remove(uintptr_t id);
+     * @fn  bool CallsQueueScheduler::Remove(CallTag id);
      *
      * @brief   Removes the scheduled call idenified by id. 
      *
@@ -222,7 +222,7 @@ private:
     {
 
         /** @brief   The identifier: lets find item in queue (e.g. for remove) */
-        uintptr_t id;
+        CallTag id;
 
         /** @brief   The time point for scheduled execution */
         ClockType::time_point tp;
@@ -237,7 +237,7 @@ private:
         //std::string comment;
 
         // support for std::find() by id
-        bool operator==(uintptr_t rhs) const
+        bool operator==(const CallTag rhs) const
         {
             return id == rhs;
         }
