@@ -1,4 +1,4 @@
-#define TRACE_ENABLED
+//#define TRACE_ENABLED
 #include <lib/system/logger.hpp>
 #include <algorithm>
 #include <cassert>
