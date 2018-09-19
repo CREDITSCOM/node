@@ -318,7 +318,7 @@ typedef std::string Matrix;
         constexpr static uint32_t T_coll_trans = TIME_TO_COLLECT_TRXNS;
 
         /** @brief   Period between flush transactions (N) */
-        constexpr static uint32_t T_flush_trans = 100;
+        constexpr static uint32_t T_flush_trans = 50;
 
         using Proc = CallsQueueScheduler::ProcType;
 

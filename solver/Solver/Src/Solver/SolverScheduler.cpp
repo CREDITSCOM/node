@@ -157,7 +157,7 @@ namespace Credits {
     {
         if(timer_used) {
             std::ostringstream os;
-            os << "schedule (" << T_coll_trans << " ms) writeNewBlock()";
+            os << "schedule (" << wait_for_ms << " ms) writeNewBlock()";
             timer_service.TimeConsoleOut(os.str(), node_->getRoundNumber());
         }
         tagWriteNewBlock = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
