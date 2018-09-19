@@ -10,7 +10,7 @@
 //#define FOREVER_ALONE
 #define TIME_TO_COLLECT_TRXNS 200
 #define TIME_TO_AWAIT_ACTIVITY 300
-#define TRX_SLEEP_TIME 200000 //microseconds
+#define TRX_SLEEP_TIME 40000 //microseconds
 #define FAKE_BLOCKS
 
 #if ! defined(DEBUG)
