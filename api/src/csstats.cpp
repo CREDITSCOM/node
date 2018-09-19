@@ -1,5 +1,5 @@
 #define TRACE_ENABLED
-
+#include <lib/system/logger.hpp>
 #include <algorithm>
 #include <cassert>
 #include <client/params.hpp>
@@ -102,7 +102,7 @@ csstats::collectStats(const Periods& periods)
   std::chrono::seconds seconds =
     std::chrono::duration_cast<std::chrono::seconds>(finishTime - startTime);
 
-  TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
+  TRACE("Collecting stats: finished (took " << (int)seconds.count() << "s)");
 
   return stats;
 }
@@ -115,7 +115,7 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
 #endif
 
   TRACE(
-    "csstats start ", "update interval is ", config.updateIntervalSec, " sec");
+    "csstats start " << "update interval is " << config.updateIntervalSec << " sec");
 
   ScopedLock lock(mutex);
 
@@ -139,20 +139,20 @@ csstats::csstats(BlockChain& blockchain, const Config& config)
                                               secondsPerDay * 365 * 100 });
 
         for (auto& s : stats) {
-          TRACE("Period ",
-                s.periodSec,
-                " collected ",
-                s.poolsCount,
-                " pools, ",
-                s.transactionsCount,
+          TRACE("Period " <<
+                s.periodSec <<
+                " collected " <<
+                s.poolsCount <<
+                " pools, " <<
+                s.transactionsCount <<
                 " transactions");
 
           for (auto& t : s.balancePerCurrency) {
-            TRACE("'",
-                  t.first,
-                  "' = ",
-                  std::to_string(t.second.integral),
-                  ".",
+            TRACE("'" <<
+                  t.first <<
+                  "' = " <<
+                  std::to_string(t.second.integral) <<
+                  "." <<
                   std::to_string(t.second.fraction));
           }
         }
