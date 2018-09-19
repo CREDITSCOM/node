@@ -77,13 +77,13 @@ public:
   csdb::PoolHash getHashBySequence(uint32_t seq) const;
   csdb::PoolHash getLastWrittenHash() const;
 
-  // slightly faster than findWalletData
-  csdb::Amount getBalance(const csdb::Address&) const;
-  csdb::Amount getBalance(WalletId) const;
- 
   // all wallet data (from cache)
-  bool findWalletData(const csdb::Address&, WalletData& wallData) const;
+  bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
+
+  // searches for existing wallet id
+  // returns true if found
+  bool findWalletId(const WalletAddress& address, WalletId& id) const;
 
   // wallet transactions: pools cache + db search
   void getTransactions(
@@ -94,12 +94,6 @@ public:
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
-
-  // wallet id interface
- 
-  // searches for existing wallet id
-  // returns true if found
-  bool findWalletId(const WalletAddress& address, WalletId& id) const;
 
 private:
   bool writeGenesisBlock();
@@ -121,7 +115,6 @@ private:
   // returns true if new id was inserted
   bool getWalletId(const WalletAddress& address, WalletId& id);
   bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
-  csdb::Amount getBalance_Unsafe(WalletId id) const;
 
   class TrxLoader;
   bool findDataForTransactions(

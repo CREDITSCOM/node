@@ -96,14 +96,15 @@ bool BlockHashes::loadNextBlock(csdb::Pool nextBlock)
     return true;
 }
 
-csdb::PoolHash BlockHashes::find(csdb::Pool::sequence_t seq) const
+bool BlockHashes::find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const
 {
     if (empty())
-        return csdb::PoolHash{};
+        return false;
     const auto& range = getDbStructure();
     if (seq < range.first_ || range.last_ < seq)
-        return csdb::PoolHash{};
-    return hashes_[seq];
+        return false;
+    res = hashes_[seq];
+    return true;
 }
 
 bool BlockHashes::saveDbStructure()

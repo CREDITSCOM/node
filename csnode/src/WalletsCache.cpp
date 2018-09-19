@@ -208,6 +208,19 @@ bool WalletsCache::Initer::moveData(WalletId srcIdSpecial, WalletId destIdNormal
     return true;
 }
 
+bool WalletsCache::Initer::isFinishedOk() const
+{
+    for (const auto& ptr : walletsSpecial_)
+    {
+        if (ptr)
+        {
+            LOG_ERROR("Some new wallet was not added to block");
+            return false;
+        }
+    }
+    return true;
+}
+
 const WalletsCache::WalletData* WalletsCache::Updater::findWallet(WalletId id) const
 {
     if (id >= data_.wallets_.size())
