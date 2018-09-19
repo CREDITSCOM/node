@@ -154,40 +154,38 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   delete[] hw;
 }
 
-uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber,
-                                const csdb::PoolHash lasthash) {
+uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const csdb::PoolHash& lasthash) {
 #ifdef MYLOG
   std::cout << "GENERALS> Take decision: starting " << std::endl;
 #endif
-  const uint8_t  nodes_amount = confidantNodes.size();
-  hash_weight*   hw           = new hash_weight[nodes_amount];
-  unsigned char* mtr          = new unsigned char[nodes_amount * 97];
+  const uint8_t nodes_amount = confidantNodes.size();
+  auto          hash_weights = new hash_weight[nodes_amount];
+  auto          mtr          = new unsigned char[nodes_amount * 97];
 
-  uint8_t max_frec_position;
   uint8_t j_max, jj;
   j_max = 0;
   bool found;
 
   memset(mtr, 0, nodes_amount * 97);
-  for (int j = 0; j < nodes_amount; j++) {
+  for (uint j = 0; j < nodes_amount; j++) {
     // matrix init
 
     if (j == 0) {
-      memcpy(hw[0].a_hash, m_hw_total[0].a_hash, 32);
-      (hw[0].a_weight) = 1;
+      memcpy(hash_weights[0].a_hash, m_hw_total[0].a_hash, 32);
+      (hash_weights[0].a_weight) = 1;
       j_max            = 1;
     } else {
       found = false;
       for (jj = 0; jj < j_max; jj++) {
-        if (memcmp(hw[jj].a_hash, m_hw_total[j].a_hash, 32) == 0) {
-          (hw[jj].a_weight)++;
+        if (memcmp(hash_weights[jj].a_hash, m_hw_total[j].a_hash, 32) == 0) {
+          (hash_weights[jj].a_weight)++;
           found = true;
           break;
         }
       }
 
       if (!found) {
-        memcpy(hw[j_max].a_hash, m_hw_total[j].a_hash, 32);
+        memcpy(hash_weights[j_max].a_hash, m_hw_total[j].a_hash, 32);
         (m_hw_total[j_max].a_weight) = 1;
         j_max++;
       }
@@ -201,8 +199,9 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
     if (*(m_new_trusted.data() + i) < trusted_limit) {
      std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
 
-    } else
+    } else {
       j++;
+      }
   }
   if (j == nodes_amount) {
    std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
@@ -212,14 +211,13 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
 
   auto hash_t = lasthash.to_binary();
   int  k      = *(hash_t.begin());
-  // std::cout << "K : " << k << std::endl;
-  int      result0 = nodes_amount;
+
   uint16_t result  = 0;
-  result           = k % (int)result0;
+  result           = k % nodes_amount;
 
   std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
 
-  delete[] hw;
+  delete[] hash_weights;
   delete[] mtr;
   return result;
 }

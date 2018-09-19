@@ -46,9 +46,9 @@ public:
   void getMatrix(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const PublicKey& sender);
-  void getTransactionsPacket(const uint8_t*, const std::size_t, const PublicKey& sender);
-  void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
-  void getPacketHashesReply(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getTransactionsPacket(const uint8_t*, const std::size_t);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t);
+  void getPacketHashesReply(const uint8_t*, const std::size_t);
   void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size);
 
@@ -88,14 +88,14 @@ public:
   void sendMatrixRequest(const PublicKey&);
 
   void sendTLRequest();
-  void getTlRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
+  void getTlRequest(const uint8_t* data, const size_t size);
 
   void getVectorRequest(const uint8_t* data, const size_t size);
   void getMatrixRequest(const uint8_t* data, const size_t size);
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& confidantNodes);
+  void initNextRound(std::vector<PublicKey>&& confidantNodes);
   // void sendTLConfirmation(size_t tcount);
   bool getSyncroStarted();
 

@@ -485,7 +485,7 @@ void Solver::gotVector(HashVector&& vector) {
     if (trustedCounterMatrix == numGen) {
       memset(receivedMatFrom, 0, 100);
       uint8_t wTrusted  = (generals->take_decision(
-          confidants, confNumber, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+          confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
 
       if (wTrusted == 100) {
@@ -566,7 +566,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
  
 	  memset(receivedMatFrom, 0, 100);
 	  trustedCounterMatrix = 0;
-	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getMyConfNumber(),node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
+	  uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber()-1)));
  
 	  if (wTrusted == 100)
 	  {
@@ -742,7 +742,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 #ifdef MYLOG
     std::cout << "Solver -> sending NEW ROUND table" << std::endl;
 #endif
-    node_->initNextRound(node_->getMyPublicKey(), std::move(ips));
+    node_->initNextRound(std::move(ips));
 		round_table_sent = true;
 		
 	}

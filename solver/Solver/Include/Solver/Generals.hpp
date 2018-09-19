@@ -38,7 +38,7 @@ class Generals {
   void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
 
   // take desision
-  uint8_t       take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
+  uint8_t       take_decision(const std::vector<PublicKey>& confidantNodes, const csdb::PoolHash& lasthash);
   static int8_t extractRaisedBitsCount(const csdb::Amount& amount);
   HashMatrix    getMatrix() const;
 
