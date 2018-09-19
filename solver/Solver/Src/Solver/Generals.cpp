@@ -45,7 +45,7 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
   // comission is let to be constant, otherwise comission should be sent to this function
 
   memset(&m_hMatrix, 0, 9700);
-  uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
+  uint8_t      hash_s[HASH_LENGTH] = {};
   const size_t transactionsCount   = _pool.transactions_count();
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;
@@ -62,10 +62,10 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
         new_pool.add_transaction(transaction);
       }
     }
-
-    boost::to_block_range(characteristicMask, std::back_inserter(m_characteristic_mask));
-    m_characteristic_mask.shrink_to_fit();
-    blake2s(&hash_s, HASH_LENGTH, m_characteristic_mask.data(), transactionsCount, "1234", 4);
+    m_characteristic.size = transactionsCount;
+    boost::to_block_range(characteristicMask, std::back_inserter(m_characteristic.mask));
+    m_characteristic.mask.shrink_to_fit();
+    blake2s(&hash_s, HASH_LENGTH, m_characteristic.mask.data(), transactionsCount, "1234", 4);
   } else {
     uint32_t a = 0;
     blake2s(&hash_s, HASH_LENGTH, static_cast<const void*>(&a), 4, "1234", 4);
@@ -233,7 +233,7 @@ void Generals::chooseHeadAndTrustedFake(std::vector<std::string>& hashes) {
 void Generals::fake_block(std::string m_public_key) {
 }
 
-std::vector<uint8_t> Generals::getCharacteristicMask() const {
-  return m_characteristic_mask;
+Characteristic Generals::getCharacteristic() const {
+  return m_characteristic;
 }
 }  // namespace Credits

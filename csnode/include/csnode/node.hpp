@@ -76,7 +76,7 @@ public:
   void sendPacketHashesReply(const cs::TransactionsPacket& packet);
 
   void sendBadBlock(const csdb::Pool& pool);
-  void sendCharacteristic(csdb::Pool emptyMetaPool, const std::vector<uint8_t>& characteristic);
+  void sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);

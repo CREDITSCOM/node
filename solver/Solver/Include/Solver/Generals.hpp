@@ -17,8 +17,12 @@
 #include <lib/system/keys.hpp>
 
 namespace Credits {
-
 class Solver;
+
+struct Characteristic {
+  uint32_t size = 0;
+  std::vector<uint8_t> mask;
+};
 
 class Generals {
  public:
@@ -45,7 +49,7 @@ class Generals {
   void addSenderToMatrix(uint8_t myConfNum);
   void fake_block(std::string);
 
-  std::vector<uint8_t> getCharacteristicMask() const;
+  Characteristic getCharacteristic() const;
 
  private:
   struct hash_weight {
@@ -56,6 +60,7 @@ class Generals {
   std::array<uint8_t, 10000>   m_find_untrusted;
   std::array<uint8_t, 100>     m_new_trusted;
   std::array<hash_weight, 100> m_hw_total;
-  std::vector<uint8_t> m_characteristic_mask;
+
+  Characteristic m_characteristic;
 };
 }

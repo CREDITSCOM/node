@@ -151,7 +151,8 @@ namespace Credits {
         void gotBlockReply(csdb::Pool&&);
         void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
         void sendTL();
-        void applyCharacteristic(const std::vector<uint8_t>& characteristic, const csdb::Pool& metaInfoPool);
+        void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
+                                 const csdb::Pool& metaInfoPool);
 
         // API methods
         void initApi();
@@ -235,9 +236,7 @@ namespace Credits {
         csdb::Pool v_pool;
         csdb::Pool b_pool;
         bool m_pool_closed = true;
-
         bool sentTransLastRound = false;
-
         bool vectorComplete = false;
         bool consensusAchieved = false;
         bool blockCandidateArrived = false;

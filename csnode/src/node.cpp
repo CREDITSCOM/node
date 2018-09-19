@@ -687,17 +687,18 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
   flushCurrentTasks();
 }
 
-void Node::sendCharacteristic(csdb::Pool emptyMetaPool, const std::vector<uint8_t>& characteristic) {
+void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
     LOG_ERROR("Only writer nodes can send blocks");
     return;
-  }
+  }  
   std::string compressed;
   snappy::Compress(reinterpret_cast<const char*>(characteristic.data()), characteristic.size(), &compressed);
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic;
 
-  ostream_ << compressed.size() << compressed << emptyMetaPool;
+  uint16_t size = compressed.size();
+  ostream_ << size << compressed << maskBitsCount << emptyMetaPool;
   flushCurrentTasks();
 }
 
@@ -875,16 +876,17 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size) {
   istream_.init(data, size == 0u);
 
   std::string compressed;
-  size_t      compressedSize;
+  uint16_t    compressedSize;
   csdb::Pool  metaInfoPool;
+  uint32_t    maskBitsCount;
 
-  istream_ >> compressedSize >> compressed >> metaInfoPool;
+  istream_ >> compressedSize >> compressed >> metaInfoPool >> maskBitsCount;
 
   std::string decompressed;
   snappy::Uncompress(compressed.c_str(), compressedSize, &decompressed);
 
   std::vector<uint8_t> characteristicMask(decompressed.begin(), decompressed.end());
-  solver_->applyCharacteristic(characteristicMask, metaInfoPool);
+  solver_->applyCharacteristic(characteristicMask, maskBitsCount, metaInfoPool);
 }
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {

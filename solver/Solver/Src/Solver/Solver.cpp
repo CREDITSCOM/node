@@ -154,16 +154,33 @@ void Solver::sendTL()
     node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
 }
 
-void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, const csdb::Pool& metaInfoPool) {
+void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
+                                 const csdb::Pool& metaInfoPool) {
   uint64_t    sequence  = metaInfoPool.sequence();
   std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
 
   boost::dynamic_bitset<> mask{characteristic.begin(), characteristic.end()};
-  const size_t count = m_uncharacterizedPool.transactions_count();
 
-  for (size_t i = 0; i < count; ++i) {
-    if (true == mask.test(i)) {
-      m_pool.add_transaction(m_uncharacterizedPool.transactions().at(i));
+  size_t maskIndex = 0;
+  const cs::Hashes& hashes = mRound.hashes;
+
+  cs::SharedLock sharedLock(mHashTableMutex);
+  for (const auto& hash : hashes) {
+    auto it = mHashTable.find(hash);
+    const auto& transactions = it->second.transactions();
+    if (it == mHashTable.end()) {
+      cserror() << "HASH NOT FOUND";
+      return;
+    }
+    if (bitsCount != transactions.size()) {
+      cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
+      return;
+    }
+    for (const auto& transaction : transactions) {
+      if (mask.test(maskIndex)) {
+        m_pool.add_transaction(transaction);
+      }
+      ++maskIndex;
     }
   }
   m_pool.set_sequence(sequence);
@@ -500,7 +517,12 @@ void Solver::gotVector(HashVector&& vector) {
             csdb::Pool emptyMetaPool;
             addTimestampToPool(emptyMetaPool);
             emptyMetaPool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
-            node_->sendCharacteristic(emptyMetaPool, generals->getCharacteristicMask());
+
+            const Characteristic&       characteristic = generals->getCharacteristic();
+            uint32_t                    bitsCount      = characteristic.size;
+            const std::vector<uint8_t>& mask           = characteristic.mask;
+
+            node_->sendCharacteristic(emptyMetaPool, bitsCount, mask);
             writeNewBlock();
           });
         }
