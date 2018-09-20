@@ -87,7 +87,8 @@ void Neighbourhood::checkSilent() {
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
-  ConnectionPtr& conn =
+  SpinLock ll(pLockFlag_);
+  ConnectionPtr &conn =
     pendingConnections_.emplace(connectionsAllocator_.emplace());
 
   conn->id = getSecureRandom<Connection::Id>();

@@ -31,8 +31,6 @@
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
 
-//#define MONITOR_NODE
-
 //#define SPAM_MAIN
 
 class Node;
@@ -160,7 +158,7 @@ typedef std::string Matrix;
 		// API methods
 
 		void initApi();
-    uint32_t getTLsize();
+    size_t getTLsize() const;
 		void addInitialBalance();
 
     void send_wallet_transaction(const csdb::Transaction& transaction);
@@ -171,8 +169,8 @@ typedef std::string Matrix;
     //remove it!!!
     void buildBlock(csdb::Pool& block);
 
-    HashVector getMyVector();
-    HashMatrix getMyMatrix();
+    const HashVector& getMyVector() const;
+    const HashMatrix& getMyMatrix() const;
     void initConfRound();
     void sendZeroVector();
     void checkVectorsReceived(size_t _rNum);
@@ -186,6 +184,7 @@ typedef std::string Matrix;
 	private:
     void _initApi();
 
+    void takeDecWorkaround();
 		void runMainRound();
 		void closeMainRound();
 
@@ -193,6 +192,7 @@ typedef std::string Matrix;
 
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
+
 
 #ifdef SPAM_MAIN
 		void createPool();
@@ -258,7 +258,11 @@ typedef std::string Matrix;
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;
-		
+    
+    /*to store new blocks*/
+    std::map <size_t, csdb::Pool> tmpStorage;
+    /*to store unrequested syncro blocks*/
+    std::map <size_t, csdb::Pool> rndStorage;
 
 #ifdef SPAMMER
 		std::atomic_bool spamRunning{ false };

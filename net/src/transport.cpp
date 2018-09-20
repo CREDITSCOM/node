@@ -147,9 +147,9 @@ inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
     auto bytes = ep.address().to_v6().to_bytes();
     auto ptr = (uint8_t*)&result;
     auto bytesPtr = bytes.data();
-    for (uint32_t i = 0; i < 8; ++i) *ptr^= *(bytesPtr++);
+    for (size_t i = 0; i < 8; ++i) *ptr^= *(bytesPtr++);
     ++ptr;
-    for (uint32_t i = 8; i < 16; ++i) *ptr^= *(bytesPtr++);
+    for (size_t i = 8; i < 16; ++i) *ptr^= *(bytesPtr++);
   }
 
   return result;
@@ -360,6 +360,8 @@ void Transport::processPostponed(const RoundNum rNum) {
 
   postponed_[1] = *postponed_;
   postponed_[0] = &ppBuf;
+
+  std::cout << "TRANSPORT> POSTPHONED finish" << std::endl;
 }
 
 void Transport::dispatchNodeMessage(const MsgTypes type,
@@ -371,7 +373,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     LOG_ERROR("Bad packet size, why is it zero?");
     return;
   }
-
+  //std::cout << __func__ << std::endl;
   switch(type) {
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum);
@@ -413,6 +415,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
 
 void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool incrementWhenResend) {
   auto end = pack + packNum;
+
   for (auto ptr = pack; ptr != end; ++ptr) {
     SpinLock l(sendPacksFlag_);
     PackSendTask pst;
