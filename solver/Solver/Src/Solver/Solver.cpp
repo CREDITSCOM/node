@@ -208,7 +208,9 @@ bool Solver::mPoolClosed()
 
 void Solver::runMainRound()
 {
-	timer_service.TimeConsoleOut( "runMainRound()", node_->getRoundNumber());
+    if(timer_used) {
+        timer_service.TimeConsoleOut("runMainRound()", node_->getRoundNumber());
+    }
   m_pool_closed = false;
   std::cout << "========================================================================================" << std::endl;
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV" << std::endl;
@@ -301,12 +303,13 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 void Solver::initConfRound()
 {
-	timer_service.TimeConsoleOut("initConfRound()", node_->getRoundNumber());
+    if(timer_used) {
+        timer_service.TimeConsoleOut("initConfRound()", node_->getRoundNumber());
+    }
   memset(receivedVecFrom, 0, 100);
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
-  size_t _rNum = rNum;
   if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
@@ -315,7 +318,9 @@ void Solver::initConfRound()
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
     cancelReqTransactionList();
-    timer_service.TimeConsoleOut("gotTransactionList()", node_->getRoundNumber());
+    if(timer_used) {
+        timer_service.TimeConsoleOut("gotTransactionList()", node_->getRoundNumber());
+    }
     if(transactionListReceived) return;
     transactionListReceived = true;
     uint8_t numGen = node_->getConfidants().size();
@@ -328,7 +333,9 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
     receivedVecFrom [node_->getMyConfNumber()] = true;
     generals->addvector(hvector);
     node_->sendVector(std::move(hvector));
-    timer_service.TimeConsoleOut("gotTransactionList(): vector sent", node_->getRoundNumber());
+    if(timer_used) {
+        timer_service.TimeConsoleOut("gotTransactionList(): vector sent", node_->getRoundNumber());
+    }
     trustedCounterVector++;
     if(trustedCounterVector == numGen)
     {
@@ -346,7 +353,9 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 #ifdef MYLOG
         std::cout << "SOLVER> Matrix added" << std::endl;
 #endif
-        timer_service.TimeConsoleOut("gotTransactionList(): matrix added and sent", node_->getRoundNumber());
+        if(timer_used) {
+            timer_service.TimeConsoleOut("gotTransactionList(): matrix added and sent", node_->getRoundNumber());
+        }
     }
     // for T-nodes: track vectors and matrices received:
     if(node_->getMyLevel() == NodeLevel::Confidant) {
@@ -391,10 +400,14 @@ void Solver::gotVector(HashVector&& vector)
   generals->addvector(vector);//building matrix
   trustedCounterVector++;
 
-  timer_service.TimeConsoleOut("gotVector(): new vector", node_->getRoundNumber());
+  if(timer_used) {
+      timer_service.TimeConsoleOut("gotVector(): new vector", node_->getRoundNumber());
+  }
   if (trustedCounterVector == numGen)
   {
-	  timer_service.TimeConsoleOut("gotVector(): all received", node_->getRoundNumber());
+      if(timer_used) {
+          timer_service.TimeConsoleOut("gotVector(): all received", node_->getRoundNumber());
+      }
       cancelReqVectors();
 	  //std::cout << "SOLVER> GotVector : " << std::endl;
     vectorComplete = true;
@@ -436,33 +449,40 @@ void Solver::takeDecWorkaround()
       if(wTrusted == node_->getMyConfNumber())
       {
           node_->becomeWriter();
-          scheduleWriteNewBlock(T_coll_trans);
+          if(timer_used) {
+              timer_service.TimeConsoleOut("Become writer", node_->getRoundNumber());
+          }
+          // cancel some scheduled calls then write block 
+          cancelReqBlock(); // we will send block
+          cancelReqRoundTable(); // we will send round table
+          cancelReqTransactionList(); // not at this round
+          cancelWriteNewBlock(); // direct call immediately:
+          writeNewBlock();
+          //scheduleWriteNewBlock(T_coll_trans);
       }
       //LOG_WARN("This should NEVER happen, NEVER");
   }
 }
 
+//void Solver::checkMatrixReceived()
+//{
+//  if (trustedCounterMatrix < 2) node_->sendMatrix(generals->getMatrix());
+//  
+//}
+
+//void Solver::setRNum(size_t _rNum)
+//{
+//  rNum = _rNum;
+//}
 
 
-void Solver::checkMatrixReceived()
-{
-  if (trustedCounterMatrix < 2) node_->sendMatrix(generals->getMatrix());
-  
-}
-
-void Solver::setRNum(size_t _rNum)
-{
-  rNum = _rNum;
-}
-
-
-void Solver::checkVectorsReceived(size_t _rNum)
-{
-  if (_rNum < rNum) return;
-  uint8_t numGen = node_->getConfidants().size();
-  if (trustedCounterVector == numGen) return;
-
-}
+//void Solver::checkVectorsReceived(size_t _rNum)
+//{
+//  if (_rNum < rNum) return;
+//  uint8_t numGen = node_->getConfidants().size();
+//  if (trustedCounterVector == numGen) return;
+//
+//}
 
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
@@ -522,7 +542,9 @@ void Solver::writeNewBlock()
 	  std::cout << "Solver -> writeNewBlock ... finish" << std::endl;
 #endif
 	  consensusAchieved = false;
-      timer_service.TimeConsoleOut("writeNewBlock(): done", node_->getRoundNumber());
+      if(timer_used) {
+          timer_service.TimeConsoleOut("writeNewBlock(): done", node_->getRoundNumber());
+      }
       scheduleReqHashes(T_hash);
   }
   else {
@@ -559,7 +581,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #ifndef MONITOR_NODE
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
-				timer_service.TimeConsoleOut("gotBlock(): send hash", node_->getRoundNumber());
+              if(timer_used) {
+                  timer_service.TimeConsoleOut("gotBlock(): send hash", node_->getRoundNumber());
+              }
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;
 			  Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
 			  node_->sendHash(test_hash, sender);
@@ -573,9 +597,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
 
-    scheduleReqRoundTable(T_rt, currentRound);
+  auto rnum = node_->getRoundNumber();
+    scheduleReqRoundTable(T_rt, rnum);
     // for T-nodes: also request transaction list starting from the 2nd round
-    if(currentRound >= 2 && node_->getMyLevel() == NodeLevel::Confidant) {
+    if(rnum >= 2 && node_->getMyLevel() == NodeLevel::Confidant) {
         scheduleReqTransactionList(T_tl);
     }
 }
@@ -589,6 +614,14 @@ bool Solver::getBigBangStatus()
 void Solver::setBigBangStatus(bool _status)
 {
   gotBigBang = _status;
+  if(timer_used) {
+      if(_status) {
+          timer_service.TimeConsoleOut("BIGBANG status is ON", node_->getRoundNumber());
+      }
+      else {
+          timer_service.TimeConsoleOut("BIGBANG status is OFF", node_->getRoundNumber());
+      }
+  }
 }
 
 
@@ -631,7 +664,9 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
 			//hashes.push_back(hash);
 			ips.push_back(sender);
 
-			timer_service.TimeConsoleOut("gotHash(): accept", currentRound);
+            if(timer_used) {
+                timer_service.TimeConsoleOut("gotHash(): accept", node_->getRoundNumber());
+            }
 		}
 		else
 		{
@@ -659,6 +694,9 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender)
     node_->initNextRound(node_->getMyPublicKey(), std::move(ips));
 		round_table_sent = true;
 
+        if(timer_used) {
+            timer_service.TimeConsoleOut("gotHash(): new RT sent", node_->getRoundNumber());
+        }
         cancelReqHashes();
 	}
   }
@@ -872,13 +910,14 @@ void Solver::addConfirmation(uint8_t confNumber_) {
 
 void Solver::beforeNextRound()
 {
-	if (currentRound == 0) {
+    auto rnum = node_->getRoundNumber();
+	if (rnum == 0) {
 		// actual before the first round
-		timer_service.Reset();
+        if(timer_used) {
+            timer_service.Reset();
+        }
 		return;
 	}
-
-	timer_service.TimeConsoleOut("beforeNextRound()", currentRound);
 
 	// moved from begin of node::onRoundStart() from where this method called
 	if ((!mPoolClosed()) && (!getBigBangStatus()))
@@ -887,23 +926,23 @@ void Solver::beforeNextRound()
 	}
 
     if(timer_used) {
-        timer_service.TimeConsoleOut("Cancel all sheduled calls", currentRound);
+        timer_service.TimeConsoleOut("beforeNextRound()", rnum);
+        timer_service.TimeConsoleOut("Cancel all sheduled calls", rnum);
     }
+    // cancel all scheduled calls if any:
     calls_scheduler.RemoveAll();
-	doSelfTest();
-
-	// get duration of finishing round
+    doSelfTest();
+	// get duration of finishing round, independent from timer_used value
 	passedRoundsDuration += timer_service.Time();
 	passedRoundsCount++;
-
-	timer_service.Reset();
+    timer_service.Reset();
 }
 
 void Solver::nextRound()
 {
-	currentRound = node_->getRoundNumber();
-	timer_service.TimeConsoleOut("nextRound()", currentRound);
-
+    if(timer_used) {
+        timer_service.TimeConsoleOut("nextRound()", node_->getRoundNumber());
+    }
 #ifdef MYLOG
 	std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
   #endif
@@ -925,12 +964,14 @@ void Solver::nextRound()
   round_table_sent = false;
   sentTransLastRound = false;
   m_pool = csdb::Pool{};
-  v_pool = csdb::Pool{};
-  if (m_pool_closed) v_pool = csdb::Pool{};
+  if(m_pool_closed) v_pool = csdb::Pool{};
 #ifdef MYLOG
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
   #endif
   auto lvl = node_->getMyLevel();
+  if(lvl == NodeLevel::Confidant) {
+      initConfRound();
+  }
   if (lvl == NodeLevel::Main) {
     runMainRound();
 #ifdef SPAM_MAIN

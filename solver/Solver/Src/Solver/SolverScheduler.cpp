@@ -10,45 +10,47 @@ namespace Credits {
     void Solver::doSelfTest()
     {
         auto lvl = node_->getMyLevel();
+        auto rnum = node_->getRoundNumber();
+
+        bool is_writer = (lvl == NodeLevel::Writer);
+        bool is_trusted = (lvl == NodeLevel::Confidant);
+
         bool test_block = true;
-        bool test_rt = true;
-        bool test_hashes = (lvl == NodeLevel::Writer);
-        bool test_tl = (lvl == NodeLevel::Confidant);
-        bool test_vect = (lvl == NodeLevel::Confidant);
-        bool test_matr = (lvl == NodeLevel::Confidant);
-        bool test_consensus = true;
+        bool test_hashes = is_writer;
+        bool test_tl = is_trusted;
+        bool test_vect = is_trusted;
+        bool test_matr = is_trusted;
+        bool test_consensus = is_trusted;
 
-        timer_service.TimeConsoleOut("doSelfTest() output begin", currentRound);
-        std::cout << "|   Round " << currentRound << std::endl;
+        if(timer_used) {
+            timer_service.TimeConsoleOut("doSelfTest() output begin", rnum);
+            std::cout << "|   Round " << rnum << std::endl;
 
-        if(test_block && !gotBlockThisRound) {
-            std::cout << "|   gotBlockThisRound: no" << std::endl;
-        }
-        if(test_tl && !transactionListReceived) {
-            std::cout << "|   transactionListReceived: no" << std::endl;
-        }
-        if(test_vect && !vectorComplete) {
-            std::cout << "|   vectorComplete: no" << std::endl;
-        }
-        if(test_matr && !allMatricesReceived) {
-            std::cout << "|   allMatricesReceived: no" << std::endl;
-        }
-        if(test_consensus && !consensusAchieved) {
-            std::cout << "|   consensusAchieved: no" << std::endl;
-        }
-        if(test_hashes) {
-            size_t cnt = ips.size();
-            std::cout << "|   hashes received: " << cnt;
-            if(cnt < min_nodes) {
-                std::cout << " (desired: " << min_nodes << ")";
+            if(test_block && !gotBlockThisRound) {
+                std::cout << "|   gotBlockThisRound: no" << std::endl;
             }
-            std::cout << std::endl;
+            if(test_tl && !transactionListReceived) {
+                std::cout << "|   transactionListReceived: no" << std::endl;
+            }
+            if(test_vect && !vectorComplete) {
+                std::cout << "|   vectorComplete: no" << std::endl;
+            }
+            if(test_matr && !allMatricesReceived) {
+                std::cout << "|   allMatricesReceived: no" << std::endl;
+            }
+            if(test_consensus && !consensusAchieved) {
+                std::cout << "|   consensusAchieved: no" << std::endl;
+            }
+            if(test_hashes) {
+                size_t cnt = ips.size();
+                std::cout << "|   hashes received: " << cnt;
+                if(cnt < min_nodes) {
+                    std::cout << " (desired: " << min_nodes << ")";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << "+-- doSelfTest output end" << std::endl;
         }
-        if(test_rt) {
-            std::cout << "|   round table received: " << (node_->getRoundNumber() != currentRound ? "yes" : "no") << std::endl;
-        }
-
-        std::cout << "+-- doSelfTest output end" << std::endl;
     }
 
     void Solver::scheduleReqRoundTable(uint32_t wait_for_ms, size_t round_num)
@@ -57,12 +59,14 @@ namespace Credits {
         {
             std::ostringstream os;
             os << "schedule (" << wait_for_ms << " ms) sendRoundTableRequest(" << round_num << ")";
-            timer_service.TimeConsoleOut(os.str(), currentRound);
+            timer_service.TimeConsoleOut(os.str(), round_num);
         }
         tagReqRoundTable = calls_scheduler.InsertOnce(wait_for_ms, [this, round_num]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("sendRoundTableRequest()", round_num);
+                // log with actual current round
+                timer_service.TimeConsoleOut("sendRoundTableRequest()", node_->getRoundNumber());
             }
+            // call with scheduled round number!
             node_->sendRoundTableRequest(round_num);
             tagReqRoundTable = no_tag;
         });
@@ -78,7 +82,7 @@ namespace Credits {
         }
         tagReqTransactionList = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("sendTLRequest()", currentRound);
+                timer_service.TimeConsoleOut("sendTLRequest()", node_->getRoundNumber());
             }
             node_->sendTLRequest();
             tagReqTransactionList = no_tag;
@@ -95,7 +99,7 @@ namespace Credits {
         }
         tagReqVectors = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("requestMissingVectors()", currentRound);
+                timer_service.TimeConsoleOut("requestMissingVectors()", node_->getRoundNumber());
             }
             requestMissingVectors();
             tagReqVectors = no_tag;
@@ -112,7 +116,7 @@ namespace Credits {
         }
         tagReqMatrices = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("requestMissingMatrices()", currentRound);
+                timer_service.TimeConsoleOut("requestMissingMatrices()", node_->getRoundNumber());
             }
             requestMissingMatrices();
             tagReqMatrices = no_tag;
@@ -128,10 +132,11 @@ namespace Credits {
             timer_service.TimeConsoleOut(os.str(), node_->getRoundNumber());
         }
         tagReqBlock = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
+            auto rnum = node_->getRoundNumber();
             if(timer_used) {
-                timer_service.TimeConsoleOut("sendBlockRequest()", currentRound);
+                timer_service.TimeConsoleOut("sendBlockRequest()", rnum);
             }
-            node_->sendBlockRequest(currentRound);
+            node_->sendBlockRequest(rnum);
             tagReqBlock = no_tag;
         });
     }
@@ -146,7 +151,7 @@ namespace Credits {
         }
         tagReqHashes = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("requestMissingHashes()", currentRound);
+                timer_service.TimeConsoleOut("requestMissingHashes()", node_->getRoundNumber());
             }
             requestMissingHashes();
             tagReqHashes = no_tag;
@@ -162,7 +167,7 @@ namespace Credits {
         }
         tagWriteNewBlock = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("writeNewBlock()", currentRound);
+                timer_service.TimeConsoleOut("writeNewBlock()", node_->getRoundNumber());
             }
             writeNewBlock();
             tagWriteNewBlock = no_tag;
@@ -178,7 +183,7 @@ namespace Credits {
         }
         tagCloseMainRound = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("closeMainRound()", currentRound);
+                timer_service.TimeConsoleOut("closeMainRound()", node_->getRoundNumber());
             }
             closeMainRound();
             tagCloseMainRound = no_tag;
@@ -194,7 +199,7 @@ namespace Credits {
         }
         tagOnRoundExpired = calls_scheduler.InsertOnce(wait_for_ms, [this]() {
             if(timer_used) {
-                timer_service.TimeConsoleOut("onRoundExpired()", currentRound);
+                timer_service.TimeConsoleOut("onRoundExpired()", node_->getRoundNumber());
             }
             doSelfTest();
             tagOnRoundExpired = no_tag;
@@ -206,7 +211,7 @@ namespace Credits {
         if(timer_used) {
             std::ostringstream os;
             os << "Shedule (period " << period_ms << " ms) flushTransactions()";
-            timer_service.TimeConsoleOut(os.str(), currentRound);
+            timer_service.TimeConsoleOut(os.str(), node_->getRoundNumber());
         }
         tagFlushTransactions = calls_scheduler.InsertPeriodic(period_ms, [this]() {
             //if(timer_used) {
@@ -221,7 +226,7 @@ namespace Credits {
     {
         if(tagReqRoundTable != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel sendRoundTableRequest()", currentRound);
+                timer_service.TimeConsoleOut("cancel sendRoundTableRequest()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagReqRoundTable);
             tagReqRoundTable = no_tag;
@@ -232,7 +237,7 @@ namespace Credits {
     {
         if(tagReqTransactionList != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel sendTLRequest()", currentRound);
+                timer_service.TimeConsoleOut("cancel sendTLRequest()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagReqTransactionList);
             tagReqTransactionList = no_tag;
@@ -254,7 +259,7 @@ namespace Credits {
     {
         if(tagReqMatrices != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel requestMissingMatrices()", currentRound);
+                timer_service.TimeConsoleOut("cancel requestMissingMatrices()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagReqMatrices);
             tagReqMatrices = no_tag;
@@ -265,7 +270,7 @@ namespace Credits {
     {
         if(tagReqBlock != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel sendBlockRequest()", currentRound);
+                timer_service.TimeConsoleOut("cancel sendBlockRequest()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagReqBlock);
             tagReqBlock = no_tag;
@@ -276,7 +281,7 @@ namespace Credits {
     {
         if(tagReqHashes != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel requestMissingHashes()", currentRound);
+                timer_service.TimeConsoleOut("cancel requestMissingHashes()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagReqHashes);
             tagReqHashes = no_tag;
@@ -287,7 +292,7 @@ namespace Credits {
     {
         if(tagWriteNewBlock != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel writeNewBlock()()", currentRound);
+                timer_service.TimeConsoleOut("cancel writeNewBlock()()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagWriteNewBlock);
             tagWriteNewBlock = no_tag;
@@ -298,7 +303,7 @@ namespace Credits {
     {
         if(tagCloseMainRound != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel closeMainRound()", currentRound);
+                timer_service.TimeConsoleOut("cancel closeMainRound()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagCloseMainRound);
             tagCloseMainRound = no_tag;
@@ -309,7 +314,7 @@ namespace Credits {
     {
         if(tagOnRoundExpired != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel onRoundExpired()", currentRound);
+                timer_service.TimeConsoleOut("cancel onRoundExpired()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagOnRoundExpired);
             tagOnRoundExpired = no_tag;
@@ -320,7 +325,7 @@ namespace Credits {
     {
         if(tagFlushTransactions != no_tag) {
             if(timer_used) {
-                timer_service.TimeConsoleOut("cancel flushTransactions()", currentRound);
+                timer_service.TimeConsoleOut("cancel flushTransactions()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagFlushTransactions);
             tagFlushTransactions = no_tag;

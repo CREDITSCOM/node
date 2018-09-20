@@ -169,9 +169,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     LOG_WARN("Bad round number, ignoring");
     return;
   }
-  if (!readRoundData(false))
-    return;
-
+  if(!readRoundData(false)) {
+      LOG_WARN("No round data, ignoring");
+      return;
+  }
 
   if(myLevel_==NodeLevel::Main)
   if (!istream_.good()) {
@@ -1036,7 +1037,7 @@ void Node::onRoundStart() {
         myLevel_ = NodeLevel::Confidant;
         myConfNumber = conf_no;
         found = true;
-        solver_->initConfRound();
+        //solver_->initConfRound();
         break;
       }
       conf_no++;

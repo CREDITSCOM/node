@@ -176,13 +176,13 @@ typedef std::string Matrix;
     const HashMatrix& getMyMatrix() const;
     void initConfRound();
     void sendZeroVector();
-    void checkVectorsReceived(size_t _rNum);
-    void checkMatrixReceived();
+    //void checkVectorsReceived(size_t _rNum); // not used?
+    //void checkMatrixReceived(); // not used?
     void addConfirmation(uint8_t confNumber_);
     bool getIPoolClosed();
     bool getBigBangStatus();
     void setBigBangStatus(bool _status);
-    void setRNum(size_t _rNum);
+    //void setRNum(size_t _rNum); // not used?
 
 	// to be called from node upon receive new RoundTable just before next round start
 	// (instead of conditional call to SendTL())
@@ -279,13 +279,11 @@ typedef std::string Matrix;
 
 		// do self-test of current state
 		void doSelfTest();
-		
+
 		// total duration of rounds passed
 		uint32_t passedRoundsDuration = 0;
 		// count of rounds passed
 		uint32_t passedRoundsCount = 0;
-		// current round number
-		uint32_t currentRound = 0;
 		// flag: all matrices are received
 		bool allMatricesReceived = false;
 
@@ -302,13 +300,13 @@ typedef std::string Matrix;
         constexpr static uint32_t T_tl = 200;
 
         /** @brief   Max timeout (msec) to wait all vectors (T) */
-        constexpr static uint32_t T_vec = 200;
+        constexpr static uint32_t T_vec = 400;
 
         /** @brief   Max timeout (msec) to wait all matrices (T) */
-        constexpr static uint32_t T_mat = 300;
+        constexpr static uint32_t T_mat = 600;
 
         /** @brief   Max timeout (msec) to wait block (N, G, T) */
-        constexpr static uint32_t T_blk = 200;
+        constexpr static uint32_t T_blk = 400;
 
         /** @brief   Max timeout (msec) to wait hashes after write & send block (W) */
         constexpr static uint32_t T_hash = 400;

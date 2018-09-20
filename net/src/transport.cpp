@@ -300,10 +300,10 @@ void Transport::processNodeMessage(const Message& msg) {
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
+#endif
   if (type == MsgTypes::BigBang) {
     std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
   }
-  #endif
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
