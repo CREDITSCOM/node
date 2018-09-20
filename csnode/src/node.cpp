@@ -1302,15 +1302,17 @@ inline bool Node::readRoundData(const bool tail) {
   uint8_t confSize = 0;
   istream_ >> confSize;
 #ifdef MYLOG
-  std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
+    std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
 #endif
-  if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
-    LOG_WARN("Bad confidants num");
-    return false;
-  }
 
-  std::vector<PublicKey> confidants;
-  confidants.reserve(confSize);
+    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS)
+    {
+        LOG_WARN("Bad confidants num");
+        return false;
+    }
+
+    std::vector<PublicKey> confidants;
+    confidants.reserve(confSize);
 
   istream_ >> mainNode;
   //LOG_EVENT("SET MAIN " << byteStreamToHex(mainNode.str, 32));
@@ -1338,7 +1340,7 @@ inline bool Node::readRoundData(const bool tail) {
 
   std::swap(confidants, confidantNodes_);
 #ifdef MYLOG
-  std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
+            std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
 #endif
 
 

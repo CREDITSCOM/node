@@ -30,7 +30,7 @@ namespace cs
 #else
         return __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
 #endif
-}
+    }
 
     Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
       std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions" << std::endl;
