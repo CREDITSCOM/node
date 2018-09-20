@@ -860,8 +860,15 @@ void Solver::nextRound()
   round_table_sent = false;
   sentTransLastRound = false;
   m_pool = csdb::Pool{};
-  v_pool = csdb::Pool{};
+  // v_pool = csdb::Pool{};
   if (m_pool_closed) v_pool = csdb::Pool{};
+  if (node_->getMyLevel() == NodeLevel::Confidant) {
+    memset(receivedVecFrom, 0, 100);
+    memset(receivedMatFrom, 0, 100);
+    trustedCounterVector = 0;
+    trustedCounterMatrix = 0;
+    if (gotBigBang) sendZeroVector();
+  }
 #ifdef MYLOG
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
   #endif

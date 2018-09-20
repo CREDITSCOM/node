@@ -1011,7 +1011,6 @@ void Node::onRoundStart() {
         myLevel_ = NodeLevel::Confidant;
         myConfNumber = conf_no;
         found = true;
-        solver_->initConfRound();
         break;
       }
       conf_no++;
