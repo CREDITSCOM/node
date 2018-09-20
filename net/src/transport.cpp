@@ -403,6 +403,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
 
   switch(type) {
   case MsgTypes::RoundTable:
+    return node_->getRoundTable(data, size, rNum);
+  case MsgTypes::Round:
     return node_->getRoundTableUpdated(data, size, rNum);
   case MsgTypes::Transactions:
     return node_->getTransaction(data, size);

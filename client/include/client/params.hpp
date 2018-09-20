@@ -14,7 +14,7 @@
 #define FAKE_BLOCKS
 #define SPAMMER
 #define SYNCRO
-//#define MYLOG
+#define MYLOG
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX

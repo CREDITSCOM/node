@@ -183,6 +183,7 @@ namespace cs
         bool getBigBangStatus();
         void setBigBangStatus(bool _status);
         void setRNum(size_t _rNum);
+        void setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general, const RoundNumber roundNum);
 
     private:
         void _initApi();

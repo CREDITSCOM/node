@@ -48,7 +48,8 @@ enum MsgTypes: uint8_t {
   TransactionPacket,
   TransactionsPacketRequest,
   TransactionsPacketReply,
-  NewCharacteristic
+  NewCharacteristic,
+  Round
 };
 
 typedef uint32_t RoundNum;

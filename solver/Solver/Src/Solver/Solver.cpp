@@ -594,7 +594,7 @@ namespace cs
         rNum = _rNum;
     }
 
-    void Solver::checkVectorsReceived(size_t _rNum)
+     void Solver::checkVectorsReceived(size_t _rNum)
     {
         if (_rNum < rNum) return;
         uint8_t numGen = node_->getConfidants().size();
@@ -934,7 +934,7 @@ namespace cs
                     transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
                     transaction.set_innerID(iid);
 #ifdef MYLOG
-                    std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
+   //                 std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
 #endif
                     {
                         cs::SpinGuard lock(mSpinLock);
@@ -1110,4 +1110,15 @@ namespace cs
 
         mTransactionsBlock[packetIndex].add_transaction(transaction);
     }
+
+    void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey & general, const RoundNumber roundNum)
+    {
+      mRound.confidants = std::move(confidants);
+      mRound.round = roundNum;
+      mRound.hashes.clear();
+      mRound.general = std::move(general);
+
+    }
+
+    
 } // namespace Credits

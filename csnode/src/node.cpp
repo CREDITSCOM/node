@@ -220,7 +220,7 @@ void Node::sendRoundTable() {
 
 void Node::sendRoundTableUpdated(cs::RoundInfo round) {
   ostream_.init(BaseFlags::Broadcast);
-  ostream_  << MsgTypes::RoundTable 
+  ostream_  << MsgTypes::Round 
             << round.round
             << round.confidants.size()
             << round.hashes.size()
@@ -408,7 +408,7 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
     const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
     //  std::cout << "Sending List: " << byteStreamToHex((const char*)data, bSize) << std::endl;
 #ifdef MYLOG
-    std::cout << "Sending List: list size: " << blength << std::endl;
+    std::cout << "Sending List: list size: " << bSize << std::endl;
 #endif
     Hash listHash;
 
@@ -1246,50 +1246,106 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
   return (rNum == roundNum_ ? MessageActions::Process : MessageActions::Postpone);
 }
 
-inline bool Node::readRoundData(const bool tail)
-{
-    PublicKey mainNode;
-    uint8_t   confSize = 0;
-    istream_ >> confSize;
+//inline bool Node::readRoundData(const bool tail)
+//{
+//    PublicKey mainNode;
+//    uint8_t   confSize = 0;
+//    istream_ >> confSize;
+//
+//#ifdef MYLOG
+//    std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
+//#endif
+//
+//    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS)
+//    {
+//        LOG_WARN("Bad confidants num");
+//        return false;
+//    }
+//
+//    std::vector<PublicKey> confidants;
+//    confidants.reserve(confSize);
+//
+//    istream_ >> mainNode;
+//
+//    while (istream_)
+//    {
+//        confidants.push_back(PublicKey());
+//        istream_ >> confidants.back();
+//
+//        if (confidants.size() == confSize && !istream_.end())
+//        {
+//            if (tail)
+//                break;
+//            else
+//            {
+//                LOG_WARN("Too many confidant nodes received");
+//                return false;
+//            }
+//
+//            std::swap(confidants, confidantNodes_);
+//
+//#ifdef MYLOG
+//            std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
+//#endif
+//
+//            mainNode_ = mainNode;
+//
+//            return true;
+//        }
+//    }
+//
+//}
 
+inline bool Node::readRoundData(const bool tail) {
+
+  PublicKey mainNode;
+  uint8_t confSize = 0;
+  istream_ >> confSize;
 #ifdef MYLOG
-    std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
+  std::cout << "NODE> Number of confidants :" << (int)confSize << std::endl;
 #endif
+  if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
+    LOG_WARN("Bad confidants num");
+    return false;
+  }
 
-    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS)
-    {
-        LOG_WARN("Bad confidants num");
+  std::vector<PublicKey> confidants;
+  confidants.reserve(confSize);
+
+  istream_ >> mainNode;
+  //LOG_EVENT("SET MAIN " << byteStreamToHex(mainNode.str, 32));
+  while (istream_) {
+    confidants.push_back(PublicKey());
+    istream_ >> confidants.back();
+
+    //LOG_EVENT("ADDED CONF " << byteStreamToHex(confidants.back().str, 32));
+
+    if (confidants.size() == confSize && !istream_.end()) {
+      if (tail)
+        break;
+      else {
+        LOG_WARN("Too many confidant nodes received");
         return false;
+      }
     }
+  }
 
-    std::vector<PublicKey> confidants;
-    confidants.reserve(confSize);
+  if (!istream_.good() || confidants.size() < confSize) {
+    LOG_WARN("Bad round table format, ignoring");
+    return false;
+  }
 
-    istream_ >> mainNode;
 
-    while (istream_)
-    {
-        confidants.push_back(PublicKey());
-        istream_ >> confidants.back();
-
-        if (confidants.size() == confSize && !istream_.end())
-        {
-            if (tail)
-                break;
-            else
-            {
-                LOG_WARN("Too many confidant nodes received");
-                return false;
-            }
-
-            std::swap(confidants, confidantNodes_);
-
+  std::swap(confidants, confidantNodes_);
 #ifdef MYLOG
-            std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
+  std::cout << "NODE> RoundNumber :" << roundNum_ << std::endl;
 #endif
 
-            mainNode_ = mainNode;
-            return true;
-        }
-    }
+
+
+  mainNode_ = mainNode;
+
+  solver_->setConfidants(confidants, mainNode, roundNum_);
+  std::cout << "NODE> Confidants set" << std::endl;
+  return true;
 }
