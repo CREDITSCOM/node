@@ -55,9 +55,10 @@ namespace cs
         }
 
         m_characteristic.size = transactionsCount;
-
-        boost::to_block_range(characteristicMask, std::back_inserter(m_characteristic.mask));
-        m_characteristic.mask.shrink_to_fit();
+        std::vector<uint8_t> serializedCahracteristicMask;
+        boost::to_block_range(characteristicMask, std::back_inserter(serializedCahracteristicMask));
+        serializedCahracteristicMask.shrink_to_fit();
+        m_characteristic.mask = std::move(serializedCahracteristicMask);
 
         blake2s(&hash_s, HASH_LENGTH, m_characteristic.mask.data(), transactionsCount, "1234", 4);
       }

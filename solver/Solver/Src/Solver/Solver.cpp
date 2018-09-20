@@ -156,11 +156,13 @@ namespace cs
     void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
         const csdb::Pool& metaInfoPool, const PublicKey& sender)
     {
+    cslog() << "SOLVER> ApplyCharacteristic";
       if (node_->getMyLevel() == NodeLevel::Writer)
         return;
       gotBigBang = false;
       gotBlockThisRound = true;
         uint64_t    sequence = metaInfoPool.sequence();
+        cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
         std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
 
         boost::dynamic_bitset<> mask{ characteristic.begin(), characteristic.end() };
@@ -201,7 +203,7 @@ namespace cs
 
         m_pool.set_sequence(sequence);
         m_pool.add_user_field(0, timestamp);
-
+        cslog() << "SOLVER> ApplyCharacteristic: pool created";
 #ifdef MONITOR_NODE
     addTimestampToPool(m_pool);
 #endif
@@ -214,13 +216,12 @@ namespace cs
     node_->getBlockChain().setGlobalSequence(g_seq);
     if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
     {
-      //std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		
-     // if(block.verify_signature()){ //INCLUDE SIGNATURES!!! 
+
         node_->getBlockChain().putBlock(m_pool);
 #ifndef MONITOR_NODE
         if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
         {
-          //std::cout << "Solver -> before sending hash to writer" << std::endl;
+ 
           Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
           node_->sendHash(test_hash, sender);
 #ifdef MYLOG
@@ -324,6 +325,7 @@ namespace cs
         for (auto& packet : mTransactionsBlock)
         {
             auto trxCount = packet.transactions_count();
+            cslog() << "Transactions in packet: " << trxCount;
 
             if (trxCount != 0 && packet.hash().is_empty())
             {
@@ -333,6 +335,7 @@ namespace cs
                 sentTransLastRound = true;
 
                 csdebug() << "FlushTransaction ...";
+                cslog() << "Transaction flushed";
 
                 if (composed)
                 {
@@ -414,7 +417,7 @@ namespace cs
             mHashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
     }
 
-    void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes)
+    void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender)
     {
         csdebug() << "Got transactions hash request, try to find in hash table";
 
@@ -423,20 +426,20 @@ namespace cs
         for (const auto& hash : hashes)
         {
             if (mHashTable.count(hash))
-                node_->sendPacketHashesReply(mHashTable[hash]);
-
+                node_->sendPacketHashesReply(mHashTable[hash], sender);
+            //void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender)
             csdebug() << "Found hash in hash table, send to requester";
         }
     }
 
     void Solver::initConfRound()
     {
-        memset(receivedVecFrom, 0, 100);
-        memset(receivedMatFrom, 0, 100);
-        trustedCounterVector = 0;
-        trustedCounterMatrix = 0;
-        size_t _rNum = rNum;
-        if (gotBigBang) sendZeroVector();
+        //memset(receivedVecFrom, 0, 100);
+        //memset(receivedMatFrom, 0, 100);
+        //trustedCounterVector = 0;
+        //trustedCounterMatrix = 0;
+        //size_t _rNum = rNum;
+        //if (gotBigBang) sendZeroVector();
         //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
         //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
     }
@@ -444,20 +447,29 @@ namespace cs
     void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet)
     {
         csdebug() << "Got packet hash reply";
-
+        cslog() << "Got packet hash reply";
         cs::TransactionsPacketHash hash = packet.hash();
         cs::Lock lock(mSharedMutex);
 
-        if (!mHashTable.count(hash))
-            mHashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
+        if (!mHashTable.count(hash)) {        
+            mHashTable.insert(std::make_pair(hash, std::move(packet)));
+        }
 
-        // TODO: do something when all needed hashes received
+        auto it = std::find(mNeededHashes.begin(), mNeededHashes.end(), hash);
+
+        if (it != mNeededHashes.end()) {
+            mNeededHashes.erase(it);
+        }
+
+        if (mNeededHashes.empty()) {
+            buildTransactionList();
+        }
     }
 
     void Solver::gotRound(cs::RoundInfo&& round)
     {
-        if (mRound.round < round.round)
-        {
+        //if (mRound.round < round.round)
+        //{
             cslog() << "Got round table";
 
             {
@@ -474,43 +486,62 @@ namespace cs
                     neededHashes.push_back(hash);
             }
 
-            if (!neededHashes.empty())
+            if (!neededHashes.empty()) {
                 node_->sendPacketHashesRequest(neededHashes);
+            }
+           else {
+              if (node_->getMyLevel() == NodeLevel::Confidant ) {
+                buildTransactionList();
+              }
+           }
+
+           mNeededHashes = std::move(neededHashes);
+       // }
+     }    
+
+    void Solver::buildTransactionList() {    
+      cslog() << "BuildTransactionlist";
+      csdb::Pool _pool = csdb::Pool{};
+
+      for (const auto& hash : mRound.hashes) {
+        auto it = mHashTable.find(hash);
+        const auto& transactions = it->second.transactions();
+        if (it == mHashTable.end()) {
+          cserror() << "HASH NOT FOUND";
+          return;
         }
+        for (const auto& transaction : transactions) {
+           _pool.add_transaction(transaction);
+        }
+      }
+
+      Hash_ result = generals->buildvector(_pool, m_pool);
+      receivedVecFrom[node_->getMyConfNumber()] = true;
+      hvector.Sender = node_->getMyConfNumber();
+      hvector.hash = result;
+      receivedVecFrom[node_->getMyConfNumber()] = true;
+      generals->addvector(hvector);
+      node_->sendVector(std::move(hvector));
+      trustedCounterVector++;
+      if (trustedCounterVector == mRound.confidants.size())
+      {
+        vectorComplete = true;
+        memset(receivedVecFrom, 0, 100);
+        trustedCounterVector = 0;
+        //compose and send matrix!!!
+        //receivedMat_ips.insert(node_->getMyId());
+        generals->addSenderToMatrix(node_->getMyConfNumber());
+        receivedMatFrom[node_->getMyConfNumber()] = true;
+        trustedCounterMatrix++;
+        node_->sendMatrix(generals->getMatrix());
+        generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
+      #ifdef MYLOG
+        std::cout << "SOLVER> Matrix added" << std::endl;
+      #endif
+      }
     }
 
-    void Solver::gotTransactionList(csdb::Pool&& _pool)
-    {
-//        m_uncharacterizedPool = _pool;
-//        transactionListReceived = true;
-//        uint8_t numGen = node_->getConfidants().size();
-//        //	std::cout << "SOLVER> GotTransactionList" << std::endl;
-//        m_pool = csdb::Pool{};
-//        Hash_ result = generals->buildvector(_pool, m_pool);
-//        receivedVecFrom[node_->getMyConfNumber()] = true;
-//        hvector.Sender = node_->getMyConfNumber();
-//        hvector.hash = result;
-//        receivedVecFrom[node_->getMyConfNumber()] = true;
-//        generals->addvector(hvector);
-//        node_->sendVector(std::move(hvector));
-//        trustedCounterVector++;
-//        if (trustedCounterVector == numGen)
-//        {
-//            vectorComplete = true;
-//            memset(receivedVecFrom, 0, 100);
-//            trustedCounterVector = 0;
-//            //compose and send matrix!!!
-//            //receivedMat_ips.insert(node_->getMyId());
-//            generals->addSenderToMatrix(node_->getMyConfNumber());
-//            receivedMatFrom[node_->getMyConfNumber()] = true;
-//            trustedCounterMatrix++;
-//            node_->sendMatrix(generals->getMatrix());
-//            generals->addmatrix(generals->getMatrix(), node_->getConfidants());//MATRIX SHOULD BE DECOMPOSED HERE!!!
-//#ifdef MYLOG
-//            std::cout << "SOLVER> Matrix added" << std::endl;
-//#endif
-//        }
-    }
+
 
     void Solver::sendZeroVector()
     {
@@ -518,7 +549,7 @@ namespace cs
         if (transactionListReceived && !getBigBangStatus()) return;
         //  std::cout << "SOLVER> Generating ZERO TransactionList" << std::endl;
         csdb::Pool test_pool = csdb::Pool{};
-        gotTransactionList(std::move(test_pool));
+        //gotTransactionList(std::move(test_pool));
 
     }
 
@@ -551,7 +582,7 @@ namespace cs
             if (trustedCounterMatrix == numGen) {
                 memset(receivedMatFrom, 0, 100);
                 uint8_t wTrusted = (generals->take_decision(
-                    confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+                    mRound.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
                 trustedCounterMatrix = 0;
 
                 if (wTrusted == 100) {
@@ -623,38 +654,36 @@ namespace cs
 #ifdef MYLOG
         std::cout << "SOLVER> Matrix added" << std::endl;
 #endif
-        if (trustedCounterMatrix == numGen)
-        {
-            memset(receivedMatFrom, 0, 100);
+        if (trustedCounterMatrix == numGen) {
+          memset(receivedMatFrom, 0, 100);
+          uint8_t wTrusted = (generals->take_decision(
+            mRound.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+          trustedCounterMatrix = 0;
 
-            trustedCounterMatrix = 0;
-            uint8_t wTrusted = (generals->take_decision(node_->getConfidants(), node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+          if (wTrusted == 100) {
+            std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
+            runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
+          }
+          else {
+            std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
+            consensusAchieved = true;
+            if (wTrusted == node_->getMyConfNumber()) {
+              node_->becomeWriter();
+              runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
+                csdb::Pool emptyMetaPool;
+                addTimestampToPool(emptyMetaPool);
+                emptyMetaPool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
 
-            if (wTrusted == 100)
-            {
-#ifdef MYLOG
-                std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
-#endif
-                runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-                    [this]() { writeNewBlock(); });
+                const Characteristic&       characteristic = generals->getCharacteristic();
+                uint32_t                    bitsCount = characteristic.size;
+                const std::vector<uint8_t>& mask = characteristic.mask;
 
-            }
-
-            else
-            {
-                consensusAchieved = true;
-                if (wTrusted == node_->getMyConfNumber())
-                {
-                    node_->becomeWriter();
-                    runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS),
-                        [this]() { writeNewBlock(); });
-                }
-                else
-                {
-                    //LOG_WARN("This should NEVER happen, NEVER");
-                }
+                node_->sendCharacteristic(emptyMetaPool, bitsCount, mask);
+                writeNewBlock();
+              });
             }
         }
+    }
     }
 
     //what block does this function write???
@@ -685,53 +714,6 @@ namespace cs
         }
     }
 
-    void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
-    {
-//        if (node_->getMyLevel() == NodeLevel::Writer)
-//            return;
-//        gotBigBang = false;
-//        gotBlockThisRound = true;
-//#ifdef MONITOR_NODE
-//        addTimestampToPool(block);
-//#endif
-//        uint32_t g_seq = block.sequence();
-//#ifdef MYLOG
-//        std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
-//#endif
-//        if (g_seq > node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
-//
-//        node_->getBlockChain().setGlobalSequence(g_seq);
-//        if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
-//        {
-//            //std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
-//            {
-//                node_->getBlockChain().putBlock(block);
-//                if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
-//                {
-//                    //std::cout << "Solver -> before sending hash to writer" << std::endl;
-//                    Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));//getLastWrittenHash().to_binary().data()));//SENDING HASH!!!
-//                    node_->sendHash(test_hash, sender);
-//#ifdef MYLOG
-//                    std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32) << std::endl;
-//#endif
-//                }
-//            }
-//
-//            //std::cout << "Solver -> finishing gotBlock" << std::endl;
-//        }
-//        size_t _rNum = rNum;
-//        // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-//         //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
-//
-//#ifndef SPAMMER
-//#ifndef MONITOR_NODE
-//  //if (!sentTransLastRound) {
-//  //  Hash test_hash = "zpa02824qsltp";
-//  //  node_->sendHash(test_hash, sender);
-//  //}
-//#endif
-//#endif
-    }
 
     bool Solver::getBigBangStatus()
     {
@@ -936,10 +918,8 @@ namespace cs
 #ifdef MYLOG
    //                 std::cout << "Solver -> Transaction " << iid << " added" << std::endl;
 #endif
-                    {
-                        cs::SpinGuard lock(mSpinLock);
-                        m_transactions.push_back(transaction);
-                    }
+                    addTransaction(transaction);
+
                     iid++;
                 }
             }
@@ -1052,15 +1032,21 @@ namespace cs
         sentTransLastRound = false;
 
         m_pool = csdb::Pool{};
-        v_pool = csdb::Pool{};
-
         if (m_pool_closed) v_pool = csdb::Pool{};
+        if (node_->getMyLevel() == NodeLevel::Confidant)
+        {
+            memset(receivedVecFrom, 0, 100);
+            memset(receivedMatFrom, 0, 100);
+            trustedCounterVector = 0;
+            trustedCounterMatrix = 0;
+            //if (gotBigBang) sendZeroVector();
+
 #ifdef MYLOG
         std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
 #endif
-        if (node_->getMyLevel() == NodeLevel::Main)
-        {
-            runMainRound();
+
+
+            //runMainRound();
 #ifdef SPAM_MAIN
             createSpam = true;
             spamThread = std::thread(&Solver::createPool, this);
@@ -1077,7 +1063,10 @@ namespace cs
             m_pool_closed = true;
 
             if (!m_SendingPacketTimer.isRunning())
+            {
+                cslog() << "Transaction timer started";
                 m_SendingPacketTimer.start(TransactionsPacketInterval);
+             }
         }
     }
 
@@ -1113,10 +1102,10 @@ namespace cs
 
     void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey & general, const RoundNumber roundNum)
     {
-      mRound.confidants = std::move(confidants);
+      mRound.confidants = confidants;
       mRound.round = roundNum;
       mRound.hashes.clear();
-      mRound.general = std::move(general);
+      mRound.general = general;
 
     }
 

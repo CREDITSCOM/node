@@ -139,14 +139,14 @@ namespace cs
         // Solver solves stuff
         void gotTransaction(csdb::Transaction&&);
         void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-        void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes);
+        void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
         void gotPacketHashesReply(cs::TransactionsPacket&& packet);
         void gotRound(cs::RoundInfo&& round);
-        void gotTransactionList(csdb::Pool&&);
+       // void gotTransactionList(csdb::Pool&&);
         void gotBlockCandidate(csdb::Pool&&);
         void gotVector(HashVector&&);
         void gotMatrix(HashMatrix&&);
-        void gotBlock(csdb::Pool&&, const PublicKey&);
+       // void gotBlock(csdb::Pool&&, const PublicKey&);
         void gotHash(Hash&, const PublicKey&);
         void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
         void gotBlockReply(csdb::Pool&&);
@@ -171,6 +171,7 @@ namespace cs
 
         //remove it!!!
         void buildBlock(csdb::Pool& block);
+        void buildTransactionList();
 
         HashVector getMyVector();
         HashMatrix getMyMatrix();
@@ -215,7 +216,7 @@ namespace cs
 
         HashVector hvector;
 
-
+        cs::Hashes mNeededHashes;
         size_t lastRoundTransactionsGot;
         std::set<PublicKey> receivedVec_ips;
         bool receivedVecFrom[100];

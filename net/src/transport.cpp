@@ -436,6 +436,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type,
     return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
+  case MsgTypes::TransactionsPacketRequest:
+    return node_->getPacketHashesRequest(data, size, firstPack.getSender());
   case MsgTypes::BigBang:
 	return node_->getBigBang(data, size, rNum, type);
     case MsgTypes::NewCharacteristic:

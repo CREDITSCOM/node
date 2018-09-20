@@ -52,8 +52,11 @@ public:
     void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
     void getHash(const uint8_t*, const size_t, const PublicKey& sender);
     void getTransactionsPacket(const uint8_t*, const std::size_t);
-    void getPacketHashesRequest(const uint8_t*, const std::size_t);
+
+    //transaction's pack syncro
+    void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
     void getPacketHashesReply(const uint8_t*, const std::size_t);
+
     void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
     void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
@@ -76,20 +79,21 @@ public:
     void sendMatrix(const cs::HashMatrix&);
     void sendBlock(const csdb::Pool&);
     void sendHash(const Hash&, const PublicKey&);
+
+    //transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
     void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
-    void sendPacketHashesReply(const cs::TransactionsPacket& packet);
+    void sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender);
 
-    void sendRoundTableUpdated(cs::RoundInfo round);
-
-    void sendBadBlock(const csdb::Pool& pool);
-    void sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic);
+  void sendBadBlock(const csdb::Pool& pool);
+  void sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic);
 
     /*syncro send functions*/
     void sendBlockRequest(uint32_t seq);
     void sendBlockReply(const csdb::Pool&, const PublicKey&);
     void sendWritingConfirmation(const PublicKey& node);
     void sendRoundTableRequest(size_t rNum);
+    void sendRoundTableUpdated(const cs::RoundInfo& round);
 
     void sendVectorRequest(const PublicKey&);
     void sendMatrixRequest(const PublicKey&);
@@ -100,11 +104,11 @@ public:
     void getVectorRequest(const uint8_t* data, const size_t size);
     void getMatrixRequest(const uint8_t* data, const size_t size);
 
-    void flushCurrentTasks();
-    void becomeWriter();
-    void initNextRound(const cs::RoundInfo& round);
-    // void sendTLConfirmation(size_t tcount);
-    bool getSyncroStarted();
+  void flushCurrentTasks();
+  void becomeWriter();
+  void initNextRound(const cs::RoundInfo& roundInfo);
+  // void sendTLConfirmation(size_t tcount);
+  bool getSyncroStarted();
 
     enum MessageActions { Process, Postpone, Drop };
     MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
