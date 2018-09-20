@@ -299,8 +299,8 @@ namespace Credits
 #ifdef MYLOG
 		std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str,32) << std::endl;
     #endif
-    delete hw;
-    delete mtr;
+    delete [] hw;
+    delete [] mtr;
 		return result;
 		//if (myId != confidantNodes[write_id]) return 0;
         //return 100;
