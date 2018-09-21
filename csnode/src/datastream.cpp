@@ -18,6 +18,7 @@ cs::DataStream::DataStream(char* packet, std::size_t dataSize):
     mIndex(0),
     mDataSize(dataSize)
 {
+    mHead = mData;
 }
 
 boost::asio::ip::udp::endpoint cs::DataStream::endpoint()
@@ -72,6 +73,11 @@ bool cs::DataStream::isValid() const
 bool cs::DataStream::isAvailable(std::size_t size)
 {
     return (mIndex + size) <= mDataSize;
+}
+
+char* cs::DataStream::data() const
+{
+    return mHead;
 }
 
 std::size_t cs::DataStream::size() const
@@ -139,6 +145,50 @@ cs::TransactionsPacketHash cs::DataStream::transactionsHash()
         bytes.push_back(streamField<uint8_t>());
 
     return cs::TransactionsPacketHash::from_binary(bytes);
+}
+
+void cs::DataStream::addVector(const std::vector<uint8_t>& data)
+{
+    if (!isAvailable(data.size()))
+        return;
+
+    for (std::size_t i = 0; i < data.size(); ++i, ++mIndex)
+        mData[mIndex] = static_cast<char>(data[i]);
+}
+
+std::vector<uint8_t> cs::DataStream::byteVector(std::size_t size)
+{
+    std::vector<uint8_t> result;
+    
+    if (size == 0 && !isAvailable(size))
+        return result;
+
+    for (std::size_t i = 0; i < size; ++i, ++mIndex)
+        result.push_back(static_cast<uint8_t>(mData[mIndex]));
+
+    return result;
+}
+
+void cs::DataStream::addString(const std::string& string)
+{
+    if (!isAvailable(string.size()))
+        return;
+
+    for (std::size_t i = 0; i < string.size(); ++i, ++mIndex)
+        mData[mIndex] = string[i];
+}
+
+std::string cs::DataStream::string(std::size_t size)
+{
+    std::string result;
+
+    if (size == 0 && !isAvailable(size))
+        return result;
+
+    for (std::size_t i = 0; i < size; ++i, ++mIndex)
+        result.push_back(mData[mIndex]);
+
+    return result;
 }
 
 template<typename T>

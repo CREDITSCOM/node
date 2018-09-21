@@ -903,56 +903,87 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
     solver_->gotRound(std::move(roundInfo));
 }
 
-void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic) {
-  if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send blocks");
-    return;
-  }
-  cslog() << "SendCharacteristic: seq = " << emptyMetaPool.sequence();
-  std::string compressed;
-  snappy::Compress(reinterpret_cast<const char*>(characteristic.data()), characteristic.size(), &compressed);
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::NewCharacteristic;
+void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic)
+{
+    if (myLevel_ != NodeLevel::Writer) {
+        LOG_ERROR("Only writer nodes can send blocks");
+        return;
+    }
 
-  uint16_t size = compressed.size();
-  std::string time = emptyMetaPool.user_field(0).value<std::string>();
-  uint64_t sequence = emptyMetaPool.sequence();
+    cslog() << "SendCharacteristic: seq = " << emptyMetaPool.sequence();
 
-  ostream_ << size << compressed << time << sequence << maskBitsCount;
+    ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
+    ostream_ << MsgTypes::NewCharacteristic << roundNum_;
 
-  flushCurrentTasks();
-  cslog() << "SendCharacteristic: DONE ";
+    cs::DynamicBuffer buffer;
+    cs::DataStream stream(*buffer, buffer.size());
+
+    std::string time = emptyMetaPool.user_field(0).value<std::string>();
+    uint64_t sequence = emptyMetaPool.sequence();
+
+    stream << static_cast<uint16_t>(time.size());
+    stream << time;
+
+    stream << maskBitsCount;
+
+    stream << static_cast<uint32_t>(characteristic.size());
+    stream << characteristic << sequence;
+
+    ostream_ << std::string(stream.data(), stream.size());
+
+    flushCurrentTasks();
+
+    cslog() << "SendCharacteristic: DONE size: " << stream.size();
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender) {
-    
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender)
+{
     cslog() << "Characteric has arrived";
 
     istream_.init(data, size);
 
-    std::string compressed;
-    uint16_t    compressedSize;
+    uint16_t timeSize = 0;
     std::string time;
+
+    uint32_t maskBitsCount;
+
+    uint32_t characteristicSize = 0;
+    std::vector<uint8_t> characteristic;
+
     uint64_t sequence;
-    uint32_t    maskBitsCount;
 
-    istream_ >> compressedSize >> compressed >> time >> sequence >> maskBitsCount;
+    std::string allData;
 
-    std::string decompressed;
-    snappy::Uncompress(compressed.c_str(), compressedSize, &decompressed);
+    istream_ >> allData;
 
-    cslog() << "getCharacteristic " << compressed << " " << sequence << " " << maskBitsCount;
-    cslog() << "Time: " << time << " EBUCHEE VREMYA";
+    cslog() << "Characteristic all data size: " << allData.size();
+
+    cs::DataStream stream(const_cast<char*>(allData.data()), allData.size());
+
+    stream >> timeSize;
+
+    time.resize(timeSize);
+
+    stream >> time >> maskBitsCount >> characteristicSize;
+
+    characteristic.resize(characteristicSize);
+
+    stream >> characteristic >> sequence;
 
     csdb::Pool pool;
+
     pool.set_sequence(sequence);
     pool.add_user_field(0, time);
 
-  std::vector<uint8_t> characteristicMask(decompressed.begin(), decompressed.end());
-  solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
+    cslog() << "GetCharacteristic " << pool.sequence() << " maskbitCount" << maskBitsCount;
+    cslog() << "Time >> " << pool.user_field(0).value<std::string>() << "  << Time";
+
+    std::vector<uint8_t> characteristicMask(characteristic.begin(), characteristic.end());
+    solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
 }
 
-void Node::sendHash(const Hash& hash, const PublicKey& target) {
+void Node::sendHash(const Hash& hash, const PublicKey& target)
+{
     if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
         LOG_ERROR("Writer and Main node shouldn't send hashes");
         return;
@@ -964,7 +995,6 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
     ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
     flushCurrentTasks();
 }
-
 
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet)
 {

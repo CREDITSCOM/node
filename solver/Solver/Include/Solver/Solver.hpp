@@ -255,7 +255,6 @@ namespace cs
         size_t rNum = 0;
 
         cs::SharedMutex mSharedMutex;
-        cs::SpinLock mSpinLock;
 
         std::vector<csdb::Transaction> m_transactions;
         csdb::Pool m_transactions_;

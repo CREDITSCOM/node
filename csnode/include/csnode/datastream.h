@@ -60,6 +60,11 @@ namespace cs
         bool isAvailable(std::size_t size);
 
         /*!
+            Returns pointer to start of the data
+        */
+        char* data() const;
+
+        /*!
             Try to get field from stream by sizeof(T)
 
             @return Returns stream field
@@ -208,6 +213,30 @@ namespace cs
         cs::TransactionsPacketHash transactionsHash();
 
         /*!
+            Adds bytes vector to stream
+        */
+        void addVector(const std::vector<uint8_t>& data);
+
+        /*!
+            Returns bytes vector
+
+            stream would take size of arg to form return vector
+        */
+        std::vector<uint8_t> byteVector(std::size_t size);
+
+        /*!
+            Adds std::string chars to stream
+        */
+        void addString(const std::string& string);
+
+        /*!
+            Returns std::string from stream
+
+            stream would take size to create string size
+        */
+        std::string string(std::size_t size);
+
+        /*!
             Peeks next parameter
 
             @return Returns next T parameter
@@ -222,6 +251,8 @@ namespace cs
 
         // attributes
         char* mData = nullptr;
+        char* mHead = nullptr;
+
         std::size_t mIndex = 0;
         std::size_t mDataSize = 0;
 
@@ -294,6 +325,24 @@ namespace cs
     }
 
     /*!
+        Puts from stream to bytes vector (stream would use data size of vector to create bytes)
+    */
+    inline DataStream& operator>>(DataStream& stream, std::vector<uint8_t>& data)
+    {
+        data = stream.byteVector(data.size());
+        return stream;
+    }
+
+    /*!
+        Puts from stream to std:;string (stream would use data size of string to create bytes)
+    */
+    inline DataStream& operator>>(DataStream& stream, std::string& data)
+    {
+        data = stream.string(data.size());
+        return stream;
+    }
+
+    /*!
         Writes array to stream
     */
     template<std::size_t size>
@@ -338,6 +387,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacketHash& hash)
     {
         stream.addTransactionsHash(hash);
+        return stream;
+    }
+
+    /*!
+        Writes vector of bytes to stream
+    */
+    inline DataStream& operator<<(DataStream& stream, const std::vector<uint8_t>& data)
+    {
+        stream.addVector(data);
         return stream;
     }
 }

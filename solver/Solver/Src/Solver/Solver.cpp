@@ -476,34 +476,34 @@ namespace cs
     {
         //if (mRound.round < round.round)
         //{
-            cslog() << "Got round table";
+        cslog() << "Got round table";
 
-            {
-                cs::SpinGuard lock(mSpinLock);
-                mRound = std::move(round);
-            }
+        {
+            cs::Lock lock(mSharedMutex);
+            mRound = std::move(round);
+        }
 
-            cs::Hashes neededHashes;
-            cs::SharedLock lock(mSharedMutex);
+        cs::Hashes neededHashes;
+        cs::SharedLock lock(mSharedMutex);
 
-            for (const auto& hash : mRound.hashes)
-            {
-                if (!mHashTable.count(hash))
-                    neededHashes.push_back(hash);
-            }
+        for (const auto& hash : mRound.hashes)
+        {
+            if (!mHashTable.count(hash))
+                neededHashes.push_back(hash);
+        }
 
-            if (!neededHashes.empty()) {
-                node_->sendPacketHashesRequest(neededHashes);
-            }
-           else {
-              if (node_->getMyLevel() == NodeLevel::Confidant ) {
+        if (!neededHashes.empty()) {
+            node_->sendPacketHashesRequest(neededHashes);
+        }
+        else {
+            if (node_->getMyLevel() == NodeLevel::Confidant) {
                 buildTransactionList();
-              }
-           }
+            }
+        }
 
-           mNeededHashes = std::move(neededHashes);
-       // }
-     }    
+        mNeededHashes = std::move(neededHashes);
+        // }
+    }
 
     void Solver::buildTransactionList() {    
       cslog() << "BuildTransactionlist";
@@ -546,8 +546,6 @@ namespace cs
       #endif
       }
     }
-
-
 
     void Solver::sendZeroVector()
     {
@@ -939,9 +937,7 @@ namespace cs
 
     void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
     {
-        //TRACE("");
-        cs::SpinGuard lock(mSpinLock);
-        //TRACE("");
+        cs::Lock lock(mSharedMutex);
         m_transactions.push_back(transaction);
     }
 
@@ -1106,14 +1102,13 @@ namespace cs
         mTransactionsBlock[packetIndex].add_transaction(transaction);
     }
 
-    void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey & general, const RoundNumber roundNum)
+    void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general, const RoundNumber roundNum)
     {
-      mRound.confidants = confidants;
-      mRound.round = roundNum;
-      mRound.hashes.clear();
-      mRound.general = general;
-
+        cs::Lock lock(mSharedMutex);
+        mRound.confidants = confidants;
+        mRound.round = roundNum;
+        mRound.hashes.clear();
+        mRound.general = general;
     }
 
-    
 } // namespace Credits
