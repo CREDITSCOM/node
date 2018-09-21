@@ -58,5 +58,5 @@ add_subdirectory(csdb)
 
 add_subdirectory(client)
 
-#enable_testing()
-#add_subdirectory(tests)
+enable_testing()
+add_subdirectory(tests)
