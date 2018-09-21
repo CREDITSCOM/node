@@ -9,15 +9,15 @@
 
 #include <Solver/Solver.hpp>
 
-#include <lib/system/keys.hpp>
 #include <lib/system/hash.hpp>
+#include <lib/system/keys.hpp>
 #include <net/packet.hpp>
 
 class IPackStream {
-public:
+ public:
   void init(const uint8_t* ptr, const size_t size) {
-    ptr_ = ptr;
-    end_ = ptr_ + size;
+    ptr_  = ptr;
+    end_  = ptr_ + size;
     good_ = true;
   }
 
@@ -33,21 +33,23 @@ public:
 
   template <typename T>
   void skip() {
-    ptr_+= sizeof(T);
+    ptr_ += sizeof(T);
   }
 
   template <typename T>
   void safeSkip(uint32_t num = 1) {
     auto size = sizeof(T) * num;
 
-    if ((uint32_t)(end_ - ptr_) < size) good_ = false;
+    if ((uint32_t)(end_ - ptr_) < size)
+      good_ = false;
     else
-      ptr_+= size;
+      ptr_ += size;
   }
 
   template <typename T>
   IPackStream& operator>>(T& cont) {
-    if (!canPeek<T>()) good_ = false;
+    if (!canPeek<T>())
+      good_ = false;
     else {
       cont = peek<T>();
       skip<T>();
@@ -58,7 +60,8 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(FixedString<Length>& str) {
-    if ((uint32_t)(end_ - ptr_) < Length) good_ = false;
+    if ((uint32_t)(end_ - ptr_) < Length)
+      good_ = false;
     else {
       memcpy(str.str, ptr_, Length);
       ptr_ += Length;
@@ -67,27 +70,34 @@ public:
     return *this;
   }
 
-  bool good() const { return good_; }
-  bool end() const { return ptr_ == end_; }
+  bool good() const {
+    return good_;
+  }
+  bool end() const {
+    return ptr_ == end_;
+  }
 
-  operator bool() const { return good() && !end(); }
-  const uint8_t* getCurrPtr() const { return ptr_; }
+  operator bool() const {
+    return good() && !end();
+  }
+  const uint8_t* getCurrPtr() const {
+    return ptr_;
+  }
 
-private:
+ private:
   const uint8_t* ptr_;
   const uint8_t* end_;
-  bool good_ = false;
+  bool           good_ = false;
 };
 
 class OPackStream {
-public:
-  OPackStream(RegionAllocator* allocator,
-              const PublicKey& myKey):
-    allocator_(allocator),
-    packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet)))),
-    packetsEnd_(packets_),
-    senderKey_(myKey)
-  { }
+ public:
+  OPackStream(RegionAllocator* allocator, const PublicKey& myKey)
+  : allocator_(allocator)
+  , packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet))))
+  , packetsEnd_(packets_)
+  , senderKey_(myKey) {
+  }
 
   void init(uint8_t flags) {
     clear();
@@ -114,8 +124,8 @@ public:
       ptr->~Packet();
 
     packetsCount_ = 0;
-    finished_ = false;
-    packetsEnd_ = packets_;
+    finished_     = false;
+    packetsEnd_   = packets_;
   }
 
   template <typename T>
@@ -126,8 +136,7 @@ public:
     if (left >= sizeof(T)) {
       *((T*)ptr_) = d;
       ptr_ += sizeof(T);
-    }
-    else {  // On border
+    } else {  // On border
       memcpy(ptr_, &d, left);
       newPack();
       memcpy(ptr_, ((uint8_t*)&d) + left, sizeof(T) - left);
@@ -149,7 +158,8 @@ public:
 
       if (packetsCount_ > 1)
         for (auto p = packets_; p != packetsEnd_; ++p)
-          *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(p->data()) + static_cast<uint32_t>(Offsets::FragmentId) + sizeof(packetsCount_)) = packetsCount_;
+          *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(p->data()) + static_cast<uint32_t>(Offsets::FragmentId) +
+                                       sizeof(packetsCount_)) = packetsCount_;
 
       finished_ = true;
     }
@@ -157,14 +167,21 @@ public:
     return packets_;
   }
 
-  uint32_t getPacketsCount() { return packetsCount_; }
+  uint32_t getPacketsCount() {
+    return packetsCount_;
+  }
 
-  uint8_t* getCurrPtr() { return ptr_; }
-  uint32_t getCurrSize() const { return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data()); }
+  uint8_t* getCurrPtr() {
+    return ptr_;
+  }
+  uint32_t getCurrSize() const {
+    return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data());
+  }
 
   void insertBytes(char const* bytes, uint32_t size) {
     while (size > 0) {
-      if (ptr_ == end_) newPack();
+      if (ptr_ == end_)
+        newPack();
 
       const auto toPut = std::min((uint32_t)(end_ - ptr_), size);
       memcpy(ptr_, bytes, toPut);
@@ -174,19 +191,20 @@ public:
     }
   }
 
-private:
+ private:
   void newPack() {
-    new(packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
+    new (packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
 
     ptr_ = static_cast<uint8_t*>(packetsEnd_->data());
     end_ = ptr_ + packetsEnd_->size();
 
-    if (packetsEnd_ != packets_) { // Not the first one
+    if (packetsEnd_ != packets_) {  // Not the first one
       memcpy(ptr_, packets_->data(), packets_->getHeadersLength());
 
-      *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(packetsEnd_->data()) + static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
+      *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(packetsEnd_->data()) +
+                                   static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
 
-      ptr_+= packets_->getHeadersLength();
+      ptr_ += packets_->getHeadersLength();
     }
 
     ++packetsCount_;
@@ -198,18 +216,18 @@ private:
 
   RegionAllocator* allocator_;
 
-  Packet* packets_;
+  Packet*  packets_;
   uint16_t packetsCount_ = 0;
-  Packet* packetsEnd_;
-  bool finished_ = false;
+  Packet*  packetsEnd_;
+  bool     finished_ = false;
 
-  uint64_t id_ = 0;
+  uint64_t  id_ = 0;
   PublicKey senderKey_;
 };
 
 template <>
 inline IPackStream& IPackStream::operator>>(std::string& str) {
-  str = std::string(ptr_, end_);
+  str  = std::string(ptr_, end_);
   ptr_ = end_;
   return *this;
 }
@@ -233,11 +251,13 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
 
 template <>
 inline IPackStream& IPackStream::operator>>(ip::address& addr) {
-  if (!canPeek<uint8_t>()) { good_ = false; }
-  else {
+  if (!canPeek<uint8_t>()) {
+    good_ = false;
+  } else {
     if (*(ptr_++) & 1) {
-      if ((uint32_t)(end_ - ptr_) < 16) { good_ = false; }
-      else {
+      if ((uint32_t)(end_ - ptr_) < 16) {
+        good_ = false;
+      } else {
         ip::address_v6::bytes_type bt;
 
         for (auto& b : bt)
@@ -245,11 +265,10 @@ inline IPackStream& IPackStream::operator>>(ip::address& addr) {
 
         addr = ip::make_address_v6(bt);
       }
-    }
-    else {
+    } else {
       uint32_t ipnum;
-	  for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
-		*this >> *ptr;
+      for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
+        *this >> *ptr;
       addr = ip::make_address_v4(ipnum);
     }
   }
@@ -262,12 +281,12 @@ inline OPackStream& OPackStream::operator<<(const ip::address& ip) {
   *this << (uint8_t)(ip.is_v6());
   if (ip.is_v6()) {
     auto bts = ip.to_v6().to_bytes();
-    for (auto& b : bts) *this << b;
-  }
-  else {
-	uint32_t ipnum = ip.to_v4().to_uint();
-	for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
-		*this << *ptr;
+    for (auto& b : bts)
+      *this << b;
+  } else {
+    uint32_t ipnum = ip.to_v4().to_uint();
+    for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
+      *this << *ptr;
   }
 
   return *this;
@@ -289,7 +308,7 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 template <>
 inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
-  auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  auto     dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes((char*)dataPtr, bSize);
   return *this;
 }
@@ -306,4 +325,4 @@ inline OPackStream& OPackStream::operator<<(const Credits::HashMatrix& mat) {
   return *this;
 }
 
-#endif // __PACKSTREAM_HPP__
+#endif  // __PACKSTREAM_HPP__
