@@ -908,35 +908,48 @@ void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t ma
     LOG_ERROR("Only writer nodes can send blocks");
     return;
   }
-  cslog() << "SendCharacteristic: " << emptyMetaPool.sequence();
+  cslog() << "SendCharacteristic: seq = " << emptyMetaPool.sequence();
   std::string compressed;
   snappy::Compress(reinterpret_cast<const char*>(characteristic.data()), characteristic.size(), &compressed);
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic;
 
   uint16_t size = compressed.size();
-  ostream_ << size << compressed << emptyMetaPool << maskBitsCount;
+  std::string time = emptyMetaPool.user_field(0).value<std::string>();
+  uint64_t sequence = emptyMetaPool.sequence();
+
+  ostream_ << size << compressed << time << sequence << maskBitsCount;
 
   flushCurrentTasks();
+  cslog() << "SendCharacteristic: DONE ";
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender) {
     
+    cslog() << "Characteric has arrived";
+
     istream_.init(data, size);
 
     std::string compressed;
     uint16_t    compressedSize;
-    csdb::Pool  metaInfoPool;
+    std::string time;
+    uint64_t sequence;
     uint32_t    maskBitsCount;
 
-    istream_ >> compressedSize >> compressed >> metaInfoPool >> maskBitsCount;
+    istream_ >> compressedSize >> compressed >> time >> sequence >> maskBitsCount;
 
     std::string decompressed;
     snappy::Uncompress(compressed.c_str(), compressedSize, &decompressed);
-    cslog() << "getCharacteristic " << compressed << " " << metaInfoPool.sequence() << " " << maskBitsCount;
+
+    cslog() << "getCharacteristic " << compressed << " " << sequence << " " << maskBitsCount;
+    cslog() << "Time: " << time << " EBUCHEE VREMYA";
+
+    csdb::Pool pool;
+    pool.set_sequence(sequence);
+    pool.add_user_field(0, time);
 
   std::vector<uint8_t> characteristicMask(decompressed.begin(), decompressed.end());
-  solver_->applyCharacteristic(characteristicMask, maskBitsCount, metaInfoPool, sender);
+  solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
 }
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {

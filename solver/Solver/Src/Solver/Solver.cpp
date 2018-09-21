@@ -329,7 +329,13 @@ namespace cs
 
             if (trxCount != 0 && packet.hash().is_empty())
             {
+                // SUPER KOSTIL
+                packet.set_storage(node_->getBlockChain().getStorage());
+
                 bool composed = packet.compose();
+
+                if (!composed)
+                  cslog() << "Transaction compose failed";
 
                 node_->sendTransactionsPacket(packet);
                 sentTransLastRound = true;

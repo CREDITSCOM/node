@@ -203,10 +203,8 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 
 	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
-	if (!pool.compose())
-		 if (!pool.compose()) {
+		if (!pool.compose()) {
 		LOG_ERROR("Couldn't compose block");
-		if (!pool.save())
 			 return;
 		
 	}
@@ -623,6 +621,11 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
 csdb::PoolHash BlockChain::getLastWrittenHash()
 {
   return lastHash_;
+}
+
+csdb::Storage & BlockChain::getStorage()
+{
+  return storage_;
 }
 
 //void
