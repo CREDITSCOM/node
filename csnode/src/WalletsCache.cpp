@@ -2,6 +2,7 @@
 #include <lib/system/logger.hpp>
 #include <csnode/WalletsIds.h>
 #include <csnode/WalletsCache.h>
+#include <csdb/amount_commission.h>
 
 using namespace std;
 
@@ -73,20 +74,21 @@ void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr)
 void WalletsCache::ProcessorBase::load(csdb::Pool& pool)
 {
     const csdb::Pool::Transactions& transactions = pool.transactions();
+    csdb::Address writer_address = writer_address.from_public_key(pool.writer_public_key());
 
     for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx)
     {
-        load(*itTrx);
+        load(*itTrx, writer_address);
     }
 }
 
-void WalletsCache::ProcessorBase::load(const csdb::Transaction& tr)
+void WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const csdb::Address& writer_public_key)
 {
-    loadTrxForSource(tr);
+    loadTrxForSource(tr, writer_public_key);
     loadTrxForTarget(tr);
 }
 
-void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr)
+void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, const csdb::Address& writer_public_key)
 {
     csdb::Address wallAddress = tr.source();
 
@@ -99,9 +101,19 @@ void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr)
         return;
     }
 
+    WalletId writer_id{};
+    if (!findWalletId(wallAddress, writer_id))
+    {
+      LOG_ERROR("Cannot find writer wallet");
+      return;
+    }
+
     WalletData& wallData = getWalletData(id, tr.source());
+    WalletData& writerWall = getWalletData(writer_id, writer_public_key);
 
     wallData.balance_ -= tr.amount();
+    wallData.balance_ -= tr.counted_fee().to_double();
+    writerWall.balance_ += tr.counted_fee().to_double();
     wallData.trxTail_.push(tr.innerID());
     setModified(id);
 }

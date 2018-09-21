@@ -58,8 +58,8 @@ namespace Credits
 
         protected:
             void load(csdb::Pool& curr);
-            void load(const csdb::Transaction& tr);
-            void loadTrxForSource(const csdb::Transaction& tr);
+            void load(const csdb::Transaction& tr, const csdb::Address& writer_public_key);
+            void loadTrxForSource(const csdb::Transaction& tr, const csdb::Address& writer_public_key);
             void loadTrxForTarget(const csdb::Transaction& tr);
             virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
             virtual void setModified(WalletId id) = 0;
