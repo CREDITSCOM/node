@@ -206,6 +206,11 @@ namespace Credits {
         });
     }
 
+    namespace {
+        // counts calls to flushTransactions() (to suppress extra debug fluid to console)
+        static uint32_t counter = 0;
+    }
+
     void Solver::scheduleFlushTransactions(uint32_t period_ms)
     {
         if(timer_used) {
@@ -214,9 +219,12 @@ namespace Credits {
             timer_service.TimeConsoleOut(os.str(), node_->getRoundNumber());
         }
         tagFlushTransactions = calls_scheduler.InsertPeriodic(period_ms, [this]() {
-            //if(timer_used) {
-            //    timer_service.TimeConsoleOut("flushTransactions()", currentRound);
-            //}
+            if(timer_used) {
+                if(counter % 20 == 19) {
+                    timer_service.TimeConsoleOut("flushTransactions() x 20 calls", node_->getRoundNumber());
+                }
+                ++counter;
+            }
             flushTransactions();
             // do not set tagFlushTransactions to no_tag!!!
         });
@@ -325,6 +333,7 @@ namespace Credits {
     {
         if(tagFlushTransactions != no_tag) {
             if(timer_used) {
+                counter = 0;
                 timer_service.TimeConsoleOut("cancel flushTransactions()", node_->getRoundNumber());
             }
             calls_scheduler.Remove(tagFlushTransactions);

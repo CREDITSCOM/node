@@ -187,8 +187,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
-	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+    uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+    std::cout << __func__ << " (rNum=" << rNum << "): my lastBlock=" << lastBlock << ", roundNum_=" << roundNum_ << std::endl;
 	if (rNum > lastBlock && rNum >= roundNum_)
   {
     solver_->setBigBangStatus(true);
@@ -1004,7 +1004,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const  PublicKey& sender) {
 #ifdef MYLOG
    std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
    #endif
-   ostream_.init(BaseFlags::Signed, sender);
+   ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags::Compressed, sender);
    ostream_ << MsgTypes::RequestedBlock
       << roundNum_
       << pool;

@@ -246,9 +246,6 @@ void Solver::flushTransactions()
 		if (m_transactions.size()) {
 			node_->sendTransaction(std::move(m_transactions));
 			sentTransLastRound = true;
-#ifdef MYLOG
-			std::cout << "FlushTransaction ..." << std::endl;
-#endif
 			m_transactions.clear();
 		}
 		else {

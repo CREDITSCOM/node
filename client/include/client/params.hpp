@@ -10,7 +10,7 @@
 //#define FOREVER_ALONE
 #define TIME_TO_COLLECT_TRXNS 200
 #define TIME_TO_AWAIT_ACTIVITY 300
-#define TRX_SLEEP_TIME 40000 //microseconds
+#define TRX_SLEEP_TIME 50000 //microseconds
 #define FAKE_BLOCKS
 
 #if ! defined(DEBUG)
@@ -18,7 +18,7 @@
 #endif
 
 #define SYNCRO
-//#define MYLOG
+#define MYLOG
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
