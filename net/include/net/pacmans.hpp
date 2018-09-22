@@ -39,7 +39,7 @@ private:
 
 class IPacMan {
 public:
-  IPacMan(): allocator_(1 << 24) { }
+  IPacMan(): allocator_(1 << 20) { }
 
   struct Task {
     ip::udp::endpoint sender;
@@ -68,6 +68,7 @@ private:
   bool lockedLast_ = false;
 
   RegionAllocator allocator_;
+
 };
 
 class OPacMan {
