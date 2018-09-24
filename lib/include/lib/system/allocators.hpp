@@ -224,7 +224,7 @@ private:
     auto page = region->page_;
     region->~Region();
 
-    const uint32_t toSub = region->size_ + sizeof(Region);
+    const uint32_t toSub = region->size_ + sizeof(Region) + ((-(int)region->size_) & 0x3f);
     if (page->usedSize.fetch_sub(toSub, std::memory_order_relaxed) == toSub) {
       // Since it was us who freed up all the memory, we're the only
       // ones accessing *page...
