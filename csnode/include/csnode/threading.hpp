@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <lib/system/logger.hpp>
+#include <lib/system/cache.hpp>
 #include <client/params.hpp>
 
 #define BOTTLENECKED_SMARTS
@@ -15,7 +16,7 @@ namespace Credits {
 
 class spinlock
 {
-    std::atomic_flag af = ATOMIC_FLAG_INIT;
+    __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
 
   public:
     void lock()
@@ -247,7 +248,7 @@ struct SpinLockable
     {}
 
 private:
-    std::atomic_flag af = ATOMIC_FLAG_INIT;
+    __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
     T t;
 
     friend struct SpinLockedRef<T>;

@@ -4,6 +4,7 @@
 #include <boost/asio.hpp>
 
 #include <lib/system/allocators.hpp>
+#include <lib/system/cache.hpp>
 #include <lib/system/keys.hpp>
 
 using namespace boost::asio;
@@ -14,10 +15,10 @@ class Packet;
 
 struct Connection;
 struct RemoteNode {
-  std::atomic<uint64_t> packets = { 0 };
+  __cacheline_aligned std::atomic<uint64_t> packets = { 0 };
 
-  std::atomic<uint32_t> strikes = { 0 };
-  std::atomic<bool> blackListed = { false };
+  __cacheline_aligned std::atomic<uint32_t> strikes = { 0 };
+  __cacheline_aligned std::atomic<bool> blackListed = { false };
 
   void addStrike() {
     strikes.fetch_add(1, std::memory_order_relaxed);
@@ -27,7 +28,7 @@ struct RemoteNode {
     return blackListed.load(std::memory_order_relaxed);
   }
 
-  std::atomic<Connection*> connection = { nullptr };
+  __cacheline_aligned std::atomic<Connection*> connection = { nullptr };
 };
 
 typedef MemPtr<TypedSlot<RemoteNode>> RemoteNodePtr;
@@ -91,10 +92,10 @@ private:
 
   TypedAllocator<Connection> connectionsAllocator_;
 
-  std::atomic_flag nLockFlag_ = ATOMIC_FLAG_INIT;
+  __cacheline_aligned std::atomic_flag nLockFlag_ = ATOMIC_FLAG_INIT;
   FixedVector<ConnectionPtr, MaxConnections> neighbours_;
 
-  std::atomic_flag pLockFlag_ = ATOMIC_FLAG_INIT;
+  __cacheline_aligned std::atomic_flag pLockFlag_ = ATOMIC_FLAG_INIT;
   FixedVector<ConnectionPtr, MaxConnections> pendingConnections_;
 };
 
