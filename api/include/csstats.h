@@ -11,13 +11,15 @@
 #include <csnode/blockchain.hpp>
 
 namespace csstats {
+	using period_t = std::chrono::seconds::rep;
+
     struct Config
     {
-        uint16_t updateIntervalSec = {300};
+        uint16_t updateIntervalSec = {3};
     };
 
-    using Period = uint32_t;
-    using Periods = std::vector<uint32_t>;
+    using Period = period_t;
+    using Periods = std::vector<period_t>;
 
     using Count = uint32_t;
 
@@ -43,7 +45,7 @@ namespace csstats {
 
     struct PeriodStats
     {
-        uint32_t periodSec = 0;
+        period_t periodSec = 0;
         Count poolsCount = 0;
         Count transactionsCount = 0;
         BalancePerCurrency balancePerCurrency;
@@ -55,25 +57,25 @@ namespace csstats {
     class csstats
     {
     public:
-
-#ifdef NDEBUG
-        inline void Log() {  }
-
-                        template <typename T, typename... Args>
-                        inline void Log(T, Args...)
-                        {
-                        }
-#else
-
-        inline void Log() {	std::cerr << std::endl;	}
-
-        template <typename T, typename... Args>
-        inline void Log(T t, Args... args)
-        {
-            std::cerr << t;
-            Log(args...);
-        }
-#endif
+//
+//#ifdef NDEBUG
+//        inline void Log() {  }
+//
+//                        template <typename T, typename... Args>
+//                        inline void Log(T, Args...)
+//                        {
+//                        }
+//#else
+//
+//        inline void Log() {	std::cerr << std::endl;	}
+//
+//        template <typename T, typename... Args>
+//        inline void Log(T t, Args... args)
+//        {
+//            std::cerr << t;
+//            Log(args...);
+//        }
+//#endif
 
 		csstats(BlockChain &blockchain, const Config &config = Config{});
 
@@ -100,7 +102,7 @@ namespace csstats {
         StatsPerPeriod collectStats(const Periods &periods);
 
         template<class F>
-        void matchPeriod(const Periods &periods, uint32_t period, F func);
+        void matchPeriod(const Periods& periods, period_t period, F func);
     };
 }
 

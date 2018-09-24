@@ -17,7 +17,6 @@ using Vector = std::string;
 using Matrix = std::string;
 
 class Transport;
-
 namespace cs {
 class Solver;
 }
@@ -131,10 +130,9 @@ class Node {
     return api_;
   }
   PublicKey writerId;
-
   void addToPackageTemporaryStorage(const csdb::Pool& pool);
 
- private:
+private:
   bool init();
 
   // signature verification
@@ -144,6 +142,8 @@ class Node {
 
   inline bool readRoundData(bool);
   void        onRoundStart();
+
+  void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
 
   // Info
   const PublicKey myPublicKey_;
@@ -180,11 +180,11 @@ class Node {
   csstats::csstats       stats_;
   csconnector::connector api_;
 
+  RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
 
   IPackStream istream_;
   OPackStream ostream_;
-
   std::vector<csdb::Pool> m_packageTemporaryStorage;
 };
 #endif  // __NODE_HPP__

@@ -3,6 +3,7 @@
 #define __STRUCTURES_HPP__
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 
 #include "allocators.hpp"
@@ -40,12 +41,25 @@ public:
   using const_iterator = FixedBufferIterator<FixedCircularBuffer>;
 
   FixedCircularBuffer():
-    elements_(static_cast<T*>(malloc(sizeof(T) * Size))) { }
+    elements_(static_cast<T*>(malloc(sizeof(T) * Size))) {
+  }
 
   ~FixedCircularBuffer() {
     clear();
     free(elements_);
   }
+
+  FixedCircularBuffer(const FixedCircularBuffer&) = delete;
+  FixedCircularBuffer(FixedCircularBuffer&& rhs): elements_(rhs.elements_),
+                                                  head_(rhs.head_),
+                                                  tail_(rhs.tail_),
+                                                  size_(rhs.size_) {
+    rhs.size_ = 0;
+    rhs.elements_ = rhs.head_ = rhs.tail_ = nullptr;
+  }
+
+  FixedCircularBuffer& operator=(const FixedCircularBuffer&) = delete;
+  FixedCircularBuffer& operator=(FixedCircularBuffer&&) = delete;
 
   template <typename... Args>
   T& emplace(Args&&... args) {
@@ -95,27 +109,12 @@ public:
     toRem->~T();
     --size_;
 
-    if (toRem >= head_ && toRem >= tail_) {
-      memmove(head_ + 1, head_, (toRem - head_));
+    if (toRem >= head_) {
+      memmove(head_ + 1, head_, (toRem - head_) * sizeof(T));
       ++head_;
     }
-    else if (toRem >= head_) {
-      auto dToHead = (toRem - head_);
-      auto dToTail = (tail_ - toRem - 1);
-
-      if (dToHead < dToTail) {
-        LOG_WARN("111");
-        memmove(head_ + 1, head_, dToHead);
-        ++head_;
-      }
-      else {
-        LOG_WARN("222");
-        memmove(toRem, toRem + 1, dToTail);
-        --tail_;
-      }
-    }
     else {
-      memmove(toRem, toRem + 1, (tail_ - toRem - 1));
+      memmove(toRem, toRem + 1, (tail_ - toRem - 1) * sizeof(T));
       --tail_;
     }
   }
@@ -155,6 +154,16 @@ public:
     free(elements_);
   }
 
+  FixedVector(const FixedVector&) = delete;
+  FixedVector(FixedVector&& rhs): elements_(rhs.elements_),
+                                  end_(rhs.end_) {
+    rhs.elements_ = nullptr;
+    rhs.end_ = nullptr;
+  }
+
+  FixedVector& operator=(const FixedVector&) = delete;
+  FixedVector& operator=(FixedVector&&) = delete;
+
   template <typename... Args>
   T& emplace(Args&&... args) {
     return *(new(end_++) T(std::forward<Args>(args)...));
@@ -191,8 +200,7 @@ inline ResultType getHashIndex(const ArgType&);
 template <typename KeyType,
           typename ArgType,
           typename IndexType = uint16_t,
-          uint32_t MaxSize = 100000,
-          bool WithProtection = false>
+          uint32_t MaxSize = 100000>
 class FixedHashMap {
 public:
   struct Element {
@@ -215,6 +223,16 @@ public:
     memset(buckets_, 0, bucketsSize);
   }
 
+  FixedHashMap(const FixedHashMap&) = delete;
+  FixedHashMap(FixedHashMap&& rhs): buffer_(std::move(rhs.buffer_)),
+                                    buckets_(rhs.buckets_) {
+    rhs.buckets_ = nullptr;
+  }
+
+  ~FixedHashMap() {
+    free(buckets_);
+  }
+
   ArgType& tryStore(const KeyType& key) {
     Element** myBucket;
     auto foundElement = getElt(key, &myBucket);
@@ -234,6 +252,9 @@ public:
 
     return newComer.data;
   }
+
+  auto begin() { return buffer_.begin(); }
+  auto end() { return buffer_.end(); }
 
 private:
   Element* getElt(const KeyType& key, Element*** bucket) {
@@ -266,10 +287,7 @@ private:
 
 class CallsQueue {
 public:
-  struct Call {
-    std::function<void()> func;
-    std::atomic<Call*> next;
-  };
+  static const uint32_t MAX_SIZE = 32;
 
   static CallsQueue& instance() {
     static CallsQueue inst;
@@ -282,48 +300,31 @@ public:
 
 private:
   CallsQueue() { }
-  std::atomic<Call*> head_ = { nullptr };
+
+  std::atomic<uint32_t> size_ = { 0 };
+  std::atomic_flag lock_ = ATOMIC_FLAG_INIT;
+  std::function<void()> calls_[MAX_SIZE];
 };
 
 inline void CallsQueue::callAll() {
-  Call* startHead = head_.load(std::memory_order_relaxed);
-  if (!startHead) return;
-  Call* newHead = startHead;
-  head_.compare_exchange_strong(newHead,
-                                nullptr,
-                                std::memory_order_relaxed,
-                                std::memory_order_relaxed);
-  Call* elt = startHead;
-  do {
-    elt->func();
-    Call* rem = elt;
-    elt = rem->next.load(std::memory_order_relaxed);
-    delete rem;
-  } while (elt);
+  if (size_.load(std::memory_order_relaxed)) {
+    SpinLock l(lock_);
+    const auto end = calls_ + size_.load(std::memory_order_relaxed);
 
-  if (newHead != startHead) {
-    do {
-      Call *next = newHead->next.load(std::memory_order_relaxed);
-      if (next == startHead) break;
-      newHead = next;
-    } while (true);
-    newHead->next.store(nullptr, std::memory_order_relaxed);
+    for (auto ptr = calls_; ptr != end; ++ptr)
+      (*ptr)();
+
+    size_.store(0, std::memory_order_relaxed);
   }
 }
 
 inline void CallsQueue::insert(std::function<void()> f) {
-  Call* newElt = new Call;
-  newElt->func = f;
+  SpinLock l(lock_);
+  auto sz = size_.load(std::memory_order_relaxed);
+  if (sz >= MAX_SIZE) return;
 
-  Call* head = head_.load(std::memory_order_relaxed);
-  do {
-    newElt->next.store(head, std::memory_order_relaxed);
-  } while (!head_.compare_exchange_weak(head,
-                                        newElt,
-                                        std::memory_order_acquire,
-                                        std::memory_order_relaxed));
-
-  //LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
+  calls_[sz] = f;
+  size_.fetch_add(1, std::memory_order_release);
 }
 
 template <size_t Length>
@@ -347,5 +348,51 @@ struct FixedString {
 
   char str[Length];
 };
+
+template <uint32_t MaxSize>
+class CharFunc {
+public:
+  CharFunc(uint32_t realSize) {
+    const uint32_t bNum = realSize / 8;
+    memset(bytes_, 0, (bNum + ((bNum * 8) != realSize)));
+  }
+
+  CharFunc(): CharFunc(MaxSize) { }
+
+  bool checkPos(uint32_t id) const {
+    uint32_t mask;
+    const uint32_t& byte = getByte(id, mask);
+    return byte & mask;
+  }
+
+  void setPos(uint32_t id, bool val) {
+    uint32_t mask;
+    uint32_t& byte = getByte(id, mask);
+
+    if (val) byte|= mask;
+    else byte&= ~mask;
+  }
+
+private:
+  uint32_t& getByte(uint32_t id, uint32_t& mask) {
+    const uint32_t oneElt = sizeof(uint32_t) * 8;
+    uint32_t pos = id / oneElt;
+    mask = 1 << (id - pos * oneElt);
+    return bytes_[pos];
+  }
+
+  const uint32_t& getByte(uint32_t id, uint32_t& mask) const {
+    return const_cast<CharFunc*>(this)->getByte(id, mask);
+  }
+
+  constexpr static uint32_t getMyBytesLength() {
+    const uint32_t oneElt = sizeof(uint32_t) * 8;
+    const uint32_t mS = MaxSize / oneElt;
+    return mS + ((mS * oneElt) != MaxSize);
+  }
+
+  uint32_t bytes_[getMyBytesLength()];
+};
+
 
 #endif // __STRUCTURES_HPP__

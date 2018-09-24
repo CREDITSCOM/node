@@ -17,6 +17,9 @@ public:
 
   void sendDirect(const Packet, const ip::udp::endpoint&);
 
+  bool resendFragment(const Hash&, const uint16_t, const ip::udp::endpoint&);
+  void registerMessage(Packet*, const uint32_t size);
+
   Network(const Network&) = delete;
   Network(Network&&) = delete;
   Network& operator=(const Network&) = delete;
@@ -57,6 +60,8 @@ private:
   std::thread readerThread_;
   std::thread writerThread_;
   std::thread processorThread_;
+
+  PacketCollector collector_;
 };
 
 #endif // __NETWORK_HPP__

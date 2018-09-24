@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <thread>
 
 #include "logger.hpp"
 
@@ -19,6 +20,9 @@
 template <typename MemRegion>
 class MemPtr {
 public:
+  typedef typename MemRegion::Type* PtrType;
+  typedef const typename MemRegion::Type* ConstPtrType;
+
   MemPtr() { }
   ~MemPtr() { if (ptr_) ptr_->unuse(); }
 
@@ -54,14 +58,14 @@ public:
     return *this;
   }
 
-  typename MemRegion::Type* get() { return ptr_->get(); }
-  const typename MemRegion::Type* get() const { return ptr_->get(); }
+  PtrType get() { return ptr_->get(); }
+  ConstPtrType get() const { return ptr_->get(); }
 
-  typename MemRegion::Type* operator*() { return get(); }
-  const typename MemRegion::Type* operator*() const { return get(); }
+  PtrType operator*() { return get(); }
+  ConstPtrType operator*() const { return get(); }
 
-  typename MemRegion::Type* operator->() { return get(); }
-  const typename MemRegion::Type* operator->() const { return get(); }
+  PtrType operator->() { return get(); }
+  ConstPtrType operator->() const { return get(); }
 
   size_t size() const { return ptr_->size(); }
   operator bool() const { return ptr_; }
@@ -277,7 +281,13 @@ struct SpinLock {
 public:
   SpinLock(std::atomic_flag& flag):
     flag_(flag) {
-    while (flag_.test_and_set(std::memory_order_acquire));
+    uint32_t cnt = 0;
+    while (flag_.test_and_set(std::memory_order_acquire)) {
+      if (++cnt == 10) {
+        cnt = 0;
+        std::this_thread::yield();
+      }
+    }
   }
 
   ~SpinLock() {

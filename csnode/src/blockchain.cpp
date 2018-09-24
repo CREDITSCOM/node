@@ -1,5 +1,5 @@
 #include <limits>
-#include <csdb/currency.h> 
+#include <csdb/currency.h>
 #include <base58.h>
 #include <lib/system/logger.hpp>
 #include <lib/system/hash.hpp>
@@ -29,8 +29,7 @@ using namespace Credits;
 
 BlockChain::BlockChain(const char* path) {
 
-  if (!loadCache())
-     return;
+  if (!loadCache()) return;
 #ifdef MYLOG
   std::cout << "Trying to open DB..." << std::endl;
   #endif
@@ -72,22 +71,20 @@ BlockChain::BlockChain(const char* path) {
         good_ = false;
 #ifdef MYLOG
         std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
-        #endif
+#endif
       }
     }
     else
     {
 #ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
-      #endif
+#endif
       std::ifstream f(dbs_fname);
-
-
       if (f.is_open())
       {
 #ifdef MYLOG
         std::cout << "File is opened ... reading" << std::endl;
-        #endif
+#endif
         f.read(kk, 14);
         f.close();
       }
@@ -100,15 +97,14 @@ BlockChain::BlockChain(const char* path) {
       ht.tag = atoi(s_beg);
 #ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-      #endif
+#endif
       setLastWrittenSequence(ht.tag);
-
       if (loadBlock(storage_.last_hash()).sequence() == ht.tag)
       {
         tempHashes.reserve(ht.tag + 1);
         temp_hash = storage_.last_hash();
 
-        for (uint32_t i = 0; i <= ht.tag; i++)
+        for (uint32_t i = 0; i <= ht.tag; ++i)
         {
           tempHashes.push_back(temp_hash);
           //std::cout << "READ> " << temp_hash.to_string() << std::endl;
@@ -117,15 +113,14 @@ BlockChain::BlockChain(const char* path) {
         }
 #ifdef MYLOG
         std::cout << "Hashes read from DB" << std::endl;
-        #endif
+#endif
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
-
           blockHashes_.push_back(*iter);
         }
 #ifdef MYLOG
         std::cout << "Hashes vector converted" << std::endl;
-        #endif
+#endif
         //for (uint32_t i = 0; i <= ht.tag; i++)
         //{
         //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
@@ -156,7 +151,7 @@ BlockChain::BlockChain(const char* path) {
         else std::cout << "Error writing DB structure" << std::endl;
 
         temp_hash = storage_.last_hash();
-        for (uint32_t i = 0; i <= ht.tag; i++)
+        for (uint32_t i = 0; i <= ht.tag; ++i)
         {
           tempHashes.push_back(temp_hash);
           temp_hash = loadBlock(temp_hash).previous_hash();
@@ -171,7 +166,6 @@ BlockChain::BlockChain(const char* path) {
         //  std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
         //}
         tempHashes.clear();
-
         lastHash_ = storage_.last_hash();
         good_ = true;
         return;
@@ -196,7 +190,7 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
 	//TRACE("");
-	
+
 	{
 		std::lock_guard<decltype(dbLock_)> l(dbLock_);
 		pool.set_storage(storage_);
@@ -206,16 +200,17 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 		if (!pool.compose()) {
 		LOG_ERROR("Couldn't compose block");
 			 return;
-		
+
 	}
-	
+
 		if (!pool.save()) {
 		LOG_ERROR("Couldn't save block");
 		return;
-		
+
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+        //LOG_DEBUG("DATA: " << byteStreamToHex((const char*)pool.to_binary().data(), pool.to_binary().size()));
 	{
 		//TRACE("");
 		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
@@ -223,7 +218,7 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 		new_block_cv.notify_all();
 		//TRACE("");
 	}
-	
+
 	if (!updateCache(pool)) {
 		LOG_ERROR("Couldn't update cache");
 	}
@@ -389,7 +384,7 @@ void BlockChain::writeGenesisBlock() {
 #ifdef MYLOG
   std::cout << "Hash inserted into the hash-vector" << std::endl;
   #endif
-  size_t bSize;
+  uint32_t bSize;
   const char* bl = genesis.to_byte_stream(bSize);
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
 }
@@ -402,8 +397,7 @@ BlockChain::loadCache()
         walletsCache_.reset(new WalletsCache(WalletsCache::Config()));
         walletsCache_->load(*this);
     } catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+        LOG_ERROR("Exc=" << e.what());
         return false;
     } catch (...) {
         LOG_ERROR("Exc=...");
@@ -419,8 +413,7 @@ BlockChain::updateCache(csdb::Pool& pool)
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         walletsCache_->updateFrom(pool);
     } catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+        LOG_ERROR("Exc=" << e.what());
         return false;
     } catch (...) {
         LOG_ERROR("Exc=...");
@@ -479,8 +472,7 @@ csdb::Pool
 BlockChain::loadBlock(const csdb::PoolHash& ph) const
 {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    auto pool = storage_.pool_load(ph);
-    return pool;
+    return storage_.pool_load(ph);
 }
 
 csdb::Pool
@@ -522,8 +514,7 @@ BlockChain::getAddressFromKey(const std::string& key)
     std::copy(key.rbegin(),
             std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()),
               pk.rbegin());
-    csdb::Address res = csdb::Address::from_public_key(pk.data());
-    return res;
+    return csdb::Address::from_public_key(pk.data());
 }
 
 csdb::Amount
@@ -540,13 +531,16 @@ BlockChain::getBalance(const csdb::Address& address) const
 }
 
 csdb::Amount
-BlockChain::calcBalance(csdb::Address address) const
+BlockChain::calcBalance(const csdb::Address &address) const
 {
     csdb::Amount result(0);
 
     csdb::Pool curr = loadBlock(getLastHash());
-    while (curr.is_valid()) {
-        for (size_t i = 0; i < curr.transactions_count(); i++) {
+    while (curr.is_valid())
+	{
+		size_t transactions_count = curr.transactions_count();
+        for (size_t i = 0; i < transactions_count; ++i)
+		{
             csdb::Transaction tr = curr.transaction(i);
             if (tr.source() == address)
                 result -= tr.amount();
@@ -618,7 +612,7 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   blockRequestIsNeeded = true;
 }
 
-csdb::PoolHash BlockChain::getLastWrittenHash()
+const csdb::PoolHash & BlockChain::getLastWrittenHash() const
 {
   return lastHash_;
 }
@@ -637,17 +631,17 @@ csdb::Storage & BlockChain::getStorage()
 //}
 
 
-uint32_t BlockChain::getGlobalSequence()
+uint32_t BlockChain::getGlobalSequence() const
 {
   return global_sequence;
 }
 
-csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq)
+csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const
 {
   return blockHashes_.at(seq);
 }
 
-uint32_t BlockChain::getRequestedBlockNumber()
+uint32_t BlockChain::getRequestedBlockNumber() const
 {
   return (last_written_sequence + 1);
 }
@@ -656,7 +650,7 @@ void BlockChain::setGlobalSequence(uint32_t seq)
   global_sequence = seq;
 }
 
-bool BlockChain::getBlockRequestNeed()
+bool BlockChain::getBlockRequestNeed() const
 {
   return blockRequestIsNeeded;
 }
@@ -720,8 +714,8 @@ namespace
 }
 
 void
-BlockChain::getTransactions(Transactions& transactions,
-                            csdb::Address address,
+BlockChain::getTransactions(Transactions &transactions,
+                            csdb::Address &address,
                             int64_t offset,
                             const int64_t limit) const
 {

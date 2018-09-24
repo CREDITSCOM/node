@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #ifdef _MSC_VER
@@ -18,6 +19,7 @@
 #include <csdb/transaction.h>
 #include <algorithm>
 #include <boost/dynamic_bitset.hpp>
+
 #include <mutex>
 #include "Solver/Generals.hpp"
 
@@ -127,6 +129,7 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
         *(m_find_untrusted.data() + j * 100 + i) = i_max;
 
         i_max++;
+
       }
     }
   }

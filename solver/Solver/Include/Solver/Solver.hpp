@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <functional>
+
 #include <shared_mutex>
 
 #include <set>
@@ -28,9 +29,6 @@
 #include <lib/system/timer.h>
 #include <client/params.hpp>
 #include <lib/system/keys.hpp>
-
-//#define MONITOR_NODE
-//#define SPAM_MAIN
 
 class Node;
 
@@ -158,8 +156,8 @@ class Solver {
   void buildBlock(csdb::Pool& block);
   void buildTransactionList();
 
-  HashVector getMyVector();
-  HashMatrix getMyMatrix();
+  HashVector getMyVector() const;
+  HashMatrix getMyMatrix() const;
   void       initConfRound();
   void       sendZeroVector();
   void       checkVectorsReceived(size_t _rNum);
@@ -182,6 +180,7 @@ class Solver {
   void writeNewBlock();
   void prepareBlockForSend(csdb::Pool& block);
 
+
 #ifdef SPAM_MAIN
   void createPool();
 
@@ -202,6 +201,7 @@ class Solver {
   HashVector hvector;
 
   cs::Hashes          mNeededHashes;
+
   size_t              lastRoundTransactionsGot;
   std::set<PublicKey> receivedVec_ips;
   bool                receivedVecFrom[100];

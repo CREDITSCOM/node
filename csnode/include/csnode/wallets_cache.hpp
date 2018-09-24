@@ -87,8 +87,8 @@ namespace Credits
         friend std::ostream& operator<<(std::ostream& os, Mode mode);
 
         void load(csdb::Pool& curr, Mode mode);
-        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash);
-        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash);
+        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
+        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
         void loadTrxForTarget(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash);
         WalletData* getWalletData(const WalletData::Address&& address);
 

@@ -92,7 +92,7 @@ class OPackStream {
  public:
   OPackStream(RegionAllocator* allocator, const PublicKey& myKey)
   : allocator_(allocator)
-  , packets_(static_cast<Packet*>(calloc(PacketCollector::MaxFragments, sizeof(Packet))))
+  , packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet))))
   , packetsEnd_(packets_)
   , senderKey_(myKey) {
   }
@@ -128,7 +128,7 @@ class OPackStream {
 
   template <typename T>
   OPackStream& operator<<(const T& d) {
-    static_assert(sizeof(T) <= Packet::MaxSize, "Type too long");
+    // static_assert(sizeof(T) <= Packet::MaxSize, "Type too long"); // обязательно раскомментировать!
 
     const uint32_t left = end_ - ptr_;
     if (left >= sizeof(T)) {
@@ -175,6 +175,7 @@ class OPackStream {
   uint32_t getCurrSize() const {
     return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data());
   }
+
 
  private:
   void newPack() {
@@ -239,7 +240,9 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 
 template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  pool = csdb::Pool::from_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_);
+  uint32_t uncompressedSize;
+  *this >> uncompressedSize;
+  pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
   ptr_ = end_;
   return *this;
 }
@@ -283,7 +286,6 @@ inline OPackStream& OPackStream::operator<<(const ip::address& ip) {
     for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr)
       *this << *ptr;
   }
-
   return *this;
 }
 
@@ -302,9 +304,9 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 
 template <>
 inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
-  size_t bSize;
-  auto   dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-  insertBytes((char*)dataPtr, bSize);
+  uint32_t bSize;
+  char*   dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  insertBytes(dataPtr, bSize);
   return *this;
 }
 

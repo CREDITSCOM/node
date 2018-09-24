@@ -109,13 +109,15 @@ Transaction::Transaction(int64_t innerID,
                          Address target,
                          Currency currency,
                          Amount amount,
-                         Amount comission,
+                         Amount max_fee,
+                         Amount counted_fee,
                          std::string signature)
   : d(new priv(innerID,
                source,
                target,
                currency,
-               comission,
+               max_fee,
+               counted_fee,
                amount,
                signature,
                amount))
@@ -125,7 +127,8 @@ Transaction::Transaction(int64_t innerID,
                          Address source,
                          Address target,
                          Currency currency,
-                         Amount comission,
+                         Amount max_fee,
+                         Amount counted_fee,
                          Amount amount,
                          std::string signature,
                          Amount balance)
@@ -133,7 +136,8 @@ Transaction::Transaction(int64_t innerID,
                source,
                target,
                currency,
-               comission,
+               max_fee,
+               counted_fee,
                amount,
                signature,
                balance))
@@ -191,9 +195,15 @@ Transaction::amount() const noexcept
 }
 
 Amount
-Transaction::comission() const noexcept
+Transaction::max_fee() const noexcept
 {
-  return d->comission_;
+  return d->max_fee_;
+}
+
+Amount
+Transaction::counted_fee() const noexcept
+{
+	return d->counted_fee_;
 }
 
 std::string
@@ -249,11 +259,19 @@ Transaction::set_amount(Amount amount)
 }
 
 void
-Transaction::set_comission(Amount comission)
+Transaction::set_max_fee(Amount max_fee)
 {
   if (!d.constData()->read_only_) {
-    d->comission_ = comission;
+    d->max_fee_ = max_fee;
   }
+}
+
+void
+Transaction::set_counted_fee(Amount counted_fee)
+{
+	if (!d.constData()->read_only_) {
+		d->counted_fee_ = counted_fee;
+	}
 }
 
 void
@@ -358,7 +376,7 @@ Transaction::to_byte_stream_for_sig() const
   else
     currency = 0;
   os.put(data->amount_);
-  os.put(data->comission_);
+  os.put(data->max_fee_);
   os.put(currency);
   const size_t fixed_prefix_length = os.buffer().size();
   decltype(data->user_fields_) custom_user_fields(
@@ -384,7 +402,8 @@ Transaction::put(::csdb::priv::obstream& os) const
   os.put(data->target_);
   os.put(data->currency_);
   os.put(data->amount_);
-  os.put(data->comission_);
+  os.put(data->max_fee_);
+  os.put(data->counted_fee_);
   os.put(data->user_fields_);
   os.put(data->signature_);
   os.put(data->balance_);
@@ -396,9 +415,9 @@ Transaction::get(::csdb::priv::ibstream& is)
   priv* data = d.data();
   return is.get(data->innerID_) && is.get(data->source_) &&
          is.get(data->target_) && is.get(data->currency_) &&
-         is.get(data->amount_) && is.get(data->comission_) &&
-         is.get(data->user_fields_) && is.get(data->signature_) &&
-         is.get(data->balance_);
+         is.get(data->amount_) && is.get(data->max_fee_) &&
+         is.get(data->counted_fee_) && is.get(data->user_fields_) &&
+         is.get(data->signature_) && is.get(data->balance_);
 }
 
 } // namespace csdb
