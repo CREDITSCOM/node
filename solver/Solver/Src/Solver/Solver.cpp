@@ -134,7 +134,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
 void Solver::sendTL()
 {
   if (gotBigBang) return;
-  uint32_t tNum = v_pool.transactions_count();
+  size_t tNum = v_pool.transactions_count();
   std::cout << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
  // std::cout << "                          Total received " << tNum << " transactions" << std::endl;
   std::cout << "========================================================================================" << std::endl;
@@ -303,7 +303,7 @@ void Solver::initConfRound()
   memset(receivedMatFrom, 0, 100);
   trustedCounterVector = 0;
   trustedCounterMatrix = 0;
-  size_t _rNum = rNum;
+//  size_t _rNum = rNum;
   if (gotBigBang) sendZeroVector();
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
@@ -520,7 +520,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
-  uint32_t g_seq = block.sequence();
+  csdb::Pool::sequence_t g_seq = block.sequence();
 #ifdef MYLOG
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
   #endif
@@ -547,7 +547,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 
 		//std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
-  size_t _rNum = rNum;
+//  size_t _rNum = rNum;
  // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 

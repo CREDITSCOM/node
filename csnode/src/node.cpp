@@ -194,7 +194,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   std::cout << __func__ << std::endl;
-	uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+	size_t lastBlock = getBlockChain().getLastWrittenSequence();
 	if (rNum > lastBlock && rNum >= roundNum_)
   {
     solver_->setBigBangStatus(true);
@@ -709,6 +709,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
   Credits::HashVector vec;
   istream_ >> vec;
 
+  std::cout << "NODE> Hash: " << byteStreamToHex((const char*)vec.hash.val,32) << std::endl;
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad vector packet format");
     return;
@@ -1038,10 +1039,16 @@ void Node::sendBlockReply(const csdb::Pool& pool, const  PublicKey& sender) {
 #ifdef MYLOG
    std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
    #endif
-   ostream_.init(BaseFlags::Signed, sender);
+   ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags ::Compressed, sender);
+   size_t bSize;
+   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+
+   std::string compressed;
+   snappy::Compress((const char*)data, bSize, &compressed);
    ostream_ << MsgTypes::RequestedBlock
-      << roundNum_
-      << pool;
+     << roundNum_
+     << compressed;
+
     flushCurrentTasks();
   }
 

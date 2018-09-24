@@ -633,7 +633,7 @@ uint32_t BlockChain::getGlobalSequence()
   return global_sequence;
 }
 
-csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq)
+csdb::PoolHash BlockChain::getHashBySequence(csdb::Pool::sequence_t seq)
 {
   return blockHashes_.at(seq);
 }
@@ -642,11 +642,12 @@ uint32_t BlockChain::getRequestedBlockNumber()
 {
   return (last_written_sequence + 1);
 }
-void BlockChain::setGlobalSequence(uint32_t seq)
-{
-  global_sequence = seq;
-}
 
+void BlockChain::setGlobalSequence(csdb::Pool::sequence_t seq)
+{
+  csdb::Pool::sequence_t global_sequence = seq;
+}
+ 
 bool BlockChain::getBlockRequestNeed()
 {
   return blockRequestIsNeeded;

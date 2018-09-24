@@ -66,12 +66,12 @@ public:
 
   uint32_t getRequestedBlockNumber();
 
-  void setGlobalSequence(uint32_t seq);
+  void setGlobalSequence(csdb::Pool::sequence_t seq);
   uint32_t getGlobalSequence();
 
   bool getBlockRequestNeed();
 
-  csdb::PoolHash getHashBySequence(uint32_t seq);
+  csdb::PoolHash getHashBySequence(csdb::Pool::sequence_t seq);
   csdb::PoolHash getLastWrittenHash();
 
 private:
