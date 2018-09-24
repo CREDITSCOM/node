@@ -24,8 +24,8 @@ Node::Node(const Config& config)
 , transport_(new Transport(config, this))
 , stats_(bc_)
 , api_(bc_, solver_)
-, allocator_(1 << 26, 3)
 , packStreamAllocator_(1 << 26, 5)
+, allocator_(1 << 26, 3)
 , ostream_(&packStreamAllocator_, myPublicKey_) {
   good_ = init();
 }
@@ -101,21 +101,13 @@ void Node::generateKeys() {
   crypto_sign_ed25519_keypair(public_key, private_key);
   myPublicForSig.clear();
   myPrivateForSig.clear();
-  for (int i = 0; i < 32; i++)
-    myPublicForSig.push_back(public_key[i]);
-
-  for (int i = 0; i < 64; i++)
-    myPrivateForSig.push_back(private_key[i]);
-
   std::string pub58, priv58;
   pub58  = EncodeBase58(myPublicForSig);
   priv58 = EncodeBase58(myPrivateForSig);
-// Ветка cs_dev > Отключаю код, не знаю какую версию смежрить. Требуется консультация Сердюка и Чернышева.
-//  myPublicForSig.resize(32);
-//  myPrivateForSig.resize(64);
 
-//  crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
-// < cs_dev
+  myPublicForSig.resize(32);
+  myPrivateForSig.resize(64);
+  crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
 
   std::ofstream f_pub("NodePublic.txt");
   f_pub << EncodeBase58(myPublicForSig);
@@ -156,7 +148,6 @@ void Node::run(const Config&) {
 }
 
 /* Requests */
-
 void Node::flushCurrentTasks() {
   transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();

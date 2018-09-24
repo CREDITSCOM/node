@@ -10,6 +10,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <net/packet.hpp>
+#include "Solver/Solver.hpp"
 
 class IPackStream {
  public:
@@ -128,7 +129,7 @@ class OPackStream {
 
   template <typename T>
   OPackStream& operator<<(const T& d) {
-    // static_assert(sizeof(T) <= Packet::MaxSize, "Type too long"); // обязательно раскомментировать!
+    static_assert(sizeof(T) <= Packet::MaxSize, "Type too long");
 
     const uint32_t left = end_ - ptr_;
     if (left >= sizeof(T)) {
@@ -307,6 +308,18 @@ inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
   char*   dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes(dataPtr, bSize);
+  return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const cs::HashVector& vec) {
+  insertBytes((const char*)&vec, sizeof(cs::HashVector));
+  return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const cs::HashMatrix& mat) {
+  insertBytes((const char*)&mat, sizeof(cs::HashMatrix));
   return *this;
 }
 
