@@ -15,7 +15,7 @@ public:
   bool isGood() const { return good_; }
   ip::udp::endpoint resolve(const EndpointData&);
 
-  void sendDirect(const Packet, const ip::udp::endpoint&);
+  void sendDirect(const Packet&, const ip::udp::endpoint&);
 
   Network(const Network&) = delete;
   Network(Network&&) = delete;
