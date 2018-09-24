@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <thread>
-#include <vector>
 #include "logger.hpp"
 
 /* First of all, here is a base unmovable smart pointer to a memory
@@ -21,10 +20,7 @@ template <typename MemRegion>
 class MemPtr {
 public:
   MemPtr() { }
-  ~MemPtr() {
-      if (ptr_)
-          ptr_->unuse();
-  }
+  ~MemPtr() { if (ptr_) ptr_->unuse(); }
 
   MemPtr(const MemPtr& rhs): ptr_(rhs.ptr_) {
     if (ptr_) ptr_->use();
@@ -101,15 +97,7 @@ struct RegionPage {
   uint8_t* usedEnd;
   uint32_t sizeLeft;
 
-  RegionPage()
-  {
-      usedSize = 0;
-  }
-
-  ~RegionPage()
-  {
-      free(regions);
-  }
+  ~RegionPage() { free(regions); }
 };
 
 class Region {
@@ -133,10 +121,7 @@ private:
          void* data,
          const uint32_t size): page_(page),
                                data_(data),
-                               size_(size)
-  {
-      users_ = 0;
-  }
+                               size_(size) { }
 
   Region(const Region&) = delete;
   Region(Region&&) = delete;
@@ -161,12 +146,11 @@ typedef MemPtr<Region> RegionPtr;
    - Whenever memory is freed on a page, if it is now empty, it
      becomes the ActivePage->nextPage */
 class RegionAllocator {
-    std::vector<RegionPage*> allocated_pages_;
 
 public:
   const uint32_t PageSize;
 
-  RegionAllocator(const uint32_t _pageSize, const uint32_t _initPages = 1): PageSize(_pageSize) {
+  RegionAllocator(const uint32_t _pageSize, const uint32_t _initPages = 10): PageSize(_pageSize) {
     activePage_ = allocatePage();
     auto lastPage = activePage_;
 
@@ -259,7 +243,6 @@ private:
 #ifdef TESTING
     ++pagesNum_;
 #endif
-    allocated_pages_.push_back(result);
     return result;
   }
 
