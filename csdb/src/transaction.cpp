@@ -375,7 +375,7 @@ Transaction::to_byte_stream_for_sig() const
     auto ptr = reinterpret_cast<const uint8_t *>(&data->innerID_);
     std::copy(ptr, ptr + sizeof(innerID), innerID); // only for little endian machines
   }
-  innerID[0] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
+  innerID[5] |= ((data->source_.is_wallet_id() << 7) | (data->target_.is_wallet_id()) << 6);
   os.put(*reinterpret_cast<uint16_t*>(innerID));
   os.put(*reinterpret_cast<uint32_t *>(innerID + sizeof(uint16_t)));
   if (data->source_.is_wallet_id()) {

@@ -558,8 +558,8 @@ void Solver::writeNewBlock()
   #endif
   if (consensusAchieved &&
     node_->getMyLevel() == NodeLevel::Writer) {
-    prepareBlockForSend(m_pool);
     node_->getBlockChain().finishNewBlock(m_pool);
+    prepareBlockForSend(m_pool);
     node_->sendBlock(m_pool);
     node_->getBlockChain().writeNewBlock(m_pool);
 
@@ -596,9 +596,11 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
-		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;		if(block.verify_signature()) //INCLUDE SIGNATURES!!!
+		//std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
+    if(block.verify_signature()) //INCLUDE SIGNATURES!!!
 		{
       node_->getBlockChain().onBlockReceived(block);
+      
 		  if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main))
 		  {
 			  //std::cout << "Solver -> before sending hash to writer" << std::endl;

@@ -611,7 +611,6 @@ bool Pool::verify_signature()
 {
 	if (this->writer_public_key().size() != 32 || d->signature_.size() != 64)
 		return false;
-
 	const auto& pool_bytes = this->to_byte_stream_for_sig();
 	if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
 		pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
@@ -657,7 +656,12 @@ void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const
 
 bool Pool::NewWalletInfo::get(::csdb::priv::ibstream& is)
 {
-    return is.get(*(size_t*)(&addressId_))  &&  is.get(walletId_);
+    size_t address_id;
+    if (!is.get(address_id))
+      return false;
+    size_t* id = reinterpret_cast<size_t*>(&addressId_);
+    *id = address_id;
+    return is.get(walletId_);
 }
 
 } // namespace csdb
