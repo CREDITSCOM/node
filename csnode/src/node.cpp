@@ -747,7 +747,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  std::cout <<  __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }

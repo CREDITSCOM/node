@@ -38,6 +38,7 @@ namespace Credits
 #ifdef MYLOG
 		std::cout << "GENERALS> buildVector: " << transactionsCount << " transactions"  << std::endl;
 #endif
+    //CLOG(transactionsCount << " transactions");
 		//comission is let to be constant, otherwise comission should be sent to this function
 		memset(&hMatrix, 0, 9700);
 

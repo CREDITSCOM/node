@@ -17,6 +17,13 @@
 #endif
 #define SYNCRO
 #define MYLOG
+#ifdef MYLOG
+#define CL_G true
+#endif
+#ifndef MYLOG
+#define CL_G false
+#endif
+#define CLOG(A) if(CL_G) std::cout << __FILE__ << "> " << __func__ << ": " << A << std::endl;
 //#define LOG_TRANSACTIONS
 
 #define BOTTLENECKED_SMARTS
