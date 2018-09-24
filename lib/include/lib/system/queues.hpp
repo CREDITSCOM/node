@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <thread>
 
+#include "cache.hpp"
 #include "logger.hpp"
 
 /* Fixed Uniform Queue (FUQueue) is a simple lock-free queue that
@@ -20,7 +21,7 @@ public:
       Write
     };
 
-    std::atomic<State> lockState{ State::Empty };
+    __cacheline_aligned std::atomic<State> lockState{ State::Empty };
     T element;
   };
 
@@ -112,8 +113,8 @@ private:
   Element elements[MaxSize];
   Element* end = elements + MaxSize;
 
-  std::atomic<Element*> readingBarrier_ = { elements };
-  std::atomic<Element*> writingBarrier_ = { elements };
+  __cacheline_aligned std::atomic<Element*> readingBarrier_ = { elements };
+  __cacheline_aligned std::atomic<Element*> writingBarrier_ = { elements };
 };
 
 #endif // __QUEUES_HPP__

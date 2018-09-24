@@ -6,6 +6,7 @@
 #include <functional>
 
 #include "allocators.hpp"
+#include "cache.hpp"
 
 /* Containers */
 
@@ -267,8 +268,8 @@ private:
 class CallsQueue {
 public:
   struct Call {
+    __cacheline_aligned std::atomic<Call*> next;
     std::function<void()> func;
-    std::atomic<Call*> next;
   };
 
   static CallsQueue& instance() {
@@ -282,7 +283,7 @@ public:
 
 private:
   CallsQueue() { }
-  std::atomic<Call*> head_ = { nullptr };
+  __cacheline_aligned std::atomic<Call*> head_ = { nullptr };
 };
 
 inline void CallsQueue::callAll() {

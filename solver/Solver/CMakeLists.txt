@@ -21,6 +21,9 @@ target_include_directories(csnode PUBLIC
   ../net/include
 )
 
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set (BOOST_ROOT ${BOOST_ROOT})
 # set (Boost_NO_SYSTEM_PATHS ON)
 set (Boost_USE_MULTITHREADED ON)

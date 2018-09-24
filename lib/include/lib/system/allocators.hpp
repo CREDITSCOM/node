@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "cache.hpp"
 #include "logger.hpp"
 
 /* First of all, here is a base unmovable smart pointer to a memory
@@ -89,8 +90,8 @@ class RegionAllocator;
 struct RegionPage {
   RegionAllocator* allocator;
 
-  std::atomic<RegionPage*> next = { nullptr };
-  std::atomic<uint32_t> usedSize = { 0 };
+  __cacheline_aligned std::atomic<RegionPage*> next = { nullptr };
+  __cacheline_aligned std::atomic<uint32_t> usedSize = { 0 };
 
   uint8_t* regions;
 
@@ -128,7 +129,7 @@ private:
   Region& operator=(const Region&) = delete;
   Region& operator=(Region&&) = delete;
 
-  std::atomic<uint32_t> users_ = { 0 };
+  __cacheline_aligned std::atomic<uint32_t> users_ = { 0 };
   RegionPage* page_;
 
   void* data_;
@@ -286,7 +287,7 @@ public:
   }
 
 private:
-  std::atomic_flag& flag_;
+  __cacheline_aligned std::atomic_flag& flag_;
 };
 
 /* Not, TypedAllocator is a completely different thing. It allocates
