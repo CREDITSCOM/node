@@ -277,9 +277,9 @@ namespace Credits
 		{
 			if (*(new_trusted + i) < trusted_limit)
 			{
-			#ifdef MYLOG
-				std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
-			#endif
+			//#ifdef MYLOG
+			//	std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
+			//#endif
 			}
 			else ++j;
 		}

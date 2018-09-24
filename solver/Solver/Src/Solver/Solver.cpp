@@ -801,7 +801,7 @@ Solver::spamWithTransactions()
       {
       
 
-          transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+          transaction.set_amount(csdb::Amount(randFT(1, 10), 0));
           transaction.set_max_fee(csdb::Amount(0, 1,10));
           transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
           transaction.set_innerID(iid);
