@@ -1,10 +1,9 @@
 set(TEST_NAME system)
-project(${TEST_NAME})
 
 file(GLOB SRCS *.cpp)
-ADD_EXECUTABLE(${TEST_NAME} ${SRCS})
+add_executable(${TEST_NAME} ${SRCS})
 
-TARGET_LINK_LIBRARIES(${TEST_NAME} net
+target_link_libraries(${TEST_NAME} net
         libgtest
         libgmock)
 
