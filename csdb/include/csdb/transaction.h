@@ -119,6 +119,7 @@ public:
   void set_amount(Amount amount);
   void set_max_fee(AmountCommission max_fee);
   void set_counted_fee(AmountCommission counted_fee);
+  void set_counted_fee_unsafe(AmountCommission counted_fee);
   void set_signature(std::string signature);
   void set_balance(Amount balance);
 

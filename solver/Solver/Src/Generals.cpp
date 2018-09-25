@@ -17,6 +17,7 @@
 #include <csdb/amount.h>
 #include <csdb/amount_commission.h>
 #include <csdb/transaction.h>
+#include <Solver/TransactionsValidator.h>
 #include <csdb/pool.h>
 
 #include <mutex>
@@ -25,11 +26,11 @@ namespace Credits
 {
 
 
-    Generals::~Generals() {}
-
-    Generals::Generals(WalletsState& _walletsState)
-        : walletsState(_walletsState)
-    { }
+Generals::Generals(WalletsState& _walletsState)
+: walletsState(_walletsState)
+, trxValidator_(new TransactionsValidator(walletsState, TransactionsValidator::Config{}))
+{ }
+Generals::~Generals() { }
 
 
     Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool) {
@@ -46,45 +47,32 @@ namespace Credits
 	  uint8_t* del1 = new uint8_t[transactionsNumber];
 	  uint32_t i = 0;
   
-    const csdb::Amount zero_balance = 0.0_c;
-    if (_pool.transactions_count() > 0) {
-      walletsState.updateFromSource();
+    if (transactionsNumber > 0)
+    {
+        walletsState.updateFromSource();
+        trxValidator_->reset(transactionsNumber);
+      
+        boost::dynamic_bitset<> characteristicMask{ transactionsNumber };
 
-	  std::vector <csdb::Transaction>& t_pool = _pool.transactions();
-	  for (auto& it : t_pool)
-	  {
-      WalletsState::WalletId walletId{};
-		  auto delta = walletsState.getData(it.source(), walletId).balance_  - it.amount() - it.counted_fee();
-
-	#ifdef _MSC_VER
-		  int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
-	#else
-		  int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
-	#endif
-      WalletsState::WalletData& wallState = walletsState.getData(it.source(), walletId);
-
-      if (!wallState.trxTail_.isAllowed(it.innerID())) {
-        *(del1 + i) = -bitcnt;
-        new_bpool.add_transaction(it);
-        ++i;
-        continue;
-      }
-
-      if (delta <= zero_balance) {
-        *(del1 + i) = -bitcnt;
-        new_bpool.add_transaction(it);
-        ++i;
-        continue;
-      }
-
-      *(del1 + i) = bitcnt;
-      wallState.trxTail_.push(it.innerID());
-      walletsState.setModified(walletId);
-      new_pool.add_transaction(it);
-      ++i;
-	  }
+        std::vector <csdb::Transaction>& t_pool = _pool.transactions();
+        for (size_t i = 0; i < t_pool.size(); i++)
+	    {
+            csdb::Transaction& trx = t_pool[i];
+            
+            if (!trxValidator_->validateTransaction(trx, i, *(del1 + i)))
+                continue;
+            characteristicMask.set(i, true);
+        }
 	  
-		uint8_t* hash_s = new uint8_t[32];
+        trxValidator_->validateByGraph(characteristicMask, t_pool, new_bpool);
+
+        for (size_t i = 0; i < t_pool.size(); i++)
+        {
+            if (characteristicMask[i])
+                new_pool.add_transaction(t_pool[i]);
+        }
+        
+        uint8_t* hash_s = new uint8_t[32];
 		//std::cout << "GENERALS> Build vector : before blake" << std::endl;
   //  std::cout << "GENERALS> buildVector: before blake, total " << new_pool.transactions_count() << "transactions in block" << std::endl;
 		blake2s(hash_s, 32, del1, transactionsNumber, "1234", 4);

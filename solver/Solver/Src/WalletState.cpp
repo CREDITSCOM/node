@@ -1,5 +1,6 @@
-#include <Solver/WalletsState.h>
 #include <csnode/blockchain.hpp>
+#include <Solver/WalletsState.h>
+using namespace std;
 
 namespace Credits
 {
@@ -48,12 +49,13 @@ namespace Credits
 
         if (storage_[id])
         {
+            storage_[id]->lastTrxInd_ = noInd_;
             storage_[id]->balance_ = walletData.balance_;
             storage_[id]->trxTail_ = walletData.trxTail_;
         }
         else
         {
-            storage_[id] = new WalletData{ walletData.balance_ , walletData.trxTail_ };
+            storage_[id] = new WalletData{ noInd_, walletData.balance_ , walletData.trxTail_ };
         }
         toCopy_.reset(id);
         return true;
@@ -81,7 +83,8 @@ namespace Credits
 
     WalletsState::WalletData& WalletsState::WalletsNew::getData(const WalletAddress& address)
     {
-        return storage_[address];
+        auto res = storage_.insert(make_pair(address, WalletData{ noInd_ }));
+        return res.first->second;
     }
 
     void WalletsState::updateFromSource()
@@ -92,7 +95,7 @@ namespace Credits
 
     WalletsState::WalletData& WalletsState::getData(const WalletAddress& address, WalletId& id)
     {
-        id = noWalletId;
+        id = noWalletId_;
 
         if (blockchain_.findWalletId(address, id))
         {
@@ -105,7 +108,7 @@ namespace Credits
 
     void WalletsState::setModified(const WalletId& id)
     {
-        if (id != noWalletId)
+        if (id != noWalletId_)
             wallExisting_.setModified(id);
     }
 }

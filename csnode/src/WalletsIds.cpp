@@ -33,7 +33,6 @@ bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id)
                 throw runtime_error("idNormal >= numeric_limits<WalletId>::max() / 2");
 
             norm_.nextId_ = id + 1;
-            norm_.data_.reserve(norm_.nextId_);
         }
         return res.second;
     }
@@ -135,7 +134,6 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
                 throw runtime_error("idNormal >= numeric_limits<WalletId>::max() / 2");
 
             norm_.nextId_ = idNormal + 1;
-            norm_.data_.reserve(norm_.nextId_);
         }
         return true;
     }

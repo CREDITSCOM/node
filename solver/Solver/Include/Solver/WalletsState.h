@@ -22,15 +22,17 @@ namespace Credits
         using WalletAddress = csdb::Address;
         using WalletId = csdb::internal::WalletId;
         using Mask = boost::dynamic_bitset<uint64_t>;
+        using TransactionIndex = uint32_t;
+        static constexpr TransactionIndex noInd_ = std::numeric_limits<TransactionIndex>::max();
+        static constexpr WalletId noWalletId_ = 0;
+
     public:
         struct WalletData
         {
+            TransactionIndex lastTrxInd_;
             csdb::Amount balance_;
             TransactionsTail trxTail_;
         };
-
-        static constexpr WalletId noWalletId = 0;
-
     public:
         WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
 

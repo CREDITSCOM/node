@@ -272,9 +272,21 @@ Transaction::set_max_fee(AmountCommission max_fee)
 void
 Transaction::set_counted_fee(AmountCommission counted_fee)
 {
-	if (!d.constData()->read_only_) {
-		d->counted_fee_ = counted_fee;
-	}
+    if (!d.constData()->read_only_) {
+        d->counted_fee_ = counted_fee;
+    }
+}
+
+void
+Transaction::set_counted_fee_unsafe(AmountCommission counted_fee)
+{
+    if (!d.constData()->read_only_)
+    {
+        auto& constPrivShared = const_cast<const decltype(d)&>(d);
+        const priv* constPrivPtr = constPrivShared.data();
+        priv* privPtr = const_cast<priv*>(constPrivPtr);
+        privPtr->counted_fee_ = counted_fee;
+    }
 }
 
 void

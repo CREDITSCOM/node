@@ -3,8 +3,9 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <vector>
+#include <memory>
 #include <string>
+#include <vector>
 #include <blake2.h>
 #include <blake2-impl.h>
 
@@ -18,6 +19,7 @@
 namespace Credits{
 
     class WalletsState;
+    class TransactionsValidator;
 	class Solver;
 
     class Generals{
@@ -48,6 +50,7 @@ namespace Credits{
     private:	
 
         WalletsState& walletsState;
+        std::unique_ptr<TransactionsValidator> trxValidator_;
 
 		struct hash_weight {
 			char a_hash[32];
