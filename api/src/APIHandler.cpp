@@ -252,14 +252,14 @@ convert_transaction_id(const api::TransactionId& trid)
 
 template<class T>
 auto
-fetchAmount(const T& trx, int) -> decltype(trx.counted_fee())
+fetchFee(const T& trx, int) -> decltype(trx.counted_fee())
 {
   return trx.counted_fee();
 }
 
 template<class T>
 csdb::Amount
-fetchAmount(const T& trx, long def)
+fetchFee(const T& trx, long def)
 {
   return def;
 }
@@ -283,7 +283,7 @@ convertTransaction(const csdb::Transaction& transaction)
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
 
-  result.trxn.fee = convertAmount(fetchAmount(transaction, 0));
+  result.trxn.fee = convertAmount(fetchFee(transaction, 0));
 
   auto uf = transaction.user_field(0);
   if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
@@ -459,9 +459,9 @@ is_deploy_transaction(const csdb::Transaction& tr)
 template<typename T>
 auto
 set_max_fee(const T& trx, const csdb::Amount& am, int)
-  -> decltype(trx.set_amount(am), void())
+  -> decltype(trx.set_max_fee(am), void())
 {
-  trx.set_amount(am);
+  trx.set_max_fee(am);
 }
 
 template<typename T>
