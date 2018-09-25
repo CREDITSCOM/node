@@ -458,7 +458,7 @@ is_deploy_transaction(const csdb::Transaction& tr)
 
 template<typename T>
 auto
-set_max_fee(const T& trx, const csdb::Amount& am, int)
+set_max_fee(T& trx, const csdb::Amount& am, int)
   -> decltype(trx.set_max_fee(am), void())
 {
   trx.set_max_fee(am);
@@ -466,7 +466,7 @@ set_max_fee(const T& trx, const csdb::Amount& am, int)
 
 template<typename T>
 void
-set_max_fee(const T& trx, const csdb::Amount& am, long)
+set_max_fee(T& trx, const csdb::Amount& am, long)
 {}
 
 csdb::Transaction
