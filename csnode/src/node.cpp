@@ -1123,7 +1123,7 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-  if ((!solver_->mPoolClosed()) && (!solver_->getBigBangStatus())) {
+  if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
     solver_->sendTL();
   }
   std::cout << "======================================== ROUND " << roundNum_

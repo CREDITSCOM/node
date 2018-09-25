@@ -140,7 +140,7 @@ void Solver::sendTL() {
 #endif
   std::cout << "========================================================================================";
 
-  m_pool_closed = true;
+  m_isPoolClosed = true;
 
   std::cout << "Solver -> Sending " << tNum << " transactions ";
 
@@ -177,18 +177,15 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
   for (const auto& hash : hashes) {
     auto        it           = m_hashTable.find(hash);
-    const auto& transactions = it->second.transactions();
-
     if (it == m_hashTable.end()) {
       cserror() << "HASH NOT FOUND";
       return;
     }
-
+    const auto& transactions = it->second.transactions();
     if (bitsCount != transactions.size()) {
       cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
       return;
     }
-
     for (const auto& transaction : transactions) {
       if (mask.test(maskIndex)) {
         m_pool.add_transaction(transaction);
@@ -197,7 +194,6 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
     }
     m_hashTable.erase(it);
   }
-
   m_pool.set_sequence(sequence);
   m_pool.add_user_field(0, timestamp);
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
@@ -257,17 +253,16 @@ void Solver::closeMainRound() {
     node_->getBlockChain().setGlobalSequence(m_pool.sequence());
     csdebug() << "Solver -> Global Sequence: " << node_->getBlockChain().getGlobalSequence();
     csdebug() << "Solver -> Writing New Block";
-
     node_->getBlockChain().putBlock(m_pool);
   }
 }
 
-bool Solver::mPoolClosed() {
-  return m_pool_closed;
+bool Solver::isPoolClosed() {
+  return m_isPoolClosed;
 }
 
 void Solver::runMainRound() {
-  m_pool_closed = false;
+  m_isPoolClosed = false;
   std::cout << "========================================================================================";
   std::cout << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV";
 
@@ -287,8 +282,9 @@ HashMatrix Solver::getMyMatrix() const {
 }
 
 void Solver::flushTransactions() {
-  if (node_->getMyLevel() != NodeLevel::Normal)
+  if (node_->getMyLevel() != NodeLevel::Normal) {
     return;
+  }
 
   cs::Lock lock(mSharedMutex);
 
@@ -301,10 +297,6 @@ void Solver::flushTransactions() {
       packet.set_storage(node_->getBlockChain().getStorage());
 
       bool composed = packet.compose();
-
-      if (!composed)
-        cslog() << "Transaction compose failed";
-
       node_->sendTransactionsPacket(packet);
       sentTransLastRound = true;
 
@@ -313,9 +305,10 @@ void Solver::flushTransactions() {
 
       if (composed) {
         auto hash = packet.hash();
-
         if (!m_hashTable.count(hash))
           m_hashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
+      } else {
+        cslog() << "Transaction compose failed";
       }
     }
   }
@@ -323,12 +316,12 @@ void Solver::flushTransactions() {
 }
 
 bool Solver::getIPoolClosed() {
-  return m_pool_closed;
+  return m_isPoolClosed;
 }
 
 void Solver::gotTransaction(csdb::Transaction&& transaction) {
-  if (m_pool_closed) {
-    csdebug() << "m_pool_closed already, cannot accept your transactions";
+  if (m_isPoolClosed) {
+    csdebug() << "m_isPoolClosed already, cannot accept your transactions";
     return;
   }
 
@@ -866,7 +859,7 @@ void Solver::nextRound() {
   sentTransLastRound      = false;
   m_pool                  = csdb::Pool{};
 
-  if (m_pool_closed) {
+  if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
   }
   if (node_->getMyLevel() == NodeLevel::Confidant) {
@@ -887,7 +880,7 @@ void Solver::nextRound() {
 #ifdef SPAMMER
     spamRunning = true;
 #endif
-    m_pool_closed = true;
+    m_isPoolClosed = true;
     if (!m_sendingPacketTimer.isRunning()) {
       cslog() << "Transaction timer started";
       m_sendingPacketTimer.start(TransactionsPacketInterval);

@@ -149,7 +149,7 @@ class Solver {
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
   void nextRound();
-  bool mPoolClosed();
+  bool isPoolClosed();
   void setLastRoundTransactionsGot(size_t trNum);
 
   // remove it!!!
@@ -225,7 +225,7 @@ class Solver {
   csdb::Pool v_pool;
   csdb::Pool b_pool;
 
-  bool m_pool_closed           = true;
+  bool m_isPoolClosed         = true;
   bool sentTransLastRound      = false;
   bool vectorComplete          = false;
   bool consensusAchieved       = false;
