@@ -1018,17 +1018,15 @@ void Node::sendBlockRequest(uint32_t seq) {
   }
 
   // cslog() << "SENDBLOCKREQUEST> Composing the request" ;
-  size_t lws, gs;
+  size_t lws;
+  size_t globalSequence = getBlockChain().getGlobalSequence();
 
-  if (getBlockChain().getGlobalSequence() == 0)
-    gs = roundNum_;
-  else
-    gs = getBlockChain().getGlobalSequence();
+  if (globalSequence == 0) {
+    globalSequence = roundNum_;
+  }
   lws = getBlockChain().getLastWrittenSequence();
-  // cslog() << "SENDBLOCKREQUEST> gs = " << getBlockChain().getGlobalSequence() ;
-  // cslog() << "SENDBLOCKREQUEST> lws = " << getBlockChain().getLastWrittenSequence() ;
-  float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
-  cslog() << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%";
+  float syncStatus = (1. - (globalSequence - lws) / globalSequence) * 100.;
+  csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%";
 
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
@@ -1038,7 +1036,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
   flushCurrentTasks();
 
-  cslog() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
+  csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
