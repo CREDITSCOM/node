@@ -266,8 +266,6 @@ template<typename T>
 std::string
 serialize(const T& sc)
 {
-  using namespace ::apache;
-
   auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>();
   thrift::protocol::TBinaryProtocol proto(buffer);
   sc.write(&proto);

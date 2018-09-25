@@ -479,18 +479,18 @@ APIHandler::make_transaction(const Transaction& transaction)
 
   const uint64_t WALLET_DENOM = 1'000'000'000'000'000'000ull;
 
-  send_transaction.set_amount(csdb::Amount(
-    transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
-  send_transaction.set_balance(s_blockchain.getBalance(source));
-  send_transaction.set_currency(csdb::Currency("CS"));
-  send_transaction.set_source(source);
-  send_transaction.set_target(
-    BlockChain::getAddressFromKey(transaction.target));
-  set_max_fee(send_transaction, csdb::Amount(
-    transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM), 0);
-  send_transaction.set_innerID(transaction.id);
-  send_transaction.set_signature(transaction.signature);
-  return send_transaction;
+    send_transaction.set_amount(csdb::Amount(
+      transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
+    send_transaction.set_balance(s_blockchain.getBalance(source));
+    send_transaction.set_currency(csdb::Currency("CS"));
+    send_transaction.set_source(source);
+    send_transaction.set_target(
+      BlockChain::getAddressFromKey(transaction.target));
+    send_transaction.set_max_fee(csdb::Amount(
+      transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
+    send_transaction.set_innerID(transaction.id);
+    send_transaction.set_signature(transaction.signature);
+    return send_transaction;
 }
 
 std::string
@@ -515,7 +515,7 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
 }
 
 template<typename T>
-std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type,
+std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::value,
                std::ostream&>
 operator<<(std::ostream& s, const T& t)
 {

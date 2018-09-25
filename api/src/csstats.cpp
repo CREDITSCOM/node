@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <client/params.hpp>
 #include <csdb/currency.h>
+#include <csstats.h>
 
 #include <APIHandler.h>
 
@@ -264,10 +264,6 @@ csstats::csstats(BlockChain& blockchain)
 
     currentStats = std::move(allStats.second);
     statsCut = std::move(allStats.first);
-
-#ifndef NO_STATS_TEST
-    startTests();
-#endif
 
     assert(currentStats.size() == collectionPeriods.size());
 
