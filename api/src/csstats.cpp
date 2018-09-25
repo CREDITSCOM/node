@@ -8,13 +8,11 @@
 #include <sstream>
 #include <sys/timeb.h>
 
-#include <APIHandler.h>
-
 namespace csstats {
 
 template<class F>
 void
-csstats::matchPeriod(const Periods& periods, period_t period, F func)
+csstats::matchPeriod(const Periods& periods, uint32_t period, F func)
 {
   for (size_t i = 0; i < periods.size(); ++i) {
     if (period < periods[i])
@@ -291,14 +289,14 @@ csstats::csstats(BlockChain& blockchain)
 
           Log(ss.str());
 #ifdef LOG_STATS_TO_FILE
-          TRACE(ss.str());
+         // TRACE(ss.str());
 
           ss.str(std::string());
 
           ss << "Blockchain size:";
           ss << this->blockchain.getSize();
 
-          TRACE(ss.str());
+         //TRACE(ss.str());
 #endif
           for (auto& t : s.balancePerCurrency) {
             Log("'",
