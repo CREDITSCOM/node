@@ -65,10 +65,10 @@ custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(200ms);
 #endif
-  TRACE(std::endl << fname);
+  TRACE('\n', fname);
   auto res =
     api::APIProcessor::dispatchCall(iprot, oprot, fname, seqid, callContext);
-  TRACE(std::endl);
+  TRACE('\n');
   return res;
 }
 
@@ -92,8 +92,8 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
   }
   //  TRACE("");
   work_queues["TransactionFlow"]; // init value with default
-                                  // constructors
-                                  TRACE("");
+  // constructors
+  TRACE("");
   auto lapooh = s_blockchain.getLastHash();
   trace = false;
   while (update_smart_caches_once(lapooh, true)) {
@@ -250,6 +250,20 @@ convert_transaction_id(const api::TransactionId& trid)
     csdb::PoolHash::from_binary(toByteArray(trid.poolHash)), trid.index);
 }
 
+template<class T>
+auto
+fetchAmount(const T& trx, int) -> decltype(trx.counted_fee())
+{
+  return trx.counted_fee();
+}
+
+template<class T>
+csdb::Amount
+fetchAmount(const T& trx, long def)
+{
+  return def;
+}
+
 api::SealedTransaction
 convertTransaction(const csdb::Transaction& transaction)
 {
@@ -269,7 +283,7 @@ convertTransaction(const csdb::Transaction& transaction)
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
 
-  result.trxn.fee = convertAmount(transaction.counted_fee());
+  result.trxn.fee = convertAmount(fetchAmount(transaction, 0));
 
   auto uf = transaction.user_field(0);
   if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
@@ -433,6 +447,28 @@ is_smart_deploy(const api::SmartContractInvocation& smart)
   return smart.method.empty();
 }
 
+bool
+is_deploy_transaction(const csdb::Transaction& tr)
+{
+  auto uf = tr.user_field(0);
+  return uf.type() == csdb::UserField::Type::String &&
+         is_smart_deploy(
+           deserialize<api::SmartContractInvocation>(uf.value<std::string>()));
+}
+
+template<typename T>
+auto
+set_max_fee(const T& trx, const csdb::Amount& am, int)
+  -> decltype(trx.set_amount(am), void())
+{
+  trx.set_amount(am);
+}
+
+template<typename T>
+void
+set_max_fee(const T& trx, const csdb::Amount& am, long)
+{}
+
 csdb::Transaction
 APIHandler::make_transaction(const Transaction& transaction)
 {
@@ -443,18 +479,18 @@ APIHandler::make_transaction(const Transaction& transaction)
 
   const uint64_t WALLET_DENOM = 1'000'000'000'000'000'000ull;
 
-    send_transaction.set_amount(csdb::Amount(
-      transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
-    send_transaction.set_balance(s_blockchain.getBalance(source));
-    send_transaction.set_currency(csdb::Currency("CS"));
-    send_transaction.set_source(source);
-    send_transaction.set_target(
-      BlockChain::getAddressFromKey(transaction.target));
-    send_transaction.set_max_fee(csdb::Amount(
-      transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM));
-    send_transaction.set_innerID(transaction.id);
-    send_transaction.set_signature(transaction.signature);
-    return send_transaction;
+  send_transaction.set_amount(csdb::Amount(
+    transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
+  send_transaction.set_balance(s_blockchain.getBalance(source));
+  send_transaction.set_currency(csdb::Currency("CS"));
+  send_transaction.set_source(source);
+  send_transaction.set_target(
+    BlockChain::getAddressFromKey(transaction.target));
+  set_max_fee(send_transaction, csdb::Amount(
+    transaction.fee.integral, transaction.fee.fraction, WALLET_DENOM), 0);
+  send_transaction.set_innerID(transaction.id);
+  send_transaction.set_signature(transaction.signature);
+  return send_transaction;
 }
 
 std::string
@@ -472,12 +508,14 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
   auto tr = make_transaction(transaction);
   TRACE("");
   solver.send_wallet_transaction(tr);
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
+  SetResponseStatus(_return.status,
+                    APIRequestStatusType::SUCCESS,
+                    get_delimited_transaction_sighex(tr));
   TRACE("");
 }
 
 template<typename T>
-std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::value,
+std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type,
                std::ostream&>
 operator<<(std::ostream& s, const T& t)
 {
@@ -490,7 +528,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                                    const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
-  TRACE(std::endl << "transaction = " << transaction);
+  TRACE('\n', '\t', "transaction =", transaction);
 
   csdb::Transaction send_transaction = make_transaction(transaction);
 
@@ -637,7 +675,9 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     });
   }
   TRACE("");
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
+  SetResponseStatus(_return.status,
+                    APIRequestStatusType::SUCCESS,
+                    get_delimited_transaction_sighex(send_transaction));
 }
 
 void
@@ -667,7 +707,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
   ///<<
   /// const_limit << std::endl;
 
-  TRACE(offset << " " << const_limit);
+  TRACE(offset, const_limit);
 
   if (offset > 100)
     const_cast<int64_t&>(offset) = 100;
