@@ -82,6 +82,7 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
   , m_pool()
   , v_pool()
   , b_pool()
+  , fee_counter_()
 {
 #ifdef SPAMMER
   uint8_t sk[64];
@@ -352,7 +353,10 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
-  Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
+  csdb::Pool pool(_pool);
+  fee_counter_.CountFeesInPool(node_, &pool,
+    node_->getBlockChain().getLastWrittenSequence() + 1, node_->getConfidants().size());
+  Hash_ result = generals->buildvector(pool, m_pool, b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
 	hvector.hash = result;

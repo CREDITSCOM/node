@@ -30,6 +30,7 @@
 //#include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <client/params.hpp>
+#include <Solver/Fee.h>
 
 //#define MONITOR_NODE
 
@@ -259,6 +260,7 @@ typedef std::string Matrix;
 		std::mutex m_trans_mut;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;
+    Fee fee_counter_;
 
 
 #ifdef SPAMMER

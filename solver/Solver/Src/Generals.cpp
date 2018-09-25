@@ -28,7 +28,7 @@ namespace Credits{
     { }
     Generals::~Generals() { }
 
-    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_of_trusted, csdb::Pool& new_bpool) {
+    Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool) {
       ////////////////////////////////////////////////////////////////////////
       //    This function was modified to calculate deltas for concensus    //
       ////////////////////////////////////////////////////////////////////////
@@ -46,10 +46,9 @@ namespace Credits{
     if (_pool.transactions_count() > 0) {
       walletsState.updateFromSource();
 
-	  std::vector <csdb::Transaction> t_pool(_pool.transactions());
+	  std::vector <csdb::Transaction>& t_pool = _pool.transactions();
 	  for (auto& it : t_pool)
 	  {
-		  countFee(it, num_of_trusted, t_pool.size());
       WalletsState::WalletId walletId{};
 		  auto delta = walletsState.getData(it.source(), walletId).balance_  - it.amount() - it.counted_fee();
 

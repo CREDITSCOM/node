@@ -32,7 +32,7 @@ namespace Credits{
         void chooseHeadAndTrusted(std::map<std::string, std::string>);
         void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
 
-        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_of_trusted, csdb::Pool& new_bpool);
+        Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool);
 
         void addvector(HashVector vector);
         void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);

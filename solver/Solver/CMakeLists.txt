@@ -10,9 +10,11 @@ add_library(Solver
             Include/Solver/Generals.hpp
             Include/Solver/Solver.hpp
             Include/Solver/WalletsState.h
+            Include/Solver/Fee.h
             Src/Solver.cpp
             Src/Generals.cpp
             Src/WalletState.cpp
+            Src/Fee.cpp
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
