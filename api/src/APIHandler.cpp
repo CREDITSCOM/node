@@ -515,7 +515,7 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
 }
 
 template<typename T>
-std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::value,
+std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type,
                std::ostream&>
 operator<<(std::ostream& s, const T& t)
 {
