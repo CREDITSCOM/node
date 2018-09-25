@@ -1,18 +1,17 @@
-#include <APIHandler.h>
+#define TRACE_ENABLED
+
 #include <algorithm>
 #include <cassert>
 #include <csdb/currency.h>
 #include <csstats.h>
-#include <lib/system/logger.hpp>
-#include <random>
-#include <sstream>
-#include <sys/timeb.h>
+
+#include <APIHandler.h>
 
 namespace csstats {
 
 template<class F>
 void
-csstats::matchPeriod(const Periods& periods, uint32_t period, F func)
+csstats::matchPeriod(const Periods& periods, period_t period, F func)
 {
   for (size_t i = 0; i < periods.size(); ++i) {
     if (period < periods[i])
@@ -28,8 +27,7 @@ csstats::collectStats(const Periods& periods)
                    std::end(periods),
                    [](const Period& l, const Period& r) { return l < r; }));
 
-  Log("Collecting stats: started");
-  std::cout << "Stats started\n";
+  TRACE("Collecting stats: started");
 
   auto stats = currentStats;
   auto startTime = std::chrono::high_resolution_clock::now();
@@ -131,7 +129,7 @@ csstats::collectStats(const Periods& periods)
   using Seconds = std::chrono::seconds;
   Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
 
-  Log("Collecting stats: finished (took ", (int)seconds.count(), "s)");
+  TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
   std::cout << "Stats updated\n";
 
   return stats;
@@ -145,7 +143,7 @@ csstats::collectAllStats(const Periods& periods)
                    std::end(periods),
                    [](const Period& l, const Period& r) { return l < r; }));
 
-  Log("Collecting All stats: started");
+  TRACE("Collecting All stats: started");
 
   AllStats stats;
   stats.second.resize(periods.size());
@@ -243,7 +241,7 @@ csstats::collectAllStats(const Periods& periods)
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
     finishTime - startTime);
 
-  Log("Collecting All stats: finished (took ", milliseconds.count(), "ms)");
+  TRACE("Collecting All stats: finished (took ", milliseconds.count(), "ms)");
 
   return stats;
 }
@@ -251,7 +249,7 @@ csstats::collectAllStats(const Periods& periods)
 csstats::csstats(BlockChain& blockchain)
   : blockchain(blockchain)
 {
-  Log("csstats start ", "update interval is ", updateTimeSec, " sec");
+  TRACE("csstats start ", "update interval is ", updateTimeSec, " sec");
 
 #ifndef MONITOR_NODE
   return;
@@ -260,16 +258,12 @@ csstats::csstats(BlockChain& blockchain)
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
-    Log("csstats thread started");
+    TRACE("csstats thread started");
 
     AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
     currentStats = std::move(allStats.second);
     statsCut = std::move(allStats.first);
-
-#ifndef NO_STATS_TEST
-    startTests();
-#endif
 
     assert(currentStats.size() == collectionPeriods.size());
 
@@ -291,19 +285,19 @@ csstats::csstats(BlockChain& blockchain)
           ss << s.poolsCount << " pools, " << s.transactionsCount;
           ss << " transactions";
 
-          Log(ss.str());
+          TRACE(ss.str());
 #ifdef LOG_STATS_TO_FILE
-         // TRACE(ss.str());
+          TRACE(ss.str());
 
           ss.str(std::string());
 
           ss << "Blockchain size:";
           ss << this->blockchain.getSize();
 
-         //TRACE(ss.str());
+          TRACE(ss.str());
 #endif
           for (auto& t : s.balancePerCurrency) {
-            Log("'",
+            TRACE("'",
                 t.first,
                 "' = ",
                 std::to_string(t.second.integral),
@@ -321,13 +315,13 @@ csstats::csstats(BlockChain& blockchain)
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-    Log("csstats thread stopped");
+    TRACE("csstats thread stopped");
   });
 }
 
 csstats::~csstats()
 {
-  Log("csstats stop");
+  TRACE("csstats stop");
 
   ScopedLock lock(mutex);
 
@@ -343,68 +337,4 @@ csstats::getStats()
   ScopedLock lock(currentStatsMutex);
   return currentStats;
 }
-
-#ifndef NO_STATS_TEST
-void
-csstats::testStats()
-{
-  const std::string start_address =
-    "0000000000000000000000000000000000000000000000000000000000000002";
-  std::string testPublicKey = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsB";
-
-  csdb::Pool pool;
-  std::size_t transactions = valueGenerator(testMaxTransactionCount);
-
-  for (std::size_t i = 0; i < transactions; ++i) {
-    csdb::Transaction transaction;
-    csdb::internal::byte_array barr(testPublicKey.begin(), testPublicKey.end());
-
-    transaction.set_target(csdb::Address::from_public_key(barr));
-    transaction.set_source(csdb::Address::from_string(start_address));
-    transaction.set_currency(csdb::Currency("CS"));
-    transaction.set_amount(csdb::Amount(valueGenerator(10000), 0));
-    transaction.set_balance(csdb::Amount(100, 0));
-
-    if (!pool.add_transaction(transaction))
-      LOG_ERROR("Initial transaction is not valid");
-  }
-
-  struct timeb t;
-  ftime(&t);
-
-  pool.add_user_field(
-    0, std::to_string((uint64_t)((uint64_t)(t.time) * 1000ll) + t.millitm));
-  pool.set_sequence(++testSequence);
-
-  blockchain.writeLastBlock(pool);
-}
-
-std::size_t
-csstats::valueGenerator(std::size_t max)
-{
-  std::random_device randomDevice;
-  std::mt19937 generator(randomDevice());
-  std::uniform_int_distribution<> dist(1, max);
-
-  return dist(generator);
-}
-
-void
-csstats::startTests()
-{
-  std::thread testThread([&]() {
-    std::cout << "Write test stats started\n";
-
-    while (!quit) {
-      for (auto i = 0ull; i < testPoolCount; ++i)
-        testStats();
-
-      std::cout << "Write test stats transactions\n";
-      std::this_thread::sleep_for(std::chrono::seconds(testWritePeriodSec));
-    }
-  });
-
-  testThread.detach();
-}
-#endif
 }

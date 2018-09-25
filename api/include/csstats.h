@@ -16,8 +16,10 @@
 
 namespace csstats {
 
-using Period = uint32_t;
-using Periods = std::vector<uint32_t>;
+	using period_t = std::chrono::seconds::rep;
+
+    using Period = period_t;
+    using Periods = std::vector<period_t>;
 
 using Count = uint32_t;
 
@@ -42,15 +44,15 @@ struct TotalAmount
 using BalancePerCurrency = std::unordered_map<Currency, TotalAmount>;
 using TimeStamp = std::chrono::system_clock::time_point;
 
-struct PeriodStats
-{
-  Period periodSec = 0;
-  Count poolsCount = 0;
-  Count transactionsCount = 0;
-  BalancePerCurrency balancePerCurrency;
-  Count smartContractsCount = 0;
-  TimeStamp timeStamp;
-};
+    struct PeriodStats
+    {
+        period_t periodSec = 0;
+        Count poolsCount = 0;
+        Count transactionsCount = 0;
+        BalancePerCurrency balancePerCurrency;
+        Count smartContractsCount = 0;
+        TimeStamp timeStamp;
+    };
 
 using StatsPerPeriod = std::vector<PeriodStats>;
 using StatsCut = std::deque<PeriodStats>;
@@ -80,23 +82,6 @@ const Periods collectionPeriods = { secondsPerDay,
 class csstats
 {
 public:
-#ifdef NDEBUG
-  inline void Log() {}
-
-  template<typename T, typename... Args>
-  inline void Log(T&& t, Args... args)
-  {}
-#else
-
-  inline void Log() { std::cout << std::endl; }
-
-  template<typename T, typename... Args>
-  inline void Log(T&& t, Args... args)
-  {
-    std::cout << t;
-    Log(args...);
-  }
-#endif
   csstats(BlockChain& blockchain);
 
   StatsPerPeriod getStats();
@@ -124,20 +109,9 @@ private:
   AllStats collectAllStats(const Periods& periods);
 
   template<class F>
-  void matchPeriod(const Periods& periods, uint32_t period, F func);
+  void matchPeriod(const Periods& periods, period_t period, F func);
 
   std::map<std::string, Currency> currencies_indexed = { { "CS", 1 } };
-
-#ifndef NO_STATS_TEST
-  const std::size_t testMaxTransactionCount = 5000;
-  const std::size_t testPoolCount = 100;
-  const std::size_t testWritePeriodSec = 20;
-  std::size_t testSequence = 0;
-
-  void startTests();
-  void testStats();
-  std::size_t valueGenerator(std::size_t max);
-#endif
 };
 }
 

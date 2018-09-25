@@ -12,8 +12,6 @@
 #define FAKE_BLOCKS
 #ifndef MONITOR_NODE 
 #define SPAMMER
-#else
-#define STATS
 #endif
 #define SYNCRO
 #define MYLOG
