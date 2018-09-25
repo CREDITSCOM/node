@@ -1,8 +1,9 @@
 #pragma once
 
-#define MONITOR_NODE
+//#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
+#define NODE_API
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE

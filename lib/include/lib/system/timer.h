@@ -16,6 +16,10 @@ namespace cs
     class Timer
     {
     public:
+        enum : unsigned int {
+            RangeDeltaInPercents = 10
+        };
+
         explicit Timer();
         ~Timer();
 

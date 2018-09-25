@@ -22,8 +22,12 @@ Node::Node(const Config& config)
 , bc_(config.getPathToDB().c_str())
 , solver_(new cs::Solver(this))
 , transport_(new Transport(config, this))
+#ifdef MONITOR_NODE
 , stats_(bc_)
+#endif
+#ifdef NODE_API
 , api_(bc_, solver_)
+#endif
 , packStreamAllocator_(1 << 26, 5)
 , allocator_(1 << 26, 3)
 , ostream_(&packStreamAllocator_, myPublicKey_) {
@@ -43,17 +47,16 @@ bool Node::init() {
     return false;
 
   // Create solver
-
   if (!solver_)
     return false;
 
-  LOG_EVENT("Everything init");
+  csdebug() << "Everything init";
 
   // check file with keys
   if (!checkKeysFile())
     return false;
-  solver_->set_keys(myPublicForSig, myPrivateForSig);  // DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
 
+  solver_->set_keys(myPublicForSig, myPrivateForSig);  // DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
   solver_->addInitialBalance();
 
   return true;
@@ -1017,15 +1020,18 @@ void Node::sendBlockRequest(uint32_t seq) {
     return;
   }
 
-  // cslog() << "SENDBLOCKREQUEST> Composing the request" ;
+  csdebug() << "SENDBLOCKREQUEST> Composing the request" ;
+
   size_t lws;
   size_t globalSequence = getBlockChain().getGlobalSequence();
 
   if (globalSequence == 0) {
     globalSequence = roundNum_;
   }
+
   lws = getBlockChain().getLastWrittenSequence();
-  float syncStatus = (1. - (globalSequence - lws) / globalSequence) * 100.;
+
+  float syncStatus = (1.0f - (globalSequence - lws) / globalSequence) * 100.0f;
   csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%";
 
   sendBlockRequestSequence = seq;

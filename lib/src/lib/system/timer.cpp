@@ -1,7 +1,5 @@
 #include "lib/system/timer.h"
 
-const unsigned int RANGE_ALLOWABLE_ERROR_IN_PERCENT = 10;
-
 cs::Timer::Timer():
     mIsRunning(false),
     mInterruption(false),
@@ -22,9 +20,7 @@ void cs::Timer::start(int msec)
     mMsec = std::chrono::milliseconds(msec);
     mThread = std::thread(&Timer::loop, this);
     mRealMsec = mMsec;
-    mAllowableDifference = RANGE_ALLOWABLE_ERROR_IN_PERCENT ?
-        msec * RANGE_ALLOWABLE_ERROR_IN_PERCENT / 100 :
-        0;
+    mAllowableDifference = RangeDeltaInPercents ? msec * RangeDeltaInPercents / 100 : 0;
 }
 
 void cs::Timer::stop()
@@ -57,8 +53,9 @@ static void singleShotHelper(int msec, const cs::TimerCallback& callback)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(msec));
 
-    if (callback)
+    if (callback) {
         callback();
+    }
 }
 
 void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback)
@@ -81,8 +78,9 @@ void cs::Timer::loop()
 
         rehabilitation();
 
-        for (const auto& callback : mCallbacks)
+        for (const auto& callback : mCallbacks) {
             callback();
+        }
     }
 }
 
@@ -93,16 +91,19 @@ void cs::Timer::rehabilitation()
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - mRehabilitationStartValue);
     auto difference = duration - mRealMsec;
 
-    if (difference >= mRealMsec)
+    if (difference >= mRealMsec) {
         mMsec = std::chrono::milliseconds(0);
+    }
     else
     {
-        if (difference.count() > mAllowableDifference)
+        if (difference.count() > mAllowableDifference) {
             mMsec = mRealMsec - (difference % mRealMsec);
+        }
         else
         {
-            if (mMsec != mRealMsec)
+            if (mMsec != mRealMsec) {
                 mMsec = mRealMsec;
+            }
         }
     }
 }

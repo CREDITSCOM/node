@@ -32,7 +32,6 @@ class Node {
   void run(const Config&);
 
   /* Incoming requests processing */
-  void getInitRing(const uint8_t*, const size_t);
   void getRoundTable(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
   void getBigBang(const uint8_t*, const size_t, const RoundNum, uint8_t type);
   void getTransaction(const uint8_t*, const size_t);
@@ -54,7 +53,6 @@ class Node {
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  // void getTLConfirmation(const uint8_t* data, const size_t size);
   void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
 
@@ -65,7 +63,7 @@ class Node {
   void sendTransaction(const csdb::Transaction&);
 
   void sendFirstTransaction(const csdb::Transaction&);
-  void sendTransactionList(const csdb::Pool&);  //, const PublicKey&);
+  void sendTransactionList(const csdb::Pool&);
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
   void sendBlock(const csdb::Pool&);
@@ -99,7 +97,6 @@ class Node {
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const cs::RoundInfo& roundInfo);
-  // void sendTLConfirmation(size_t tcount);
   bool getSyncroStarted();
 
   enum MessageActions { Process, Postpone, Drop };
@@ -112,7 +109,6 @@ class Node {
     return myLevel_;
   }
   uint32_t getRoundNumber();
-  // bool getSyncroStarted();
   uint8_t getMyConfNumber();
 
   const std::vector<PublicKey>& getConfidants() const {
@@ -126,9 +122,12 @@ class Node {
     return bc_;
   }
 
+#ifdef NODE_API
   csconnector::connector& getConnector() {
     return api_;
   }
+#endif
+
   PublicKey writerId;
   void addToPackageTemporaryStorage(const csdb::Pool& pool);
 
@@ -177,8 +176,13 @@ private:
   cs::Solver* solver_;
   Transport*  transport_;
 
+#ifdef MONITOR_NODE
   csstats::csstats       stats_;
+#endif
+
+#ifdef NODE_API
   csconnector::connector api_;
+#endif
 
   RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
