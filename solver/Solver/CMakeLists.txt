@@ -7,37 +7,16 @@ set(SOLVER_TEST_BUILD FALSE)
 set(SOLVER_DOC_BUILD FALSE)
 
 add_library(Solver
-	Include/Solver/Generals.hpp
-	Include/Solver/Solver.hpp
-	Include/Solver/WalletsState.h
-        Src/Solver.cpp
-        Src/Generals.cpp
-        Src/WalletState.cpp
-	${THRIFT_GENERATED_FILES}
-)
-
-target_include_directories(csnode PUBLIC
-  ../csnode/include
-  ../net/include
+            Include/Solver/Generals.hpp
+            Include/Solver/Solver.hpp
+            Include/Solver/WalletsState.h
+            Src/Solver.cpp
+            Src/Generals.cpp
+            Src/WalletState.cpp
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set (BOOST_ROOT ${BOOST_ROOT})
-# set (Boost_NO_SYSTEM_PATHS ON)
-set (Boost_USE_MULTITHREADED ON)
-set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
-set (BOOST_ALL_DYN_LINK OFF)
-
-find_package (Boost REQUIRED COMPONENTS system filesystem chrono)
-target_link_libraries(Solver
-		      Boost::system
-		      Boost::filesystem
-		      Boost::chrono
-		      Boost::disable_autolinking
-		      )
 
 target_include_directories(Solver PUBLIC Include)
 

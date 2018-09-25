@@ -1,5 +1,5 @@
-#include <csnode/blockchain.hpp>
 #include <Solver/WalletsState.h>
+#include <csnode/blockchain.hpp>
 
 namespace Credits
 {

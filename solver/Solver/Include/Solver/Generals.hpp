@@ -10,10 +10,10 @@
 
 #include <csdb/csdb.h>
 #include <csdb/pool.h>
+#include <lib/system/keys.hpp>
 #include <map>
 
 #include <csnode/node.hpp>
-#include <lib/system/keys.hpp>
 
 namespace Credits{
 

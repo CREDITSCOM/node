@@ -7,19 +7,16 @@
 #include <string.h>
 #ifdef _MSC_VER
 #include <intrin.h>
-#else
-#include <x86intrin.h>
 #endif
 
 #include "Solver/Generals.hpp"
 #include "Solver/WalletsState.h"
 
 #include <algorithm>
-#include <csdb/currency.h>
-#include <csdb/address.h>
+#include <csdb/amount.h>
 #include <csdb/amount_commission.h>
-#include <csdb/pool.h>
 #include <csdb/transaction.h>
+#include <csdb/pool.h>
 
 #include <mutex>
 
