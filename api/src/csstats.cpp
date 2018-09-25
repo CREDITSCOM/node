@@ -253,6 +253,10 @@ csstats::csstats(BlockChain& blockchain)
 {
   Log("csstats start ", "update interval is ", updateTimeSec, " sec");
 
+#ifndef MONITOR_NODE
+  return;
+#endif
+
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
