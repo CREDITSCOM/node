@@ -158,15 +158,16 @@ class Solver {
 
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
-  void       initConfRound();
-  void       sendZeroVector();
-  void       checkVectorsReceived(size_t _rNum);
-  void       checkMatrixReceived();
-  void       addConfirmation(uint8_t confNumber_);
-  bool       getIPoolClosed();
-  bool       getBigBangStatus();
-  void       setBigBangStatus(bool _status);
-  void       setRNum(size_t _rNum);
+
+  void initConfRound();
+  void sendZeroVector();
+  void checkVectorsReceived(size_t _rNum);
+  void checkMatrixReceived();
+  void addConfirmation(uint8_t confNumber_);
+  bool getIPoolClosed();
+  bool getBigBangStatus();
+  void setBigBangStatus(bool _status);
+  void setRNum(size_t _rNum);
   void setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general, const RoundNumber roundNum);
 
  private:
@@ -179,7 +180,6 @@ class Solver {
 
   void writeNewBlock();
   void prepareBlockForSend(csdb::Pool& block);
-
 
 #ifdef SPAM_MAIN
   void createPool();
@@ -195,12 +195,13 @@ class Solver {
   std::vector<uint8_t> myPublicKey;
   std::vector<uint8_t> myPrivateKey;
 
-  Node*                     node_;
+  Node* node_;
+
   std::unique_ptr<Generals> generals;
 
   HashVector hvector;
 
-  cs::Hashes          mNeededHashes;
+  cs::Hashes m_neededHashes;
 
   size_t              lastRoundTransactionsGot;
   std::set<PublicKey> receivedVec_ips;
@@ -219,23 +220,24 @@ class Solver {
   csdb::Pool m_pool;
   csdb::Pool m_uncharacterizedPool;
 
-  cs::RoundInfo mRound;
+  cs::RoundInfo m_roundInfo;
 
   csdb::Pool v_pool;
   csdb::Pool b_pool;
-  bool       m_pool_closed           = true;
-  bool       sentTransLastRound      = false;
-  bool       vectorComplete          = false;
-  bool       consensusAchieved       = false;
-  bool       blockCandidateArrived   = false;
-  bool       round_table_sent        = false;
-  bool       transactionListReceived = false;
-  bool       vectorReceived          = false;
-  bool       gotBlockThisRound       = false;
-  bool       writingConfirmationGot  = false;
-  bool       gotBigBang              = false;
 
-  bool    writingConfGotFrom[100];
+  bool m_pool_closed           = true;
+  bool sentTransLastRound      = false;
+  bool vectorComplete          = false;
+  bool consensusAchieved       = false;
+  bool blockCandidateArrived   = false;
+  bool round_table_sent        = false;
+  bool transactionListReceived = false;
+  bool vectorReceived          = false;
+  bool gotBlockThisRound       = false;
+  bool writingConfirmationGot  = false;
+  bool gotBigBang              = false;
+  bool writingConfGotFrom[100];
+
   uint8_t writingCongGotCurrent;
   size_t  rNum = 0;
 
@@ -244,10 +246,10 @@ class Solver {
   std::vector<csdb::Transaction> m_transactions;
   csdb::Pool                     m_transactions_;
 
-  cs::TransactionsPacketHashTable mHashTable;
-  cs::TransactionsBlock           mTransactionsBlock;
+  cs::TransactionsPacketHashTable m_hashTable;
+  cs::TransactionsBlock           m_transactionsBlock;
 
-  cs::Timer m_SendingPacketTimer;
+  cs::Timer m_sendingPacketTimer;
 
 #ifdef SPAMMER
   std::atomic_bool spamRunning{false};

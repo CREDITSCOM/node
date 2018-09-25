@@ -32,10 +32,6 @@ class Generals {
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  // Rewrite method//
-  void chooseHeadAndTrusted(std::map<std::string, std::string>);
-  void chooseHeadAndTrustedFake(std::vector<std::string>& hashes);
-
   Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
 
   void addvector(HashVector vector);
@@ -47,7 +43,6 @@ class Generals {
   HashMatrix    getMatrix() const;
 
   void addSenderToMatrix(uint8_t myConfNum);
-  void fake_block(std::string);
 
   Characteristic getCharacteristic() const;
 

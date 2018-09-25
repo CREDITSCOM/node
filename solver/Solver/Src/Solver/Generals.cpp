@@ -2,7 +2,7 @@
 //                    Created by Analytical Solytions Core Team 07.09.2018                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <string.h>
+#include <cstring>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -70,7 +70,7 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
   m_new_trusted.fill(0);
   m_hw_total.fill(hash_weight{});
 
-  return Hash_(hash_s);
+  return hash_s;
 }
 
 void Generals::addvector(HashVector vector) {
@@ -88,16 +88,16 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   std::cout << "GENERALS> Add matrix" << std::endl;
 
   const uint8_t nodes_amount = confidantNodes.size();
-  hash_weight*  hw           = new hash_weight[nodes_amount];
-  Hash_         temp_hash;
-  uint8_t       j = matrix.Sender;
-  uint8_t       i_max;
-  bool          found = false;
+
+  auto*   hw = new hash_weight[nodes_amount];
+  Hash_   temp_hash;
+  uint8_t j = matrix.Sender;
+  uint8_t i_max;
+  bool    found = false;
 
   uint8_t max_frec_position;
-  uint8_t j_max = 0;
 
-  std::cout << "GENERALS> HW OUT: nodes amount = " << (int)nodes_amount << std::endl;
+  std::cout << "GENERALS> HW OUT: nodes amount = " << nodes_amount << std::endl;
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
@@ -114,10 +114,9 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
       for (uint8_t ii = 0; ii < i_max; ii++) {
         if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.val, 32) == 0) {
           (hw[ii].a_weight)++;
-
-          found                                    = true;
           *(m_find_untrusted.data() + j * 100 + i) = ii;
 
+          found = true;
           break;
         }
       }
@@ -150,8 +149,9 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   memcpy(m_hw_total[j].a_hash, hw[max_frec_position].a_hash, 32);
 
   for (int i = 0; i < nodes_amount; i++) {
-    if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position)
+    if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position) {
       *(m_new_trusted.data() + i) += 1;
+    }
   }
 
   delete[] hw;
@@ -206,21 +206,21 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
   for (int i = 0; i < nodes_amount; i++) {
     if (*(m_new_trusted.data() + i) < trusted_limit) {
       std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
-
-    } else
+    } else {
       j++;
+    }
   }
 
-  if (j == nodes_amount)
+  if (j == nodes_amount) {
     std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
+  }
 
   std::cout << "Hash : " << lasthash.to_string() << std::endl;
 
   auto hash_t = lasthash.to_binary();
   int  k      = *(hash_t.begin());
 
-  uint16_t result = 0;
-  result          = k % nodes_amount;
+  uint16_t result = k % nodes_amount;
 
   std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
 
@@ -232,15 +232,6 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
 
 HashMatrix Generals::getMatrix() const {
   return m_hMatrix;
-}
-
-void Generals::chooseHeadAndTrusted(std::map<std::string, std::string>) {
-}
-
-void Generals::chooseHeadAndTrustedFake(std::vector<std::string>& hashes) {
-}
-
-void Generals::fake_block(std::string m_public_key) {
 }
 
 Characteristic Generals::getCharacteristic() const {
