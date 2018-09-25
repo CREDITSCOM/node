@@ -97,6 +97,10 @@ extern thread_local bool trace;
 #define TRACE(PRINT_ARGS) [&]() -> decltype(auto) {}()
 #endif
 
+namespace logger {
+void stacktrace();
+}
+
 static inline std::string byteStreamToHex(const char* stream, const size_t length) {
   static std::string map = "0123456789ABCDEF";
 
