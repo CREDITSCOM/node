@@ -275,4 +275,4 @@ serialize(const T& sc)
 }
 
 bool
-is_smart_deploy(const api::SmartContractInvocation& smart);
+is_deploy_transaction(const csdb::Transaction& tr);
