@@ -146,4 +146,11 @@ namespace slv2
         }
     }
 
+    void SolverCore::send_wallet_transaction(const csdb::Transaction& trans)
+    {
+        if(m_pSolvV1) {
+            return m_pSolvV1->send_wallet_transaction(trans);
+        }
+    }
+
 } // slv2

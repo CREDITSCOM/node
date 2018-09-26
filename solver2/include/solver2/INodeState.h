@@ -8,6 +8,8 @@ class Hash;
 #include <lib/system/keys.hpp> // Hash, PublicKey
 #endif
 
+#include <cstdint>
+
 namespace csdb
 {
     class Pool;
@@ -22,6 +24,7 @@ namespace Credits
 namespace slv2
 {
     class SolverContext;
+
     class INodeState
     {
     public:

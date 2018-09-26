@@ -5,18 +5,11 @@
 #include "Consensus.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)
-//#include "ProxyTypes.h"
+#include "ProxyTypes.h"
 #else
 //#include <csdb/pool.h>
 //#include <Solver/Solver.hpp> // Credits::HashVector, Credits::Solver
 #include <vector> // to define byte_array
-#endif
-
-#include <memory>
-#include <map>
-
-class Node;
-
 namespace csdb
 {
     class PoolHash;
@@ -27,6 +20,12 @@ namespace csdb
     }
 }
 
+#endif
+
+#include <memory>
+#include <map>
+
+class Node;
 namespace Credits
 {
     class Solver;
@@ -101,6 +100,8 @@ namespace slv2
         void addConfirmation(uint8_t conf_number);
         void beforeNextRound();
         void nextRound();
+        // required by api
+        void send_wallet_transaction(const csdb::Transaction& trans);
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*pool*/, const PublicKey& /*sender*/)
         {}
