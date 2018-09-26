@@ -17,6 +17,10 @@ target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
 
 add_definitions(-DBOOST_STACKTRACE_LINK)
 
+set (Boost_USE_MULTITHREADED ON)
+set (Boost_USE_STATIC_LIBS ON)
+set (Boost_USE_STATIC_RUNTIME ON)
+
 if (MSVC)
   find_package (Boost REQUIRED COMPONENTS stacktrace_windbg_cached)
   add_definitions(-DBOOST_STACKTRACE_USE_WINDBG_CACHED)
