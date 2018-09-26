@@ -306,17 +306,16 @@ void Solver::flushTransactions() {
       csdebug() << "FlushTransaction ...";
       cslog() << "Transaction flushed";
 
-      if (composed && !m_hashTable.count(packet.hash())) {
-<<<<<<< HEAD
-        m_hashTable.insert(std::make_pair(packet.hash(), std::move(packet)));
-=======
+      auto hash = packet.hash();
+
+      if (composed && !m_hashTable.count(hash)) {
         m_hashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
->>>>>>> c1fcb3709753362df66f2304e7e13eb102ea48c1
       } else {
         cslog() << "Transaction compose failed";
       }
     }
   }
+
   m_transactionsBlock.clear();
 }
 
