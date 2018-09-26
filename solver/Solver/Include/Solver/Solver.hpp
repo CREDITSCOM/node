@@ -158,7 +158,7 @@ typedef std::string Matrix;
 		void gotVector(HashVector&&);
 		void gotMatrix(HashMatrix&&);
 		void gotBlock(csdb::Pool&&, const PublicKey&);
-		void gotHash(Hash&, const PublicKey&);
+		void gotHash(const Hash&, const PublicKey&);
 		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
 		void gotBlockReply(csdb::Pool&&);
     void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);

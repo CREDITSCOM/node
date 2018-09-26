@@ -641,7 +641,7 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
  // writeNewBlock();
 }
 
-void Solver::gotHash(Hash& hash, const PublicKey& sender)
+void Solver::gotHash(const Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
 

@@ -22,16 +22,26 @@ namespace slv2
         return stub;
     }
 
-    void SolverCore::set_keys(const csdb::internal::byte_array& /*pub*/, const csdb::internal::byte_array& /*priv*/)
+    void SolverCore::set_keys(const csdb::internal::byte_array& pub, const csdb::internal::byte_array& priv)
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->set_keys(pub, priv);
+        }
     }
 
     void SolverCore::addInitialBalance()
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->addInitialBalance();
+        }
     }
 
     void SolverCore::setBigBangStatus(bool status)
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->setBigBangStatus(status);
+        }
+
         if(!m_pState) {
             return;
         }
@@ -42,6 +52,11 @@ namespace slv2
 
     void SolverCore::gotTransaction(const csdb::Transaction& trans)
     {
+        if(m_pSolvV1) {
+            csdb::Transaction tmp = trans;
+            m_pSolvV1->gotTransaction(std::move(tmp));
+        }
+
         if(!m_pState) {
             return;
         }
@@ -52,6 +67,11 @@ namespace slv2
 
     void SolverCore::gotTransactionList(const csdb::Pool& pool)
     {
+        if(m_pSolvV1) {
+            csdb::Pool tmp = pool;
+            m_pSolvV1->gotTransactionList(std::move(tmp));
+        }
+
         if(!m_pState) {
             return;
         }
@@ -62,6 +82,11 @@ namespace slv2
 
     void SolverCore::gotVector(const Credits::HashVector& vect)
     {
+        if(m_pSolvV1) {
+            Credits::HashVector tmp = vect;
+            m_pSolvV1->gotVector(std::move(tmp));
+        }
+
         if(!m_pState) {
             return;
         }
@@ -73,6 +98,11 @@ namespace slv2
 
     void SolverCore::gotMatrix(const Credits::HashMatrix& matr)
     {
+        if(m_pSolvV1) {
+            Credits::HashMatrix tmp = matr;
+            m_pSolvV1->gotMatrix(std::move(tmp));
+        }
+
         if(!m_pState) {
             return;
         }
@@ -84,6 +114,11 @@ namespace slv2
 
     void SolverCore::gotBlock(const csdb::Pool& pool, const PublicKey& sender)
     {
+        if(m_pSolvV1) {
+            csdb::Pool tmp = pool;
+            m_pSolvV1->gotBlock(std::move(tmp), sender);
+        }
+
         if(!m_pState) {
             return;
         }
@@ -92,16 +127,25 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotBlockRequest(const csdb::PoolHash& /*pool_hash*/, const PublicKey& /*sender*/)
+    void SolverCore::gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender)
     {
+        if(m_pSolvV1) {
+            csdb::PoolHash tmp = pool_hash;
+            m_pSolvV1->gotBlockRequest(std::move(tmp), sender);
+        }
+
         if(!m_pState) {
             return;
         }
-
     }
 
-    void SolverCore::gotBlockReply(const csdb::Pool& /*pool*/)
+    void SolverCore::gotBlockReply(const csdb::Pool& pool)
     {
+        if(m_pSolvV1) {
+            csdb::Pool tmp = pool;
+            m_pSolvV1->gotBlockReply(std::move(tmp));
+        }
+
         if(!m_pState) {
             return;
         }
@@ -110,6 +154,10 @@ namespace slv2
 
     void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->gotHash(hash, sender);
+        }
+
         if(!m_pState) {
             return;
         }
@@ -118,24 +166,34 @@ namespace slv2
         }
     }
 
-    void SolverCore::addConfirmation(uint8_t /*conf_number*/)
+    void SolverCore::addConfirmation(uint8_t conf_number)
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->addConfirmation(conf_number);
+        }
+
         if(!m_pState) {
             return;
         }
-
     }
 
     void SolverCore::beforeNextRound()
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->beforeNextRound();
+        }
+        
         if(!m_pState) {
             return;
         }
-
     }
 
     void SolverCore::nextRound()
     {
+        if(m_pSolvV1) {
+            m_pSolvV1->nextRound();
+        }
+
         if(!m_pState) {
             return;
         }
@@ -149,7 +207,7 @@ namespace slv2
     void SolverCore::send_wallet_transaction(const csdb::Transaction& trans)
     {
         if(m_pSolvV1) {
-            return m_pSolvV1->send_wallet_transaction(trans);
+            m_pSolvV1->send_wallet_transaction(trans);
         }
     }
 
