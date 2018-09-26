@@ -5,7 +5,7 @@
 
 #include <csstats.h>
 #include <csconnector/csconnector.h>
-#include <Solver/Solver.hpp>
+#include <solver2/SolverCore.h>
 #include <client/config.hpp>
 
 #include "blockchain.hpp"
@@ -22,7 +22,7 @@ typedef std::string Vector;
 typedef std::string Matrix;
 
 class Transport;
-namespace Credits { class Solver; }
+namespace slv2 { class SolverCore; }
 
 class Node {
 public:
@@ -152,7 +152,7 @@ private:
   // Resources
   BlockChain bc_;
 
-  Credits::Solver* solver_;
+  slv2::SolverCore* solver_;
   Transport* transport_;
 
   csstats::csstats stats_;

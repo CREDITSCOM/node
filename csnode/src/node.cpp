@@ -15,7 +15,7 @@ const unsigned MAX_CONFIDANTS = 4;
 Node::Node(const Config& config):
   myPublicKey_(config.getMyPublicKey()),
   bc_(config.getPathToDB().c_str()),
-  solver_(new Credits::Solver(this)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
+  solver_(new slv2::SolverCore(this)),//Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
   transport_(new Transport(config, this)),
   stats_(bc_),
   api_(bc_, solver_),

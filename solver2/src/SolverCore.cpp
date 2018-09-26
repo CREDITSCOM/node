@@ -1,99 +1,141 @@
 #include "SolverCore.h"
-#include "StartState.h"
-#include "NormalState.h"
-#include "NormalSyncState.h"
-#include "TrustedState.h"
-#include "TrustedCollectState.h"
-#include "TrustedWriteState.h"
-
+#include <Solver/Solver.hpp>
 #include <iostream>
 
-SolverCore::SolverCore()
-    : m_stateExpiredTag(CallsQueueScheduler::no_tag)
-    , m_shouldStop(false)
-    , m_pState(&m_noState)
+namespace slv2
 {
-    m_pStartState = new StartState();
-    m_pNormalState = new NormalState();
-    m_pNormalSyncState = new NormalSyncState();
-    m_pTrustedState = new TrustedState();
-    m_pTrustedCollectState = new TrustedCollectState();
-    m_pTrustedWriteState = new TrustedWriteState();
 
-    setState(m_pStartState);
-}
-
-SolverCore::~SolverCore()
-{
-    m_scheduler.Stop();
-    delete m_pStartState;
-    delete m_pNormalState;
-    delete m_pNormalSyncState;
-    delete m_pTrustedState;
-    delete m_pTrustedCollectState;
-    delete m_pTrustedWriteState;
-}
-
-void SolverCore::setState(INodeState* pState)
-{
-    // To prevent state from extend itself uncomment next block
-    //if(pState == m_pState) {
-    //    return;
-    //}
-    if(m_stateExpiredTag != CallsQueueScheduler::no_tag) {
-        // no timeout, cancel waiting
-        m_scheduler.Remove(m_stateExpiredTag);
-        m_stateExpiredTag = CallsQueueScheduler::no_tag;
+    SolverCore::SolverCore()
+        // internal data
+        : m_context(*this)
+        , m_stateExpiredTag(CallsQueueScheduler::no_tag)
+        , m_shouldStop(false)
+        // options
+        , m_optTimeoutsEnabled(false)
+        , m_optDuplicateStateEnabled(true)
+        // consensus data
+        , m_round(0)
+        , m_pNode(nullptr)
+        , m_pGen(nullptr)
+    {
+        InitTransitions();
     }
-    else {
-        // state changed due timeout from within expired state        
+
+    SolverCore::SolverCore(Node * pNode) : SolverCore()
+    {
+        m_pSolvV1 = (std::make_unique<Credits::Solver>(pNode));
+        m_pGen = m_pSolvV1->generals.get();
+        m_pNode = m_pSolvV1->node_;
     }
-    std::cout << "Change state: " << m_pState->getName() << " -> " << pState->getName() << std::endl;
-    const INodeState* tmp = m_pState;
-    m_pState->stateOff(*this);
-    m_pState = pState;
-    m_pState->stateOn(*this, *tmp);
-    m_stateExpiredTag = m_scheduler.InsertOnce(DefaultStateTimeout, [this]() {
-        std::cout << "State expired: " << m_pState->getName() << std::endl;
-        // clear flag to know timeout expired
+
+    SolverCore::~SolverCore()
+    {
+        m_scheduler.Stop();
+        m_transitions.clear();
+    }
+
+    void SolverCore::Start()
+    {
+        m_shouldStop = false;
+        handleTransitions(Event::Start);
+    }
+
+    void SolverCore::Finish()
+    {
+        m_pState->stateOff(m_context);
+        m_scheduler.RemoveAll();
         m_stateExpiredTag = CallsQueueScheduler::no_tag;
-        // control state switch
-        INodeState * expired = m_pState;
-        m_pState->stateExpired(*this);
-        if(m_pState == expired) {
-            // expired state did not change to another one, do it now
-            std::cout << "expired state did not select new one, set NormalState (default)" << std::endl;
-            setNormalState();
+        m_pState = nullptr;
+        m_shouldStop = true;
+    }
+
+    void SolverCore::setState(const StatePtr& pState)
+    {
+        if(!m_optDuplicateStateEnabled) {
+            if(pState == m_pState) {
+                return;
+            }
         }
-    }, true);
-}
+        if(m_stateExpiredTag != CallsQueueScheduler::no_tag) {
+            // no timeout, cancel waiting
+            m_scheduler.Remove(m_stateExpiredTag);
+            m_stateExpiredTag = CallsQueueScheduler::no_tag;
+        }
+        else {
+            // state changed due timeout from within expired state        
+        }
+        
+        m_pState->stateOff(m_context);
+        std::cout << "Core: switch state " << m_pState->getName() << " -> " << pState->getName() << std::endl;
+        m_pState = pState;
+        m_pState->stateOn(m_context);
+        
+        // timeout hadling
+        if(m_optTimeoutsEnabled) {
+            m_stateExpiredTag = m_scheduler.InsertOnce(DefaultStateTimeout, [this]() {
+                std::cout << "Core: state " << m_pState->getName() << " is expired" << std::endl;
+                // clear flag to know timeout expired
+                m_stateExpiredTag = CallsQueueScheduler::no_tag;
+                // control state switch
+                std::weak_ptr<INodeState> p1(m_pState);
+                m_pState->stateExpired(m_context);
+                if(m_pState == p1.lock()) {
+                    // expired state did not change to another one, do it now
+                    std::cout << "Core: there is no state set on expiration of " << m_pState->getName() << std::endl;
+                    //setNormalState();
+                }
+            }, true);
+        }
+    }
 
-void SolverCore::setStartState()
-{
-    setState(m_pStartState);
-}
+    void SolverCore::handleTransitions(Event evt)
+    {
+        if(Event::BigBang == evt) {
+            std::cout << "Core: BigBang on" << std::endl;
+        }
+        const auto& variants = m_transitions [m_pState];
+        if(variants.empty()) {
+            std::cout << "Core: there are no transitions for " << m_pState->getName() << std::endl;
+            return;
+        }
+        auto it = variants.find(evt);
+        if(it == variants.cend()) {
+            // such event is ignored in current state
+            return;
+        }
+        setState(it->second);
+    }
 
-void SolverCore::setNormalState()
-{
-    setState(m_pNormalState);
-}
+    bool SolverCore::stateCompleted(Result res)
+    {
+        if(Result::Failure == res) {
+            std::cout << "Core: handler error in state " << m_pState->getName() << std::endl;
+        }
+        return (Result::Finish == res);
+    }
 
-void SolverCore::setNormalSyncState()
-{
-    setState(m_pNormalSyncState);
-}
+    // SolverCore::Context implementation
+    
+    void SolverContext::becomeNormal()
+    {
+        m_core.handleTransitions(SolverCore::Event::SetNormal);
+    }
 
-void SolverCore::setTrustedState()
-{
-    setState(m_pTrustedState);
-}
+    void SolverContext::becomeTrusted()
+    {
+        m_core.handleTransitions(SolverCore::Event::SetTrusted);
+    }
 
-void SolverCore::setTrustedCollectState()
-{
-    setState(m_pTrustedCollectState);
-}
+    void SolverContext::becomeWriter()
+    {
+        m_core.handleTransitions(SolverCore::Event::SetWriter);
+    }
 
-void SolverCore::setTrustedWriteState()
-{
-    setState(m_pTrustedWriteState);
-}
+    void SolverContext::startNewRound()
+    {
+        m_core.beforeNextRound();
+        m_core.nextRound();
+    }
+
+
+} // slv2

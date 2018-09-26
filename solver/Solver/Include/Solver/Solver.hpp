@@ -38,6 +38,11 @@
 
 class Node;
 
+namespace slv2
+{
+    class SolverCore;
+}
+
 namespace Credits{
 typedef std::string Vector;
 typedef std::string Matrix;
@@ -215,6 +220,7 @@ typedef std::string Matrix;
 		std::vector<uint8_t> myPublicKey;
 		std::vector<uint8_t> myPrivateKey;
 
+        friend class slv2::SolverCore;
 		Node* node_;
         std::unique_ptr<Generals> generals;
 
@@ -374,5 +380,5 @@ typedef std::string Matrix;
 
         // makes and send request to T-nodes those hashes are still absent this round
         void requestMissingHashes();
-};
+    };
 }
