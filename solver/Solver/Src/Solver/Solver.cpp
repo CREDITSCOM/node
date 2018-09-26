@@ -165,35 +165,50 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
   gotBlockThisRound = true;
 
   uint64_t sequence = metaInfoPool.sequence();
-  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
-  std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
 
+  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
+
+  std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
   boost::dynamic_bitset<> mask{characteristic.begin(), characteristic.end()};
 
-  size_t         maskIndex = 0;
-  cs::SharedLock sharedLock(mSharedMutex);
+  size_t maskIndex = 0;
+  cs::Hashes hashes;
 
-  for (const auto& hash : m_roundInfo.hashes) {
-    auto it = m_hashTable.find(hash);
-    if (it == m_hashTable.end()) {
+  {
+    cs::SharedLock sharedLock(mSharedMutex);
+    hashes = m_roundInfo.hashes;
+  }
+
+  for (const auto& hash : hashes) {
+    if (!m_hashTable.contains(hash)) {
       cserror() << "HASH NOT FOUND";
       return;
     }
-    const auto& transactions = it->second.transactions();
+
+    const auto& transactions = m_hashTable.find(hash).transactions();
+
     if (bitsCount != transactions.size()) {
       cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
       return;
     }
+
     for (const auto& transaction : transactions) {
       if (mask.test(maskIndex)) {
         m_pool.add_transaction(transaction);
       }
+
       ++maskIndex;
     }
-    m_hashTable.erase(it);
+
+    m_hashTable.erase(hash);
   }
-  m_pool.set_sequence(sequence);
-  m_pool.add_user_field(0, timestamp);
+
+  {
+    cs::Lock lock(mSharedMutex);
+
+    m_pool.set_sequence(sequence);
+    m_pool.add_user_field(0, timestamp);
+  }
 
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
 
@@ -201,16 +216,15 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
   addTimestampToPool(m_pool);
 #endif
 
-  uint32_t g_seq = m_pool.sequence();
-  csdebug() << "GOT NEW BLOCK: global sequence = " << g_seq;
+  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
-  if (g_seq > node_->getRoundNumber()) {
+  if (sequence > node_->getRoundNumber()) {
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
 
-  node_->getBlockChain().setGlobalSequence(g_seq);
+  node_->getBlockChain().setGlobalSequence(sequence);
 
-  if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
+  if (sequence == node_->getBlockChain().getLastWrittenSequence() + 1) {
     node_->getBlockChain().putBlock(m_pool);
 #ifndef MONITOR_NODE
     if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
@@ -296,20 +310,19 @@ void Solver::flushTransactions() {
     cslog() << "Transactions in packet: " << trxCount;
 
     if (trxCount != 0 && packet.hash().is_empty()) {
-      // SUPER KOSTIL
+      // SUPER KOSTIL //TODO fix kostil
       packet.set_storage(node_->getBlockChain().getStorage());
 
       bool composed = packet.compose();
       node_->sendTransactionsPacket(packet);
       sentTransLastRound = true;
 
-      csdebug() << "FlushTransaction ...";
-      cslog() << "Transaction flushed";
+      csdebug() << "Transaction flushed";
 
       auto hash = packet.hash();
 
-      if (composed && !m_hashTable.count(hash)) {
-        m_hashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
+      if (composed && !m_hashTable.contains(hash)) {
+        m_hashTable.insert(std::move(hash), std::move(packet));
       } else {
         cslog() << "Transaction compose failed";
       }
@@ -364,19 +377,19 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   csdebug() << "Got transaction packet";
   cs::TransactionsPacketHash hash = packet.hash();
 
-  cs::Lock lock(mSharedMutex);
-  if (!m_hashTable.count(hash))
-    m_hashTable.insert(std::make_pair(std::move(hash), std::move(packet)));
+  if (!m_hashTable.contains(hash))
+    m_hashTable.insert(std::move(hash), std::move(packet));
 }
 
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
   csdebug() << "Got transactions hash request, try to find in hash table";
-  cs::SharedLock lock(mSharedMutex);
+
   for (const auto& hash : hashes) {
-    if (m_hashTable.count(hash)) {
-      node_->sendPacketHashesReply(m_hashTable[hash], sender);
+    if (m_hashTable.contains(hash)) {
+      node_->sendPacketHashesReply(m_hashTable.find(hash), sender);
+
+      csdebug() << "Found hash in hash table, send to requester";
     }
-    csdebug() << "Found hash in hash table, send to requester";
   }
 }
 
@@ -386,80 +399,104 @@ void Solver::initConfRound() {
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   csdebug() << "Got packet hash reply";
   cslog() << "Got packet hash reply";
+
   cs::TransactionsPacketHash hash = packet.hash();
-  cs::Lock                   lock(mSharedMutex);
 
-  if (!m_hashTable.count(hash)) {
-    m_hashTable.insert(std::make_pair(hash, std::move(packet)));
+  if (!m_hashTable.contains(hash)) {
+    m_hashTable.insert(hash, std::move(packet));
   }
 
-  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
+  {
+    cs::Lock lock(mSharedMutex);
 
-  if (it != m_neededHashes.end()) {
-    m_neededHashes.erase(it);
-  }
+    auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
 
-  if (m_neededHashes.empty()) {
-    buildTransactionList();
+    if (it != m_neededHashes.end()) {
+      m_neededHashes.erase(it);
+    }
+
+    if (m_neededHashes.empty()) {
+      buildTransactionList();
+    }
   }
 }
 
 void Solver::gotRound(cs::RoundInfo&& round) {
   cslog() << "Got round table";
+
+  cs::Hashes localHashes = round.hashes;
+  cs::Hashes neededHashes;
+
   {
     cs::Lock lock(mSharedMutex);
     m_roundInfo = std::move(round);
   }
-  cs::Hashes     neededHashes;
-  cs::SharedLock lock(mSharedMutex);
 
-  for (const auto& hash : m_roundInfo.hashes) {
-    if (!m_hashTable.count(hash)) {
-      neededHashes.push_back(hash);
+  for (const auto& hash : localHashes) {
+    if (!m_hashTable.contains(hash)) {
+      neededHashes.push_back(std::move(hash));
     }
   }
+
   if (!neededHashes.empty()) {
     node_->sendPacketHashesRequest(neededHashes);
   } else if (node_->getMyLevel() == NodeLevel::Confidant) {
+    cs::Lock lock(mSharedMutex);
     buildTransactionList();
   }
-  m_neededHashes = std::move(neededHashes);
+
+  {
+    cs::Lock lock(mSharedMutex);
+    m_neededHashes = std::move(neededHashes);
+  }
 }
 
 void Solver::buildTransactionList() {
   cslog() << "BuildTransactionlist";
-  csdb::Pool _pool = csdb::Pool{};
+  csdb::Pool pool = csdb::Pool{};
 
   for (const auto& hash : m_roundInfo.hashes) {
-    auto it = m_hashTable.find(hash);
-    if (it == m_hashTable.end()) {
-      cserror() << "HASH NOT FOUND";
+    if (!m_hashTable.contains(hash)) {
+      cserror() << "Build vector: HASH NOT FOUND";
       return;
     }
-    const auto& transactions = it->second.transactions();
+
+    const auto& transactions = m_hashTable.find(hash).transactions();
+
     for (const auto& transaction : transactions) {
-      _pool.add_transaction(transaction);
+      pool.add_transaction(transaction);
     }
   }
 
-  Hash_ result                              = generals->buildvector(_pool, m_pool);
+  Hash_ result = generals->buildvector(pool, m_pool);
+
   receivedVecFrom[node_->getMyConfNumber()] = true;
-  hvector.Sender                            = node_->getMyConfNumber();
-  hvector.hash                              = result;
+
+  hvector.Sender = node_->getMyConfNumber();
+  hvector.hash   = result;
+
   receivedVecFrom[node_->getMyConfNumber()] = true;
+
   generals->addvector(hvector);
   node_->sendVector(hvector);
+
   trustedCounterVector++;
+
   if (trustedCounterVector == m_roundInfo.confidants.size()) {
     vectorComplete = true;
+
     memset(receivedVecFrom, 0, 100);
     trustedCounterVector = 0;
+
     // compose and send matrix!!!
     generals->addSenderToMatrix(node_->getMyConfNumber());
+
     receivedMatFrom[node_->getMyConfNumber()] = true;
     ++trustedCounterMatrix;
+
     node_->sendMatrix(generals->getMatrix());
     generals->addmatrix(generals->getMatrix(), node_->getConfidants());  // MATRIX SHOULD BE DECOMPOSED HERE!!!
+
     csdebug() << "SOLVER> Matrix added";
   }
 }
@@ -633,8 +670,10 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender) {
   if (round_table_sent) {
     return;
   }
+
   Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
   csdebug() << "Solver -> My Hash: " << byteStreamToHex(myHash.str, 32);
+
   if (ips.size() <= min_nodes) {
     if (hash == myHash) {
       csdebug() << "Solver -> Hashes are good";
@@ -647,18 +686,26 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender) {
     cslog() << "Solver -> We have enough hashes!";
     return;
   }
+
   if ((ips.size() == min_nodes) && (!round_table_sent)) {
     cslog() << "Solver -> sending NEW ROUND table";
     cs::Hashes hashes;
-    for (auto& it : m_hashTable) {
-      hashes.push_back(it.first);
+
+    {
+      auto lockTable = m_hashTable.lock_table();
+
+      for (auto& it : lockTable) {
+        hashes.push_back(it.first);
+      }
     }
 
     m_roundInfo.round      = ++rNum;
     m_roundInfo.confidants = std::move(ips);
     m_roundInfo.general    = node_->getMyPublicKey();
     m_roundInfo.hashes     = std::move(hashes);
-    std::cout << "Solver -> NEW ROUND initialization done";
+
+    cslog() << "Solver -> NEW ROUND initialization done";
+
     node_->initNextRound(m_roundInfo);
     round_table_sent = true;
   }

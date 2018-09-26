@@ -10,6 +10,7 @@
 #include <shared_mutex>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/smart_ptr/detail/spinlock.hpp>
+#include <libcuckoo/cuckoohash_map.hh>
 
 namespace cs
 {
@@ -22,7 +23,7 @@ namespace cs
     using TransactionsPacketHash = csdb::PoolHash;
 
     // hash table for fast transactions storage
-    using TransactionsPacketHashTable = std::unordered_map<TransactionsPacketHash, TransactionsPacket>;
+    using TransactionsPacketHashTable = cuckoohash_map<TransactionsPacketHash, TransactionsPacket>;
 
     // array of packets
     using TransactionsBlock = std::vector<cs::TransactionsPacket>;
