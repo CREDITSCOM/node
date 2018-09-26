@@ -34,21 +34,19 @@ Fee::Fee()
     current_pool_(nullptr),
     node_(nullptr) {}
 
-void Fee::CountFeesInPool(Node* node, csdb::Pool* pool,
-    size_t pool_sequence, size_t num_of_trusted_nodes) {
+void Fee::CountFeesInPool(Node* node, csdb::Pool* pool) {
   if (pool->transactions().size() < 1) {
     return;
   }
-  Init(node, pool, pool_sequence, num_of_trusted_nodes);
+  Init(node, pool);
   GetOneByteCost();
   SetCountedFee();
 }
 
-inline void Fee::Init(Node* node, csdb::Pool* pool,
-    size_t pool_sequence, size_t num_of_trusted_nodes) {
+inline void Fee::Init(Node* node, csdb::Pool* pool) {
   current_pool_ = pool;
-  num_of_last_block_ = pool_sequence;
-  num_of_trusted_nodes_ = num_of_trusted_nodes;
+  num_of_last_block_ = node->getBlockChain().getLastWrittenSequence() + 1;
+  num_of_trusted_nodes_ = node->getConfidants().size();
   node_ = node;
 }
 
@@ -117,7 +115,6 @@ double Fee::GetBlockTimeStampDifference(size_t num_block_from) {
   csdb::Pool block_to = node_->getBlockChain().loadBlock(block_to_hash);
   double time_stamp_to = std::stod(block_to.user_field(0).value<std::string>());
 
-  return (time_stamp_to - time_stamp_from);
+  return time_stamp_to - time_stamp_from;
 }
-
-}  // namespace Credits
+} // namespace Credits

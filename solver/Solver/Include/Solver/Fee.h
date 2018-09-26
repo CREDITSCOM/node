@@ -30,12 +30,8 @@ class Fee {
   *  @param node - is needed to have an access to blockchain.
   *  @param pool - counted fee will be set for each transaction
   *                in this pool.
-  *  @param pool_sequence - last written sequnce in blockchain + 1.
-  *  @param num_of_trusted_nodes - tmp, will be removed in future
-  *                                with num of all nodes in network.
   */
-  void CountFeesInPool(Node* node, csdb::Pool* pool,
-      size_t pool_sequence, size_t num_of_trusted_nodes);
+  void CountFeesInPool(Node* node, csdb::Pool* pool);
 
   Fee();
   Fee(const Fee&) = delete;
@@ -54,8 +50,7 @@ class Fee {
   void GetRoundFrequency();
   double GetBlockTimeStampDifference(size_t num_block_from);
   inline void CountTotalTransactionsLength();
-  inline void Init(Node* node, csdb::Pool* pool,
-    size_t pool_sequence, size_t num_of_trusted_nodes);
+  inline void Init(Node* node, csdb::Pool* pool);
 
   size_t num_of_trusted_nodes_;
   size_t num_of_last_block_;

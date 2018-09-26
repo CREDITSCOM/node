@@ -354,8 +354,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
   csdb::Pool pool(_pool);
-  fee_counter_.CountFeesInPool(node_, &pool,
-    node_->getBlockChain().getLastWrittenSequence() + 1, node_->getConfidants().size());
+  fee_counter_.CountFeesInPool(node_, &pool);
   Hash_ result = generals->buildvector(pool, m_pool, b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
 	hvector.Sender = node_->getMyConfNumber();
