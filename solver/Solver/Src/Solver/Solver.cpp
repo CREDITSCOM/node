@@ -157,13 +157,17 @@ void Solver::setLastRoundTransactionsGot(size_t trNum) {
 }
 
 void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
-                                 const csdb::Pool& metaInfoPool, const PublicKey& sender) {
+                                 const csdb::Pool& metaInfoPool, const PublicKey& sender)
+{
   cslog() << "SOLVER> ApplyCharacteristic";
+
   if (node_->getMyLevel() == NodeLevel::Writer) {
     return;
   }
+
   gotBigBang        = false;
   gotBlockThisRound = true;
+
   uint64_t sequence = metaInfoPool.sequence();
   cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
   std::string timestamp = metaInfoPool.user_field(0).value<std::string>();
@@ -196,17 +200,22 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
   }
   m_pool.set_sequence(sequence);
   m_pool.add_user_field(0, timestamp);
+
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
+
 #ifdef MONITOR_NODE
   addTimestampToPool(m_pool);
 #endif
+
   uint32_t g_seq = m_pool.sequence();
   csdebug() << "GOT NEW BLOCK: global sequence = " << g_seq;
 
   if (g_seq > node_->getRoundNumber()) {
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
+
   node_->getBlockChain().setGlobalSequence(g_seq);
+
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
     node_->getBlockChain().putBlock(m_pool);
 #ifndef MONITOR_NODE
@@ -217,7 +226,8 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
                                  .data()));  // getLastWrittenHash().to_binary().data()));//SENDING
                                              // HASH!!!
       node_->sendHash(test_hash, sender);
-      csdebug() << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32);
+
+      cslog() << "SENDING HASH to writer: " << byteStreamToHex(test_hash.str, 32);
     }
 #endif
   }

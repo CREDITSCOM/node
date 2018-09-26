@@ -294,23 +294,20 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 }
 
 constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
-void                     Transport::processNodeMessage(const Message& msg) {
+void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
 
-#ifdef MYLOG
-  //if (type == MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message MSG: Transactions " << std::endl;
   if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum << std::endl;
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message MSG: Characteristic " << std::endl;
+  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message MSG: Characteristic received" << std::endl;
   if (type == MsgTypes::BigBang) {
     std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
   }
-  #endif
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -332,19 +329,17 @@ void                     Transport::processNodeMessage(const Message& msg) {
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
-#ifdef MYLOG
- // if(type==MsgTypes::Transactions) std::cout << "TRANSPORT> Process Node Message PKG: Transactions " << std::endl;
+
   if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
   if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
   if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
-  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic" << std::endl;
+  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic received" << std::endl;
   if (type == MsgTypes::BigBang) {
 	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
   }
-  #endif
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:

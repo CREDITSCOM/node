@@ -594,7 +594,7 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
 
   cslog() << "NODE> 1 Sending matrix to ";  //<< byteStreamToHex(it.str, 32)
 
-  ostream_.init(BaseFlags::Broadcast);
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
 
   flushCurrentTasks();
@@ -851,15 +851,15 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 
   istream_.init(data, size);
 
-  uint16_t    timeSize = 0;
+  uint16_t timeSize = 0;
   std::string time;
 
   uint32_t maskBitsCount;
 
-  uint32_t             characteristicSize = 0;
+  uint32_t characteristicSize = 0;
   std::vector<uint8_t> characteristic;
 
-  uint64_t sequence;
+  uint64_t sequence = 0;
 
   std::string allData;
 
@@ -1156,6 +1156,9 @@ void Node::initNextRound(const cs::RoundInfo& roundInfo) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
+  if (type == MsgTypes::NewCharacteristic) {
+    return MessageActions::Process;
+  }
   if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence()) {
     return MessageActions::Process;
   }
