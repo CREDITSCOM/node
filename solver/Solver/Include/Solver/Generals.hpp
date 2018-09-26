@@ -48,8 +48,6 @@ namespace Credits{
     private:	
 
         WalletsState& walletsState;
-		void countFee(csdb::Transaction& transation, size_t numOfTrustedNodesInRound,
-			size_t numOfTransactionsInRound);
 
 		struct hash_weight {
 			char a_hash[32];
