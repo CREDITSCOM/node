@@ -40,24 +40,39 @@ class Fee {
  private:
   /** @brief Counts cost of one byte in transaction in current round.
   *
-  *  To count full amount of fee result of this function (stored in
+  *  To count full amount of fee, result of this function (stored in
   *  one_byte_cost_ member) should be multiplied by number of bytes
   *  in transaction.
   */
-  void GetOneByteCost();
+  void CountOneByteCost();
+  /** @brief Set "counted_fee_" field for each transaction in current_pool_.
+  *
+  *  To find counted fee it multiplies size of transaction by one_byte_cost_.
+  */
   void SetCountedFee();
-  void GetOneRoundCost();
-  void GetRoundFrequency();
-  double GetBlockTimeStampDifference(size_t num_block_from);
+  /** @brief Counts cost of the current round.
+  *
+  *  Cost of round depends on number of rounds per day, number of nodes in
+  *  the network and rental cost of one node per day.
+  *  Sets one_round_cost_.
+  */
+  void CountOneRoundCost();
+  /** @brief Counts rounds frequency and save it in member rounds_frequency_.
+  *
+  *  Round frequency depends on time stamp difference between previous pool
+  *  and pool of current round - 100.
+  */
+  void CountRoundsFrequency();
+  double CountBlockTimeStampDifference(size_t num_block_from);
   inline void CountTotalTransactionsLength();
   inline void Init(Node* node, csdb::Pool* pool);
 
-  size_t num_of_trusted_nodes_;
+  size_t num_of_nodes_;
   size_t num_of_last_block_;
   size_t total_transactions_length_;
   double one_byte_cost_;
   double one_round_cost_;
-  double round_frequency_;
+  double rounds_frequency_;
   csdb::Pool* current_pool_;
   Node* node_;
 };

@@ -25,12 +25,12 @@ constexpr size_t kNumOfBlocksToCountFrequency = 100;
 }  // namespace
 
 Fee::Fee()
-    : num_of_trusted_nodes_(0),
+    : num_of_nodes_(0),
     num_of_last_block_(0),
     total_transactions_length_(0),
     one_byte_cost_(0),
     one_round_cost_(0),
-    round_frequency_(0),
+    rounds_frequency_(0),
     current_pool_(nullptr),
     node_(nullptr) {}
 
@@ -39,14 +39,16 @@ void Fee::CountFeesInPool(Node* node, csdb::Pool* pool) {
     return;
   }
   Init(node, pool);
-  GetOneByteCost();
+  CountOneByteCost();
   SetCountedFee();
 }
 
 inline void Fee::Init(Node* node, csdb::Pool* pool) {
   current_pool_ = pool;
   num_of_last_block_ = node->getBlockChain().getLastWrittenSequence() + 1;
-  num_of_trusted_nodes_ = node->getConfidants().size();
+  // Now we don't have tools to estimate number of all nodes in the network.
+  // So we use number of trusted. In fact it is a constant. Will be fixed soon.
+  num_of_nodes_ = node->getConfidants().size();
   node_ = node;
 }
 
@@ -59,7 +61,7 @@ void Fee::SetCountedFee() {
   }
 }
 
-void Fee::GetOneByteCost() {
+void Fee::CountOneByteCost() {
   if (num_of_last_block_ == 0) {
     one_byte_cost_ = 0;
     return;
@@ -70,7 +72,7 @@ void Fee::GetOneByteCost() {
     return;
   } else {
     CountTotalTransactionsLength();
-    GetOneRoundCost();
+    CountOneRoundCost();
     one_byte_cost_ = one_round_cost_ / total_transactions_length_;
   }
 }
@@ -83,16 +85,16 @@ inline void Fee::CountTotalTransactionsLength() {
   }
 }
 
-void Fee::GetOneRoundCost() {
-  GetRoundFrequency();
-  double num_of_rounds_per_day = 60 * 60 * 24 * round_frequency_;
+void Fee::CountOneRoundCost() {
+  CountRoundsFrequency();
+  double num_of_rounds_per_day = 60 * 60 * 24 * rounds_frequency_;
   if (num_of_rounds_per_day < 1) {
     num_of_rounds_per_day = 1;
   }
-  one_round_cost_ = (kNodeRentalCostPerDay * num_of_trusted_nodes_) / num_of_rounds_per_day; 
+  one_round_cost_ = (kNodeRentalCostPerDay * num_of_nodes_) / num_of_rounds_per_day; 
 }
 
-void Fee::GetRoundFrequency() {
+void Fee::CountRoundsFrequency() {
   if (num_of_last_block_ <= kMaxRoundNumWithFixedFee) {
     return;
   }
@@ -102,11 +104,11 @@ void Fee::GetRoundFrequency() {
   } else {
     block_number_from = 1;
   }
-  double time_stamp_diff = GetBlockTimeStampDifference(block_number_from);
-  round_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
+  double time_stamp_diff = CountBlockTimeStampDifference(block_number_from);
+  rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
 }
 
-double Fee::GetBlockTimeStampDifference(size_t num_block_from) {
+double Fee::CountBlockTimeStampDifference(size_t num_block_from) {
   csdb::PoolHash block_from_hash = node_->getBlockChain().getHashBySequence(num_block_from);
   csdb::Pool block_from = node_->getBlockChain().loadBlock(block_from_hash);
   double time_stamp_from = std::stod(block_from.user_field(0).value<std::string>());
