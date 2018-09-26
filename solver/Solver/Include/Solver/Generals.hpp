@@ -15,6 +15,8 @@
 #include <csnode/node.hpp>
 #include <lib/system/keys.hpp>
 
+#include <Solver/Solver.hpp>
+
 namespace Credits{
 
 	class Solver;
