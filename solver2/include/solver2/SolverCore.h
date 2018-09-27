@@ -4,6 +4,11 @@
 #include "INodeState.h"
 #include "Consensus.h"
 
+#include <memory>
+#include <map>
+
+// forward declarations
+
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"
 #else
@@ -21,9 +26,6 @@ namespace csdb
 }
 
 #endif
-
-#include <memory>
-#include <map>
 
 class Node;
 namespace Credits
@@ -47,7 +49,7 @@ namespace slv2
         SolverContext() = delete;
 
         explicit SolverContext(SolverCore& core)
-            : m_core(core)
+            : core(core)
         {}
 
         void becomeNormal();
@@ -59,7 +61,7 @@ namespace slv2
         void startNewRound();
 
     private:
-        SolverCore& m_core;
+        SolverCore& core;
     };
 
     class SolverCore
@@ -69,17 +71,17 @@ namespace slv2
 
         SolverCore();
 
-        SolverCore(Node * pNode);
+        explicit SolverCore(Node * pNode);
 
         ~SolverCore();
 
-        void Start();
+        void start();
 
-        void Finish();
+        void finish();
 
-        bool isFinished() const
+        bool is_finished() const
         {
-            return m_shouldStop;
+            return req_stop;
         }
 
         // below are the "required" methods to be implemented by Solver-compatibility issue:
@@ -107,22 +109,21 @@ namespace slv2
         {}
 
     private:
-        constexpr static uint32_t DefaultStateTimeout = 5000;
-        CallsQueueScheduler m_scheduler;
-        CallsQueueScheduler::CallTag m_stateExpiredTag;
-
         // options
 
-        bool m_optTimeoutsEnabled;
-        bool m_optDuplicateStateEnabled;
+        bool opt_timeouts_enabled;
+        bool opt_repeat_state_enabled;
 
         // inner data
 
         // to allow act as SolverCore
         friend class SolverContext;
-        SolverContext m_context;
+        SolverContext context;
 
-        bool m_shouldStop;
+        CallsQueueScheduler scheduler;
+        CallsQueueScheduler::CallTag tag_state_expired;
+
+        bool req_stop;
 
         enum class Event
         {
@@ -144,8 +145,8 @@ namespace slv2
         using StatePtr = std::shared_ptr<INodeState>;
         using Transitions = std::map<Event, StatePtr>;
 
-        std::map<StatePtr, Transitions> m_transitions;
-        StatePtr m_pState;
+        std::map<StatePtr, Transitions> transitions;
+        StatePtr pstate;
 
         void InitTransitions();
         void setState(const StatePtr& pState);
@@ -155,12 +156,15 @@ namespace slv2
 
         // consensus data
         
-        Counter m_round;
+        Counter cur_round;
+
+        csdb::internal::byte_array public_key;
+        csdb::internal::byte_array private_key;
 
         // previous solver version instance
-        
-        std::unique_ptr<Credits::Solver> m_pSolvV1;
-        Node * m_pNode;
-        Credits::Generals * m_pGen;
+        std::unique_ptr<Credits::Solver> pslv_v1;
+
+        Node * pnode;
+        Credits::Generals * pgen;
     };
 } // slv2

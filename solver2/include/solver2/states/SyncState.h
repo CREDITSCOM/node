@@ -13,7 +13,7 @@ namespace slv2
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "Sync";
         }

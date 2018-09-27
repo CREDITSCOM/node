@@ -7,81 +7,83 @@ namespace slv2
 
     SolverCore::SolverCore()
         // internal data
-        : m_context(*this)
-        , m_stateExpiredTag(CallsQueueScheduler::no_tag)
-        , m_shouldStop(false)
+        : context(*this)
+        , tag_state_expired(CallsQueueScheduler::no_tag)
+        , req_stop(false)
         // options
-        , m_optTimeoutsEnabled(false)
-        , m_optDuplicateStateEnabled(true)
+        , opt_timeouts_enabled(false)
+        , opt_repeat_state_enabled(true)
         // consensus data
-        , m_round(0)
-        , m_pNode(nullptr)
-        , m_pGen(nullptr)
+        , cur_round(0)
+        , pnode(nullptr)
+        , pgen(nullptr)
     {
         InitTransitions();
     }
 
     SolverCore::SolverCore(Node * pNode) : SolverCore()
     {
-        m_pSolvV1 = (std::make_unique<Credits::Solver>(pNode));
-        m_pGen = m_pSolvV1->generals.get();
-        m_pNode = m_pSolvV1->node_;
+        pslv_v1 = (std::make_unique<Credits::Solver>(pNode));
+        pgen = pslv_v1->generals.get();
+        pnode = pslv_v1->node_;
+        // autostart in node environment
+        start();
     }
 
     SolverCore::~SolverCore()
     {
-        m_scheduler.Stop();
-        m_transitions.clear();
+        scheduler.Stop();
+        transitions.clear();
     }
 
-    void SolverCore::Start()
+    void SolverCore::start()
     {
-        m_shouldStop = false;
+        req_stop = false;
         handleTransitions(Event::Start);
     }
 
-    void SolverCore::Finish()
+    void SolverCore::finish()
     {
-        m_pState->stateOff(m_context);
-        m_scheduler.RemoveAll();
-        m_stateExpiredTag = CallsQueueScheduler::no_tag;
-        m_pState = nullptr;
-        m_shouldStop = true;
+        pstate->beforeOff(context);
+        scheduler.RemoveAll();
+        tag_state_expired = CallsQueueScheduler::no_tag;
+        pstate = nullptr;
+        req_stop = true;
     }
 
     void SolverCore::setState(const StatePtr& pState)
     {
-        if(!m_optDuplicateStateEnabled) {
-            if(pState == m_pState) {
+        if(!opt_repeat_state_enabled) {
+            if(pState == pstate) {
                 return;
             }
         }
-        if(m_stateExpiredTag != CallsQueueScheduler::no_tag) {
+        if(tag_state_expired != CallsQueueScheduler::no_tag) {
             // no timeout, cancel waiting
-            m_scheduler.Remove(m_stateExpiredTag);
-            m_stateExpiredTag = CallsQueueScheduler::no_tag;
+            scheduler.Remove(tag_state_expired);
+            tag_state_expired = CallsQueueScheduler::no_tag;
         }
         else {
             // state changed due timeout from within expired state        
         }
         
-        m_pState->stateOff(m_context);
-        std::cout << "Core: switch state " << m_pState->getName() << " -> " << pState->getName() << std::endl;
-        m_pState = pState;
-        m_pState->stateOn(m_context);
+        pstate->beforeOff(context);
+        std::cout << "Core: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
+        pstate = pState;
+        pstate->beforeOn(context);
         
         // timeout hadling
-        if(m_optTimeoutsEnabled) {
-            m_stateExpiredTag = m_scheduler.InsertOnce(DefaultStateTimeout, [this]() {
-                std::cout << "Core: state " << m_pState->getName() << " is expired" << std::endl;
+        if(opt_timeouts_enabled) {
+            tag_state_expired = scheduler.InsertOnce(Consensus::DefaultStateTimeout, [this]() {
+                std::cout << "Core: state " << pstate->name() << " is expired" << std::endl;
                 // clear flag to know timeout expired
-                m_stateExpiredTag = CallsQueueScheduler::no_tag;
+                tag_state_expired = CallsQueueScheduler::no_tag;
                 // control state switch
-                std::weak_ptr<INodeState> p1(m_pState);
-                m_pState->stateExpired(m_context);
-                if(m_pState == p1.lock()) {
+                std::weak_ptr<INodeState> p1(pstate);
+                pstate->onExpired(context);
+                if(pstate == p1.lock()) {
                     // expired state did not change to another one, do it now
-                    std::cout << "Core: there is no state set on expiration of " << m_pState->getName() << std::endl;
+                    std::cout << "Core: there is no state set on expiration of " << pstate->name() << std::endl;
                     //setNormalState();
                 }
             }, true);
@@ -93,9 +95,9 @@ namespace slv2
         if(Event::BigBang == evt) {
             std::cout << "Core: BigBang on" << std::endl;
         }
-        const auto& variants = m_transitions [m_pState];
+        const auto& variants = transitions [pstate];
         if(variants.empty()) {
-            std::cout << "Core: there are no transitions for " << m_pState->getName() << std::endl;
+            std::cout << "Core: there are no transitions for " << pstate->name() << std::endl;
             return;
         }
         auto it = variants.find(evt);
@@ -109,7 +111,7 @@ namespace slv2
     bool SolverCore::stateCompleted(Result res)
     {
         if(Result::Failure == res) {
-            std::cout << "Core: handler error in state " << m_pState->getName() << std::endl;
+            std::cout << "Core: handler error in state " << pstate->name() << std::endl;
         }
         return (Result::Finish == res);
     }
@@ -118,23 +120,23 @@ namespace slv2
     
     void SolverContext::becomeNormal()
     {
-        m_core.handleTransitions(SolverCore::Event::SetNormal);
+        core.handleTransitions(SolverCore::Event::SetNormal);
     }
 
     void SolverContext::becomeTrusted()
     {
-        m_core.handleTransitions(SolverCore::Event::SetTrusted);
+        core.handleTransitions(SolverCore::Event::SetTrusted);
     }
 
     void SolverContext::becomeWriter()
     {
-        m_core.handleTransitions(SolverCore::Event::SetWriter);
+        core.handleTransitions(SolverCore::Event::SetWriter);
     }
 
     void SolverContext::startNewRound()
     {
-        m_core.beforeNextRound();
-        m_core.nextRound();
+        core.beforeNextRound();
+        core.nextRound();
     }
 
 

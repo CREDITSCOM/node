@@ -7,7 +7,7 @@ namespace slv2
 
     Result SyncState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
     {
-        std::cout << getName() << ": round table received: " << round << std::endl;
+        std::cout << name() << ": round table received: " << round << std::endl;
         return Result::Finish;
     }
 

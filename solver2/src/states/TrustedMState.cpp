@@ -4,22 +4,22 @@
 
 namespace slv2
 {
-    void TrustedMState::stateOn(SolverContext& /*context*/)
+    void TrustedMState::beforeOn(SolverContext& /*context*/)
     {
-        m_cntVectors = 0;
+        cnt_vectors = 0;
     }
 
     Result TrustedMState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
     {
-        std::cout << getName() << ": round table received: " << round << std::endl;
+        std::cout << name() << ": round table received: " << round << std::endl;
         return Result::Finish;
     }
 
     Result TrustedMState::onVector(SolverContext& /*context*/, const Credits::HashVector & /*vect*/, const PublicKey & /*sender*/)
     {
-        std::cout << getName() << ": vector received" << std::endl;
-        ++m_cntVectors;
-        if(m_cntVectors >= Consensus::MinTrustedNodes) {
+        std::cout << name() << ": vector received" << std::endl;
+        ++cnt_vectors;
+        if(cnt_vectors >= Consensus::MinTrustedNodes) {
             return Result::Finish;
         }
         return Result::Ignore;

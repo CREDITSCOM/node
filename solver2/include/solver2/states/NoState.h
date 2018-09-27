@@ -45,7 +45,7 @@ namespace slv2
             return Result::Failure;
         }
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "None";
         }

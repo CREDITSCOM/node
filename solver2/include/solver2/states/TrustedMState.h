@@ -11,20 +11,20 @@ namespace slv2
         ~TrustedMState() override
         {}
 
-        void stateOn(SolverContext& context) override;
+        void beforeOn(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
         Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "TrustedM";
         }
 
     private:
 
-        unsigned int m_cntVectors { 0 };
+        unsigned int cnt_vectors { 0 };
     };
 
 } // slv2

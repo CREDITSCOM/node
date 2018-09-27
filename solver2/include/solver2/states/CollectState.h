@@ -11,9 +11,9 @@ namespace slv2
         ~CollectState() override
         {}
 
-        void stateOn(SolverContext& context) override;
+        void beforeOn(SolverContext& context) override;
 
-        void stateOff(SolverContext& context) override;
+        void beforeOff(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
@@ -21,14 +21,14 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "Collect";
         }
 
     private:
 
-        size_t m_cntTransactions { 0 };
+        size_t cnt_transactions { 0 };
     };
 
 } // slv2

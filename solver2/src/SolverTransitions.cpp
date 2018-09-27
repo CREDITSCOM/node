@@ -28,12 +28,12 @@ namespace slv2
         StatePtr pWrite = std::make_shared<WriteState>();
         StatePtr pRTH = std::make_shared<HandleRTState>();
         StatePtr pBB = std::make_shared<HandleBBState>();
-        m_pState = std::make_shared<NoState>();
+        pstate = std::make_shared<NoState>();
 
         std::pair<Event, StatePtr> defaultRT { Event::RoundTable, pRTH };
         std::pair<Event, StatePtr> defaultBB { Event::BigBang, pBB };
 
-        m_transitions = {
+        transitions = {
         { pStart, {
             defaultRT, defaultBB
         } },
@@ -67,7 +67,7 @@ namespace slv2
         { pBB, {
             { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, defaultRT
         } },
-        { m_pState, {
+        { pstate, {
             { Event::Start, pStart }
         } }
         };

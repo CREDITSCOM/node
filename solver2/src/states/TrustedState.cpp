@@ -4,23 +4,23 @@
 
 namespace slv2
 {
-    void TrustedState::stateOn(SolverContext& /*context*/)
+    void TrustedState::beforeOn(SolverContext& /*context*/)
     {
-        m_cntMatrices = 0;
-        m_cntVectors = 0;
+        cnt_matrices = 0;
+        cnt_vectors = 0;
     }
 
     Result TrustedState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
     {
-        std::cout << getName() << ": round table received: " << round << std::endl;
+        std::cout << name() << ": round table received: " << round << std::endl;
         return Result::Finish;
     }
 
     Result TrustedState::onVector(SolverContext& /*context*/, const Credits::HashVector & /*vect*/, const PublicKey & /*sender*/)
     {
-        std::cout << getName() << ": vector received" << std::endl;
-        ++m_cntVectors;
-        if(m_cntVectors >= Consensus::MinTrustedNodes) {
+        std::cout << name() << ": vector received" << std::endl;
+        ++cnt_vectors;
+        if(cnt_vectors >= Consensus::MinTrustedNodes) {
             return Result::Finish;
         }
         return Result::Ignore;
@@ -28,9 +28,9 @@ namespace slv2
 
     Result TrustedState::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix & /*matr*/, const PublicKey & /*sender*/)
     {
-        std::cout << getName() << ": matrix received" << std::endl;
-        ++m_cntMatrices;
-        if(m_cntMatrices >= Consensus::MinTrustedNodes) {
+        std::cout << name() << ": matrix received" << std::endl;
+        ++cnt_matrices;
+        if(cnt_matrices >= Consensus::MinTrustedNodes) {
             return Result::Finish;
         }
         return Result::Ignore;

@@ -5,7 +5,7 @@
 namespace slv2
 {
 
-    void HandleBBState::stateOn(SolverContext& context)
+    void HandleBBState::beforeOn(SolverContext& context)
     {
         std::cout << "do specific actions on BigBang" << std::endl;
         context.becomeNormal();

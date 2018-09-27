@@ -32,13 +32,13 @@ namespace slv2
         virtual ~INodeState()
         {}
 
-        virtual void stateOn(SolverContext& /*context*/)
+        virtual void beforeOn(SolverContext& /*context*/)
         {}
 
-        virtual void stateOff(SolverContext& /*context*/)
+        virtual void beforeOff(SolverContext& /*context*/)
         {}
 
-        virtual void stateExpired(SolverContext& /*context*/)
+        virtual void onExpired(SolverContext& /*context*/)
         {}
 
         virtual Result onRoundTable(SolverContext& context, const uint32_t round) = 0;
@@ -55,6 +55,6 @@ namespace slv2
 
         virtual Result onTransactionList(SolverContext& context, const csdb::Pool& pool) = 0;
 
-        virtual const char * getName() const = 0;
+        virtual const char * name() const = 0;
     };
 } // slv2

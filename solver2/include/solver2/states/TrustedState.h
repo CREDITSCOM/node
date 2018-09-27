@@ -11,7 +11,7 @@ namespace slv2
         ~TrustedState() override
         {}
 
-        void stateOn(SolverContext& context) override;
+        void beforeOn(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
@@ -19,15 +19,15 @@ namespace slv2
 
         Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "Trusted";
         }
 
     private:
 
-        unsigned int m_cntVectors { 0 };
-        unsigned int m_cntMatrices { 0 };
+        unsigned int cnt_vectors { 0 };
+        unsigned int cnt_matrices { 0 };
     };
 
 } // slv2

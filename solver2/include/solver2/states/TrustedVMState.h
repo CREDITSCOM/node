@@ -11,18 +11,18 @@ namespace slv2
         ~TrustedVMState() override
         {}
 
-        void stateOn(SolverContext& context) override;
+        void beforeOn(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        const char * getName() const override
+        const char * name() const override
         {
             return "TrustedVM";
         }
 
     private:
 
-        unsigned int m_activation_counter { 0 };
+        unsigned int activation_counter { 0 };
     };
 
 } // slv2

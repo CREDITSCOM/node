@@ -3,7 +3,7 @@
 
 namespace slv2
 {
-    void HandleRTState::stateOn(SolverContext& context)
+    void HandleRTState::beforeOn(SolverContext& context)
     {
         //TODO: deduce from round table desired node status
         static uint32_t flag = 0;
