@@ -11,7 +11,7 @@ namespace slv2
         ~TrustedVMState() override
         {}
 
-        void beforeOn(SolverContext& context) override;
+        void on(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 

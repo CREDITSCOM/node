@@ -4,7 +4,7 @@
 
 namespace slv2
 {
-    void WriteState::beforeOn(SolverContext& /*context*/)
+    void WriteState::on(SolverContext& /*context*/)
     {
         std::cout << name() << ": writing & sending block, then waiting for hashes (" << Consensus::MinTrustedNodes << " required)" << std::endl;
         cnt_hashes = 0;

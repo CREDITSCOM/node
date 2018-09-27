@@ -11,9 +11,9 @@ namespace slv2
         ~CollectState() override
         {}
 
-        void beforeOn(SolverContext& context) override;
+        void on(SolverContext& context) override;
 
-        void beforeOff(SolverContext& context) override;
+        void off(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 

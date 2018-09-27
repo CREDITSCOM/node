@@ -9,13 +9,13 @@
 
 namespace slv2
 {
-    void CollectState::beforeOn(SolverContext& /*context*/)
+    void CollectState::on(SolverContext& /*context*/)
     {
         std::cout << name() << ": starting to collect transactions" << std::endl;
         cnt_transactions = 0;
     }
 
-    void CollectState::beforeOff(SolverContext& /*context*/)
+    void CollectState::off(SolverContext& /*context*/)
     {
         std::cout << name() << ": " << cnt_transactions << " are collected" << std::endl;
     }

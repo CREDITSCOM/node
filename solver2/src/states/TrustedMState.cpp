@@ -4,7 +4,7 @@
 
 namespace slv2
 {
-    void TrustedMState::beforeOn(SolverContext& /*context*/)
+    void TrustedMState::on(SolverContext& /*context*/)
     {
         cnt_vectors = 0;
     }

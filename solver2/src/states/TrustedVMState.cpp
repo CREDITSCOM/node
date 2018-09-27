@@ -4,7 +4,7 @@
 
 namespace slv2
 {
-    void TrustedVMState::beforeOn(SolverContext& context)
+    void TrustedVMState::on(SolverContext& context)
     {
         //TODO: make a decision to become writer or not
         if(++activation_counter % 2 == 0) {

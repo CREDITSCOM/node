@@ -11,7 +11,7 @@ namespace slv2
         ~HandleRTState() override
         {}
 
-        void beforeOn(SolverContext& context) override;
+        void on(SolverContext& context) override;
 
         const char * name() const override
         {
