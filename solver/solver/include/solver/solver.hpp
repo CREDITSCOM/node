@@ -212,9 +212,7 @@ class Solver {
   bool                receivedMatFrom[100];
   uint8_t             trustedCounterMatrix;
 
-  std::vector<Hash>      hashes;
   std::vector<PublicKey> ips;
-
   std::vector<std::string> vector_datas;
 
   csdb::Pool m_pool;
