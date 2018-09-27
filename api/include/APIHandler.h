@@ -225,6 +225,7 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor>
     getProcessor(const ::apache::thrift::TConnectionInfo& ci) override
     {
+        (void)ci;
         // TRACE("");
         processor_.ss.occupy();
         // TRACE("");

@@ -309,20 +309,6 @@ convert_transaction_id(const api::TransactionId& trid)
     csdb::PoolHash::from_binary(toByteArray(trid.poolHash)), trid.index);
 }
 
-template<class T>
-auto
-fetchFee(const T& trx, int) -> decltype(trx.counted_fee())
-{
-  return trx.counted_fee();
-}
-
-template<class T>
-csdb::Amount
-fetchFee(const T& trx, long def)
-{
-  return def;
-}
-
 api::SealedTransaction
 convertTransaction(const csdb::Transaction& transaction)
 {
