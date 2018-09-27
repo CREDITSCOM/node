@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-extern thread_local bool trace = true;
+thread_local bool trace = true;
 
-extern auto clog_default_locale = []() {
+auto clog_default_locale = []() {
   return std::clog.imbue(std::locale::classic());
 }();

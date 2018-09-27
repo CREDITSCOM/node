@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #define FLAG_LOG_NOTICE 1
 #define FLAG_LOG_WARN 2

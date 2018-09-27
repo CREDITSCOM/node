@@ -1,4 +1,4 @@
-#define TRACE_ENABLER
+//#define TRACE_ENABLER
 
 #include <APIHandler.h>
 //#include <DebugLog.h>
