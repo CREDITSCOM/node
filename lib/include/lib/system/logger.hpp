@@ -113,7 +113,7 @@ tracer(const char* file, int line, const char* func, Ts... ts)
   std::clock_t hh = mins / 60;
   mins %= 60;
   char buf[16];
-  snprintf(buf, sizeof(buf), "[%02d:%02d:%02d.%03d]", hh, mins, ss, ms);
+  snprintf(buf, sizeof(buf), "[%02ld:%02ld:%02ld.%03ld]", hh, mins, ss, ms);
   res << buf << ' ' << std::this_thread::get_id() << "|\t" << file << ':' << func << ':' << line;
   tracer(res, ts...);
   res << std::endl;
@@ -133,10 +133,6 @@ extern thread_local bool trace;
   do {                                                                         \
   } while (0)
 #endif
-
-namespace logger {
-void stacktrace();
-}
 
 static inline std::string byteStreamToHex(const char* stream, const size_t length) {
   static std::string map = "0123456789ABCDEF";

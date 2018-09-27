@@ -97,8 +97,8 @@ namespace Credits
 		//std::cout << "GENERALS> Build vector : after zeroing" << std::endl;
 
 		Hash_ hash_(hash_s);	
-    delete hash_s; 
-    delete del1;
+    delete[] hash_s; 
+    delete[] del1;
  //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
 		return hash_;
     }
@@ -112,9 +112,9 @@ namespace Credits
       memset(new_trusted, 0, 100);
       memset(hw_total, 0, 3300);
       Hash_ hash_(hash_s);
-      delete hash_s;
+      delete[] hash_s;
  //     std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
-      delete del1;
+      delete[] del1;
       return hash_;
 
     }
