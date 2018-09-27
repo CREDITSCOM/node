@@ -19,6 +19,7 @@
 #include <csdb/transaction.h>
 #include <algorithm>
 #include <boost/dynamic_bitset.hpp>
+#include <lib/system/utils.hpp>
 
 #include <mutex>
 #include "solver/generals.hpp"
@@ -54,9 +55,11 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
       }
     }
 
-    m_characteristic.size = transactionsCount;
+    m_characteristic.size = static_cast<uint32_t>(transactionsCount);
+
     std::vector<uint8_t> serializedCahracteristicMask;
     boost::to_block_range(characteristicMask, std::back_inserter(serializedCahracteristicMask));
+
     serializedCahracteristicMask.shrink_to_fit();
     m_characteristic.mask = std::move(serializedCahracteristicMask);
 
@@ -74,10 +77,10 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
 }
 
 void Generals::addvector(HashVector vector) {
-  std::cout << "GENERALS> Add vector" << std::endl;
+  cslog() << "GENERALS> Add vector";
 
   m_hMatrix.hmatr[vector.Sender] = vector;
-  std::cout << "GENERALS> Vector succesfully added" << std::endl;
+  cslog() << "GENERALS> Vector succesfully added";
 }
 
 void Generals::addSenderToMatrix(uint8_t myConfNum) {
@@ -85,9 +88,9 @@ void Generals::addSenderToMatrix(uint8_t myConfNum) {
 }
 
 void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
-  std::cout << "GENERALS> Add matrix" << std::endl;
+  cslog() << "GENERALS> Add matrix";
 
-  const uint8_t nodes_amount = confidantNodes.size();
+  const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
 
   auto*   hw = new hash_weight[nodes_amount];
   Hash_   temp_hash;
@@ -97,13 +100,13 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
 
   uint8_t max_frec_position;
 
-  std::cout << "GENERALS> HW OUT: nodes amount = " << nodes_amount << std::endl;
+  cslog() << "GENERALS> HW OUT: nodes amount = " << nodes_amount;
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
       memcpy(hw[0].a_hash, matrix.hmatr[0].hash.val, 32);
 
-      std::cout << "GENERALS> HW OUT: writing initial hash " << byteStreamToHex(hw[i].a_hash, 32) << std::endl;
+      cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].a_hash, 32);
 
       hw[0].a_weight                       = 1;
       *(m_find_untrusted.data() + j * 100) = 0;
@@ -158,10 +161,9 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
 }
 
 uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const csdb::PoolHash& lasthash) {
-#ifdef MYLOG
-  std::cout << "GENERALS> Take decision: starting " << std::endl;
-#endif
-  const uint8_t nodes_amount = confidantNodes.size();
+  csdebug() << "GENERALS> Take decision: starting ";
+
+  const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
   auto          hash_weights = new hash_weight[nodes_amount];
   auto          mtr          = new unsigned char[nodes_amount * 97];
 
@@ -205,24 +207,24 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
 
   for (int i = 0; i < nodes_amount; i++) {
     if (*(m_new_trusted.data() + i) < trusted_limit) {
-      std::cout << "GENERALS> Take decision: Liar nodes : " << i << std::endl;
+      cslog() << "GENERALS> Take decision: Liar nodes : " << i;
     } else {
       j++;
     }
   }
 
   if (j == nodes_amount) {
-    std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
+    cslog() << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! ";
   }
 
-  std::cout << "Hash : " << lasthash.to_string() << std::endl;
+  cslog() << "Hash : " << lasthash.to_string();
 
   auto hash_t = lasthash.to_binary();
   int  k      = *(hash_t.begin());
 
   uint16_t result = k % nodes_amount;
 
-  std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
+  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(confidantNodes.at(result).str, 32);
 
   delete[] hash_weights;
   delete[] mtr;

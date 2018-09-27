@@ -1,7 +1,6 @@
 #define TRACE_ENABLER
 
 #include <APIHandler.h>
-//#include <DebugLog.h>
 
 #include "csconnector/csconnector.h"
 
@@ -24,6 +23,7 @@
 #include <API.h>
 
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 #include <boost/io/ios_state.hpp>
 #include <iomanip>
@@ -458,7 +458,7 @@ std::string
 get_delimited_transaction_sighex(const csdb::Transaction& tr)
 {
   auto bs = fromByteArray(tr.to_byte_stream_for_sig());
-  return std::string({ ' ' }) + byteStreamToHex(bs.data(), bs.length());
+  return std::string({ ' ' }) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
 }
 
 void

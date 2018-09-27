@@ -4,6 +4,7 @@
 #include <dynamicbuffer.h>
 #include <csnode/node.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 #include <net/transport.hpp>
 
 #include <base58.h>
@@ -163,7 +164,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   if (roundNum_ < rNum || type == MsgTypes::BigBang)
     roundNum_ = rNum;
   else {
-    LOG_WARN("Bad round number, ignoring");
+    cswarning() << "Bad round number, ignoring";
     return;
   }
   if (!readRoundData(false))
@@ -171,13 +172,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   if (myLevel_ == NodeLevel::Main)
     if (!istream_.good()) {
-      LOG_WARN("Bad round table format, ignoring");
+      cswarning() << "Bad round table format, ignoring";
       return;
     }
 
   if (myLevel_ == NodeLevel::Main) {
     if (!istream_.good()) {
-      LOG_WARN("Bad round table format, ignoring");
+      cswarning() << "Bad round table format, ignoring";
       return;
     }
   }
@@ -209,16 +210,21 @@ void Node::sendRoundTable() {
   for (auto& conf : confidantNodes_) {
     ostream_ << conf;
   }
+
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-  cslog() << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << "Confidants: ";
+  cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(mainNode_.str, 32) << "Confidants: ";
+
   int i = 0;
+
   for (auto& e : confidantNodes_) {
     if (e != mainNode_) {
-      cslog() << i << ". " << byteStreamToHex(e.str, 32);
+      cslog() << i << ". " << cs::Utils::byteStreamToHex(e.str, 32);
       i++;
     }
   }
+
   transport_->clearTasks();
+
   flushCurrentTasks();
 }
 
@@ -227,23 +233,30 @@ void Node::sendRoundTableUpdated(const cs::RoundInfo& round) {
 
   ostream_ << MsgTypes::Round << round.round << round.confidants.size() << round.hashes.size() << round.general;
 
-  for (auto& it : round.confidants)
+  for (auto& it : round.confidants) {
     ostream_ << it;
-  for (auto& it : round.hashes)
-    ostream_ << it;
+  }
 
-  // LOG_EVENT("Sending round table");
+  for (auto& it : round.hashes) {
+    ostream_ << it;
+  }
+
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-  cslog() << "Round " << roundNum_ << ", General: " << byteStreamToHex(mainNode_.str, 32) << "Confidants: ";
+  cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(mainNode_.str, 32) << "Confidants: ";
+
   size_t i = 0;
+
   for (auto& e : confidantNodes_) {
     if (e != mainNode_) {
-      cslog() << i << ". " << byteStreamToHex(e.str, 32);
+      cslog() << i << ". " << cs::Utils::byteStreamToHex(e.str, 32);
       ++i;
     }
   }
+
   i = 0;
+
   cslog() << "Hashes";
+
   for (auto& e : round.hashes) {
     cslog() << i << ". " << e.to_string().c_str();
     i++;
@@ -254,8 +267,9 @@ void Node::sendRoundTableUpdated(const cs::RoundInfo& round) {
 }
 
 void Node::sendRoundTableRequest(size_t rNum) {
-  if (rNum < roundNum_)
+  if (rNum < roundNum_) {
     return;
+  }
 
   cslog() << "rNum = " << rNum << ", real RoundNumber = " << roundNum_;
 
@@ -264,32 +278,37 @@ void Node::sendRoundTableRequest(size_t rNum) {
 
   cslog() << "Sending RoundTable request";
 
-  LOG_EVENT("Sending RoundTable request");
   flushCurrentTasks();
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
   istream_.init(data, size);
+
   size_t rNum;
   istream_ >> rNum;
-  if (rNum >= roundNum_)
-    return;
 
-  cslog() << "NODE> Get RT request from " << byteStreamToHex(sender.str, 32);
-
-  if (!istream_.good()) {
-    LOG_WARN("Bad RoundTableRequest format");
+  if (rNum >= roundNum_) {
     return;
   }
+
+  cslog() << "NODE> Get RT request from " << cs::Utils::byteStreamToHex(sender.str, 32);
+
+  if (!istream_.good()) {
+    cswarning() << "Bad RoundTableRequest format";
+    return;
+  }
+
   sendRoundTable();
 }
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
-  if (solver_->getIPoolClosed())
+  if (solver_->getIPoolClosed()) {
     return;
+  }
 
-  if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Writer)
+  if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Writer) {
     return;
+  }
 
   istream_.init(data, size);
 
@@ -299,11 +318,9 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
   cslog() << "NODE> Transactions amount got " << pool.transactions_count();
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transactions packet format");
+    cswarning() << "Bad transactions packet format";
     return;
   }
-
-  // LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
 
   auto&    trx = pool.transactions();
   uint16_t i   = 0;
@@ -322,8 +339,6 @@ void Node::sendTransaction(const csdb::Transaction& trans) {
 
   cslog() << "Sending transactions";
 
-  LOG_EVENT("Sending transaction");
-
   flushCurrentTasks();
 }
 
@@ -338,14 +353,14 @@ void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
   istream_ >> trans;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transaction packet format");
+    cswarning() << "Bad transaction packet format";
     return;
   }
+
   csdb::Pool pool_;
   pool_.add_transaction(trans);
 
-  LOG_EVENT("Got first transaction, initializing consensus...");
-  // solver_->gotTransactionList(std::move(pool_));
+  cslog() << "Got first transaction, initializing consensus...";
 }
 
 void Node::sendFirstTransaction(const csdb::Transaction& trans) {
@@ -375,10 +390,11 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
     istream_ >> pool;
 
     if (!istream_.good() || !istream_.end()) {
-      LOG_WARN("Bad transactions list packet format");
+      cswarning() << "Bad transactions list packet format";
       pool = csdb::Pool{};
     }
-    LOG_EVENT("Got full transactions list of " << pool.transactions_count());
+
+    cslog() << "Got full transactions list of " << pool.transactions_count();
   }
 }
 
@@ -396,19 +412,21 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
 
 void Node::sendVectorRequest(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send vectors");
+    cswarning() << "Only confidant nodes can send vectors";
     return;
   }
 
-  cslog() << "NODE> Sending vector request to  " << byteStreamToHex(node.str, 32);
+  cslog() << "NODE> Sending vector request to  " << cs::Utils::byteStreamToHex(node.str, 32);
 
   ostream_.init(BaseFlags::Signed, node);
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << 1;
+
   flushCurrentTasks();
 }
 
 void Node::getVectorRequest(const uint8_t* data, const size_t size) {
   cslog() << __func__;
+
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -424,21 +442,22 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size) {
     sendVector(solver_->getMyVector());
   }
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    cswarning() << "Bad vector packet format";
     return;
   }
 }
 
 void Node::sendWritingConfirmation(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send confirmation of the Writer");
+    cserror() << "Only confidant nodes can send confirmation of the Writer";
     return;
   }
 
-  cslog() << "NODE> Sending writing confirmation to  " << byteStreamToHex(node.str, 32);
+  cslog() << "NODE> Sending writing confirmation to  " << cs::Utils::byteStreamToHex(node.str, 32);
 
   ostream_.init(BaseFlags::Signed, node);
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
+
   flushCurrentTasks();
 }
 
@@ -447,40 +466,44 @@ void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const 
     return;
   }
 
-  cslog() << "NODE> Getting WRITING CONFIRMATION from " << byteStreamToHex(sender.str, 32);
+  cslog() << "NODE> Getting WRITING CONFIRMATION from " << cs::Utils::byteStreamToHex(sender.str, 32);
 
   istream_.init(data, size);
 
   uint8_t confNumber_;
   istream_ >> confNumber_;
+
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    cswarning() << "Bad vector packet format";
     return;
   }
-  if (confNumber_ < 3)
+
+  if (confNumber_ < 3) {
     solver_->addConfirmation(confNumber_);
+  }
 }
 
 void Node::sendTLRequest() {
   if ((myLevel_ != NodeLevel::Confidant) || (roundNum_ < 2)) {
-    LOG_ERROR("Only confidant nodes need TransactionList");
+    cserror() << "Only confidant nodes need TransactionList";
     return;
   }
 
-  cslog() << "NODE> Sending TransactionList request to  " << byteStreamToHex(mainNode_.str, 32);
+  cslog() << "NODE> Sending TransactionList request to  " << cs::Utils::byteStreamToHex(mainNode_.str, 32);
 
   ostream_.init(BaseFlags::Signed, mainNode_);
   ostream_ << MsgTypes::ConsTLRequest << getMyConfNumber();
+
   flushCurrentTasks();
 }
 
 void Node::getTlRequest(const uint8_t* data, const size_t size) {
   if (myLevel_ != NodeLevel::Main) {
-    LOG_ERROR("Only main nodes can send TransactionList");
+    cserror() << "Only main nodes can send TransactionList";
     return;
   }
 
-  cslog() << "NODE> Getting TransactionList request";  // byteStreamToHex(sender.str, 32) <<
+  cslog() << "NODE> Getting TransactionList request";
 
   istream_.init(data, size);
 
@@ -490,6 +513,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size) {
   if (!istream_.good() || !istream_.end()) {
     return;
   }
+
   if (num < getConfidants().size()) {
     sendMatrix(solver_->getMyMatrix());
   }
@@ -497,11 +521,11 @@ void Node::getTlRequest(const uint8_t* data, const size_t size) {
 
 void Node::sendMatrixRequest(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    //  LOG_ERROR("Only confidant nodes can send vectors");
+    cserror() << "Only confidant nodes can send vectors";
     return;
   }
 
-  cslog() << "NODE> Sending vector request to  " << byteStreamToHex(node.str, 32);
+  cslog() << "NODE> Sending vector request to  " << cs::Utils::byteStreamToHex(node.str, 32);
 
   ostream_.init(BaseFlags::Signed, node);
   ostream_ << MsgTypes::ConsMatrixRequest << roundNum_ << 1;
@@ -532,19 +556,25 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
+
   if (myPublicKey_ == sender) {
     return;
   }
-  cslog() << "NODE> Getting vector from " << byteStreamToHex(sender.str, 32);
+
+  cslog() << "NODE> Getting vector from " << cs::Utils::byteStreamToHex(sender.str, 32);
 
   istream_.init(data, size);
+
   cs::HashVector vec;
   istream_ >> vec;
+
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad vector packet format");
     return;
   }
-  LOG_EVENT("Got vector");
+
+  cslog() << "Got vector";
+
   solver_->gotVector(std::move(vec));
 }
 
@@ -552,9 +582,10 @@ void Node::sendVector(const cs::HashVector& vector) {
   cslog() << "NODE> 0 Sending vector ";
 
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send vectors");
+    cserror() << "Only confidant nodes can send vectors";
     return;
   }
+
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::ConsVector << roundNum_ << vector;
 
@@ -565,22 +596,25 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
+
   if (myPublicKey_ == sender) {
     return;
   }
+
   istream_.init(data, size);
 
   cs::HashMatrix mat;
   istream_ >> mat;
 
-  cslog() << "NODE> Getting matrix from " << byteStreamToHex(sender.str, 32);
+  cslog() << "NODE> Getting matrix from " << cs::Utils::byteStreamToHex(sender.str, 32);
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad matrix packet format");
+    cswarning() << "Bad matrix packet format";
     return;
   }
 
-  LOG_EVENT("Got matrix");
+  cslog() << "Got matrix";
+
   solver_->gotMatrix(std::move(mat));
 }
 
@@ -588,11 +622,11 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
   cslog() << "NODE> 0 Sending matrix to ";
 
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send matrices");
+    cserror() << "Only confidant nodes can send matrices";
     return;
   }
 
-  cslog() << "NODE> 1 Sending matrix to ";  //<< byteStreamToHex(it.str, 32)
+  cslog() << "NODE> 1 Sending matrix to ";
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::ConsMatrix << roundNum_ << matrix;
@@ -606,57 +640,62 @@ uint32_t Node::getRoundNumber() {
 
 void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
   if (myLevel_ == NodeLevel::Writer) {
-    LOG_WARN("Writer cannot get blocks");
+    cswarning() << "Writer cannot get blocks";
     return;
   }
+
+  csunused(sender);
+
   istream_.init(data, size);
 
   csdb::Pool pool;
   istream_ >> pool;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad block packet format");
+    cswarning() << "Bad block packet format";
     return;
   }
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send blocks");
+    cserror() << "Only writer nodes can send blocks";
     return;
   }
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::NewBlock);
 
-  LOG_DEBUG("Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence()
+  csdebug() << "Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence()
                                 << " and hash " << pool.hash().to_string() << " and ts "
-                                << pool.user_field(0).value<std::string>());
+                                << pool.user_field(0).value<std::string>();
   flushCurrentTasks();
 }
 
 void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
   if (myLevel_ == NodeLevel::Writer) {
-    LOG_WARN("Writer cannot get bad blocks");
+    cswarning() << "Writer cannot get bad blocks";
     return;
   }
+
   istream_.init(data, size);
 
   csdb::Pool pool;
   istream_ >> pool;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad block packet format");
+    cswarning() << "Bad block packet format";
     return;
   }
 
-  LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
+  cslog() << "Got block of " << pool.transactions_count() << " transactions";
+
   solver_->gotBadBlockHandler(std::move(pool), sender);
 }
 
 void Node::sendBadBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send bad blocks");
+    cserror() << "Only writer nodes can send bad blocks";
     return;
   }
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
@@ -668,13 +707,14 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
   if (myLevel_ != NodeLevel::Writer) {
     return;
   }
+
   istream_.init(data, size);
 
   Hash hash;
   istream_ >> hash;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_DEBUG("Bad hash packet format");
+    cswarning() << "Bad hash packet format";
     return;
   }
 
@@ -690,12 +730,12 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   cslog() << "NODE> Transactions amount got " << packet.transactions_count();
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transactions packet format");
+    cswarning() << "Bad transactions packet format";
     return;
   }
 
   if (packet.hash().is_empty()) {
-    LOG_ERROR("Received transaction packet hash is empty");
+    cswarning() << "Received transaction packet hash is empty";
     return;
   }
 
@@ -723,12 +763,12 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   cslog() << "NODE> Hashes request got size: " << hashesCount;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad packet request format");
+    cswarning() << "Bad packet request format";
     return;
   }
 
   if (hashesCount != hashes.size()) {
-    LOG_ERROR("Bad hashes created");
+    cserror() << "Bad hashes created";
     return;
   }
 
@@ -744,12 +784,12 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   cslog() << "NODE> Transactions hashes answer amount got " << packet.transactions_count();
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transactions hashes answer packet format");
+    cswarning() << "Bad transactions hashes answer packet format";
     return;
   }
 
   if (packet.hash().is_empty()) {
-    LOG_ERROR("Received transaction hashes answer packet hash is empty");
+    cserror() <<"Received transaction hashes answer packet hash is empty";
     return;
   }
 
@@ -760,6 +800,7 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
   cslog() << "NODE> RoundTableUpdated";
 
   istream_.init(data, size);
+
   if (round <= solver_->currentRoundNumber()) {
     return;
   }
@@ -768,7 +809,7 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
   istream_ >> confidantsCount;
 
   if (confidantsCount == 0) {
-    LOG_ERROR("Bad confidants count in round table");
+    cserror() << "Bad confidants count in round table";
     return;
   }
 
@@ -802,21 +843,23 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
   }
 
   if (!istream_.end() || !istream_.good()) {
-    LOG_ERROR("Bad round table parsing");
+    cserror() << "Bad round table parsing";
     return;
   }
 
   roundInfo.general    = std::move(general);
   roundInfo.confidants = std::move(confidants);
   roundInfo.hashes     = std::move(hashes);
+
   onRoundStart();
+
   solver_->gotRound(std::move(roundInfo));
 }
 
 void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount,
                               const std::vector<uint8_t>& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send blocks");
+    cserror() << "Only writer nodes can send blocks";
     return;
   }
 
@@ -893,11 +936,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
-    LOG_ERROR("Writer and Main node shouldn't send hashes");
+    cserror() << "Writer and Main node shouldn't send hashes";
     return;
   }
 
-  LOG_WARN("Sending hash of " << roundNum_ << " to " << byteStreamToHex(target.str, 32));
+  cswarning() << "Sending hash of " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.str, 32);
 
   ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
   ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
@@ -912,7 +955,6 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
 
   if (packet.hash().is_empty()) {
     cslog() << "Send transaction packet with empty hash failed";
-
     return;
   }
 
@@ -937,7 +979,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
 
 void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes) {
   if (myLevel_ == NodeLevel::Writer) {
-    LOG_ERROR("Writer should has all transactions hashes");
+    cserror() << "Writer should has all transactions hashes";
     return;
   }
 
@@ -967,7 +1009,6 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender) {
   if (packet.hash().is_empty()) {
     cslog() << "Send transaction packet reply with empty hash failed";
-
     return;
   }
 
@@ -994,6 +1035,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
   if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant) {
     return;
   }
+
   if (sender == myPublicKey_) {
     return;
   }
@@ -1006,9 +1048,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 
   if (requested_seq > getBlockChain().getLastWrittenSequence()) {
     cslog() << "GETBLOCKREQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN";
-
     return;
   }
+
   solver_->gotBlockRequest(getBlockChain().getHashBySequence(requested_seq), sender);
 }
 
@@ -1038,9 +1080,11 @@ void Node::sendBlockRequest(uint32_t seq) {
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
+
   uint8_t requestTo        = rand() % (int)(MIN_CONFIDANTS);
   ostream_.init(BaseFlags::Signed, confidantNodes_[requestTo]);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
+
   flushCurrentTasks();
 
   csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
@@ -1048,6 +1092,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
   cslog() << __func__;
+
   csdb::Pool pool;
 
   istream_.init(data, size);
@@ -1086,7 +1131,7 @@ void Node::onRoundStart() {
   }
   cslog() << "======================================== ROUND " << roundNum_
           << " ========================================";
-  cslog() << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32);
+  cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.str, 32);
 
   if (mainNode_ == myPublicKey_) {
     myLevel_ = NodeLevel::Main;
@@ -1109,12 +1154,11 @@ void Node::onRoundStart() {
   }
 
   // Pretty printing...
-
   cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_ << "Confidants: ";
 
   int i = 0;
   for (auto& e : confidantNodes_) {
-    cslog() << i << ". " << byteStreamToHex(e.str, 32);
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(e.str, 32);
     i++;
   }
 
@@ -1128,6 +1172,7 @@ void Node::onRoundStart() {
     awaitingSyncroBlock = false;
   }
 #endif
+
   solver_->nextRound();
   transport_->processPostponed(roundNum_);
 }
@@ -1147,12 +1192,17 @@ void Node::addToPackageTemporaryStorage(const csdb::Pool& pool) {
 void Node::initNextRound(const cs::RoundInfo& roundInfo) {
   roundNum_ = roundInfo.round;
   mainNode_ = roundInfo.general;
+
   confidantNodes_.clear();
+
   for (auto& conf : roundInfo.confidants) {
     confidantNodes_.push_back(conf);
   }
+
   sendRoundTable();
+
   cslog() << "NODE> RoundNumber :" << roundNum_;
+
   onRoundStart();
 }
 
@@ -1183,10 +1233,10 @@ inline bool Node::readRoundData(const bool tail) {
   uint8_t   confSize = 0;
   istream_ >> confSize;
 
-  cslog() << "NODE> Number of confidants :" << (int)confSize;
+  cslog() << "NODE> Number of confidants :" << static_cast<int>(confSize);
 
   if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
-    LOG_WARN("Bad confidants num");
+    cswarning() << "Bad confidants num";
     return false;
   }
 
@@ -1194,25 +1244,24 @@ inline bool Node::readRoundData(const bool tail) {
   confidants.reserve(confSize);
 
   istream_ >> mainNode;
-  // LOG_EVENT("SET MAIN " << byteStreamToHex(mainNode.str, 32));
+
   while (istream_) {
     confidants.push_back(PublicKey());
     istream_ >> confidants.back();
 
-    // LOG_EVENT("ADDED CONF " << byteStreamToHex(confidants.back().str, 32));
-
     if (confidants.size() == confSize && !istream_.end()) {
-      if (tail)
+      if (tail) {
         break;
+      }
       else {
-        LOG_WARN("Too many confidant nodes received");
+        cswarning() << "Too many confidant nodes received";
         return false;
       }
     }
   }
 
   if (!istream_.good() || confidants.size() < confSize) {
-    LOG_WARN("Bad round table format, ignoring");
+    cswarning() << "Bad round table format, ignoring";
     return false;
   }
 

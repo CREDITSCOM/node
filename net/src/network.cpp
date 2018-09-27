@@ -1,6 +1,6 @@
-
 /* Send blaming letters to @yrtimd */
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 #include <sys/timeb.h>
 
 #include "network.hpp"
@@ -158,7 +158,7 @@ void Network::processorRoutine() {
     }
 
     if (!(task->pack.isHeaderValid())) {
-      LOG_WARN("Header is not valid: " << byteStreamToHex((const char*)task->pack.data(), 100));
+      LOG_WARN("Header is not valid: " << cs::Utils::byteStreamToHex((const char*)task->pack.data(), 100));
       remoteSender->addStrike();
       continue;
     }

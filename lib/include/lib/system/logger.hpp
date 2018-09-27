@@ -99,20 +99,6 @@ extern thread_local bool trace;
 #define TRACE(PRINT_ARGS) [&]() -> decltype(auto) {}()
 #endif
 
-static inline std::string byteStreamToHex(const char* stream, const size_t length) {
-  static std::string map = "0123456789ABCDEF";
-
-  std::string result;
-  result.reserve(length * 2);
-
-  for (size_t i = 0; i < length; ++i) {
-    result.push_back(map[(uint8_t)(stream[i]) >> 4]);
-    result.push_back(map[(uint8_t)(stream[i]) & (uint8_t)15]);
-  }
-
-  return result;
-}
-
 namespace cs
 {
     // Represents cs async logger to file, singleton realization

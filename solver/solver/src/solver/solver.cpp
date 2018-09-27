@@ -210,7 +210,7 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
       node_->sendHash(test_hash, sender);
 
-      cslog() << "SENDING HASH to writer: " << byteStreamToHex(test_hash.str, 32);
+      cslog() << "SENDING HASH to writer: " << cs::Utils::byteStreamToHex(test_hash.str, 32);
     }
 #endif
   }
@@ -661,7 +661,8 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender) {
   }
 
   Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
-  csdebug() << "Solver -> My Hash: " << byteStreamToHex(myHash.str, 32);
+
+  csdebug() << "Solver -> My Hash: " << cs::Utils::debugByteStreamToHex(myHash.str, 32);
 
   if (ips.size() <= min_nodes) {
     if (hash == myHash) {

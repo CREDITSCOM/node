@@ -247,16 +247,16 @@ namespace cs
         }
 
         /*!
-            Calls std::function after ms time
+            Calls std::function after ms time in another thread
         */
-        static void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
+        static void runAfter(const std::chrono::milliseconds& ms, std::function<void()> callBack)
         {
             const auto tp = std::chrono::system_clock::now() + ms;
 
-            std::thread tr([tp, cb]() {
+            std::thread tr([tp, callBack]() {
 
                 std::this_thread::sleep_until(tp);
-                CallsQueue::instance().insert(cb);
+                CallsQueue::instance().insert(callBack);
 
             });
 
