@@ -33,8 +33,6 @@
 class Node;
 
 namespace cs {
-typedef std::string Vector;
-typedef std::string Matrix;
 
 class Generals;
 struct Hash_ {

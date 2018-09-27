@@ -931,23 +931,17 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32], uin
 }
 
 void Solver::addTransaction(const csdb::Transaction& transaction) {
-  cs::Lock    lock(mSharedMutex);
-  std::size_t packetIndex = 0;
+  cs::Lock lock(mSharedMutex);
 
-  // TODO: fix algorithm for optimization
-  for (auto& packet : m_transactionsBlock) {
-    if (packet.transactions_count() >= MaxPacketTransactions) {
-      ++packetIndex;
-    } else {
-      break;
-    }
+  if (m_transactionsBlock.empty()) {
+    m_transactionsBlock.push_back(cs::TransactionsPacket{});
   }
 
-  if (m_transactionsBlock.size() <= packetIndex) {
-    m_transactionsBlock.emplace_back(csdb::Pool{});
+  if (m_transactionsBlock.back().transactions_count() >= MaxPacketTransactions) {
+    m_transactionsBlock.push_back(cs::TransactionsPacket{});
   }
 
-  m_transactionsBlock[packetIndex].add_transaction(transaction);
+  m_transactionsBlock.back().add_transaction(transaction);
 }
 
 void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general,
