@@ -461,8 +461,10 @@ void Solver::writeNewBlock() {
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
-  if (node_->getMyLevel() == NodeLevel::Writer)
+  if (node_->getMyLevel() == NodeLevel::Writer) {
+    LOG_WARN("Writer nodes don't get blocks");
     return;
+  }
   gotBigBang        = false;
   gotBlockThisRound = true;
 #ifdef MONITOR_NODE

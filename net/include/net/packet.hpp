@@ -57,7 +57,7 @@ public:
   static const uint32_t MaxSize = 1 << 10;
   static const uint32_t MaxFragments = 1 << 16;
 
-  static const uint32_t SmartRedirectTreshold = 1;
+  static const uint32_t SmartRedirectTreshold = 100000;
 
   Packet() { }
   Packet(RegionPtr&& data): data_(std::move(data)) { }
