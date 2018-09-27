@@ -5,7 +5,6 @@
 
 #include <csconnector/csconnector.h>
 #include <csstats.h>
-#include <Solver/Solver.hpp>
 #include <client/config.hpp>
 
 #include "blockchain.hpp"

@@ -7,7 +7,7 @@
 #include <queue>
 
 #include <API.h>
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 //#include <csconnector/csconnector.h>
 #include <csstats.h>
 

@@ -10,7 +10,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <net/packet.hpp>
-#include "Solver/Solver.hpp"
+#include "solver/solver.hpp"
 
 class IPackStream {
  public:

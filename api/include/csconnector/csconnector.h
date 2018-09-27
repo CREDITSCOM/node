@@ -13,7 +13,7 @@
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TServerSocket.h>
 
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 #include <csdb/storage.h>
 
 #include <client/params.hpp>

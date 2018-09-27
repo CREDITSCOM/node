@@ -1,4 +1,4 @@
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 
 #include <datastream.h>
 #include <dynamicbuffer.h>
