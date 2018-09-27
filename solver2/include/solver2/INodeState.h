@@ -32,13 +32,13 @@ namespace slv2
         virtual ~INodeState()
         {}
 
-        virtual void beforeOn(SolverContext& /*context*/)
+        virtual void on(SolverContext& /*context*/)
         {}
 
-        virtual void beforeOff(SolverContext& /*context*/)
+        virtual void off(SolverContext& /*context*/)
         {}
 
-        virtual void onExpired(SolverContext& /*context*/)
+        virtual void expired(SolverContext& /*context*/)
         {}
 
         virtual Result onRoundTable(SolverContext& context, const uint32_t round) = 0;

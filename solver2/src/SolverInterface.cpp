@@ -30,6 +30,11 @@ namespace slv2
         //
         public_key = pub;
         private_key = priv;
+
+        // "autostart" in node environment
+        if(is_finished()) {
+            start();
+        }
     }
 
     void SolverCore::addInitialBalance()

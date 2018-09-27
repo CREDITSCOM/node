@@ -1,5 +1,13 @@
 #include "SolverCore.h"
 #include <Solver/Solver.hpp>
+
+#if ! defined(SOLVER_USES_PROXY_TYPES)
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <csnode/node.hpp>
+#pragma warning(pop)
+#endif
+
 #include <iostream>
 
 namespace slv2
@@ -9,7 +17,7 @@ namespace slv2
         // internal data
         : context(*this)
         , tag_state_expired(CallsQueueScheduler::no_tag)
-        , req_stop(false)
+        , req_stop(true)
         // options
         , opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
@@ -26,8 +34,6 @@ namespace slv2
         pslv_v1 = (std::make_unique<Credits::Solver>(pNode));
         pgen = pslv_v1->generals.get();
         pnode = pslv_v1->node_;
-        // autostart in node environment
-        start();
     }
 
     SolverCore::~SolverCore()
@@ -44,7 +50,7 @@ namespace slv2
 
     void SolverCore::finish()
     {
-        pstate->beforeOff(context);
+        pstate->off(context);
         scheduler.RemoveAll();
         tag_state_expired = CallsQueueScheduler::no_tag;
         pstate = nullptr;
@@ -67,10 +73,10 @@ namespace slv2
             // state changed due timeout from within expired state        
         }
         
-        pstate->beforeOff(context);
+        pstate->off(context);
         std::cout << "Core: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
         pstate = pState;
-        pstate->beforeOn(context);
+        pstate->on(context);
         
         // timeout hadling
         if(opt_timeouts_enabled) {
@@ -80,7 +86,7 @@ namespace slv2
                 tag_state_expired = CallsQueueScheduler::no_tag;
                 // control state switch
                 std::weak_ptr<INodeState> p1(pstate);
-                pstate->onExpired(context);
+                pstate->expired(context);
                 if(pstate == p1.lock()) {
                     // expired state did not change to another one, do it now
                     std::cout << "Core: there is no state set on expiration of " << pstate->name() << std::endl;
@@ -116,6 +122,34 @@ namespace slv2
         return (Result::Finish == res);
     }
 
+    // Copied methods from solver.v1
+    
+    void SolverCore::prepareBlockAndSend()
+    {
+        addTimestampToPool(m_pool);
+        m_pool.set_writer_public_key(public_key);
+        m_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        m_pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        m_pool.sign(private_key);
+        pnode->sendBlock(std::move(m_pool));
+        pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
+        pnode->getBlockChain().putBlock(m_pool);
+    }
+
+    void SolverCore::prepareBadBlockAndSend()
+    {
+        b_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        b_pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        pnode->sendBadBlock(std::move(b_pool));
+    }
+
+    void SolverCore::addTimestampToPool(csdb::Pool& pool)
+    {
+        pool.add_user_field(0, std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
+        ));
+    }
+
     // SolverCore::Context implementation
     
     void SolverContext::becomeNormal()
@@ -139,5 +173,14 @@ namespace slv2
         core.nextRound();
     }
 
+    void SolverContext::makeAndSendBlock()
+    {
+        core.prepareBlockAndSend();
+    }
+
+    void SolverContext::makeAndSendBadBlock()
+    {
+        core.prepareBadBlockAndSend();
+    }
 
 } // slv2

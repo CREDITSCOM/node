@@ -12,8 +12,7 @@
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"
 #else
-//#include <csdb/pool.h>
-//#include <Solver/Solver.hpp> // Credits::HashVector, Credits::Solver
+#include <csdb/pool.h>
 #include <vector> // to define byte_array
 namespace csdb
 {
@@ -59,6 +58,15 @@ namespace slv2
         void becomeWriter();
 
         void startNewRound();
+
+        inline Node& node();
+
+        inline Credits::Generals& generals();
+
+        // candidates for refactor:
+        
+        void makeAndSendBlock();
+        void makeAndSendBadBlock();
 
     private:
         SolverCore& core;
@@ -160,6 +168,14 @@ namespace slv2
 
         csdb::internal::byte_array public_key;
         csdb::internal::byte_array private_key;
+        csdb::Pool m_pool; // copied from solver.v1
+        csdb::Pool v_pool; // copied from solver.v1
+        csdb::Pool b_pool; // copied from solver.v1
+
+        // consensus private members (copied from solver.v1)
+        void prepareBlockAndSend(); // m_pool
+        void prepareBadBlockAndSend(); // b_pool
+        void addTimestampToPool(csdb::Pool& pool);
 
         // previous solver version instance
         std::unique_ptr<Credits::Solver> pslv_v1;
@@ -167,4 +183,15 @@ namespace slv2
         Node * pnode;
         Credits::Generals * pgen;
     };
+
+    Node& SolverContext::node()
+    {
+        return *core.pnode;
+    }
+
+    Credits::Generals& SolverContext::generals()
+    {
+        return *core.pgen;
+    }
+
 } // slv2
