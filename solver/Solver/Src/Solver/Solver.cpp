@@ -461,41 +461,9 @@ void Solver::takeDecWorkaround()
   }
 }
 
-//void Solver::checkMatrixReceived()
-//{
-//  if (trustedCounterMatrix < 2) node_->sendMatrix(generals->getMatrix());
-//  
-//}
-
-//void Solver::setRNum(size_t _rNum)
-//{
-//  rNum = _rNum;
-//}
-
-
-//void Solver::checkVectorsReceived(size_t _rNum)
-//{
-//  if (_rNum < rNum) return;
-//  uint8_t numGen = node_->getConfidants().size();
-//  if (trustedCounterVector == numGen) return;
-//
-//}
-
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
-  //runAfter(std::chrono::milliseconds(500),
-  //  [this]() { checkVectorsReceived(); });
-	//std::cout << "SOLVER> Got Matrix" << std::endl;
 	uint8_t numGen = node_->getConfidants().size();
-  /*for(uint8_t i=0; i<numGen; i++)
-  {
-    if(!receivedVecFrom[i]) node_->sendVectorRequest(node_->getConfidants()[i]);
-  }*/
-  //if(trustedCounterMatrix==0)
-  //{
-  //      runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS/5),
-  //      [this]() { writeNewBlock();});
-  //}
 
   if(gotBlockThisRound) return;
 	if (receivedMatFrom[matrix.Sender])
