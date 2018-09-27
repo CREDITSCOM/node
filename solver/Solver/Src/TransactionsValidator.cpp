@@ -44,7 +44,7 @@ namespace Credits
 #ifdef _MSC_VER
         int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
 #else
-        int8_t bitcnt = __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
+        int8_t bitcnt = __builtin_popcount(newBalance.integral()) + __builtin_popcountl(newBalance.fraction());
 #endif
 
         if (!wallState.trxTail_.isAllowed(trx.innerID()))
