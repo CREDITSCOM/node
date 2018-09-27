@@ -11,7 +11,8 @@ add_library(lib
   include/lib/system/keys.hpp
   include/lib/system/logger.hpp
   include/lib/system/allocators.hpp
-  include/lib/system/timer.h
+  include/lib/system/timer.hpp
+  include/lib/system/utils.hpp
 )
 
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)

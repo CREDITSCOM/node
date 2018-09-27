@@ -201,6 +201,7 @@ namespace cs
         template<typename T>
         inline void addDebug(const T& type) const noexcept
         {
+            (void)type;
 #ifndef NDEBUG
             std::cout << type;
 #endif

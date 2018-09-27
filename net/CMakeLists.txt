@@ -16,13 +16,14 @@ add_library(net
 )
 
 add_dependencies(${PROJECT_NAME} csconnector)
-target_include_directories(net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/include/net
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../api/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csnode/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
-                                      ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/thrift/lib/cpp/src/
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/thrift/lib/cpp/src
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libcuckoo
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csdb
                                       ${CMAKE_BINARY_DIR}/csdb/snappy
                                       ${CMAKE_BINARY_DIR}/api/api_gen

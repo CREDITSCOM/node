@@ -26,7 +26,7 @@
 #include <boost/asio.hpp>
 
 #include <csnode/nodecore.h>
-#include <lib/system/timer.h>
+#include <lib/system/timer.hpp>
 #include <client/params.hpp>
 #include <lib/system/keys.hpp>
 

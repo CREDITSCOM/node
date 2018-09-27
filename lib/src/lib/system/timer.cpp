@@ -1,4 +1,4 @@
-#include "lib/system/timer.h"
+#include "lib/system/timer.hpp"
 
 cs::Timer::Timer():
     mIsRunning(false),
@@ -20,7 +20,7 @@ void cs::Timer::start(int msec)
     mMsec = std::chrono::milliseconds(msec);
     mThread = std::thread(&Timer::loop, this);
     mRealMsec = mMsec;
-    mAllowableDifference = RangeDeltaInPercents ? msec * RangeDeltaInPercents / 100 : 0;
+    mAllowableDifference = RangeDeltaInPercents ? (static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100) : 0;
 }
 
 void cs::Timer::stop()

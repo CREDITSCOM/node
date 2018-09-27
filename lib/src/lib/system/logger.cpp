@@ -10,13 +10,17 @@
 
 extern thread_local bool trace = true;
 
+template<typename Buffer>
+static void writeToFile(const Buffer& buffer);
+
 struct cs::Logger::Impl
 {
     std::thread thread;
     std::vector<std::string> info;
     std::atomic<bool> isTerminateRequest;
+    std::atomic<bool> isEmpty;
     std::mutex mutex;
-    std::chrono::milliseconds sleepTime = std::chrono::milliseconds(10);
+    std::chrono::milliseconds sleepTime = std::chrono::milliseconds(100);
 
     //main thread loop
     void loop();
@@ -28,40 +32,52 @@ struct cs::Logger::Impl
 cs::Logger::Impl::Impl()
 {
     isTerminateRequest = false;
+    isEmpty = true;
+
     thread = std::thread(&Impl::loop, this);
+
+    csdebug() << "File logger created";
 }
 
 cs::Logger::Impl::~Impl()
 {
     isTerminateRequest = true;
+    isEmpty = true;
 
     if (thread.joinable())
         thread.join();
 
-    info.clear();
-}
+    if (!info.empty())
+        writeToFile(info);
 
-template<typename Buffer>
-static void writeToFile(const Buffer& buffer);
+    info.clear();
+
+    csdebug() << "File logger destroyed";
+}
 
 void cs::Logger::Impl::loop()
 {
     while (!isTerminateRequest)
     {
-        mutex.lock();
-
-        if (!info.empty())
+        if (!isEmpty)
         {
-            std::vector<std::string> tempBuffer(info.size());
-            std::move(info.begin(), info.end(), tempBuffer.begin());
-            info.clear();
+            std::vector<std::string> buffer;
 
-            mutex.unlock();
+            {
+                std::lock_guard<std::mutex> lock(mutex);
 
-            writeToFile(tempBuffer);
+                std::vector<std::string> tempBuffer(info.size());
+                std::move(info.begin(), info.end(), tempBuffer.begin());
+
+                info.clear();
+                isEmpty = true;
+
+                buffer = std::move(tempBuffer);
+            }
+
+            if (!buffer.empty())
+                writeToFile(buffer);
         }
-        else
-            mutex.unlock();
 
         std::this_thread::sleep_for(sleepTime);
     }
@@ -81,14 +97,14 @@ static void writeToFile(const Buffer& buffer)
 
     std::for_each(buffer.begin(), buffer.end(), [&](const std::string& str) {
         ss << std::put_time(std::localtime(&in_time_t), "%Hh %Mm %Ss:");
-        ss << str + "\n\n";
+        ss << str << "\n";
     });
 
     file << ss.rdbuf();
     file.close();
 }
 
-cs::Logger::Logger() :
+cs::Logger::Logger():
     mPimpl(new Impl())
 {
 }
@@ -101,7 +117,14 @@ const cs::Logger& cs::Logger::instance()
 
 void cs::Logger::toFile(const std::string& log) const noexcept
 {
+    if (log.empty())
+        return;
+
     std::lock_guard<std::mutex> lock(mPimpl->mutex);
+
+    if (mPimpl->info.empty())
+        mPimpl->isEmpty = false;
+
     mPimpl->info.push_back(log);
 }
 
