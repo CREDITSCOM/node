@@ -235,7 +235,7 @@ class Solver {
   bool writingConfGotFrom[100];
 
   uint8_t writingCongGotCurrent;
-  size_t  rNum = 0;
+  uint32_t  rNum = 0;
 
   cs::SharedMutex mSharedMutex;
 

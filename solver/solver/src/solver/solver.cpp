@@ -205,11 +205,9 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
     node_->getBlockChain().putBlock(m_pool);
 #ifndef MONITOR_NODE
     if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
-      Hash test_hash((char*)(node_->getBlockChain()
-                                 .getLastWrittenHash()
-                                 .to_binary()
-                                 .data()));  // getLastWrittenHash().to_binary().data()));//SENDING
-                                             // HASH!!!
+      auto binary = node_->getBlockChain().getLastWrittenHash().to_binary();
+      Hash test_hash = reinterpret_cast<char*>(binary.data());;
+
       node_->sendHash(test_hash, sender);
 
       cslog() << "SENDING HASH to writer: " << byteStreamToHex(test_hash.str, 32);
@@ -324,33 +322,27 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) { // reviewer: "Nee
 
   if (transaction.is_valid()) {
 #ifndef SPAMMER
-    auto v = transaction.to_byte_stream_for_sig();
-    size_t msg_len = v.size();
+    auto bytes = transaction.to_byte_stream_for_sig();
 
-    auto message = new uint8_t[msg_len];
+    auto vec = transaction.source().public_key();
 
-    for (size_t i = 0; i < msg_len; i++) {
-      message[i] = v[i];
-    }
+    const std::size_t keyLength = 32;
+    uint8_t public_key[keyLength];
 
-    auto    vec = transaction.source().public_key();
-    uint8_t public_key[32];
-
-    for (int i = 0; i < 32; i++) {
+    for (std::size_t i = 0; i < keyLength; i++) {
       public_key[i] = vec[i];
     }
 
     std::string sig_str = transaction.signature();
-    uint8_t*    signature = (uint8_t*)sig_str.c_str();
+    uint8_t*    signature = reinterpret_cast<uint8_t*>(const_cast<char*>(sig_str.c_str()));
 
-    if (verify_signature(signature, public_key, message, msg_len)) {
+    if (verify_signature(signature, public_key, bytes.data(), bytes.size())) {
 #endif
       v_pool.add_transaction(transaction);
 #ifndef SPAMMER
     } else {
       cserror() << "Wrong signature";
     }
-    delete[] message;
 #endif
   } else {
     csdebug() << "Invalid transaction received";
@@ -561,14 +553,16 @@ void Solver::checkMatrixReceived() {
 }
 
 void Solver::setRNum(size_t _rNum) {
-  rNum = _rNum;
+  rNum = static_cast<uint32_t>(_rNum);
 }
 
 void Solver::checkVectorsReceived(size_t _rNum) {
   if (_rNum < rNum) {
     return;
   }
+
   const uint8_t numGen = static_cast<uint8_t>(node_->getConfidants().size());
+
   if (trustedCounterVector == numGen) {
     return;
   }

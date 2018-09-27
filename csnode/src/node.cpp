@@ -901,6 +901,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
   ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
   ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
+
   flushCurrentTasks();
 }
 
