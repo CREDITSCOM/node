@@ -6,6 +6,8 @@
 
 #include <memory>
 #include <map>
+#include <vector>
+#include <set>
 
 // forward declarations
 
@@ -13,7 +15,6 @@
 #include "ProxyTypes.h"
 #else
 #include <csdb/pool.h>
-#include <vector> // to define byte_array
 namespace csdb
 {
     class PoolHash;
@@ -40,8 +41,11 @@ namespace slv2
 
     class SolverCore;
 
-    // "Интерфейсный" класс для обращений из состояний к ядру солвера,
-    // ограничивает подмножество вызовов солвера, которые допускаются из классов состояний
+    using KeyType = csdb::internal::byte_array;
+
+    // "Интерфейсный" класс для обращений из классов состояний к ядру солвера,
+    // определяет подмножество вызовов солвера, которые доступны из классов состояний,
+    // д. б. универсальными и не избыточными одновременно
     class SolverContext
     {
     public:
@@ -59,14 +63,24 @@ namespace slv2
 
         void startNewRound();
 
+        // fast access methods, may be removed at the end
         inline Node& node();
-
         inline Credits::Generals& generals();
+        inline CallsQueueScheduler& scheduler();
 
-        // candidates for refactor:
+        inline const KeyType& public_key() const;
+        inline const KeyType& private_key() const;
+
+        inline int32_t round() const;
+
+        // candidates for refactoring:
         
         void makeAndSendBlock();
         void makeAndSendBadBlock();
+        inline bool is_spammer() const;
+        inline void add(const csdb::Transaction& tr);
+        inline void flush_transactions();
+        inline bool verify(const csdb::Transaction& tr) const;
 
     private:
         SolverCore& core;
@@ -92,11 +106,12 @@ namespace slv2
             return req_stop;
         }
 
+        // Solver "public" interface,
         // below are the "required" methods to be implemented by Solver-compatibility issue:
         
         const Credits::HashVector& getMyVector() const;
         const Credits::HashMatrix& getMyMatrix() const;
-        void set_keys(const csdb::internal::byte_array& pub, const csdb::internal::byte_array& priv);
+        void set_keys(const KeyType& pub, const KeyType& priv);
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
@@ -111,7 +126,7 @@ namespace slv2
         void beforeNextRound();
         void nextRound();
         // required by api
-        void send_wallet_transaction(const csdb::Transaction& trans);
+        void send_wallet_transaction(const csdb::Transaction& tr);
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*pool*/, const PublicKey& /*sender*/)
         {}
@@ -121,6 +136,7 @@ namespace slv2
 
         bool opt_timeouts_enabled;
         bool opt_repeat_state_enabled;
+        bool opt_spammer_on;
 
         // inner data
 
@@ -166,16 +182,45 @@ namespace slv2
         
         Counter cur_round;
 
-        csdb::internal::byte_array public_key;
-        csdb::internal::byte_array private_key;
-        csdb::Pool m_pool; // copied from solver.v1
-        csdb::Pool v_pool; // copied from solver.v1
-        csdb::Pool b_pool; // copied from solver.v1
+        KeyType public_key;
+        KeyType private_key;
 
-        // consensus private members (copied from solver.v1)
+        // copied from solver.v1: по мере разнесения функционала по состояниям кол-во данных должно уменьшиться
+        csdb::Pool m_pool {};
+        //csdb::Pool v_pool {}; -> SelectState - накопление чужих транзакций
+        //csdb::Pool b_pool {}; -> StartState? - отправка bad block
+        size_t lastRoundTransactionsGot { 0 };
+        std::set<PublicKey> receivedVec_ips;
+        bool receivedVecFrom [100];
+        uint8_t trustedCounterVector { 0 };
+        std::set<PublicKey> receivedMat_ips;
+        bool receivedMatFrom [100];
+        uint8_t trustedCounterMatrix { 0 };
+        std::vector<Hash> hashes;
+        std::vector<PublicKey> ips;
+        std::vector<std::string> vector_datas;
+        bool m_pool_closed { true };
+        bool vectorComplete { false };
+        bool consensusAchieved { false };
+        bool blockCandidateArrived { false };
+        bool round_table_sent { false };
+        bool transactionListReceived { false };
+        bool vectorReceived { false };
+        bool gotBlockThisRound { false };
+        bool writingConfirmationGot { false };
+        bool gotBigBang { false };
+        bool writingConfGotFrom [100];
+        uint8_t writingCongGotCurrent { 0 };
+        bool allMatricesReceived { false };
+        std::mutex trans_mtx;
+        std::vector<csdb::Transaction> transactions;
+
+        // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
         void prepareBlockAndSend(); // m_pool
         void prepareBadBlockAndSend(); // b_pool
         void addTimestampToPool(csdb::Pool& pool);
+        void flushTransactions();
+        bool verify_signature(const csdb::Transaction& tr);
 
         // previous solver version instance
         std::unique_ptr<Credits::Solver> pslv_v1;
@@ -192,6 +237,46 @@ namespace slv2
     Credits::Generals& SolverContext::generals()
     {
         return *core.pgen;
+    }
+
+    CallsQueueScheduler& SolverContext::scheduler()
+    {
+        return core.scheduler;
+    }
+
+    const KeyType& SolverContext::public_key() const
+    {
+        return core.public_key;
+    }
+
+    const KeyType& SolverContext::private_key() const
+    {
+        return core.private_key;
+    }
+
+    inline int32_t SolverContext::round() const
+    {
+        return core.cur_round;
+    }
+
+    bool SolverContext::is_spammer() const
+    {
+        return core.opt_spammer_on;
+    }
+
+    void SolverContext::add(const csdb::Transaction& tr)
+    {
+        core.send_wallet_transaction(tr);
+    }
+
+    void SolverContext::flush_transactions()
+    {
+        core.flushTransactions();
+    }
+
+    bool SolverContext::verify(const csdb::Transaction& tr) const
+    {
+        return core.verify_signature(tr);
     }
 
 } // slv2

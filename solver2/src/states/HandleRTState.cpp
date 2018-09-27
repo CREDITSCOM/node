@@ -1,17 +1,27 @@
 #include "HandleRTState.h"
 #include "../SolverCore.h"
+#include "../Node.h"
+#include <iostream>
 
 namespace slv2
 {
     void HandleRTState::on(SolverContext& context)
     {
-        //TODO: deduce from round table desired node status
-        static uint32_t flag = 0;
-        if(++flag % 2 != 0) {
-            context.becomeNormal();
-        }
-        else {
-            context.becomeTrusted();
+        switch(context.node().getMyLevel()) {
+            case NodeLevel::Confidant:
+                context.becomeTrusted();
+                break;
+            case NodeLevel::Normal:
+                context.becomeNormal();
+                break;
+            case NodeLevel::Writer:
+                std::cout << name() << " warning: node must not become writer through round table" << std::endl;
+                context.becomeWriter();
+                break;
+            case NodeLevel::Main:
+            default:
+                std::cout << name() << " error: unexpected NodeLevel() result from Node" << std::endl;
+                break;
         }
     }
 

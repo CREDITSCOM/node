@@ -1,6 +1,12 @@
 #pragma once
 #include "DefaultIgnore.h"
 
+#if defined(SOLVER_USES_PROXY_TYPES)
+#include "ProxyTypes.h"
+#else
+#include <csdb/pool.h>
+#endif
+
 namespace slv2
 {
 
@@ -17,7 +23,7 @@ namespace slv2
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        Result onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
+        Result onTransaction(SolverContext& context, const csdb::Transaction& tr) override;
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
@@ -29,6 +35,7 @@ namespace slv2
     private:
 
         size_t cnt_transactions { 0 };
+        csdb::Pool pool;
     };
 
 } // slv2

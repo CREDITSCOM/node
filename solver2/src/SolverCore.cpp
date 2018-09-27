@@ -1,12 +1,11 @@
 #include "SolverCore.h"
 #include <Solver/Solver.hpp>
+#include "../Node.h"
 
-#if ! defined(SOLVER_USES_PROXY_TYPES)
 #pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <csnode/node.hpp>
+#pragma warning(disable: 4324)
+#include <sodium.h>
 #pragma warning(pop)
-#endif
 
 #include <iostream>
 
@@ -138,6 +137,7 @@ namespace slv2
 
     void SolverCore::prepareBadBlockAndSend()
     {
+        csdb::Pool b_pool;
         b_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
         b_pool.set_previous_hash(csdb::PoolHash::from_string(""));
         pnode->sendBadBlock(std::move(b_pool));
@@ -148,6 +148,25 @@ namespace slv2
         pool.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
+    }
+
+    void SolverCore::flushTransactions()
+    {
+        // thread-safe with send_wallet_transaction(), suppose to sync with calls from network-related threads
+        std::lock_guard<std::mutex> l(trans_mtx);
+        if(!transactions.empty()) {
+            pnode->sendTransaction(std::move(transactions));
+            transactions.clear();
+        }
+    }
+
+    bool SolverCore::verify_signature(const csdb::Transaction& tr)
+    {
+        std::vector<uint8_t> message = tr.to_byte_stream_for_sig();
+        std::vector<uint8_t> pub_key = tr.source().public_key();
+        std::string signature = tr.signature();
+        // if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
+        return (0 == crypto_sign_ed25519_verify_detached((uint8_t *) signature.data(), message.data(), message.size(), pub_key.data()) );
     }
 
     // SolverCore::Context implementation

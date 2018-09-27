@@ -1,5 +1,6 @@
 #include "SolverCore.h"
 #include <Solver/Solver.hpp>
+#include "../Node.h"
 
 namespace slv2
 {
@@ -22,7 +23,7 @@ namespace slv2
         return stub;
     }
 
-    void SolverCore::set_keys(const csdb::internal::byte_array& pub, const csdb::internal::byte_array& priv)
+    void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
         if(pslv_v1) {
             pslv_v1->set_keys(pub, priv);
@@ -198,25 +199,49 @@ namespace slv2
 
     void SolverCore::nextRound()
     {
-        if(pslv_v1) {
-            pslv_v1->nextRound();
-        }
+#ifdef MYLOG
+        std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
+#endif
+        receivedVec_ips.clear();
+        receivedMat_ips.clear();
+
+        hashes.clear();
+        ips.clear();
+        vector_datas.clear();
+
+        vectorComplete = false;
+        consensusAchieved = false;
+        blockCandidateArrived = false;
+        transactionListReceived = false;
+        vectorReceived = false;
+        gotBlockThisRound = false;
+        allMatricesReceived = false;
+
+        round_table_sent = false;
+        m_pool = csdb::Pool {};
+#ifdef MYLOG
+        std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
+#endif
+        // from Solver::initConfRound() (там нужно для ДУ)
+        memset(receivedVecFrom, 0, 100);
+        memset(receivedMatFrom, 0, 100);
+        trustedCounterVector = 0;
+        trustedCounterMatrix = 0;
 
         if(!pstate) {
             return;
         }
-        //TODO: get round number from node_
-        ++cur_round;
+        cur_round = pnode->getRoundNumber();
         if(stateCompleted(pstate->onRoundTable(context, cur_round))) {
             handleTransitions(Event::RoundTable);
         }
     }
 
-    void SolverCore::send_wallet_transaction(const csdb::Transaction& trans)
+    void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
     {
-        if(pslv_v1) {
-            pslv_v1->send_wallet_transaction(trans);
-        }
+        // thread-safe with flushTransactions(), suppose to receive calls from network-related threads
+        std::lock_guard<std::mutex> l(trans_mtx);
+        transactions.push_back(tr);
     }
 
 } // slv2
