@@ -1,15 +1,9 @@
-#include <iostream>
-#include <sstream>
-#include <boost/stacktrace.hpp>
 #include <lib/system/logger.hpp>
+
+#include <iostream>
 
 extern thread_local bool trace = true;
 
-namespace logger {
-void stacktrace() {
-  std::ostringstream ss;
-  ss << boost::stacktrace::stacktrace();
-  auto s = ss.str();
-  std::cout << s.substr(s.find('\n'), s.size());
-}
-}
+extern auto clog_default_locale = []() {
+  return std::clog.imbue(std::locale::classic());
+}();

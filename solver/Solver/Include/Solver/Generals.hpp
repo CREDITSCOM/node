@@ -34,13 +34,13 @@ namespace Credits{
 
         Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, csdb::Pool& new_bpool);
 
-        void addvector(HashVector vector);
-        void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
+        void addvector(const HashVector& vector);
+        void addmatrix(const HashMatrix& matrix, const std::vector<PublicKey>& confidantNodes);
 
         //take desision
-        uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash lasthash);
+        uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
 		
-        HashMatrix getMatrix();
+        const HashMatrix& getMatrix() const;
 
 		    void addSenderToMatrix(uint8_t myConfNum);
 

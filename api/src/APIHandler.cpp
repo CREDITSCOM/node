@@ -1,4 +1,4 @@
-//#define TRACE_ENABLER
+#define TRACE_ENABLER
 
 #include <APIHandler.h>
 //#include <DebugLog.h>
@@ -67,10 +67,10 @@ custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(200ms);
 #endif
-  TRACE(std::endl << fname);
+  TRACE('\n', fname);
   auto res =
     api::APIProcessor::dispatchCall(iprot, oprot, fname, seqid, callContext);
-  TRACE(std::endl);
+  TRACE('\n');
   return res;
 }
 
@@ -283,33 +283,6 @@ toByteArray(const std::string& s)
   return res;
 }
 
-template<typename T>
-T
-deserialize(std::string&& s)
-{
-  // https://stackoverflow.com/a/16261758/2016154
-  static_assert(
-    CHAR_BIT == 8 && std::is_same<std::uint8_t, unsigned char>::value,
-    "This code requires std::uint8_t to be implemented as unsigned char.");
-
-  auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>(
-    reinterpret_cast<uint8_t*>(&(s[0])), (uint32_t)s.size());
-  thrift::protocol::TBinaryProtocol proto(buffer);
-  T sc;
-  sc.read(&proto);
-  return sc;
-}
-
-template<typename T>
-std::string
-serialize(const T& sc)
-{
-  auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>();
-  thrift::protocol::TBinaryProtocol proto(buffer);
-  sc.write(&proto);
-  return buffer->getBufferAsString();
-}
-
 api::Amount
 convertAmount(const csdb::Amount& amount)
 {
@@ -336,6 +309,20 @@ convert_transaction_id(const api::TransactionId& trid)
     csdb::PoolHash::from_binary(toByteArray(trid.poolHash)), trid.index);
 }
 
+template<class T>
+auto
+fetchFee(const T& trx, int) -> decltype(trx.counted_fee())
+{
+  return trx.counted_fee();
+}
+
+template<class T>
+csdb::Amount
+fetchFee(const T& trx, long def)
+{
+  return def;
+}
+
 api::SealedTransaction
 convertTransaction(const csdb::Transaction& transaction)
 {
@@ -354,6 +341,8 @@ convertTransaction(const csdb::Transaction& transaction)
 
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
+
+  result.trxn.fee.commission = transaction.counted_fee().get_raw();
 
   auto uf = transaction.user_field(0);
   if ((result.trxn.__isset.smartContract = uf.is_valid())) { // non-bug
@@ -518,8 +507,30 @@ is_smart(const csdb::Transaction& tr)
 bool
 is_smart_deploy(const api::SmartContractInvocation& smart)
 {
-  return !smart.byteCode.empty();
+  return smart.method.empty();
 }
+
+bool
+is_deploy_transaction(const csdb::Transaction& tr)
+{
+  auto uf = tr.user_field(0);
+  return uf.type() == csdb::UserField::Type::String &&
+         is_smart_deploy(
+           deserialize<api::SmartContractInvocation>(uf.value<std::string>()));
+}
+
+template<typename T>
+auto
+set_max_fee(T& trx, const csdb::Amount& am, int)
+  -> decltype(trx.set_max_fee(am), void())
+{
+  trx.set_max_fee(am);
+}
+
+template<typename T>
+void
+set_max_fee(T& trx, const csdb::Amount& am, long)
+{}
 
 csdb::Transaction
 APIHandler::make_transaction(const Transaction& transaction)
@@ -549,17 +560,29 @@ APIHandler::make_transaction(const Transaction& transaction)
   return send_transaction;
 }
 
+std::string
+get_delimited_transaction_sighex(const csdb::Transaction& tr)
+{
+  auto bs = fromByteArray(tr.to_byte_stream_for_sig());
+  return std::string({ ' ' }) + byteStreamToHex(bs.data(), bs.length());
+}
+
 void
 APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
                                   const Transaction& transaction)
 {
   work_queues["TransactionFlow"].yield();
-  solver.send_wallet_transaction(make_transaction(transaction));
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  auto tr = make_transaction(transaction);
+  TRACE("");
+  solver.send_wallet_transaction(tr);
+  SetResponseStatus(_return.status,
+                    APIRequestStatusType::SUCCESS,
+                    get_delimited_transaction_sighex(tr));
+  TRACE("");
 }
 
 template<typename T>
-std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::value,
+std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type,
                std::ostream&>
 operator<<(std::ostream& s, const T& t)
 {
@@ -572,17 +595,16 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                                    const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
-  TRACE(std::endl << "transaction = " << transaction);
+  TRACE('\n', '\t', "transaction =", transaction);
 
   csdb::Transaction send_transaction = make_transaction(transaction);
 
   const auto smart_addr = send_transaction.target();
 
-  bool deploy = input_smart.method.empty();
-  if (input_smart.byteCode.empty() != input_smart.sourceCode.empty() ||
-      deploy == input_smart.byteCode.empty()) {
-    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    return;
+  bool deploy = is_smart_deploy(input_smart);
+  if (!deploy) {
+    input_smart.byteCode = std::string();
+    input_smart.sourceCode = std::string();
   }
 
   TRACE("");
@@ -665,7 +687,6 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   }
 
   TRACE("");
-
   executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
@@ -714,7 +735,9 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     });
   }
   TRACE("");
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  SetResponseStatus(_return.status,
+                    APIRequestStatusType::SUCCESS,
+                    get_delimited_transaction_sighex(send_transaction));
 }
 
 void
@@ -744,7 +767,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
   ///<<
   /// const_limit << std::endl;
 
-  TRACE(offset << " " << const_limit);
+  TRACE(offset, const_limit);
 
   if (offset > 100)
     const_cast<int64_t&>(offset) = 100;
@@ -822,9 +845,7 @@ APIHandler::PoolInfoGet(PoolInfoGetResult& _return,
 void
 APIHandler::StatsGet(api::StatsGetResult& _return)
 {
-  //#ifndef FOREVER_ALONE
-  //    Log("StatsGet");
-  //#endif
+  TRACE("StatsGet");
 
   csstats::StatsPerPeriod stats = this->stats.getStats();
 
@@ -858,14 +879,20 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
 
   // smart_rescan();
 
-  auto trid = [&]() -> decltype(auto) {
-    TRACE("");
+  auto smartrid = [&]() -> decltype(auto) {
+    //   TRACE("");
     auto smart_origin = locked_ref(this->smart_origin);
-    TRACE("");
-    return (*smart_origin)[BlockChain::getAddressFromKey(address)];
+    //   TRACE("");
+    auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
+
+    return it == smart_origin->end() ? csdb::TransactionID() : it->second;
   }();
-  auto tr = s_blockchain.loadTransaction(trid);
-  _return.smartContract = fetch_smart_body(tr);
+  if (!smartrid.is_valid()) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+  _return.smartContract =
+    fetch_smart_body(s_blockchain.loadTransaction(smartrid));
 
   SetResponseStatus(_return.status,
                     !_return.smartContract.address.empty()
@@ -921,7 +948,6 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   if (!pending_smart_transactions->queue.empty()) {
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
-    TRACE(std::endl << convertTransaction(tr));
     auto smart = fetch_smart(tr);
     auto address = tr.target();
 

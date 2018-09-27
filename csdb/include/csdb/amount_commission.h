@@ -34,6 +34,7 @@ class AmountCommission {
  public:
   inline double to_double() const noexcept;
   inline operator double() const noexcept {return to_double();}
+  inline uint16_t get_raw() {return bits_;}
 
   // Сериализация
  public:

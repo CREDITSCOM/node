@@ -160,7 +160,11 @@ typedef std::string Matrix;
 		void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
 		void gotBlockReply(csdb::Pool&&);
     void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+    void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+    void gotFreeSyncroBlock(csdb::Pool&&);
     void sendTL();
+    void rndStorageProcessing();
+    void tmpStorageProcessing();
 		// API methods
 
 		void initApi();
@@ -169,14 +173,15 @@ typedef std::string Matrix;
 
     void send_wallet_transaction(const csdb::Transaction& transaction);
 
+
 		void nextRound();
     bool mPoolClosed();
     void setLastRoundTransactionsGot(size_t trNum);
     //remove it!!!
     void buildBlock(csdb::Pool& block);
 
-    HashVector getMyVector();
-    HashMatrix getMyMatrix();
+    const HashVector& getMyVector() const;
+    const HashMatrix& getMyMatrix() const;
     void initConfRound();
     void sendZeroVector();
     void checkVectorsReceived(size_t _rNum);
@@ -190,6 +195,7 @@ typedef std::string Matrix;
 	private:
     void _initApi();
 
+    void takeDecWorkaround();
 		void runMainRound();
 		void closeMainRound();
 
@@ -261,7 +267,10 @@ typedef std::string Matrix;
 		std::vector<csdb::Transaction> m_transactions;
     csdb::Pool m_transactions_;
     Fee fee_counter_;
-
+    /*to store new blocks*/
+    std::map <size_t, csdb::Pool> tmpStorage;
+    /*to store unrequested syncro blocks*/
+    std::map <size_t, csdb::Pool> rndStorage;
 
 #ifdef SPAMMER
 		std::atomic_bool spamRunning{ false };
