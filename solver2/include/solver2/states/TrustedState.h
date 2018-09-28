@@ -1,10 +1,10 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "DefaultStateBehavior.h"
 
 namespace slv2
 {
 
-    class TrustedState : public DefaultIgnore
+    class TrustedState : public DefaultStateBehavior
     {
     public:
         
@@ -31,8 +31,6 @@ namespace slv2
         bool test_vectors_completed(const SolverContext& context) const;
         bool test_matrices_completed(const SolverContext& context) const;
 
-        //TODO: уточнить логику блокировки приема матриц после получения блока в тек. раунде
-        bool is_block_recv;
     };
 
 } // slv2

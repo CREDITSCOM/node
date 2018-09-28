@@ -5,11 +5,11 @@
 namespace slv2
 {
 
-    class DefaultIgnore : public INodeState
+    class DefaultStateBehavior : public INodeState
     {
     public:
 
-        ~DefaultIgnore() override
+        ~DefaultStateBehavior() override
         {}
 
         Result onRoundTable(SolverContext& /*context*/, const uint32_t round) override;

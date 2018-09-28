@@ -1,10 +1,10 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "DefaultStateBehavior.h"
 
 namespace slv2
 {
 
-    class HandleRTState final : public DefaultIgnore
+    class HandleRTState final : public DefaultStateBehavior
     {
     public:
 

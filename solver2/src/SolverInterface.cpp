@@ -202,29 +202,28 @@ namespace slv2
 #ifdef MYLOG
         std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
 #endif
-        receivedVec_ips.clear();
-        receivedMat_ips.clear();
+        //receivedVec_ips.clear();
+        //receivedMat_ips.clear();
 
-        hashes.clear();
-        ips.clear();
-        vector_datas.clear();
+        //hashes.clear();
+        //ips.clear();
+        //vector_datas.clear();
 
-        vectorComplete = false;
-        consensusAchieved = false;
-        blockCandidateArrived = false;
-        transactionListReceived = false;
-        vectorReceived = false;
-        gotBlockThisRound = false;
-        allMatricesReceived = false;
+        //vectorComplete = false;
+        //consensusAchieved = false;
+        //blockCandidateArrived = false;
+        //transactionListReceived = false;
+        //vectorReceived = false;
+        //gotBlockThisRound = false;
+        //allMatricesReceived = false;
 
-        round_table_sent = false;
+        //round_table_sent = false;
         m_pool = csdb::Pool {};
-#ifdef MYLOG
-        std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
-#endif
+
         // as store result of current round:
         recv_vect.clear();
         recv_matr.clear();
+        recv_hash.clear();
 
         if(!pstate) {
             return;

@@ -1,10 +1,11 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "DefaultStateBehavior.h"
+#include <memory>
 
 namespace slv2
 {
 
-    class WriteState final : public DefaultIgnore
+    class WriteState final : public DefaultStateBehavior
     {
     public:
 
@@ -24,7 +25,8 @@ namespace slv2
 
     private:
 
-        unsigned int cnt_hashes { 0 };
+        std::unique_ptr<Hash> pown;
+
     };
 
 } // slv2

@@ -1,11 +1,11 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "DefaultStateBehavior.h"
 #include "Solver/CallsQueueScheduler.h"
 
 namespace slv2
 {
 
-    class NormalState final : public DefaultIgnore
+    class NormalState final : public DefaultStateBehavior
     {
     public:
 

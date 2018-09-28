@@ -133,6 +133,13 @@ namespace slv2
         pnode->sendBlock(std::move(m_pool));
         pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
         pnode->getBlockChain().putBlock(m_pool);
+#if 0
+#ifdef MYLOG
+        std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
+        std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
+        std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
+#endif
+#endif
     }
 
     void SolverCore::prepareBadBlockAndSend()
@@ -176,4 +183,13 @@ namespace slv2
         return core.pnode->getMyConfNumber();
     }
 
+    size_t SolverContext::cnt_trusted() const
+    {
+        return core.pnode->getConfidants().size();
+    }
+
+    void SolverContext::spawn_next_round()
+    {
+        core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash));
+    }
 } // slv2

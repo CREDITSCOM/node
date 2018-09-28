@@ -1,5 +1,5 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "DefaultStateBehavior.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"
@@ -10,7 +10,7 @@
 namespace slv2
 {
 
-    class CollectState final : public DefaultIgnore
+    class CollectState final : public DefaultStateBehavior
     {
     public:
 

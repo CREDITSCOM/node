@@ -8,6 +8,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <algorithm>
 
 // forward declarations
 
@@ -15,16 +16,6 @@
 #include "ProxyTypes.h"
 #else
 #include <csdb/pool.h>
-namespace csdb
-{
-    class PoolHash;
-
-    namespace internal
-    {
-        using byte_array = std::vector<std::uint8_t>;
-    }
-}
-
 #endif
 
 class Node;
@@ -72,9 +63,11 @@ namespace slv2
 
         inline int32_t round() const;
         uint8_t conf_number() const;
+        size_t cnt_trusted() const;
 
         // candidates for refactoring:
         
+        void spawn_next_round();
         inline void makeAndSendBlock();
         inline void makeAndSendBadBlock();
         inline bool is_spammer() const;
@@ -88,6 +81,9 @@ namespace slv2
         inline bool is_matr_recv_from(uint8_t sender) const;
         inline void recv_matr_from(uint8_t sender);
         inline size_t cnt_matr_recv() const;
+        inline bool is_hash_recv_from(const PublicKey& sender) const;
+        inline void recv_hash_from(const PublicKey& sender);
+        inline size_t cnt_hash_recv() const;
 
     private:
         SolverCore& core;
@@ -144,10 +140,11 @@ namespace slv2
         bool opt_timeouts_enabled;
         bool opt_repeat_state_enabled;
         bool opt_spammer_on;
+        bool opt_is_proxy_v1;
 
         // inner data
 
-        // to allow act as SolverCore
+        // to allow serve states as SolverCore:
         friend class SolverContext;
         SolverContext context;
 
@@ -196,30 +193,32 @@ namespace slv2
         std::set<uint8_t> recv_vect;
         // senders of matrices received this round
         std::set<uint8_t> recv_matr;
+        // senders of hashes received this round
+        std::vector<PublicKey> recv_hash;
 
         // copied from solver.v1: по мере разнесения функционала по состояниям кол-во данных должно уменьшиться
         csdb::Pool m_pool {};
         //csdb::Pool v_pool {}; -> SelectState - накопление чужих транзакций
         //csdb::Pool b_pool {}; -> StartState? - отправка bad block
-        size_t lastRoundTransactionsGot { 0 };
-        std::set<PublicKey> receivedVec_ips;
-        std::set<PublicKey> receivedMat_ips;
-        std::vector<Hash> hashes;
-        std::vector<PublicKey> ips;
-        std::vector<std::string> vector_datas;
-        bool m_pool_closed { true };
-        bool vectorComplete { false };
-        bool consensusAchieved { false };
-        bool blockCandidateArrived { false };
-        bool round_table_sent { false };
-        bool transactionListReceived { false };
-        bool vectorReceived { false };
-        bool gotBlockThisRound { false };
-        bool writingConfirmationGot { false };
-        bool gotBigBang { false };
-        bool writingConfGotFrom [100];
-        uint8_t writingCongGotCurrent { 0 };
-        bool allMatricesReceived { false };
+        //size_t lastRoundTransactionsGot { 0 };
+        //std::set<PublicKey> receivedVec_ips;
+        //std::set<PublicKey> receivedMat_ips;
+        //std::vector<Hash> hashes;
+        //std::vector<PublicKey> ips;
+        //std::vector<std::string> vector_datas;
+        //bool m_pool_closed { true };
+        //bool vectorComplete { false };
+        //bool consensusAchieved { false };
+        //bool blockCandidateArrived { false };
+        //bool round_table_sent { false };
+        //bool transactionListReceived { false };
+        //bool vectorReceived { false };
+        //bool gotBlockThisRound { false };
+        //bool writingConfirmationGot { false };
+        //bool gotBigBang { false };
+        //bool writingConfGotFrom [100];
+        //uint8_t writingCongGotCurrent { 0 };
+        //bool allMatricesReceived { false };
         std::mutex trans_mtx;
         std::vector<csdb::Transaction> transactions;
 
@@ -356,6 +355,21 @@ namespace slv2
     size_t SolverContext::cnt_matr_recv() const
     {
         return core.recv_matr.size();
+    }
+
+    bool SolverContext::is_hash_recv_from(const PublicKey& sender) const
+    {
+        return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
+    }
+
+    void SolverContext::recv_hash_from(const PublicKey& sender)
+    {
+        core.recv_hash.push_back(sender);
+    }
+
+    size_t SolverContext::cnt_hash_recv() const
+    {
+        return core.recv_hash.size();
     }
 
 } // slv2

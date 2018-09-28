@@ -488,7 +488,6 @@ void Solver::gotMatrix(HashMatrix&& matrix)
       takeDecWorkaround();
   }
 }
-#pragma endregion
 
 //what block does this function write???
 void Solver::writeNewBlock()
@@ -520,6 +519,7 @@ void Solver::writeNewBlock()
     //LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
   }
 }
+#pragma endregion
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
@@ -613,6 +613,7 @@ void Solver::gotBlockCandidate(csdb::Pool&& block)
  // writeNewBlock();
 }
 
+#pragma region moved to solver 2
 void Solver::gotHash(const Hash& hash, const PublicKey& sender)
 {
 	if (round_table_sent) return;
@@ -669,6 +670,7 @@ void Solver::gotHash(const Hash& hash, const PublicKey& sender)
         cancelReqHashes();
 	}
   }
+#pragma endregion
 #if 0 // unused code
 void Solver::initApi()
 {
