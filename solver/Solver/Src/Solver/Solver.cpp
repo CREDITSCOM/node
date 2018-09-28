@@ -503,6 +503,69 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 }
 
+
+
+
+void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
+{
+  std::cout << __func__ << std::endl;
+  if (tmpStorage.count(block.sequence()) == 0)
+  {
+    tmpStorage.emplace(block.sequence(), block);
+    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+
+}
+
+void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
+{
+  std::cout << __func__ << std::endl;
+  if (rndStorage.count(block.sequence()) == 0)
+  {
+    rndStorage.emplace(block.sequence(), block);
+    std::cout << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+}
+
+void Solver::rndStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (rndStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      rndStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
+void Solver::tmpStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (tmpStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      tmpStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
+
 bool Solver::getBigBangStatus() {
   return gotBigBang;
 }

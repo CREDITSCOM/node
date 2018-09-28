@@ -137,7 +137,11 @@ class Solver {
   void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
   void gotBlockReply(csdb::Pool&&);
   void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+  void gotFreeSyncroBlock(csdb::Pool&&);
   void sendTL();
+  void rndStorageProcessing();
+  void tmpStorageProcessing();
   // API methods
 
   void   initApi();
