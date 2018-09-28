@@ -41,7 +41,18 @@ struct Connection {
   typedef uint64_t Id;
 
   Connection() = default;
-  Connection(Connection&&) = default;
+  Connection(Connection&& rhs): id(rhs.id),
+                                lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed)),
+                                lastPacketsCount(rhs.lastPacketsCount),
+                                attempts(rhs.attempts),
+                                key(rhs.key),
+                                in(std::move(rhs.in)),
+                                specialOut(rhs.specialOut),
+                                out(std::move(rhs.out)),
+                                node(std::move(rhs.node)),
+                                isSignal(rhs.isSignal),
+                                connected(rhs.connected),
+                                msgRels(std::move(rhs.msgRels)) { }
 
   Connection(const Connection&) = delete;
   ~Connection() { }
@@ -51,7 +62,7 @@ struct Connection {
   Id id = 0;
 
   static const uint32_t BytesLimit = 1 << 20;
-  mutable std::atomic<uint32_t> lastBytesCount = 0;
+  mutable std::atomic<uint32_t> lastBytesCount = { 0 };
 
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
@@ -72,8 +83,6 @@ struct Connection {
     bool needSend = true;
   };
   FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
-
-  uint64_t syncBlock = 0;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
