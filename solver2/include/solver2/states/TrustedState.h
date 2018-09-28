@@ -19,8 +19,6 @@ namespace slv2
 
         Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
 
-        Result onBlock(SolverContext& context, const csdb::Pool& pool, const PublicKey& sender) override;
-
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
         const char * name() const override

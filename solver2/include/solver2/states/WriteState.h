@@ -16,6 +16,12 @@ namespace slv2
 
         Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
 
+        // override DefaultStateBehavior to ignore blocks
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
+        {
+            return Result::Ignore;
+        }
+
         const char * name() const override
         {
             return "Write";

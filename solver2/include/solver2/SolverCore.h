@@ -122,9 +122,9 @@ namespace slv2
         void gotTransactionList(csdb::Pool& pool);
         void gotVector(const Credits::HashVector& vect);
         void gotMatrix(const Credits::HashMatrix& matr);
-        void gotBlock(const csdb::Pool& pool, const PublicKey& sender);
+        void gotBlock(csdb::Pool& pool, const PublicKey& sender);
         void gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender);
-        void gotBlockReply(const csdb::Pool& pool);
+        void gotBlockReply(csdb::Pool& pool);
         void gotHash(const Hash& hash, const PublicKey& sender);
         void addConfirmation(uint8_t own_conf_number);
         void beforeNextRound();

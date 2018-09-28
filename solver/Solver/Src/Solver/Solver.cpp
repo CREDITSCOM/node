@@ -113,7 +113,7 @@ void Solver::buildBlock(csdb::Pool& block)
 
 }
 
-
+#pragma region moved to solver2
 void Solver::prepareBlockForSend(csdb::Pool& block)
 {
   //std::cout << "SOLVER> Before time stamp" << std::endl;
@@ -135,7 +135,6 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   #endif
 }
 
-#pragma region moved to solver2
 void Solver::sendTL()
 {
   if (gotBigBang) return;
@@ -519,7 +518,6 @@ void Solver::writeNewBlock()
     //LOG_WARN("Consensus achieved: " << (consensusAchieved ? 1 : 0) << ", ml=" << (int)node_->getMyLevel());
   }
 }
-#pragma endregion
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 {
@@ -573,13 +571,14 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
         scheduleReqTransactionList(T_tl);
     }
 }
-
+#pragma endregion
 
 bool Solver::getBigBangStatus()
 {
   return gotBigBang;
 }
 
+#pragma region moved to solver2
 void Solver::setBigBangStatus(bool _status)
 {
   gotBigBang = _status;
@@ -592,7 +591,7 @@ void Solver::setBigBangStatus(bool _status)
       }
   }
 }
-
+#pragma endregion
 
 void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender)
 {
@@ -840,6 +839,7 @@ void Solver::addInitialBalance()
 #endif
 }
 
+#pragma region moved to solver2
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////// gotBlockRequest
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 	csdb::Pool pool = node_->getBlockChain().loadBlock(hash);
@@ -852,6 +852,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 	}
 
 }
+#pragma endregion
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////// gotBlockReply
 void Solver::gotBlockReply(csdb::Pool&& pool) {

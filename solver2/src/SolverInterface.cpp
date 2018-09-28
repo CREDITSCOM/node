@@ -144,7 +144,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotBlock(const csdb::Pool& pool, const PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool& pool, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = pool;
@@ -167,24 +167,25 @@ namespace slv2
             pslv_v1->gotBlockRequest(std::move(tmp), sender);
             return;
         }
-
-        if(!pstate) {
-            return;
+        // state does not take part
+        csdb::Pool pool = pnode->getBlockChain().loadBlock(pool_hash);
+        if(pool.is_valid())        {
+            pool.set_previous_hash(csdb::PoolHash::from_string(""));
+            pnode->sendBlockReply(std::move(pool), sender);
         }
     }
 
-    void SolverCore::gotBlockReply(const csdb::Pool& pool)
+    void SolverCore::gotBlockReply(csdb::Pool& pool)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::Pool tmp = pool;
-            pslv_v1->gotBlockReply(std::move(tmp));
+            pslv_v1->gotBlockReply(std::move(pool));
             return;
         }
 
-        if(!pstate) {
-            return;
+        //std::cout << "Solver -> Got Block for my Request: " << pool.sequence() << std::endl;
+        if(pool.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
+            pnode->getBlockChain().putBlock(pool);
         }
-
     }
 
     void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)

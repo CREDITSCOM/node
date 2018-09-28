@@ -15,7 +15,7 @@ namespace slv2
             return Result::Failure;
         }
 
-        Result onBlock(SolverContext& /*context*/, const csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }

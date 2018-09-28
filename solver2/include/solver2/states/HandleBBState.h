@@ -13,6 +13,8 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
+        //TODO: завершается по логике солвера-1 с приходом блока (см. gotBlock())
+
         const char * name() const override
         {
             return "Handle BB";

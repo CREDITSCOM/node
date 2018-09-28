@@ -67,12 +67,6 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result TrustedState::onBlock(SolverContext & /*context*/, const csdb::Pool& /*pool*/, const PublicKey & /*sender*/)
-    {
-        //TODO: to be implemented
-        return Result::Ignore;
-    }
-
     Result TrustedState::onTransactionList(SolverContext & context, const csdb::Pool & /*pool*/)
     {
         // block duplicated lists

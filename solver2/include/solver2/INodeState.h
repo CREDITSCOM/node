@@ -43,7 +43,7 @@ namespace slv2
 
         virtual Result onRoundTable(SolverContext& context, const uint32_t round) = 0;
 
-        virtual Result onBlock(SolverContext& context, const csdb::Pool& pool, const PublicKey& sender) = 0;
+        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
 
         virtual Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) = 0;
 

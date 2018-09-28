@@ -14,8 +14,7 @@ namespace slv2
 {
     void StartState::on(SolverContext& /*context*/)
     {
-        //TODO: проверить, что
-        // на практике не вызывается на первом раунде, как м.б. подумать
+        //TODO: проверить, что на практике не вызывается на первом раунде, как м.б. подумать
 //
 //        context.node().becomeWriter(); //???
 //#ifdef SPAM_MAIN
