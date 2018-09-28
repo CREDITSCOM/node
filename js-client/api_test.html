@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <script src="js/API.js"></script>
+    <script src="js/api_types.js"></script>
+    <script src="js/variant_types.js"></script>
+    <script src="../third-party/thrift/lib/js/src/thrift.js"></script>
+    <script src="https://www.browserling.com/js/tools/base58.js"></script>
+    <script>
+        function base58_decode(text) {
+                var bytes = Base58.decode(text);
+                var str = '';
+                for (var i = 0; i < bytes.length; i++) {
+                    str += String.fromCharCode(bytes[i]);
+                }
+                return str;
+        }
+        function base58_encode(text) {
+            var bytes = [];
+            for (var i = 0; i < text.length; i++) {
+                bytes.push(text[i].charCodeAt(0));
+            }
+            return Base58.encode(bytes);
+        }
+        function connect(ip) {
+            var transport = new Thrift.Transport("http://" + ip + "/thrift/service/API/");
+            var protocol = new Thrift.Protocol(transport);
+            var client = new APIClient(protocol);
+            return client;
+        }
+
+        function fun(pk, i) {
+            var j = 0;
+            for (var k = i; k; --k) {
+                client.BalanceGet(base58_decode(pk), 'CS', function(r) {
+                    if (++j == i) {
+                        fun(pk, i + 1);
+                    }
+                });
+            }
+        }
+
+        var client = connect("51.38.0.1");
+    </script>
+</head>
+<body>
+
+</body>
+</html>

@@ -7,7 +7,7 @@
 #include <queue>
 
 #include <API.h>
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 //#include <csconnector/csconnector.h>
 #include <csstats.h>
 
@@ -52,7 +52,7 @@ class APIProcessor;
 class APIFaker : public APINull
 {
   public:
-    APIFaker(BlockChain&, Credits::Solver&) {}
+    APIFaker(BlockChain&, cs::Solver&) {}
 };
 //
 //#ifndef FAKE_API_HANDLING
@@ -65,7 +65,7 @@ class APIFaker : public APINull
 class APIHandler : public APIHandlerInterface
 {
   public:
-    APIHandler(BlockChain& blockchain, Credits::Solver& _solver);
+    APIHandler(BlockChain& blockchain, cs::Solver& _solver);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -129,7 +129,7 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    Credits::Solver& solver;
+    cs::Solver& solver;
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<
@@ -220,7 +220,7 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
     {}
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor>
-    getProcessor(const ::apache::thrift::TConnectionInfo& ci) override
+    getProcessor(const ::apache::thrift::TConnectionInfo&) override
     {
         // TRACE("");
         processor_.ss.occupy();
@@ -241,3 +241,38 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
 
 api::SealedTransaction
 convertTransaction(const csdb::Transaction& transaction);
+
+template<typename T>
+T
+deserialize(std::string&& s)
+{
+
+  using namespace ::apache;
+
+  // https://stackoverflow.com/a/16261758/2016154
+  static_assert(
+    CHAR_BIT == 8 && std::is_same<std::uint8_t, unsigned char>::value,
+    "This code requires std::uint8_t to be implemented as unsigned char.");
+
+  auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>(
+    reinterpret_cast<uint8_t*>(&(s[0])), (uint32_t)s.size());
+  thrift::protocol::TBinaryProtocol proto(buffer);
+  T sc;
+  sc.read(&proto);
+  return sc;
+}
+
+template<typename T>
+std::string
+serialize(const T& sc)
+{
+  using namespace ::apache;
+
+  auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>();
+  thrift::protocol::TBinaryProtocol proto(buffer);
+  sc.write(&proto);
+  return buffer->getBufferAsString();
+}
+
+bool
+is_smart_deploy(const api::SmartContractInvocation& smart);

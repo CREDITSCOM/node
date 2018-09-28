@@ -13,7 +13,7 @@
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TServerSocket.h>
 
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 #include <csdb/storage.h>
 
 #include <client/params.hpp>
@@ -28,7 +28,7 @@ struct Config
 {
   int port = 9090;
 #ifdef AJAX_IFACE
-  int ajax_port = 80;
+  int ajax_port = 8081;
 #endif
 };
 
@@ -36,7 +36,7 @@ class connector
 {
 public:
   connector(BlockChain& m_blockchain,
-            Credits::Solver* solver,
+            cs::Solver* solver,
             const Config& config = Config{});
   ~connector();
 

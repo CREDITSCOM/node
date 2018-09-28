@@ -3,6 +3,6 @@
 #
 cmake_minimum_required (VERSION 3.4)
 
-project (Solver)
+project (solver)
 
-add_subdirectory (Solver)
+add_subdirectory (solver)

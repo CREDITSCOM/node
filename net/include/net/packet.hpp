@@ -15,12 +15,15 @@ enum BaseFlags: uint8_t {
   Broadcast  = 1 << 2,
   Compressed = 1 << 3,
   Encrypted  = 1 << 4,
-  Signed     = 1 << 5
+  Signed     = 1 << 5,
+  Direct     = 1 << 6
 };
 
 enum Offsets: uint32_t {
   FragmentId = 1,
   FragmentsNum = 3,
+  IdWhenFragmented = 5,
+  IdWhenSingle = 1,
   SenderWhenFragmented = 13,
   SenderWhenSingle = 9,
   AddresseeWhenFragmented = 45,
@@ -44,14 +47,22 @@ enum MsgTypes: uint8_t {
   ConsTLRequest,
   RoundTableRequest,
   NewBadBlock,
-  BigBang = 35
+  BigBang = 35,
+  TransactionPacket,
+  TransactionsPacketRequest,
+  TransactionsPacketReply,
+  NewCharacteristic,
+  Round
 };
 
 typedef uint32_t RoundNum;
 
 class Packet {
 public:
-  const static std::size_t MaxSize = 1 << 15;
+  static const uint32_t MaxSize = 1 << 10;
+  static const uint32_t MaxFragments = 1 << 12;
+
+  static const uint32_t SmartRedirectTreshold = 1;
 
   Packet() { }
   Packet(RegionPtr&& data): data_(std::move(data)) { }
@@ -61,6 +72,7 @@ public:
   bool isBroadcast() const { return checkFlag(BaseFlags::Broadcast); }
 
   bool isCompressed() const { return checkFlag(BaseFlags::Compressed); }
+  bool isDirect() const { return checkFlag(BaseFlags::Direct); }
 
   const Hash& getHash() const {
     if (!hashed_) {
@@ -72,7 +84,7 @@ public:
 
   bool addressedToMe(const PublicKey& myKey) const {
     return
-      isNetwork() ||
+      isNetwork() || isDirect() ||
       (isBroadcast() && !(getSender() == myKey)) ||
       getAddressee() == myKey;
   }
@@ -80,11 +92,13 @@ public:
   const PublicKey& getSender() const { return getWithOffset<PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle); }
   const PublicKey& getAddressee() const { return getWithOffset<PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented : Offsets::AddresseeWhenSingle); }
 
+  const uint64_t& getId() const { return getWithOffset<uint64_t>(isFragmented() ? Offsets::IdWhenFragmented : Offsets::IdWhenSingle); }
+
   const Hash& getHeaderHash() const;
   bool isHeaderValid() const;
 
-  const uint16_t& getFragmentId() const { return getWithOffset<uint16_t>(Offsets::FragmentId); };
-  const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); };
+  const uint16_t& getFragmentId() const { return getWithOffset<uint16_t>(Offsets::FragmentId); }
+  const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); }
 
   MsgTypes getType() const { return getWithOffset<MsgTypes>(getHeadersLength()); }
   RoundNum getRoundNum() const { return getWithOffset<RoundNum>(getHeadersLength() + 1); }
@@ -95,10 +109,7 @@ public:
   size_t size() const { return data_.size(); }
 
   const uint8_t* getMsgData() const { return static_cast<const uint8_t*>(data_.get()) + getHeadersLength(); }
-  size_t getMsgSize() const { 
-  
-    if (size() - getHeadersLength() == 4) std::cout << "//////////////////////////////////PACKET> size = " << size() << ", HeadersLength = " << getHeadersLength() << std::endl;
-  return size() - getHeadersLength(); }
+  size_t getMsgSize() const { return size() - getHeadersLength(); }
 
   uint32_t getHeadersLength() const;
 
@@ -132,6 +143,14 @@ typedef Packet* PacketPtr;
 
 class Message {
 public:
+  Message() = default;
+
+  Message(Message&&) = default;
+  Message& operator=(Message&&) = default;
+
+  Message(const Message&) = delete;
+  Message& operator=(const Message&) = delete;
+
   ~Message();
 
   bool isComplete() const { return packetsLeft_ == 0; }
@@ -145,14 +164,13 @@ public:
 
   size_t getFullSize() const {
     if (!fullData_) composeFullData();
-    if (fullData_.size() == 4) std::cout << "//////////////////////////////////PACKET> FULL Data size = " << fullData_.size() << std::endl;
     return fullData_.size() - packets_->getHeadersLength();
   }
 
   Packet extractData() const {
     if (!fullData_) composeFullData();
     Packet result(std::move(fullData_));
-    result.headersLength_ = packets_->headersLength_;
+    result.headersLength_ = packets_->getHeadersLength();
     return result;
   }
 
@@ -161,36 +179,42 @@ private:
 
   void composeFullData() const;
 
+  std::atomic_flag pLock_ = ATOMIC_FLAG_INIT;
+
   uint32_t packetsLeft_;
-  uint32_t packetsTotal_;
-  Packet* packets_ = nullptr;
+  uint32_t packetsTotal_ = 0;
+
+  uint16_t maxFragment_ = 0;
+  Packet packets_[Packet::MaxFragments];
+
+  Hash headerHash_;
 
   mutable RegionPtr fullData_;
 
   friend class PacketCollector;
+  friend class Transport;
+  friend class Network;
 };
+
+typedef MemPtr<TypedSlot<Message>> MessagePtr;
 
 class PacketCollector {
 public:
-  static const uint32_t MaxParallelCollections = 8;
-  static const uint32_t MaxFragments = 1 << 14;
+  static const uint32_t MaxParallelCollections = 32;
 
   PacketCollector():
-    ptrs_(static_cast<Packet*>(malloc(MaxParallelCollections * MaxFragments * sizeof(Packet)))),
-    activePtr_(ptrs_),
-    ptrsEnd_(ptrs_ + MaxParallelCollections * MaxFragments) {
-  }
+    msgAllocator_(MaxParallelCollections + 1) { }
 
-  Message& getMessage(const Packet& pack);
+  MessagePtr getMessage(const Packet&, bool&);
 
 private:
-  FixedHashMap<Hash, Message, uint16_t, MaxParallelCollections> map_;
+  TypedAllocator<Message> msgAllocator_;
+
+  std::atomic_flag mLock_ = ATOMIC_FLAG_INIT;
+  FixedHashMap<Hash, MessagePtr, uint16_t, MaxParallelCollections> map_;
 
   Message lastMessage_;
-
-  Packet* ptrs_;
-  Packet* activePtr_;
-  Packet* ptrsEnd_;
+  friend class Network;
 };
 
 #endif // __PACKET_HPP__

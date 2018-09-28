@@ -4,11 +4,12 @@ project(client)
 
 add_executable(client
   include/client/config.hpp
+  include/client/params.hpp
   src/config.cpp
   src/main.cpp
 )
 
-target_link_libraries (client net csnode Solver csconnector blake2 lib)
+target_link_libraries (client net csnode solver csconnector blake2 lib)
 
 target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include

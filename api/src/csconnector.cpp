@@ -15,7 +15,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain,
-                     Credits::Solver* solver,
+                     cs::Solver* solver,
                      const Config& config)
   : api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
   , api_processor(api_handler)
@@ -34,25 +34,25 @@ connector::connector(BlockChain& m_blockchain,
 #endif
 {
 #ifdef BINARY_TCP_API
-    thread = std::thread([this, config]() {
-        try {
-            //TRACE("csconnector started on port " << config.port);
-            server.run();
-        } catch (...) {
-            std::cerr << "Oh no! I'm dead :'-(" << std::endl;
-        }
-    });
+  thread = std::thread([this, config]() {
+    try {
+      // TRACE("csconnector started on port " << config.port);
+      server.run();
+    } catch (...) {
+      std::cerr << "Oh no! I'm dead :'-(" << std::endl;
+    }
+  });
 #endif
 #ifdef AJAX_IFACE
-    ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
-    ajax_thread = std::thread([this, config]() {
-        try {
-          //  TRACE("csconnector for AJAX started on port " << config.ajax_port);
-            ajax_server.run();
-        } catch (...) {
-            std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
-        }
-    });
+  ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
+  ajax_thread = std::thread([this, config]() {
+    try {
+      //  TRACE("csconnector for AJAX started on port " << config.ajax_port);
+      ajax_server.run();
+    } catch (...) {
+      std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
+    }
+  });
 #endif
 }
 
@@ -60,19 +60,19 @@ connector::~connector()
 {
 
 #ifdef BINARY_TCP_API
-    server.stop();
-    if (thread.joinable()) {
-        thread.join();
-    }
+  server.stop();
+  if (thread.joinable()) {
+    thread.join();
+  }
 #endif
 
 #ifdef AJAX_IFACE
-    ajax_server.stop();
-    if (ajax_thread.joinable()) {
-        ajax_thread.join();
-    }
+  ajax_server.stop();
+  if (ajax_thread.joinable()) {
+    ajax_thread.join();
+  }
 #endif
 
-    //TRACE("csconnector stopped");
+  // TRACE("csconnector stopped");
 }
 }

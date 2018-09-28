@@ -1,9 +1,9 @@
 /* Send blaming letters to @yrtimd */
-#include <snappy.h>
+#include <lz4.h>
 
 #include "packet.hpp"
 
-RegionAllocator Message::allocator_(1 << 25, 2);
+RegionAllocator Message::allocator_(1 << 26, 4);
 
 enum Lengths {
   FragmentedHeader = 36
@@ -23,7 +23,7 @@ bool Packet::isHeaderValid() const {
 
     auto& frNum = getFragmentsNum();
     //LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " << size() << " vs " << getHeadersLength());
-    if (frNum > PacketCollector::MaxFragments ||
+    if (/*frNum > Packet::MaxFragments ||*/
         getFragmentId() >= frNum)
       return false;
   }
@@ -34,15 +34,13 @@ bool Packet::isHeaderValid() const {
 uint32_t Packet::getHeadersLength() const {
   if (!headersLength_) {
     headersLength_ = 1;  // Flags
-    
+
     if (isFragmented())
       headersLength_+= 4;  // Min fragments & all fragments
 
-
-
     if (!isNetwork()) {
       headersLength_+= 40;  // Sender key + ID
-      if (!isBroadcast())
+      if (!isBroadcast() && !isDirect())
         headersLength_+= 32; // Receiver key
     }
   }
@@ -50,91 +48,73 @@ uint32_t Packet::getHeadersLength() const {
   return headersLength_;
 }
 
-Message& PacketCollector::getMessage(const Packet& pack) {
-  Message& msg = map_.tryStore(pack.getHeaderHash());
-  if (!msg.packets_) { // First time
-    msg.packets_ = activePtr_;
-    msg.packetsLeft_ = pack.getFragmentsNum();
-    msg.packetsTotal_ = pack.getFragmentsNum();
+MessagePtr PacketCollector::getMessage(const Packet& pack,
+                                       bool& newFragmentedMsg) {
+  if (!pack.isFragmented()) return MessagePtr();
 
-    memset(msg.packets_, 0, msg.packetsLeft_ * sizeof(Packet));
+  newFragmentedMsg = false;
 
-    activePtr_+= MaxFragments;
-    if (activePtr_ == ptrsEnd_) activePtr_ = ptrs_;
+  MessagePtr* msgPtr;
+  MessagePtr msg;
+
+  {
+    SpinLock l(mLock_);
+    msgPtr = &map_.tryStore(pack.getHeaderHash());
   }
 
-  auto goodPlace = msg.packets_ + pack.getFragmentId();
-  if (!*goodPlace) {
-    --msg.packetsLeft_;
-    *goodPlace = pack;
+  if (!*msgPtr) { // First time
+    *msgPtr = msg = msgAllocator_.emplace();
+    msg->packetsLeft_ = pack.getFragmentsNum();
+    msg->packetsTotal_ = pack.getFragmentsNum();
+    msg->headerHash_ = pack.getHeaderHash();
+    newFragmentedMsg = true;
+  }
+  else msg = *msgPtr;
+
+  {
+    SpinLock l(msg->pLock_);
+    auto goodPlace = msg->packets_ + pack.getFragmentId();
+    if (!*goodPlace) {
+      msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
+      --msg->packetsLeft_;
+      *goodPlace = pack;
+    }
+
+    //if (msg->packetsLeft_ % 100 == 0)
+    //if (msg->packetsLeft_ == 0)
+    //  LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
   }
 
   return msg;
 }
 
+/* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
 void Message::composeFullData() const {
   if (getFirstPack().isFragmented()) {
-    uint32_t totalSize = 0;
-
-    Packet* pack = packets_;
+    const Packet* pack = packets_;
     uint32_t headersLength = pack->getHeadersLength();
 
+    uint32_t totalSize = headersLength;
+
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack)
-      totalSize+= pack->size() - headersLength;
+      totalSize+= (pack->size() - headersLength);
 
-    const uint32_t MsgHeaderSize = 1 + sizeof(RoundNum);
-
-    fullData_ = allocator_.allocateNext(totalSize - MsgHeaderSize);
+    fullData_ = allocator_.allocateNext(totalSize);
 
     uint8_t* data = static_cast<uint8_t*>(fullData_.get());
     pack = packets_;
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-      //LOG_WARN("-- " << byteStreamToHex((const char*)pack->data(), 100));
-      uint32_t cSize = pack->size() - headersLength - (i == 0 ? MsgHeaderSize : 0);
-      memcpy(data, pack->getMsgData() + (i == 0 ? MsgHeaderSize : 0), cSize);
+      uint32_t cSize = pack->size() - (i == 0 ? 0 : headersLength);
+      memcpy(data, ((const char*)pack->data()) + (i == 0 ? 0 : headersLength), cSize);
       data+= cSize;
     }
-
-    if (getFirstPack().isCompressed()) {
-      size_t uncompressedSize;
-
-      //LOG_WARN("fullData size: " << fullData_.size());
-
-      snappy::GetUncompressedLength((const char*)fullData_.get(),
-                                    fullData_.size(),
-                                    &uncompressedSize);
-
-      RegionPtr uncompressedData = allocator_.allocateNext(uncompressedSize + MsgHeaderSize + headersLength);
-
-      //LOG_WARN("Uncomressed block will be " << uncompressedSize);
-
-      snappy::RawUncompress((const char*)fullData_.get(),
-                            (size_t)fullData_.size(),
-                            (char*)uncompressedData.get() + MsgHeaderSize + headersLength);
-
-      //LOG_WARN("Unpresult " << (t1 ? 1 : 0) << ", " << (t2 ? 1 : 0));
-
-      memcpy(uncompressedData.get(), packets_->getMsgData(), MsgHeaderSize + headersLength);
-      fullData_ = uncompressedData;
-    }
-  }
-  else {
-    size_t uncompressedSize;
-    snappy::GetUncompressedLength((const char*)(packets_->getMsgData()),
-                                  (size_t)(packets_->getMsgSize()),
-                                  &uncompressedSize);
-
-    fullData_ = allocator_.allocateNext(uncompressedSize);
-
-    snappy::RawUncompress((const char*)fullData_.get(),
-                          (size_t)fullData_.size(),
-                          (char*)fullData_.get());
   }
 }
 
 Message::~Message() {
-  auto pEnd = packets_ + packetsTotal_;
-  for (auto ptr = packets_; ptr != pEnd; ++ptr) {
+  /*auto pEnd = packets_ + packetsTotal_;
+  for (auto ptr = packets_; ptr != pEnd; ++ptr)
     if (ptr) ptr->~Packet();
-  }
+
+    memset(packets_, 0, sizeof(Packet*) * packetsTotal_);*/
 }
