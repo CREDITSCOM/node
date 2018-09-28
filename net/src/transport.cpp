@@ -90,11 +90,12 @@ void Transport::run() {
   uint32_t ctr = 0;
   for (;;) {
     ++ctr;
-    bool askMissing   = true;
-    bool resendPacks  = ctr % 2 == 0;
-    bool sendPing     = ctr % 20 == 0;
-    bool checkPending = ctr % 100 == 0;
-    bool checkSilent  = ctr % 100 == 0;
+    bool askMissing    = true;
+    bool resendPacks   = ctr % 2 == 0;
+    bool sendPing      = ctr % 20 == 0;
+    bool refreshLimits = ctr % 20 == 0;
+    bool checkPending  = ctr % 100 == 0;
+    bool checkSilent   = ctr % 150 == 0;
 
     if (askMissing)
       askForMissingPackages();
@@ -110,6 +111,9 @@ void Transport::run() {
 
     if (sendPing)
       nh_.pingNeighbours();
+
+    if (refreshLimits)
+      nh_.refreshLimits();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
@@ -145,6 +149,14 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 
   rn->packets.fetch_add(1, std::memory_order_relaxed);
   return rn;
+}
+
+void Transport::sendDirect(const Packet* pack, const Connection& conn) {
+  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
+  if (nextBytesCount <= conn.BytesLimit) {
+    conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
+    net_->sendDirect(*pack, conn.getOut());
+  }
 }
 
 // Processing network packages
@@ -308,7 +320,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   if (!pack.isFragmented()) return pack.getRoundNum() >= node_->getRoundNumber();
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
-  if (pack.getFragmentId() == 1)
+  if (pack.getFragmentId() == 0)
     rn = pack.getRoundNum();
 
   return !rn || rn >= node_->getRoundNumber();

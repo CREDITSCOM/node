@@ -21,7 +21,7 @@ T getSecureRandom() {
 
 bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
   bool result = false;
-  //if (!transport_->shouldSendPacket(bp.pack)) return result;
+  if (!transport_->shouldSendPacket(bp.pack)) return result;
 
   uint32_t c = 0;
   for (auto& nb : neighbours_) {
@@ -76,7 +76,13 @@ void Neighbourhood::checkPending() {
   SpinLock l2(nLockFlag_);
   LOG_DEBUG("NEIGHBOURS: ");
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
-    LOG_DEBUG(conn->get() << " : " << (*conn)->in);
+    LOG_DEBUG(conn->get() << " : " << (*conn)->in << " : " << (*conn)->getOut() << " : " << (*conn)->id << " ~ " << (bool)(*conn)->node);
+}
+
+void Neighbourhood::refreshLimits() {
+  SpinLock l(nLockFlag_);
+  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
+    (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
 }
 
 void Neighbourhood::checkSilent() {
@@ -92,6 +98,13 @@ void Neighbourhood::checkSilent() {
       if ((*conn)->isSignal)
         continue;
 
+      if (!(*conn)->node) {
+        ConnectionPtr tc = *conn; 
+        disconnectNode(conn);
+        --conn;
+        continue;
+      }
+
       const auto packetsCount = (*(*conn)->node)->packets.
         load(std::memory_order_relaxed);
 
@@ -99,6 +112,12 @@ void Neighbourhood::checkSilent() {
         LOG_WARN("Node " << (*conn)->in << " stopped responding");
 
         ConnectionPtr tc = *conn;
+        Connection* c = *tc;
+        tc->node->connection.compare_exchange_strong(c,
+          nullptr,
+          std::memory_order_release,
+          std::memory_order_relaxed);
+
         disconnectNode(conn);
         --conn;
       }
@@ -109,8 +128,8 @@ void Neighbourhood::checkSilent() {
     }
   }
 
-  if (needRefill)
-    transport_->refillNeighbourhood();
+  //if (needRefill)
+    //transport_->refillNeighbourhood();
 }
 
 template <typename Vec>
@@ -152,10 +171,8 @@ ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
   LOG_WARN("Establishing connection to " << ep);
   SpinLock lp(mLockFlag_);
-  LOG_WARN("Locked " << ep);
 
   auto conn = getConnection(ep);
-  LOG_WARN("Got " << ep);
   if (!conn->id)
     conn->id = getSecureRandom<Connection::Id>();
 
@@ -202,6 +219,8 @@ void Neighbourhood::connectNode(RemoteNodePtr node,
   }
 
   conn->node = node;
+
+  if (conn->connected) return;
   conn->connected = true;
   neighbours_.emplace(conn);
 }
@@ -261,17 +280,23 @@ void Neighbourhood::gotConfirmation(const Connection::Id& my,
 
 void Neighbourhood::validateConnectionId(RemoteNodePtr node,
                                          const Connection::Id id,
-                                         const ip::udp::endpoint&) {
+                                         const ip::udp::endpoint& ep) {
   SpinLock l1(mLockFlag_);
   SpinLock l2(nLockFlag_);
 
   auto realPtr = findInMap(id, connections_);
   if (!realPtr) {
-    LOG_WARN("Validation: Connection " << id << " not found");
+    //LOG_WARN("Validation: Connection " << id << " not found");
     return;
   }
-  else if (realPtr->get() != node->connection.load(std::memory_order_relaxed))
+  else if (realPtr->get() != node->connection.load(std::memory_order_relaxed)) {
+    if (!(*realPtr)->specialOut && (*realPtr)->in != ep) {
+      (*realPtr)->specialOut = true;
+      (*realPtr)->out = (*realPtr)->in;
+    }
+    (*realPtr)->in = ep;
     connectNode(node, *realPtr);
+  }
 }
 
 void Neighbourhood::gotRefusal(const Connection::Id& id) {}

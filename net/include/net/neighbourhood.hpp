@@ -50,6 +50,9 @@ struct Connection {
 
   Id id = 0;
 
+  static const uint32_t BytesLimit = 1 << 20;
+  mutable std::atomic<uint32_t> lastBytesCount = 0;
+
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
 
@@ -107,6 +110,8 @@ public:
   void resendPackets();
   void checkPending();
   void checkSilent();
+
+  void refreshLimits();
 
   bool canHaveNewConnection();
 
