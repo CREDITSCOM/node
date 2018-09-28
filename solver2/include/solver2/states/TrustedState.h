@@ -4,7 +4,7 @@
 namespace slv2
 {
 
-    class TrustedState final : public DefaultIgnore
+    class TrustedState : public DefaultIgnore
     {
     public:
         

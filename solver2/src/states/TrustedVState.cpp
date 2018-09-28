@@ -4,25 +4,16 @@
 
 namespace slv2
 {
-    void TrustedVState::on(SolverContext& /*context*/)
+    void TrustedVState::on(SolverContext& context)
     {
-        cnt_matrices = 0;
+        // makes initial tests:
+        TrustedState::on(context);
     }
 
-    Result TrustedVState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
+    Result TrustedVState::onVector(SolverContext & context, const Credits::HashVector & vect, const PublicKey & sender)
     {
-        std::cout << name() << ": round table received: " << round << std::endl;
-        return Result::Finish;
-    }
-
-    Result TrustedVState::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix & /*matr*/, const PublicKey & /*sender*/)
-    {
-        std::cout << name() << ": matrix received" << std::endl;
-        ++cnt_matrices;
-        if(cnt_matrices >= Consensus::MinTrustedNodes) {
-            return Result::Finish;
-        }
+        // continue work as trusted but suppress further events on receive vectors
+        TrustedState::onVector(context, vect, sender);
         return Result::Ignore;
     }
-
 } // slv2

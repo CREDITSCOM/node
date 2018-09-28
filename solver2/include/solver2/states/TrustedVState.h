@@ -1,10 +1,10 @@
 #pragma once
-#include "DefaultIgnore.h"
+#include "TrustedState.h"
 
 namespace slv2
 {
 
-    class TrustedVState final : public DefaultIgnore
+    class TrustedVState final : public TrustedState
     {
     public:
 
@@ -13,18 +13,15 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
+        Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
 
-        Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+        // onMatrix() behaviour is completely implemented in TrustesState
 
         const char * name() const override
         {
             return "TrustedV";
         }
 
-    private:
-
-        unsigned int cnt_matrices { 0 };
     };
 
 } // slv2

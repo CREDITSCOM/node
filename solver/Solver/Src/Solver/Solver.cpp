@@ -430,7 +430,6 @@ void Solver::gotVector(HashVector&& vector)
   std::cout << "Solver>  VECTOR GOT SUCCESSFULLY!!!" << std::endl;
   #endif
 }
-#pragma endregion
 
 void Solver::takeDecWorkaround()
 {
@@ -466,7 +465,6 @@ void Solver::takeDecWorkaround()
   }
 }
 
-#pragma region moved to solver2
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
 	uint8_t numGen = node_->getConfidants().size();

@@ -10,6 +10,10 @@ public:
 
     constexpr static unsigned int MinTrustedNodes = 3;
 
+
+    /** @brief   The general (Writer->General) is not selected by "generals" */
+    constexpr static uint8_t GeneralNotSelected = 100;
+
     /** @brief   Max duration (msec) of the whole round (N, W, G, T) */
     constexpr static uint32_t T_round = 2000;
 
