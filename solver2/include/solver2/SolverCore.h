@@ -189,6 +189,8 @@ namespace slv2
         KeyType public_key;
         KeyType private_key;
 
+        std::unique_ptr<Credits::HashVector> pown_hvec;
+
         // senders of vectors received this round
         std::set<uint8_t> recv_vect;
         // senders of matrices received this round
@@ -211,7 +213,10 @@ namespace slv2
         //bool consensusAchieved { false };
         //bool blockCandidateArrived { false };
         //bool round_table_sent { false };
-        //bool transactionListReceived { false };
+        
+        // флаг получения списка транзакций в текущем раунде, в начале раунда сбрасывается
+        bool is_trans_list_recv;
+        
         //bool vectorReceived { false };
         //bool gotBlockThisRound { false };
         //bool writingConfirmationGot { false };

@@ -1,37 +1,44 @@
 #include "SolverCore.h"
 #include <Solver/Solver.hpp>
 #include "../Node.h"
+#include <Solver/Generals.hpp>
 
 namespace slv2
 {
 
     const Credits::HashVector& SolverCore::getMyVector() const
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->getMyVector();
         }
-        static Credits::HashVector stub{};
-        return stub;
+        if(!pown_hvec) {
+            // empty one is for test purpose
+            static Credits::HashVector stub {};
+            return stub;
+        }
+        return *pown_hvec;
     }
 
     const Credits::HashMatrix& SolverCore::getMyMatrix() const
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->getMyMatrix();
         }
-        static Credits::HashMatrix stub {};
-        return stub;
+        if(!pgen) {
+            // empty one is for test purpose
+            static Credits::HashMatrix stub {};
+            return stub;
+        }
+        return pgen->getMatrix();
     }
 
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->set_keys(pub, priv);
         }
-        //
         public_key = pub;
         private_key = priv;
-
         // "autostart" in node environment
         if(is_finished()) {
             start();
@@ -40,15 +47,16 @@ namespace slv2
 
     void SolverCore::addInitialBalance()
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->addInitialBalance();
         }
     }
 
     void SolverCore::setBigBangStatus(bool status)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->setBigBangStatus(status);
+            return;
         }
 
         if(!pstate) {
@@ -61,9 +69,10 @@ namespace slv2
 
     void SolverCore::gotTransaction(const csdb::Transaction& trans)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Transaction tmp = trans;
             pslv_v1->gotTransaction(std::move(tmp));
+            return;
         }
 
         if(!pstate) {
@@ -76,10 +85,15 @@ namespace slv2
 
     void SolverCore::gotTransactionList(const csdb::Pool& pool)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = pool;
             pslv_v1->gotTransactionList(std::move(tmp));
+            return;
         }
+
+
+
+        //---------------------------------------------------------------
 
         if(!pstate) {
             return;
@@ -91,9 +105,10 @@ namespace slv2
 
     void SolverCore::gotVector(const Credits::HashVector& vect)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             Credits::HashVector tmp = vect;
             pslv_v1->gotVector(std::move(tmp));
+            return;
         }
 
         if(!pstate) {
@@ -107,9 +122,10 @@ namespace slv2
 
     void SolverCore::gotMatrix(const Credits::HashMatrix& matr)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             Credits::HashMatrix tmp = matr;
             pslv_v1->gotMatrix(std::move(tmp));
+            return;
         }
 
         if(!pstate) {
@@ -123,9 +139,10 @@ namespace slv2
 
     void SolverCore::gotBlock(const csdb::Pool& pool, const PublicKey& sender)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = pool;
             pslv_v1->gotBlock(std::move(tmp), sender);
+            return;
         }
 
         if(!pstate) {
@@ -138,9 +155,10 @@ namespace slv2
 
     void SolverCore::gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             csdb::PoolHash tmp = pool_hash;
             pslv_v1->gotBlockRequest(std::move(tmp), sender);
+            return;
         }
 
         if(!pstate) {
@@ -150,9 +168,10 @@ namespace slv2
 
     void SolverCore::gotBlockReply(const csdb::Pool& pool)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = pool;
             pslv_v1->gotBlockReply(std::move(tmp));
+            return;
         }
 
         if(!pstate) {
@@ -163,8 +182,9 @@ namespace slv2
 
     void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotHash(hash, sender);
+            return;
         }
 
         if(!pstate) {
@@ -177,8 +197,9 @@ namespace slv2
 
     void SolverCore::addConfirmation(uint8_t conf_number)
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->addConfirmation(conf_number);
+            return;
         }
 
         if(!pstate) {
@@ -188,8 +209,9 @@ namespace slv2
 
     void SolverCore::beforeNextRound()
     {
-        if(pslv_v1) {
+        if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->beforeNextRound();
+            return;
         }
         
         if(!pstate) {
@@ -199,6 +221,11 @@ namespace slv2
 
     void SolverCore::nextRound()
     {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->nextRound();
+            return;
+        }
+
 #ifdef MYLOG
         std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
 #endif
@@ -213,12 +240,12 @@ namespace slv2
         //consensusAchieved = false;
         //blockCandidateArrived = false;
         //transactionListReceived = false;
+        is_trans_list_recv = false;
         //vectorReceived = false;
         //gotBlockThisRound = false;
         //allMatricesReceived = false;
 
         //round_table_sent = false;
-        m_pool = csdb::Pool {};
 
         // as store result of current round:
         recv_vect.clear();
@@ -236,6 +263,11 @@ namespace slv2
 
     void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
     {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->send_wallet_transaction(tr);
+            return;
+        }
+
         // thread-safe with flushTransactions(), suppose to receive calls from network-related threads
         std::lock_guard<std::mutex> l(trans_mtx);
         transactions.push_back(tr);

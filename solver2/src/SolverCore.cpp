@@ -20,10 +20,12 @@ namespace slv2
         // options
         , opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
+        , opt_is_proxy_v1(true)
         // consensus data
         , cur_round(0)
         , pnode(nullptr)
         , pgen(nullptr)
+        , pown_hvec(std::make_unique<Credits::HashVector>())
     {
         InitTransitions();
     }
