@@ -13,8 +13,8 @@ namespace slv2
 
     Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const uint32_t round)
     {
-        std::cout << name() << ": round table ignored: " << round << std::endl;
-        return Result::Ignore;
+        std::cout << name() << ": round table received (# " << round << ")" << std::endl;
+        return Result::Finish;
     }
 
     Result DefaultStateBehavior::onBlock(SolverContext& /*context*/, const csdb::Pool& pool, const PublicKey& /*sender*/)
