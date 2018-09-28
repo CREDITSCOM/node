@@ -91,10 +91,7 @@ class Transport {
   void sendBroadcast(const Packet* pack) {
     nh_.sendByNeighbours(pack);
   }
-
-  void sendDirect(const Packet* pack, const Connection& conn) {
-    net_->sendDirect(*pack, conn.getOut());
-  }
+  void sendDirect(const Packet*, const Connection&);
 
   void gotPacket(const Packet&, RemoteNodePtr&);
   void redirectPacket(const Packet&, RemoteNodePtr&);
