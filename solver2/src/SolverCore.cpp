@@ -180,7 +180,7 @@ namespace slv2
 
     // SolverCore::Context implementation
     
-    uint8_t SolverContext::conf_number() const
+    uint8_t SolverContext::own_conf_number() const
     {
         return core.pnode->getMyConfNumber();
     }

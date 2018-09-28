@@ -60,9 +60,10 @@ namespace slv2
 
         inline const KeyType& public_key() const;
         inline const KeyType& private_key() const;
+        inline const Credits::HashVector& hash_vector() const;
 
         inline int32_t round() const;
-        uint8_t conf_number() const;
+        uint8_t own_conf_number() const;
         size_t cnt_trusted() const;
 
         // candidates for refactoring:
@@ -118,14 +119,14 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(const csdb::Pool& pool);
+        void gotTransactionList(csdb::Pool& pool);
         void gotVector(const Credits::HashVector& vect);
         void gotMatrix(const Credits::HashMatrix& matr);
         void gotBlock(const csdb::Pool& pool, const PublicKey& sender);
         void gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender);
         void gotBlockReply(const csdb::Pool& pool);
         void gotHash(const Hash& hash, const PublicKey& sender);
-        void addConfirmation(uint8_t conf_number);
+        void addConfirmation(uint8_t own_conf_number);
         void beforeNextRound();
         void nextRound();
         // required by api
@@ -213,10 +214,6 @@ namespace slv2
         //bool consensusAchieved { false };
         //bool blockCandidateArrived { false };
         //bool round_table_sent { false };
-        
-        // флаг получения списка транзакций в текущем раунде, в начале раунда сбрасывается
-        bool is_trans_list_recv;
-        
         //bool vectorReceived { false };
         //bool gotBlockThisRound { false };
         //bool writingConfirmationGot { false };
@@ -264,6 +261,11 @@ namespace slv2
     const KeyType& SolverContext::private_key() const
     {
         return core.private_key;
+    }
+
+    const Credits::HashVector& SolverContext::hash_vector() const
+    {
+        return core.getMyVector();
     }
 
     int32_t SolverContext::round() const

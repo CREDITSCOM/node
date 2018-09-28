@@ -21,6 +21,12 @@ namespace slv2
         }
     }
 
+    Result TrustedState::onRoundTable(SolverContext & context, const uint32_t round)
+    {
+        is_trans_list_recv = false;
+        return DefaultStateBehavior::onRoundTable(context, round);
+    }
+
     Result TrustedState::onVector(SolverContext& context, const Credits::HashVector & vect, const PublicKey & /*sender*/)
     {
         if(context.is_vect_recv_from(vect.Sender)) {
@@ -64,6 +70,25 @@ namespace slv2
     Result TrustedState::onBlock(SolverContext & /*context*/, const csdb::Pool& /*pool*/, const PublicKey & /*sender*/)
     {
         //TODO: to be implemented
+        return Result::Ignore;
+    }
+
+    Result TrustedState::onTransactionList(SolverContext & context, const csdb::Pool & /*pool*/)
+    {
+        // block duplicated lists
+        if(is_trans_list_recv) {
+            return Result::Ignore;
+        }
+        is_trans_list_recv = true;
+
+        context.node().sendVector(context.hash_vector());
+
+        Result res = onVector(context, context.hash_vector(), PublicKey {});
+        if(res == Result::Finish) {
+            // let context immediately to decide what to do
+            context.vectors_completed();
+            // then to avoid undesired extra transition simply return Ignore
+        }
         return Result::Ignore;
     }
 

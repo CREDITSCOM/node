@@ -10,10 +10,11 @@ add_library(solver2
 	include/solver2/INodeState.h
 	include/solver2/Result.h
 	include/solver2/SolverCore.h
-	include/solver2/timer_service.h
+	include/solver2/Node.h
+	include/solver2/Generals.h
 
 	include/solver2/states/CollectState.h
-	include/solver2/states/DefaultIgnore.h
+	include/solver2/states/DefaultStateBehavior.h
 	include/solver2/states/HandleBBState.h
 	include/solver2/states/HandleRTState.h
 	include/solver2/states/NormalState.h
@@ -27,14 +28,14 @@ add_library(solver2
 	include/solver2/states/WriteState.h
 
 	../solver/Solver/Include/Solver/CallsQueueScheduler.h
-        ../solver/Solver/Include/Solver/Generals.hpp
+    ../solver/Solver/Include/Solver/Generals.hpp
 
 	src/SolverCore.cpp
 	src/SolverInterface.cpp
 	src/SolverTransitions.cpp
 
 	src/states/CollectState.cpp
-	src/states/DefaultIgnore.cpp
+	src/states/DefaultStateBehavior.cpp
 	src/states/HandleBBState.cpp
 	src/states/HandleRTState.cpp
 	src/states/NormalState.cpp

@@ -83,7 +83,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotTransactionList(const csdb::Pool& pool)
+    void SolverCore::gotTransactionList(csdb::Pool& pool)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = pool;
@@ -91,9 +91,16 @@ namespace slv2
             return;
         }
 
-
-
-        //---------------------------------------------------------------
+        // чистим, если список не пуст, для нового списка
+        if(m_pool.transactions_count() > 0) {
+            m_pool = csdb::Pool {};
+        }
+        // bad tansactions storage:
+        csdb::Pool b_pool {};
+        // update own hash vector
+        auto result = pgen->buildvector(pool, m_pool, pnode->getConfidants().size(), b_pool);
+        pown_hvec->Sender = pnode->getMyConfNumber();
+        pown_hvec->hash = result;
 
         if(!pstate) {
             return;
@@ -195,10 +202,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::addConfirmation(uint8_t conf_number)
+    void SolverCore::addConfirmation(uint8_t own_conf_number)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->addConfirmation(conf_number);
+            pslv_v1->addConfirmation(own_conf_number);
             return;
         }
 
@@ -226,26 +233,7 @@ namespace slv2
             return;
         }
 
-#ifdef MYLOG
-        std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
-#endif
-        //receivedVec_ips.clear();
-        //receivedMat_ips.clear();
-
-        //hashes.clear();
-        //ips.clear();
-        //vector_datas.clear();
-
-        //vectorComplete = false;
-        //consensusAchieved = false;
-        //blockCandidateArrived = false;
-        //transactionListReceived = false;
-        is_trans_list_recv = false;
-        //vectorReceived = false;
-        //gotBlockThisRound = false;
-        //allMatricesReceived = false;
-
-        //round_table_sent = false;
+        //std::cout << "SOLVER> next Round : Starting ... nextRound" << std::endl;
 
         // as store result of current round:
         recv_vect.clear();

@@ -314,7 +314,6 @@ void Solver::initConfRound()
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
-#pragma endregion
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
@@ -364,6 +363,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
         scheduleReqMatrices(T_mat);
   }
 }
+#pragma endregion
 
 void Solver::sendZeroVector()
 {
