@@ -45,7 +45,8 @@ class Generals {
 
   void addSenderToMatrix(uint8_t myConfNum);
 
-  Characteristic getCharacteristic() const;
+  const Characteristic& getCharacteristic() const;
+  const PublicKey& getWriterPublicKey() const;
 
  private:
   struct hash_weight {
@@ -59,6 +60,7 @@ class Generals {
   std::array<hash_weight, 100> m_hw_total;
 
   Characteristic m_characteristic;
+  PublicKey m_writerPublicKey;
 };
 }  // namespace cs
 #endif

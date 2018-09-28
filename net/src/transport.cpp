@@ -425,6 +425,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
       return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
       return node_->getCharacteristic(data, size, firstPack.getSender());
+  case MsgTypes::WriterNotification:
+      return node_->getWriterNotification(data, size);
   default:
     LOG_ERROR("Unknown type");
     break;

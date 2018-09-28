@@ -169,7 +169,6 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
 
   uint8_t j_max, jj;
   j_max = 0;
-  bool found;
 
   memset(mtr, 0, nodes_amount * 97);
 
@@ -180,8 +179,7 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
       (hash_weights[0].a_weight) = 1;
       j_max                      = 1;
     } else {
-      found = false;
-
+      bool found = false;
       for (jj = 0; jj < j_max; jj++) {
         if (memcmp(hash_weights[jj].a_hash, m_hw_total[j].a_hash, 32) == 0) {
           (hash_weights[jj].a_weight)++;
@@ -224,7 +222,8 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
 
   uint16_t result = k % nodes_amount;
 
-  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(confidantNodes.at(result).str, 32);
+  m_writerPublicKey = confidantNodes.at(result);
+  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.str, 32);
 
   delete[] hash_weights;
   delete[] mtr;
@@ -236,7 +235,11 @@ HashMatrix Generals::getMatrix() const {
   return m_hMatrix;
 }
 
-Characteristic Generals::getCharacteristic() const {
+const Characteristic& Generals::getCharacteristic() const {
   return m_characteristic;
+}
+
+const PublicKey& Generals::getWriterPublicKey() const {
+  return m_writerPublicKey;
 }
 }  // namespace cs

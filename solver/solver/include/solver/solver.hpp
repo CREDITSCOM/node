@@ -136,6 +136,13 @@ class Solver {
   void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
                            const csdb::Pool& metaInfoPool, const PublicKey& sender);
 
+  Hash getCharacteristicHash() const;
+  std::vector<uint8_t> getSignedNotification();
+
+  PublicKey getWriterPublicKey() const;
+
+  const char* getSignature();
+
   // API methods
   void     initApi();
   uint32_t getTLsize();
@@ -207,8 +214,10 @@ class Solver {
   uint8_t             trustedCounterVector;
 
   std::set<PublicKey> receivedMat_ips;
-  bool                receivedMatFrom[100];
-  uint8_t             trustedCounterMatrix;
+
+  bool    receivedMatFrom[100];
+  uint8_t trustedCounterMatrix;
+  uint8_t m_writerIndex; // index at confidants
 
   std::vector<PublicKey> ips;
   std::vector<std::string> vector_datas;

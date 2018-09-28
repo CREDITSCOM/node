@@ -46,7 +46,8 @@ constexpr short min_nodes = 3;
 
 Solver::Solver(Node* node)
 : node_(node)
-, generals(std::unique_ptr<Generals>(new Generals())) {
+, generals(std::unique_ptr<Generals>(new Generals()))
+, m_writerIndex(0) {
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
 }
 
@@ -215,6 +216,42 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 #endif
   }
 }
+
+Hash Solver::getCharacteristicHash() const {
+  const Characteristic& characteristic = generals->getCharacteristic();
+  return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
+}
+
+std::vector<uint8_t> Solver::getSignedNotification() {
+  std::vector<uint8_t> message;
+  constexpr size_t signatureLength = 64;
+
+  message.insert(message.end(), getCharacteristicHash().str, getCharacteristicHash().str + HASH_LENGTH);
+  message.insert(message.end(), getWriterPublicKey().str, getWriterPublicKey().str + signatureLength);
+
+  assert(message.size() == (PUBLIC_KEY_LENGTH + signatureLength));
+
+  std::vector<uint8_t> result(message.size());
+  unsigned long long   siglen = result.size();
+
+  std::vector<uint8_t> mask     = generals->getCharacteristic().mask;
+  unsigned long long   maskSize = mask.size();
+
+  std::vector<uint8_t> nodePrivateKey = myPrivateKey;
+
+  crypto_sign_detached(result.data(), &siglen, mask.data(), maskSize, myPrivateKey.data());
+  return result;
+}
+
+PublicKey Solver::getWriterPublicKey() const {
+  PublicKey result;
+  if (m_writerIndex < m_roundInfo.confidants.size()) {
+    result = m_roundInfo.confidants[m_writerIndex];
+  } else {
+     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
+  }
+  return result;
+}  // namespace cs
 
 void Solver::closeMainRound() {
   if (node_->getRoundNumber() == 1)  // || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by
@@ -513,18 +550,18 @@ void Solver::gotVector(HashVector&& vector) {
 
     if (trustedCounterMatrix == numGen) {
       memset(receivedMatFrom, 0, 100);
-      uint8_t wTrusted     = (generals->take_decision(
+      m_writerIndex     = (generals->take_decision(
           m_roundInfo.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
 
-      if (wTrusted == 100) {
+      if (m_writerIndex == 100) {
         cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
         cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
       } else {
-        cslog() << "SOLVER> wTrusted = " << static_cast<int>(wTrusted);
+        cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
         consensusAchieved = true;
 
-        if (wTrusted == node_->getMyConfNumber()) {
+        if (m_writerIndex == node_->getMyConfNumber()) {
           node_->becomeWriter();
           cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
             csdb::Pool emptyMetaPool;
@@ -585,18 +622,18 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   const uint8_t numGen = static_cast<uint8_t>(node_->getConfidants().size());
   if (trustedCounterMatrix == numGen) {
     memset(receivedMatFrom, 0, 100);
-    uint8_t wTrusted     = (generals->take_decision(m_roundInfo.confidants,
+    uint8_t m_writerIndex     = (generals->take_decision(m_roundInfo.confidants,
                                                 node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
     trustedCounterMatrix = 0;
 
-    if (wTrusted == 100) {
+    if (m_writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
       cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
     } else {
-      cslog() << "SOLVER> wTrusted = " << static_cast<int>(wTrusted);
+      cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
       consensusAchieved = true;
 
-      if (wTrusted == node_->getMyConfNumber()) {
+      if (m_writerIndex == node_->getMyConfNumber()) {
         node_->becomeWriter();
         cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
           csdb::Pool emptyMetaPool;

@@ -5,7 +5,7 @@
 
 const size_t BLAKE2_HASH_LENGTH = 32;
 const size_t PUBLIC_KEY_LENGTH = 32;
-typedef FixedString<PUBLIC_KEY_LENGTH> PublicKey;
+using PublicKey = FixedString<PUBLIC_KEY_LENGTH>;
 
 inline PublicKey getHashedPublicKey(const char* str) {
   PublicKey result;

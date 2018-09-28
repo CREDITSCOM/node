@@ -934,6 +934,26 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
 }
 
+void Node::getWriterNotification(const uint8_t* data, const std::size_t size) {
+  istream_.init(data, size);
+
+  // TODO! Your codes here...
+}
+
+void Node::sendNotificationToWriter() {
+  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, solver_->getWriterPublicKey());
+  ostream_ << MsgTypes::WriterNotification;
+  ostream_ << roundNum_;
+
+  cs::DynamicBuffer data(HASH_LENGTH + PUBLIC_KEY_LENGTH);
+  cs::DataStream    stream(*data, data.size());
+
+  stream << solver_->getSignedNotification(); // need to code review
+  ostream_ << std::string(stream.data(), stream.size());
+
+  flushCurrentTasks();
+}
+
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
     cserror() << "Writer and Main node shouldn't send hashes";
