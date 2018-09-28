@@ -20,12 +20,6 @@ namespace slv2
         context.node().sendTransactionList(std::move(pool)); // Correct sending, better when to all one time
     }
 
-    Result CollectState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
-    {
-        std::cout << name() << ": round table received: " << round << std::endl;
-        return Result::Finish;
-    }
-
     Result CollectState::onTransaction(SolverContext& context, const csdb::Transaction & tr)
     {
         if(tr.is_valid())

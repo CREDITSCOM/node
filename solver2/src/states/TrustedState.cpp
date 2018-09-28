@@ -21,12 +21,6 @@ namespace slv2
         }
     }
 
-    Result TrustedState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
-    {
-        std::cout << name() << ": round table received: " << round << std::endl;
-        return Result::Finish;
-    }
-
     Result TrustedState::onVector(SolverContext& context, const Credits::HashVector & vect, const PublicKey & /*sender*/)
     {
         if(context.is_vect_recv_from(vect.Sender)) {

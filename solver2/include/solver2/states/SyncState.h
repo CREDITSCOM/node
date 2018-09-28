@@ -11,8 +11,6 @@ namespace slv2
         ~SyncState() override
         {}
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
-
         const char * name() const override
         {
             return "Sync";

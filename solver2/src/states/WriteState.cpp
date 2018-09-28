@@ -19,12 +19,6 @@ namespace slv2
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
     }
 
-    Result WriteState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
-    {
-        std::cout << name() << ": round table received: " << round << ". Wtf has sent this?!" << std::endl;
-        return Result::Ignore;
-    }
-
     Result WriteState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender)
     {
         auto not_enough = static_cast<int>(Consensus::MinTrustedNodes) - static_cast<int>(context.cnt_hash_recv());

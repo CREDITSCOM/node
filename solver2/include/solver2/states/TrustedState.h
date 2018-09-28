@@ -13,8 +13,6 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
-
         Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
 
         Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;

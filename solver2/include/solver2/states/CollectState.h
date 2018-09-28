@@ -21,8 +21,6 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
-
         Result onTransaction(SolverContext& context, const csdb::Transaction& tr) override;
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
