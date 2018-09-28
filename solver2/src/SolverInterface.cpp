@@ -222,11 +222,9 @@ namespace slv2
 #ifdef MYLOG
         std::cout << "SOLVER> next Round : the variables initialized" << std::endl;
 #endif
-        // from Solver::initConfRound() (там нужно для ДУ)
-        memset(receivedVecFrom, 0, 100);
-        memset(receivedMatFrom, 0, 100);
-        trustedCounterVector = 0;
-        trustedCounterMatrix = 0;
+        // as store result of current round:
+        recv_vect.clear();
+        recv_matr.clear();
 
         if(!pstate) {
             return;

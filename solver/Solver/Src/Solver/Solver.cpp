@@ -135,9 +135,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block)
   #endif
 }
 
-
-
-
+#pragma region moved to solver2
 void Solver::sendTL()
 {
   if (gotBigBang) return;
@@ -152,6 +150,7 @@ void Solver::sendTL()
   node_->sendTransactionList(std::move(v_pool)); // Correct sending, better when to all one time
 
 }
+#pragma endregion
 
 size_t Solver::getTLsize() const
 {
@@ -301,7 +300,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 	}
 #endif
 }
-#pragma endregion
+
 void Solver::initConfRound()
 {
     if(timer_used) {
@@ -315,6 +314,7 @@ void Solver::initConfRound()
   //runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
 }
+#pragma endregion
 
 void Solver::gotTransactionList(csdb::Pool&& _pool)
 {
@@ -375,7 +375,7 @@ void Solver::sendZeroVector()
 
 }
 
-
+#pragma region moved to solver2
 void Solver::gotVector(HashVector&& vector)
 {
 #ifdef MYLOG
@@ -430,6 +430,7 @@ void Solver::gotVector(HashVector&& vector)
   std::cout << "Solver>  VECTOR GOT SUCCESSFULLY!!!" << std::endl;
   #endif
 }
+#pragma endregion
 
 void Solver::takeDecWorkaround()
 {
@@ -465,6 +466,7 @@ void Solver::takeDecWorkaround()
   }
 }
 
+#pragma region moved to solver2
 void Solver::gotMatrix(HashMatrix&& matrix)
 {
 	uint8_t numGen = node_->getConfidants().size();
@@ -488,7 +490,7 @@ void Solver::gotMatrix(HashMatrix&& matrix)
       takeDecWorkaround();
   }
 }
-
+#pragma endregion
 
 //what block does this function write???
 void Solver::writeNewBlock()

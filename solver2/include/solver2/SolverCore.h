@@ -55,32 +55,39 @@ namespace slv2
             : core(core)
         {}
 
-        void becomeNormal();
-
-        void becomeTrusted();
-
-        void becomeWriter();
-
-        void startNewRound();
+        inline void becomeNormal();
+        inline void becomeTrusted();
+        inline void becomeWriter();
+        inline void startNewRound();
+        inline void vectors_completed();
+        inline void matrices_completed();
 
         // fast access methods, may be removed at the end
-        inline Node& node();
-        inline Credits::Generals& generals();
-        inline CallsQueueScheduler& scheduler();
+        inline Node& node() const;
+        inline Credits::Generals& generals() const;
+        inline CallsQueueScheduler& scheduler() const;
 
         inline const KeyType& public_key() const;
         inline const KeyType& private_key() const;
 
         inline int32_t round() const;
+        uint8_t conf_number() const;
 
         // candidates for refactoring:
         
-        void makeAndSendBlock();
-        void makeAndSendBadBlock();
+        inline void makeAndSendBlock();
+        inline void makeAndSendBadBlock();
         inline bool is_spammer() const;
         inline void add(const csdb::Transaction& tr);
         inline void flush_transactions();
         inline bool verify(const csdb::Transaction& tr) const;
+        
+        inline bool is_vect_recv_from(uint8_t sender) const;
+        inline void recv_vect_from(uint8_t sender);
+        inline size_t cnt_vect_recv() const;
+        inline bool is_matr_recv_from(uint8_t sender) const;
+        inline void recv_matr_from(uint8_t sender);
+        inline size_t cnt_matr_recv() const;
 
     private:
         SolverCore& core;
@@ -185,17 +192,18 @@ namespace slv2
         KeyType public_key;
         KeyType private_key;
 
+        // senders of vectors received this round
+        std::set<uint8_t> recv_vect;
+        // senders of matrices received this round
+        std::set<uint8_t> recv_matr;
+
         // copied from solver.v1: по мере разнесения функционала по состояниям кол-во данных должно уменьшиться
         csdb::Pool m_pool {};
         //csdb::Pool v_pool {}; -> SelectState - накопление чужих транзакций
         //csdb::Pool b_pool {}; -> StartState? - отправка bad block
         size_t lastRoundTransactionsGot { 0 };
         std::set<PublicKey> receivedVec_ips;
-        bool receivedVecFrom [100];
-        uint8_t trustedCounterVector { 0 };
         std::set<PublicKey> receivedMat_ips;
-        bool receivedMatFrom [100];
-        uint8_t trustedCounterMatrix { 0 };
         std::vector<Hash> hashes;
         std::vector<PublicKey> ips;
         std::vector<std::string> vector_datas;
@@ -229,17 +237,17 @@ namespace slv2
         Credits::Generals * pgen;
     };
 
-    Node& SolverContext::node()
+    Node& SolverContext::node() const
     {
         return *core.pnode;
     }
 
-    Credits::Generals& SolverContext::generals()
+    Credits::Generals& SolverContext::generals() const
     {
         return *core.pgen;
     }
 
-    CallsQueueScheduler& SolverContext::scheduler()
+    CallsQueueScheduler& SolverContext::scheduler() const
     {
         return core.scheduler;
     }
@@ -254,7 +262,7 @@ namespace slv2
         return core.private_key;
     }
 
-    inline int32_t SolverContext::round() const
+    int32_t SolverContext::round() const
     {
         return core.cur_round;
     }
@@ -262,6 +270,47 @@ namespace slv2
     bool SolverContext::is_spammer() const
     {
         return core.opt_spammer_on;
+    }
+
+    void SolverContext::becomeNormal()
+    {
+        core.handleTransitions(SolverCore::Event::SetNormal);
+    }
+
+    void SolverContext::becomeTrusted()
+    {
+        core.handleTransitions(SolverCore::Event::SetTrusted);
+    }
+
+    void SolverContext::becomeWriter()
+    {
+        core.handleTransitions(SolverCore::Event::SetWriter);
+    }
+
+    void SolverContext::vectors_completed()
+    {
+        core.handleTransitions(SolverCore::Event::Vectors);
+    }
+
+    void SolverContext::matrices_completed()
+    {
+        core.handleTransitions(SolverCore::Event::Matrices);
+    }
+
+    void SolverContext::startNewRound()
+    {
+        core.beforeNextRound();
+        core.nextRound();
+    }
+
+    void SolverContext::makeAndSendBlock()
+    {
+        core.prepareBlockAndSend();
+    }
+
+    void SolverContext::makeAndSendBadBlock()
+    {
+        core.prepareBadBlockAndSend();
     }
 
     void SolverContext::add(const csdb::Transaction& tr)
@@ -277,6 +326,36 @@ namespace slv2
     bool SolverContext::verify(const csdb::Transaction& tr) const
     {
         return core.verify_signature(tr);
+    }
+
+    bool SolverContext::is_vect_recv_from(uint8_t sender) const
+    {
+        return core.recv_vect.find(sender) != core.recv_vect.cend();
+    }
+
+    void SolverContext::recv_vect_from(uint8_t sender)
+    {
+        core.recv_vect.insert(sender);
+    }
+
+    size_t SolverContext::cnt_vect_recv() const
+    {
+        return core.recv_vect.size();
+    }
+
+    bool SolverContext::is_matr_recv_from(uint8_t sender) const
+    {
+        return core.recv_matr.find(sender) != core.recv_matr.cend();
+    }
+
+    void SolverContext::recv_matr_from(uint8_t sender)
+    {
+        core.recv_matr.insert(sender);
+    }
+
+    size_t SolverContext::cnt_matr_recv() const
+    {
+        return core.recv_matr.size();
     }
 
 } // slv2

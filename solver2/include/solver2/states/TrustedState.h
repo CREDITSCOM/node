@@ -19,15 +19,20 @@ namespace slv2
 
         Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
 
+        Result onBlock(SolverContext& context, const csdb::Pool& pool, const PublicKey& sender) override;
+
         const char * name() const override
         {
             return "Trusted";
         }
 
-    private:
+    protected:
 
-        unsigned int cnt_vectors { 0 };
-        unsigned int cnt_matrices { 0 };
+        bool test_vectors_completed(const SolverContext& context) const;
+        bool test_matrices_completed(const SolverContext& context) const;
+
+        //TODO: уточнить логику блокировки приема матриц после получения блока в тек. раунде
+        bool is_block_recv;
     };
 
 } // slv2

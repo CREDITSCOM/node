@@ -171,35 +171,9 @@ namespace slv2
 
     // SolverCore::Context implementation
     
-    void SolverContext::becomeNormal()
+    uint8_t SolverContext::conf_number() const
     {
-        core.handleTransitions(SolverCore::Event::SetNormal);
-    }
-
-    void SolverContext::becomeTrusted()
-    {
-        core.handleTransitions(SolverCore::Event::SetTrusted);
-    }
-
-    void SolverContext::becomeWriter()
-    {
-        core.handleTransitions(SolverCore::Event::SetWriter);
-    }
-
-    void SolverContext::startNewRound()
-    {
-        core.beforeNextRound();
-        core.nextRound();
-    }
-
-    void SolverContext::makeAndSendBlock()
-    {
-        core.prepareBlockAndSend();
-    }
-
-    void SolverContext::makeAndSendBadBlock()
-    {
-        core.prepareBadBlockAndSend();
+        return core.pnode->getMyConfNumber();
     }
 
 } // slv2
