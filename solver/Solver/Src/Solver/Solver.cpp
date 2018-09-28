@@ -23,7 +23,7 @@
 #include <base58.h>
 #include <sodium.h>
 
-#if 0
+#pragma region moved to solver2
 namespace {
 void addTimestampToPool(csdb::Pool& pool)
 {
@@ -32,9 +32,8 @@ void addTimestampToPool(csdb::Pool& pool)
     std::chrono::duration_cast<std::chrono::milliseconds>(
       now_time.time_since_epoch()).count()));
 }
-#endif // 0
-// method is replaced with CallsQueueScheduler:
-#if 0
+
+#if 0 // method is replaced with CallsQueueScheduler:
 void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
 {    
  // std::cout << "SOLVER> Before calback" << std::endl;
@@ -49,7 +48,7 @@ void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb)
   tr.detach();
 }
 #endif // 0
-#if 0
+
 #if defined(SPAM_MAIN) || defined(SPAMMER)
 static int
 randFT(int min, int max)
@@ -58,7 +57,9 @@ randFT(int min, int max)
 }
 #endif
 } // anonimous namespace
-#endif // 0
+
+#pragma endregion
+
 namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
@@ -163,7 +164,7 @@ void Solver::setLastRoundTransactionsGot(size_t trNum)
   lastRoundTransactionsGot = trNum;
 }
 
-#if 0
+#pragma region moved to solver2
 void Solver::closeMainRound()
 {
   if (node_->getRoundNumber()==1)// || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by previous main node should be added!!!!!!!!!!!!!!!!!!!!!
@@ -201,14 +202,12 @@ void Solver::closeMainRound()
     node_->getBlockChain().putBlock(m_pool);
     }
 }
-#endif // 0
-#if 0
+
 bool Solver::mPoolClosed()
 {
   return m_pool_closed;
 }
-#endif // 0
-#if 0
+
 void Solver::runMainRound()
 {
     if(timer_used) {
@@ -226,7 +225,8 @@ void Solver::runMainRound()
   }
   scheduleCloseMainRound(duration_main_round);
 }
-#endif // 0
+#pragma endregion
+
 const HashVector& Solver::getMyVector() const
 {
   return hvector;
@@ -237,8 +237,8 @@ const HashMatrix& Solver::getMyMatrix() const
  return (generals->getMatrix());
 }
 
+#pragma region moved to solver2
 
-#if 0
 void Solver::flushTransactions()
 {
 	if (node_->getMyLevel() != NodeLevel::Normal) {
@@ -256,12 +256,12 @@ void Solver::flushTransactions()
 		}
 	}
 }
-#endif // 0
+#pragma endregion
 
 bool Solver::getIPoolClosed() {
   return m_pool_closed;
 }
-#if 0
+#pragma region moved to solver2
 void Solver::gotTransaction(csdb::Transaction&& transaction)
 {
 #ifdef MYLOG
@@ -301,7 +301,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 	}
 #endif
 }
-#endif // 0
+#pragma endregion
 void Solver::initConfRound()
 {
     if(timer_used) {
@@ -669,7 +669,7 @@ void Solver::gotHash(const Hash& hash, const PublicKey& sender)
         cancelReqHashes();
 	}
   }
-#if 0
+#if 0 // unused code
 void Solver::initApi()
 {
   _initApi();
@@ -748,7 +748,7 @@ Solver::createPool()
 }
 #endif
 
-#if 0
+#pragma region moved to solver2
 #ifdef SPAMMER
 void
 Solver::spamWithTransactions()
@@ -801,9 +801,7 @@ Solver::spamWithTransactions()
   }
 }
 #endif
-#endif // 0
 ///////////////////
-#if 0
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
 {
   //TRACE("");
@@ -811,7 +809,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
   //TRACE("");
   m_transactions.push_back(transaction);
 }
-#endif // 0
+#pragma endregion
 void Solver::addInitialBalance()
 {
   std::cout << "===SETTING DB===" << std::endl;
@@ -907,8 +905,7 @@ void Solver::beforeNextRound()
 	passedRoundsCount++;
     timer_service.Reset();
 }
-
-#if 0 // -> solver2
+#pragma region moved to solver2
 void Solver::nextRound()
 {
     if(timer_used) {
@@ -981,14 +978,12 @@ void Solver::nextRound()
   // for (N, G, T) node types: track block received
   scheduleReqBlock(T_blk);
 }
-#endif // 0
-#if 0
 bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
 									uint8_t* message, size_t message_len)
 {
 	// if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
 	return !crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
 }
-#endif // 0
+#pragma endregion
 } // namespace Credits
 
