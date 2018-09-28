@@ -44,7 +44,7 @@ namespace slv2
         }
         else {
             // std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
-            return (wTrusted == context.conf_number());
+            return (wTrusted == context.own_conf_number());
         }
         return false;
     }

@@ -33,8 +33,7 @@ namespace slv2
         if(test_vectors_completed(context))
         {
             //compose and send matrix!!!
-            auto my_num = context.conf_number();
-            context.generals().addSenderToMatrix(my_num);
+            context.generals().addSenderToMatrix(context.own_conf_number());
 
             // context.generals().addmatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
             onMatrix(context, context.generals().getMatrix(), PublicKey {});
