@@ -2,6 +2,7 @@
 #include <Solver/Solver.hpp>
 #include "../Node.h"
 #include <Solver/Generals.hpp>
+#include <csdb/currency.h>
 
 namespace slv2
 {
@@ -50,6 +51,18 @@ namespace slv2
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->addInitialBalance();
         }
+
+        // copied from original solver-1
+        //std::cout << "===SETTING DB===" << std::endl;
+        const std::string start_address = "0000000000000000000000000000000000000000000000000000000000000002";
+        csdb::Transaction tr;
+        tr.set_target(csdb::Address::from_public_key((char*) public_key.data()));
+        tr.set_source(csdb::Address::from_string(start_address));
+        tr.set_currency(csdb::Currency("CS"));
+        tr.set_amount(csdb::Amount(10000, 0));
+        tr.set_balance(csdb::Amount(10000000, 0));
+        tr.set_innerID(1);
+        send_wallet_transaction(tr);
     }
 
     void SolverCore::setBigBangStatus(bool status)

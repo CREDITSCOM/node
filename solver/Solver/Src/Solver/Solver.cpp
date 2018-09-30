@@ -58,8 +58,6 @@ randFT(int min, int max)
 #endif
 } // anonimous namespace
 
-#pragma endregion
-
 namespace Credits {
 using ScopedLock = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
@@ -86,6 +84,7 @@ void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t
 	myPublicKey = pub;
 	myPrivateKey = priv;
 }
+#pragma endregion
 
 void Solver::buildBlock(csdb::Pool& block)
 {
@@ -810,7 +809,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction)
   //TRACE("");
   m_transactions.push_back(transaction);
 }
-#pragma endregion
+
 void Solver::addInitialBalance()
 {
   std::cout << "===SETTING DB===" << std::endl;
@@ -839,7 +838,6 @@ void Solver::addInitialBalance()
 #endif
 }
 
-#pragma region moved to solver2
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////// gotBlockRequest
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 	csdb::Pool pool = node_->getBlockChain().loadBlock(hash);
@@ -852,7 +850,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 	}
 
 }
-#pragma endregion
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////// gotBlockReply
 void Solver::gotBlockReply(csdb::Pool&& pool) {
@@ -865,6 +863,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
 	
 
 }
+#pragma endregion
 
 void Solver::addConfirmation(uint8_t confNumber_) {
   if(writingConfGotFrom[confNumber_]) return;
@@ -879,6 +878,7 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   
 }
 
+#pragma region moved to solver2
 void Solver::beforeNextRound()
 {
     auto rnum = node_->getRoundNumber();
@@ -908,7 +908,7 @@ void Solver::beforeNextRound()
 	passedRoundsCount++;
     timer_service.Reset();
 }
-#pragma region moved to solver2
+
 void Solver::nextRound()
 {
     if(timer_used) {

@@ -11,6 +11,8 @@ namespace slv2
         ~SyncState() override
         {}
 
+        void on(SolverContext& context) override;
+
         const char * name() const override
         {
             return "Sync";

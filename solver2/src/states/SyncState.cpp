@@ -4,4 +4,8 @@
 
 namespace slv2
 {
+
+    void SyncState::on(SolverContext& /*context*/)
+    {}
+
 } // slv2
