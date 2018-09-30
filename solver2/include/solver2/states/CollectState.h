@@ -9,6 +9,11 @@
 
 namespace slv2
 {
+    /// <summary>   A transaction collector node state (so called "main node"). This class cannot be inherited. </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:DefaultStateBehavior"/>
 
     class CollectState final : public DefaultStateBehavior
     {

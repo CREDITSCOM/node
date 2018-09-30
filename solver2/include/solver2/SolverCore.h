@@ -152,8 +152,8 @@ namespace slv2
         std::vector<csdb::Transaction> transactions;
 
         // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
-        void prepareBlockAndSend(); // m_pool
-        void prepareBadBlockAndSend(); // b_pool
+        void sendCurrentBlock(); // m_pool-related
+        void sendBlock(csdb::Pool& pool, bool isBad = false);
         void addTimestampToPool(csdb::Pool& pool);
         void flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);

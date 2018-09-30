@@ -3,6 +3,11 @@
 
 namespace slv2
 {
+    /// <summary>   A special state to handle a Big Bang. This class cannot be inherited</summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:DefaultStateBehavior"/>
 
     class HandleBBState final : public DefaultStateBehavior
     {
@@ -13,7 +18,7 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        //TODO: завершается по логике солвера-1 с приходом блока (см. gotBlock())
+        //TODO: завершается по логике солвера-1 с приходом блока (см. Solver::gotBlock())
 
         const char * name() const override
         {

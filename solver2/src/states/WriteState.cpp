@@ -15,7 +15,7 @@ namespace slv2
         context.node().becomeWriter();
 
         std::cout << name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")" << std::endl;
-        context.makeAndSendBlock();
+        context.make_and_send_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
     }
 

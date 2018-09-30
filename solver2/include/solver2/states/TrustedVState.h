@@ -3,6 +3,11 @@
 
 namespace slv2
 {
+    /// <summary>   A trusted node state with vectors completed, but matrices still not. This class cannot be inherited </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:TrustedState"/>
 
     class TrustedVState final : public TrustedState
     {

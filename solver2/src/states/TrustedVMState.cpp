@@ -12,7 +12,7 @@ namespace slv2
     {
         if(decide_to_write(context)) {
             // let context switch state
-            context.becomeWriter();
+            context.become_writer();
         }
         // continue work as trusted node
     }

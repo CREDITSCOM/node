@@ -3,6 +3,11 @@
 
 namespace slv2
 {
+    /// <summary>   A synchronise state. Used for node normal mode when some blocks are missed. This class cannot be inherited. </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:DefaultStateBehavior"/>
 
     class SyncState final : public DefaultStateBehavior
     {

@@ -126,31 +126,30 @@ namespace slv2
 
     // Copied methods from solver.v1
     
-    void SolverCore::prepareBlockAndSend()
+    void SolverCore::sendCurrentBlock()
     {
         addTimestampToPool(m_pool);
         m_pool.set_writer_public_key(public_key);
-        m_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        m_pool.set_previous_hash(csdb::PoolHash::from_string(""));
         m_pool.sign(private_key);
-        pnode->sendBlock(std::move(m_pool));
         pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
         pnode->getBlockChain().putBlock(m_pool);
-#if 0
-#ifdef MYLOG
-        std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
-        std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
-        std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
-#endif
-#endif
+        
+        sendBlock(m_pool, false);
+        //std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
+        //std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
+        //std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
     }
 
-    void SolverCore::prepareBadBlockAndSend()
+    void SolverCore::sendBlock(csdb::Pool& pool, bool isBad /*= false*/)
     {
-        csdb::Pool b_pool;
-        b_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        b_pool.set_previous_hash(csdb::PoolHash::from_string(""));
-        pnode->sendBadBlock(std::move(b_pool));
+        pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        if(isBad) {
+            pnode->sendBadBlock(pool);
+        }
+        else {
+            pnode->sendBlock(pool);
+        }
     }
 
     void SolverCore::addTimestampToPool(csdb::Pool& pool)

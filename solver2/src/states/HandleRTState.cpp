@@ -9,14 +9,14 @@ namespace slv2
     {
         switch(context.node().getMyLevel()) {
             case NodeLevel::Confidant:
-                context.becomeTrusted();
+                context.become_trusted();
                 break;
             case NodeLevel::Normal:
-                context.becomeNormal();
+                context.become_normal();
                 break;
             case NodeLevel::Writer:
                 std::cout << name() << " warning: node must not become writer through round table" << std::endl;
-                context.becomeWriter();
+                context.become_writer();
                 break;
             case NodeLevel::Main:
             default:

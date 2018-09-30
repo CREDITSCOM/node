@@ -3,6 +3,12 @@
 
 namespace slv2
 {
+    /// <summary>   A special state of "No state". Used at the very beginning of work. This class cannot be inherited. </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:INodeState"/>
+
     class NoState final : public INodeState
     {
     public:

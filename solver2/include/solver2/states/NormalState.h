@@ -4,6 +4,11 @@
 
 namespace slv2
 {
+    /// <summary>   A normal node state. This class cannot be inherited. </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:DefaultStateBehavior"/>
 
     class NormalState final : public DefaultStateBehavior
     {

@@ -8,7 +8,7 @@ namespace slv2
     void HandleBBState::on(SolverContext& context)
     {
         std::cout << "do specific actions on BigBang" << std::endl;
-        context.becomeNormal();
+        context.become_normal();
     }
 
 }

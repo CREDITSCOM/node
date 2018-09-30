@@ -35,43 +35,237 @@ namespace slv2
             : core(core)
         {}
 
-        inline void becomeNormal();
-        inline void becomeTrusted();
-        inline void becomeWriter();
+        // Switch state methods:
+
+        /// <summary>   Request to become normal node. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
+        inline void become_normal();
+
+        /// <summary>   Request to become trusted node. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
+        inline void become_trusted();
+
+        /// <summary>   Request to become writer node. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
+        inline void become_writer();
+
+        /// <summary>   Inform that receive enough vectors. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
         inline void vectors_completed();
+
+        /// <summary>   Inform that receive enough matrices. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
         inline void matrices_completed();
 
-        // fast access methods, may be removed at the end
-        inline Node& node() const;
-        inline Credits::Generals& generals() const;
-        inline CallsQueueScheduler& scheduler() const;
-
-        inline const KeyType& public_key() const;
-        inline const KeyType& private_key() const;
-        inline const Credits::HashVector& hash_vector() const;
-
-        inline int32_t round() const;
-        uint8_t own_conf_number() const;
-        size_t cnt_trusted() const;
-
-        // candidates for refactoring:
+        /// <summary>   Spawn next round. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
 
         void spawn_next_round();
-        inline void makeAndSendBlock();
-        inline void makeAndSendBadBlock();
+
+        // Fast access methods, may be removed at the end
+
+        /// <summary>   Gets the node instance. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to a Node. </returns>
+
+        inline Node& node() const;
+
+        /// <summary>   Gets the generals instance. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to the Credits::Generals. </returns>
+
+        inline Credits::Generals& generals() const;
+
+        /// <summary>   Gets the scheduler instance. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to a CallsQueueScheduler. </returns>
+
+        inline CallsQueueScheduler& scheduler() const;
+
+        // Access to common state properties
+        
+        /// <summary>   Public key. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to a const KeyType public key. </returns>
+
+        inline const KeyType& public_key() const;
+
+        /// <summary>   Private key. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to a const KeyType private key. </returns>
+
+        inline const KeyType& private_key() const;
+
+        /// <summary>   Current hash vector. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   A reference to a const Credits::HashVector. </returns>
+
+        inline const Credits::HashVector& hash_vector() const;
+
+        /// <summary>   Gets the current round number. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   An int32_t. </returns>
+
+        inline int32_t round() const;
+
+        /// <summary>   Gets the own number among confidant (trusted) nodes. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   An uint8_t. </returns>
+
+        uint8_t own_conf_number() const;
+
+        /// <summary>   Gets count of trusted nodes in current round. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   The total number of trusted. </returns>
+
+        size_t cnt_trusted() const;
+
+        /// <summary>   Query if this node is in spammer mode. </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   True if spammer, false if not. </returns>
+
         inline bool is_spammer() const;
+
+        // Common operations, candidates for refactoring:
+         
+        
+        /// <summary>   Makes a block from inner pool of collected and validated transactions and send it</summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
+        inline void make_and_send_block();
+
+        /// <summary>   Adds transaction to inner list </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="tr">   The tr to add. </param>
+
         inline void add(const csdb::Transaction& tr);
+
+        /// <summary>   Sends the transactions in inner list </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+
         inline void flush_transactions();
+
+        /// <summary>   Verifies the given transaction </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="tr">   The tr. </param>
+        ///
+        /// <returns>   True if it succeeds, false if it fails. </returns>
+
         inline bool verify(const csdb::Transaction& tr) const;
 
+        /// <summary>   Query if is vector received from passed sender </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+        ///
+        /// <returns>   True if vect receive from, false if not. </returns>
+
         inline bool is_vect_recv_from(uint8_t sender) const;
+
+        /// <summary>   Inform core to remember that vector from passed sender is received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+
         inline void recv_vect_from(uint8_t sender);
+
+        /// <summary>   Count of vectors received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   The total number of vect receive. </returns>
+
         inline size_t cnt_vect_recv() const;
+
+        /// <summary>   Query if is matrix received from passed sender </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+        ///
+        /// <returns>   True if matr receive from, false if not. </returns>
+
         inline bool is_matr_recv_from(uint8_t sender) const;
+
+        /// <summary>   Inform core to remember that matrix from passed sender is received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+
         inline void recv_matr_from(uint8_t sender);
+
+        /// <summary>   Count of matrices received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   The total number of matr receive. </returns>
+
         inline size_t cnt_matr_recv() const;
+
+        /// <summary>   Query if is hash received from passed sender </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+        ///
+        /// <returns>   True if hash receive from, false if not. </returns>
+
         inline bool is_hash_recv_from(const PublicKey& sender) const;
+
+        /// <summary>   Inform core to remember that hash from passed sender is received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <param name="sender">   The sender. </param>
+
         inline void recv_hash_from(const PublicKey& sender);
+
+        /// <summary>   Count of hashes received </summary>
+        ///
+        /// <remarks>   Aae, 30.09.2018. </remarks>
+        ///
+        /// <returns>   The total number of hash receive. </returns>
+
         inline size_t cnt_hash_recv() const;
 
     private:
@@ -118,17 +312,17 @@ namespace slv2
         return core.opt_spammer_on;
     }
 
-    void SolverContext::becomeNormal()
+    void SolverContext::become_normal()
     {
         core.handleTransitions(SolverCore::Event::SetNormal);
     }
 
-    void SolverContext::becomeTrusted()
+    void SolverContext::become_trusted()
     {
         core.handleTransitions(SolverCore::Event::SetTrusted);
     }
 
-    void SolverContext::becomeWriter()
+    void SolverContext::become_writer()
     {
         core.handleTransitions(SolverCore::Event::SetWriter);
     }
@@ -143,14 +337,9 @@ namespace slv2
         core.handleTransitions(SolverCore::Event::Matrices);
     }
 
-    void SolverContext::makeAndSendBlock()
+    void SolverContext::make_and_send_block()
     {
-        core.prepareBlockAndSend();
-    }
-
-    void SolverContext::makeAndSendBadBlock()
-    {
-        core.prepareBadBlockAndSend();
+        core.sendCurrentBlock();
     }
 
     void SolverContext::add(const csdb::Transaction& tr)

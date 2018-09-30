@@ -3,6 +3,11 @@
 
 namespace slv2
 {
+    /// <summary>   A start node state. Intended to handle first round. This class cannot be inherited. </summary>
+    ///
+    /// <remarks>   Aae, 30.09.2018. </remarks>
+    ///
+    /// <seealso cref="T:DefaultStateBehavior"/>
 
     class StartState final : public DefaultStateBehavior
     {
