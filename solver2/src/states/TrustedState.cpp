@@ -1,8 +1,8 @@
 #include "TrustedState.h"
-#include "../SolverCore.h"
-#include <Solver/Solver.hpp>
+#include "../SolverContext.h"
+#include "../SolverCompat.h"
 #include "../Node.h"
-#include <Solver/Generals.hpp>
+#include "../Generals.h"
 
 #include <iostream>
 

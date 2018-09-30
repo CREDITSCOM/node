@@ -1,14 +1,5 @@
 #include "StartState.h"
-#include "../SolverCore.h"
-
-#if !defined(SOLVER_USES_PROXY_TYPES)
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <csnode/node.hpp>
-#pragma warning(pop)
-#endif
-
-#include <iostream>
+//#include "../SolverContext.h"
 
 namespace slv2
 {

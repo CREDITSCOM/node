@@ -1,5 +1,5 @@
 #include "NormalState.h"
-#include "../SolverCore.h"
+#include "../SolverContext.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
 

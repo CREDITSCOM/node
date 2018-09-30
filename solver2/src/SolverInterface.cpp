@@ -91,7 +91,7 @@ namespace slv2
         if(!pstate) {
             return;
         }
-        if(stateCompleted(pstate->onTransaction(context, trans))) {
+        if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
             handleTransitions(Event::Transactions);
         }
     }
@@ -118,7 +118,7 @@ namespace slv2
         if(!pstate) {
             return;
         }
-        if(stateCompleted(pstate->onTransactionList(context, pool))) {
+        if(stateCompleted(pstate->onTransactionList(*pcontext, pool))) {
             handleTransitions(Event::Transactions);
         }
     }
@@ -135,7 +135,7 @@ namespace slv2
             return;
         }
         //TODO: how to get real public key from vect.Sender?
-        if(stateCompleted(pstate->onVector(context, vect, PublicKey {}))) {
+        if(stateCompleted(pstate->onVector(*pcontext, vect, PublicKey {}))) {
             handleTransitions(Event::Vectors);
         }
     }
@@ -152,7 +152,7 @@ namespace slv2
             return;
         }
         //TODO: how to get real public key from vect.Sender?
-        if(stateCompleted(pstate->onMatrix(context, matr, PublicKey {}))) {
+        if(stateCompleted(pstate->onMatrix(*pcontext, matr, PublicKey {}))) {
             handleTransitions(Event::Matrices);
         }
     }
@@ -168,7 +168,7 @@ namespace slv2
         if(!pstate) {
             return;
         }
-        if(stateCompleted(pstate->onBlock(context, pool, sender))) {
+        if(stateCompleted(pstate->onBlock(*pcontext, pool, sender))) {
             handleTransitions(Event::Block);
         }
     }
@@ -211,7 +211,7 @@ namespace slv2
         if(!pstate) {
             return;
         }
-        if(stateCompleted(pstate->onHash(context, hash, sender))) {
+        if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
             handleTransitions(Event::Hashes);
         }
     }
@@ -258,7 +258,7 @@ namespace slv2
             return;
         }
         cur_round = pnode->getRoundNumber();
-        if(stateCompleted(pstate->onRoundTable(context, cur_round))) {
+        if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
             handleTransitions(Event::RoundTable);
         }
     }

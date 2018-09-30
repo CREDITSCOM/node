@@ -1,4 +1,5 @@
 #include "SolverCore.h"
+#include "SolverContext.h"
 #include <Solver/Solver.hpp>
 #include "../Node.h"
 
@@ -14,9 +15,9 @@ namespace slv2
 
     SolverCore::SolverCore()
         // internal data
-        : context(*this)
-        , tag_state_expired(CallsQueueScheduler::no_tag)
+        : tag_state_expired(CallsQueueScheduler::no_tag)
         , req_stop(true)
+        , pcontext(std::make_unique<SolverContext>(*this))
         // options
         , opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
@@ -51,7 +52,7 @@ namespace slv2
 
     void SolverCore::finish()
     {
-        pstate->off(context);
+        pstate->off(*pcontext);
         scheduler.RemoveAll();
         tag_state_expired = CallsQueueScheduler::no_tag;
         pstate = nullptr;
@@ -74,10 +75,10 @@ namespace slv2
             // state changed due timeout from within expired state        
         }
         
-        pstate->off(context);
+        pstate->off(*pcontext);
         std::cout << "Core: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
         pstate = pState;
-        pstate->on(context);
+        pstate->on(*pcontext);
         
         // timeout hadling
         if(opt_timeouts_enabled) {
@@ -87,7 +88,7 @@ namespace slv2
                 tag_state_expired = CallsQueueScheduler::no_tag;
                 // control state switch
                 std::weak_ptr<INodeState> p1(pstate);
-                pstate->expired(context);
+                pstate->expired(*pcontext);
                 if(pstate == p1.lock()) {
                     // expired state did not change to another one, do it now
                     std::cout << "Core: there is no state set on expiration of " << pstate->name() << std::endl;
@@ -178,20 +179,4 @@ namespace slv2
         return (0 == crypto_sign_ed25519_verify_detached((uint8_t *) signature.data(), message.data(), message.size(), pub_key.data()) );
     }
 
-    // SolverCore::Context implementation
-    
-    uint8_t SolverContext::own_conf_number() const
-    {
-        return core.pnode->getMyConfNumber();
-    }
-
-    size_t SolverContext::cnt_trusted() const
-    {
-        return core.pnode->getConfidants().size();
-    }
-
-    void SolverContext::spawn_next_round()
-    {
-        core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash));
-    }
 } // slv2

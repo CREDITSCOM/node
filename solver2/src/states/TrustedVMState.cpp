@@ -1,7 +1,7 @@
 #include "TrustedVMState.h"
-#include "../SolverCore.h"
+#include "../SolverContext.h"
 #include "../Node.h"
-#include <Solver/Generals.hpp>
+#include "../Generals.h"
 #include "Consensus.h"
 
 #include <iostream>

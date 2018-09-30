@@ -1,5 +1,5 @@
 #include "WriteState.h"
-#include "../SolverCore.h"
+#include "../SolverContext.h"
 #include "../Node.h"
 #include "Consensus.h"
 

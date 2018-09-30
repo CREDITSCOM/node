@@ -28,6 +28,7 @@ namespace slv2
         StatePtr pWrite = std::make_shared<WriteState>();
         StatePtr pRTH = std::make_shared<HandleRTState>();
         StatePtr pBB = std::make_shared<HandleBBState>();
+        // start with that:
         pstate = std::make_shared<NoState>();
 
         std::pair<Event, StatePtr> defaultRT { Event::RoundTable, pRTH };
