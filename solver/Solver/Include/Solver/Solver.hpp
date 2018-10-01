@@ -203,6 +203,7 @@ typedef std::string Matrix;
 
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
+    csdb::Pool removeTransactionsWithBadSignatures(const csdb::Pool& pool);
 		
 		std::vector<uint8_t> myPublicKey;
 		std::vector<uint8_t> myPrivateKey;

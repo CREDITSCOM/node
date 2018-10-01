@@ -294,19 +294,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 
 	if (transaction.is_valid())
 	{
-#ifndef SPAMMER
-
-		if (transaction.verify_signature())
-		{
-#endif
 			v_pool.add_transaction(transaction);
-#ifndef SPAMMER
-		}
-		else
-		{
-			LOG_EVENT("Wrong signature");
-		}
-#endif
 	}
 #ifdef MYLOG
 	else
@@ -335,7 +323,7 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
-  csdb::Pool pool(_pool);
+  csdb::Pool pool = removeTransactionsWithBadSignatures(_pool);
   fee_counter_.CountFeesInPool(node_, &pool);
   Hash_ result = generals->buildvector(pool, m_pool, b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
@@ -907,4 +895,16 @@ void Solver::nextRound()
     flushTransactions();
   }
 }
+
+csdb::Pool Solver::removeTransactionsWithBadSignatures(const csdb::Pool& pool)
+{
+  csdb::Pool good_pool;
+  std::vector<csdb::Transaction> transactions = pool.transactions();
+  for (int i = 0; i < transactions.size(); ++i) {
+    if (transactions[i].verify_signature())
+      good_pool.add_transaction(transactions[i]);
+  }
+  return good_pool;
+}
+
 } // namespace Credits
