@@ -22,9 +22,6 @@
 
 #include <lib/system/logger.hpp>
 
-#include <base58.h>
-#include <sodium.h>
-
 #ifdef SPAMMER
   static const int NUM_OF_SPAM_KEYS = 10;
 #endif
@@ -909,12 +906,5 @@ void Solver::nextRound()
     m_pool_closed = true;
     flushTransactions();
   }
-}
-
-bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32],
-									uint8_t* message, size_t message_len)
-{
-	// if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
-	return !crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
 }
 } // namespace Credits

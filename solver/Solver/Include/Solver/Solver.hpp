@@ -203,8 +203,6 @@ typedef std::string Matrix;
 
 		void writeNewBlock();
     void prepareBlockForSend(csdb::Pool& block);
-
-		bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 		
 		std::vector<uint8_t> myPublicKey;
 		std::vector<uint8_t> myPrivateKey;

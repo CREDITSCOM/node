@@ -24,7 +24,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 target_include_directories(Solver PUBLIC Include)
 
-target_link_libraries (Solver csconnector csdb csnode base58 libsodium)
+target_link_libraries (Solver csconnector csdb csnode)
 
 if(SOLVER_TEST_BUILD)
     add_subdirectory(Tests)
