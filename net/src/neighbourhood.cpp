@@ -425,8 +425,6 @@ void Neighbourhood::resendPackets() {
     else
       ++cnt;
   }
-
-  //LOG_DEBUG("TPTR: " << cnt);
 }
 
 ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
