@@ -13,7 +13,9 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     if (ipv6) sock.set_option(ip::v6_only(false));
 
     sock.set_option(ip::udp::socket::reuse_address(true));
+#ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(Packet::MaxSize));
+#endif
 
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
