@@ -14,7 +14,9 @@ namespace slv2
 
         context.node().becomeWriter();
 
-        std::cout << name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")" << std::endl;
+        if(Consensus::Log) {
+            std::cout << name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")" << std::endl;
+        }
         context.make_and_send_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
     }
@@ -26,13 +28,21 @@ namespace slv2
             if(hash == *pown) {
                 context.recv_hash_from(sender);
                 not_enough--;
+                if(Consensus::Log) {
+                    std::cout << name() << ": hash received (" << context.cnt_hash_recv() << "), " << not_enough << " more need" << std::endl;
+                }
             }
             else {
-                std::cout << name() << ": hashes do not match!!!" << std::endl;
+                if(Consensus::Log) {
+                    std::cout << name() << ": hash received do not match!!!" << std::endl;
+                }
             }
         }
         if(not_enough <= 0) {
             // received enough hashes
+            if(Consensus::Log) {
+                std::cout << name() << ": request new round" << std::endl;
+            }
             context.spawn_next_round();
             return Result::Finish;
         }

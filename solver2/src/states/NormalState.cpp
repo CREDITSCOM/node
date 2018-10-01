@@ -1,5 +1,6 @@
 #include "NormalState.h"
 #include "../SolverContext.h"
+#include "../Node.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
 
@@ -13,15 +14,27 @@ namespace slv2
 
         if(context.is_spammer()) {
             // in fact, pctx ic not less "alive" as a context.scheduler itself :-)
+            if(Consensus::Log) {
+                std::cout << name() << ": started spam transactions every " << T_spam_trans << " msec" << std::endl;
+            }
             tag_spam = context.scheduler().InsertPeriodic(T_spam_trans, [this, pctx]() {
                 csdb::Transaction tr;
                 setup(&tr, pctx);
                 pctx->add(tr);
+                //if(Consensus::Log) {
+                //    std::cout << name() << ": added spam transaction" << std::endl;
+                //}
             }, true);
         }
 
-        tag_flush = context.scheduler().InsertPeriodic(Consensus::T_flush_trans, [pctx]() {
+        if(Consensus::Log) {
+            std::cout << name() << ": started flush transactions every " << Consensus::T_coll_trans << " msec" << std::endl;
+        }
+        tag_flush = context.scheduler().InsertPeriodic(Consensus::T_coll_trans, [this, pctx]() {
             pctx->flush_transactions();
+            //if(Consensus::Log) {
+            //    std::cout << name() << ": flushing transactions" << std::endl;
+            //}
         }, true);
 
     }
@@ -29,20 +42,33 @@ namespace slv2
     void NormalState::off(SolverContext& context)
     {
         if(CallsQueueScheduler::no_tag != tag_spam) {
+            if(Consensus::Log) {
+                std::cout << name() << ": stop spam transactions" << std::endl;
+            }
             context.scheduler().Remove(tag_spam);
             tag_spam = CallsQueueScheduler::no_tag;
         }
 
         if(CallsQueueScheduler::no_tag != tag_flush) {
+            if(Consensus::Log) {
+                std::cout << name() << ": stop flush transactions" << std::endl;
+            }
             context.scheduler().Remove(tag_flush);
             tag_flush = CallsQueueScheduler::no_tag;
         }
     }
 
-    Result NormalState::onRoundTable(SolverContext& /*context*/, const uint32_t round)
+    Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
     {
-        std::cout << name() << ": round table received: " << round << std::endl;
-        return Result::Finish;
+        Result res = DefaultStateBehavior::onBlock(context, block, sender);
+        if(res == Result::Finish) {
+            Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
+            context.node().sendHash(test_hash, sender);
+            if(Consensus::Log) {
+                std::cout << name() << ": sending hash in reply to block sender" << std::endl;
+            }
+        }
+        return res;
     }
 
     int NormalState::randFT(int min, int max)

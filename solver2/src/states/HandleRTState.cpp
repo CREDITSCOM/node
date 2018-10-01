@@ -15,12 +15,21 @@ namespace slv2
                 context.become_normal();
                 break;
             case NodeLevel::Writer:
-                std::cout << name() << " warning: node must not become writer through round table" << std::endl;
+                if(Consensus::Log) {
+                    std::cout << name() << " warning: node must not become writer through round table" << std::endl;
+                }
                 context.become_writer();
                 break;
             case NodeLevel::Main:
+                if(Consensus::Log) {
+                    std::cout << name() << " warning: node may become a main (collector) through round table only as a BigBang or the 1st round result" << std::endl;
+                }
+                context.become_collector();
+                break;
             default:
-                std::cout << name() << " error: unexpected NodeLevel() result from Node" << std::endl;
+                if(Consensus::Log) {
+                    std::cout << name() << " error: unexpected getMyLevel() result from Node" << std::endl;
+                }
                 break;
         }
     }

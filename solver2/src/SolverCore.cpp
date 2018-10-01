@@ -21,12 +21,13 @@ namespace slv2
         // options
         , opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
-        , opt_is_proxy_v1(true)
+        , opt_is_proxy_v1(false)
         // consensus data
         , cur_round(0)
         , pnode(nullptr)
         , pgen(nullptr)
         , pown_hvec(std::make_unique<Credits::HashVector>())
+        , last_trans_list_recv(0)
     {
         InitTransitions();
     }
@@ -46,6 +47,9 @@ namespace slv2
 
     void SolverCore::start()
     {
+        if(Consensus::Log) {
+            std::cout << "SolverCore: starting in " << (opt_is_proxy_v1 ? "proxy" : "standalone") << " mode" << std::endl;
+        }
         req_stop = false;
         handleTransitions(Event::Start);
     }
@@ -76,14 +80,14 @@ namespace slv2
         }
         
         pstate->off(*pcontext);
-        std::cout << "Core: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
+        std::cout << "SolverCore: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
         pstate = pState;
         pstate->on(*pcontext);
         
         // timeout hadling
         if(opt_timeouts_enabled) {
             tag_state_expired = scheduler.InsertOnce(Consensus::DefaultStateTimeout, [this]() {
-                std::cout << "Core: state " << pstate->name() << " is expired" << std::endl;
+                std::cout << "SolverCore: state " << pstate->name() << " is expired" << std::endl;
                 // clear flag to know timeout expired
                 tag_state_expired = CallsQueueScheduler::no_tag;
                 // control state switch
@@ -91,7 +95,7 @@ namespace slv2
                 pstate->expired(*pcontext);
                 if(pstate == p1.lock()) {
                     // expired state did not change to another one, do it now
-                    std::cout << "Core: there is no state set on expiration of " << pstate->name() << std::endl;
+                    std::cout << "SolverCore: there is no state set on expiration of " << pstate->name() << std::endl;
                     //setNormalState();
                 }
             }, true);
@@ -101,11 +105,11 @@ namespace slv2
     void SolverCore::handleTransitions(Event evt)
     {
         if(Event::BigBang == evt) {
-            std::cout << "Core: BigBang on" << std::endl;
+            std::cout << "SolverCore: BigBang on" << std::endl;
         }
         const auto& variants = transitions [pstate];
         if(variants.empty()) {
-            std::cout << "Core: there are no transitions for " << pstate->name() << std::endl;
+            std::cout << "SolverCore: there are no transitions for " << pstate->name() << std::endl;
             return;
         }
         auto it = variants.find(evt);
@@ -119,7 +123,7 @@ namespace slv2
     bool SolverCore::stateCompleted(Result res)
     {
         if(Result::Failure == res) {
-            std::cout << "Core: handler error in state " << pstate->name() << std::endl;
+            std::cout << "SolverCore: error in state " << pstate->name() << std::endl;
         }
         return (Result::Finish == res);
     }
@@ -130,20 +134,19 @@ namespace slv2
     {
         addTimestampToPool(m_pool);
         m_pool.set_writer_public_key(public_key);
-        m_pool.sign(private_key);
+
+        sendBlock(m_pool, false);
+
         pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
         pnode->getBlockChain().putBlock(m_pool);
         
-        sendBlock(m_pool, false);
-        //std::cout << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence()) << std::endl;// ", last time:" << node_->getBlockChain().loadBlock(node_->getBlockChain().getLastHash()).user_field(0).value<std::string>().c_str() 
-        //std::cout << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!" << std::endl;
-        //std::cout << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str() << std::endl;
     }
 
     void SolverCore::sendBlock(csdb::Pool& pool, bool isBad /*= false*/)
     {
         pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
         pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        m_pool.sign(private_key);
         if(isBad) {
             pnode->sendBadBlock(pool);
         }

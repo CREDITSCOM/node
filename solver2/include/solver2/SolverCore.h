@@ -114,7 +114,8 @@ namespace slv2
             Expired,
             SetNormal,
             SetTrusted,
-            SetWriter
+            SetWriter,
+            SetCollector
         };
 
         using StatePtr = std::shared_ptr<INodeState>;
@@ -144,6 +145,9 @@ namespace slv2
         std::set<uint8_t> recv_matr;
         // senders of hashes received this round
         std::vector<PublicKey> recv_hash;
+
+        // sequence number of the last transaction received
+        uint64_t last_trans_list_recv;
 
         // pool for collecting "own" transactions
         csdb::Pool m_pool {};

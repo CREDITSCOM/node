@@ -21,7 +21,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
 
         const char * name() const override
         {

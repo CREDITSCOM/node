@@ -11,6 +11,9 @@ namespace slv2
     void TrustedVMState::on(SolverContext& context)
     {
         if(decide_to_write(context)) {
+            if(Consensus::Log) {
+                std::cout << name() << ": request to become writing node" << std::endl;
+            }
             // let context switch state
             context.become_writer();
         }
@@ -39,11 +42,15 @@ namespace slv2
             context.node().getBlockChain().getHashBySequence(context.node().getRoundNumber() - 1)
         );
         if(Consensus::GeneralNotSelected == wTrusted) {
-            // std::cout << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!" << std::endl;
+            if(Consensus::Log) {
+                std::cout << name() << ": consensus has not been reached" << std::endl;
+            }
             //TODO: scheduleWriteNewBlock(T_coll_trans);
         }
         else {
-            // std::cout << "SOLVER> wTrusted = " << (int)wTrusted << std::endl;
+            if(Consensus::Log) {
+                std::cout << name() << ": consensus has been reached" << std::endl;
+            }
             return (wTrusted == context.own_conf_number());
         }
         return false;

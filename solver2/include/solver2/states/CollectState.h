@@ -1,5 +1,6 @@
 #pragma once
 #include "DefaultStateBehavior.h"
+#include "Solver/CallsQueueScheduler.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"
@@ -24,7 +25,18 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        void off(SolverContext& context) override;
+        /**
+         * @fn  virtual void final::onRoundEnd(SolverContext& context) override;
+         *
+         * @brief   Cancel round timeout if set. Sends list of transactions collected this round
+         *
+         * @author  aae
+         * @date    01.10.2018
+         *
+         * @param [in,out]  context The context.
+         */
+
+        virtual void onRoundEnd(SolverContext& context) override;
 
         Result onTransaction(SolverContext& context, const csdb::Transaction& tr) override;
 
@@ -39,6 +51,7 @@ namespace slv2
 
         size_t cnt_transactions { 0 };
         csdb::Pool pool;
+        CallsQueueScheduler::CallTag tag_timeout;
     };
 
 } // slv2

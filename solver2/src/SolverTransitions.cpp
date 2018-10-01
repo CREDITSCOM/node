@@ -57,13 +57,14 @@ namespace slv2
             defaultRT, defaultBB, { Event::SetWriter, pWrite }
         } },
         { pCollect, {
-            { Event::RoundTable, pNormal }, defaultBB
+            // the last transition is for the 1st round: allow to become writer and spawn close the 1st round
+            { Event::RoundTable, pNormal }, defaultBB, { Event::SetWriter, pWrite }
         } },
         { pWrite, {
-            { Event::RoundTable, pCollect }, { Event::Hashes, pCollect }, defaultBB
+            { Event::RoundTable, pCollect }/*defaultRT*/, { Event::Hashes, pCollect }, defaultBB
         } },
         { pRTH, {
-            { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, defaultBB
+            { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, { Event::SetCollector, pCollect }, defaultBB
         } },
         { pBB, {
             { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, defaultRT

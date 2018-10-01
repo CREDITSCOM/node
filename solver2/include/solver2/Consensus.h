@@ -6,10 +6,13 @@ class Consensus
 {
 public:
 
+
+    /** @brief   Set the flag to log solver-with-state info to console*/
+    constexpr static bool Log = true;
+
     constexpr static unsigned int DefaultStateTimeout = 5000;
 
     constexpr static unsigned int MinTrustedNodes = 3;
-
 
     /** @brief   The general (Writer->General) is not selected by "generals" */
     constexpr static uint8_t GeneralNotSelected = 100;

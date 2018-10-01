@@ -26,6 +26,8 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
+        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+
         const char * name() const override
         {
             return "Trusted";
@@ -35,9 +37,6 @@ namespace slv2
 
         bool test_vectors_completed(const SolverContext& context) const;
         bool test_matrices_completed(const SolverContext& context) const;
-
-        // флаг получения списка транзакций в текущем раунде, в начале раунда сбрасывается
-        bool is_trans_list_recv { false };
 
     };
 

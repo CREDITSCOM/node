@@ -55,10 +55,21 @@ namespace slv2
 
         inline void become_writer();
 
+        /**
+         * @fn  inline void SolverContext::become_collector();
+         *
+         * @brief   Request to become collector (main node)
+         *
+         * @author  aae
+         * @date    01.10.2018
+         */
+
+        inline void become_collector();
+
         /// <summary>   Inform that receive enough vectors. </summary>
         ///
         /// <remarks>   Aae, 30.09.2018. </remarks>
-
+        
         inline void vectors_completed();
 
         /// <summary>   Inform that receive enough matrices. </summary>
@@ -325,6 +336,11 @@ namespace slv2
     void SolverContext::become_writer()
     {
         core.handleTransitions(SolverCore::Event::SetWriter);
+    }
+
+    void SolverContext::become_collector()
+    {
+        core.handleTransitions(SolverCore::Event::SetCollector);
     }
 
     void SolverContext::vectors_completed()

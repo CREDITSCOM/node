@@ -5,10 +5,11 @@
 namespace slv2
 {
 
-    void HandleBBState::on(SolverContext& context)
+    void HandleBBState::on(SolverContext& /*context*/)
     {
-        std::cout << "do specific actions on BigBang" << std::endl;
-        context.become_normal();
+        if(Consensus::Log) {
+            std::cout << "do specific actions on BigBang" << std::endl;
+        }
     }
 
 }
