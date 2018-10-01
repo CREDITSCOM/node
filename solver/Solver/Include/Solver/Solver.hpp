@@ -239,7 +239,6 @@ class Solver {
 
   size_t                         rNum = 0;
   std::mutex                     m_trans_mut;
-  std::vector<csdb::Transaction> m_transactions;
   csdb::Pool                     m_transactions_;
 
   /*to store new blocks*/

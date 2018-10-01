@@ -216,13 +216,13 @@ void Solver::flushTransactions() {
   }
   {
     std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
+    if (m_transactions_.transactions().size()) {
+      node_->sendTransaction(std::move(m_transactions_));
       sentTransLastRound = true;
 #ifdef MYLOG
       std::cout << "FlushTransaction ..." << std::endl;
 #endif
-      m_transactions.clear();
+      m_transactions_.transactions().clear();
     } else {
       return;
     }
@@ -737,7 +737,7 @@ void Solver::spamWithTransactions() {
 #endif
         {
           std::lock_guard<std::mutex> l(m_trans_mut);
-          m_transactions.push_back(transaction);
+          m_transactions_.transactions().push_back(transaction);
         }
         iid++;
       }
@@ -754,7 +754,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   // TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   // TRACE("");
-  m_transactions.push_back(transaction);
+  m_transactions_.transactions().push_back(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -773,7 +773,7 @@ void Solver::addInitialBalance() {
 
   {
     std::lock_guard<std::mutex> l(m_trans_mut);
-    m_transactions.push_back(transaction);
+    m_transactions_.transactions().push_back(transaction);
   }
 
 #ifdef SPAMMER
