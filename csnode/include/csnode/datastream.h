@@ -36,6 +36,8 @@ namespace cs
     {
     public:
         explicit DataStream(char* packet, std::size_t dataSize);
+        explicit DataStream(const char* packet, std::size_t dataSize);
+        explicit DataStream(const uint8_t* packet, std::size_t dataSize);
 
         /*!
             Try to get enpoint from data

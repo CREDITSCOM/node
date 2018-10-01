@@ -223,23 +223,23 @@ Hash Solver::getCharacteristicHash() const {
 }
 
 std::vector<uint8_t> Solver::getSignedNotification() {
-  std::vector<uint8_t> message;
+  std::vector<uint8_t> result;
   constexpr size_t signatureLength = 64;
 
-  message.insert(message.end(), getCharacteristicHash().str, getCharacteristicHash().str + HASH_LENGTH);
-  message.insert(message.end(), getWriterPublicKey().str, getWriterPublicKey().str + signatureLength);
+  result.insert(result.end(), getCharacteristicHash().str, getCharacteristicHash().str + HASH_LENGTH);
+  result.insert(result.end(), getWriterPublicKey().str,    getWriterPublicKey().str    + signatureLength);
 
-  assert(message.size() == (PUBLIC_KEY_LENGTH + signatureLength));
+  assert(result.size() == (HASH_LENGTH + signatureLength));
 
-  std::vector<uint8_t> result(message.size());
-  unsigned long long   siglen = result.size();
+  std::vector<uint8_t> signature(result.size());
+  unsigned long long   siglen = 0;
 
-  std::vector<uint8_t> mask     = generals->getCharacteristic().mask;
-  unsigned long long   maskSize = mask.size();
+  crypto_sign_detached(signature.data(), &siglen, result.data(), result.size(), myPrivateKey.data());
 
-  std::vector<uint8_t> nodePrivateKey = myPrivateKey;
+  assert(signatureLength == siglen);
 
-  crypto_sign_detached(result.data(), &siglen, mask.data(), maskSize, myPrivateKey.data());
+  result.insert(result.end(), signature.begin(), signature.end());
+
   return result;
 }
 
