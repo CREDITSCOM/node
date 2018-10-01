@@ -298,11 +298,8 @@ void Solver::gotTransaction(csdb::Transaction&& transaction)
 	if (transaction.is_valid())
 	{
 #ifndef SPAMMER
-		std::vector<uint8_t>	message		= transaction.to_byte_stream_for_sig();
-		std::vector<uint8_t>	public_key	= transaction.source().public_key();
-		std::string				signature	= transaction.signature();
 
-		if (verify_signature((uint8_t *)signature.data(), public_key.data(), message.data(), message.size()))
+		if (transaction.verify_signature())
 		{
 #endif
 			v_pool.add_transaction(transaction);

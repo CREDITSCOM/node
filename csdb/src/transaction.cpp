@@ -11,6 +11,7 @@
 #include "csdb/currency.h"
 #include "csdb/pool.h"
 #include "csdb/internal/types.h"
+#include <sodium.h>
 
 #include "priv_crypto.h"
 
@@ -375,6 +376,16 @@ Transaction::to_byte_stream() const
   ::csdb::priv::obstream os;
   put(os);
   return os.buffer();
+}
+
+bool
+Transaction::verify_signature() const
+{
+  // if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
+  return !crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(this->signature().data()),
+                                              this->to_byte_stream_for_sig().data(),
+                                              this->to_byte_stream_for_sig().size(),
+                                              this->source().public_key().data());
 }
 
 std::vector<uint8_t>

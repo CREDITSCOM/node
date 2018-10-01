@@ -130,6 +130,8 @@ public:
   std::vector<uint8_t> to_byte_stream() const;
   std::vector<uint8_t> to_byte_stream_for_sig() const;
 
+  bool verify_signature() const;
+
   /**
    * @brief Добавляет дополнительное произвольное поле к транзакции
    * @param[in] id    Идентификатор дополнительного поля
