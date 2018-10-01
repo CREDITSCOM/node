@@ -6,6 +6,7 @@
 #include <string>
 #include <nodecore.h>
 #include <algorithm>
+#include <type_traits>
 
 namespace cs
 {
@@ -358,6 +359,7 @@ namespace cs
     template<typename T>
     inline DataStream& operator<<(DataStream& stream, const T& streamField)
     {
+        static_assert(std::is_trivial<T>::value, "template parameter to must be trivial. Overload this function for non-trivial type");
         stream.setStreamField(streamField);
         return stream;
     }
@@ -396,6 +398,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const std::vector<uint8_t>& data)
     {
         stream.addVector(data);
+        return stream;
+    }
+
+    /*!
+        Writes std::string to stream
+    */
+    inline DataStream& operator<<(DataStream& stream, const std::string& data)
+    {
+        stream.addString(data);
         return stream;
     }
 }
