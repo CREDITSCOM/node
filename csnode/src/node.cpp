@@ -259,14 +259,10 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
       solver_->gotTransaction(std::move(t));
     }
   }
-
-  if (!istream_.good()) {
-    LOG_WARN("Bad transaction packet format");
-    return;
-  }
 }
 
 void Node::sendTransaction(csdb::Pool&& transactions) {
+  transactions.recount();
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
   composeMessageWithBlock(transactions, MsgTypes::Transactions);
   flushCurrentTasks();

@@ -222,7 +222,7 @@ void Solver::flushTransactions() {
 #ifdef MYLOG
       std::cout << "FlushTransaction ..." << std::endl;
 #endif
-      m_transactions_.transactions().clear();
+      m_transactions_ = csdb::Pool {};
     } else {
       return;
     }
