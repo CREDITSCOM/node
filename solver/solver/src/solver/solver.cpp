@@ -98,9 +98,9 @@ void Solver::prepareBlockForSend(csdb::Pool& block) {
   block.set_previous_hash(prev_hash);
   block.sign(myPrivateKey);
 
-  csdebug() << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence());
-  csdebug() << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!";
-  csdebug() << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str();
+  cslog() << "last sequence: " << (node_->getBlockChain().getLastWrittenSequence());
+  cslog() << "prev_hash: " << node_->getBlockChain().getLastHash().to_string() << " <- Not sending!!!";
+  cslog() << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str();
 }
 
 void Solver::sendTL() {
@@ -204,14 +204,14 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
   if (sequence == node_->getBlockChain().getLastWrittenSequence() + 1) {
     node_->getBlockChain().putBlock(m_pool);
+
 #ifndef MONITOR_NODE
     if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
-      auto binary = node_->getBlockChain().getLastWrittenHash().to_binary();
-      Hash test_hash = reinterpret_cast<char*>(binary.data());;
+      auto hash = node_->getBlockChain().getLastWrittenHash().to_string();
 
-      node_->sendHash(test_hash, sender);
+      node_->sendHash(hash, sender);
 
-      cslog() << "SENDING HASH to writer: " << cs::Utils::byteStreamToHex(test_hash.str, 32);
+      cslog() << "SENDING HASH to writer: " << hash;
     }
 #endif
   }
@@ -466,7 +466,7 @@ void Solver::gotRound(cs::RoundInfo&& round) {
 
 void Solver::buildTransactionList() {
   cslog() << "BuildTransactionlist";
-  csdb::Pool pool = csdb::Pool{};
+  csdb::Pool pool = csdb::Pool{};       // FIX TO PACKET
 
   for (const auto& hash : m_roundInfo.hashes) {
     if (!m_hashTable.contains(hash)) {
@@ -628,7 +628,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
 
     if (m_writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
-      cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
+      //cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
     } else {
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
       consensusAchieved = true;
@@ -645,6 +645,10 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
           const std::vector<uint8_t>& mask           = characteristic.mask;
 
           node_->sendCharacteristic(emptyMetaPool, bitsCount, mask);
+
+          m_pool.set_sequence(emptyMetaPool.sequence());
+          m_pool.add_user_field(0, emptyMetaPool.user_field(0));
+
           writeNewBlock();
         });
       }
@@ -652,17 +656,19 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   }
 }
 
-// what block does this function write???
 void Solver::writeNewBlock() {
-  csdebug() << "Solver -> writeNewBlock ... start";
+  cslog() << "Solver -> writeNewBlock ... start";
+
   if (consensusAchieved && node_->getMyLevel() == NodeLevel::Writer) {
-    prepareBlockForSend(m_pool);
-    node_->sendBlock(m_pool);
+
     node_->getBlockChain().putBlock(m_pool);
     node_->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
+
     b_pool.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+
     auto prev_hash = csdb::PoolHash::from_string("");
     b_pool.set_previous_hash(prev_hash);
+
     consensusAchieved = false;
   }
 }
@@ -692,14 +698,15 @@ void Solver::gotBlockCandidate(csdb::Pool&& block) {
   blockCandidateArrived = true;
 }
 
-void Solver::gotHash(Hash& hash, const PublicKey& sender) {
+void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
   if (round_table_sent) {
     return;
   }
 
-  Hash myHash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));
+  std::string myHash = node_->getBlockChain().getLastWrittenHash().to_string();
 
-  csdebug() << "Solver -> My Hash: " << cs::Utils::debugByteStreamToHex(myHash.str, 32);
+  cslog() << "Solver -> My Hash: " << myHash;
+  cslog() << "Solver -> Received hash:" << hash;
 
   if (ips.size() <= min_nodes) {
     if (hash == myHash) {
@@ -726,7 +733,7 @@ void Solver::gotHash(Hash& hash, const PublicKey& sender) {
       }
     }
 
-    m_roundInfo.round      = ++rNum;
+    m_roundInfo.round++;
     m_roundInfo.confidants = std::move(ips);
     m_roundInfo.general    = node_->getMyPublicKey();
     m_roundInfo.hashes     = std::move(hashes);

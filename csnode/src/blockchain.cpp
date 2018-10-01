@@ -530,6 +530,7 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
 
   csdebug() << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str();
   csdebug() << " Last      hash: " << lastHash_.to_string();
+  cslog() << pool.hash().to_string();
   csdebug() << "Checking Sequence ... ";
 
   if (pool.sequence() == getLastWrittenSequence() + 1) {

@@ -702,15 +702,16 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
   composeMessageWithBlock(pool, MsgTypes::NewBadBlock);
 }
 
-// istream_ >> compressedSize >> compressed >> metaInfoPool >> maskBitsCount;
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
   if (myLevel_ != NodeLevel::Writer) {
     return;
   }
 
+  cslog() << "Get hash size: " << size;
+
   istream_.init(data, size);
 
-  Hash hash;
+  std::string hash;
   istream_ >> hash;
 
   if (!istream_.good() || !istream_.end()) {
@@ -718,7 +719,7 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
     return;
   }
 
-  solver_->gotHash(hash, sender);
+  solver_->gotHash(std::move(hash), sender);
 }
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
@@ -954,15 +955,16 @@ void Node::sendNotificationToWriter() {
   flushCurrentTasks();
 }
 
-void Node::sendHash(const Hash& hash, const PublicKey& target) {
+void Node::sendHash(const std::string& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
     cserror() << "Writer and Main node shouldn't send hashes";
     return;
   }
 
   cswarning() << "Sending hash of " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.str, 32);
+  cslog() << "Hash is " << hash;
 
-  ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
+  ostream_.init(BaseFlags::Fragmented, target);
   ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
 
   flushCurrentTasks();

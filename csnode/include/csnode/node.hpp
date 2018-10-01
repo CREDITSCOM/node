@@ -69,7 +69,7 @@ class Node {
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
   void sendBlock(const csdb::Pool&);
-  void sendHash(const Hash&, const PublicKey&);
+  void sendHash(const std::string&, const PublicKey&);
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
