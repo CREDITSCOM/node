@@ -935,9 +935,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size) {
-  istream_.init(data, size);
+  cs::DataStream stream(data, size);
 
-  // TODO! Your codes here...
+  std::vector<uint8_t> notification;
+
+  stream >> notification;
 }
 
 void Node::sendNotificationToWriter() {
@@ -945,11 +947,9 @@ void Node::sendNotificationToWriter() {
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
 
-  cs::DynamicBuffer data(HASH_LENGTH + PUBLIC_KEY_LENGTH);
-  cs::DataStream    stream(*data, data.size());
+  std::vector<uint8_t> notification = solver_->getSignedNotification();
 
-  stream << solver_->getSignedNotification(); // need to code review
-  ostream_ << std::string(stream.data(), stream.size());
+  ostream_ << std::string(notification.begin(), notification.end());
 
   flushCurrentTasks();
 }

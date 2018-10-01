@@ -21,6 +21,16 @@ cs::DataStream::DataStream(char* packet, std::size_t dataSize):
     mHead = mData;
 }
 
+cs::DataStream::DataStream(const char* packet, std::size_t dataSize):
+    DataStream(const_cast<char*>(packet), dataSize)
+{
+}
+
+cs::DataStream::DataStream(const uint8_t* packet, std::size_t dataSize):
+    DataStream(reinterpret_cast<const char*>(packet), dataSize)
+{
+}
+
 boost::asio::ip::udp::endpoint cs::DataStream::endpoint()
 {
     char flags = *(mData + mIndex);
