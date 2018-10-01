@@ -985,16 +985,10 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
   uint32_t    bSize;
   const void* data = const_cast<cs::TransactionsPacket&>(packet).to_byte_stream(bSize);
 
-  cslog() << "Sending transaction packet: size: " << bSize;
-
   std::string compressed;
   snappy::Compress((const char*)data, bSize, &compressed);
 
   ostream_ << MsgTypes::TransactionPacket << compressed;
-
-  cslog() << "Sending transaction packet: compressed size: " << compressed.size();
-
-  cslog() << "NODE> Sending " << packet.transactions_count() << " transaction(s)";
 
   flushCurrentTasks();
 }

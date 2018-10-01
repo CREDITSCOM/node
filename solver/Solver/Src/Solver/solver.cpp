@@ -322,17 +322,14 @@ void Solver::flushTransactions() {
 
   for (auto& packet : m_transactionsBlock) {
     auto trxCount = packet.transactions_count();
-    cslog() << "Transactions in packet: " << trxCount;
 
-    if (trxCount != 0 && packet.hash().is_empty()) {
+    if (trxCount != 0) {
       // SUPER KOSTIL //TODO fix kostil
       packet.set_storage(node_->getBlockChain().getStorage());
 
       bool composed = packet.compose();
       node_->sendTransactionsPacket(packet);
       sentTransLastRound = true;
-
-      csdebug() << "Transaction flushed";
 
       auto hash = packet.hash();
 
@@ -343,6 +340,8 @@ void Solver::flushTransactions() {
       }
     }
   }
+
+  cslog() << "All transaction packets flushed";
 
   m_transactionsBlock.clear();
 }
@@ -837,7 +836,7 @@ void Solver::spamWithTransactions() {
     if (spamRunning && (node_->getMyLevel() == Normal)) {
       if ((node_->getRoundNumber() < 10) || (node_->getRoundNumber() > 20)) {
         transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-        transaction.set_comission(csdb::Amount(0, 1, 10));
+        //transaction.set_comission(csdb::Amount(0, 1, 10));
         transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
         transaction.set_innerID(iid);
         addTransaction(transaction);
