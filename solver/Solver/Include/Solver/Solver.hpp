@@ -66,7 +66,7 @@ struct HashVector {
 struct HashMatrix {
   uint8_t Sender;
   // uint32_t roundNum;
-  HashVector hmatr[100];
+  HashVector hmatr[5];
   Signature  sig;
 };
 struct NormalState {

@@ -316,14 +316,15 @@ void                     Transport::processNodeMessage(const Message& msg) {
 
 bool Transport::shouldSendPacket(const Packet& pack) {
   if (pack.isNetwork()) return false;
+  const auto rLim = std::max(node_->getRoundNumber(), (RoundNum)1) - 1;
 
-  if (!pack.isFragmented()) return pack.getRoundNum() >= node_->getRoundNumber();
+  if (!pack.isFragmented()) return pack.getRoundNum() >= rLim;
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0)
     rn = pack.getRoundNum();
 
-  return !rn || rn >= node_->getRoundNumber();
+  return !rn || rn >= rLim;
 }
 
 void Transport::processNodeMessage(const Packet& pack) {

@@ -57,7 +57,7 @@ bool Neighbourhood::canHaveNewConnection() {
 
 void Neighbourhood::checkPending() {
   SpinLock l1(mLockFlag_);
-  LOG_DEBUG("CONNECTIONS: ");
+  //LOG_DEBUG("CONNECTIONS: ");
   // If the connection cannot be established, retry it
   for (auto conn = connections_.begin();
        conn != connections_.end();
@@ -67,16 +67,17 @@ void Neighbourhood::checkPending() {
       transport_->sendRegistrationRequest(****conn);
 
   }
-  for (auto conn = connections_.begin();
+  /*for (auto conn = connections_.begin();
        conn != connections_.end();
        ++conn) {
     LOG_DEBUG((conn->data)->id << ". " << (conn->data).get() << ": " << (conn->data)->in << " : " << (conn->data)->out << " ~ " << (conn->data)->specialOut << " ~ " << (conn->data)->connected << " ~ " << (conn->data)->node.get());
-  }
+  }*/
 
-  SpinLock l2(nLockFlag_);
+  /*SpinLock l2(nLockFlag_);
   LOG_DEBUG("NEIGHBOURS: ");
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
     LOG_DEBUG(conn->get() << " : " << (*conn)->in << " : " << (*conn)->getOut() << " : " << (*conn)->id << " ~ " << (bool)(*conn)->node);
+*/
 }
 
 void Neighbourhood::refreshLimits() {
@@ -425,7 +426,7 @@ void Neighbourhood::resendPackets() {
       ++cnt;
   }
 
-  LOG_DEBUG("TPTR: " << cnt);
+  //LOG_DEBUG("TPTR: " << cnt);
 }
 
 ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {

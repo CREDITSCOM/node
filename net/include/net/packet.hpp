@@ -195,7 +195,7 @@ typedef MemPtr<TypedSlot<Message>> MessagePtr;
 
 class PacketCollector {
 public:
-  static const uint32_t MaxParallelCollections = 64;
+  static const uint32_t MaxParallelCollections = 1024;
 
   PacketCollector():
     msgAllocator_(MaxParallelCollections + 1) { }
