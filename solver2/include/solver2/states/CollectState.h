@@ -52,6 +52,8 @@ namespace slv2
         size_t cnt_transactions { 0 };
         csdb::Pool pool;
         CallsQueueScheduler::CallTag tag_timeout;
+
+        void do_send_tl(SolverContext& context, uint64_t sequence);
     };
 
 } // slv2

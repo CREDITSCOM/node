@@ -24,15 +24,8 @@ namespace slv2
         // on the start of the second round someone has to send TL, CollectState is always single in the network, so we send TL
         // also, if we have unsent transactions from previous rounds, also can send them
         if(cur_round == 2) {
-            if(Consensus::Log) {
-                std::cout << name() << ": on start of the 2nd round I have " << pool.transactions_count() << " transactions unsent, sending" << std::endl;
-            }
-            pool.set_sequence(cur_round - 1);
-            context.node().sendTransactionList(pool);
+            do_send_tl(context, cur_round - 1);
         }
-        //pool.clear();
-        //// таким способом pool обнуляются в solver.v1, видимо, так надежнее :-)
-        //pool = csdb::Pool {};
         if(Consensus::Log) {
             std::cout << name() << ": starting to collect transactions" << std::endl;
         }
@@ -44,11 +37,7 @@ namespace slv2
             context.scheduler().Remove(tag_timeout);
             tag_timeout = CallsQueueScheduler::no_tag;
         }
-        if(Consensus::Log) {
-            std::cout << name() << ": transaction list of " << pool.transactions_count() << " is collected, sending with " << context.round() << " #sequence" << std::endl;
-        }
-        pool.set_sequence(context.round());
-        context.node().sendTransactionList(pool);
+        do_send_tl(context, context.round());
     }
 
     Result CollectState::onTransaction(SolverContext& context, const csdb::Transaction & tr)
@@ -92,6 +81,18 @@ namespace slv2
             std::cout << name() << ": transaction list received (cnt " << tl.transactions_count() << "), ignored" << std::endl;
         }
         return Result::Ignore;
+    }
+
+    void CollectState::do_send_tl(SolverContext& context, uint64_t sequence)
+    {
+        if(Consensus::Log) {
+            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << pool.transactions_count() << " items" << std::endl;
+        }
+        pool.set_sequence(sequence);
+        context.node().sendTransactionList(pool);
+        pool.clear();
+        // таким способом pool обнуляются в solver.v1, видимо, так надежнее :-)
+        pool = csdb::Pool {};
     }
 
 } // slv2

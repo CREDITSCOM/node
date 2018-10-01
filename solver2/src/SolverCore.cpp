@@ -134,25 +134,16 @@ namespace slv2
     {
         addTimestampToPool(m_pool);
         m_pool.set_writer_public_key(public_key);
-
-        sendBlock(m_pool, false);
-
+        m_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        m_pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        m_pool.sign(private_key);
+        if(Consensus::Log) {
+            std::cout << "SolverCore: sending block #" << m_pool.sequence() << " of " << m_pool.transactions_count() << " transactions" << std::endl;
+        }
+        pnode->sendBlock(m_pool);
         pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
         pnode->getBlockChain().putBlock(m_pool);
         
-    }
-
-    void SolverCore::sendBlock(csdb::Pool& pool, bool isBad /*= false*/)
-    {
-        pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        pool.set_previous_hash(csdb::PoolHash::from_string(""));
-        m_pool.sign(private_key);
-        if(isBad) {
-            pnode->sendBadBlock(pool);
-        }
-        else {
-            pnode->sendBlock(pool);
-        }
     }
 
     void SolverCore::addTimestampToPool(csdb::Pool& pool)

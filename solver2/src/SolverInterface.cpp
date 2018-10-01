@@ -122,13 +122,11 @@ namespace slv2
         }
         last_trans_list_recv = tl_seq;
 
-        // чистим, если список не пуст, для нового списка
-        if(m_pool.transactions_count() > 0) {
-            m_pool = csdb::Pool {};
-        }
+        // чистим для нового списка
+        m_pool = csdb::Pool {};
 
         if(Consensus::Log) {
-            std::cout << "SolverCore: transaction list(#" << tl_seq << ") received, updating own hashvector" << std::endl;
+            std::cout << "SolverCore: transaction list (#" << tl_seq << ") received, updating own hashvector" << std::endl;
         }
         // bad tansactions storage:
         csdb::Pool b_pool {};

@@ -48,7 +48,7 @@ namespace slv2
         context.generals().addvector(vect); // building matrix
 
         if(Consensus::Log) {
-            std::cout << name() << ": vector received from " << (unsigned int) vect.Sender << ",  cnt " << context.cnt_vect_recv() << ")" << std::endl;
+            std::cout << name() << ": vector received from " << (unsigned int) vect.Sender << ",  total " << context.cnt_vect_recv() << std::endl;
         }
         if(test_vectors_completed(context))
         {
@@ -85,7 +85,7 @@ namespace slv2
         context.generals().addmatrix(matr, context.node().getConfidants());
 
         if(Consensus::Log) {
-            std::cout << name() << ": matrix received from " << (unsigned int) matr.Sender << ", cnt " << context.cnt_matr_recv() << ")" << std::endl;
+            std::cout << name() << ": matrix received from " << (unsigned int) matr.Sender << ", total " << context.cnt_matr_recv() << std::endl;
         }
 
         if(test_matrices_completed(context)) {
