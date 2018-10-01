@@ -142,7 +142,7 @@ namespace cs
     };
 
     // logs info and err
-    class InlineLogger
+    class InlineLogger final
     {
     public:
         enum class Settings : uint8_t
@@ -151,50 +151,64 @@ namespace cs
             None
         };
 
-        inline InlineLogger(const std::string& str) noexcept { std::cout << str; }
-        inline ~InlineLogger() noexcept
+        inline InlineLogger(const std::string& str) noexcept
         {
-            if (mSettings == Settings::Debug)
-            {
-#ifndef NDEBUG
-                std::cout << '\n';
-#endif
-            }
-            else
-                std::cout << '\n';
+            m_stream << str;
         }
 
-        inline InlineLogger(cs::InlineLogger::Settings settings, const std::string& str = ""):
-            mSettings(settings)
+        inline ~InlineLogger() noexcept
+        {
+            if (m_settings == Settings::Debug) {
+#ifndef NDEBUG
+                m_stream << '\n';
+#endif
+            }
+            else {
+                m_stream << '\n';
+            }
+
+            std::cout << m_stream.rdbuf()->str();
+            std::cout.flush();
+        }
+
+        inline InlineLogger(cs::InlineLogger::Settings settings, const std::string& str = "") noexcept:
+            m_settings(settings)
         {
             (void)str;
 #ifndef NDEBUG
-            std::cout << str;
+            m_stream << str;
 #endif
         }
 
-        inline InlineLogger& operator()() noexcept { return *this; }
-
-        template<typename T>
-        inline void log(const T& type) const noexcept
+        inline InlineLogger& operator()() noexcept
         {
-            (mSettings == Settings::Debug) ? addDebug(type) : add(type);
+            return *this;
         }
 
         template<typename T>
-        inline void add(const T& type) const noexcept { std::cout << type; }
+        inline void log(T&& type) const noexcept
+        {
+            (m_settings == Settings::Debug) ? addDebug(type) : add(type);
+        }
 
         template<typename T>
-        inline void addDebug(const T& type) const noexcept
+        inline void add(T&& type) const noexcept
+        {
+            m_stream << type;
+        }
+
+        template<typename T>
+        inline void addDebug(T&& type) const noexcept
         {
             (void)type;
 #ifndef NDEBUG
-            std::cout << type;
+            m_stream << type;
 #endif
         }
 
     private:
-        const Settings mSettings = Settings::None;
+        const Settings m_settings = Settings::None;
+        mutable std::stringstream m_stream;
     };
 
     // operator << for string
@@ -211,7 +225,7 @@ namespace cs
 
     // operator << for inline logger
     template<typename T>
-    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, const T& message) noexcept
+    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, T&& message) noexcept
     {
         logger.log(message);
         return logger;
@@ -220,19 +234,19 @@ namespace cs
     // operator << for inline logger and string stream
     inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, const std::stringstream& stream) noexcept
     {
-        logger.log(stream.str());
+        logger.log(stream.rdbuf()->str());
         return logger;
     }
 
-///
-/// Macro csfile writes to file if /log folder exists
-///
-/// @example csfile() << "Hello, world";
-///
+    ///
+    /// Macro csfile writes to file if /log folder exists
+    ///
+    /// @example csfile() << "Hello, world";
+    ///
 #define csfile cs::Logger::instance
 
 ///
-/// Macro cslog ptinys RAII message
+/// Macro cslog prints RAII message
 ///
 /// @example cslog() << "Some message";
 ///
@@ -286,7 +300,7 @@ namespace cs
 /// @example csdwarning() << "Hello" << ", world!";
 ///
 #define csdwarning cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::warning)
-}  // namespace cs
+    }  // namespace cs
 
 
 #endif // __LOGGER_HPP__
