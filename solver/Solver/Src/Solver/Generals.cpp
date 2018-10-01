@@ -23,6 +23,9 @@
 
 #include <mutex>
 
+// Temporary activate MYLOG while debugging solver-with-states
+#define MYLOG
+
 namespace Credits
 {
     Generals::Generals() {}
