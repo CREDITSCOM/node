@@ -222,7 +222,6 @@ void Solver::runMainRound()
   }
   scheduleCloseMainRound(duration_main_round);
 }
-#pragma endregion
 
 const HashVector& Solver::getMyVector() const
 {
@@ -233,8 +232,6 @@ const HashMatrix& Solver::getMyMatrix() const
 {
  return (generals->getMatrix());
 }
-
-#pragma region moved to solver2
 
 void Solver::flushTransactions()
 {
