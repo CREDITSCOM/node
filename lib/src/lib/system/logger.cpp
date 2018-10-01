@@ -8,10 +8,17 @@
 #include <mutex>
 #include <algorithm>
 
+#ifdef __cpp_lib_filesystem 
+    #define STD_FILE_SYSTEM
+    #include <filesystem>
+#endif
+
 extern thread_local bool trace = true;
 
 template<typename Buffer>
 static void writeToFile(const Buffer& buffer);
+
+const static std::string fileLogPath = "log";
 
 struct cs::Logger::Impl
 {
@@ -34,6 +41,15 @@ cs::Logger::Impl::Impl()
     isTerminateRequest = false;
     isEmpty = true;
 
+#ifdef STD_FILE_SYSTEM
+    std::filesystem::path path = std::filesystem::current_path().string() +
+        "/" + fileLogPath;
+
+    if (!std::filesystem::exists(path)) {
+        std::filesystem::create_directory(path);
+    }
+
+#endif
     thread = std::thread(&Impl::loop, this);
 
     csdebug() << "File logger created";
@@ -92,7 +108,7 @@ static void writeToFile(const Buffer& buffer)
     std::stringstream ss;
     ss << std::put_time(std::localtime(&in_time_t), "%Y_%m_%d");
 
-    std::ofstream file("log/" + ss.str() + "_log.txt", std::ios_base::app);
+    std::ofstream file(fileLogPath + "/" + ss.str() + "_log.txt", std::ios_base::app);
     ss.str(std::string());
 
     std::for_each(buffer.begin(), buffer.end(), [&](const std::string& str) {

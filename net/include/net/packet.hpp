@@ -61,7 +61,7 @@ typedef uint32_t RoundNum;
 class Packet {
 public:
   static const uint32_t MaxSize = 1 << 10;
-  static const uint32_t MaxFragments = 1 << 16;
+  static const uint32_t MaxFragments = 1 << 12;
 
   static const uint32_t SmartRedirectTreshold = 1;
 
@@ -201,10 +201,10 @@ typedef MemPtr<TypedSlot<Message>> MessagePtr;
 
 class PacketCollector {
 public:
-  static const uint32_t MaxParallelCollections = 512;
+  static const uint32_t MaxParallelCollections = 32;
 
   PacketCollector():
-    msgAllocator_(MaxParallelCollections * 2) { }
+    msgAllocator_(MaxParallelCollections + 1) { }
 
   MessagePtr getMessage(const Packet&, bool&);
 

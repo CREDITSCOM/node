@@ -58,5 +58,5 @@ add_subdirectory(crypto)
 add_subdirectory(csdb)
 add_subdirectory(client)
 
-#enable_testing()
+enable_testing()
 #add_subdirectory(tests)
