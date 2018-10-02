@@ -22,7 +22,9 @@ namespace slv2
                 break;
             case NodeLevel::Main:
                 if(Consensus::Log) {
-                    std::cout << name() << " warning: node may become a main (collector) through round table only as a BigBang or the 1st round result" << std::endl;
+                    if(context.round() > 1) {
+                        std::cout << name() << " warning: node may become a main (collector) through round table only as a BigBang or the 1st round result" << std::endl;
+                    }
                 }
                 context.become_collector();
                 break;

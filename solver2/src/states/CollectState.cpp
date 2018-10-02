@@ -11,23 +11,12 @@ namespace slv2
         auto cur_round = context.round();
         if(cur_round == 1) {
             if(Consensus::Log) {
-                std::cout << name() << ": at the 1st round schedule switch to write state after " << Consensus::T_round << " msec" << std::endl;
+                std::cout << name() << ": at the 1st round send empty TL to initiate consensus" << std::endl;
             }
-            
-            SolverContext * pctx = &context;
-            tag_timeout = context.scheduler().InsertOnce(Consensus::T_round, [pctx]() {
-                pctx->become_writer();
-            }, true); // last true - replace existing call if any
-            
-            return;
-        }
-        // on the start of the second round someone has to send TL, CollectState is always single in the network, so we send TL
-        // also, if we have unsent transactions from previous rounds, also can send them
-        if(cur_round == 2) {
-            do_send_tl(context, cur_round - 1);
+            do_send_tl(context, 0);
         }
         if(Consensus::Log) {
-            std::cout << name() << ": starting to collect transactions" << std::endl;
+            std::cout << name() << ": starting to collect transactions of round #" << context.round() << std::endl;
         }
     }
 
@@ -49,7 +38,7 @@ namespace slv2
 
             if(!context.is_spammer()) {
                 if(context.verify(tr)) {
-                    pool.add_transaction(tr);
+                    ppool->add_transaction(tr);
                     if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
                         std::cout << name() << ": transaction accepted (1) x" << logging_counter << std::endl;
                     }
@@ -61,7 +50,8 @@ namespace slv2
                 }
             }
             else {
-                pool.add_transaction(tr);
+                ppool->add_transaction(tr);
+                // too much flood
                 //if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
                 //    std::cout << name() << ": spammer transaction accepted (1) x" << logging_counter << std::endl;
                 //}
@@ -86,13 +76,11 @@ namespace slv2
     void CollectState::do_send_tl(SolverContext& context, uint64_t sequence)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << pool.transactions_count() << " items" << std::endl;
+            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << ppool->transactions_count() << " items" << std::endl;
         }
-        pool.set_sequence(sequence);
-        context.node().sendTransactionList(pool);
-        pool.clear();
-        // таким способом pool обнуляются в solver.v1, видимо, так надежнее :-)
-        pool = csdb::Pool {};
+        ppool->set_sequence(sequence);
+        context.node().sendTransactionList(*ppool);
+        ppool = std::make_unique<csdb::Pool>();
     }
 
 } // slv2

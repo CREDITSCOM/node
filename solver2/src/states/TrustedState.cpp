@@ -34,10 +34,6 @@ namespace slv2
 
     Result TrustedState::onVector(SolverContext& context, const Credits::HashVector & vect, const PublicKey & /*sender*/)
     {
-        if(context.round() == 1) {
-            return Result::Ignore;
-        }
-
         if(context.is_vect_recv_from(vect.Sender)) {
             if(Consensus::Log) {
                 std::cout << name() << ": duplicated vector received from " << (unsigned int) vect.Sender << ", ignore" << std::endl;
@@ -71,10 +67,6 @@ namespace slv2
 
     Result TrustedState::onMatrix(SolverContext& context, const Credits::HashMatrix & matr, const PublicKey & /*sender*/)
     {
-        if(context.round() == 1) {
-            return Result::Ignore;
-        }
-
         if(context.is_matr_recv_from(matr.Sender)) {
             if(Consensus::Log) {
                 std::cout << name() << ": duplicated matrix received from " << (unsigned int) matr.Sender << ", ignore" << std::endl;
@@ -97,8 +89,15 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result TrustedState::onTransactionList(SolverContext & context, const csdb::Pool & /*pool*/)
+    Result TrustedState::onTransactionList(SolverContext & context, const csdb::Pool & pool)
     {
+        if(context.round() == 1) {
+            if(pool.transactions_count() != 0) {
+                if(Consensus::Log) {
+                    std::cout << name() << ": (warning) transaction list on the 1st round must not contain transactions!" << std::endl;
+                }
+            }
+        }
         if(Consensus::Log) {
             std::cout << name() << ": transaction list received, sending own vector back and processing it myself" << std::endl;
         }

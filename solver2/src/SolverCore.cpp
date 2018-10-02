@@ -9,6 +9,7 @@
 #pragma warning(pop)
 
 #include <iostream>
+#include <limits>
 
 namespace slv2
 {
@@ -27,7 +28,7 @@ namespace slv2
         , pnode(nullptr)
         , pgen(nullptr)
         , pown_hvec(std::make_unique<Credits::HashVector>())
-        , last_trans_list_recv(0)
+        , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
     {
         InitTransitions();
     }
