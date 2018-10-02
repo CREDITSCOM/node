@@ -1,5 +1,5 @@
 #include "StartState.h"
-//#include "../SolverContext.h"
+#include "../SolverContext.h"
 
 namespace slv2
 {

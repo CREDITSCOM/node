@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../INodeState.h"
+#include <vector>
 
 namespace slv2
 {
@@ -31,7 +32,11 @@ namespace slv2
         }
 
         virtual void off(SolverContext& /*context*/) override
-        {}
+        {
+            if(!future_blocks.empty()) {
+                future_blocks.clear();
+            }
+        }
 
         virtual void expired(SolverContext& /*context*/) override
         {}
@@ -176,7 +181,9 @@ namespace slv2
         /** @brief   Flag to suppress too much flood when report about ignore transactions */
         bool report_ignore_transactions;
 
+        std::vector<csdb::Pool> future_blocks;
 
+        void try_blocks_in_cahce(SolverContext& context, uint64_t last_seq);
     };
 
 } // slv2
