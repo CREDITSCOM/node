@@ -799,8 +799,8 @@ void Node::sendBlockRequest(uint32_t seq) {
   float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
   //std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
   std::cout << "SYNC: [";
-  for (uint32_t i = 0; i < (int)syncStatus; ++i) std::cout << "#";
-  for (uint32_t i = (int)syncStatus; i < 100; ++i) std::cout << "-";
+  for (uint32_t i = 0; i < (int)syncStatus; ++i) if (i % 2) std::cout << "#";
+  for (uint32_t i = (int)syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
   std::cout << "] " << (int)syncStatus << "%" << std::endl;
   //#endif
   sendBlockRequestSequence = seq;
