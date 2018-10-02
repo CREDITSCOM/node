@@ -3,13 +3,25 @@ cmake_minimum_required(VERSION 3.10)
 project(csnode)
 
 add_library(csnode
+  include/csnode/BitHeap.hpp
   include/csnode/blockchain.hpp
+  include/csnode/CyclicBuffer.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
-  include/csnode/wallets_cache.hpp
+  include/csnode/threading.hpp
+  include/csnode/TransactionsTail.h
+  include/csnode/utils.h
+  include/csnode/WalletsCache.h
+  include/csnode/WalletsIds.h
+  include/csnode/WalletsPools.h
+  include/csnode/BlockHashes.h
   src/blockchain.cpp
   src/node.cpp
-  src/wallets_cache.cpp
+  src/utils.cpp
+  src/WalletsCache.cpp
+  src/WalletsIds.cpp
+  src/WalletsPools.cpp
+  src/BlockHashes.cpp
 )
 
 target_link_libraries (csnode net csdb Solver base58 lz4)
@@ -26,5 +38,5 @@ target_include_directories(csnode PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

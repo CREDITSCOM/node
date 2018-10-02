@@ -22,7 +22,7 @@ class Currency
 {
   SHARED_DATA_CLASS_DECLARE(Currency)
 public:
-  Currency(const std::string &name);
+  Currency(const uint8_t &id);
 
   bool is_valid() const noexcept;
   std::string to_string() const noexcept;

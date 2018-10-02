@@ -9,6 +9,7 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/cache.hpp>
 #include <net/network.hpp>
 
 #include "neighbourhood.hpp"
@@ -149,7 +150,7 @@ class Transport {
   static const uint32_t MaxPacksQueue  = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
 
-  std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
+  __cacheline_aligned std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
   struct PackSendTask {
     Packet   pack;
     uint32_t resendTimes = 0;

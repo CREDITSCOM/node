@@ -13,17 +13,30 @@
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 4;
 
-Node::Node(const Config& config)
-: myPublicKey_(config.getMyPublicKey())
-, bc_(config.getPathToDB().c_str())
-, solver_(new Credits::Solver(this))
-,  // Credits::SolverFactory().createSolver(Credits::solver_type::fake, this)),
-    transport_(new Transport(config, this))
-, stats_(bc_)
-, api_(bc_, solver_)
-, allocator_(1 << 26, 3)
-, packStreamAllocator_(1 << 26, 5)
-, ostream_(&packStreamAllocator_, myPublicKey_) {
+const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
+const csdb::Address Node::startAddress_   = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
+#ifdef SPAMMER
+  const csdb::Address Node::spammerAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003");
+#endif
+
+Node::Node(const Config& config):
+  myPublicKey_(config.getMyPublicKey()),
+  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_
+#ifdef SPAMMER
+    ,spammerAddress_
+#endif
+  ),
+  solver_(new Credits::Solver(this, genesisAddress_, startAddress_
+#ifdef SPAMMER
+    , spammerAddress_
+#endif
+  )),
+  transport_(new Transport(config, this)),
+  stats_(bc_),
+  api_(bc_, solver_),
+  allocator_(1 << 24, 5),
+  packStreamAllocator_(1 << 26, 5),
+  ostream_(&allocator_, myPublicKey_) {
   good_ = init();
 }
 
@@ -175,8 +188,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   std::cout << __func__ << std::endl;
-  uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
-  if (rNum > lastBlock && rNum >= roundNum_) {
+	size_t lastBlock = getBlockChain().getLastWrittenSequence();
+	if (rNum > lastBlock && rNum >= roundNum_)
+  {
     solver_->setBigBangStatus(true);
     getRoundTable(data, size, rNum, type);
 
@@ -544,6 +558,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
   Credits::HashVector vec;
   istream_ >> vec;
 
+  std::cout << "NODE> Hash: " << byteStreamToHex((const char*)vec.hash.val,32) << std::endl;
   if (!istream_.good() || !istream_.end()) {
     LOG_WARN("Bad vector packet format");
     return;
@@ -577,7 +592,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  std::cout <<  __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -642,16 +657,10 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     LOG_WARN("Bad block packet format");
     return;
   }
-
-  LOG_DEBUG("Got block of " << pool.transactions_count() << " transactions of seq " << pool.sequence() << " and hash "
-                            << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>());
-
-  // LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
-
   size_t localSeq = getBlockChain().getLastWrittenSequence();
   size_t blockSeq = pool.sequence();
-  if (roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
-  if (localSeq >= blockSeq) return;
+  if(roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
+  if(localSeq >= blockSeq) return;
 
   if (!blocksReceivingStarted_)
   {
@@ -660,11 +669,15 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     std::cout << "GETBLOCK> Setting first got block: " << lastStartSequence_ << std::endl;
   }
 
-  //LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
+  LOG_DEBUG("Got block of " << pool.transactions_count() << " transactions of seq " << pool.sequence() << " and hash "
+                            << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>());
 
-  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
+  if(pool.sequence() == getBlockChain().getLastWrittenSequence()+1) solver_->gotBlock(std::move(pool), sender);
   else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
+
+
+
 
 void Node::sendBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
@@ -777,6 +790,11 @@ void Node::sendBlockRequest(uint32_t seq) {
     solver_->tmpStorageProcessing();
     return;
   }
+  if (awaitingSyncroBlock && awaitingRecBlockCount<1 && false)
+  {
+    solver_->tmpStorageProcessing();
+    return;
+  }
   if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
 #ifdef MYLOG
 // std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence <<
@@ -819,8 +837,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   istream_ >> pool;
 #ifdef MYLOG
   std::cout << "GETBLOCKREPLY> Getting block " << pool.sequence() << std::endl;
-#endif
-  if (pool.sequence() == sendBlockRequestSequence) {
+  #endif
+
+  if (pool.sequence() == sendBlockRequestSequence)
+  {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
@@ -828,14 +848,17 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
   }
-  else if ((pool.sequence() > sendBlockRequestSequence) &&
-    (pool.sequence() < lastStartSequence_))
-      solver_->gotFreeSyncroBlock(std::move(pool));
+  else if((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) solver_->gotFreeSyncroBlock(std::move(pool));
   else return;
-  if (getBlockChain().getGlobalSequence() >
-      getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  std::cout << "GETBLOCKREPLY> GlSeq = " << getBlockChain().getGlobalSequence() << ", GetLSeq = " << getBlockChain().getLastWrittenSequence() << std::endl;
+
+  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())//&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
-  else {
+  }
+
+  else
+  {
     syncro_started = false;
 #ifdef MYLOG
     std::cout << "SYNCRO FINISHED!!!" << std::endl;
@@ -845,13 +868,30 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
-#endif
+   std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
+   #endif
+   ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags ::Compressed, sender);
+   uint32_t bSize;
+   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
-  flushCurrentTasks();
-}
+   std::string compressed;
+   snappy::Compress((const char*)data, bSize, &compressed);
+   ostream_ << MsgTypes::RequestedBlock
+     << roundNum_
+     << compressed;
+
+    flushCurrentTasks();
+  }
+
+//ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags::Compressed);
+//size_t bSize;
+//const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+//
+//std::string compressed;
+//snappy::Compress((const char*)data, bSize, &compressed);
+//ostream_ << MsgTypes::NewBadBlock
+//<< roundNum_
+//<< compressed;
 
 void Node::becomeWriter() {
   // if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Confidant)
@@ -878,7 +918,8 @@ void Node::onRoundStart() {
       if (conf == myPublicKey_) {
         myLevel_     = NodeLevel::Confidant;
         myConfNumber = conf_no;
-        found        = true;
+        found = true;
+        //solver_->initConfRound();
         break;
       }
       conf_no++;

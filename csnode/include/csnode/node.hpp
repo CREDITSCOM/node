@@ -2,10 +2,10 @@
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
 #include <memory>
+#include <string>
 
-#include <csconnector/csconnector.h>
 #include <csstats.h>
-#include <Solver/Solver.hpp>
+#include <csconnector/csconnector.h>
 #include <client/config.hpp>
 
 #include "blockchain.hpp"
@@ -22,7 +22,9 @@ class Solver;
 }
 
 class Node {
- public:
+public:
+  static const std::string start_address_;
+public:
   Node(const Config&);
   ~Node();
 
@@ -53,6 +55,7 @@ class Node {
 
   /* Outcoming requests forming */
   void sendRoundTable();
+  void sendTransaction(const csdb::Transaction&);
   void sendTransaction(csdb::Pool&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);  //, const PublicKey&);
@@ -128,6 +131,11 @@ class Node {
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
   // Info
+  static const csdb::Address genesisAddress_;
+  static const csdb::Address startAddress_;
+#ifdef SPAMMER
+  static const csdb::Address spammerAddress_;
+#endif
   const PublicKey myPublicKey_;
   bool            good_ = true;
 
@@ -162,8 +170,8 @@ class Node {
   csstats::csstats       stats_;
   csconnector::connector api_;
 
-  RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
+  RegionAllocator packStreamAllocator_;
 
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;

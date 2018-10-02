@@ -16,8 +16,10 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 
     sock.set_option(ip::udp::socket::reuse_address(true));
 
+#ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
+#endif
 
     sock.non_blocking(true);
 
@@ -194,7 +196,7 @@ void Network::processorRoutine() {
   }
 }
 
-void Network::sendDirect(const Packet p, const ip::udp::endpoint& ep) {
+void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
 
   qePtr->element.endpoint = ep;

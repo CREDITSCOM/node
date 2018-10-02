@@ -120,8 +120,14 @@ class Pool::priv : public ::csdb::internal::shared_data
       os.put(it);
     }
 
-    os.put(writer_public_key_);
-    os.put(signature_);
+    os.put(newWallets_.size());
+    for (const auto& wall : newWallets_) {
+        os.put(wall);
+    }
+
+    os.put(user_fields_);
+	os.put(writer_public_key_);
+	os.put(signature_);
   }
 
   void put_for_sig(::csdb::priv::obstream& os)
@@ -131,18 +137,19 @@ class Pool::priv : public ::csdb::internal::shared_data
 
     os.put(user_fields_);
 
-    os.put(transactions_.size());
-    for (const auto& it : transactions_) {
-      os.put(it);
-    }
+      os.put(newWallets_.size());
+      for (const auto& wall : newWallets_) {
+          os.put(wall);
+      }
 
-    os.put(writer_public_key_);
-   }
+	  os.put(user_fields_);
+	  os.put(writer_public_key_);
+  }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
 	  if (!is.get(previous_hash_)) {
 		  return false;
-	  }
+      }
 
 	  if (!is.get(sequence_))
 		  return false;
@@ -161,23 +168,51 @@ class Pool::priv : public ::csdb::internal::shared_data
 	  return true;
   }
 
+  bool getTransactions(::csdb::priv::ibstream& is, size_t cnt)
+   {
+      transactions_.clear();
+      transactions_.reserve(cnt);
+      for (size_t i = 0; i < cnt; ++i)
+      {
+          Transaction tran;
+          if (!is.get(tran))
+              return false;
+          transactions_.emplace_back(tran);
+      }
+      return true;
+  }
+
+  bool getNewWallets(::csdb::priv::ibstream& is)
+   {
+      size_t cnt = 0;
+      if (!is.get(cnt))
+          return false;
+
+      newWallets_.clear();
+      newWallets_.reserve(cnt);
+      for (size_t i = 0; i < cnt; ++i)
+      {
+          NewWalletInfo wall;
+          if (!is.get(wall))
+              return false;
+          newWallets_.emplace_back(wall);
+      }
+      return true;
+  }
   bool get(::csdb::priv::ibstream& is)
   {
 	size_t cnt;
 	if (!get_meta(is, cnt))
 		return false;
 
-    transactions_.clear();
-    transactions_.reserve(cnt);
-    for(size_t i = 0; i < cnt; ++i )
-    {
-      Transaction tran;
-      if(!is.get(tran)) {
-        is_valid_ = false;
+    if (!getTransactions(is, cnt))
         return false;
-      }
-      transactions_.emplace_back(tran);
-    }
+
+    if (!getNewWallets(is))
+        return false;
+
+    if(!is.get(user_fields_))
+      return false;
 
     if (!is.get(writer_public_key_))
       return false;
@@ -238,6 +273,7 @@ class Pool::priv : public ::csdb::internal::shared_data
   Pool::sequence_t sequence_;
   std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
+  NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   ::std::vector<uint8_t> writer_public_key_;
@@ -429,12 +465,29 @@ void Pool::set_storage(Storage storage) noexcept
   data->storage_ = storage.weak_ptr();
 }
 
-std::vector<csdb::Transaction>& Pool::transactions()
+Pool::Transactions& Pool::transactions()
 {
 	return d->transactions_;
 }
 
-  bool Pool::add_user_field(user_field_id_t id, UserField field) noexcept
+const Pool::Transactions& Pool::transactions() const
+{
+    return d->transactions_;
+}
+
+Pool::NewWallets* Pool::newWallets() noexcept
+{
+    if (d.constData()->read_only_)
+        return nullptr;
+    return &d->newWallets_;
+}
+ 
+const Pool::NewWallets& Pool::newWallets() const noexcept
+{
+    return d->newWallets_;
+}
+
+bool Pool::add_user_field(user_field_id_t id, UserField field) noexcept
 {
   if (d.constData()->read_only_ || (!field.is_valid())) {
     return false;
@@ -607,7 +660,6 @@ bool Pool::verify_signature()
 {
 	if (this->writer_public_key().size() != 32 || d->signature_.size() != 64)
 		return false;
-
 	const auto& pool_bytes = this->to_byte_stream_for_sig();
 	if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
 		pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
@@ -629,12 +681,36 @@ Pool Pool::load(PoolHash hash, Storage storage)
   return res;
 }
 
-  bool Pool::clear() noexcept
-  {
-    d->transactions_.clear();
+bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const
+{
+    const csdb::Pool::Transactions& transactions = this->transactions();
 
-    if (!d->transactions_.empty())
-      return false;
+    size_t idx = info.addressId_.trxInd_;
+    if (idx >= transactions.size())
+    {
+        return false;
+    }
+
+    csdb::Transaction trx = transactions[idx];
+    const bool isSource = (info.addressId_.addressType_ == NewWalletInfo::AddressType::AddressIsSource);
+    wallAddress = (isSource) ? trx.source() : trx.target();
     return true;
-  }
+}
+
+void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const
+{
+    os.put(*(size_t*)(&addressId_));
+    os.put(walletId_);
+}
+
+bool Pool::NewWalletInfo::get(::csdb::priv::ibstream& is)
+{
+    size_t address_id;
+    if (!is.get(address_id))
+      return false;
+    size_t* id = reinterpret_cast<size_t*>(&addressId_);
+    *id = address_id;
+    return is.get(walletId_);
+}
+
 } // namespace csdb

@@ -14,7 +14,7 @@ target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/cli
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include)
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (Boost_USE_MULTITHREADED ON)
@@ -31,3 +31,8 @@ target_link_libraries (client Boost::system
                               Boost::regex
                               Boost::disable_autolinking
                               ${CMAKE_THREAD_LIBS_INIT})
+
+if (NOT MSVC AND WITH_GPROF)
+add_definitions(-DBUILD_WITH_GPROF)
+target_link_libraries (client dl)
+endif()
