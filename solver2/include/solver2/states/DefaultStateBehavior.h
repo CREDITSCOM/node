@@ -26,7 +26,9 @@ namespace slv2
         {}
 
         virtual void on(SolverContext& /*context*/) override
-        {}
+        {
+            report_ignore_transactions = true;
+        }
 
         virtual void off(SolverContext& /*context*/) override
         {}
@@ -169,6 +171,10 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
+    protected:
+
+        /** @brief   Flag to suppress too much flood when report about ignore transactions */
+        bool report_ignore_transactions;
     };
 
 } // slv2

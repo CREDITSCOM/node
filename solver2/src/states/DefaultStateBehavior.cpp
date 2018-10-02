@@ -89,8 +89,9 @@ namespace slv2
 
     Result DefaultStateBehavior::onTransaction(SolverContext& /*context*/, const csdb::Transaction& /*trans*/)
     {
-        if(Consensus::Log) {
-            std::cout << name() << ": transaction ignored" << std::endl;
+        if(Consensus::Log && report_ignore_transactions) {
+            report_ignore_transactions = false;
+            std::cout << name() << ": transactions ignored in this state" << std::endl;
         }
         return Result::Ignore;
     }

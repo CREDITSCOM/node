@@ -1,5 +1,6 @@
 #pragma once
 #include "DefaultStateBehavior.h"
+#include "../Consensus.h"
 #include <memory>
 
 namespace slv2
@@ -17,7 +18,7 @@ namespace slv2
      * ### remarks  Aae, 30.09.2018.
      */
 
-    class WriteState final : public DefaultStateBehavior
+    class WriteState : public DefaultStateBehavior
     {
     public:
 
@@ -73,11 +74,12 @@ namespace slv2
             return "Write";
         }
 
-    private:
+    protected:
 
         /** @brief   The pointer to own hash actual this round */
         std::unique_ptr<Hash> pown;
 
+        int min_count_hashes { static_cast<int>(Consensus::MinTrustedNodes) };
     };
 
 } // slv2

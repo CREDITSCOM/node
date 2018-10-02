@@ -104,15 +104,15 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotTransactionList(csdb::Pool& pool)
+    void SolverCore::gotTransactionList(csdb::Pool& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::Pool tmp = pool;
+            csdb::Pool tmp = p;
             pslv_v1->gotTransactionList(std::move(tmp));
             return;
         }
 
-        auto tl_seq = pool.sequence();
+        auto tl_seq = p.sequence();
         if(tl_seq == last_trans_list_recv) {
             // already received
             if(Consensus::Log) {
@@ -123,7 +123,7 @@ namespace slv2
         last_trans_list_recv = tl_seq;
 
         // чистим для нового списка
-        m_pool = csdb::Pool {};
+        pool = csdb::Pool {};
 
         if(Consensus::Log) {
             std::cout << "SolverCore: transaction list (#" << tl_seq << ") received, updating own hashvector" << std::endl;
@@ -131,14 +131,14 @@ namespace slv2
         // bad tansactions storage:
         csdb::Pool b_pool {};
         // update own hash vector
-        auto result = pgen->buildvector(pool, m_pool, pnode->getConfidants().size(), b_pool);
+        auto result = pgen->buildvector(p, pool, pnode->getConfidants().size(), b_pool);
         pown_hvec->Sender = pnode->getMyConfNumber();
         pown_hvec->hash = result;
 
         if(!pstate) {
             return;
         }
-        if(stateCompleted(pstate->onTransactionList(*pcontext, pool))) {
+        if(stateCompleted(pstate->onTransactionList(*pcontext, p))) {
             handleTransitions(Event::Transactions);
         }
     }
@@ -183,10 +183,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotBlock(csdb::Pool& pool, const PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool& p, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::Pool tmp = pool;
+            csdb::Pool tmp = p;
             pslv_v1->gotBlock(std::move(tmp), sender);
             return;
         }
@@ -197,15 +197,15 @@ namespace slv2
         if(Consensus::Log) {
             std::cout << "SolverCore: gotBlock()" << std::endl;
         }
-        if(stateCompleted(pstate->onBlock(*pcontext, pool, sender))) {
+        if(stateCompleted(pstate->onBlock(*pcontext, p, sender))) {
             handleTransitions(Event::Block);
         }
     }
 
-    void SolverCore::gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender)
+    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::PoolHash tmp = pool_hash;
+            csdb::PoolHash tmp = p_hash;
             pslv_v1->gotBlockRequest(std::move(tmp), sender);
             return;
         }
@@ -214,26 +214,26 @@ namespace slv2
             std::cout << "SolverCore: gotBlockRequest()" << std::endl;
         }
         // state does not take part
-        csdb::Pool pool = pnode->getBlockChain().loadBlock(pool_hash);
-        if(pool.is_valid())        {
-            pool.set_previous_hash(csdb::PoolHash::from_string(""));
-            pnode->sendBlockReply(std::move(pool), sender);
+        csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
+        if(p.is_valid())        {
+            p.set_previous_hash(csdb::PoolHash::from_string(""));
+            pnode->sendBlockReply(p, sender);
         }
     }
 
-    void SolverCore::gotBlockReply(csdb::Pool& pool)
+    void SolverCore::gotBlockReply(csdb::Pool& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotBlockReply(std::move(pool));
+            pslv_v1->gotBlockReply(std::move(p));
             return;
         }
 
         if(Consensus::Log) {
             std::cout << "SolverCore: gotBlockReply()" << std::endl;
         }
-        //std::cout << "Solver -> Got Block for my Request: " << pool.sequence() << std::endl;
-        if(pool.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
-            pnode->getBlockChain().putBlock(pool);
+        //std::cout << "Solver -> Got Block for my Request: " << p.sequence() << std::endl;
+        if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
+            pnode->getBlockChain().putBlock(p);
         }
     }
 

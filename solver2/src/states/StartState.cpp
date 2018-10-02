@@ -14,7 +14,7 @@ namespace slv2
 //        prepareBlockForSend(testPool);
 //        node_->sendBlock(testPool);
 //#else
-//        context.make_and_send_block();
+//        context.store_and_send_block();
 //        context.make_and_send_bad_block();
 //#endif
     }

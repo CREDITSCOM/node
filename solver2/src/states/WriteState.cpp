@@ -12,18 +12,25 @@ namespace slv2
         // No one other state must not store hashes this round!
         assert(context.cnt_hash_recv() == 0);
 
+        // adjust minimal hashes to await
+        int tmp = static_cast<int>(context.cnt_trusted());
+        if(tmp > min_count_hashes) {
+            min_count_hashes = tmp;
+        }
+
         context.node().becomeWriter();
 
         if(Consensus::Log) {
             std::cout << name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")" << std::endl;
         }
-        context.make_and_send_block();
+        context.store_and_send_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
     }
 
     Result WriteState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender)
     {
-        auto not_enough = static_cast<int>(Consensus::MinTrustedNodes) - static_cast<int>(context.cnt_hash_recv());
+        // can use Consensus::MinTrustedNodes if timeout occur
+        auto not_enough = min_count_hashes - static_cast<int>(context.cnt_hash_recv());
         if(not_enough > 0) {
             if(hash == *pown) {
                 context.recv_hash_from(sender);

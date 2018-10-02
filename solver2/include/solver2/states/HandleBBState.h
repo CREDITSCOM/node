@@ -1,24 +1,40 @@
 #pragma once
-#include "DefaultStateBehavior.h"
+#include "WriteState.h"
 
 namespace slv2
 {
-    /// <summary>   A special state to handle a Big Bang. This class cannot be inherited</summary>
-    ///
-    /// <remarks>   Aae, 30.09.2018. </remarks>
-    ///
-    /// <seealso cref="T:DefaultStateBehavior"/>
+    /**
+     * @class   HandleBBState
+     *
+     * @brief   A special state to handle a Big Bang. This class cannot be inherited. Acts almost as WriteState
+     *
+     * @author  aae
+     * @date    02.10.2018
+     *
+     * @sa  T:DefaultStateBehavior  
+     *
+     * ### remarks  Aae, 30.09.2018.
+     */
 
-    class HandleBBState final : public DefaultStateBehavior
+    class HandleBBState final : public WriteState
     {
     public:
 
         ~HandleBBState() override
         {}
 
-        void on(SolverContext& context) override;
+        /**
+         * @fn  void final::on(SolverContext& context) override;
+         *
+         * @brief   Override WriteState behavior. Repeat last block when on and does not require no hashes received when on
+         *
+         * @author  aae
+         * @date    02.10.2018
+         *
+         * @param [in,out]  context The context.
+         */
 
-        //TODO: завершается по логике солвера-1 с приходом блока (см. Solver::gotBlock())
+        void on(SolverContext& context) override;
 
         const char * name() const override
         {

@@ -27,6 +27,7 @@ namespace slv2
         , cur_round(0)
         , pnode(nullptr)
         , pgen(nullptr)
+        , pslv_v1(nullptr)
         , pown_hvec(std::make_unique<Credits::HashVector>())
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
     {
@@ -123,35 +124,64 @@ namespace slv2
 
     bool SolverCore::stateCompleted(Result res)
     {
-        if(Result::Failure == res) {
+        if(Consensus::Log && Result::Failure == res) {
             std::cout << "SolverCore: error in state " << pstate->name() << std::endl;
         }
         return (Result::Finish == res);
     }
 
-    // Copied methods from solver.v1
-    
-    void SolverCore::sendCurrentBlock()
+    void SolverCore::repeatLastBlock()
     {
-        addTimestampToPool(m_pool);
-        m_pool.set_writer_public_key(public_key);
-        m_pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        m_pool.set_previous_hash(csdb::PoolHash::from_string(""));
-        m_pool.sign(private_key);
-        if(Consensus::Log) {
-            std::cout << "SolverCore: sending block #" << m_pool.sequence() << " of " << m_pool.transactions_count() << " transactions" << std::endl;
-        }
-        pnode->sendBlock(m_pool);
-        pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
-        pnode->getBlockChain().putBlock(m_pool);
-        
+        //if(cur_round == pool.sequence()) {
+        //    // still actual, send it again
+        //    if(Consensus::Log) {
+        //        std::cout << "SolverCore: current block is ready to repeat" << std::endl;
+        //    }
+        //    sendBlock(pool);
+        //}
+        //else {
+            // load block and send it
+            if(Consensus::Log) {
+                std::cout << "SolverCore: current block is out of date, so load stored block to repeat" << std::endl;
+            }
+            auto& bch = pnode->getBlockChain();
+            csdb::Pool p = bch.loadBlock(bch.getLastWrittenHash());
+            if(p.is_valid()) {
+                sendBlock(p);
+            }
+        //}
     }
 
-    void SolverCore::addTimestampToPool(csdb::Pool& pool)
+    // Copied methods from solver.v1
+    
+    void SolverCore::sendBlock(csdb::Pool& p)
     {
-        pool.add_user_field(0, std::to_string(
+        if(Consensus::Log) {
+            std::cout << "SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions" << std::endl;
+        }
+        pnode->sendBlock(p);
+    }
+
+    void SolverCore::storeBlock(csdb::Pool& p)
+    {
+        if(Consensus::Log) {
+            std::cout << "SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions" << std::endl;
+        }
+        pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(p.sequence()));
+        pnode->getBlockChain().putBlock(p);
+    }
+
+    void SolverCore::prepareBlock(csdb::Pool& p)
+    {
+        // add timestamp
+        p.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
+        // finalize
+        pool.set_writer_public_key(public_key);
+        pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        pool.set_previous_hash(csdb::PoolHash::from_string(""));
+        pool.sign(private_key);
     }
 
     void SolverCore::flushTransactions()

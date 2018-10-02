@@ -175,7 +175,18 @@ namespace slv2
         ///
         /// <remarks>   Aae, 30.09.2018. </remarks>
 
-        inline void make_and_send_block();
+        inline void store_and_send_block();
+
+        /**
+         * @fn  inline void SolverContext::resend_last_block();
+         *
+         * @brief   Resend last block
+         *
+         * @author  aae
+         * @date    02.10.2018
+         */
+
+        inline void repeat_last_block();
 
         /// <summary>   Adds transaction to inner list </summary>
         ///
@@ -353,9 +364,16 @@ namespace slv2
         core.handleTransitions(SolverCore::Event::Matrices);
     }
 
-    void SolverContext::make_and_send_block()
+    void SolverContext::store_and_send_block()
     {
-        core.sendCurrentBlock();
+        core.prepareBlock(core.pool);
+        core.sendBlock(core.pool);
+        core.storeBlock(core.pool);
+    }
+
+    void SolverContext::repeat_last_block()
+    {
+        core.repeatLastBlock();
     }
 
     void SolverContext::add(const csdb::Transaction& tr)

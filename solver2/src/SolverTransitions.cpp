@@ -36,38 +36,39 @@ namespace slv2
 
         transitions = {
         { pStart, {
-            defaultRT, defaultBB
+            defaultRT
         } },
         { pNormal, {
-            defaultRT, defaultBB
+            defaultRT
         } },
         { pSync, {
-            defaultRT, defaultBB
+            defaultRT
         } },
         { pTrusted, {
-            defaultRT, defaultBB, { Event::Vectors, pTrustedV }, { Event::Matrices, pTrustedM }
+            defaultRT, { Event::Vectors, pTrustedV }, { Event::Matrices, pTrustedM }
         } },
         { pTrustedV, {
-            defaultRT, defaultBB, { Event::Matrices, pTrustedVM }
+            defaultRT, { Event::Matrices, pTrustedVM }
         } },
         { pTrustedM, {
-            defaultRT, defaultBB, { Event::Vectors, pTrustedVM }
+            defaultRT, { Event::Vectors, pTrustedVM }
         } },
         { pTrustedVM, {
-            defaultRT, defaultBB, { Event::SetWriter, pWrite }
+            defaultRT, { Event::SetWriter, pWrite }
         } },
         { pCollect, {
-            // the last transition is for the 1st round: allow to become writer and spawn close the 1st round
-            { Event::RoundTable, pNormal }, defaultBB, { Event::SetWriter, pWrite }
+            // commented out transition is correct almost always but is not after BigBang
+            defaultRT // { Event::RoundTable, pNormal }
         } },
         { pWrite, {
             { Event::RoundTable, pCollect }/*defaultRT*/, { Event::Hashes, pCollect }, defaultBB
         } },
         { pRTH, {
-            { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, { Event::SetCollector, pCollect }, defaultBB
+            { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, { Event::SetCollector, pCollect }
         } },
         { pBB, {
-            { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, defaultRT
+            // only option to activate BB is from Write, so act almost as Write and finishing round upon receive hashes
+            defaultRT
         } },
         { pstate, {
             { Event::Start, pStart }

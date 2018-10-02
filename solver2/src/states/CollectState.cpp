@@ -38,7 +38,7 @@ namespace slv2
 
             if(!context.is_spammer()) {
                 if(context.verify(tr)) {
-                    ppool->add_transaction(tr);
+                    pool.add_transaction(tr);
                     if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
                         std::cout << name() << ": transaction accepted (1) x" << logging_counter << std::endl;
                     }
@@ -50,7 +50,7 @@ namespace slv2
                 }
             }
             else {
-                ppool->add_transaction(tr);
+                pool.add_transaction(tr);
                 // too much flood
                 //if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
                 //    std::cout << name() << ": spammer transaction accepted (1) x" << logging_counter << std::endl;
@@ -76,11 +76,11 @@ namespace slv2
     void CollectState::do_send_tl(SolverContext& context, uint64_t sequence)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << ppool->transactions_count() << " items" << std::endl;
+            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << pool.transactions_count() << " items" << std::endl;
         }
-        ppool->set_sequence(sequence);
-        context.node().sendTransactionList(*ppool);
-        ppool = std::make_unique<csdb::Pool>();
+        pool.set_sequence(sequence);
+        context.node().sendTransactionList(pool);
+        pool = csdb::Pool {};
     }
 
 } // slv2

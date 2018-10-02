@@ -65,12 +65,12 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(csdb::Pool& pool);
+        void gotTransactionList(csdb::Pool& p);
         void gotVector(const Credits::HashVector& vect);
         void gotMatrix(const Credits::HashMatrix& matr);
-        void gotBlock(csdb::Pool& pool, const PublicKey& sender);
-        void gotBlockRequest(const csdb::PoolHash& pool_hash, const PublicKey& sender);
-        void gotBlockReply(csdb::Pool& pool);
+        void gotBlock(csdb::Pool& p, const PublicKey& sender);
+        void gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender);
+        void gotBlockReply(csdb::Pool& p);
         void gotHash(const Hash& hash, const PublicKey& sender);
         void addConfirmation(uint8_t own_conf_number);
         void beforeNextRound();
@@ -78,7 +78,7 @@ namespace slv2
         // required by api
         void send_wallet_transaction(const csdb::Transaction& tr);
         // empty in Solver
-        void gotBadBlockHandler(const csdb::Pool& /*pool*/, const PublicKey& /*sender*/)
+        void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/)
         {}
 
     private:
@@ -149,15 +149,20 @@ namespace slv2
         // sequence number of the last transaction received
         uint64_t last_trans_list_recv;
 
-        // pool for collecting "own" transactions
-        csdb::Pool m_pool {};
+        // pool for storing transactions list, serve as source for new block
+        // must be managed by SolverCore because consumed by different states (Trusted*, Write...)
+        csdb::Pool pool {};
 
         std::mutex trans_mtx;
         std::vector<csdb::Transaction> transactions;
 
+        // sends current block if actual otherwise loads block from storage and sends it
+        void repeatLastBlock();
+
         // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
-        void sendCurrentBlock(); // m_pool-related
-        void addTimestampToPool(csdb::Pool& pool);
+        void sendBlock(csdb::Pool& p);
+        void storeBlock(csdb::Pool& p);
+        void prepareBlock(csdb::Pool& p);
         void flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);
 
