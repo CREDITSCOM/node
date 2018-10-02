@@ -25,7 +25,6 @@ bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
 
   uint32_t c = 0;
   for (auto& nb : neighbours_) {
-    if (nb->isSignal) continue;
     bool found = false;
     for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
       if (*ptr == nb->id) {
@@ -35,8 +34,11 @@ bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
     }
 
     if (!found) {
-      result = true;
       transport_->sendDirect(&(bp.pack), **nb);
+      if (nb->isSignal)  // Assume the SS got this
+        *(bp.recEnd++) = nb->id;
+      else
+        result = true;
     }
   }
 

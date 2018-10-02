@@ -16,7 +16,7 @@
 #define STATS
 #endif
 #define SYNCRO
-#define MYLOG
+//#define MYLOG
 //#define LOG_TRANSACTIONS
 
 #define BOTTLENECKED_SMARTS

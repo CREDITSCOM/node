@@ -64,6 +64,7 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_
 #endif
       if (delta > zero_balance) {
         *(del1 + i) = bitcnt;
+        it.set_balance(delta);
         new_pool.add_transaction(it);
       } else {
         *(del1 + i) = -bitcnt;

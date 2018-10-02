@@ -147,7 +147,7 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   istream_.init(data, size);
 #ifdef MYLOG
   std::cout << "NODE> Get Round Table" << std::endl;
@@ -303,7 +303,7 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
 }
 
 void Node::getTransactionsList(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -529,7 +529,7 @@ void Node::getMatrixRequest(const uint8_t* data, const size_t size)  //, const P
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -549,7 +549,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
     return;
   }
 
-  LOG_EVENT("Got vector");
+  //LOG_EVENT("Got vector");
   solver_->gotVector(std::move(vec));
 #ifdef MYLOG
   std::cout << "NODE>  WE returned!!!" << std::endl;
@@ -577,7 +577,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -595,7 +595,7 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
     return;
   }
 
-  LOG_EVENT("Got matrix");
+  //LOG_EVENT("Got matrix");
   solver_->gotMatrix(std::move(mat));
 }
 
@@ -626,7 +626,7 @@ uint32_t Node::getRoundNumber() {
 }
 
 void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get blocks");
     return;
@@ -682,7 +682,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
 }
 
 void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get bad blocks");
     return;
@@ -717,7 +717,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Writer) {
     std::cout << "Non-Writers cannot get hashes" << std::endl;
     return;
@@ -750,7 +750,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
     return;
   if (sender == myPublicKey_)
@@ -812,7 +812,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   csdb::Pool pool;
 
   istream_.init(data, size);

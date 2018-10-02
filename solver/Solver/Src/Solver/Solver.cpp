@@ -286,6 +286,9 @@ void Solver::gotTransactionList(csdb::Pool&& _pool) {
   uint8_t numGen          = node_->getConfidants().size();
   //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool       = csdb::Pool{};
+  for (auto& t : _pool.transactions())
+    t.set_balance(node_->getBlockChain().getBalance(t.source()));
+
   Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
   hvector.Sender                            = node_->getMyConfNumber();
