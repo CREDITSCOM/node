@@ -50,6 +50,7 @@ namespace csstats {
         Count transactionsCount = 0;
         BalancePerCurrency balancePerCurrency;
         Count smartContractsCount = 0;
+		Count transactionsSmartCount = 0;
     };
 
     using StatsPerPeriod = std::vector<PeriodStats>;

@@ -65,6 +65,9 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
         TRACE("");
 
+		if (scuf.is_valid()) //transactionsSmartCount - amount of transactions associated with smart contracts
+			++periodStats.transactionsSmartCount;
+
         if (scuf.is_valid() && is_smart_deploy(deserialize<api::SmartContractInvocation>(scuf.value<std::string>()))) {
           TRACE("");
           ++periodStats.smartContractsCount;

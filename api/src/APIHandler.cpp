@@ -755,6 +755,7 @@ APIHandler::StatsGet(api::StatsGetResult& _return)
     ps.poolsCount = s.poolsCount;
     ps.transactionsCount = s.transactionsCount;
     ps.smartContractsCount = s.smartContractsCount;
+	ps.transactionsSmartCount = s.transactionsSmartCount;
 
     for (auto& t : s.balancePerCurrency) {
       api::CumulativeAmount amount;
