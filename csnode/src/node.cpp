@@ -785,7 +785,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     ++awaitingRecBlockCount;
     return;
   }
-#ifdef MYLOG
+  //#ifdef MYLOG
   // std::cout << "SENDBLOCKREQUEST> Composing the request" << std::endl;
   size_t lws, gs;
 
@@ -797,8 +797,12 @@ void Node::sendBlockRequest(uint32_t seq) {
   // std::cout << "SENDBLOCKREQUEST> gs = " << getBlockChain().getGlobalSequence() << std::endl;
   // std::cout << "SENDBLOCKREQUEST> lws = " << getBlockChain().getLastWrittenSequence() << std::endl;
   float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
-  std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
-#endif
+  //std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
+  std::cout << "SYNC: [";
+  for (uint32_t i = 0; i < (int)syncStatus; ++i) std::cout << "#";
+  for (uint32_t i = (int)syncStatus; i < 100; ++i) std::cout << "-";
+  std::cout << "] " << (int)syncStatus << "%" << std::endl;
+  //#endif
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
