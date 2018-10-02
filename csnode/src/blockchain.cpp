@@ -273,12 +273,14 @@ csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key)
 {
-    std::string pk(static_cast<size_t>(PUBLIC_KEY_LENGTH), '\0');
-    std::copy(key.rbegin(),
-        std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()),
-        pk.rbegin());
-    csdb::Address res = csdb::Address::from_public_key(pk.data());
-    return res;
+    if (key.size() == PUBLIC_KEY_LENGTH) {
+      csdb::Address res = csdb::Address::from_public_key(key.data());
+      return res;
+    } else {
+      csdb::internal::WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(key.data());
+      csdb::Address res = csdb::Address::from_wallet_id(id);
+      return res;
+    }
 }
 
 bool BlockChain::finishNewBlock(csdb::Pool& pool)
