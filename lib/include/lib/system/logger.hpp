@@ -238,11 +238,11 @@ namespace cs
         return logger;
     }
 
-    ///
-    /// Macro csfile writes to file if /log folder exists
-    ///
-    /// @example csfile() << "Hello, world";
-    ///
+///
+/// Macro csfile writes to file if /log folder exists
+///
+/// @example csfile() << "Hello, world";
+///
 #define csfile cs::Logger::instance
 
 ///

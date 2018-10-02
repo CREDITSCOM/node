@@ -12,7 +12,11 @@ namespace cs
 {
     using TimerCallback = std::function<void()>;
 
-    // Represents standard timer that calls callbacks every msec with time correction
+    ///
+    /// Represents standard timer that calls callbacks every msec with time correction.
+    ///
+    /// @brief Timer uses callback in another thread
+    ///
     class Timer
     {
     public:
@@ -23,22 +27,47 @@ namespace cs
         explicit Timer();
         ~Timer();
 
-        // starts timer with milliseconds period
+        ///
+        /// Starts timer with milliseconds period.
+        ///
+        /// @param msec is time in msec to tick.
+        ///
         void start(int msec);
 
-        // stops timer
+        ///
+        /// Stops timer.
+        ///
+        /// @brief Timer would not stop immediatly, only after thread joining.
+        ///
         void stop();
 
-        // register callback
+        ///
+        /// Registers callback to timer
+        ///
+        /// @param callback is any functor, lambda, closure, function object.
+        /// @brief You can add any count of callbacks to call.
+        /// Method should be called only if isRunning returns false.
+        ///
         void connect(const TimerCallback& callback);
 
-        // unregister callbacks
+        ///
+        /// Unregisters all callbacks.
+        ///
         void disconnect();
 
-        // returns timer status
+        ///
+        /// Returns timer status.
+        ///
+        /// @return Returns timer running state
+        ///
         bool isRunning();
 
-        // calls callback after msec time
+        ///
+        /// Calls callback once in another thread after msec time.
+        ///
+        /// @param msec is time in msec to tick.
+        /// @param callback is any functor, lambda, closure, function object.
+        ///
         static void singleShot(int msec, const TimerCallback& callback);
 
     protected:
