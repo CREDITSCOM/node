@@ -175,6 +175,8 @@ namespace slv2
 
         /** @brief   Flag to suppress too much flood when report about ignore transactions */
         bool report_ignore_transactions;
+
+
     };
 
 } // slv2

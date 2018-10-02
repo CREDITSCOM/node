@@ -3,8 +3,10 @@
 
 namespace slv2
 {
-    void StartState::on(SolverContext& /*context*/)
+    void StartState::on(SolverContext& context)
     {
+        DefaultStateBehavior::on(context);
+
         //TODO: проверить, что на практике не вызывается на первом раунде, как м.б. подумать
 //
 //        context.node().becomeWriter(); //???

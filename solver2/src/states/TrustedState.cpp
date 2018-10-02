@@ -10,6 +10,8 @@ namespace slv2
 {
     void TrustedState::on(SolverContext& context)
     {
+        DefaultStateBehavior::on(context);
+
         // its possible vectors or matrices already completed
         if(test_vectors_completed(context)) {
             // let context decide what to do

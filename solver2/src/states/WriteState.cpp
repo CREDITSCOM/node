@@ -9,6 +9,8 @@ namespace slv2
 {
     void WriteState::on(SolverContext& context)
     {
+        DefaultStateBehavior::on(context);
+
         // No one other state must not store hashes this round!
         assert(context.cnt_hash_recv() == 0);
 

@@ -10,6 +10,8 @@ namespace slv2
 {
     void NormalState::on(SolverContext& context)
     {
+        DefaultStateBehavior::on(context);
+
         SolverContext * pctx = &context;
 
         if(context.is_spammer()) {

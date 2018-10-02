@@ -8,6 +8,8 @@ namespace slv2
 {
     void CollectState::on(SolverContext& context)
     {
+        DefaultStateBehavior::on(context);
+
         auto cur_round = context.round();
         if(cur_round == 1) {
             if(Consensus::Log) {

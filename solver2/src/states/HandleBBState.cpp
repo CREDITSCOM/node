@@ -7,6 +7,9 @@ namespace slv2
 
     void HandleBBState::on(SolverContext& context)
     {
+        // not WriteState::on(context) !!!
+        DefaultStateBehavior::on(context);
+
         // if BigBang occur reduce hashes awaited to minimal value
         min_count_hashes = static_cast<int>(Consensus::MinTrustedNodes);
         int remains = min_count_hashes - static_cast<int>(context.cnt_hash_recv());
