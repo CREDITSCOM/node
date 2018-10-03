@@ -333,12 +333,10 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
   }
 }
 
-void Node::sendTransaction(const csdb::Transaction& trans) {
-  ostream_.init(BaseFlags::Broadcast, mainNode_);
-  ostream_ << MsgTypes::Transactions << roundNum_ << trans;
-
-  cslog() << "Sending transactions";
-
+void Node::sendTransaction(csdb::Pool&& transactions) {
+  transactions.recount();
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+  composeMessageWithBlock(transactions, MsgTypes::Transactions);
   flushCurrentTasks();
 }
 
@@ -655,6 +653,21 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     cswarning() << "Bad block packet format";
     return;
   }
+
+  size_t localSeq = getBlockChain().getLastWrittenSequence();
+  size_t blockSeq = pool.sequence();
+  if (roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
+  if (localSeq >= blockSeq) return;
+
+  if (!blocksReceivingStarted_)
+  {
+    blocksReceivingStarted_ = true;
+    lastStartSequence_ = pool.sequence();
+    csdebug() << "GETBLOCK> Setting first got block: " << lastStartSequence_;
+  }
+
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
+  else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -1071,7 +1084,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (awaitingSyncroBlock && awaitingRecBlockCount < 1) {
+  if (seq == lastStartSequence_)
+  {
+    solver_->tmpStorageProcessing();
+    return;
+  }
+  //FIXME: result of merge cs_dev branch
+  if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
     cslog() << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence;
 
     awaitingRecBlockCount++;
@@ -1121,9 +1140,12 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
-  } else {
-    return;
+    solver_->rndStorageProcessing();
   }
+  else if ((pool.sequence() > sendBlockRequestSequence) && 
+    (pool.sequence() < lastStartSequence_)) 
+      solver_->gotFreeSyncroBlock(std::move(pool));
+  else return;
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
@@ -1293,15 +1315,16 @@ void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) 
   uint32_t bSize;
 
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-
+  composeCompressed(data, bSize, type);
+}
+ 
+void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
   auto max    = LZ4_compressBound(bSize);
   auto memPtr = allocator_.allocateNext(max);
 
   auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), bSize, memPtr.size());
 
   allocator_.shrinkLast(realSize);
-
   ostream_ << type << roundNum_ << bSize;
-
   ostream_ << std::string(static_cast<char*>(memPtr.get()), memPtr.size());
 }

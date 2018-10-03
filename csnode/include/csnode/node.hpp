@@ -62,8 +62,7 @@ class Node {
 
   /* Outcoming requests forming */
   void sendRoundTable();
-  void sendTransaction(const csdb::Transaction&);
-
+  void sendTransaction(csdb::Pool&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);
   void sendVector(const cs::HashVector&);
@@ -145,6 +144,7 @@ private:
   void        onRoundStart();
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
+  void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
   // Info
   const PublicKey myPublicKey_;
@@ -188,6 +188,9 @@ private:
 
   RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
+
+  size_t lastStartSequence_;
+  bool blocksReceivingStarted_ = false;
 
   IPackStream istream_;
   OPackStream ostream_;

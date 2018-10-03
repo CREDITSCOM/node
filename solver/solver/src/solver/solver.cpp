@@ -672,6 +672,100 @@ void Solver::writeNewBlock() {
   }
 }
 
+void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
+  if (node_->getMyLevel() == NodeLevel::Writer) {
+    LOG_WARN("Writer nodes don't get blocks");
+    return;
+  }
+  gotBigBang        = false;
+  gotBlockThisRound = true;
+#ifdef MONITOR_NODE
+  addTimestampToPool(block);
+#endif
+  uint32_t g_seq = block.sequence();
+  csdebug() << "GOT NEW BLOCK: global sequence = " << g_seq;
+
+  if (g_seq > node_->getRoundNumber())
+    return;  // remove this line when the block candidate signing of all trusted will be implemented
+
+  node_->getBlockChain().setGlobalSequence(g_seq);
+  if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
+    std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
+    if (block.verify_signature())  // INCLUDE SIGNATURES!!!
+    {
+      node_->getBlockChain().putBlock(block);
+#ifndef MONITOR_NODE
+      if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
+        // std::cout << "Solver -> before sending hash to writer" << std::endl;
+        Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));  // getLastWrittenHash().to_binary().data()));//SENDING
+                                                                                                  // HASH!!!
+        node_->sendHash(test_hash, sender);
+        csdebug() << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32);
+      }
+#endif
+    }
+  }
+}
+
+void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
+{
+  std::cout << __func__ << std::endl;
+  if (tmpStorage.count(block.sequence()) == 0)
+  {
+    tmpStorage.emplace(block.sequence(), block);
+    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+
+}
+
+void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
+{
+  std::cout << __func__ << std::endl;
+  if (rndStorage.count(block.sequence()) == 0)
+  {
+    rndStorage.emplace(block.sequence(), block);
+    std::cout << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+}
+
+void Solver::rndStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (rndStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      rndStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
+void Solver::tmpStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (tmpStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      tmpStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
 bool Solver::getBigBangStatus() {
   return gotBigBang;
 }
@@ -852,7 +946,7 @@ void Solver::spamWithTransactions() {
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   cs::Lock lock(mSharedMutex);
-  m_transactions.push_back(transaction);
+  m_transactionsBlock.back().add_transaction(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -871,7 +965,7 @@ void Solver::addInitialBalance() {
 
   {
     cs::Lock lock(mSharedMutex);
-    m_transactions.push_back(transaction);
+    m_transactionsBlock.back().add_transaction(transaction);
   }
 
 #ifdef SPAMMER

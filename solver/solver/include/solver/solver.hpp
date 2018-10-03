@@ -59,7 +59,7 @@ struct HashVector {
 };
 struct HashMatrix {
   uint8_t    Sender;
-  HashVector hmatr[100];
+  HashVector hmatr[5];
   Signature  sig;
 };
 struct NormalState {
@@ -127,12 +127,16 @@ class Solver {
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
-  // void gotBlock(csdb::Pool&&, const PublicKey&);
+  void gotBlock(csdb::Pool&&, const PublicKey&);
   void gotHash(std::string&&, const PublicKey&);
   void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
   void gotBlockReply(csdb::Pool&&);
   void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+  void gotFreeSyncroBlock(csdb::Pool&&);
   void sendTL();
+  void rndStorageProcessing();
+  void tmpStorageProcessing();
   void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
                            const csdb::Pool& metaInfoPool, const PublicKey& sender);
 
@@ -248,13 +252,15 @@ class Solver {
 
   cs::SharedMutex mSharedMutex;
 
-  std::vector<csdb::Transaction> m_transactions;
-  csdb::Pool                     m_transactions_;
-
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock           m_transactionsBlock;
 
   cs::Timer m_sendingPacketTimer;
+
+  /*to store new blocks*/
+  std::map<size_t, csdb::Pool> tmpStorage;
+  /*to store unrequested syncro blocks*/
+  std::map<size_t, csdb::Pool> rndStorage;
 
 #ifdef SPAMMER
   std::atomic_bool spamRunning{false};

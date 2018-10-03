@@ -63,7 +63,7 @@ public:
   static const uint32_t MaxSize = 1 << 10;
   static const uint32_t MaxFragments = 1 << 12;
 
-  static const uint32_t SmartRedirectTreshold = 1;
+  static const uint32_t SmartRedirectTreshold = 100000;
 
   Packet() { }
   Packet(RegionPtr&& data): data_(std::move(data)) { }
@@ -201,7 +201,7 @@ typedef MemPtr<TypedSlot<Message>> MessagePtr;
 
 class PacketCollector {
 public:
-  static const uint32_t MaxParallelCollections = 32;
+  static const uint32_t MaxParallelCollections = 1024;
 
   PacketCollector():
     msgAllocator_(MaxParallelCollections + 1) { }
