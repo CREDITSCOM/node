@@ -1,7 +1,7 @@
 #include "SolverCore.h"
 #include "SolverContext.h"
 #include <Solver/Solver.hpp>
-#include "../Node.h"
+#include "Node.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4324)
@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <limits>
+#include <string>
 
 namespace slv2
 {

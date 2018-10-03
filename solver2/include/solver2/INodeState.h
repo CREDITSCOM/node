@@ -2,8 +2,7 @@
 #include "Result.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)
-class PublicKey;
-class Hash;
+#include "ProxyTypes.h"
 #else
 #include <lib/system/keys.hpp> // Hash, PublicKey
 #endif

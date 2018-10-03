@@ -1,8 +1,10 @@
 #include "SolverCore.h"
 #include <Solver/Solver.hpp>
-#include "../Node.h"
+#include "Node.h"
 #include <Solver/Generals.hpp>
 #include <csdb/currency.h>
+
+#include <iostream>
 
 namespace slv2
 {
@@ -131,9 +133,11 @@ namespace slv2
         // bad tansactions storage:
         csdb::Pool b_pool {};
         // update own hash vector
-        auto result = pgen->buildvector(p, pool, pnode->getConfidants().size(), b_pool);
-        pown_hvec->Sender = pnode->getMyConfNumber();
-        pown_hvec->hash = result;
+        if(pnode != nullptr && pgen != nullptr) {
+            auto result = pgen->buildvector(p, pool, pnode->getConfidants().size(), b_pool);
+            pown_hvec->Sender = pnode->getMyConfNumber();
+            pown_hvec->hash = result;
+        }
 
         if(!pstate) {
             return;
@@ -214,10 +218,12 @@ namespace slv2
             std::cout << "SolverCore: gotBlockRequest()" << std::endl;
         }
         // state does not take part
-        csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
-        if(p.is_valid())        {
-            p.set_previous_hash(csdb::PoolHash::from_string(""));
-            pnode->sendBlockReply(p, sender);
+        if(pnode != nullptr) {
+            csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
+            if(p.is_valid()) {
+                p.set_previous_hash(csdb::PoolHash::from_string(""));
+                pnode->sendBlockReply(p, sender);
+            }
         }
     }
 
@@ -302,7 +308,9 @@ namespace slv2
         if(!pstate) {
             return;
         }
-        cur_round = pnode->getRoundNumber();
+        if(pnode != nullptr) {
+            cur_round = pnode->getRoundNumber();
+        }
         if(Consensus::Log) {
             std::cout << "SolverCore: nextRound()" << std::endl;
         }

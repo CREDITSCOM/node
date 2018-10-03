@@ -12,7 +12,11 @@ namespace slv2
         DefaultStateBehavior::on(context);
 
         // No one other state must not store hashes this round!
-        assert(context.cnt_hash_recv() == 0);
+        if(context.cnt_hash_recv() != 0) {
+            if(Consensus::Log) {
+                std::cout << name() << ": (error) hashes must not be stored until I send a new block (" << context.cnt_hash_recv() << " are)" << std::endl;
+            }
+        }
 
         // adjust minimal hashes to await
         int tmp = static_cast<int>(context.cnt_trusted());

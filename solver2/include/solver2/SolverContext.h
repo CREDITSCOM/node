@@ -23,9 +23,19 @@ namespace slv2
     class SolverCore;
     using KeyType = csdb::internal::byte_array;
 
-    // "Интерфейсный" класс для обращений из классов состояний к ядру солвера,
-    // определяет подмножество вызовов солвера, которые доступны из классов состояний,
-    // д. б. достаточным, но не избыточным одновременно
+    /**
+     * @class   SolverContext
+     *
+     * @brief   A solver context.
+     *          
+     *          "Интерфейсный" класс для обращений из классов состояний к ядру солвера, определяет
+     *          подмножество вызовов солвера, которые доступны из классов состояний, д. б.
+     *          достаточным, но не избыточным одновременно.
+     *
+     * @author  aae
+     * @date    03.10.2018
+     */
+
     class SolverContext
     {
     public:
@@ -37,21 +47,42 @@ namespace slv2
 
         // Switch state methods:
 
-        /// <summary>   Request to become normal node. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::become_normal();
+         *
+         * @brief   Request to become normal node.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void become_normal();
 
-        /// <summary>   Request to become trusted node. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::become_trusted();
+         *
+         * @brief   Request to become trusted node.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void become_trusted();
 
-        /// <summary>   Request to become writer node. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::become_writer();
+         *
+         * @brief   Request to become writer node.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void become_writer();
 
@@ -66,51 +97,93 @@ namespace slv2
 
         inline void become_collector();
 
-        /// <summary>   Inform that receive enough vectors. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::vectors_completed();
+         *
+         * @brief   Inform that receive enough vectors.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
         
         inline void vectors_completed();
 
-        /// <summary>   Inform that receive enough matrices. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::matrices_completed();
+         *
+         * @brief   Inform that receive enough matrices.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void matrices_completed();
 
-        /// <summary>   Spawn next round. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  void SolverContext::spawn_next_round();
+         *
+         * @brief   Spawn next round.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         void spawn_next_round();
 
         // Fast access methods, may be removed at the end
 
-        /// <summary>   Gets the node instance. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to a Node. </returns>
+        /**
+         * @fn  inline Node& SolverContext::node() const;
+         *
+         * @brief   Gets the node instance.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  A reference to a Node.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline Node& node() const;
 
-        /// <summary>   Gets the generals instance. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to the Credits::Generals. </returns>
+        /**
+         * @fn  inline Credits::Generals& SolverContext::generals() const;
+         *
+         * @brief   Gets the generals instance.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  A reference to the Credits::Generals.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline Credits::Generals& generals() const;
 
-        /// <summary>   Gets the scheduler instance. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to a CallsQueueScheduler. </returns>
+        /**
+         * @fn  inline CallsQueueScheduler& SolverContext::scheduler() const;
+         *
+         * @brief   Gets the scheduler instance.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  A reference to a CallsQueueScheduler.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline CallsQueueScheduler& scheduler() const;
 
-        // Access to common state properties
+        // Access to common state properties. 
         
         /// <summary>   Public key. </summary>
         ///
@@ -120,60 +193,108 @@ namespace slv2
 
         inline const KeyType& public_key() const;
 
-        /// <summary>   Private key. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to a const KeyType private key. </returns>
+        /**
+         * @fn  inline const KeyType& SolverContext::private_key() const;
+         *
+         * @brief   Private key.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  A reference to a const KeyType private key.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline const KeyType& private_key() const;
 
-        /// <summary>   Current hash vector. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to a const Credits::HashVector. </returns>
+        /**
+         * @fn  inline const Credits::HashVector& SolverContext::hash_vector() const;
+         *
+         * @brief   Current hash vector.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  A reference to a const Credits::HashVector.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline const Credits::HashVector& hash_vector() const;
 
-        /// <summary>   Gets the current round number. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   An int32_t. </returns>
+        /**
+         * @fn  inline uint32_t SolverContext::round() const;
+         *
+         * @brief   Gets the current round number.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  An int32_t.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
-        inline int32_t round() const;
+        inline uint32_t round() const;
 
-        /// <summary>   Gets the own number among confidant (trusted) nodes. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   An uint8_t. </returns>
+        /**
+         * @fn  uint8_t SolverContext::own_conf_number() const;
+         *
+         * @brief   Gets the own number among confidant (trusted) nodes.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  An uint8_t.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         uint8_t own_conf_number() const;
 
-        /// <summary>   Gets count of trusted nodes in current round. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   The total number of trusted. </returns>
+        /**
+         * @fn  size_t SolverContext::cnt_trusted() const;
+         *
+         * @brief   Gets count of trusted nodes in current round.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  The total number of trusted.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         size_t cnt_trusted() const;
 
-        /// <summary>   Query if this node is in spammer mode. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   True if spammer, false if not. </returns>
+        /**
+         * @fn  inline bool SolverContext::is_spammer() const;
+         *
+         * @brief   Query if this node is in spammer mode.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  True if spammer, false if not.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline bool is_spammer() const;
 
         // Common operations, candidates for refactoring:
-         
-        
-        /// <summary>   Makes a block from inner pool of collected and validated transactions and send it</summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+
+        /**
+         * @fn  inline void SolverContext::store_and_send_block();
+         *
+         * @brief   Makes a block from inner pool of collected and validated transactions and send it
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void store_and_send_block();
 
@@ -188,105 +309,189 @@ namespace slv2
 
         inline void repeat_last_block();
 
-        /// <summary>   Adds transaction to inner list </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="tr">   The tr to add. </param>
+        /**
+         * @fn  inline void SolverContext::add(const csdb::Transaction& tr);
+         *
+         * @brief   Adds transaction to inner list
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   tr  The tr to add.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void add(const csdb::Transaction& tr);
 
-        /// <summary>   Sends the transactions in inner list </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
+        /**
+         * @fn  inline void SolverContext::flush_transactions();
+         *
+         * @brief   Sends the transactions in inner list
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void flush_transactions();
 
-        /// <summary>   Verifies the given transaction </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="tr">   The tr. </param>
-        ///
-        /// <returns>   True if it succeeds, false if it fails. </returns>
+        /**
+         * @fn  inline bool SolverContext::verify(const csdb::Transaction& tr) const;
+         *
+         * @brief   Verifies the given transaction
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   tr  The tr.
+         *
+         * @return  True if it succeeds, false if it fails.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline bool verify(const csdb::Transaction& tr) const;
 
-        /// <summary>   Query if is vector received from passed sender </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
-        ///
-        /// <returns>   True if vect receive from, false if not. </returns>
+        /**
+         * @fn  inline bool SolverContext::is_vect_recv_from(uint8_t sender) const;
+         *
+         * @brief   Query if is vector received from passed sender
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  True if vect receive from, false if not.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline bool is_vect_recv_from(uint8_t sender) const;
 
-        /// <summary>   Inform core to remember that vector from passed sender is received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
+        /**
+         * @fn  inline void SolverContext::recv_vect_from(uint8_t sender);
+         *
+         * @brief   Inform core to remember that vector from passed sender is received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void recv_vect_from(uint8_t sender);
 
-        /// <summary>   Count of vectors received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   The total number of vect receive. </returns>
+        /**
+         * @fn  inline size_t SolverContext::cnt_vect_recv() const;
+         *
+         * @brief   Count of vectors received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  The total number of vect receive.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline size_t cnt_vect_recv() const;
 
-        /// <summary>   Query if is matrix received from passed sender </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
-        ///
-        /// <returns>   True if matr receive from, false if not. </returns>
+        /**
+         * @fn  inline bool SolverContext::is_matr_recv_from(uint8_t sender) const;
+         *
+         * @brief   Query if is matrix received from passed sender
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  True if matr receive from, false if not.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline bool is_matr_recv_from(uint8_t sender) const;
 
-        /// <summary>   Inform core to remember that matrix from passed sender is received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
+        /**
+         * @fn  inline void SolverContext::recv_matr_from(uint8_t sender);
+         *
+         * @brief   Inform core to remember that matrix from passed sender is received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void recv_matr_from(uint8_t sender);
 
-        /// <summary>   Count of matrices received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   The total number of matr receive. </returns>
+        /**
+         * @fn  inline size_t SolverContext::cnt_matr_recv() const;
+         *
+         * @brief   Count of matrices received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  The total number of matr receive.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline size_t cnt_matr_recv() const;
 
-        /// <summary>   Query if is hash received from passed sender </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
-        ///
-        /// <returns>   True if hash receive from, false if not. </returns>
+        /**
+         * @fn  inline bool SolverContext::is_hash_recv_from(const PublicKey& sender) const;
+         *
+         * @brief   Query if is hash received from passed sender
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  True if hash receive from, false if not.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline bool is_hash_recv_from(const PublicKey& sender) const;
 
-        /// <summary>   Inform core to remember that hash from passed sender is received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <param name="sender">   The sender. </param>
+        /**
+         * @fn  inline void SolverContext::recv_hash_from(const PublicKey& sender);
+         *
+         * @brief   Inform core to remember that hash from passed sender is received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @param   sender  The sender.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline void recv_hash_from(const PublicKey& sender);
 
-        /// <summary>   Count of hashes received </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   The total number of hash receive. </returns>
+        /**
+         * @fn  inline size_t SolverContext::cnt_hash_recv() const;
+         *
+         * @brief   Count of hashes received
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  The total number of hash receive.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
         inline size_t cnt_hash_recv() const;
 
@@ -324,7 +529,7 @@ namespace slv2
         return core.getMyVector();
     }
 
-    int32_t SolverContext::round() const
+    uint32_t SolverContext::round() const
     {
         return core.cur_round;
     }
