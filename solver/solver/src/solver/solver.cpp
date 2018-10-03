@@ -341,9 +341,10 @@ void Solver::flushTransactions() {
     }
   }
 
-  cslog() << "All transaction packets flushed";
-
-  m_transactionsBlock.clear();
+  if (!m_transactionsBlock.empty()) {
+    cslog() << "All transaction packets flushed, packet count: " << m_transactionsBlock.size();
+    m_transactionsBlock.clear();
+  }
 }
 
 bool Solver::getIPoolClosed() {
@@ -434,7 +435,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
 }
 
 void Solver::gotRound(cs::RoundInfo&& round) {
-  cslog() << "Got round table";
+  cslog() << "Solver Got round table";
 
   cs::Hashes localHashes = round.hashes;
   cs::Hashes neededHashes;
@@ -737,6 +738,8 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     m_roundInfo.general    = node_->getMyPublicKey();
     m_roundInfo.hashes     = std::move(hashes);
 
+    ips.clear();
+
     cslog() << "Solver -> NEW ROUND initialization done";
 
     node_->initNextRound(m_roundInfo);
@@ -884,6 +887,11 @@ cs::RoundNumber Solver::currentRoundNumber() {
   return m_roundInfo.round;
 }
 
+const cs::RoundInfo& Solver::roundInfo() const
+{
+  return m_roundInfo;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// gotBlockRequest
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
@@ -937,11 +945,14 @@ void Solver::nextRound() {
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
   }
+
   if (node_->getMyLevel() == NodeLevel::Confidant) {
     memset(receivedVecFrom, 0, 100);
     memset(receivedMatFrom, 0, 100);
+
     trustedCounterVector = 0;
     trustedCounterMatrix = 0;
+
     cslog() << "SOLVER> next Round : the variables initialized";
 
 #ifdef SPAM_MAIN
@@ -956,6 +967,7 @@ void Solver::nextRound() {
     spamRunning = true;
 #endif
     m_isPoolClosed = true;
+
     if (!m_sendingPacketTimer.isRunning()) {
       cslog() << "Transaction timer started";
       m_sendingPacketTimer.start(TransactionsPacketInterval);
