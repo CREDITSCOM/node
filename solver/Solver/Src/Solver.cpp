@@ -322,7 +322,11 @@ void Solver::gotTransactionList(csdb::Pool&& _pool)
   uint8_t numGen = node_->getConfidants().size();
 //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool = csdb::Pool{};
+#ifndef SPAMMER
   csdb::Pool pool = removeTransactionsWithBadSignatures(_pool);
+#else
+  csdb::Pool pool(_pool);
+#endif
   fee_counter_.CountFeesInPool(node_, &pool);
   Hash_ result = generals->buildvector(pool, m_pool, b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
@@ -896,8 +900,17 @@ csdb::Pool Solver::removeTransactionsWithBadSignatures(const csdb::Pool& pool)
 {
   csdb::Pool good_pool;
   std::vector<csdb::Transaction> transactions = pool.transactions();
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    if (transactions[i].verify_signature())
+  BlockChain::WalletData data_to_fetch_pulic_key;
+  for (int i = 0; i < transactions.size(); ++i) {
+    if (transactions[i].source().is_wallet_id()) {
+      node_->getBlockChain().findWalletData(transactions[i].source().wallet_id(), data_to_fetch_pulic_key);
+      if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),
+        data_to_fetch_pulic_key.address_.end()))) {
+        good_pool.add_transaction(transactions[i]);
+        continue;
+      }
+    }
+    if (transactions[i].verify_signature(transactions[i].source().public_key()))
       good_pool.add_transaction(transactions[i]);
   }
   return good_pool;
