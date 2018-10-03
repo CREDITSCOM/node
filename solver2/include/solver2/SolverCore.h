@@ -82,23 +82,9 @@ namespace slv2
         {}
 
     private:
-        // options
-
-        bool opt_timeouts_enabled;
-        bool opt_repeat_state_enabled;
-        bool opt_spammer_on;
-        bool opt_is_proxy_v1;
-
-        // inner data
 
         // to use private data while serve for states as SolverCore context:
         friend class SolverContext;
-        std::unique_ptr<SolverContext> pcontext;
-
-        CallsQueueScheduler scheduler;
-        CallsQueueScheduler::CallTag tag_state_expired;
-
-        bool req_stop;
 
         enum class Event
         {
@@ -121,40 +107,54 @@ namespace slv2
         using StatePtr = std::shared_ptr<INodeState>;
         using Transitions = std::map<Event, StatePtr>;
 
+        // options
+
+        bool opt_timeouts_enabled;
+        bool opt_repeat_state_enabled;
+        bool opt_spammer_on;
+        bool opt_is_proxy_v1;
+
+        // inner data
+
+        std::unique_ptr<SolverContext> pcontext;
+        CallsQueueScheduler scheduler;
+        CallsQueueScheduler::CallTag tag_state_expired;
+        bool req_stop;
         std::map<StatePtr, Transitions> transitions;
         StatePtr pstate;
-
-        void InitTransitions();
-        void setState(const StatePtr& pState);
-
-        void handleTransitions(Event evt);
-        bool stateCompleted(Result result);
 
         // consensus data
         
         Counter cur_round;
-
         KeyType public_key;
         KeyType private_key;
-
         std::unique_ptr<Credits::HashVector> pown_hvec;
-
         // senders of vectors received this round
         std::set<uint8_t> recv_vect;
         // senders of matrices received this round
         std::set<uint8_t> recv_matr;
         // senders of hashes received this round
         std::vector<PublicKey> recv_hash;
-
         // sequence number of the last transaction received
         uint64_t last_trans_list_recv;
-
         // pool for storing transactions list, serve as source for new block
         // must be managed by SolverCore because consumed by different states (Trusted*, Write...)
         csdb::Pool pool {};
-
         std::mutex trans_mtx;
         std::vector<csdb::Transaction> transactions;
+
+        // previous solver version instance
+
+        std::unique_ptr<Credits::Solver> pslv_v1;
+        Node * pnode;
+        std::unique_ptr<Credits::Generals> pgen_inst;
+        Credits::Generals * pgen;
+
+        void InitTransitions();
+        void setState(const StatePtr& pState);
+
+        void handleTransitions(Event evt);
+        bool stateCompleted(Result result);
 
         // sends current block if actual otherwise loads block from storage and sends it
         void repeatLastBlock();
@@ -165,12 +165,6 @@ namespace slv2
         void prepareBlock(csdb::Pool& p);
         void flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);
-
-        // previous solver version instance
-        std::unique_ptr<Credits::Solver> pslv_v1;
-
-        Node * pnode;
-        Credits::Generals * pgen;
     };
 
 } // slv2

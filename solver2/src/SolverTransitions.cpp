@@ -57,7 +57,7 @@ namespace slv2
             defaultRT, { Event::SetWriter, pWrite }
         } },
         { pCollect, {
-            // commented out transition is correct almost always but is not after BigBang
+            // commented out direct transition is not correct after BB
             defaultRT // { Event::RoundTable, pNormal }
         } },
         { pWrite, {
@@ -67,7 +67,7 @@ namespace slv2
             { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, { Event::SetCollector, pCollect }
         } },
         { pBB, {
-            // only option to activate BB is from Write, so act almost as Write and finishing round upon receive hashes
+            // only option to activate BB is from Write, so we will act almost as Write and finishing round upon receive hashes
             defaultRT
         } },
         { pstate, {

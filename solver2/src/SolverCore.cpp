@@ -2,13 +2,15 @@
 #include "SolverContext.h"
 #include <Solver/Solver.hpp>
 #include "Node.h"
+#include "Generals.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4324)
 #include <sodium.h>
 #pragma warning(pop)
 
-#include <iostream>
+#include <lib/system/logger.hpp>
+
 #include <limits>
 #include <string>
 
@@ -16,30 +18,51 @@ namespace slv2
 {
 
     SolverCore::SolverCore()
-        // internal data
-        : tag_state_expired(CallsQueueScheduler::no_tag)
-        , req_stop(true)
-        , pcontext(std::make_unique<SolverContext>(*this))
         // options
-        , opt_timeouts_enabled(false)
+        : opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
+        , opt_spammer_on(false)
         , opt_is_proxy_v1(false)
+        // inner data
+        , pcontext(std::make_unique<SolverContext>(*this))
+        //, scheduler()
+        , tag_state_expired(CallsQueueScheduler::no_tag)
+        , req_stop(true)
+        //, transitions()
+        //, pstate
         // consensus data
         , cur_round(0)
-        , pnode(nullptr)
-        , pgen(nullptr)
-        , pslv_v1(nullptr)
+        //, public_key()
+        //, private_key()
         , pown_hvec(std::make_unique<Credits::HashVector>())
+        //, recv_vect()
+        //, recv_matr()
+        //, recv_hash()
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
+        //, pool()
+        //, trans_mtx()
+        //, transactions()
+        // previous solver version instance
+        , pslv_v1(nullptr)
+        , pnode(nullptr)
+        , pgen_inst(nullptr)
+        , pgen(nullptr)
     {
         InitTransitions();
     }
 
     SolverCore::SolverCore(Node * pNode) : SolverCore()
     {
-        pslv_v1 = (std::make_unique<Credits::Solver>(pNode));
-        pgen = pslv_v1->generals.get();
-        pnode = pslv_v1->node_;
+        if(opt_is_proxy_v1) {
+            pslv_v1 = std::make_unique<Credits::Solver>(pNode);
+            pgen = pslv_v1->generals.get();
+        }
+        else {
+            pgen_inst = std::make_unique<Credits::Generals>();
+            // temp decision until solver-1 may be instantiated:
+            pgen = pgen_inst.get();
+        }
+        pnode = pNode;
     }
 
     SolverCore::~SolverCore()
@@ -51,7 +74,7 @@ namespace slv2
     void SolverCore::start()
     {
         if(Consensus::Log) {
-            std::cout << "SolverCore: starting in " << (opt_is_proxy_v1 ? "proxy" : "standalone") << " mode" << std::endl;
+            LOG_NOTICE("SolverCore: starting in " << (opt_is_proxy_v1 ? "proxy" : "standalone") << " mode");
         }
         req_stop = false;
         handleTransitions(Event::Start);
@@ -83,14 +106,18 @@ namespace slv2
         }
         
         pstate->off(*pcontext);
-        std::cout << "SolverCore: switch state " << pstate->name() << " -> " << pState->name() << std::endl;
+        if(Consensus::Log) {
+            LOG_NOTICE("SolverCore: switch state " << pstate->name() << " -> " << pState->name());
+        }
         pstate = pState;
         pstate->on(*pcontext);
         
-        // timeout hadling
+        // timeout handling
         if(opt_timeouts_enabled) {
             tag_state_expired = scheduler.InsertOnce(Consensus::DefaultStateTimeout, [this]() {
-                std::cout << "SolverCore: state " << pstate->name() << " is expired" << std::endl;
+                if(Consensus::Log) {
+                    LOG_NOTICE("SolverCore: state " << pstate->name() << " is expired");
+                }
                 // clear flag to know timeout expired
                 tag_state_expired = CallsQueueScheduler::no_tag;
                 // control state switch
@@ -98,7 +125,9 @@ namespace slv2
                 pstate->expired(*pcontext);
                 if(pstate == p1.lock()) {
                     // expired state did not change to another one, do it now
-                    std::cout << "SolverCore: there is no state set on expiration of " << pstate->name() << std::endl;
+                    if(Consensus::Log) {
+                        LOG_NOTICE("SolverCore: there is no state set on expiration of " << pstate->name());
+                    }
                     //setNormalState();
                 }
             }, true);
@@ -108,16 +137,23 @@ namespace slv2
     void SolverCore::handleTransitions(Event evt)
     {
         if(Event::BigBang == evt) {
-            std::cout << "SolverCore: BigBang on" << std::endl;
+            if(Consensus::Log) {
+                LOG_WARN("SolverCore: BigBang on");
+            }
         }
         const auto& variants = transitions [pstate];
         if(variants.empty()) {
-            std::cout << "SolverCore: there are no transitions for " << pstate->name() << std::endl;
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: there are no transitions for " << pstate->name());
+            }
             return;
         }
         auto it = variants.find(evt);
         if(it == variants.cend()) {
             // such event is ignored in current state
+            if(Consensus::Log) {
+                LOG_DEBUG("SolverCore: event " << static_cast<int>(evt) << "ignored in state " << pstate->name());
+            }
             return;
         }
         setState(it->second);
@@ -126,31 +162,31 @@ namespace slv2
     bool SolverCore::stateCompleted(Result res)
     {
         if(Consensus::Log && Result::Failure == res) {
-            std::cout << "SolverCore: error in state " << pstate->name() << std::endl;
+            LOG_ERROR("SolverCore: error in state " << pstate->name());
         }
         return (Result::Finish == res);
     }
 
     void SolverCore::repeatLastBlock()
     {
-        //if(cur_round == pool.sequence()) {
-        //    // still actual, send it again
-        //    if(Consensus::Log) {
-        //        std::cout << "SolverCore: current block is ready to repeat" << std::endl;
-        //    }
-        //    sendBlock(pool);
-        //}
-        //else {
+        if(cur_round == pool.sequence()) {
+            // still actual, send it again
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: current block is ready to repeat");
+            }
+            sendBlock(pool);
+        }
+        else {
             // load block and send it
             if(Consensus::Log) {
-                std::cout << "SolverCore: current block is out of date, so load stored block to repeat" << std::endl;
+                LOG_NOTICE("SolverCore: current block is out of date, so load stored block to repeat");
             }
             auto& bch = pnode->getBlockChain();
             csdb::Pool p = bch.loadBlock(bch.getLastWrittenHash());
             if(p.is_valid()) {
                 sendBlock(p);
             }
-        //}
+        }
     }
 
     // Copied methods from solver.v1
@@ -158,7 +194,7 @@ namespace slv2
     void SolverCore::sendBlock(csdb::Pool& p)
     {
         if(Consensus::Log) {
-            std::cout << "SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions" << std::endl;
+            LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
         }
         pnode->sendBlock(p);
     }
@@ -166,7 +202,7 @@ namespace slv2
     void SolverCore::storeBlock(csdb::Pool& p)
     {
         if(Consensus::Log) {
-            std::cout << "SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions" << std::endl;
+            LOG_NOTICE("SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
         }
         pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(p.sequence()));
         pnode->getBlockChain().putBlock(p);
