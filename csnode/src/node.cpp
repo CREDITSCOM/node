@@ -36,7 +36,7 @@ Node::Node(const Config& config):
   api_(bc_, solver_),
   allocator_(1 << 24, 5),
   packStreamAllocator_(1 << 26, 5),
-  ostream_(&allocator_, myPublicKey_) {
+  ostream_(&packStreamAllocator_, myPublicKey_) {
   good_ = init();
 }
 
@@ -790,11 +790,6 @@ void Node::sendBlockRequest(uint32_t seq) {
     solver_->tmpStorageProcessing();
     return;
   }
-  if (awaitingSyncroBlock && awaitingRecBlockCount<1 && false)
-  {
-    solver_->tmpStorageProcessing();
-    return;
-  }
   if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
 #ifdef MYLOG
 // std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence <<
@@ -868,20 +863,13 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-   std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
-   #endif
-   ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags ::Compressed, sender);
-   uint32_t bSize;
-   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
+#endif
 
-   std::string compressed;
-   snappy::Compress((const char*)data, bSize, &compressed);
-   ostream_ << MsgTypes::RequestedBlock
-     << roundNum_
-     << compressed;
-
-    flushCurrentTasks();
-  }
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
+  flushCurrentTasks();
+}
 
 //ostream_.init(BaseFlags::Signed | BaseFlags::Fragmented | BaseFlags::Compressed);
 //size_t bSize;

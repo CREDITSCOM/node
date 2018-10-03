@@ -896,7 +896,7 @@ csdb::Pool Solver::removeTransactionsWithBadSignatures(const csdb::Pool& pool)
 {
   csdb::Pool good_pool;
   std::vector<csdb::Transaction> transactions = pool.transactions();
-  for (int i = 0; i < transactions.size(); ++i) {
+  for (size_t i = 0; i < transactions.size(); ++i) {
     if (transactions[i].verify_signature())
       good_pool.add_transaction(transactions[i]);
   }

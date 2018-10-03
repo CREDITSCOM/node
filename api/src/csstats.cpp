@@ -80,7 +80,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     total.balancePerCurrency[element.first].fraction += element.second.fraction;
   }
 
-  for (int i = 0; i < periods.size(); ++i) {
+  for (size_t i = 0; i < periods.size(); ++i) {
     assert(updateTimeSec != 0);
 
     std::size_t index = (periods[i] / updateTimeSec) - 1;

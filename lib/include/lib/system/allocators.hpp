@@ -177,7 +177,7 @@ public:
    - shrinkLast is called before the last allocation gets unuse()d */
   RegionPtr allocateNext(const uint32_t size) {
     uint32_t regSize = size + sizeof(Region);
-    regSize += (-(int)size) & 0x3f;
+    regSize += (-(int)regSize) & 0x3f;
 
     if (!activePage_->usedSize.load(std::memory_order_acquire)) {
       activePage_->sizeLeft = PageSize;
@@ -209,7 +209,11 @@ public:
 
   void shrinkLast(const uint32_t size) {
     assert(lastReg_->size_ >= size);
-    auto diff = lastReg_->size_ - (size + ((-(int)size) & 0x3f));
+    int32_t prevSize = lastReg_->size_ + sizeof(Region);
+    prevSize += (-prevSize) & 0x3f;
+    int32_t newSize = size + sizeof(Region);
+    newSize += (-newSize) & 0x3f;
+    int32_t diff = prevSize - newSize;
 
     lastReg_->size_ = size;
     lastReg_->page_->sizeLeft += diff;
@@ -228,7 +232,8 @@ private:
     auto page = region->page_;
     region->~Region();
 
-    const uint32_t toSub = region->size_ + sizeof(Region) + ((-(int)region->size_) & 0x3f);
+    uint32_t toSub = region->size_ + sizeof(Region);
+    toSub += (-(int)toSub) & 0x3f;
     if (page->usedSize.fetch_sub(toSub, std::memory_order_relaxed) == toSub) {
       // Since it was us who freed up all the memory, we're the only
       // ones accessing *page...
