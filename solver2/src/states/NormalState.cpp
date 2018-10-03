@@ -65,10 +65,12 @@ namespace slv2
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {
             Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
-            context.node().sendHash(test_hash, sender);
             if(Consensus::Log) {
                 std::cout << name() << ": sending hash in reply to block sender" << std::endl;
             }
+            // in case of some block was restored from inner cache the last_block_sender contains correct value, other then
+            // argument sender value
+            context.node().sendHash(test_hash, DefaultStateBehavior::last_block_sender);
         }
         return res;
     }

@@ -14,9 +14,9 @@
 // provide find by sequence() capability
 namespace std
 {
-    bool operator==(const csdb::Pool& lhs, uint64_t rhs)
+    bool operator==(const std::pair<csdb::Pool, PublicKey>& lhs, uint64_t rhs)
     {
-        return lhs.sequence() == rhs;
+        return lhs.first.sequence() == rhs;
     }
 }
 
@@ -31,48 +31,51 @@ namespace slv2
         return Result::Finish;
     }
 
-    void DefaultStateBehavior::try_blocks_in_cahce(SolverContext& context, uint64_t last_seq)
+    void DefaultStateBehavior::try_blocks_in_cache(SolverContext& context, uint64_t last_seq)
     {
         if(!future_blocks.empty()) {
-            auto ibegin = last_seq + 1;
-            auto iend = ibegin + future_blocks.size();
-            for(auto i = ibegin; i < iend; ++i) {
+            auto seq_begin = last_seq + 1;
+            auto seq_end = seq_begin + future_blocks.size();
+            // find in cache and insert next blocks
+            for(auto seq = seq_begin; seq < seq_end; ++seq) {
                 // until first absent number reached
-                auto it = std::find(future_blocks.begin(), future_blocks.end(), i);
+                auto it = std::find(future_blocks.begin(), future_blocks.end(), seq);
                 if(it == future_blocks.end()) {
-                    // not consequent blocks in cache
+                    // required next block is not in cache
                     break;
                 }
-                // we can add block to chain
-                csdb::Pool& b = *it;
+                // here we can add block to chain
+                csdb::Pool& b = it->first;
                 if(b.verify_signature()) {
+                    context.node().getBlockChain().setGlobalSequence(static_cast<uint32_t>(seq));
                     context.node().getBlockChain().putBlock(b);
-                    if(Consensus::Log) {
-                        std::cout << name() << ": block #" << i << " stored from cache" << std::endl;
-                    }
+                    last_block_sender = it->second;
                     future_blocks.erase(it);
-                    last_seq = i;
+                    last_seq = seq;
+                    if(Consensus::Log) {
+                        std::cout << name() << ": block #" << seq << " restored from cache (" << future_blocks.size() << " remains cached)" << std::endl;
+                    }
                 }
                 else {
                     if(Consensus::Log) {
-                        std::cout << name() << ": block #" << i << " is in cache but has wrong signature, ignored" << std::endl;
+                        std::cout << name() << ": block #" << seq << " is found in cache but has wrong signature, ignored" << std::endl;
                     }
                     break;
                 }
-                // last_seq includes newly inserted blocks, remove outdated blocks if any
-                for(auto itc = future_blocks.cbegin(); itc != future_blocks.cend(); ++itc) {
-                    if(itc->sequence() <= last_seq) {
-                        itc = future_blocks.erase(itc);
-                        if(itc == future_blocks.cend()) {
-                            break;
-                        }
+            }
+            // last_seq includes newly inserted blocks, remove outdated blocks if any
+            for(auto itc = future_blocks.cbegin(); itc != future_blocks.cend(); ++itc) {
+                if(itc->first.sequence() <= last_seq) {
+                    itc = future_blocks.erase(itc);
+                    if(itc == future_blocks.cend()) {
+                        break;
                     }
                 }
             }
         }
     }
 
-    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender)
     {
 //#ifdef MONITOR_NODE
 //        addTimestampToPool(block);
@@ -93,13 +96,15 @@ namespace slv2
         if(g_seq == awaiting_seq ) {
             if(block.verify_signature()) {
                 context.node().getBlockChain().putBlock(block);
-                // test future blocks and insert appropriate ones
-                try_blocks_in_cahce(context, g_seq);
+                last_block_sender = sender;
+                // test if we have got future blocks before and insert appropriate ones
+                try_blocks_in_cache(context, g_seq);
                 // по логике солвера-1 Writer & Main отправку хэша не делают,
-                // дл€ Writer'а вопрос решен автоматически на уровне Node (он не получает блок вообще) и на его уровне (он переопредел€ет пустой метод onBlock()),
-                // а вот дл€ Main (CollectState) ситуаци€ не очень удобна€,
-                // € переопределил методы onBlock() в NormalState & TrustedState, где по возврату значени€ Finish выполн€ю отправку хэша полученного блока
-                // (т.е. получилось не очень большое дублирование одинакового кода в переопределенных методах)
+                // дл€ Writer'а вопрос решен автоматически на уровне Node (он не получает блок вообще) и на уровне WriteState (он переопредел€ет пустой метод onBlock()),
+                // а вот дл€ Main (CollectState) ситуаци€ не очень удобна€, приходитс€ не делать здесь отправку хэша.
+                // я переопределил методы onBlock() в NormalState & TrustedState, где по возврату значени€ Finish выполн€ю отправку хэша полученного блока
+                // (т.е. получилось некоторое дублирование одинакового кода в наследниках).
+                // CollectSate и прочие не переопредел€ют метод OnBlock(), соотвественно блок сохран€ют, но не отправл€ет хэш обратно.
                 return Result::Finish;
             }
             else {
@@ -113,7 +118,7 @@ namespace slv2
                 std::cout << name() << ": only block #" << awaiting_seq << " is allowed, ignore" << std::endl;
                 // store future blocks in cache
                 if(g_seq > awaiting_seq) {
-                    future_blocks.push_back(block);
+                    future_blocks.push_back(std::make_pair(block, sender));
                 }
             }
         }

@@ -66,15 +66,18 @@ namespace slv2
         /**
          * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
          *
-         * @brief   Do test of block received. If OK stores block in chain storage. Must be overridden to
-         *          send hash back to sender. Has to be invoked from overrides.
+         * @brief   Do test of block received.
+         *          
+         *          If OK stores block in chain storage. Must be overridden to send hash back to sender. Has to be invoked in overrides.
+         *          If overrides send hash of last block back to sender they MUST use last_block_sender protected data member instead of
+         *          method argument. It is caused by possible restoring of cached blocks
          *
          * @author  aae
          * @date    01.10.2018
          *
          * @param [in,out]  context The context.
          * @param [in,out]  block   The block received.
-         * @param           sender  The sender of block.
+         * @param           sender  The sender of current block.
          *
          * @return  A Result::Finish value if block accepted and stored, Result::Ignore value if ignored.
          *
@@ -181,9 +184,19 @@ namespace slv2
         /** @brief   Flag to suppress too much flood when report about ignore transactions */
         bool report_ignore_transactions;
 
-        std::vector<csdb::Pool> future_blocks;
+        using CachedBlock = std::pair<csdb::Pool, PublicKey>;
+        std::vector<CachedBlock> future_blocks;
 
-        void try_blocks_in_cahce(SolverContext& context, uint64_t last_seq);
+        /**
+         * @brief   The last block sender.  
+         *          It is guaranteed that upon return Result::Finish from onBlock() it contains the real
+         *          sender of last stored block, value may differ from argument of onBlock(..., sender)
+         *          method when we use cached blocks.
+         */
+
+        PublicKey last_block_sender;
+
+        void try_blocks_in_cache(SolverContext& context, uint64_t last_seq);
     };
 
 } // slv2
