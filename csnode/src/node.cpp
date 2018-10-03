@@ -656,18 +656,21 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   size_t localSeq = getBlockChain().getLastWrittenSequence();
   size_t blockSeq = pool.sequence();
-  if (roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
-  if (localSeq >= blockSeq) return;
+  if (roundNum_ == blockSeq)
+    getBlockChain().setGlobalSequence(blockSeq);
+  if (localSeq >= blockSeq)
+    return;
 
-  if (!blocksReceivingStarted_)
-  {
+  if (!blocksReceivingStarted_) {
     blocksReceivingStarted_ = true;
-    lastStartSequence_ = pool.sequence();
+    lastStartSequence_      = pool.sequence();
     csdebug() << "GETBLOCK> Setting first got block: " << lastStartSequence_;
   }
 
-  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
-  else solver_->gotIncorrectBlock(std::move(pool), sender);
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1)
+    solver_->gotBlock(std::move(pool), sender);
+  else
+    solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -680,8 +683,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
   composeMessageWithBlock(pool, MsgTypes::NewBlock);
 
   csdebug() << "Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence()
-                                << " and hash " << pool.hash().to_string() << " and ts "
-                                << pool.user_field(0).value<std::string>();
+            << " and hash " << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>();
   flushCurrentTasks();
 }
 
@@ -803,7 +805,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   }
 
   if (packet.hash().is_empty()) {
-    cserror() <<"Received transaction hashes answer packet hash is empty";
+    cserror() << "Received transaction hashes answer packet hash is empty";
     return;
   }
 
@@ -908,12 +910,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 
   istream_.init(data, size);
 
-  uint16_t timeSize = 0;
+  uint16_t    timeSize = 0;
   std::string time;
 
   uint32_t maskBitsCount;
 
-  uint32_t characteristicSize = 0;
+  uint32_t             characteristicSize = 0;
   std::vector<uint8_t> characteristic;
 
   uint64_t sequence = 0;
@@ -1084,12 +1086,11 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (seq == lastStartSequence_)
-  {
+  if (seq == lastStartSequence_) {
     solver_->tmpStorageProcessing();
     return;
   }
-  //FIXME: result of merge cs_dev branch
+  // FIXME: result of merge cs_dev branch
   if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
     cslog() << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence;
 
@@ -1098,7 +1099,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     return;
   }
 
-  csdebug() << "SENDBLOCKREQUEST> Composing the request" ;
+  csdebug() << "SENDBLOCKREQUEST> Composing the request";
 
   size_t lws;
   size_t globalSequence = getBlockChain().getGlobalSequence();
@@ -1116,7 +1117,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
 
-  uint8_t requestTo        = rand() % (int)(MIN_CONFIDANTS);
+  uint8_t requestTo = rand() % (int)(MIN_CONFIDANTS);
   ostream_.init(BaseFlags::Signed, confidantNodes_[requestTo]);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
 
@@ -1141,11 +1142,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
-  }
-  else if ((pool.sequence() > sendBlockRequestSequence) && 
-    (pool.sequence() < lastStartSequence_)) 
-      solver_->gotFreeSyncroBlock(std::move(pool));
-  else return;
+  } else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_))
+    solver_->gotFreeSyncroBlock(std::move(pool));
+  else
+    return;
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
@@ -1290,8 +1290,7 @@ inline bool Node::readRoundData(const bool tail) {
     if (confidants.size() == confSize && !istream_.end()) {
       if (tail) {
         break;
-      }
-      else {
+      } else {
         cswarning() << "Too many confidant nodes received";
         return false;
       }
@@ -1317,7 +1316,7 @@ void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) 
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   composeCompressed(data, bSize, type);
 }
- 
+
 void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
   auto max    = LZ4_compressBound(bSize);
   auto memPtr = allocator_.allocateNext(max);
