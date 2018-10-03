@@ -22,7 +22,7 @@ T getSecureRandom() {
 bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
                              bool force) {
   bool result = false;
-  if (bp.sentLastTime && !force) return true;
+  if (bp.sentLastTime) return true;
 
   if (bp.attempts > MaxResendTimes ||
       !transport_->shouldSendPacket(bp.pack)) return result;
