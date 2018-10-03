@@ -3,8 +3,7 @@
 #include "../Node.h"
 #include "../Generals.h"
 #include "Consensus.h"
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -12,7 +11,7 @@ namespace slv2
     {
         if(decide_to_write(context)) {
             if(Consensus::Log) {
-                std::cout << name() << ": request to become writing node" << std::endl;
+                LOG_NOTICE(name() << ": request to become writing node");
             }
             // let context switch state
             context.become_writer();
@@ -43,13 +42,13 @@ namespace slv2
         );
         if(Consensus::GeneralNotSelected == wTrusted) {
             if(Consensus::Log) {
-                std::cout << name() << ": consensus has not been reached" << std::endl;
+                LOG_WARN(name() << ": consensus has not been reached");
             }
             //TODO: scheduleWriteNewBlock(T_coll_trans);
         }
         else {
             if(Consensus::Log) {
-                std::cout << name() << ": consensus has been reached" << std::endl;
+                LOG_NOTICE(name() << ": consensus has been reached");
             }
             return (wTrusted == context.own_conf_number());
         }

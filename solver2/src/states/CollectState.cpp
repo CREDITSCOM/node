@@ -1,8 +1,7 @@
 #include "CollectState.h"
 #include "../SolverContext.h"
 #include "../Node.h"
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -13,12 +12,12 @@ namespace slv2
         auto cur_round = context.round();
         if(cur_round == 1) {
             if(Consensus::Log) {
-                std::cout << name() << ": at the 1st round send empty TL to initiate consensus" << std::endl;
+                LOG_NOTICE(name() << ": at the 1st round send empty transaction list to initiate consensus");
             }
             do_send_tl(context, 0);
         }
         if(Consensus::Log) {
-            std::cout << name() << ": starting to collect transactions of round #" << context.round() << std::endl;
+            LOG_NOTICE(name() << ": starting to collect transactions of round #" << context.round());
         }
     }
 
@@ -42,35 +41,27 @@ namespace slv2
                 if(context.verify(tr)) {
                     pool.add_transaction(tr);
                     if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
-                        std::cout << name() << ": transaction accepted (1) x" << logging_counter << std::endl;
+                        LOG_DEBUG(name() << ": transaction accepted (1) x" << logging_counter);
                     }
                 }
                 else {
                     if(Consensus::Log) {
-                        std::cout << name() << ": wrong transaction signature" << std::endl;
+                        LOG_WARN(name() << ": wrong transaction signature");
                     }
                 }
             }
             else {
                 pool.add_transaction(tr);
                 // too much flood
-                //if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
-                //    std::cout << name() << ": spammer transaction accepted (1) x" << logging_counter << std::endl;
-                //}
+                if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
+                    LOG_DEBUG(name() << ": spammer transaction accepted (1) x" << logging_counter);
+                }
             }
         }
         else {
             if(Consensus::Log) {
-                std::cout << name() << ": invalid transaction received" << std::endl;
+                LOG_WARN(name() << ": invalid transaction received");
             }
-        }
-        return Result::Ignore;
-    }
-
-    Result CollectState::onTransactionList(SolverContext& /*context*/, const csdb::Pool& tl)
-    {
-        if(Consensus::Log) {
-            std::cout << name() << ": transaction list received (cnt " << tl.transactions_count() << "), ignored" << std::endl;
         }
         return Result::Ignore;
     }
@@ -78,7 +69,7 @@ namespace slv2
     void CollectState::do_send_tl(SolverContext& context, uint64_t sequence)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": sending transaction list #" <<  sequence << " of " << pool.transactions_count() << " items" << std::endl;
+            LOG_NOTICE(name() << ": sending transaction list #" <<  sequence << " of " << pool.transactions_count() << " items");
         }
         pool.set_sequence(sequence);
         context.node().sendTransactionList(pool);

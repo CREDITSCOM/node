@@ -3,8 +3,7 @@
 #include "../Node.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -17,26 +16,26 @@ namespace slv2
         if(context.is_spammer()) {
             // in fact, pctx ic not less "alive" as a context.scheduler itself :-)
             if(Consensus::Log) {
-                std::cout << name() << ": started spam transactions every " << T_spam_trans << " msec" << std::endl;
+                LOG_NOTICE(name() << ": started spam transactions every " << T_spam_trans << " msec");
             }
             tag_spam = context.scheduler().InsertPeriodic(T_spam_trans, [this, pctx]() {
                 csdb::Transaction tr;
                 setup(&tr, pctx);
                 pctx->add(tr);
-                //if(Consensus::Log) {
-                //    std::cout << name() << ": added spam transaction" << std::endl;
-                //}
+                if(Consensus::Log) {
+                    LOG_DEBUG(name() << ": added spam transaction");
+                }
             }, true);
         }
 
         if(Consensus::Log) {
-            std::cout << name() << ": started flush transactions every " << Consensus::T_coll_trans << " msec" << std::endl;
+            LOG_NOTICE(name() << ": started flush transactions every " << Consensus::T_coll_trans << " msec");
         }
         tag_flush = context.scheduler().InsertPeriodic(Consensus::T_coll_trans, [this, pctx]() {
             pctx->flush_transactions();
-            //if(Consensus::Log) {
-            //    std::cout << name() << ": flushing transactions" << std::endl;
-            //}
+            if(Consensus::Log) {
+                LOG_DEBUG(name() << ": flushing transactions");
+            }
         }, true);
 
     }
@@ -45,7 +44,7 @@ namespace slv2
     {
         if(CallsQueueScheduler::no_tag != tag_spam) {
             if(Consensus::Log) {
-                std::cout << name() << ": stop spam transactions" << std::endl;
+                LOG_NOTICE(name() << ": stop spam transactions");
             }
             context.scheduler().Remove(tag_spam);
             tag_spam = CallsQueueScheduler::no_tag;
@@ -53,7 +52,7 @@ namespace slv2
 
         if(CallsQueueScheduler::no_tag != tag_flush) {
             if(Consensus::Log) {
-                std::cout << name() << ": stop flush transactions" << std::endl;
+                LOG_NOTICE(name() << ": stop flush transactions");
             }
             context.scheduler().Remove(tag_flush);
             tag_flush = CallsQueueScheduler::no_tag;
@@ -66,7 +65,7 @@ namespace slv2
         if(res == Result::Finish) {
             Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
             if(Consensus::Log) {
-                std::cout << name() << ": sending hash in reply to block sender" << std::endl;
+                LOG_NOTICE(name() << ": sending hash in reply to block sender");
             }
             // in case of some block was restored from inner cache the last_block_sender contains correct value, other then
             // argument sender value

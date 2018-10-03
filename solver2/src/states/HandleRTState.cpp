@@ -1,7 +1,7 @@
 #include "HandleRTState.h"
 #include "../SolverContext.h"
 #include "../Node.h"
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -16,21 +16,21 @@ namespace slv2
                 break;
             case NodeLevel::Writer:
                 if(Consensus::Log) {
-                    std::cout << name() << " warning: node must not become writer through round table" << std::endl;
+                    LOG_WARN(name() << ": node must not become writer through round table");
                 }
                 context.become_writer();
                 break;
             case NodeLevel::Main:
                 if(Consensus::Log) {
                     if(context.round() > 1) {
-                        std::cout << name() << " warning: node may become a main (collector) through round table only as a BigBang or the 1st round result" << std::endl;
+                        LOG_WARN(name() << ": node may become a main (collector) through round table only as a BB or the 1st round result");
                     }
                 }
                 context.become_collector();
                 break;
             default:
                 if(Consensus::Log) {
-                    std::cout << name() << " error: unexpected getMyLevel() result from Node" << std::endl;
+                    LOG_ERROR(name() << ": unexpected Node::getMyLevel() result");
                 }
                 break;
         }

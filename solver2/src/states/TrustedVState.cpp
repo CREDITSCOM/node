@@ -1,6 +1,5 @@
 #include "TrustedVState.h"
 #include "../SolverContext.h"
-#include <iostream>
 
 namespace slv2
 {

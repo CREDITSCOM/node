@@ -50,8 +50,6 @@ namespace slv2
 
         Result onTransaction(SolverContext& context, const csdb::Transaction& tr) override;
 
-        Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
-
         const char * name() const override
         {
             return "Collect";

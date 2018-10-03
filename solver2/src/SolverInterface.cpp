@@ -3,8 +3,7 @@
 #include "Node.h"
 #include <Solver/Generals.hpp>
 #include <csdb/currency.h>
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -56,7 +55,7 @@ namespace slv2
         }
 
         // copied from original solver-1
-        //std::cout << "===SETTING DB===" << std::endl;
+        LOG_DEBUG("===SETTING DB===");
         const std::string start_address = "0000000000000000000000000000000000000000000000000000000000000002";
         csdb::Transaction tr;
         tr.set_target(csdb::Address::from_public_key((char*) public_key.data()));
@@ -67,7 +66,7 @@ namespace slv2
         tr.set_innerID(1);
         send_wallet_transaction(tr);
         if(Consensus::Log) {
-            std::cout << "SolverCore: initial balance added" << std::endl;
+            LOG_NOTICE("SolverCore: initial balance added");
         }
     }
 
@@ -98,9 +97,9 @@ namespace slv2
             return;
         }
         // produces too much output:
-        //if(Consensus::Log) {
-        //    std::cout << "SolverCore: gotTransaction()" << std::endl;
-        //}
+        if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: gotTransaction()");
+        }
         if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
             handleTransitions(Event::Transactions);
         }
@@ -118,7 +117,7 @@ namespace slv2
         if(tl_seq == last_trans_list_recv) {
             // already received
             if(Consensus::Log) {
-                std::cout << "SolverCore: transaction list (#" << tl_seq << ") already received, ignore" << std::endl;
+                LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
             }
             return;
         }
@@ -128,7 +127,7 @@ namespace slv2
         pool = csdb::Pool {};
 
         if(Consensus::Log) {
-            std::cout << "SolverCore: transaction list (#" << tl_seq << ") received, updating own hashvector" << std::endl;
+            LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ") received, updating own hashvector");
         }
         // bad tansactions storage:
         csdb::Pool b_pool {};
@@ -160,7 +159,7 @@ namespace slv2
         }
         //TODO: how to get real public key from vect.Sender?
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotVector()" << std::endl;
+            LOG_DEBUG("SolverCore: gotVector()");
         }
         if(stateCompleted(pstate->onVector(*pcontext, vect, PublicKey {}))) {
             handleTransitions(Event::Vectors);
@@ -180,7 +179,7 @@ namespace slv2
         }
         //TODO: how to get real public key from vect.Sender?
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotMatrix()" << std::endl;
+            LOG_DEBUG("SolverCore: gotMatrix()");
         }
         if(stateCompleted(pstate->onMatrix(*pcontext, matr, PublicKey {}))) {
             handleTransitions(Event::Matrices);
@@ -199,7 +198,7 @@ namespace slv2
             return;
         }
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotBlock()" << std::endl;
+            LOG_DEBUG("SolverCore: gotBlock()");
         }
         if(stateCompleted(pstate->onBlock(*pcontext, p, sender))) {
             handleTransitions(Event::Block);
@@ -215,7 +214,7 @@ namespace slv2
         }
 
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotBlockRequest()" << std::endl;
+            LOG_DEBUG("SolverCore: gotBlockRequest()");
         }
         // state does not take part
         if(pnode != nullptr) {
@@ -235,9 +234,9 @@ namespace slv2
         }
 
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotBlockReply()" << std::endl;
+            LOG_DEBUG("SolverCore: gotBlockReply()");
         }
-        //std::cout << "Solver -> Got Block for my Request: " << p.sequence() << std::endl;
+        LOG_DEBUG("SolverCore: got block on my request: " << p.sequence());
         if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
             pnode->getBlockChain().putBlock(p);
         }
@@ -254,7 +253,7 @@ namespace slv2
             return;
         }
         if(Consensus::Log) {
-            std::cout << "SolverCore: gotHash()" << std::endl;
+            LOG_DEBUG("SolverCore: gotHash()");
         }
         if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
             handleTransitions(Event::Hashes);
@@ -269,7 +268,7 @@ namespace slv2
         }
 
         if(Consensus::Log) {
-            std::cout << "SolverCore: addConfirmation(): not implemented yet" << std::endl;
+            LOG_ERROR("SolverCore: addConfirmation(): not implemented yet");
         }
         if(!pstate) {
             return;
@@ -298,7 +297,7 @@ namespace slv2
 
         // as store result of current round:
         if(Consensus::Log) {
-            std::cout << "SolverCore: clear all stored senders (vectors, matrices, hashes)" << std::endl;
+            LOG_NOTICE("SolverCore: clear all stored senders (vectors, matrices, hashes)");
         }
 
         recv_vect.clear();
@@ -312,7 +311,7 @@ namespace slv2
             cur_round = pnode->getRoundNumber();
         }
         if(Consensus::Log) {
-            std::cout << "SolverCore: nextRound()" << std::endl;
+            LOG_NOTICE("SolverCore: nextRound()");
         }
         if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
             handleTransitions(Event::RoundTable);

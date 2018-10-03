@@ -7,9 +7,9 @@
 #else
 #include <csdb/pool.h>
 #endif
+#include <lib/system/logger.hpp>
 
 #include <algorithm>
-#include <iostream>
 
 // provide find by sequence() capability
 namespace std
@@ -26,7 +26,7 @@ namespace slv2
     Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const uint32_t round)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": round table received (#" << round << ")" << std::endl;
+            LOG_NOTICE(name() << ": round table received (#" << round << ")");
         }
         return Result::Finish;
     }
@@ -53,12 +53,12 @@ namespace slv2
                     future_blocks.erase(it);
                     last_seq = seq;
                     if(Consensus::Log) {
-                        std::cout << name() << ": block #" << seq << " restored from cache (" << future_blocks.size() << " remains cached)" << std::endl;
+                        LOG_NOTICE(name() << ": block #" << seq << " restored from cache (" << future_blocks.size() << " remains cached)");
                     }
                 }
                 else {
                     if(Consensus::Log) {
-                        std::cout << name() << ": block #" << seq << " is found in cache but has wrong signature, ignored" << std::endl;
+                        LOG_NOTICE(name() << ": block #" << seq << " is found in cache but has wrong signature, ignored");
                     }
                     break;
                 }
@@ -82,11 +82,11 @@ namespace slv2
 //#endif
         auto g_seq = block.sequence();
         if(Consensus::Log) {
-            std::cout << name() << ": block received (#" << block.sequence() << ", " << block.transactions_count() << " transactions)" << std::endl;
+            LOG_NOTICE(name() << ": block received (#" << block.sequence() << ", " << block.transactions_count() << " transactions)");
         }
         if(g_seq > context.round()) {
             if(Consensus::Log) {
-                std::cout << name() << ": block sequence number is out of current round " << context.round() << std::endl;
+                LOG_NOTICE(name() << ": block sequence number is out of current round " << context.round());
             }
             // remove this when the block candidate signing of all trusted will be implemented
             return Result::Ignore;
@@ -109,13 +109,13 @@ namespace slv2
             }
             else {
                 if(Consensus::Log) {
-                    std::cout << name() << ": block has correct #sequence but wrong signature, ignore" << std::endl;
+                    LOG_WARN(name() << ": block #" << g_seq << " has correct sequence but wrong signature, ignore");
                 }
             }
         }
         else {
             if(Consensus::Log) {
-                std::cout << name() << ": only block #" << awaiting_seq << " is allowed, ignore" << std::endl;
+                LOG_NOTICE(name() << ": only block #" << awaiting_seq << " is allowed, ignore");
                 // store future blocks in cache
                 if(g_seq > awaiting_seq) {
                     future_blocks.push_back(std::make_pair(block, sender));
@@ -128,7 +128,7 @@ namespace slv2
     Result DefaultStateBehavior::onVector(SolverContext& /*context*/, const Credits::HashVector& /*vect*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": vector ignored" << std::endl;
+            LOG_DEBUG(name() << ": vector ignored");
         }
         return Result::Ignore;
     }
@@ -136,7 +136,7 @@ namespace slv2
     Result DefaultStateBehavior::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix& /*matr*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": matrix ignored" << std::endl;
+            LOG_DEBUG(name() << ": matrix ignored");
         }
         return Result::Ignore;
     }
@@ -144,7 +144,7 @@ namespace slv2
     Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": hash ignored" << std::endl;
+            LOG_DEBUG(name() << ": hash ignored");
         }
         return Result::Ignore;
     }
@@ -153,7 +153,7 @@ namespace slv2
     {
         if(Consensus::Log && report_ignore_transactions) {
             report_ignore_transactions = false;
-            std::cout << name() << ": transactions ignored in this state" << std::endl;
+            LOG_DEBUG(name() << ": transactions ignored in this state");
         }
         return Result::Ignore;
     }
@@ -161,7 +161,7 @@ namespace slv2
     Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, const csdb::Pool& /*pool*/)
     {
         if(Consensus::Log) {
-            std::cout << name() << ": transaction list ignored" << std::endl;
+            LOG_DEBUG(name() << ": transaction list ignored");
         }
         return Result::Ignore;
     }

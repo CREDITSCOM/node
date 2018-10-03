@@ -2,8 +2,7 @@
 #include "../SolverContext.h"
 #include "../Node.h"
 #include "Consensus.h"
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -14,7 +13,7 @@ namespace slv2
         // No one other state must not store hashes this round!
         if(context.cnt_hash_recv() != 0) {
             if(Consensus::Log) {
-                std::cout << name() << ": (error) hashes must not be stored until I send a new block (" << context.cnt_hash_recv() << " are)" << std::endl;
+                LOG_ERROR(name() << ": hashes must not be stored until I send a new block (" << context.cnt_hash_recv() << " are)");
             }
         }
 
@@ -27,7 +26,7 @@ namespace slv2
         context.node().becomeWriter();
 
         if(Consensus::Log) {
-            std::cout << name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")" << std::endl;
+            LOG_NOTICE(name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")");
         }
         context.store_and_send_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
@@ -42,19 +41,19 @@ namespace slv2
                 context.recv_hash_from(sender);
                 not_enough--;
                 if(Consensus::Log) {
-                    std::cout << name() << ": hash received (" << context.cnt_hash_recv() << "), " << not_enough << " more need" << std::endl;
+                    LOG_NOTICE(name() << ": hash received (" << context.cnt_hash_recv() << "), " << not_enough << " more need");
                 }
             }
             else {
                 if(Consensus::Log) {
-                    std::cout << name() << ": hash received do not match!!!" << std::endl;
+                    LOG_WARN(name() << ": hash received do not match!!!");
                 }
             }
         }
         if(not_enough <= 0) {
             // received enough hashes
             if(Consensus::Log) {
-                std::cout << name() << ": request new round" << std::endl;
+                LOG_NOTICE(name() << ": request new round");
             }
             context.spawn_next_round();
             return Result::Finish;

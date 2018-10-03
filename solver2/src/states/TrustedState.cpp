@@ -3,8 +3,7 @@
 #include "../SolverCompat.h"
 #include "../Node.h"
 #include "../Generals.h"
-
-#include <iostream>
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {
@@ -16,14 +15,14 @@ namespace slv2
         if(test_vectors_completed(context)) {
             // let context decide what to do
             if(Consensus::Log) {
-                std::cout << name() << ": enough vectors received" << std::endl;
+                LOG_NOTICE(name() << ": enough vectors received");
             }
             context.vectors_completed();
         }
         if(test_matrices_completed(context)) {
             // let context decide what to do
             if(Consensus::Log) {
-                std::cout << name() << ": enough matrices received" << std::endl;
+                LOG_NOTICE(name() << ": enough matrices received");
             }
             context.matrices_completed();
         }
@@ -38,7 +37,7 @@ namespace slv2
     {
         if(context.is_vect_recv_from(vect.Sender)) {
             if(Consensus::Log) {
-                std::cout << name() << ": duplicated vector received from " << (unsigned int) vect.Sender << ", ignore" << std::endl;
+                LOG_DEBUG(name() << ": duplicated vector received from " << (unsigned int) vect.Sender << ", ignore");
             }
             return Result::Ignore;
         }
@@ -46,12 +45,12 @@ namespace slv2
         context.generals().addvector(vect); // building matrix
 
         if(Consensus::Log) {
-            std::cout << name() << ": vector received from " << (unsigned int) vect.Sender << ",  total " << context.cnt_vect_recv() << std::endl;
+            LOG_NOTICE(name() << ": vector received from " << (unsigned int) vect.Sender << ",  total " << context.cnt_vect_recv());
         }
         if(test_vectors_completed(context))
         {
             if(Consensus::Log) {
-                std::cout << name() << ": enough vectors received" << std::endl;
+                LOG_NOTICE(name() << ": enough vectors received");
             }
 
             //compose and send matrix!!!
@@ -71,7 +70,7 @@ namespace slv2
     {
         if(context.is_matr_recv_from(matr.Sender)) {
             if(Consensus::Log) {
-                std::cout << name() << ": duplicated matrix received from " << (unsigned int) matr.Sender << ", ignore" << std::endl;
+                LOG_DEBUG(name() << ": duplicated matrix received from " << (unsigned int) matr.Sender << ", ignore");
             }
             return Result::Ignore;
         }
@@ -79,12 +78,12 @@ namespace slv2
         context.generals().addmatrix(matr, context.node().getConfidants());
 
         if(Consensus::Log) {
-            std::cout << name() << ": matrix received from " << (unsigned int) matr.Sender << ", total " << context.cnt_matr_recv() << std::endl;
+            LOG_NOTICE(name() << ": matrix received from " << (unsigned int) matr.Sender << ", total " << context.cnt_matr_recv());
         }
 
         if(test_matrices_completed(context)) {
             if(Consensus::Log) {
-                std::cout << name() << ": enough matrices received" << std::endl;
+                LOG_NOTICE(name() << ": enough matrices received");
             }
             return Result::Finish;
         }
@@ -96,12 +95,12 @@ namespace slv2
         if(context.round() == 1) {
             if(pool.transactions_count() != 0) {
                 if(Consensus::Log) {
-                    std::cout << name() << ": (warning) transaction list on the 1st round must not contain transactions!" << std::endl;
+                    LOG_ERROR(name() << ": transaction list on the 1st round must not contain transactions!");
                 }
             }
         }
         if(Consensus::Log) {
-            std::cout << name() << ": transaction list received, sending own vector back and processing it myself" << std::endl;
+            LOG_NOTICE(name() << ": transaction list received, sending own vector back and processing it myself");
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
         context.node().sendVector(context.hash_vector());
@@ -120,7 +119,7 @@ namespace slv2
         if(res == Result::Finish) {
             Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
             if(Consensus::Log) {
-                std::cout << name() << ": sending hash in reply to block sender" << std::endl;
+                LOG_NOTICE(name() << ": sending hash in reply to block sender");
             }
             // in case of some block was restored from inner cache the last_block_sender contains correct value, other then
             // argument sender value
