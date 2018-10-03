@@ -50,7 +50,7 @@ class Node {
   void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size);
-  void sendNotificationToWriter();
+  void sendNotification(const PublicKey& destination);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
@@ -62,8 +62,7 @@ class Node {
 
   /* Outcoming requests forming */
   void sendRoundTable();
-  void sendTransaction(const csdb::Transaction&);
-
+  void sendTransaction(csdb::Pool&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);
   void sendVector(const cs::HashVector&);
@@ -145,6 +144,7 @@ private:
   void        onRoundStart();
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
+  void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
   // Info
   const PublicKey myPublicKey_;
@@ -171,6 +171,7 @@ private:
   std::vector<PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
+  uint16_t m_notificationsCount;
 
   // Resources
   BlockChain bc_;
@@ -188,6 +189,9 @@ private:
 
   RegionAllocator packStreamAllocator_;
   RegionAllocator allocator_;
+
+  size_t lastStartSequence_;
+  bool blocksReceivingStarted_ = false;
 
   IPackStream istream_;
   OPackStream ostream_;

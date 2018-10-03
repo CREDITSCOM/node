@@ -24,6 +24,7 @@ const unsigned MAX_CONFIDANTS = 4;
 
 Node::Node(const Config& config)
 : myPublicKey_(config.getMyPublicKey())
+, m_notificationsCount(0)
 , bc_(config.getPathToDB().c_str())
 , solver_(new cs::Solver(this))
 , transport_(new Transport(config, this))
@@ -345,12 +346,10 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
   }
 }
 
-void Node::sendTransaction(const csdb::Transaction& trans) {
-  ostream_.init(BaseFlags::Broadcast, mainNode_);
-  ostream_ << MsgTypes::Transactions << roundNum_ << trans;
-
-  cslog() << "Sending transactions";
-
+void Node::sendTransaction(csdb::Pool&& transactions) {
+  transactions.recount();
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+  composeMessageWithBlock(transactions, MsgTypes::Transactions);
   flushCurrentTasks();
 }
 
@@ -667,6 +666,24 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
     cswarning() << "Bad block packet format";
     return;
   }
+
+  size_t localSeq = getBlockChain().getLastWrittenSequence();
+  size_t blockSeq = pool.sequence();
+  if (roundNum_ == blockSeq)
+    getBlockChain().setGlobalSequence(blockSeq);
+  if (localSeq >= blockSeq)
+    return;
+
+  if (!blocksReceivingStarted_) {
+    blocksReceivingStarted_ = true;
+    lastStartSequence_      = pool.sequence();
+    csdebug() << "GETBLOCK> Setting first got block: " << lastStartSequence_;
+  }
+
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1)
+    solver_->gotBlock(std::move(pool), sender);
+  else
+    solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -679,8 +696,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
   composeMessageWithBlock(pool, MsgTypes::NewBlock);
 
   csdebug() << "Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence()
-                                << " and hash " << pool.hash().to_string() << " and ts "
-                                << pool.user_field(0).value<std::string>();
+            << " and hash " << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>();
   flushCurrentTasks();
 }
 
@@ -804,7 +820,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   }
 
   if (packet.hash().is_empty()) {
-    cserror() <<"Received transaction hashes answer packet hash is empty";
+    cserror() << "Received transaction hashes answer packet hash is empty";
     return;
   }
 
@@ -905,12 +921,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 
   istream_.init(data, size);
 
-  uint16_t timeSize = 0;
+  uint16_t    timeSize = 0;
   std::string time;
 
   uint32_t maskBitsCount;
 
-  uint32_t characteristicSize = 0;
+  uint32_t             characteristicSize = 0;
   std::vector<uint8_t> characteristic;
 
   uint64_t sequence = 0;
@@ -946,21 +962,34 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size) {
-  cs::DataStream stream(data, size);
+  m_notificationsCount += 1;
+  if (m_notificationsCount < (getConfidants().size() / 2)) {
+    return;
+  }
 
+
+  cs::DataStream       stream(data, size);
   std::vector<uint8_t> notification;
 
   stream >> notification;
+  this->sendNotification(solver_->getWriterPublicKey());
 }
 
-void Node::sendNotificationToWriter() {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, solver_->getWriterPublicKey());
+void Node::sendNotification(const PublicKey& destination) {
+  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, destination);
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
 
-  std::vector<uint8_t> notification = solver_->getSignedNotification();
+  const Hash&      characteristicHash = solver_->getCharacteristicHash();
+  const PublicKey& writerPublicKey    = solver_->getWriterPublicKey();
 
-  ostream_ << std::string(notification.begin(), notification.end());
+  std::vector<uint8_t> notification;
+  notification.insert(notification.end(), characteristicHash.str, characteristicHash.str + HASH_LENGTH);
+  notification.insert(notification.end(), writerPublicKey.str, writerPublicKey.str + PUBLIC_KEY_LENGTH);
+
+  std::vector<uint8_t> signedNotification = solver_->sign(notification);
+
+  ostream_ << std::string(signedNotification.begin(), signedNotification.end());
 
   flushCurrentTasks();
 }
@@ -1074,7 +1103,12 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (awaitingSyncroBlock && awaitingRecBlockCount < 1) {
+  if (seq == lastStartSequence_) {
+    solver_->tmpStorageProcessing();
+    return;
+  }
+  // FIXME: result of merge cs_dev branch
+  if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
     cslog() << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence;
 
     awaitingRecBlockCount++;
@@ -1082,7 +1116,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     return;
   }
 
-  csdebug() << "SENDBLOCKREQUEST> Composing the request" ;
+  csdebug() << "SENDBLOCKREQUEST> Composing the request";
 
   size_t lws;
   size_t globalSequence = getBlockChain().getGlobalSequence();
@@ -1100,7 +1134,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
 
-  uint8_t requestTo        = rand() % (int)(MIN_CONFIDANTS);
+  uint8_t requestTo = rand() % (int)(MIN_CONFIDANTS);
   ostream_.init(BaseFlags::Signed, confidantNodes_[requestTo]);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
 
@@ -1124,9 +1158,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
-  } else {
+    solver_->rndStorageProcessing();
+  } else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_))
+    solver_->gotFreeSyncroBlock(std::move(pool));
+  else
     return;
-  }
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
@@ -1276,8 +1312,7 @@ inline bool Node::readRoundData(const bool tail) {
     if (confidants.size() == confSize && !istream_.end()) {
       if (tail) {
         break;
-      }
-      else {
+      } else {
         cswarning() << "Too many confidant nodes received";
         return false;
       }
@@ -1301,15 +1336,16 @@ void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) 
   uint32_t bSize;
 
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  composeCompressed(data, bSize, type);
+}
 
+void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
   auto max    = LZ4_compressBound(bSize);
   auto memPtr = allocator_.allocateNext(max);
 
   auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), bSize, memPtr.size());
 
   allocator_.shrinkLast(realSize);
-
   ostream_ << type << roundNum_ << bSize;
-
   ostream_ << std::string(static_cast<char*>(memPtr.get()), memPtr.size());
 }
