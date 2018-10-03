@@ -40,7 +40,7 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
     }
 
     if (!found) {
-      sent = sent || transport_->sendDirect(&(bp.pack), **nb);
+      sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
       if (nb->isSignal)  // Assume the SS got this
         *(bp.recEnd++) = nb->id;
       else

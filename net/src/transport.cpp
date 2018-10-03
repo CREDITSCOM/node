@@ -91,7 +91,7 @@ void Transport::run() {
   for (;;) {
     ++ctr;
     bool askMissing    = true;
-    bool resendPacks   = ctr % 20 == 0;
+    bool resendPacks   = ctr % 2 == 0;
     bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending  = ctr % 100 == 0;
