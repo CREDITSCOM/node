@@ -772,44 +772,41 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (seq == lastStartSequence_)
-  {
+  if (seq == lastStartSequence_) {
     solver_->tmpStorageProcessing();
     return;
   }
-  if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
-#ifdef MYLOG
-// std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence <<
-// std::endl;
-#endif
-    ++awaitingRecBlockCount;
-    return;
-  }
-  //#ifdef MYLOG
-  // std::cout << "SENDBLOCKREQUEST> Composing the request" << std::endl;
+
   size_t lws, gs;
 
   if (getBlockChain().getGlobalSequence() == 0)
     gs = roundNum_;
   else
     gs = getBlockChain().getGlobalSequence();
+
   lws = getBlockChain().getLastWrittenSequence();
-  // std::cout << "SENDBLOCKREQUEST> gs = " << getBlockChain().getGlobalSequence() << std::endl;
-  // std::cout << "SENDBLOCKREQUEST> lws = " << getBlockChain().getLastWrittenSequence() << std::endl;
-  float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
-  //std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
-  std::cout << "SYNC: [";
-  for (uint32_t i = 0; i < (int)syncStatus; ++i) if (i % 2) std::cout << "#";
-  for (uint32_t i = (int)syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
-  std::cout << "] " << (int)syncStatus << "%" << std::endl;
+
+  const float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
+  if ((int)syncStatus <= 100) {
+    std::cout << "SYNC: [";
+    for (uint32_t i = 0; i < (int)syncStatus; ++i) if (i % 2) std::cout << "#";
+    for (uint32_t i = (int)syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
+    std::cout << "] " << (int)syncStatus << "%" << std::endl;
+  }
+
+  ConnectionPtr requestee = transport_->getSyncRequestee(seq);
+  if (!requestee) return;
+
   //#endif
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
-  uint8_t requestTo        = rand() % (int)(MIN_CONFIDANTS);
-  ostream_.init(BaseFlags::Signed, confidantNodes_[requestTo]);
+
+  ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
-  flushCurrentTasks();
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
+  ostream_.clear();
+
 #ifdef MYLOG
   std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
 #endif
@@ -824,6 +821,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 #ifdef MYLOG
   std::cout << "GETBLOCKREPLY> Getting block " << pool.sequence() << std::endl;
 #endif
+
+  transport_->syncReplied(pool.sequence());
+
   if (pool.sequence() == sendBlockRequestSequence) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
@@ -852,9 +852,15 @@ void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
   std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
 #endif
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ConnectionPtr conn = transport_->getConnectionByKey(sender);
+  if (!conn) return;
+
+  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
-  flushCurrentTasks();
+  transport_->deliverDirect(ostream_.getPackets(),
+                            ostream_.getPacketsCount(),
+                            conn);
+  ostream_.clear();
 }
 
 void Node::becomeWriter() {
@@ -902,14 +908,9 @@ void Node::onRoundStart() {
     i++;
   }
 #ifdef SYNCRO
-  // std::cout << "Last written sequence = " << getBlockChain().getLastWrittenSequence() << std::endl;
-  //  if (awaitingSyncroBlock) std::cout << "Get Status> AwaitingSyncroBlock" << std::endl;
-  // else std::cout << "Get Status> We still don't wait for a missed block" << std::endl;
-  // if (syncro_started) std::cout << "Get Status> SYNCRO STARTED" << std::endl;
-  // else  std::cout << "Get Status> SYNCRO NOT STARTED ... YET" << std::endl;
 
   if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||
-      (getBlockChain().getBlockRequestNeed()))  // && (!awaitingSyncroBlock))// && (!syncro_started))) vvv
+      (getBlockChain().getBlockRequestNeed()))
   {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
     syncro_started = true;

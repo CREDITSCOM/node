@@ -91,7 +91,9 @@ class Transport {
   void sendBroadcast(const Packet* pack) {
     nh_.sendByNeighbours(pack);
   }
-  void sendDirect(const Packet*, const Connection&);
+
+  bool sendDirect(const Packet*, const Connection&);
+  void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
 
   void gotPacket(const Packet&, RemoteNodePtr&);
   void redirectPacket(const Packet&, RemoteNodePtr&);
@@ -109,8 +111,11 @@ class Transport {
   void sendPingPack(const Connection&);
 
   void registerMessage(MessagePtr);
-
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
+
+  ConnectionPtr getSyncRequestee(const uint32_t seq) { return nh_.getNextSyncRequestee(seq); }
+  ConnectionPtr getConnectionByKey(const PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
+  void syncReplied(const uint32_t seq) { return nh_.releaseSyncRequestee(seq); }
 
  private:
   void postponePacket(const RoundNum, const MsgTypes, const Packet&);

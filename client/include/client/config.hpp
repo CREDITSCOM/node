@@ -11,11 +11,14 @@ namespace po = boost::program_options;
 using namespace boost::asio;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 77;
+const NodeVersion NODE_VERSION = 78;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
+
+const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
+const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 20;
 
 typedef short unsigned Port;
 
@@ -62,6 +65,9 @@ public:
   bool useIPv6() const { return ipv6_; }
   bool hasTwoSockets() const { return twoSockets_; }
 
+  uint32_t getMaxNeighbours() { return maxNeighbours_; }
+  uint64_t getConnectionBandwidth() { return connectionBandwidth_; }
+
   bool isSymmetric() const { return symmetric_; }
   const EndpointData& getAddressEndpoint() const { return hostAddressEp_; }
 
@@ -79,6 +85,8 @@ private:
   NodeType nType_;
 
   bool ipv6_;
+  uint32_t maxNeighbours_;
+  uint64_t connectionBandwidth_;
 
   bool symmetric_;
   EndpointData hostAddressEp_;

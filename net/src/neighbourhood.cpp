@@ -19,9 +19,15 @@ T getSecureRandom() {
   return result;
 }
 
-bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
+bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
+                             bool force) {
   bool result = false;
-  if (!transport_->shouldSendPacket(bp.pack)) return result;
+  if (bp.sentLastTime && !force) return true;
+
+  if (bp.attempts > MaxResendTimes ||
+      !transport_->shouldSendPacket(bp.pack)) return result;
+
+  bool sent = false;
 
   uint32_t c = 0;
   for (auto& nb : neighbours_) {
@@ -34,7 +40,7 @@ bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
     }
 
     if (!found) {
-      transport_->sendDirect(&(bp.pack), **nb);
+      sent = sent || transport_->sendDirect(&(bp.pack), **nb);
       if (nb->isSignal)  // Assume the SS got this
         *(bp.recEnd++) = nb->id;
       else
@@ -42,14 +48,28 @@ bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
     }
   }
 
+  if (sent) {
+    ++bp.attempts;
+    bp.sentLastTime = true;
+  }
+
   return result;
+}
+
+bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
+  if (dp.received || dp.attempts > MaxResendTimes) return false;
+
+  if (transport_->sendDirect(&(dp.pack), **dp.receiver))
+    ++dp.attempts;
+
+  return true;
 }
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
   SpinLock l(nLockFlag_);
   auto& bp = msgBroads_.tryStore(pack->getHash());
   if (!bp.pack) bp.pack = *pack;
-  dispatchBroadcast(bp);
+  dispatch(bp, true);
 }
 
 bool Neighbourhood::canHaveNewConnection() {
@@ -57,7 +77,7 @@ bool Neighbourhood::canHaveNewConnection() {
   return neighbours_.size() < MaxNeighbours;
 }
 
-void Neighbourhood::checkPending() {
+void Neighbourhood::checkPending(const uint32_t) {
   SpinLock l1(mLockFlag_);
   //LOG_DEBUG("CONNECTIONS: ");
   // If the connection cannot be established, retry it
@@ -102,7 +122,7 @@ void Neighbourhood::checkSilent() {
         continue;
 
       if (!(*conn)->node) {
-        ConnectionPtr tc = *conn; 
+        ConnectionPtr tc = *conn;
         disconnectNode(conn);
         --conn;
         continue;
@@ -276,6 +296,7 @@ void Neighbourhood::gotConfirmation(const Connection::Id& my,
     (*connPtr)->in = ep;
   }
 
+  (*connPtr)->key = pk;
   if (my != real) (*connPtr)->id = real;
 
   connectNode(node, *connPtr);
@@ -305,18 +326,28 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 void Neighbourhood::gotRefusal(const Connection::Id& id) {}
 
 void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
-                                       const Hash& hash) {
+                                       const Hash& hash,
+                                       const bool isDirect) {
   SpinLock l(nLockFlag_);
   auto conn = node->connection.load(std::memory_order_relaxed);
   if (!conn) return;
 
-  auto& bp = msgBroads_.tryStore(hash);
-  for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
-    if (*ptr == conn->id) return;
+  if (isDirect) {
+    auto& dp = msgDirects_.tryStore(hash);
+    if (conn->id == dp.receiver->id)
+      dp.received = true;
+    else
+      LOG_WARN("Got confirmation from a different connection");
   }
+  else {
+    auto& bp = msgBroads_.tryStore(hash);
+    for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
+      if (*ptr == conn->id) return;
+    }
 
-  if ((bp.recEnd - bp.receivers) < MaxNeighbours)
-    *(bp.recEnd++) = conn->id;
+    if ((bp.recEnd - bp.receivers) < MaxNeighbours)
+      *(bp.recEnd++) = conn->id;
+  }
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
@@ -419,13 +450,24 @@ void Neighbourhood::pingNeighbours() {
 
 void Neighbourhood::resendPackets() {
   SpinLock l(nLockFlag_);
-  uint32_t cnt = 0;
+  uint32_t cnt1 = 0;
+  uint32_t cnt2 = 0;
   for (auto& bp : msgBroads_) {
     if (!bp.data.pack) continue;
-    if (!dispatchBroadcast(bp.data))
+    if (!dispatch(bp.data, false))
       bp.data.pack = Packet();
     else
-      ++cnt;
+      ++cnt1;
+
+    bp.data.sentLastTime = false;
+  }
+
+  for (auto& dp : msgDirects_) {
+    if (!dp.data.pack) continue;
+    if (!dispatch(dp.data))
+      dp.data.pack = Packet();
+    else
+      ++cnt2;
   }
 }
 
@@ -447,4 +489,61 @@ ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
   }
 
   return si.prioritySender;
+}
+
+ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq) {
+  SpinLock l(nLockFlag_);
+
+  ConnectionPtr candidate;
+  for (auto& nb : neighbours_) {
+    if (nb->isSignal) continue;
+    if (nb->syncSeq == seq) {
+      if (++(nb->syncSeqRetries) < MaxSyncAttempts)
+        return ConnectionPtr();
+
+      nb->syncSeq = 0;
+      nb->syncSeqRetries = 0;
+    }
+    else if (!nb->syncSeq)
+      candidate = nb;
+  }
+
+  if (candidate) {
+    candidate->syncSeq = seq;
+    candidate->syncSeqRetries = 0;
+  }
+
+  return candidate;
+}
+
+ConnectionPtr Neighbourhood::getNeighbourByKey(const PublicKey& pk) {
+  SpinLock l(nLockFlag_);
+
+  for (auto& nb : neighbours_)
+    if (nb->key == pk)
+        return nb;
+
+  return ConnectionPtr();
+}
+
+void Neighbourhood::registerDirect(const Packet* packPtr,
+                                   ConnectionPtr conn) {
+  SpinLock lm(mLockFlag_);
+  SpinLock ln(nLockFlag_);
+
+  auto& bp = msgDirects_.tryStore(packPtr->getHash());
+  bp.pack = *packPtr;
+  bp.receiver = conn;
+}
+
+void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
+  SpinLock n(nLockFlag_);
+
+  for (auto& nb : neighbours_) {
+    if (nb->syncSeq == seq) {
+      nb->syncSeq = 0;
+      nb->syncSeqRetries = 0;
+      return;
+    }
+  }
 }

@@ -91,7 +91,7 @@ void Transport::run() {
   for (;;) {
     ++ctr;
     bool askMissing    = true;
-    bool resendPacks   = ctr % 2 == 0;
+    bool resendPacks   = ctr % 20 == 0;
     bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending  = ctr % 100 == 0;
@@ -101,7 +101,7 @@ void Transport::run() {
       askForMissingPackages();
 
     if (checkPending)
-      nh_.checkPending();
+      nh_.checkPending(config_.getMaxNeighbours());
 
     if (checkSilent)
       nh_.checkSilent();
@@ -151,11 +151,22 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
   return rn;
 }
 
-void Transport::sendDirect(const Packet* pack, const Connection& conn) {
+bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
   uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
-  if (nextBytesCount <= conn.BytesLimit) {
+  if (nextBytesCount <= config_.getConnectionBandwidth()) {
     conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
     net_->sendDirect(*pack, conn.getOut());
+    return true;
+  }
+
+  return false;
+}
+
+void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
+  const auto packEnd = pack + size;
+  for (auto ptr = pack; ptr != packEnd; ++ptr) {
+    nh_.registerDirect(pack, conn);
+    sendDirect(ptr, **conn);
   }
 }
 
@@ -273,6 +284,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   if (!iPackStream_.good())
     return false;
 
+  uint32_t ctr = 0;
   if (config_.getBootstrapType() == BootstrapType::SignalServer) {
     for (uint8_t i = 0; i < numCirc; ++i) {
       EndpointData ep;
@@ -282,7 +294,8 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
       if (!iPackStream_.good())
         return false;
 
-      nh_.establishConnection(net_->resolve(ep));
+      if (++ctr <= config_.getMaxNeighbours())
+        nh_.establishConnection(net_->resolve(ep));
 
       iPackStream_.safeSkip<PublicKey>();
       if (!iPackStream_.good())
@@ -632,7 +645,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
     nh_.redirectByNeighbours(&pack);
   }
   else {
-    nh_.neighbourHasPacket(sender, pack.getHash());
+    nh_.neighbourHasPacket(sender, pack.getHash(), false);
     sendBroadcast(&pack);
   }
 }
@@ -640,17 +653,18 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::PackInform << pack.getHash();
+  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isDirect() << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
   oPackStream_.clear();
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
+  uint8_t isDirect;
   Hash hHash;
-  iPackStream_ >> hHash;
+  iPackStream_ >> isDirect >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end()) return false;
 
-  nh_.neighbourHasPacket(sender, hHash);
+  nh_.neighbourHasPacket(sender, hHash, isDirect);
   return true;
 }
 
