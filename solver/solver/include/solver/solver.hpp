@@ -141,7 +141,7 @@ class Solver {
                            const csdb::Pool& metaInfoPool, const PublicKey& sender);
 
   Hash getCharacteristicHash() const;
-  std::vector<uint8_t> getSignedNotification();
+  std::vector<uint8_t> sign(std::vector<uint8_t> data);
 
   PublicKey getWriterPublicKey() const;
 

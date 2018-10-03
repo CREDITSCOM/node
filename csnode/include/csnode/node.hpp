@@ -50,7 +50,7 @@ class Node {
   void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size);
-  void sendNotificationToWriter();
+  void sendNotification(const PublicKey& destination);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
@@ -171,6 +171,7 @@ private:
   std::vector<PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
+  uint16_t m_notificationsCount;
 
   // Resources
   BlockChain bc_;

@@ -221,25 +221,17 @@ Hash Solver::getCharacteristicHash() const {
   return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
 }
 
-std::vector<uint8_t> Solver::getSignedNotification() {
-  std::vector<uint8_t> result;
-  constexpr size_t     signatureLength = 64;
+std::vector<uint8_t> Solver::sign(std::vector<uint8_t> data) {
+  std::vector<uint8_t> signature(64);  // 64 is signature length. We need place this as constant!
+  unsigned long long   signLength = 0;
 
-  result.insert(result.end(), getCharacteristicHash().str, getCharacteristicHash().str + HASH_LENGTH);
-  result.insert(result.end(), getWriterPublicKey().str, getWriterPublicKey().str + signatureLength);
+  crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), myPrivateKey.data());
 
-  assert(result.size() == (HASH_LENGTH + signatureLength));
+  assert(64 == signLength); // signature length = 64. Where's constant?
 
-  std::vector<uint8_t> signature(result.size());
-  unsigned long long   siglen = 0;
+  data.insert(data.end(), signature.begin(), signature.end());
 
-  crypto_sign_detached(signature.data(), &siglen, result.data(), result.size(), myPrivateKey.data());
-
-  assert(signatureLength == siglen);
-
-  result.insert(result.end(), signature.begin(), signature.end());
-
-  return result;
+  return data;
 }
 
 PublicKey Solver::getWriterPublicKey() const {
@@ -250,7 +242,7 @@ PublicKey Solver::getWriterPublicKey() const {
     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
   }
   return result;
-}  // namespace cs
+}
 
 void Solver::closeMainRound() {
   if (node_->getRoundNumber() == 1)  // || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by

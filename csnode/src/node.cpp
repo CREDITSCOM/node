@@ -20,6 +20,7 @@ const unsigned MAX_CONFIDANTS = 4;
 
 Node::Node(const Config& config)
 : myPublicKey_(config.getMyPublicKey())
+, m_notificationsCount(0)
 , bc_(config.getPathToDB().c_str())
 , solver_(new cs::Solver(this))
 , transport_(new Transport(config, this))
@@ -951,21 +952,34 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size) {
-  cs::DataStream stream(data, size);
+  m_notificationsCount += 1;
+  if (m_notificationsCount < (getConfidants().size() / 2)) {
+    return;
+  }
 
+
+  cs::DataStream       stream(data, size);
   std::vector<uint8_t> notification;
 
   stream >> notification;
+  this->sendNotification(solver_->getWriterPublicKey());
 }
 
-void Node::sendNotificationToWriter() {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, solver_->getWriterPublicKey());
+void Node::sendNotification(const PublicKey& destination) {
+  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, destination);
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
 
-  std::vector<uint8_t> notification = solver_->getSignedNotification();
+  const Hash&      characteristicHash = solver_->getCharacteristicHash();
+  const PublicKey& writerPublicKey    = solver_->getWriterPublicKey();
 
-  ostream_ << std::string(notification.begin(), notification.end());
+  std::vector<uint8_t> notification;
+  notification.insert(notification.end(), characteristicHash.str, characteristicHash.str + HASH_LENGTH);
+  notification.insert(notification.end(), writerPublicKey.str, writerPublicKey.str + PUBLIC_KEY_LENGTH);
+
+  std::vector<uint8_t> signedNotification = solver_->sign(notification);
+
+  ostream_ << std::string(signedNotification.begin(), signedNotification.end());
 
   flushCurrentTasks();
 }
