@@ -16,6 +16,8 @@
 #include <thread>
 #include <functional>
 #include <lib/system/structures.hpp>
+#include <sodium.h>
+
 
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
 #define csunused(x) (void)(x)
@@ -31,7 +33,8 @@ namespace cs
         enum Values
         {
             MinHashValue = std::numeric_limits<int>::min(),
-            MaxHashValue = std::numeric_limits<int>::max()
+            MaxHashValue = std::numeric_limits<int>::max(),
+            SignatureLength = 64  // <-- right place. TODO: get from right place!
         };
 
         /*!
@@ -261,6 +264,20 @@ namespace cs
             });
 
             tr.detach();
+        }
+
+        static std::vector<uint8_t> sign(std::vector<uint8_t> data, const unsigned char* securityKey)
+        {
+            std::vector<uint8_t> signature(Values::SignatureLength);
+            unsigned long long   signLength = 0;
+
+            crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), securityKey);
+
+            assert(Values::SignatureLength == signLength);
+
+            data.insert(data.end(), signature.begin(), signature.end());
+
+            return data;
         }
     };
 }

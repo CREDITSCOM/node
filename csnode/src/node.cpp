@@ -951,12 +951,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
 }
 
-void Node::getWriterNotification(const uint8_t* data, const std::size_t size) {
+void Node::getNotification(const uint8_t* data, const std::size_t size) {
   m_notificationsCount += 1;
   if (m_notificationsCount < (getConfidants().size() / 2)) {
     return;
   }
-
 
   cs::DataStream       stream(data, size);
   std::vector<uint8_t> notification;
@@ -970,18 +969,21 @@ void Node::sendNotification(const PublicKey& destination) {
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
 
+  ostream_ << createNotification();
+
+  flushCurrentTasks();
+}
+
+std::string Node::createNotification() {
   const Hash&      characteristicHash = solver_->getCharacteristicHash();
   const PublicKey& writerPublicKey    = solver_->getWriterPublicKey();
 
-  std::vector<uint8_t> notification;
+  std::vector<uint8_t> notification(HASH_LENGTH + PUBLIC_KEY_LENGTH);
   notification.insert(notification.end(), characteristicHash.str, characteristicHash.str + HASH_LENGTH);
   notification.insert(notification.end(), writerPublicKey.str, writerPublicKey.str + PUBLIC_KEY_LENGTH);
 
-  std::vector<uint8_t> signedNotification = solver_->sign(notification);
-
-  ostream_ << std::string(signedNotification.begin(), signedNotification.end());
-
-  flushCurrentTasks();
+  std::vector<uint8_t> signedNotification = cs::Utils::sign(notification, solver_->getPrivateKey().data());
+  return std::string(signedNotification.begin(), signedNotification.end());
 }
 
 void Node::sendHash(const std::string& hash, const PublicKey& target) {

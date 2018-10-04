@@ -49,8 +49,9 @@ class Node {
   void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
-  void getWriterNotification(const uint8_t* data, const std::size_t size);
+  void getNotification(const uint8_t* data, const std::size_t size);
   void sendNotification(const PublicKey& destination);
+  std::string createNotification();
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);

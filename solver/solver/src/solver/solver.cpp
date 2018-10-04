@@ -1068,4 +1068,8 @@ void Solver::setConfidants(const std::vector<PublicKey>& confidants, const Publi
   m_roundInfo.general = general;
 }
 
+const std::vector<uint8_t>& Solver::getPrivateKey() const {
+  return myPrivateKey;
+}
+
 }  // namespace cs

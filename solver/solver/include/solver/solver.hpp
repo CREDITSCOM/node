@@ -179,6 +179,8 @@ class Solver {
   void setRNum(size_t _rNum);
   void setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general, const RoundNumber roundNum);
 
+  const std::vector<uint8_t>& getPrivateKey() const;
+
  private:
   void _initApi();
 
