@@ -206,6 +206,20 @@ bool BlockChain::writeGenesisBlock()
   genesis.add_transaction(transaction);
 #endif
 
+  csdb::Address test_address;
+  std::string str_addr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+  std::vector<uint8_t> pub_key;
+  DecodeBase58(str_addr, pub_key);
+  test_address = csdb::Address::from_public_key(pub_key);
+  transaction.set_target(test_address);
+  transaction.set_source(genesisAddress_);
+  transaction.set_currency(csdb::Currency(1));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_innerID(0);
+
+  genesis.add_transaction(transaction);
+
   genesis.set_previous_hash(csdb::PoolHash());
   finishNewBlock(genesis);
   std::cout << "Genesis block completed ... trying to save" << std::endl;

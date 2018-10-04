@@ -126,7 +126,7 @@ tracer(const char* file, int line, const char* func, Ts... ts)
 }
 
 extern thread_local bool trace;
-#if LOG_LEVEL & FLAG_TRACE & -TRACE_ENABLED
+#if 0 //LOG_LEVEL & FLAG_TRACE & -TRACE_ENABLED
 #define TRACE(...)                                                             \
   do {                                                                         \
     if (!trace)                                                                \
