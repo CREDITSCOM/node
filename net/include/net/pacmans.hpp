@@ -68,7 +68,6 @@ private:
   bool lockedLast_ = false;
 
   RegionAllocator allocator_;
-
 };
 
 class OPacMan {

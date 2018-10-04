@@ -889,9 +889,10 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-	// replaces direct conditional call to solver_->sendTL()
-	solver_->beforeNextRound();
-  std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
+  // replaces direct conditional call to solver_->sendTL() and implements more useful features
+  solver_->beforeNextRound();
+  std::cout << "======================================== ROUND " << roundNum_
+            << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
 
   if (mainNode_ == myPublicKey_)
