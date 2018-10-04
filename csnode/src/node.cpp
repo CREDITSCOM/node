@@ -147,7 +147,7 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   istream_.init(data, size);
 #ifdef MYLOG
   std::cout << "NODE> Get Round Table" << std::endl;
@@ -243,134 +243,30 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   sendRoundTable();
 }
 
-// void Node::getTransaction(const uint8_t* data, const size_t size) {
-// // std::cout << __func__ << std::endl;
-// /* std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-//  std::cout << "|            NODE> Get Transactions          |" << std::endl;
-//  std::cout << "++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;*/
-// if(solver_->getIPoolClosed()) return;
-//
-//  if (myLevel_ != NodeLevel::Main &&
-//      myLevel_ != NodeLevel::Writer) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//  csdb::Pool pool;
-//  istream_ >> pool;
-//
-//  std::cout << "NODE> Transactions amount got " << pool.transactions_count() << std::endl;
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    LOG_WARN("Bad transactions packet format");
-//    return;
-//  }
-//   const char* bl = pool.to_byte_stream(size);
-//  std::cout << "GotBlock: " << byteStreamToHex(bl, size) << std::endl;
-//  //LOG_EVENT("Got full package of transactions: " << pool.transactions_count());
-//
-//  auto _transactions = pool.transactions();
-//  uint16_t i=0;
-// for(auto it : _transactions)
-// {
-//#ifdef MYLOG
-//    std::cout << "NODE> Get transaction #:" << i << " from " << it.source().to_string() << " ID= " << it.innerID() <<
-//    std::endl; #endif solver_->gotTransaction(std::move(it)); i++;
-//  }
-//}
-
 void Node::getTransaction(const uint8_t* data, const size_t size) {
-#ifdef LOG_TRANSACTIONS
-  std::cout << __func__ << std::endl;
-  bool         file_is;
-  std::fstream f;
-#endif
-
   istream_.init(data, size);
 
-  while (istream_.good() && !istream_.end()) {
-    csdb::Transaction trans;
-    istream_ >> trans;
+  csdb::Pool pool;
+  istream_ >> pool;
 
-#ifdef LOG_TRANSACTIONS
-    f.open(rcvd_trx_fname, std::fstream::out | std::fstream::app);
-    f << trans.source().to_string().c_str() << " " << trans.innerID() << std::endl;
-    f.close();
-#endif
+  if (!istream_.good() || !istream_.end()) {
+    LOG_WARN("Bad transaction packet format");
+    return;
+  }
 
-    //  std::cout << "NODE> Get transaction #: " << trans.innerID() << " from " << trans.source().to_string()  <<
-    //  std::endl;
+  for (auto& t : pool.transactions()) {
     if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer) {
-      solver_->gotTransaction(std::move(trans));
-    }
-
-    if (!istream_.good()) {
-      LOG_WARN("Bad transaction packet format");
-      return;
+      solver_->gotTransaction(std::move(t));
     }
   }
 }
 
-void Node::sendTransaction(const csdb::Transaction& trans) {
-  ostream_.init(BaseFlags::Broadcast, mainNode_);
-  ostream_ << MsgTypes::Transactions << roundNum_ << trans;
-#ifdef MYLOG
-  std::cout << "Sending transactions" << std::endl;
-#endif
-  LOG_EVENT("Sending transaction");
-
+void Node::sendTransaction(csdb::Pool&& transactions) {
+  transactions.recount();
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+  composeMessageWithBlock(transactions, MsgTypes::Transactions);
   flushCurrentTasks();
 }
-
-// void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-//    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-//    size_t bSize;
-//    const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-//
-//    std::string compressed;
-//    snappy::Compress((const char*)data, bSize, &compressed);
-//
-//    ostream_ << MsgTypes::Transactions
-//      << roundNum_
-//      << compressed;
-//
-//  //LOG_EVENT("Sending transactions");
-//  flushCurrentTasks();
-//}
-
-void Node::sendTransaction(std::vector<csdb::Transaction>&& transactions) {
-  for (auto& tr : transactions) {
-    ostream_.init(BaseFlags::Broadcast);
-    ostream_ << MsgTypes::Transactions << roundNum_;
-    ostream_ << tr;
-    // LOG_EVENT("Sending transaction");
-    flushCurrentTasks();
-#ifdef LOG_TRANSACTIONS
-    bool         file_is;
-    std::fstream f;
-    f.open(sent_trx_fname, std::fstream::out | std::fstream::app);
-    f << tr.source().to_string().c_str() << " " << tr.innerID() << std::endl;
-    f.close();
-#endif
-  }
-}
-
-//
-// void Node::sendTransaction(const csdb::Pool& m_transactions_) {
-//  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-//  size_t bSize;
-//  const void* data = const_cast<csdb::Pool&>(m_transactions_).to_byte_stream(bSize);
-//
-//  std::string compressed;
-//  snappy::Compress((const char*)data, bSize, &compressed);
-//
-//  ostream_ << MsgTypes::Transactions
-//    << roundNum_
-//    << compressed;
-//
-//  //LOG_EVENT("Sending transactions");
-//  flushCurrentTasks();
-//}
 
 void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
   std::cout << __func__ << std::endl;
@@ -407,7 +303,7 @@ void Node::sendFirstTransaction(const csdb::Transaction& trans) {
 }
 
 void Node::getTransactionsList(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -633,7 +529,7 @@ void Node::getMatrixRequest(const uint8_t* data, const size_t size)  //, const P
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -653,7 +549,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
     return;
   }
 
-  LOG_EVENT("Got vector");
+  //LOG_EVENT("Got vector");
   solver_->gotVector(std::move(vec));
 #ifdef MYLOG
   std::cout << "NODE>  WE returned!!!" << std::endl;
@@ -681,7 +577,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -699,7 +595,7 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
     return;
   }
 
-  LOG_EVENT("Got matrix");
+  //LOG_EVENT("Got matrix");
   solver_->gotMatrix(std::move(mat));
 }
 
@@ -730,7 +626,7 @@ uint32_t Node::getRoundNumber() {
 }
 
 void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get blocks");
     return;
@@ -752,8 +648,22 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   // LOG_EVENT("Got block of " << pool.transactions_count() <<" transactions");
 
-  if (pool.sequence() <= roundNum_)
-    solver_->gotBlock(std::move(pool), sender);
+  size_t localSeq = getBlockChain().getLastWrittenSequence();
+  size_t blockSeq = pool.sequence();
+  if (roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
+  if (localSeq >= blockSeq) return;
+
+  if (!blocksReceivingStarted_)
+  {
+    blocksReceivingStarted_ = true;
+    lastStartSequence_ = pool.sequence();
+    std::cout << "GETBLOCK> Setting first got block: " << lastStartSequence_ << std::endl;
+  }
+
+  //LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
+
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
+  else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -772,7 +682,7 @@ void Node::sendBlock(const csdb::Pool& pool) {
 }
 
 void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get bad blocks");
     return;
@@ -807,7 +717,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Writer) {
     std::cout << "Non-Writers cannot get hashes" << std::endl;
     return;
@@ -840,7 +750,7 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
     return;
   if (sender == myPublicKey_)
@@ -862,6 +772,11 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
+  if (seq == lastStartSequence_)
+  {
+    solver_->tmpStorageProcessing();
+    return;
+  }
   if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
 #ifdef MYLOG
 // std::cout << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence <<
@@ -870,7 +785,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     ++awaitingRecBlockCount;
     return;
   }
-#ifdef MYLOG
+  //#ifdef MYLOG
   // std::cout << "SENDBLOCKREQUEST> Composing the request" << std::endl;
   size_t lws, gs;
 
@@ -882,8 +797,12 @@ void Node::sendBlockRequest(uint32_t seq) {
   // std::cout << "SENDBLOCKREQUEST> gs = " << getBlockChain().getGlobalSequence() << std::endl;
   // std::cout << "SENDBLOCKREQUEST> lws = " << getBlockChain().getLastWrittenSequence() << std::endl;
   float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
-  std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
-#endif
+  //std::cout << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%" << std::endl;
+  std::cout << "SYNC: [";
+  for (uint32_t i = 0; i < (int)syncStatus; ++i) if (i % 2) std::cout << "#";
+  for (uint32_t i = (int)syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
+  std::cout << "] " << (int)syncStatus << "%" << std::endl;
+  //#endif
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
@@ -897,7 +816,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   csdb::Pool pool;
 
   istream_.init(data, size);
@@ -911,8 +830,12 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 #endif
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
-  } else
-    return;
+    solver_->rndStorageProcessing();
+  }
+  else if ((pool.sequence() > sendBlockRequestSequence) &&
+    (pool.sequence() < lastStartSequence_))
+      solver_->gotFreeSyncroBlock(std::move(pool));
+  else return;
   if (getBlockChain().getGlobalSequence() >
       getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
@@ -1088,17 +1011,17 @@ inline bool Node::readRoundData(const bool tail) {
 
 void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) {
   uint32_t bSize;
-
   const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  composeCompressed(data, bSize, type);
+}
 
+void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
   auto max    = LZ4_compressBound(bSize);
   auto memPtr = allocator_.allocateNext(max);
 
   auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), bSize, memPtr.size());
 
   allocator_.shrinkLast(realSize);
-
   ostream_ << type << roundNum_ << bSize;
-
   ostream_.insertBytes((const char*)memPtr.get(), memPtr.size());
 }

@@ -66,7 +66,7 @@ struct HashVector {
 struct HashMatrix {
   uint8_t Sender;
   // uint32_t roundNum;
-  HashVector hmatr[100];
+  HashVector hmatr[5];
   Signature  sig;
 };
 struct NormalState {
@@ -137,7 +137,11 @@ class Solver {
   void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
   void gotBlockReply(csdb::Pool&&);
   void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+  void gotFreeSyncroBlock(csdb::Pool&&);
   void sendTL();
+  void rndStorageProcessing();
+  void tmpStorageProcessing();
   // API methods
 
   void   initApi();
@@ -235,7 +239,6 @@ class Solver {
 
   size_t                         rNum = 0;
   std::mutex                     m_trans_mut;
-  std::vector<csdb::Transaction> m_transactions;
   csdb::Pool                     m_transactions_;
 
   /*to store new blocks*/

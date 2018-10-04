@@ -89,40 +89,37 @@ void Transport::run() {
   uint32_t ctr = 0;
   for (;;) {
     ++ctr;
-    bool askMissing   = true;
-    bool resendPacks  = ctr % 6 == 0;
-    bool sendPing     = ctr % 20 == 0;
-    bool checkPending = ctr % 100 == 0;
-    bool checkSilent  = ctr % 300 == 0;
+    bool askMissing    = true;
+    bool resendPacks   = ctr % 2 == 0;
+    bool sendPing      = ctr % 20 == 0;
+    bool refreshLimits = ctr % 20 == 0;
+    bool checkPending  = ctr % 100 == 0;
+    bool checkSilent   = ctr % 150 == 0;
 
     if (askMissing)
       askForMissingPackages();
 
     if (checkPending)
       nh_.checkPending();
+
     if (checkSilent)
       nh_.checkSilent();
 
-    if (resendPacks) {
-      SpinLock l(sendPacksFlag_);
-      for (auto& c : sendPacks_) {
-        if (c.incrementId)
-          ++(const_cast<uint64_t&>(c.pack.getId()));
-        // if (c.resendTimes > 100) LOG_EVENT("Resending " << byteStreamToHex((const char*)c.pack.data(), 128));
-        ++c.resendTimes;
-        sendBroadcast(&c.pack);
-      }
-    }
+    if (resendPacks)
+      nh_.resendPackets();
 
     if (sendPing)
       nh_.pingNeighbours();
+
+    if (refreshLimits)
+      nh_.refreshLimits();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 }
 
 template <>
-inline uint16_t getHashIndex(const ip::udp::endpoint& ep) {
+uint16_t getHashIndex(const ip::udp::endpoint& ep) {
   uint16_t result = ep.port();
 
   if (ep.protocol() == ip::udp::v4()) {
@@ -151,6 +148,14 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 
   rn->packets.fetch_add(1, std::memory_order_relaxed);
   return rn;
+}
+
+void Transport::sendDirect(const Packet* pack, const Connection& conn) {
+  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
+  if (nextBytesCount <= conn.BytesLimit) {
+    conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
+    net_->sendDirect(*pack, conn.getOut());
+  }
 }
 
 // Processing network packages
@@ -311,6 +316,19 @@ void                     Transport::processNodeMessage(const Message& msg) {
   }
 }
 
+bool Transport::shouldSendPacket(const Packet& pack) {
+  if (pack.isNetwork()) return false;
+  const auto rLim = std::max(node_->getRoundNumber(), (RoundNum)1) - 1;
+
+  if (!pack.isFragmented()) return pack.getRoundNum() >= rLim;
+  auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
+
+  if (pack.getFragmentId() == 0)
+    rn = pack.getRoundNum();
+
+  return !rn || rn >= rLim;
+}
+
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
@@ -432,12 +450,12 @@ void Transport::sendRegistrationRequest(Connection& conn) {
   sendDirect(&req, conn);
 }
 
-void Transport::sendRegistrationConfirmation(const Connection& conn) {
-  LOG_EVENT("Confirming registration with " << conn.in);
+void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
+  LOG_EVENT("Confirming registration with " << conn.getOut());
 
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::RegistrationConfirmed << conn.id << myPublicKey_;
+  oPackStream_ << NetworkCommand::RegistrationConfirmed << requestedId << conn.id << myPublicKey_;
 
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
@@ -508,18 +526,23 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  ConnectionId cId;
+  LOG_EVENT("Got registration confirmation from " << task->sender);
+
+  ConnectionId myCId;
+  ConnectionId realCId;
   PublicKey    key;
-  iPackStream_ >> cId >> key;
+  iPackStream_ >> myCId >> realCId >> key;
 
   if (!iPackStream_.good())
     return false;
 
-  nh_.gotConfirmation(cId, task->sender, key, sender);
+  nh_.gotConfirmation(myCId, realCId, task->sender, key, sender);
   return true;
 }
 
 bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodePtr&) {
+  LOG_EVENT("Got registration refusal from " << task->sender);
+
   RegistrationRefuseReasons reason;
   Connection::Id            id;
   iPackStream_ >> id >> reason;
@@ -607,21 +630,36 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
   nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
-void Transport::redirectPacket(const Packet& pack) {
-  if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold)
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
+  auto conn = sender->connection.load(std::memory_order_relaxed);
+  if (!conn)
+    return;
+
+  sendPackInform(pack, *conn);
+
+  if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
-  else
+  }
+  else {
+    nh_.neighbourHasPacket(sender, pack.getHash());
     sendBroadcast(&pack);
+  }
 }
 
-bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&) {
-  /*Hash hHash;
-  uint16_t fragmentId;
+void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
+  SpinLock l(oLock_);
+  oPackStream_.init(BaseFlags::NetworkMsg);
+  oPackStream_ << NetworkCommand::PackInform << pack.getHash();
+  sendDirect(oPackStream_.getPackets(), addr);
+  oPackStream_.clear();
+}
 
-  iPackStream_ >> hHash >> fragmentId;
-  if (!iPackStream_.good() || iPackStream_.end()) return false;
+bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
+  Hash hHash;
+  iPackStream_ >> hHash;
+  if (!iPackStream_.good() || !iPackStream_.end()) return false;
 
-  nh_.neighbourHasPacket(sender, hHash, fragmentId);*/
+  nh_.neighbourHasPacket(sender, hHash);
   return true;
 }
 
@@ -644,7 +682,6 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
 
   nh_.neighbourSentRenounce(sender, hHash);
 
-  // LOG_WARN("Got renounce from " << task->sender);
   return true;
 }
 
@@ -749,7 +786,6 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     ++start;
     mask <<= 1;
   }
-  // LOG_WARN("Got missing for " << reqd << " (" << req << "), sent " << snt);
 
   return true;
 }

@@ -216,13 +216,13 @@ void Solver::flushTransactions() {
   }
   {
     std::lock_guard<std::mutex> l(m_trans_mut);
-    if (m_transactions.size()) {
-      node_->sendTransaction(std::move(m_transactions));
+    if (m_transactions_.transactions().size()) {
+      node_->sendTransaction(std::move(m_transactions_));
       sentTransLastRound = true;
 #ifdef MYLOG
       std::cout << "FlushTransaction ..." << std::endl;
 #endif
-      m_transactions.clear();
+      m_transactions_ = csdb::Pool {};
     } else {
       return;
     }
@@ -286,6 +286,9 @@ void Solver::gotTransactionList(csdb::Pool&& _pool) {
   uint8_t numGen          = node_->getConfidants().size();
   //	std::cout << "SOLVER> GotTransactionList" << std::endl;
   m_pool       = csdb::Pool{};
+  for (auto& t : _pool.transactions())
+    t.set_balance(node_->getBlockChain().getBalance(t.source()));
+
   Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
   receivedVecFrom[node_->getMyConfNumber()] = true;
   hvector.Sender                            = node_->getMyConfNumber();
@@ -461,8 +464,10 @@ void Solver::writeNewBlock() {
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
-  if (node_->getMyLevel() == NodeLevel::Writer)
+  if (node_->getMyLevel() == NodeLevel::Writer) {
+    LOG_WARN("Writer nodes don't get blocks");
     return;
+  }
   gotBigBang        = false;
   gotBlockThisRound = true;
 #ifdef MONITOR_NODE
@@ -500,6 +505,69 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 }
+
+
+
+
+void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
+{
+  std::cout << __func__ << std::endl;
+  if (tmpStorage.count(block.sequence()) == 0)
+  {
+    tmpStorage.emplace(block.sequence(), block);
+    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+
+}
+
+void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
+{
+  std::cout << __func__ << std::endl;
+  if (rndStorage.count(block.sequence()) == 0)
+  {
+    rndStorage.emplace(block.sequence(), block);
+    std::cout << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+  }
+}
+
+void Solver::rndStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (rndStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      rndStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
+void Solver::tmpStorageProcessing()
+{
+  std::cout << __func__ << std::endl;
+  bool loop = true;
+  size_t newSeq;
+
+  while (loop)
+  {
+    newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
+
+    if (tmpStorage.count(newSeq)>0)
+    {
+      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      tmpStorage.erase(newSeq);
+    }
+    else loop = false;
+  }
+}
+
 
 bool Solver::getBigBangStatus() {
   return gotBigBang;
@@ -672,7 +740,7 @@ void Solver::spamWithTransactions() {
 #endif
         {
           std::lock_guard<std::mutex> l(m_trans_mut);
-          m_transactions.push_back(transaction);
+          m_transactions_.transactions().push_back(transaction);
         }
         iid++;
       }
@@ -689,7 +757,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   // TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   // TRACE("");
-  m_transactions.push_back(transaction);
+  m_transactions_.transactions().push_back(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -708,7 +776,7 @@ void Solver::addInitialBalance() {
 
   {
     std::lock_guard<std::mutex> l(m_trans_mut);
-    m_transactions.push_back(transaction);
+    m_transactions_.transactions().push_back(transaction);
   }
 
 #ifdef SPAMMER

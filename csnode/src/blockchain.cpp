@@ -512,11 +512,10 @@ BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
 csdb::Address
 BlockChain::getAddressFromKey(const std::string& key)
 {
-  std::string pk(static_cast<size_t>(PUBLIC_KEY_LENGTH), '\0');
-    std::copy(key.rbegin(),
-            std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()),
-              pk.rbegin());
-    return csdb::Address::from_public_key(pk.data());
+	std::string pk(static_cast<size_t>(PUBLIC_KEY_LENGTH), '\0');
+	if (key.size() >= PUBLIC_KEY_LENGTH)
+		std::copy(key.rbegin(), std::min(key.rbegin() + PUBLIC_KEY_LENGTH, key.rend()), pk.rbegin());
+	return csdb::Address::from_public_key(pk.data());
 }
 
 csdb::Amount

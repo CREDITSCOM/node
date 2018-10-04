@@ -57,16 +57,6 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_
       countFee(it, num_of_trusted, transactionsCount);
       delta = it.balance() - it.amount() - it.counted_fee();
 
-      // if (tempBalance.empty())
-      //{
-      //
-      //  tempBalance.emplace(it.source(), delta);
-      //}
-      // else
-      //{
-      //  if(tempBalance.at(it.source))it.set_balance()
-      //}
-
 #ifdef _MSC_VER
       int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
 #else
@@ -74,6 +64,7 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_
 #endif
       if (delta > zero_balance) {
         *(del1 + i) = bitcnt;
+        it.set_balance(delta);
         new_pool.add_transaction(it);
       } else {
         *(del1 + i) = -bitcnt;

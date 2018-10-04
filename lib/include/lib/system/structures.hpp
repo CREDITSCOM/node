@@ -210,6 +210,8 @@ public:
     KeyType key;
     ArgType data = {};
 
+    ArgType& operator*() { return data; }
+
     Element(const KeyType& _key,
             Element** _bucket): bucket(_bucket),
                                 key(_key) { }

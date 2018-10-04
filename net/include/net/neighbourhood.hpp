@@ -6,15 +6,16 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
 
+#include "packet.hpp"
+
 using namespace boost::asio;
 
 class Network;
 class Transport;
-class Packet;
 
 class BlockChain;
 
-const uint32_t MaxMessagesToKeep = 512;
+const uint32_t MaxMessagesToKeep = 32;
 
 struct Connection;
 struct RemoteNode {
@@ -40,13 +41,28 @@ struct Connection {
   typedef uint64_t Id;
 
   Connection() = default;
-  Connection(Connection&&) = default;
+  Connection(Connection&& rhs): id(rhs.id),
+                                lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed)),
+                                lastPacketsCount(rhs.lastPacketsCount),
+                                attempts(rhs.attempts),
+                                key(rhs.key),
+                                in(std::move(rhs.in)),
+                                specialOut(rhs.specialOut),
+                                out(std::move(rhs.out)),
+                                node(std::move(rhs.node)),
+                                isSignal(rhs.isSignal),
+                                connected(rhs.connected),
+                                msgRels(std::move(rhs.msgRels)) { }
 
   Connection(const Connection&) = delete;
-
   ~Connection() { }
 
-  Id id;
+  const ip::udp::endpoint& getOut() const { return specialOut ? out : in; }
+
+  Id id = 0;
+
+  static const uint32_t BytesLimit = 1 << 20;
+  mutable std::atomic<uint32_t> lastBytesCount = { 0 };
 
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
@@ -58,15 +74,15 @@ struct Connection {
   ip::udp::endpoint out;
 
   RemoteNodePtr node;
+
   bool isSignal = 0;
+  bool connected = false;
 
   struct MsgRel {
     uint32_t acceptOrder = 0;
     bool needSend = true;
   };
   FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
-
-  uint64_t syncBlock = 0;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
@@ -78,10 +94,10 @@ typedef MemPtr<TypedSlot<Connection>> ConnectionPtr;
 class Neighbourhood {
 public:
   const static uint32_t MinConnections = 1;
-  const static uint32_t MaxConnections = 64;
-  const static uint32_t MaxConnectAttempts = 64;
-
+  const static uint32_t MaxConnections = 1024;
   const static uint32_t MaxNeighbours = 32;
+
+  const static uint32_t MaxConnectAttempts = 64;
 
   Neighbourhood(Transport*);
 
@@ -92,18 +108,23 @@ public:
 
   void gotRegistration(Connection&&, RemoteNodePtr);
 
-  void gotConfirmation(const Connection::Id&,
+  void gotConfirmation(const Connection::Id& my,
+                       const Connection::Id& real,
                        const ip::udp::endpoint&,
                        const PublicKey&,
                        RemoteNodePtr);
 
   void gotRefusal(const Connection::Id&);
 
+  void resendPackets();
   void checkPending();
   void checkSilent();
 
+  void refreshLimits();
+
   bool canHaveNewConnection();
 
+  void neighbourHasPacket(RemoteNodePtr, const Hash&);
   void neighbourSentPacket(RemoteNodePtr, const Hash&);
   void neighbourSentRenounce(RemoteNodePtr, const Hash&);
 
@@ -118,24 +139,40 @@ public:
   ConnectionPtr getNextRequestee(const Hash&);
 
 private:
+  struct BroadPackInfo {
+    Packet pack;
+    Connection::Id receivers[MaxNeighbours];
+    Connection::Id* recEnd = receivers;
+  };
+
+  bool dispatchBroadcast(BroadPackInfo&);
+
+  ConnectionPtr getConnection(const ip::udp::endpoint&);
+
   void connectNode(RemoteNodePtr, ConnectionPtr);
+  void disconnectNode(ConnectionPtr*);
 
   Transport* transport_;
 
   TypedAllocator<Connection> connectionsAllocator_;
 
   std::atomic_flag nLockFlag_ = ATOMIC_FLAG_INIT;
-  FixedVector<ConnectionPtr, MaxConnections> neighbours_;
+  FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
-  std::atomic_flag pLockFlag_ = ATOMIC_FLAG_INIT;
-  FixedVector<ConnectionPtr, MaxConnections> pendingConnections_;
+  std::atomic_flag mLockFlag_ = ATOMIC_FLAG_INIT;
+  FixedHashMap<ip::udp::endpoint,
+               ConnectionPtr,
+               uint16_t,
+               MaxConnections> connections_;
 
   struct SenderInfo {
     uint32_t totalSenders = 0;
     uint32_t reaskTimes = 0;
     ConnectionPtr prioritySender;
   };
+
   FixedHashMap<Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
+  FixedHashMap<Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

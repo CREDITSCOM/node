@@ -92,21 +92,20 @@ class Transport {
   void sendBroadcast(const Packet* pack) {
     nh_.sendByNeighbours(pack);
   }
-
-  void sendDirect(const Packet* pack, const Connection& conn) {
-    net_->sendDirect(*pack, conn.specialOut ? conn.out : conn.in);
-  }
+  void sendDirect(const Packet*, const Connection&);
 
   void gotPacket(const Packet&, RemoteNodePtr&);
-  void redirectPacket(const Packet&);
+  void redirectPacket(const Packet&, RemoteNodePtr&);
+  bool shouldSendPacket(const Packet&);
 
   void refillNeighbourhood();
   void processPostponed(const RoundNum);
 
   void sendRegistrationRequest(Connection&);
-  void sendRegistrationConfirmation(const Connection&);
+  void sendRegistrationConfirmation(const Connection&, const Connection::Id);
   void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
   void sendPackRenounce(const Hash&, const Connection&);
+  void sendPackInform(const Packet&, const Connection&);
 
   void sendPingPack(const Connection&);
 
@@ -204,6 +203,7 @@ class Transport {
   Node*    node_;
 
   Neighbourhood nh_;
+  FixedHashMap<Hash, RoundNum, uint16_t, 10000> fragOnRound_;
 };
 
 #endif  // __TRANSPORT_HPP__
