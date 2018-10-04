@@ -40,6 +40,7 @@ enum BootstrapType {
 
 class Config {
 public:
+  Config() {} // necessary for testing
   Config(const Config&) = default;
   Config(Config&&) = default;
 
@@ -66,7 +67,6 @@ public:
   const EndpointData& getAddressEndpoint() const { return hostAddressEp_; }
 
 private:
-  Config() { }
   static Config readFromFile(const std::string& fileName);
 
   bool good_ = false;
