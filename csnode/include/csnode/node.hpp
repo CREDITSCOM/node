@@ -17,9 +17,7 @@ typedef std::string Vector;
 typedef std::string Matrix;
 
 class Transport;
-namespace Credits {
-class Solver;
-}
+namespace slv2 { class SolverCore; }
 
 class Node {
 public:
@@ -164,8 +162,8 @@ public:
   // Resources
   BlockChain bc_;
 
-  Credits::Solver* solver_;
-  Transport*       transport_;
+  slv2::SolverCore* solver_;
+  Transport* transport_;
 
   csstats::csstats       stats_;
   csconnector::connector api_;

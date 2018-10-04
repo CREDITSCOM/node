@@ -1,4 +1,4 @@
-#include <Solver/Solver.hpp>
+#include <solver2/SolverCore.h>
 
 #include <csnode/node.hpp>
 #include <lib/system/logger.hpp>
@@ -26,7 +26,7 @@ Node::Node(const Config& config):
     ,spammerAddress_
 #endif
   ),
-  solver_(new Credits::Solver(this, genesisAddress_, startAddress_
+  solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_
 #ifdef SPAMMER
     , spammerAddress_
 #endif
@@ -187,8 +187,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
-	size_t lastBlock = getBlockChain().getLastWrittenSequence();
+    uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+    std::cout << __func__ << " (rNum=" << rNum << "): my lastBlock=" << lastBlock << ", roundNum_=" << roundNum_ << std::endl;
 	if (rNum > lastBlock && rNum >= roundNum_)
   {
     solver_->setBigBangStatus(true);
@@ -889,11 +889,9 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart() {
-  if ((!solver_->mPoolClosed()) && (!solver_->getBigBangStatus())) {
-    solver_->sendTL();
-  }
-  std::cout << "======================================== ROUND " << roundNum_
-            << " ========================================" << std::endl;
+	// replaces direct conditional call to solver_->sendTL()
+	solver_->beforeNextRound();
+  std::cout << "======================================== ROUND " << roundNum_ << " ========================================" << std::endl;
   std::cout << "Node PK = " << byteStreamToHex(myPublicKey_.str, 32) << std::endl;
 
   if (mainNode_ == myPublicKey_)

@@ -19,7 +19,7 @@
 
 ///////////////////
 #define LOG_LEVEL                                                              \
-  (FLAG_LOG_NOTICE | 0 | 0 | 0 | FLAG_LOG_PACKETS |                            \
+  (FLAG_LOG_NOTICE | FLAG_LOG_WARN | FLAG_LOG_ERROR | 0 | FLAG_LOG_PACKETS |   \
    (FLAG_LOG_NODES_BUFFER & 0)) |                                              \
     LOG_DEBUG //(FLAG_LOG_PACKETS & 0)
 ///////////////////

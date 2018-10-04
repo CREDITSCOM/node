@@ -127,7 +127,6 @@ public:
   static Pool from_lz4_byte_stream(const char*, size_t, size_t);
 
 
-  bool clear()  noexcept;
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;

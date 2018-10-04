@@ -24,13 +24,13 @@ add_library(csnode
   src/BlockHashes.cpp
 )
 
-target_link_libraries (csnode net csdb Solver base58 lz4)
+target_link_libraries (csnode net csdb solver2 base58 lz4)
 
 target_include_directories(csnode PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../api/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver/Solver/Include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver2/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/

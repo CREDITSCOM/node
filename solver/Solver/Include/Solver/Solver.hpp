@@ -31,7 +31,12 @@
 
 class Node;
 
-namespace Credits {
+namespace slv2
+{
+    class SolverCore;
+}
+
+namespace Credits{
 typedef std::string Vector;
 typedef std::string Matrix;
 
@@ -187,6 +192,10 @@ typedef std::string Matrix;
     void setBigBangStatus(bool _status);
     void setRNum(size_t _rNum);
 
+	// to be called from node upon receive new RoundTable just before next round start
+	// (instead of conditional call to SendTL())
+	void beforeNextRound();
+
 	private:
     void _initApi();
 
@@ -203,6 +212,7 @@ typedef std::string Matrix;
 		std::vector<uint8_t> myPublicKey;
 		std::vector<uint8_t> myPrivateKey;
 
+        friend class slv2::SolverCore;
 		Node* node_;
         std::unique_ptr<WalletsState> walletsState;
         std::unique_ptr<Generals> generals;

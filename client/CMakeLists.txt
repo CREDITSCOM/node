@@ -8,7 +8,7 @@ add_executable(client
   src/main.cpp
 )
 
-target_link_libraries (client net csnode Solver csconnector blake2 lib)
+target_link_libraries (client net csnode csconnector blake2 lib solver2)
 
 target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include

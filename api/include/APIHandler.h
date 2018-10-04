@@ -7,7 +7,7 @@
 #include <queue>
 
 #include <API.h>
-#include <Solver/Solver.hpp>
+#include <solver2/SolverCore.h>
 //#include <csconnector/csconnector.h>
 #include <csstats.h>
 
@@ -66,7 +66,7 @@ class APIFaker : public APINull
 class APIHandler : public APIHandlerInterface
 {
   public:
-    APIHandler(BlockChain& blockchain, Credits::Solver& _solver);
+    APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -132,7 +132,7 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    Credits::Solver& solver;
+    slv2::SolverCore& solver;
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<

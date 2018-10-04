@@ -16,19 +16,19 @@
 
 #include <csnode/node.hpp>
 
-namespace Credits{
+namespace Credits {
 
     class WalletsState;
     class TransactionsValidator;
-	class Solver;
+    class Solver;
 
-    class Generals{
+    class Generals {
     public:
         Generals(WalletsState& walletsState);
         ~Generals();
 
-        Generals(const Generals&)= delete;
-        Generals& operator=(const Generals&)= delete;
+        Generals(const Generals&) = delete;
+        Generals& operator=(const Generals&) = delete;
 
         //Rewrite method//
         void chooseHeadAndTrusted(std::map<std::string, std::string>);
@@ -41,29 +41,29 @@ namespace Credits{
 
         //take desision
         uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
-		
+
         const HashMatrix& getMatrix() const;
 
-		    void addSenderToMatrix(uint8_t myConfNum);
+        void addSenderToMatrix(uint8_t myConfNum);
 
         void fake_block(std::string);
-    private:	
+    private:
 
         WalletsState& walletsState;
         std::unique_ptr<TransactionsValidator> trxValidator_;
 
-		struct hash_weight {
-			char a_hash[32];
-			uint8_t a_weight;
+        struct hash_weight {
+            char a_hash [32];
+            uint8_t a_weight;
 
-		};
-		//unsigned char hash_vector[97];
-		//unsigned char hash_matrix[9700];
-		//unsigned char got_matrix[9700];
-		HashMatrix hMatrix;
-		uint8_t find_untrusted[10000];
-		uint8_t new_trusted[100];
-		hash_weight hw_total[100];
+        };
+        //unsigned char hash_vector[97];
+        //unsigned char hash_matrix[9700];
+        //unsigned char got_matrix[9700];
+        HashMatrix hMatrix;
+        uint8_t find_untrusted [10000];
+        uint8_t new_trusted [100];
+        hash_weight hw_total [100];
 
         //void encrypt_vector(std::string& vector_string
               //  ,std::vector<int64_t>& vector_data);

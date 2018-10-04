@@ -844,6 +844,14 @@ void Solver::addConfirmation(uint8_t confNumber_) {
   
 }
 
+void Solver::beforeNextRound()
+{
+    // moved from begin of node::onRoundStart() from where this method called
+    if((!mPoolClosed()) && (!getBigBangStatus())) {
+        sendTL();
+    }
+}
+
 void Solver::nextRound()
 {
 #ifdef MYLOG
