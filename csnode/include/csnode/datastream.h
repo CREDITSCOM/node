@@ -10,9 +10,9 @@
 
 namespace cs
 {
-    /*!
-        Exception for packet stream
-    */
+    ///
+    /// Exception for packet stream
+    ///
     class DataStreamException : public std::exception
     {
     public:
@@ -23,15 +23,9 @@ namespace cs
         const std::string mMessage;
     };
 
-    /*!
-        Static byte (unsigned char) array
-    */
-    template<std::size_t size>
-    using ByteArray = std::array<unsigned char, size>;
-
-    /*!
-        The Data stream class represents an entity that controls data from any char array
-    */
+    ///
+    /// The Data stream class represents an entity that controls data from any char array
+    ///
     class DataStream
     {
     public:
@@ -337,7 +331,7 @@ namespace cs
     }
 
     /*!
-        Puts from stream to std:;string (stream would use data size of string to create bytes)
+        Puts from stream to std::string (stream would use data size of string to create bytes)
     */
     inline DataStream& operator>>(DataStream& stream, std::string& data)
     {
@@ -403,9 +397,9 @@ namespace cs
         return stream;
     }
 
-    /*!
-        Writes std::string to stream
-    */
+    ///
+    /// Writes std::string to stream
+    ///
     inline DataStream& operator<<(DataStream& stream, const std::string& data)
     {
         stream.addString(data);

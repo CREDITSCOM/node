@@ -2,9 +2,13 @@
 
 #include <datastream.h>
 #include <dynamicbuffer.h>
+
 #include <csnode/node.hpp>
+#include <csnode/nodecore.h>
+
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+
 #include <net/transport.hpp>
 
 #include <base58.h>
@@ -162,20 +166,17 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   cslog() << "NODE> Get Round Table";
 
-  if (roundNum_ < rNum || type == MsgTypes::BigBang)
+  if (roundNum_ < rNum || type == MsgTypes::BigBang) {
     roundNum_ = rNum;
+  }
   else {
     cswarning() << "Bad round number, ignoring";
     return;
   }
-  if (!readRoundData(false))
-    return;
 
-  if (myLevel_ == NodeLevel::Main)
-    if (!istream_.good()) {
-      cswarning() << "Bad round table format, ignoring";
-      return;
-    }
+  if (!readRoundData(false)) {
+    return;
+  }
 
   if (myLevel_ == NodeLevel::Main) {
     if (!istream_.good()) {
@@ -183,13 +184,24 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
       return;
     }
   }
+
+  if (myLevel_ == NodeLevel::Main) {
+    if (!istream_.good()) {
+      cswarning() << "Bad round table format, ignoring";
+      return;
+    }
+  }
+
   cs::RoundInfo roundInfo;
   roundInfo.round      = rNum;
   roundInfo.confidants = confidantNodes_;
   roundInfo.hashes.clear();
   roundInfo.general = mainNode_;
+
   transport_->clearTasks();
+
   onRoundStart();
+
   solver_->gotRound(std::move(roundInfo));
 }
 
@@ -741,8 +753,10 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   istream_.init(data, size);
 
-  cs::TransactionsPacket packet;
-  istream_ >> packet;
+  std::vector<uint8_t> bytes;
+  istream_ >> bytes;
+
+  cs::TransactionsPacket packet = cs::TransactionsPacket::from_binary(bytes);
 
   cslog() << "NODE> Transactions amount got " << packet.transactions_count();
 
@@ -817,10 +831,6 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
   cslog() << "NODE> RoundTableUpdated";
 
   istream_.init(data, size);
-
-  if (round <= solver_->currentRoundNumber()) {
-    return;
-  }
 
   uint8_t confidantsCount = 0;
   istream_ >> confidantsCount;
@@ -1011,15 +1021,8 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     return;
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-
-  uint32_t    bSize;
-  const void* data = const_cast<cs::TransactionsPacket&>(packet).to_byte_stream(bSize);
-
-  std::string compressed;
-  snappy::Compress((const char*)data, bSize, &compressed);
-
-  ostream_ << MsgTypes::TransactionPacket << compressed;
+  ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented | BaseFlags::Broadcast);
+  ostream_ << MsgTypes::TransactionPacket << roundNum_ << packet.to_binary();
 
   flushCurrentTasks();
 }
@@ -1200,11 +1203,13 @@ void Node::onRoundStart() {
         found        = true;
         break;
       }
+
       conf_no++;
     }
 
-    if (!found)
+    if (!found) {
       myLevel_ = NodeLevel::Normal;
+    }
   }
 
   // Pretty printing...
@@ -1253,7 +1258,7 @@ void Node::initNextRound(const cs::RoundInfo& roundInfo) {
     confidantNodes_.push_back(conf);
   }
 
-  sendRoundTable();
+  sendRoundTable(); // TODO: sendRoundTableUpdated(solver_->roundInfo());
 
   cslog() << "NODE> RoundNumber :" << roundNum_;
 
@@ -1262,6 +1267,9 @@ void Node::initNextRound(const cs::RoundInfo& roundInfo) {
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
   if (type == MsgTypes::NewCharacteristic) {
+    return MessageActions::Process;
+  }
+  if (type == MsgTypes::TransactionPacket) {
     return MessageActions::Process;
   }
   if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence()) {

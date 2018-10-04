@@ -15,7 +15,7 @@ namespace cs
     ///
     /// Represents standard timer that calls callbacks every msec with time correction.
     ///
-    /// @brief Timer uses callback in another thread
+    /// @brief Timer uses callback in another thread.
     ///
     class Timer
     {
@@ -58,7 +58,7 @@ namespace cs
         ///
         /// Returns timer status.
         ///
-        /// @return Returns timer running state
+        /// @return Returns timer running state.
         ///
         bool isRunning();
 

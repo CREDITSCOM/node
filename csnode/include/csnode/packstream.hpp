@@ -249,6 +249,13 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
 }
 
 template <>
+inline IPackStream& IPackStream::operator>>(std::vector<uint8_t>& bytes) {
+  bytes = std::vector<uint8_t>(ptr_, end_);
+  ptr_ = end_;
+  return *this;
+}
+
+template <>
 inline IPackStream& IPackStream::operator>>(ip::address& addr) {
   if (!canPeek<uint8_t>()) {
     good_ = false;
@@ -320,6 +327,12 @@ inline OPackStream& OPackStream::operator<<(const cs::HashVector& vec) {
 template <>
 inline OPackStream& OPackStream::operator<<(const cs::HashMatrix& mat) {
   insertBytes((const char*)&mat, sizeof(cs::HashMatrix));
+  return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const std::vector<uint8_t>& bytes) {
+  insertBytes((const char*)bytes.data(), bytes.size());
   return *this;
 }
 

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <array>
 #include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
@@ -17,6 +18,13 @@ namespace cs
     // solver data
     using Vector = std::string;
     using Matrix = std::string;
+
+    // static byte (unsigned char) array
+    template<std::size_t size>
+    using ByteArray = std::array<unsigned char, size>;
+
+    using Byte = uint8_t;
+    using Bytes = std::vector<Byte>;
 
     // transaction packet storage
     using TransactionsPacket = csdb::Pool;

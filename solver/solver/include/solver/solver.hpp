@@ -145,15 +145,16 @@ class Solver {
 
   PublicKey getWriterPublicKey() const;
 
-  const char* getSignature();
-
   // API methods
   void     initApi();
   uint32_t getTLsize();
   void     addInitialBalance();
 
   cs::RoundNumber currentRoundNumber();
-  void            addTransaction(const csdb::Transaction& transaction);
+  const cs::RoundInfo& roundInfo() const;
+
+  // conveyer start point
+  void addTransaction(const csdb::Transaction& transaction);
 
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
