@@ -187,9 +187,7 @@ void Network::processorRoutine() {
         transport_->processNodeMessage(task->pack);
     }
 
-    if (!task->pack.isDirect())
-      transport_->redirectPacket(task->pack, remoteSender);
-
+    transport_->redirectPacket(task->pack, remoteSender);
     ++recCounter;
   }
 }

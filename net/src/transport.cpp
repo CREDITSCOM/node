@@ -641,6 +641,8 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 
   sendPackInform(pack, *conn);
 
+  if (pack.isDirect()) return;  // Do not redirect direct packs
+
   if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
   }

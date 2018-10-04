@@ -662,10 +662,10 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   //LOG_EVENT("Got block of " << pool.transactions_count() << " transactions");
 
+  solver_->rndStorageProcessing();
+
   if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
   else solver_->gotIncorrectBlock(std::move(pool), sender);
-
-  solver_->rndStorageProcessing();
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -774,11 +774,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (seq == lastStartSequence_) {
-    solver_->rndStorageProcessing();
-    return;
-  }
-
+  solver_->rndStorageProcessing();
+  seq = getBlockChain().getLastWrittenSequence() + 1;
+  
   size_t lws, gs;
 
   if (getBlockChain().getGlobalSequence() == 0)

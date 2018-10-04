@@ -478,7 +478,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
 #endif
   if (g_seq > node_->getRoundNumber())
-    return;  // remove this line when the block candidate signing of all trusted will be implemented
+    return gotIncorrectBlock(std::move(block), sender);  // remove this line when the block candidate signing of all trusted will be implemented
 
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
@@ -515,7 +515,7 @@ void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
   if (tmpStorage.count(block.sequence()) == 0)
   {
     tmpStorage.emplace(block.sequence(), block);
-    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << ", lwr = " << node_->getBlockChain().getLastWrittenSequence() << std::endl;
   }
 
 }
