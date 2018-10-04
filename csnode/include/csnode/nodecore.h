@@ -70,6 +70,18 @@ namespace cs
         ConfidantsKeys confidants;
         Hashes hashes;
     };
+
+    struct Characteristic
+    {
+        uint32_t size = 0;
+        std::vector<uint8_t> mask;
+    };
+
+    struct PoolMetaInfo
+    {
+      std::string timestamp;
+      csdb::Pool::sequence_t sequenceNumber;
+    };
 }
 
 namespace std

@@ -1,10 +1,7 @@
 #include <solver/solver.hpp>
 
-#include <datastream.h>
-#include <dynamicbuffer.h>
-
-#include <csnode/node.hpp>
 #include <csnode/nodecore.h>
+#include <csnode/node.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -24,7 +21,6 @@ const unsigned MAX_CONFIDANTS = 4;
 
 Node::Node(const Config& config)
 : myPublicKey_(config.getMyPublicKey())
-, m_notificationsCount(0)
 , bc_(config.getPathToDB().c_str())
 , solver_(new cs::Solver(this))
 , transport_(new Transport(config, this))
@@ -168,8 +164,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   if (roundNum_ < rNum || type == MsgTypes::BigBang) {
     roundNum_ = rNum;
-  }
-  else {
+  } else {
     cswarning() << "Bad round number, ignoring";
     return;
   }
@@ -883,14 +878,14 @@ void Node::getRoundTableUpdated(const uint8_t* data, const size_t size, const Ro
   solver_->gotRound(std::move(roundInfo));
 }
 
-void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount,
+void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const uint32_t maskBitsCount,
                               const std::vector<uint8_t>& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
     cserror() << "Only writer nodes can send blocks";
     return;
   }
 
-  cslog() << "SendCharacteristic: seq = " << emptyMetaPool.sequence();
+  cslog() << "Send Characteristic: seq = " << poolMetaInfo.sequenceNumber;
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
@@ -898,8 +893,8 @@ void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t ma
   cs::DynamicBuffer buffer;
   cs::DataStream    stream(*buffer, buffer.size());
 
-  std::string time     = emptyMetaPool.user_field(0).value<std::string>();
-  uint64_t    sequence = emptyMetaPool.sequence();
+  std::string time     = poolMetaInfo.timestamp;
+  uint64_t    sequence = poolMetaInfo.sequenceNumber;
 
   stream << static_cast<uint16_t>(time.size());
   stream << time;
@@ -913,7 +908,7 @@ void Node::sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t ma
 
   flushCurrentTasks();
 
-  cslog() << "SendCharacteristic: DONE size: " << stream.size();
+  cslog() << "Send Characteristic: DONE size: " << stream.size();
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender) {
@@ -949,29 +944,138 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
 
   stream >> characteristic >> sequence;
 
-  csdb::Pool pool;
+  cs::PoolMetaInfo poolMetaInfo;
+  poolMetaInfo.sequenceNumber = sequence;
+  poolMetaInfo.timestamp      = time;
 
-  pool.set_sequence(sequence);
-  pool.add_user_field(0, time);
+  std::vector<uint8_t> signature;
+  signature.resize(cs::Utils::SignatureLength);
 
-  cslog() << "GetCharacteristic " << pool.sequence() << " maskbitCount" << maskBitsCount;
-  cslog() << "Time >> " << pool.user_field(0).value<std::string>() << "  << Time";
+  stream >> signature;
 
-  std::vector<uint8_t> characteristicMask(characteristic.begin(), characteristic.end());
-  solver_->applyCharacteristic(characteristicMask, maskBitsCount, pool, sender);
+  uint16_t notificationsSize = 0;
+  stream >> notificationsSize;
+
+  uint32_t bufferSize = 0;
+  stream >> bufferSize;
+
+  if (m_notifications.empty()) {
+    cserror() << "Get characteristics, logical error";
+  }
+
+  cslog() << "Notifications size " << notificationsSize;
+  cslog() << "Notification buffer size " << bufferSize;
+
+  // TODO: write to blockchain pool
+  for (std::size_t i = 0; i < notificationsSize; ++i) {
+    std::vector<uint8_t> bytes;
+    bytes.resize(bufferSize);
+
+    stream >> bytes;
+
+    m_notifications.push_back(cs::DynamicBufferPtr(new cs::DynamicBuffer(bytes.data(), bytes.size())));
+  }
+
+  std::vector<Hash> confidantsHashes;
+
+  for (const auto& ptr : m_notifications) {
+    Hash hash;
+
+    std::copy(ptr->begin(), ptr->begin() + HASH_LENGTH, hash.str);
+    confidantsHashes.push_back(hash);
+  }
+
+  Hash characteristicHash = getBlake2Hash(characteristic.data(), characteristic.size());
+
+  for (const auto& hash : confidantsHashes) {
+    if (hash != characteristicHash) {
+      cserror() << "Some of confidants hashes is dirty";
+      return;
+    }
+  }
+
+  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
+  cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
+
+  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo);
 }
 
-void Node::getNotification(const uint8_t* data, const std::size_t size) {
-  m_notificationsCount += 1;
-  if (m_notificationsCount < (getConfidants().size() / 2)) {
+void Node::getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey) {
+  istream_.init(data, size);
+
+  Hash      characteristicHash;
+  PublicKey writerPublicKey;
+
+  istream_ >> characteristicHash;
+  istream_ >> writerPublicKey;
+  // TODO: need to extract signature too!
+
+  const bool  isCorrectWriterPublicKey     = writerPublicKey == myPublicKey_;
+  const bool  isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
+  const auto& confidants                   = solver_->roundInfo().confidants;
+  const auto  iterator                     = std::find(confidants.begin(), confidants.end(), senderPublicKey);
+  const bool  isFoundSenderPublicKey       = iterator != std::end(confidants);
+
+  if (!isCorrectWriterPublicKey || !isCorrectChararcteristicHash || !isFoundSenderPublicKey) {
     return;
   }
 
-  cs::DataStream       stream(data, size);
-  std::vector<uint8_t> notification;
+  m_notifications.push_back(cs::DynamicBufferPtr(new cs::DynamicBuffer(data, size)));
 
-  stream >> notification;
-  this->sendNotification(solver_->getWriterPublicKey());
+  if (m_notifications.size() < (getConfidants().size() / 2)) {
+    return;
+  }
+  cslog() << "Confidants count more then 51%";
+
+  cs::PoolMetaInfo poolMetaInfo;
+  poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
+  poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
+
+  const cs::Characteristic& characteristic = solver_->getCharacteristic();
+  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo);
+
+  const std::vector<uint8_t>& poolBinary     = bc_.loadBlock(bc_.getLastHash()).to_binary();
+  const std::vector<uint8_t>  poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());
+
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
+  ostream_ << MsgTypes::NewCharacteristic << roundNum_;
+  ostream_ << buildBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, m_notifications);
+
+  flushCurrentTasks();
+}
+
+std::vector<uint8_t> Node::buildBlockValidatingPacket(const cs::PoolMetaInfo&                  poolMetaInfo,
+                                                      const cs::Characteristic&                characteristic,
+                                                      const std::vector<uint8_t>&              signature,
+                                                      const std::vector<cs::DynamicBufferPtr>& notifications) {
+  cs::DynamicBuffer buffer;
+  cs::DataStream    stream(*buffer, buffer.size());
+
+  std::string time     = poolMetaInfo.timestamp;
+  uint64_t    sequence = poolMetaInfo.sequenceNumber;
+
+  stream << static_cast<uint16_t>(time.size());
+  stream << time;
+
+  stream << characteristic.size;
+
+  stream << static_cast<uint32_t>(characteristic.mask.size());
+  stream << characteristic.mask;
+  stream << sequence;
+
+  stream << signature;
+
+  stream << static_cast<uint16_t>(notifications.size());
+
+  if (!notifications.empty()) {
+    stream << static_cast<uint32_t>(notifications.front()->size());
+  }
+
+  for (const auto& ptr : notifications) {
+    stream << std::vector<uint8_t>(ptr->begin(), ptr->end());
+  }
+
+  return std::vector<uint8_t>(buffer.begin(), buffer.end());
 }
 
 void Node::sendNotification(const PublicKey& destination) {
@@ -984,16 +1088,17 @@ void Node::sendNotification(const PublicKey& destination) {
   flushCurrentTasks();
 }
 
-std::string Node::createNotification() {
+std::vector<uint8_t> Node::createNotification() {
   const Hash&      characteristicHash = solver_->getCharacteristicHash();
   const PublicKey& writerPublicKey    = solver_->getWriterPublicKey();
 
   std::vector<uint8_t> notification(HASH_LENGTH + PUBLIC_KEY_LENGTH);
+
   notification.insert(notification.end(), characteristicHash.str, characteristicHash.str + HASH_LENGTH);
   notification.insert(notification.end(), writerPublicKey.str, writerPublicKey.str + PUBLIC_KEY_LENGTH);
 
   std::vector<uint8_t> signedNotification = cs::Utils::sign(notification, solver_->getPrivateKey().data());
-  return std::string(signedNotification.begin(), signedNotification.end());
+  return signedNotification;
 }
 
 void Node::sendHash(const std::string& hash, const PublicKey& target) {
@@ -1258,7 +1363,7 @@ void Node::initNextRound(const cs::RoundInfo& roundInfo) {
     confidantNodes_.push_back(conf);
   }
 
-  sendRoundTable(); // TODO: sendRoundTableUpdated(solver_->roundInfo());
+  sendRoundTable();  // TODO: sendRoundTableUpdated(solver_->roundInfo());
 
   cslog() << "NODE> RoundNumber :" << roundNum_;
 

@@ -138,8 +138,9 @@ class Solver {
   void rndStorageProcessing();
   void tmpStorageProcessing();
   void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
-                           const csdb::Pool& metaInfoPool, const PublicKey& sender);
+                           const PoolMetaInfo& metaInfoPool);
 
+  const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
   std::vector<uint8_t> sign(std::vector<uint8_t> data);
 

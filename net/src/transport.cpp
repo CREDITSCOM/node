@@ -444,7 +444,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   case MsgTypes::NewCharacteristic:
       return node_->getCharacteristic(data, size, firstPack.getSender());
   case MsgTypes::WriterNotification:
-      return node_->getNotification(data, size);
+      return node_->getNotification(data, size, firstPack.getSender());
   default:
     LOG_ERROR("Unknown type");
     break;

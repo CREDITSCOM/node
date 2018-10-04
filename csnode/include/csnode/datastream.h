@@ -4,7 +4,7 @@
 #include <boost/asio/ip/udp.hpp>
 #include <exception>
 #include <string>
-#include <nodecore.h>
+#include <csnode/nodecore.h>
 #include <algorithm>
 #include <type_traits>
 

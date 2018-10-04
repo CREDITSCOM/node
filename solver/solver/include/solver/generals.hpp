@@ -19,12 +19,6 @@
 
 namespace cs {
 class Solver;
-
-struct Characteristic {
-  uint32_t             size = 0;
-  std::vector<uint8_t> mask;
-};
-
 class Generals {
  public:
   Generals()  = default;

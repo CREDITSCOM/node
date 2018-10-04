@@ -18,6 +18,8 @@ namespace cs
     {
     public:
         explicit DynamicBuffer(std::size_t size = csval::defaultSize);
+        explicit DynamicBuffer(const char* data, std::size_t size);
+        explicit DynamicBuffer(const unsigned char* data, std::size_t size);
 
         DynamicBuffer(const DynamicBuffer& buffer);
         DynamicBuffer(DynamicBuffer&& buffer);

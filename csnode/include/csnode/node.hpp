@@ -7,6 +7,9 @@
 #include <csstats.h>
 #include <client/config.hpp>
 
+#include <csnode/datastream.h>
+#include <csnode/dynamicbuffer.h>
+
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
@@ -49,9 +52,11 @@ class Node {
   void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
-  void getNotification(const uint8_t* data, const std::size_t size);
+  void getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey);
   void sendNotification(const PublicKey& destination);
-  std::string createNotification();
+  std::vector<uint8_t> createNotification();
+
+  std::vector<uint8_t> buildBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const std::vector<uint8_t>& signature, const std::vector<cs::DynamicBufferPtr>& notifications);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
@@ -77,7 +82,7 @@ class Node {
   void sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender);
 
   void sendBadBlock(const csdb::Pool& pool);
-  void sendCharacteristic(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount,
+  void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const uint32_t maskBitsCount,
                           const std::vector<uint8_t>& characteristic);
 
   /*syncro send functions*/
@@ -172,7 +177,6 @@ private:
   std::vector<PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
-  uint16_t m_notificationsCount;
 
   // Resources
   BlockChain bc_;
@@ -197,5 +201,6 @@ private:
   IPackStream istream_;
   OPackStream ostream_;
   std::vector<csdb::Pool> m_packageTemporaryStorage;
+  std::vector<cs::DynamicBufferPtr> m_notifications;
 };
 #endif  // __NODE_HPP__

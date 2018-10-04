@@ -61,7 +61,7 @@ namespace cs
         /*!
             Returns current time in string representation
         */
-        static std::string currentTime()
+        static std::string formattedCurrentTime()
         {
             auto now = std::chrono::system_clock::now();
             auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -244,7 +244,7 @@ namespace cs
 
             std::string str;
 #ifndef NDEBUG
-            str = std::move(cs::Utils::byteStreamToHex(stream, length));
+            str = cs::Utils::byteStreamToHex(stream, length);
 #endif
             return str;
         }
@@ -278,6 +278,11 @@ namespace cs
             data.insert(data.end(), signature.begin(), signature.end());
 
             return data;
+        }
+
+        static std::string currentTimestamp() {
+          auto now_time = std::chrono::system_clock::now();
+          return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
         }
     };
 }
