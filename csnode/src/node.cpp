@@ -664,6 +664,8 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
   else solver_->gotIncorrectBlock(std::move(pool), sender);
+
+  solver_->rndStorageProcessing();
 }
 
 void Node::sendBlock(const csdb::Pool& pool) {
@@ -773,7 +775,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 
 void Node::sendBlockRequest(uint32_t seq) {
   if (seq == lastStartSequence_) {
-    solver_->tmpStorageProcessing();
+    solver_->rndStorageProcessing();
     return;
   }
 
@@ -794,18 +796,30 @@ void Node::sendBlockRequest(uint32_t seq) {
     std::cout << "] " << (int)syncStatus << "%" << std::endl;
   }
 
-  ConnectionPtr requestee = transport_->getSyncRequestee(seq);
-  if (!requestee) return;
+  uint32_t reqSeq = seq;
+
+  while (reqSeq) {
+    bool alreadyRequested = false;
+    ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
+    if (!requestee) {
+      break;  // No more free requestees
+    }
+
+    if (!alreadyRequested) {  // Already requested this block from this guy?
+      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
+      transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
+      ostream_.clear();
+    }
+    
+    reqSeq = solver_->getNextMissingBlock(reqSeq);
+  }
 
   //#endif
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
-
-  ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
-  ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
-  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
-  ostream_.clear();
 
 #ifdef MYLOG
   std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
@@ -813,7 +827,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-  //std::cout << __func__ << std::endl;
+  std::cout << __func__ << std::endl;
   csdb::Pool pool;
 
   istream_.init(data, size);
@@ -832,10 +846,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
   }
-  else if ((pool.sequence() > sendBlockRequestSequence) &&
-    (pool.sequence() < lastStartSequence_))
-      solver_->gotFreeSyncroBlock(std::move(pool));
-  else return;
+  else
+    solver_->gotFreeSyncroBlock(std::move(pool));
+  
   if (getBlockChain().getGlobalSequence() >
       getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);

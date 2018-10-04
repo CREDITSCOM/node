@@ -104,8 +104,13 @@ void Neighbourhood::checkPending(const uint32_t) {
 
 void Neighbourhood::refreshLimits() {
   SpinLock l(nLockFlag_);
-  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
+  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+    if (++((*conn)->syncSeqRetries) >= MaxSyncAttempts) {
+      (*conn)->syncSeqRetries = 0;
+      (*conn)->syncSeq = 0;
+    }
     (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
+  }
 }
 
 void Neighbourhood::checkSilent() {
@@ -491,15 +496,18 @@ ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
   return si.prioritySender;
 }
 
-ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq) {
+ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
   SpinLock l(nLockFlag_);
 
+  alreadyRequested = false;
   ConnectionPtr candidate;
   for (auto& nb : neighbours_) {
     if (nb->isSignal) continue;
     if (nb->syncSeq == seq) {
-      if (++(nb->syncSeqRetries) < MaxSyncAttempts)
-        return ConnectionPtr();
+      if (nb->syncSeqRetries < MaxSyncAttempts) {
+        alreadyRequested = true;
+        return nb;
+      }
 
       nb->syncSeq = 0;
       nb->syncSeqRetries = 0;

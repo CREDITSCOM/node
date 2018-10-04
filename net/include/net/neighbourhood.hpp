@@ -17,7 +17,7 @@ class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 32;
 const uint32_t MaxResendTimes = 64;
-const uint32_t MaxSyncAttempts = 4;
+const uint32_t MaxSyncAttempts = 8;
 
 struct Connection;
 struct RemoteNode {
@@ -142,7 +142,7 @@ public:
                             const ip::udp::endpoint&);
 
   ConnectionPtr getNextRequestee(const Hash&);
-  ConnectionPtr getNextSyncRequestee(const uint32_t seq);
+  ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
   ConnectionPtr getNeighbourByKey(const PublicKey&);
 
   void releaseSyncRequestee(const uint32_t seq);

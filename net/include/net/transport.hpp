@@ -113,7 +113,7 @@ class Transport {
   void registerMessage(MessagePtr);
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
-  ConnectionPtr getSyncRequestee(const uint32_t seq) { return nh_.getNextSyncRequestee(seq); }
+  ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested) { return nh_.getNextSyncRequestee(seq, alreadyRequested); }
   ConnectionPtr getConnectionByKey(const PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
   void syncReplied(const uint32_t seq) { return nh_.releaseSyncRequestee(seq); }
 

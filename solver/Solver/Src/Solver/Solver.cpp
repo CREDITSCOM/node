@@ -532,7 +532,7 @@ void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
 
 void Solver::rndStorageProcessing()
 {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   bool loop = true;
   size_t newSeq;
 
@@ -547,11 +547,13 @@ void Solver::rndStorageProcessing()
     }
     else loop = false;
   }
+
+  tmpStorageProcessing();
 }
 
 void Solver::tmpStorageProcessing()
 {
-  std::cout << __func__ << std::endl;
+  //std::cout << __func__ << std::endl;
   bool loop = true;
   size_t newSeq;
 
@@ -579,6 +581,15 @@ void Solver::setBigBangStatus(bool _status) {
 
 void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender) {
   // insert code here
+}
+
+uint32_t Solver::getNextMissingBlock(const uint32_t fromSeq) {
+  for (uint32_t b = fromSeq + 1; b < node_->getRoundNumber(); ++b) {
+    if (tmpStorage.count(b) || rndStorage.count(b)) continue;
+    return b;
+  }
+
+  return 0;
 }
 
 void Solver::gotBlockCandidate(csdb::Pool&& block) {

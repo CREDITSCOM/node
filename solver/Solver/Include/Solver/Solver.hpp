@@ -168,6 +168,8 @@ class Solver {
   void              setBigBangStatus(bool _status);
   void              setRNum(size_t _rNum);
 
+  uint32_t          getNextMissingBlock(const uint32_t fromSeq);
+
  private:
   void _initApi();
 
