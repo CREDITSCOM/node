@@ -14,7 +14,7 @@ add_library(solver2
 	include/solver2/Node.h
 	include/solver2/Generals.h
 	include/solver2/SolverCompat.h
-	include/Solver2/CallsQueueScheduler.h
+	include/solver2/CallsQueueScheduler.h
 
 	include/solver2/states/CollectState.h
 	include/solver2/states/DefaultStateBehavior.h

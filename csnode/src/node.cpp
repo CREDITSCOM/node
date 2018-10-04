@@ -301,7 +301,7 @@ void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
   pool_.add_transaction(trans);
 
   LOG_EVENT("Got first transaction, initializing consensus...");
-  solver_->gotTransactionList(std::move(pool_));
+  solver_->gotTransactionList(pool_);
 }
 
 void Node::sendFirstTransaction(const csdb::Transaction& trans) {
@@ -345,7 +345,7 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
     LOG_EVENT("Got full transactions list of " << pool.transactions_count());
     // if (pool.transactions_count()>0)
   }
-  solver_->gotTransactionList(std::move(pool));
+  solver_->gotTransactionList(pool);
   // }
 }
 
@@ -672,7 +672,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
   LOG_DEBUG("Got block of " << pool.transactions_count() << " transactions of seq " << pool.sequence() << " and hash "
                             << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>());
 
-  if(pool.sequence() == getBlockChain().getLastWrittenSequence()+1) solver_->gotBlock(std::move(pool), sender);
+  if(pool.sequence() == getBlockChain().getLastWrittenSequence()+1) solver_->gotBlock(pool, sender);
   else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
@@ -839,7 +839,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
-    solver_->gotBlockReply(std::move(pool));
+    solver_->gotBlockReply(pool);
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
   }
