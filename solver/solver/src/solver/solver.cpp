@@ -313,19 +313,19 @@ void Solver::flushTransactions() {
   cs::Lock lock(mSharedMutex);
 
   for (auto& packet : m_transactionsBlock) {
-    auto trxCount = packet.transactions_count();
+    auto trxCount = packet.transactionsCount();
 
-    if (trxCount != 0) {
-      // SUPER KOSTIL //TODO fix kostil
-      packet.set_storage(node_->getBlockChain().getStorage());
+    if (trxCount != 0 &&
+        packet.isHashEmpty())
+    {
+      packet.makeHash();
 
-      bool composed = packet.compose();
       node_->sendTransactionsPacket(packet);
       sentTransLastRound = true;
 
       auto hash = packet.hash();
 
-      if (composed && !m_hashTable.contains(hash)) {
+      if (!m_hashTable.contains(hash)) {
         m_hashTable.insert(std::move(hash), std::move(packet));
       } else {
         cslog() << "Transaction compose failed";
@@ -932,7 +932,7 @@ void Solver::spamWithTransactions() {
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   cs::Lock lock(mSharedMutex);
-  m_transactionsBlock.back().add_transaction(transaction);
+  m_transactionsBlock.back().addTransaction(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -951,7 +951,7 @@ void Solver::addInitialBalance() {
 
   {
     cs::Lock lock(mSharedMutex);
-    m_transactionsBlock.back().add_transaction(transaction);
+    m_transactionsBlock.back().addTransaction(transaction);
   }
 
 #ifdef SPAMMER
@@ -1064,11 +1064,11 @@ void Solver::addTransaction(const csdb::Transaction& transaction) {
     m_transactionsBlock.push_back(cs::TransactionsPacket{});
   }
 
-  if (m_transactionsBlock.back().transactions_count() >= MaxPacketTransactions) {
+  if (m_transactionsBlock.back().transactionsCount() >= MaxPacketTransactions) {
     m_transactionsBlock.push_back(cs::TransactionsPacket{});
   }
 
-  m_transactionsBlock.back().add_transaction(transaction);
+  m_transactionsBlock.back().addTransaction(transaction);
 }
 
 void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general,

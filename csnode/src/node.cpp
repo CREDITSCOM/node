@@ -271,7 +271,7 @@ void Node::sendRoundTableUpdated(const cs::RoundInfo& round) {
   cslog() << "Hashes";
 
   for (auto& e : round.hashes) {
-    cslog() << i << ". " << e.to_string().c_str();
+    cslog() << i << ". " << e.toString().c_str();
     i++;
   }
 
@@ -756,16 +756,16 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   std::vector<uint8_t> bytes;
   istream_ >> bytes;
 
-  cs::TransactionsPacket packet = cs::TransactionsPacket::from_binary(bytes);
+  cs::TransactionsPacket packet = cs::TransactionsPacket::fromBinary(bytes);
 
-  cslog() << "NODE> Transactions amount got " << packet.transactions_count();
+  cslog() << "NODE> Transactions amount got " << packet.transactionsCount();
 
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "Bad transactions packet format";
     return;
   }
 
-  if (packet.hash().is_empty()) {
+  if (packet.hash().isEmpty()) {
     cswarning() << "Received transaction packet hash is empty";
     return;
   }
@@ -812,14 +812,14 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   cs::TransactionsPacket packet;
   istream_ >> packet;
 
-  cslog() << "NODE> Transactions hashes answer amount got " << packet.transactions_count();
+  cslog() << "NODE> Transactions hashes answer amount got " << packet.transactionsCount();
 
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "Bad transactions hashes answer packet format";
     return;
   }
 
-  if (packet.hash().is_empty()) {
+  if (packet.hash().isEmpty()) {
     cserror() << "Received transaction hashes answer packet hash is empty";
     return;
   }
@@ -1014,13 +1014,13 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     return;
   }
 
-  if (packet.hash().is_empty()) {
+  if (packet.hash().isEmpty()) {
     cslog() << "Send transaction packet with empty hash failed";
     return;
   }
 
   ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented | BaseFlags::Broadcast);
-  ostream_ << MsgTypes::TransactionPacket << roundNum_ << packet.to_binary();
+  ostream_ << MsgTypes::TransactionPacket << roundNum_ << packet.toBinary();
 
   flushCurrentTasks();
 }
@@ -1055,26 +1055,27 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 }
 
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender) {
-  if (packet.hash().is_empty()) {
+  if (packet.hash().isEmpty()) {
     cslog() << "Send transaction packet reply with empty hash failed";
     return;
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
 
-  uint32_t    bSize;
-  const void* data = const_cast<cs::TransactionsPacket&>(packet).to_byte_stream(bSize);
+  auto     buffer   = packet.toBinary();
+  void*    rawData  = buffer.data();
+  uint32_t buffSize = buffer.size();
 
-  cslog() << "Sending transaction packet reply: size: " << bSize;
+  cslog() << "Sending transaction packet reply: size: " << buffSize;
 
   std::string compressed;
-  snappy::Compress(static_cast<const char*>(data), bSize, &compressed);
+  snappy::Compress(static_cast<const char*>(rawData), buffSize, &compressed);
 
   ostream_ << MsgTypes::TransactionsPacketReply << compressed;
 
   cslog() << "Sending transaction packet reply: compressed size: " << compressed.size();
 
-  cslog() << "NODE> Sending " << packet.transactions_count() << " transaction(s)";
+  cslog() << "NODE> Sending " << packet.transactionsCount() << " transaction(s)";
 
   flushCurrentTasks();
 }

@@ -12,6 +12,7 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <libcuckoo/cuckoohash_map.hh>
+#include <csnode/transactionsPacket.h>
 
 namespace cs
 {
@@ -25,10 +26,6 @@ namespace cs
 
     using Byte = uint8_t;
     using Bytes = std::vector<Byte>;
-
-    // transaction packet storage
-    using TransactionsPacket = csdb::Pool;
-    using TransactionsPacketHash = csdb::PoolHash;
 
     // hash table for fast transactions storage
     using TransactionsPacketHashTable = cuckoohash_map<TransactionsPacketHash, TransactionsPacket>;
