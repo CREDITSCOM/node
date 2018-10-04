@@ -2,6 +2,7 @@
 #ifndef __STRUCTURES_HPP__
 #define __STRUCTURES_HPP__
 #include <cstdint>
+#include <cstring>
 #include <cstdlib>
 #include <functional>
 

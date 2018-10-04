@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <chrono>
 #include <thread>
+#include <functional>
 #include <condition_variable>
 #include <atomic>
 #include <set>
