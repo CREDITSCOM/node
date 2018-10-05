@@ -20,7 +20,7 @@ namespace cs
         virtual const char* what() const noexcept override;
 
     private:
-        const std::string mMessage;
+        const std::string m_message;
     };
 
     ///
@@ -73,8 +73,8 @@ namespace cs
             if (!isAvailable(sizeof(T)))
                 return T();
 
-            T field = getFromArray<T>(mData, mIndex);
-            mIndex += sizeof(T);
+            T field = getFromArray<T>(m_data, m_index);
+            m_index += sizeof(T);
             return field;
         }
 
@@ -89,8 +89,8 @@ namespace cs
             if (!isAvailable(sizeof(T)))
                 return;
 
-            insertToArray(mData, mIndex, streamField);
-            mIndex += sizeof(T);
+            insertToArray(m_data, m_index, streamField);
+            m_index += sizeof(T);
         }
 
         ///
@@ -108,9 +108,9 @@ namespace cs
                 return array;
 
             for (std::size_t i = 0; i < size; ++i)
-                array[i] = mData[i + mIndex];
+                array[i] = m_data[i + m_index];
 
-            mIndex += size;
+            m_index += size;
             return array;
         }
 
@@ -127,9 +127,9 @@ namespace cs
                 return;
 
             for (std::size_t i = 0; i < size; ++i)
-                mData[i + mIndex] = array[i];
+                m_data[i + m_index] = array[i];
 
-            mIndex += size;
+            m_index += size;
         }
 
         ///
@@ -194,7 +194,7 @@ namespace cs
             if (!isAvailable(size))
                 return;
 
-            mIndex += size;
+            m_index += size;
         }
 
         ///
@@ -251,17 +251,17 @@ namespace cs
         template <typename T>
         inline const T& peek() const
         {
-            return *(reinterpret_cast<T*>(mData + mIndex));
+            return *(reinterpret_cast<T*>(m_data + m_index));
         }
 
     private:
 
         // attributes
-        char* mData = nullptr;
-        char* mHead = nullptr;
+        char* m_data = nullptr;
+        char* m_head = nullptr;
 
-        std::size_t mIndex = 0;
-        std::size_t mDataSize = 0;
+        std::size_t m_index = 0;
+        std::size_t m_dataSize = 0;
 
         // creates template address
         template<typename T>

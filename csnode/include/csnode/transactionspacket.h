@@ -46,7 +46,7 @@ namespace cs
     public: // Interface
 
         ///
-        /// @brief Ñhecks hash size bytes on 0
+        /// @brief Ð¡hecks hash size bytes on 0
         /// @return true if hash size == 0
         ///
         bool isEmpty() const noexcept;
@@ -78,8 +78,6 @@ namespace cs
         internal::Bytes m_bytes;
     };
 
-
-
     ///
     /// Flexible strorage for transactions
     ///
@@ -92,6 +90,7 @@ namespace cs
         /// @param  Binary representation of a packet.
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty packet is returned.
+		///
         static TransactionsPacket fromBinary(const internal::Bytes& data);
 
         ///
@@ -100,6 +99,7 @@ namespace cs
         /// @param  Binary representation size
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty packet is returned.
+		///
         static TransactionsPacket fromByteStream(const char* data, size_t size);
 
     public: // Interface
