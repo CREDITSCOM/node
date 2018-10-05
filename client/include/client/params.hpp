@@ -5,12 +5,10 @@
 //#define STARTER
 #define NODE_API
 #define AJAX_IFACE
-#define CUSTOMER_NODE
-//#define FOREVER_ALONE
 #define TIME_TO_COLLECT_TRXNS 50
 #define TIME_TO_AWAIT_ACTIVITY 200
 #define TRX_SLEEP_TIME 50000  // microseconds
-#define FAKE_BLOCKS
+
 #ifndef MONITOR_NODE
 //#define SPAMMER
 #else
