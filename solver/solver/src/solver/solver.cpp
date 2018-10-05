@@ -131,7 +131,7 @@ void Solver::setLastRoundTransactionsGot(size_t trNum) {
 }
 
 void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
-                                 const PoolMetaInfo& metaInfoPool) {
+                                 const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   if (node_->getMyLevel() == NodeLevel::Writer) {
@@ -695,14 +695,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
       node_->getBlockChain().putBlock(block);
 #ifndef MONITOR_NODE
       if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
-        // std::cout << "Solver -> before sending hash to writer" << std::endl;
-        Hash test_hash((char*)(node_->getBlockChain()
-                                   .getLastWrittenHash()
-                                   .to_binary()
-                                   .data()));  // getLastWrittenHash().to_binary().data()));//SENDING
+        std::string test_hash = node_->getBlockChain().getLastWrittenHash().to_string();
                                                // HASH!!!
         node_->sendHash(test_hash, sender);
-        csdebug() << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32);
+        csdebug() << "SENDING HASH: " << cs::Utils::debugByteStreamToHex(test_hash.data(), 32);
       }
 #endif
     }

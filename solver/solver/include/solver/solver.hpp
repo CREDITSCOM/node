@@ -138,7 +138,7 @@ class Solver {
   void rndStorageProcessing();
   void tmpStorageProcessing();
   void applyCharacteristic(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
-                           const PoolMetaInfo& metaInfoPool);
+                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender);
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;

@@ -997,7 +997,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
-  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo);
+  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo, sender);
 }
 
 void Node::getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey) {
@@ -1032,7 +1032,7 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const Pu
   poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo);
+  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo, senderPublicKey);
 
   const std::vector<uint8_t>& poolBinary     = bc_.loadBlock(bc_.getLastHash()).to_binary();
   const std::vector<uint8_t>  poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());

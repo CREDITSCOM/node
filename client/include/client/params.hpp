@@ -1,6 +1,6 @@
 #pragma once
 
-#define MONITOR_NODE
+//#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
 #define NODE_API
@@ -17,7 +17,6 @@
 #define STATS
 #endif
 #define SYNCRO
-#define MYLOG
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
