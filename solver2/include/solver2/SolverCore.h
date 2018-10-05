@@ -24,6 +24,7 @@ namespace Credits
     class WalletsState;
     class Solver;
     class Generals;
+    class Fee;
 }
 
 //TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by SolverCore
@@ -73,7 +74,9 @@ namespace slv2
         void gotBlockReply(csdb::Pool& p);
         void gotHash(const Hash& hash, const PublicKey& sender);
         void gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender);
+        // store outrunning syncro blocks
         void gotFreeSyncroBlock(csdb::Pool&& p);
+        // retrieve outrunning syncro blocks and store them
         void rndStorageProcessing();
         void tmpStorageProcessing();
         void addConfirmation(uint8_t own_conf_number);
@@ -136,6 +139,7 @@ namespace slv2
         KeyType public_key;
         KeyType private_key;
         std::unique_ptr<Credits::HashVector> pown_hvec;
+        std::unique_ptr<Credits::Fee> pfee;
         // senders of vectors received this round
         std::set<uint8_t> recv_vect;
         // senders of matrices received this round
@@ -149,6 +153,11 @@ namespace slv2
         csdb::Pool pool {};
         std::mutex trans_mtx;
         csdb::Pool transactions;
+        // to store outrunning blocks until the time comes
+        // stores pairs of <block, sender> sorted by sequence number
+        std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,PublicKey>> outrunning_blocks;
+        // to store unrequested syncro blocks
+        std::map <size_t, csdb::Pool> rnd_storage;
 
         // previous solver version instance
 
@@ -164,7 +173,8 @@ namespace slv2
 
         void handleTransitions(Event evt);
         bool stateCompleted(Result result);
-
+        // scans cached before blocks and retrieve them for processing if good sequence number
+        void test_outrunning_blocks();
         // sends current block if actual otherwise loads block from storage and sends it
         void repeatLastBlock();
 
@@ -174,6 +184,7 @@ namespace slv2
         void prepareBlock(csdb::Pool& p);
         void flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);
+        csdb::Pool removeTransactionsWithBadSignatures(const csdb::Pool& p);
     };
 
 } // slv2

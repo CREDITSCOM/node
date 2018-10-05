@@ -2,7 +2,8 @@
 #include "SolverContext.h"
 #include "CallsQueueScheduler.h"
 #include <Solver/Solver.hpp>
-#include "Solver/WalletsState.h"
+#include <Solver/WalletsState.h>
+#include <Solver/Fee.h>
 #include "Node.h"
 #include "Generals.h"
 
@@ -32,6 +33,7 @@ namespace slv2
         , addr_spam(std::nullopt)
         , cur_round(0)
         , pown_hvec(std::make_unique<Credits::HashVector>())
+        , pfee(std::make_unique<Credits::Fee>())
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
         // previous solver version instance
         , pslv_v1(nullptr)
@@ -214,8 +216,10 @@ namespace slv2
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
         }
-        pnode->getBlockChain().setGlobalSequence(static_cast<uint32_t>(p.sequence()));
-        pnode->getBlockChain().putBlock(p);
+        auto& bc = pnode->getBlockChain();
+        bc.finishNewBlock(p);
+        bc.writeNewBlock(p);
+        bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
     }
 
     void SolverCore::prepareBlock(csdb::Pool& p)
@@ -227,7 +231,6 @@ namespace slv2
         // finalize
         pool.set_writer_public_key(public_key);
         pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        pool.set_previous_hash(csdb::PoolHash::from_string(""));
         pool.sign(private_key);
     }
 
@@ -248,6 +251,64 @@ namespace slv2
         std::string signature = tr.signature();
         // if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
         return (0 == crypto_sign_ed25519_verify_detached((uint8_t *) signature.data(), message.data(), message.size(), pub_key.data()) );
+    }
+
+    csdb::Pool SolverCore::removeTransactionsWithBadSignatures(const csdb::Pool& p)
+    {
+        csdb::Pool good;
+        BlockChain::WalletData data_to_fetch_pulic_key;
+        for( const auto& tr: p.transactions()) {
+            const auto& src = tr.source();
+            if(src.is_wallet_id()) {
+                pnode->getBlockChain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
+                if(tr.verify_signature(csdb::internal::byte_array(
+                    data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()))) {
+                    good.add_transaction(tr);
+                }
+            }
+            else if(tr.verify_signature(src.public_key())) {
+                good.add_transaction(tr);
+            }
+        }
+        return good;
+    }
+
+    void SolverCore::test_outrunning_blocks()
+    {
+        if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: test_outrunning_blocks()");
+        }
+        // retrieve blocks until cache empty or block sequence is broken:
+        while(! outrunning_blocks.empty()) {
+            size_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
+            const auto oldest = outrunning_blocks.cbegin();
+            if(oldest->first < desired_seq) {
+                // clear outdated block if it is and select next one:
+                if(Consensus::Log) {
+                    LOG_NOTICE("SolverCore: remove outdated block #" << desired_seq << " from cache");
+                }
+                outrunning_blocks.erase(oldest);
+            }
+            else if(oldest->first == desired_seq) {
+                if(Consensus::Log) {
+                    LOG_NOTICE("SolverCore: retrieve and use required block #" << desired_seq << " from cache");
+                }
+                // retrieve and use block if it is exactly what we need:
+                auto& data = outrunning_blocks.at(desired_seq);
+                if(stateCompleted(pstate->onBlock(*pcontext, data.first, data.second))) {
+                    // do not forget make proper transitions if they are set in our table
+                    handleTransitions(Event::Block);
+                }
+                outrunning_blocks.erase(desired_seq);
+            }
+            else {
+                // stop processing, we have not got required block yet
+                if(Consensus::Log) {
+                    LOG_DEBUG("SolverCore: nothing to retreive yet");
+                }
+                break;
+            }
+        }
     }
 
 } // slv2

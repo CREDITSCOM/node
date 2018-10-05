@@ -121,9 +121,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": sending hash in reply to block sender");
             }
-            // in case of some block was restored from inner cache the last_block_sender contains correct value, other then
-            // argument sender value
-            context.node().sendHash(test_hash, DefaultStateBehavior::last_block_sender);
+            context.node().sendHash(test_hash, sender);
         }
         return res;
     }

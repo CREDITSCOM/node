@@ -32,11 +32,7 @@ namespace slv2
         }
 
         virtual void off(SolverContext& /*context*/) override
-        {
-            if(!future_blocks.empty()) {
-                future_blocks.clear();
-            }
-        }
+        {}
 
         virtual void expired(SolverContext& /*context*/) override
         {}
@@ -184,19 +180,6 @@ namespace slv2
         /** @brief   Flag to suppress too much flood when report about ignore transactions */
         bool report_ignore_transactions;
 
-        using CachedBlock = std::pair<csdb::Pool, PublicKey>;
-        std::vector<CachedBlock> future_blocks;
-
-        /**
-         * @brief   The last block sender.  
-         *          It is guaranteed that upon return Result::Finish from onBlock() it contains the real
-         *          sender of last stored block, value may differ from argument of onBlock(..., sender)
-         *          method when we use cached blocks.
-         */
-
-        PublicKey last_block_sender;
-
-        void try_blocks_in_cache(SolverContext& context, uint64_t last_seq);
     };
 
 } // slv2

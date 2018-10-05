@@ -135,6 +135,10 @@ namespace slv2
         csdb::Pool b_pool {};
         // update own hash vector
         if(pnode != nullptr && pgen != nullptr) {
+            if(!opt_spammer_on) {
+                p = removeTransactionsWithBadSignatures(p);
+            }
+            pfee->CountFeesInPool(pnode, &p);
             auto result = pgen->buildvector(p, pool, b_pool);
             pown_hvec->Sender = pnode->getMyConfNumber();
             pown_hvec->hash = result;
@@ -205,6 +209,8 @@ namespace slv2
         if(stateCompleted(pstate->onBlock(*pcontext, p, sender))) {
             handleTransitions(Event::Block);
         }
+        // makes subsequent calls to pstate->onBlock() if find appropriate next blocks in cache:
+        test_outrunning_blocks();
     }
 
     void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender)
@@ -269,30 +275,19 @@ namespace slv2
             pslv_v1->gotIncorrectBlock(std::move(p), sender);
             return;
         }
-        if(Consensus::Log) {
-            LOG_ERROR("SolverCore: gotIncorrectBlock(...): not implemented yet");
-        }
-    }
 
-    void SolverCore::gotFreeSyncroBlock(csdb::Pool&& p)
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotFreeSyncroBlock(std::move(p));
-            return;
+        // store outrunning block for future using
+        const auto seq = p.sequence();
+        if(outrunning_blocks.count(seq) == 0) {
+            outrunning_blocks [seq] = std::make_pair(p, sender);
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: got outrunning block #" << seq << ", cache it for future using");
+            }
         }
-        if(Consensus::Log) {
-            LOG_ERROR("SolverCore: gotFreeSyncroBlock(...): not implemented yet");
-        }
-    }
-
-    void SolverCore::rndStorageProcessing()
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->rndStorageProcessing();
-            return;
-        }
-        if(Consensus::Log) {
-            LOG_ERROR("SolverCore: rndStorageProcessing(): not implemented yet");
+        else {
+            if(Consensus::Log) {
+                LOG_DEBUG("SolverCore: gotIncorrectBlock(" << seq << "), ignored duplicated");
+            }
         }
     }
 
@@ -302,8 +297,64 @@ namespace slv2
             pslv_v1->tmpStorageProcessing();
             return;
         }
+
         if(Consensus::Log) {
-            LOG_ERROR("SolverCore: tmpStorageProcessing(): not implemented yet");
+            LOG_DEBUG("SolverCore: tmpStorageProcessing()");
+        }
+        test_outrunning_blocks();
+    }
+
+    void SolverCore::gotFreeSyncroBlock(csdb::Pool&& p)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotFreeSyncroBlock(std::move(p));
+            return;
+        }
+
+        // exactly acts as solver-1 analog
+        const auto seq = p.sequence();
+        if(rnd_storage.count(seq) == 0) {
+            rnd_storage [seq] = p;
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: gotFreeSyncroBlock(" << seq << "), cached in rnd storage");
+            }
+        }
+        else {
+            if(Consensus::Log) {
+                LOG_DEBUG("SolverCore: gotFreeSyncroBlock(" << seq << "), ignored duplicated");
+            }
+        }
+    }
+
+    void SolverCore::rndStorageProcessing()
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->rndStorageProcessing();
+            return;
+        }
+        
+        if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: rndStorageProcessing()");
+        }
+        // acts as solver-1 analog but removes outdated blocks from cache
+        auto& bc = pnode->getBlockChain();
+        while(! rnd_storage.empty()) {
+            size_t new_seq = bc.getLastWrittenSequence() + 1;
+            auto oldest = rnd_storage.begin();
+            if(oldest->first < new_seq) {
+                // erase outdated block
+                rnd_storage.erase(oldest);
+                continue;
+            }
+            else if(oldest->first == new_seq) {
+                // store block and remove it from cache
+                bc.putBlock(oldest->second);
+                rnd_storage.erase(oldest);
+            }
+            else {
+                // stop processing while get required block
+                break;
+            }
         }
     }
 
