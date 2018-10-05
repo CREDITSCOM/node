@@ -84,7 +84,6 @@ void Transport::run() {
   }
 
   refillNeighbourhood();
-
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
@@ -201,6 +200,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       break;
     case NetworkCommand::SSRegistration:
       gotSSRegistration(task, sender);
+      break;
+    case NetworkCommand::SSReRegistration:
+      gotSSReRegistration();
       break;
     case NetworkCommand::SSFirstRound:
       gotSSDispatch(task);
@@ -583,6 +585,13 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
   } else
     ssStatus_ = SSBootstrapStatus::RegisteredWait;
 
+  return true;
+}
+
+bool Transport::gotSSReRegistration()
+{
+  LOG_WARN("ReRegistration on Signal Server");
+  refillNeighbourhood();
   return true;
 }
 
