@@ -18,7 +18,6 @@
 #include <lib/system/structures.hpp>
 #include <sodium.h>
 
-
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
 #define csunused(x) (void)(x)
 
@@ -280,7 +279,8 @@ namespace cs
             return data;
         }
 
-        static std::string currentTimestamp() {
+        static std::string currentTimestamp()
+        {
           auto now_time = std::chrono::system_clock::now();
           return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
         }

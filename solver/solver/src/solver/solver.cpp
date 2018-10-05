@@ -949,10 +949,7 @@ void Solver::addInitialBalance() {
   transaction.set_balance(csdb::Amount(10000000, 0));
   transaction.set_innerID(1);
 
-  {
-    cs::Lock lock(mSharedMutex);
-    addTransaction(transaction);
-  }
+  addTransaction(transaction);
 
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
