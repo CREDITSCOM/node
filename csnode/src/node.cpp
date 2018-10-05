@@ -992,7 +992,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   }
   const cs::RoundInfo& roundTable = solver_->roundInfo();
   for (const auto& confidant : roundTable.confidants) {
-    if (not cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)(confidant.str), (uint8_t*)data, size)) {
+    if (not cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)(confidant.str),
+                                       (uint8_t*)data, size)) {
       return;
     }
   }
@@ -1009,7 +1010,6 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const Pu
   }
 
   m_notifications.push_back(cs::DynamicBufferPtr(new cs::DynamicBuffer(data, size)));
-
   if (m_notifications.size() < (getConfidants().size() / 2)) {
     return;
   }
@@ -1035,30 +1035,42 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const Pu
 bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey) {
   istream_.init(data, size);
 
-  Hash characteristicHash;
-  istream_ >> characteristicHash;
   PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
 
+  const bool isCorrectWriterPublicKey = writerPublicKey == myPublicKey_;
+  if (!isCorrectWriterPublicKey) {
+    return false;
+  }
+
+  const auto& confidants = solver_->roundInfo().confidants;
+  const auto  iterator   = std::find(confidants.begin(), confidants.end(), senderPublicKey);
+
+  const bool isFoundSenderPublicKey = iterator != std::end(confidants);
+  if (!isFoundSenderPublicKey) {
+    return false;
+  }
+
+  Hash characteristicHash;
+  istream_ >> characteristicHash;
+  const bool isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
+  if (!isCorrectChararcteristicHash) {
+    return false;
+  }
+
   cs::Signature signature;
   istream_ >> signature;
-
-  // TODO: need to extract signature too
-
-  const bool isCorrectWriterPublicKey     = writerPublicKey == myPublicKey_;
-  const bool isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
-
-  const auto& confidants             = solver_->roundInfo().confidants;
-  const auto  iterator               = std::find(confidants.begin(), confidants.end(), senderPublicKey);
-  const bool  isFoundSenderPublicKey = iterator != std::end(confidants);
-
-  return isCorrectWriterPublicKey && isCorrectChararcteristicHash && isFoundSenderPublicKey;
+  if (!cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)senderPublicKey.str,
+                                  (uint8_t*)data, size)) {
+    return false;
+  }
+  return true;
 }
 
 std::vector<uint8_t> Node::createBlockValidatingPacket(const cs::PoolMetaInfo&                  poolMetaInfo,
-                                                      const cs::Characteristic&                characteristic,
-                                                      const std::vector<uint8_t>&              signature,
-                                                      const std::vector<cs::DynamicBufferPtr>& notifications) {
+                                                       const cs::Characteristic&                characteristic,
+                                                       const std::vector<uint8_t>&              signature,
+                                                       const std::vector<cs::DynamicBufferPtr>& notifications) {
   cs::DynamicBuffer buffer;
   cs::DataStream    stream(*buffer, buffer.size());
 
