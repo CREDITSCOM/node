@@ -635,11 +635,10 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
-  auto conn = sender->connection.load(std::memory_order_relaxed);
-  if (!conn)
-    return;
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return;
 
-  sendPackInform(pack, *conn);
+  sendPackInform(pack, **conn);
 
   if (pack.isDirect()) return;  // Do not redirect direct packs
 
@@ -769,9 +768,8 @@ void Transport::registerMessage(MessagePtr msg) {
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-  Connection* conn = sender->connection.load(std::memory_order_acquire);
-  if (!conn)
-    return false;
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return false;
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   Hash     hHash;

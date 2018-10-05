@@ -1,6 +1,6 @@
 #pragma once
 
-//#define MONITOR_NODE
+#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
 #define AJAX_IFACE
@@ -13,7 +13,7 @@
 #ifndef MONITOR_NODE
 //#define SPAMMER
 #else
-#define STATS
+//#define STATS
 #endif
 #define SYNCRO
 //#define MYLOG

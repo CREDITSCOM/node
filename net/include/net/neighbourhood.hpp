@@ -141,6 +141,8 @@ public:
                             const Connection::Id,
                             const ip::udp::endpoint&);
 
+  ConnectionPtr getConnection(const RemoteNodePtr);
+
   ConnectionPtr getNextRequestee(const Hash&);
   ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
   ConnectionPtr getNeighbourByKey(const PublicKey&);

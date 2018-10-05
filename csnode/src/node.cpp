@@ -918,8 +918,11 @@ void Node::onRoundStart() {
     std::cout << i << ". " << byteStreamToHex(e.str, 32) << std::endl;
     i++;
   }
-#ifdef SYNCRO
 
+  solver_->nextRound();
+  transport_->processPostponed(roundNum_);
+
+#ifdef SYNCRO
   if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||
       (getBlockChain().getBlockRequestNeed()))
   {
@@ -931,8 +934,6 @@ void Node::onRoundStart() {
     awaitingSyncroBlock = false;
   }
 #endif  // !1
-  solver_->nextRound();
-  transport_->processPostponed(roundNum_);
 }
 
 bool Node::getSyncroStarted() {

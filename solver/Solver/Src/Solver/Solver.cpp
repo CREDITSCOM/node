@@ -483,10 +483,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
     std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
+#ifndef MONITOR_NODE
     if (block.verify_signature())  // INCLUDE SIGNATURES!!!
     {
       node_->getBlockChain().putBlock(block);
-#ifndef MONITOR_NODE
       if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
         // std::cout << "Solver -> before sending hash to writer" << std::endl;
         Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));  // getLastWrittenHash().to_binary().data()));//SENDING
@@ -496,8 +496,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
         std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32) << std::endl;
 #endif
       }
-#endif
     }
+#else
+  node_->getBlockChain().putBlock(block);
+#endif
 
     // std::cout << "Solver -> finishing gotBlock" << std::endl;
   }
@@ -536,6 +538,13 @@ void Solver::rndStorageProcessing()
   bool loop = true;
   size_t newSeq;
 
+  for (auto it = rndStorage.begin(); it != rndStorage.end(); ) {
+    if (it->first > node_->getBlockChain().getLastWrittenSequence())
+      break;
+
+    it = rndStorage.erase(it);
+  }    
+
   while (loop)
   {
     newSeq = node_->getBlockChain().getLastWrittenSequence() + 1;
@@ -556,6 +565,13 @@ void Solver::tmpStorageProcessing()
   //std::cout << __func__ << std::endl;
   bool loop = true;
   size_t newSeq;
+
+  for (auto it = tmpStorage.begin(); it != tmpStorage.end(); ) {
+    if (it->first > node_->getBlockChain().getLastWrittenSequence())
+      break;
+
+    it = tmpStorage.erase(it);
+  }
 
   while (loop)
   {

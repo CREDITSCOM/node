@@ -339,7 +339,7 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 
   if (isDirect) {
     auto& dp = msgDirects_.tryStore(hash);
-    if (conn->id == dp.receiver->id)
+    if (dp.receiver && conn->id == dp.receiver->id)
       dp.received = true;
     else
       LOG_WARN("Got confirmation from a different connection");
@@ -474,6 +474,16 @@ void Neighbourhood::resendPackets() {
     else
       ++cnt2;
   }
+}
+
+ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
+  SpinLock l(nLockFlag_);
+  Connection* conn = node->connection.load(std::memory_order_acquire);
+  if (!conn) return ConnectionPtr();
+  
+  auto cPtr = findInVec(conn->id, neighbours_);
+  if (cPtr) return *cPtr;
+  return ConnectionPtr();
 }
 
 ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
