@@ -131,7 +131,7 @@ void cs::DataStream::addEndpoint(const boost::asio::ip::udp::endpoint& endpoint)
 
 void cs::DataStream::addTransactionsHash(const cs::TransactionsPacketHash& hash)
 {
-    auto hashData = hash.to_binary();
+    auto hashData = hash.toBinary();
 
     if (!isAvailable(hashData.size()))
         return;
@@ -154,7 +154,7 @@ cs::TransactionsPacketHash cs::DataStream::transactionsHash()
     for (std::size_t i = 0; i < hashSize; ++i)
         bytes.push_back(streamField<uint8_t>());
 
-    return cs::TransactionsPacketHash::from_binary(bytes);
+    return cs::TransactionsPacketHash::fromBinary(bytes);
 }
 
 void cs::DataStream::addVector(const std::vector<uint8_t>& data)

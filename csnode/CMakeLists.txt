@@ -31,12 +31,14 @@ add_library(csnode
   include/csnode/dynamicbuffer.h
   include/csnode/datastream.h
   include/csnode/nodecore.h
+  include/csnode/transactionsPacket.h
   src/blockchain.cpp
   src/node.cpp
   src/wallets_cache.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
   src/nodecore.cpp
+  src/transactionsPacket.cpp
 )
 
 target_link_libraries (csnode net csdb solver base58 lz4 Boost::thread)
