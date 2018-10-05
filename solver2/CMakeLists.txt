@@ -67,6 +67,9 @@ target_link_libraries (
 	libsodium
 )
 
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(SOLVER2_TEST_BUILD)
     add_subdirectory(tests)
 endif()

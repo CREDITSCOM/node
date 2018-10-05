@@ -647,7 +647,7 @@ namespace slv2
 
     csdb::Address SolverContext::address_spammer() const
     {
-        return core.addr_spam;
+        return core.addr_spam.value_or(csdb::Address {});
     }
 
     csdb::Address SolverContext::address_genesis() const

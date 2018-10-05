@@ -15,7 +15,6 @@
 
 #include <limits>
 #include <string>
-
 namespace slv2
 {
 
@@ -27,26 +26,13 @@ namespace slv2
         , opt_is_proxy_v1(true)
         // inner data
         , pcontext(std::make_unique<SolverContext>(*this))
-        //, scheduler()
         , tag_state_expired(CallsQueueScheduler::no_tag)
         , req_stop(true)
-        //, transitions()
-        //, pstate
         // consensus data
-        //, addr_genesis
-        //, addr_start
-        //, addr_spam
+        , addr_spam(std::nullopt)
         , cur_round(0)
-        //, public_key()
-        //, private_key()
         , pown_hvec(std::make_unique<Credits::HashVector>())
-        //, recv_vect()
-        //, recv_matr()
-        //, recv_hash()
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
-        //, pool()
-        //, trans_mtx()
-        //, transactions()
         // previous solver version instance
         , pslv_v1(nullptr)
         , pnode(nullptr)
@@ -58,23 +44,26 @@ namespace slv2
         InitTransitions();
     }
 
-    SolverCore::SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress)
+    SolverCore::SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddress /*= {}*/)
         : SolverCore()
     {
         addr_genesis = GenesisAddress;
         addr_start = StartAddress;
-        opt_spammer_on = false;
+        addr_spam = SpammerAddress;
+        opt_spammer_on = addr_spam.has_value();
         pnode = pNode;
         if(opt_is_proxy_v1) {
 
-#if defined(SPAMMER)
-            // pslv_v1, pgen will be constructed in 4-args constructor
+#if !defined(SPAMMER) // see: client\include\client\params.hpp
+            // thanks to Solver constructor :-), it has 3 args in this case
+            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start);
 #else
-            // thanks to author of Solver constructor :-), it has 3 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, GenesisAddress, StartAddress);
+            // thanks to Solver constructor :-), it has 4 args in this case
+            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
+#endif
+
             pgen = pslv_v1->generals.get();
             pws = pslv_v1->walletsState.get();
-#endif
         }
         else {
             pws_inst = std::make_unique<Credits::WalletsState>(pNode->getBlockChain());
@@ -84,27 +73,7 @@ namespace slv2
             // temp decision until solver-1 may be instantiated:
             pgen = pgen_inst.get();
         }
-
 }
-
-    SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, csdb::Address SpammerAddress)
-        : SolverCore(pNode, GenesisAddress, StartAddress)
-    {
-        addr_spam = SpammerAddress;
-        opt_spammer_on = true;
-        // this constructor called only when SPAMMER defined, see node.cpp #29-32
-
-        if(opt_is_proxy_v1) {
-#if defined(SPAMMER)
-            // thanks to author of Solver constructor :-), it has 3 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, GenesisAddress, StartAddress, SpammerAddress);
-            pgen = pslv_v1->generals.get();
-            pws = pslv_v1->walletsState.get();
-#else
-            // pslv_v1 and pgen have been constructed in 3-args constructor
-#endif
-        }
-    }
 
     SolverCore::~SolverCore()
     {

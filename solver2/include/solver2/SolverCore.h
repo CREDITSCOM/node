@@ -4,20 +4,20 @@
 #include "INodeState.h"
 #include "Consensus.h"
 
-#include <memory>
-#include <map>
-#include <vector>
-#include <set>
-#include <algorithm>
-
-// forward declarations
-
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"
 #else
 #include <csdb/pool.h>
 #endif
 
+#include <memory>
+#include <map>
+#include <vector>
+#include <set>
+#include <algorithm>
+#include <optional>
+
+// forward declarations
 class Node;
 namespace Credits
 {
@@ -43,8 +43,7 @@ namespace slv2
         using Counter = uint32_t;
 
         SolverCore();
-        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress);
-        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, csdb::Address SpammerAddress);
+        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddres = {});
 
         ~SolverCore();
 
@@ -132,7 +131,7 @@ namespace slv2
         
         csdb::Address addr_genesis;
         csdb::Address addr_start;
-        csdb::Address addr_spam;
+        std::optional<csdb::Address> addr_spam;
         Counter cur_round;
         KeyType public_key;
         KeyType private_key;
