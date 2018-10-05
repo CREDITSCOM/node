@@ -131,7 +131,7 @@ void Solver::setLastRoundTransactionsGot(size_t trNum) {
 }
 
 void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
-                                 const PoolMetaInfo& metaInfoPool) {
+                                 const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   if (node_->getMyLevel() == NodeLevel::Writer) {
@@ -173,13 +173,12 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
       if (mask.test(maskIndex)) {
         m_pool.add_transaction(transaction);
       }
-
       ++maskIndex;
     }
 
     m_hashTable.erase(hash);
   }
-
+  // bool isCorrectSignature = verify_signature(sender);
   {
     cs::Lock lock(mSharedMutex);
 

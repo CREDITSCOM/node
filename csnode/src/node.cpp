@@ -993,30 +993,16 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
       return;
     }
   }
+  // TODO! how to Validate writer sugnature???
 
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
-  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo);
+  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo, sender);
 }
 
 void Node::getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey) {
-  istream_.init(data, size);
-
-  Hash      characteristicHash;
-  PublicKey writerPublicKey;
-
-  istream_ >> characteristicHash;
-  istream_ >> writerPublicKey;
-  // TODO: need to extract signature too!
-
-  const bool  isCorrectWriterPublicKey     = writerPublicKey == myPublicKey_;
-  const bool  isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
-  const auto& confidants                   = solver_->roundInfo().confidants;
-  const auto  iterator                     = std::find(confidants.begin(), confidants.end(), senderPublicKey);
-  const bool  isFoundSenderPublicKey       = iterator != std::end(confidants);
-
-  if (!isCorrectWriterPublicKey || !isCorrectChararcteristicHash || !isFoundSenderPublicKey) {
+  if (!isCorrectNotification(data, size, senderPublicKey)) {
     return;
   }
 
@@ -1032,19 +1018,38 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const Pu
   poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo);
+  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo, senderPublicKey);
 
-  const std::vector<uint8_t>& poolBinary     = bc_.loadBlock(bc_.getLastHash()).to_binary();
+  const std::vector<uint8_t>& poolBinary    = bc_.loadBlock(bc_.getLastHash()).to_binary();
   const std::vector<uint8_t>  poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-  ostream_ << buildBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, m_notifications);
+  ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, m_notifications);
 
   flushCurrentTasks();
 }
 
-std::vector<uint8_t> Node::buildBlockValidatingPacket(const cs::PoolMetaInfo&                  poolMetaInfo,
+bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey) {
+  istream_.init(data, size);
+
+  Hash characteristicHash;
+  istream_ >> characteristicHash;
+  PublicKey writerPublicKey;
+  istream_ >> writerPublicKey;
+  // TODO: need to extract signature too!
+
+  const bool isCorrectWriterPublicKey     = writerPublicKey == myPublicKey_;
+  const bool isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
+
+  const auto& confidants             = solver_->roundInfo().confidants;
+  const auto  iterator               = std::find(confidants.begin(), confidants.end(), senderPublicKey);
+  const bool  isFoundSenderPublicKey = iterator != std::end(confidants);
+
+  return isCorrectWriterPublicKey && isCorrectChararcteristicHash && isFoundSenderPublicKey;
+}
+
+std::vector<uint8_t> Node::createBlockValidatingPacket(const cs::PoolMetaInfo&                  poolMetaInfo,
                                                       const cs::Characteristic&                characteristic,
                                                       const std::vector<uint8_t>&              signature,
                                                       const std::vector<cs::DynamicBufferPtr>& notifications) {
