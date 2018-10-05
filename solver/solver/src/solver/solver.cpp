@@ -954,7 +954,7 @@ void Solver::addInitialBalance() {
 
   {
     cs::Lock lock(mSharedMutex);
-    m_transactionsBlock.back().addTransaction(transaction);
+    addTransaction(transaction);
   }
 
 #ifdef SPAMMER
