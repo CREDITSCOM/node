@@ -519,6 +519,11 @@ void BlockChain::getTransactions(
 {
     bool isToLoadWalletsPoolsCache = 
         hashesArray.empty()  && wallPubKey != genesisAddress_  && wallPubKey != startAddress_;
+    if (wallPubKey.is_public_key()) {
+      WalletId id;
+      if (!findWalletId(wallPubKey, id)) return;
+      wallPubKey = csdb::Address::from_wallet_id(id);
+    }
     TrxLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
 
     csdb::PoolHash prevHash = getLastHash();
