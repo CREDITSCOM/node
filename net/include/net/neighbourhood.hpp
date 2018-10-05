@@ -136,6 +136,8 @@ public:
   void redirectByNeighbours(const Packet*);
   void pourByNeighbours(const Packet*, const uint32_t packNum);
 
+  uint32_t size();
+
   void pingNeighbours();
   void validateConnectionId(RemoteNodePtr,
                             const Connection::Id,

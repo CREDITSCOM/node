@@ -286,7 +286,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   if (!iPackStream_.good())
     return false;
 
-  uint32_t ctr = 0;
+  uint32_t ctr = nh_.size();
   if (config_.getBootstrapType() == BootstrapType::SignalServer) {
     for (uint8_t i = 0; i < numCirc; ++i) {
       EndpointData ep;
@@ -591,7 +591,11 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 bool Transport::gotSSReRegistration()
 {
   LOG_WARN("ReRegistration on Signal Server");
-  refillNeighbourhood();
+  {
+    SpinLock l(oLock_);
+    formSSConnectPack(config_, oPackStream_, myPublicKey_);
+    net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+  }
   return true;
 }
 

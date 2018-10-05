@@ -204,7 +204,13 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
   if (!conn->id)
     conn->id = getSecureRandom<Connection::Id>();
 
-  transport_->sendRegistrationRequest(**conn);
+  if (!conn->connected)
+    transport_->sendRegistrationRequest(**conn);
+}
+
+uint32_t Neighbourhood::size() {
+  SpinLock ln(nLockFlag_);
+  return neighbours_.size();
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in,
