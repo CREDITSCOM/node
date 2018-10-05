@@ -43,11 +43,14 @@ struct Hash_ {
   }
   uint8_t val[32];
 };
-struct Signature {
-  Signature(void* a) {
+
+// TODO!!!
+// WARNING!
+struct SolverSignature {
+  SolverSignature(void* a) {
     memcpy(val, a, 64);
   }
-  Signature() {
+  SolverSignature() {
   }
   uint8_t val[64];
 };
@@ -55,12 +58,12 @@ struct Signature {
 struct HashVector {
   uint8_t   Sender;
   Hash_     hash;
-  Signature sig;
+  SolverSignature sig;
 };
 struct HashMatrix {
   uint8_t    Sender;
   HashVector hmatr[5];
-  Signature  sig;
+  SolverSignature  sig;
 };
 struct NormalState {
   bool isOn;

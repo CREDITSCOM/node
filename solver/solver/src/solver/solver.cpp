@@ -176,16 +176,16 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
       ++maskIndex;
     }
 
+
     m_hashTable.erase(hash);
   }
-  // bool isCorrectSignature = verify_signature(sender);
+
   {
     cs::Lock lock(mSharedMutex);
 
     m_pool.set_sequence(sequence);
     m_pool.add_user_field(0, timestamp);
   }
-
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
 
 #ifdef MONITOR_NODE
