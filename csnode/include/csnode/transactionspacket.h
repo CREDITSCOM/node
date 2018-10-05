@@ -5,8 +5,6 @@
 #include <string>
 #include <csdb/transaction.h>
 
-#include "csdb/storage.h"
-
 namespace cs
 {
     namespace internal
@@ -15,15 +13,15 @@ namespace cs
         using Bytes = std::vector<byte>;
     }
 
-    /*!
-        Wrapper of std::vector<uint8_t> to represent hash
-    */
+    ///
+    /// Wrapper of std::vector<uint8_t> to represent hash
+    ///
     class TransactionsPacketHash
     {
     public: // Static interface
 
         ///
-        /// @brief  Getting a hash from a string representation
+        /// @brief  Gets a hash from a string representation
         /// @param  String representation of a hash
         /// @return Hash obtained from a string representation.
         ///         If the string representation is incorrect, an empty hash is returned.
@@ -31,7 +29,7 @@ namespace cs
         static TransactionsPacketHash fromString(const ::std::string& str);
 
         ///
-        /// @brief  Getting a hash from a binary representation
+        /// @brief  Gets a hash from a binary representation
         /// @param  Binary representation of a hash
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty hash is returned.
@@ -39,7 +37,7 @@ namespace cs
         static TransactionsPacketHash fromBinary(const internal::Bytes& data);
 
         ///
-        /// @brief calculated hash from binary data
+        /// @brief Calculates hash from binary data
         /// @param vector of bytes
         /// @return hash
         ///
@@ -48,14 +46,14 @@ namespace cs
     public: // Interface
 
         ///
-        /// @brief heck hash size bytes on 0
+        /// @brief Ñhecks hash size bytes on 0
         /// @return true if hash size == 0
         ///
         bool isEmpty() const noexcept;
 
         ///
-        /// @brief  hash size as bytes
-        /// @return hash size as bytes
+        /// @brief  Returns hash bytes count
+        /// @return hash bytes count
         ///
         size_t size() const noexcept;
 
@@ -82,22 +80,22 @@ namespace cs
 
 
 
-    /*!
-        Flexible strorage for transactions
-    */
+    ///
+    /// Flexible strorage for transactions
+    ///
     class TransactionsPacket
     {
     public: // Static interface
 
         ///
-        /// @brief  Getting a transactions packet from a binary representation.
+        /// @brief  Gets a transactions packet from a binary representation.
         /// @param  Binary representation of a packet.
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty packet is returned.
         static TransactionsPacket fromBinary(const internal::Bytes& data);
 
         ///
-        /// @brief  Getting a transactions packet from a binary representation
+        /// @brief  Gets a transactions packet from a binary representation
         /// @param  Binary representation of a transactions packet
         /// @param  Binary representation size
         /// @return Hash obtained from a binary representation.
@@ -113,8 +111,8 @@ namespace cs
         internal::Bytes toBinary() const noexcept;
 
         ///
-        /// @brief Generate hash
-        /// @return True if ise mpty hash
+        /// @brief Generates hash
+        /// @return True if hash generated successed
         ///
         bool makeHash();
 

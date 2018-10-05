@@ -11,7 +11,7 @@
 namespace cs
 {
     ///
-    /// Exception for packet stream
+    /// Exception for packet stream.
     ///
     class DataStreamException : public std::exception
     {
@@ -24,7 +24,7 @@ namespace cs
     };
 
     ///
-    /// The Data stream class represents an entity that controls data from any char array
+    /// The Data stream class represents an entity that controls data from any char array.
     ///
     class DataStream
     {
@@ -33,40 +33,40 @@ namespace cs
         explicit DataStream(const char* packet, std::size_t dataSize);
         explicit DataStream(const uint8_t* packet, std::size_t dataSize);
 
-        /*!
-            Try to get enpoint from data
-
-            @return Returns current end point from data
-            If data stream can not return valid enpoint then returns empty enpoint
-        */
+        ///
+        /// Try to get enpoint from data.
+        ///
+        /// @return Returns current end point from data.
+        /// If data stream can not return valid enpoint then returns empty enpoint.
+        ///
         boost::asio::ip::udp::endpoint endpoint();
 
-        /*!
-            Returns current state of stream
-
-            @return Returns state of stream
-        */
+        ///
+        /// Returns current state of stream.
+        ///
+        /// @return Returns state of stream.
+        ///
         bool isValid() const;
 
-        /*!
-            Returns state of available bytes
-
-            @param size Count of bytes
-            @return Returns state of available bytes
-        */
+        ///
+        /// Returns state of available bytes.
+        ///
+        /// @param size Count of bytes.
+        /// @return Returns state of available bytes.
+        ///
         bool isAvailable(std::size_t size);
 
-        /*!
-            Returns pointer to start of the data
-        */
+        ///
+        /// Returns pointer to start of the data.
+        ///
         char* data() const;
 
-        /*!
-            Try to get field from stream by sizeof(T)
-
-            @return Returns stream field
-            If stream can not return field than returns empty T()
-        */
+        ///
+        /// Try to get field from stream by sizeof(T).
+        ///
+        /// @return Returns stream field.
+        /// If stream can not return field than returns empty T().
+        ///
         template<typename T>
         inline T streamField()
         {
@@ -78,11 +78,11 @@ namespace cs
             return field;
         }
 
-        /*!
-            Try to add field to stream
-
-            @param streamField Added type
-        */
+        ///
+        /// Try to add field to stream.
+        ///
+        /// @param streamField Added type.
+        ///
         template<typename T>
         inline void setStreamField(const T& streamField)
         {
@@ -93,12 +93,12 @@ namespace cs
             mIndex += sizeof(T);
         }
 
-        /*!
-            Returns char array from stream
-
-            @return Returns char array
-            If stream can not return valid array than returns empty char array
-        */
+        ///
+        /// Returns char array from stream.
+        ///
+        /// @return Returns char array.
+        /// If stream can not return valid array than returns empty char array.
+        ///
         template<std::size_t size>
         inline std::array<char, size> streamArray()
         {
@@ -114,12 +114,12 @@ namespace cs
             return array;
         }
 
-        /*!
-            Adds char array to data stream
-
-            @param array Char array
-            If stream can not add char array to stream than method does nothing
-        */
+        ///
+        /// Adds char array to data stream.
+        ///
+        /// @param array Char array.
+        /// If stream can not add char array to stream than method does nothing.
+        ///
         template<std::size_t size>
         inline void setStreamArray(const std::array<char, size>& array)
         {
@@ -132,12 +132,12 @@ namespace cs
             mIndex += size;
         }
 
-        /*!
-            Adds array to stream
-
-            @param array Byte array
-            If stream can not add byte array to strem than method does nothing
-        */
+        ///
+        /// Adds array to stream.
+        ///
+        /// @param array Byte array.
+        /// If stream can not add byte array to strem than method does nothing.
+        ///
         template<std::size_t size>
         inline void setByteArray(const ByteArray<size>& array)
         {
@@ -150,12 +150,12 @@ namespace cs
             setStreamArray(transformed);
         }
 
-        /*!
-            Returns static byte array
-
-            @return Returns byte array
-            If stream can not returns valid byte array it returns empty array
-        */
+        ///
+        /// Returns static byte array.
+        ///
+        /// @return Returns byte array.
+        /// If stream can not returns valid byte array it returns empty array.
+        ///
         template<std::size_t size>
         inline ByteArray<size> byteArray()
         {
@@ -169,25 +169,25 @@ namespace cs
             return result;
         }
 
-        /*!
-            Returns byte size of write/read data
-
-            @return Returns data stream size
-        */
+        ///
+        /// Returns byte size of write/read data.
+        ///
+        /// @return Returns data stream size.
+        ///
         std::size_t size() const;
 
-        /*!
-            Adds enpoint to stream
-
-            @param enpoint Boost enpoint
-        */
+        ///
+        /// Adds enpoint to stream.
+        ///
+        /// @param enpoint Boost enpoint.
+        ///
         void addEndpoint(const boost::asio::ip::udp::endpoint& endpoint);
 
-        /*!
-            Skips compile time size
-
-            If stream can not skip size than it does nothing
-        */
+        ///
+        /// Skips compile time size.
+        ///
+        /// If stream can not skip size than it does nothing.
+        ///
         template<std::size_t size>
         inline void skip()
         {
@@ -197,47 +197,57 @@ namespace cs
             mIndex += size;
         }
 
-        /*!
-            Adds transactions packet hash to stream
-
-            @param hash Data base transactions packet hash
-        */
+        ///
+        /// Adds transactions packet hash to stream.
+        ///
+        /// @param hash Data base transactions packet hash.
+        ///
         void addTransactionsHash(const cs::TransactionsPacketHash& hash);
 
-        /*!
-            Returns packet hash
-        */
+        ///
+        /// Returns packet hash.
+        ///
+        /// @return Returns packet hash.
+        /// If stream can not return hash it returns empty hash.
+        ///
         cs::TransactionsPacketHash transactionsHash();
 
-        /*!
-            Adds bytes vector to stream
-        */
+        ///
+        /// Adds bytes vector to stream.
+        /// @param data Vector of bytes to write.
+        ///
         void addVector(const std::vector<uint8_t>& data);
 
-        /*!
-            Returns bytes vector
-
-            stream would take size of arg to form return vector
-        */
+        ///
+        /// Returns bytes vector.
+        ///
+        /// @param size Stream would take size of arg to form return vector.
+        /// @return Returns byte vector.
+        /// If stream can not return size of bytes it returns empty vector.
+        ///
         std::vector<uint8_t> byteVector(std::size_t size);
 
-        /*!
-            Adds std::string chars to stream
-        */
+        ///
+        /// Adds std::string chars to stream.
+        ///
+        /// @param string Any information represented as std::string.
+        ///
         void addString(const std::string& string);
 
-        /*!
-            Returns std::string from stream
-
-            stream would take size to create string size
-        */
+        ///
+        /// Returns std::string from stream.
+        ///
+        /// @param size Stream would take size to create string size.
+        /// @return Returns std::string by arguments size.
+        /// If stream can not return size of bytes it returns empty std::string.
+        ///
         std::string string(std::size_t size);
 
-        /*!
-            Peeks next parameter
-
-            @return Returns next T parameter
-        */
+        ///
+        /// Peeks next parameter
+        ///
+        /// @return Returns next T parameter
+        ///
         template <typename T>
         inline const T& peek() const
         {
@@ -273,28 +283,29 @@ namespace cs
         }
     };
 
-    /*!
-        Puts next end point from stream to end point variable
-    */
+    ///
+    /// Gets next end point from stream to end point variable.
+    ///
     inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint& endPoint)
     {
         endPoint = stream.endpoint();
         return stream;
     }
 
-    /*!
-        Puts from stream to uint8_t variable
-    */
+    ///
+    /// Gets from stream to uint8_t variable.
+    ///
     template<typename T>
     inline DataStream& operator>>(DataStream& stream, T& streamField)
     {
+        static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
         streamField = stream.streamField<T>();
         return stream;
     }
 
-    /*!
-        Puts from stream to array
-    */
+    ///
+    /// Gets from stream to array.
+    ///
     template<std::size_t size>
     inline DataStream& operator>>(DataStream& stream, std::array<char, size>& array)
     {
@@ -302,9 +313,9 @@ namespace cs
         return stream;
     }
 
-    /*!
-        Puts from stream to byte array
-    */
+    ///
+    /// Gets from stream to byte array.
+    ///
     template<std::size_t size>
     inline DataStream& operator>>(DataStream& stream, ByteArray<size>& array)
     {
@@ -312,36 +323,36 @@ namespace cs
         return stream;
     }
 
-    /*!
-        Puts from stream to transactions packet hash
-    */
+    ///
+    /// Gets from stream to transactions packet hash.
+    ///
     inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& hash)
     {
         hash = stream.transactionsHash();
         return stream;
     }
 
-    /*!
-        Puts from stream to bytes vector (stream would use data size of vector to create bytes)
-    */
+    ///
+    /// Gets from stream to bytes vector (stream would use data size of vector to create bytes).
+    ///
     inline DataStream& operator>>(DataStream& stream, std::vector<uint8_t>& data)
     {
         data = stream.byteVector(data.size());
         return stream;
     }
 
-    /*!
-        Puts from stream to std::string (stream would use data size of string to create bytes)
-    */
+    ///
+    /// Gets from stream to std::string (stream would use data size of string to create bytes).
+    ///
     inline DataStream& operator>>(DataStream& stream, std::string& data)
     {
         data = stream.string(data.size());
         return stream;
     }
 
-    /*!
-        Writes array to stream
-    */
+    ///
+    /// Writes array to stream.
+    ///
     template<std::size_t size>
     inline DataStream& operator<<(DataStream& stream, const std::array<char, size>& array)
     {
@@ -349,29 +360,29 @@ namespace cs
         return stream;
     }
 
-    /*!
-        Writes T to stream
-    */
+    ///
+    /// Writes T to stream.
+    ///
     template<typename T>
     inline DataStream& operator<<(DataStream& stream, const T& streamField)
     {
-        static_assert(std::is_trivial<T>::value, "template parameter to must be trivial. Overload this function for non-trivial type");
+        static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
         stream.setStreamField(streamField);
         return stream;
     }
 
-    /*!
-        Writes address to stream
-    */
+    ///
+    /// Writes address to stream.
+    ///
     inline DataStream& operator<<(DataStream& stream, const boost::asio::ip::udp::endpoint& endpoint)
     {
         stream.addEndpoint(endpoint);
         return stream;
     }
 
-    /*!
-        Writes byte array to stream
-    */
+    ///
+    /// Writes byte array to stream.
+    ///
     template<std::size_t size>
     inline DataStream& operator<<(DataStream& stream, const ByteArray<size>& array)
     {
@@ -379,18 +390,18 @@ namespace cs
         return stream;
     }
 
-    /*!
-        Writes hash binary to stream
-    */
+    ///
+    /// Writes hash binary to stream.
+    ///
     inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacketHash& hash)
     {
         stream.addTransactionsHash(hash);
         return stream;
     }
 
-    /*!
-        Writes vector of bytes to stream
-    */
+    ///
+    /// Writes vector of bytes to stream.
+    ///
     inline DataStream& operator<<(DataStream& stream, const std::vector<uint8_t>& data)
     {
         stream.addVector(data);
@@ -398,7 +409,7 @@ namespace cs
     }
 
     ///
-    /// Writes std::string to stream
+    /// Writes std::string to stream.
     ///
     inline DataStream& operator<<(DataStream& stream, const std::string& data)
     {

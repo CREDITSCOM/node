@@ -12,7 +12,7 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <libcuckoo/cuckoohash_map.hh>
-#include <csnode/transactionsPacket.h>
+#include <csnode/transactionspacket.h>
 
 namespace cs
 {
@@ -47,10 +47,13 @@ namespace cs
     using SharedLock = std::shared_lock<cs::SharedMutex>;
     using SpinGuard = std::lock_guard<SpinLock>;
 
+    // TODO: find values in another files
     enum NodeConsts : uint32_t
     {
         PublicKeyLength = 32,
-        Black2HashLength = 32
+        Black2HashLength = 32,
+        SignatureLength = 64,
+        PrivateKeyLength = 32
     };
 
     enum SolverConsts : uint32_t

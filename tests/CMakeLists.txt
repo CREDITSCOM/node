@@ -52,4 +52,4 @@ include_directories("${source_dir}/googletest/include"
 
 add_subdirectory(lib_system)
 add_subdirectory(node)
-add_subdirectory(transactionsPacket)
+add_subdirectory(transactionspacket)

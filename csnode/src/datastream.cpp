@@ -142,7 +142,7 @@ void cs::DataStream::addTransactionsHash(const cs::TransactionsPacketHash& hash)
 
 cs::TransactionsPacketHash cs::DataStream::transactionsHash()
 {
-    const std::size_t hashSize = 32;    // TODO: gag, look real project const
+    const std::size_t hashSize = cs::Black2HashLength;
     cs::TransactionsPacketHash hash;
 
     if (!isAvailable(hashSize))
