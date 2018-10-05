@@ -126,7 +126,7 @@ uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
 }
 
-void Solver::setLastRoundTransactionsGot(size_t trNum) {
+auto Solver::setLastRoundTransactionsGot(size_t trNum) -> void {
   lastRoundTransactionsGot = trNum;
 }
 
@@ -173,13 +173,12 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
       if (mask.test(maskIndex)) {
         m_pool.add_transaction(transaction);
       }
-
       ++maskIndex;
     }
 
     m_hashTable.erase(hash);
   }
-
+  // bool isCorrectSignature = verify_signature(sender);
   {
     cs::Lock lock(mSharedMutex);
 
@@ -232,7 +231,7 @@ std::vector<uint8_t> Solver::sign(std::vector<uint8_t> data) {
 
   crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), myPrivateKey.data());
 
-  assert(64 == signLength); // signature length = 64. Where's constant?
+  assert(64 == signLength);  // signature length = 64. Where's constant?
 
   data.insert(data.end(), signature.begin(), signature.end());
 
@@ -285,7 +284,7 @@ void Solver::closeMainRound() {
   }
 }
 
-bool Solver::isPoolClosed() {
+bool Solver::isPoolClosed() const {
   return m_isPoolClosed;
 }
 
@@ -320,9 +319,7 @@ void Solver::flushTransactions() {
   for (auto& packet : m_transactionsBlock) {
     auto trxCount = packet.transactionsCount();
 
-    if (trxCount != 0 &&
-        packet.isHashEmpty())
-    {
+    if (trxCount != 0 && packet.isHashEmpty()) {
       packet.makeHash();
 
       node_->sendTransactionsPacket(packet);
@@ -525,8 +522,8 @@ void Solver::gotVector(HashVector&& vector) {
   }
 
   const std::vector<PublicKey>& confidants = node_->getConfidants();
-  uint8_t numGen = static_cast<uint8_t>(confidants.size());
-  receivedVecFrom[vector.Sender] = true;
+  uint8_t                       numGen     = static_cast<uint8_t>(confidants.size());
+  receivedVecFrom[vector.Sender]           = true;
 
   generals->addvector(vector);  // building matrix
   trustedCounterVector++;
@@ -562,12 +559,12 @@ void Solver::gotVector(HashVector&& vector) {
           node_->becomeWriter();
           cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
             PoolMetaInfo poolMetaInfo;
-            poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
+            poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
             poolMetaInfo.sequenceNumber = 1 + node_->getBlockChain().getLastWrittenSequence();
 
-            const Characteristic& characteristic = generals->getCharacteristic();
-            const std::vector<uint8_t>& mask = characteristic.mask;
-            uint32_t bitsCount = characteristic.size;
+            const Characteristic&       characteristic = generals->getCharacteristic();
+            const std::vector<uint8_t>& mask           = characteristic.mask;
+            uint32_t                    bitsCount      = characteristic.size;
 
             node_->sendCharacteristic(poolMetaInfo, bitsCount, mask);
             writeNewBlock();
@@ -590,7 +587,7 @@ void Solver::setRNum(size_t _rNum) {
   rNum = static_cast<uint32_t>(_rNum);
 }
 
-void Solver::checkVectorsReceived(size_t _rNum) {
+void Solver::checkVectorsReceived(size_t _rNum) const {
   if (_rNum < rNum) {
     return;
   }
@@ -619,9 +616,9 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   const uint8_t numGen = static_cast<uint8_t>(node_->getConfidants().size());
   if (trustedCounterMatrix == numGen) {
     memset(receivedMatFrom, 0, 100);
-    uint8_t writerIndex = (generals->take_decision(
+    uint8_t writerIndex  = (generals->take_decision(
         m_roundInfo.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
-    trustedCounterMatrix  = 0;
+    trustedCounterMatrix = 0;
 
     if (writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
@@ -696,7 +693,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
 #ifndef MONITOR_NODE
       if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
         std::string test_hash = node_->getBlockChain().getLastWrittenHash().to_string();
-                                               // HASH!!!
+        // HASH!!!
         node_->sendHash(test_hash, sender);
         csdebug() << "SENDING HASH: " << cs::Utils::debugByteStreamToHex(test_hash.data(), 32);
       }
@@ -967,8 +964,7 @@ cs::RoundNumber Solver::currentRoundNumber() {
   return m_roundInfo.round;
 }
 
-const cs::RoundInfo& Solver::roundInfo() const
-{
+const cs::RoundInfo& Solver::roundInfo() const {
   return m_roundInfo;
 }
 

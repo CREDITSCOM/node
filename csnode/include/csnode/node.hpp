@@ -53,10 +53,11 @@ class Node {
   void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
 
   void getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey);
+  bool isCorrectNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey);
   void sendNotification(const PublicKey& destination);
   std::vector<uint8_t> createNotification();
 
-  std::vector<uint8_t> buildBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const std::vector<uint8_t>& signature, const std::vector<cs::DynamicBufferPtr>& notifications);
+  std::vector<uint8_t> createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const std::vector<uint8_t>& signature, const std::vector<cs::DynamicBufferPtr>& notifications);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
