@@ -284,6 +284,12 @@ namespace cs
           auto now_time = std::chrono::system_clock::now();
           return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
         }
+
+        static bool verifySignature(uint8_t* signature, uint8_t* public_key, uint8_t* message,
+                                     size_t message_len) {
+          const int ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
+          return ok == 0;
+        }
     };
 }
 

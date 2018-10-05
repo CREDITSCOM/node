@@ -56,6 +56,10 @@ namespace cs
         PrivateKeyLength = 32
     };
 
+// TODO! replace all   using PublicKey = cs::ByteArray<PublicKeyLength>;
+    using Signature = cs::ByteArray<SignatureLength>;
+// TODO! replace all   using Hash = cs::ByteArray<Black2HashLength>;
+
     enum SolverConsts : uint32_t
     {
         TransactionsPacketInterval = 50,    // ms

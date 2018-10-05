@@ -948,9 +948,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   poolMetaInfo.sequenceNumber = sequence;
   poolMetaInfo.timestamp      = time;
 
-  std::vector<uint8_t> signature;
-  signature.resize(cs::Utils::SignatureLength);
-
+  cs::Signature signature;
   stream >> signature;
 
   uint16_t notificationsSize = 0;
@@ -966,7 +964,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
   cslog() << "Notifications size " << notificationsSize;
   cslog() << "Notification buffer size " << bufferSize;
 
-  // TODO: write to blockchain pool
   for (std::size_t i = 0; i < notificationsSize; ++i) {
     std::vector<uint8_t> bytes;
     bytes.resize(bufferSize);
@@ -993,7 +990,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const Publi
       return;
     }
   }
-  // TODO! how to Validate writer sugnature???
+  const cs::RoundInfo& roundTable = solver_->roundInfo();
+  for (const auto& confidant : roundTable.confidants) {
+    if (not cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)(confidant.str), (uint8_t*)data, size)) {
+      return;
+    }
+  }
 
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
@@ -1037,7 +1039,11 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, co
   istream_ >> characteristicHash;
   PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
-  // TODO: need to extract signature too!
+
+  cs::Signature signature;
+  istream_ >> signature;
+
+  // TODO: need to extract signature too
 
   const bool isCorrectWriterPublicKey     = writerPublicKey == myPublicKey_;
   const bool isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();

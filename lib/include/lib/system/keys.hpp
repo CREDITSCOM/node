@@ -3,8 +3,9 @@
 #include "hash.hpp"
 #include "structures.hpp"
 
-const size_t BLAKE2_HASH_LENGTH = 32;
-const size_t PUBLIC_KEY_LENGTH = 32;
+constexpr size_t BLAKE2_HASH_LENGTH = 32;
+constexpr size_t PUBLIC_KEY_LENGTH = 32;
+
 using PublicKey = FixedString<PUBLIC_KEY_LENGTH>;
 
 inline PublicKey getHashedPublicKey(const char* str) {
