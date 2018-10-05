@@ -528,7 +528,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
 
   if (candidate) {
     candidate->syncSeq = seq;
-    candidate->syncSeqRetries = 0;
+    candidate->syncSeqRetries = rand() % (MaxSyncAttempts / 2);
   }
 
   return candidate;
