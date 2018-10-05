@@ -123,7 +123,6 @@ class Solver {
   void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
   void gotPacketHashesReply(cs::TransactionsPacket&& packet);
   void gotRound(cs::RoundInfo&& round);
-  // void gotTransactionList(csdb::Pool&&);
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
@@ -160,7 +159,7 @@ class Solver {
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
   void nextRound();
-  bool isPoolClosed();
+  bool isPoolClosed() const;
   void setLastRoundTransactionsGot(size_t trNum);
 
   // remove it!!!
@@ -172,7 +171,7 @@ class Solver {
 
   void initConfRound();
   void sendZeroVector();
-  void checkVectorsReceived(size_t _rNum);
+  void checkVectorsReceived(size_t _rNum) const;
   void checkMatrixReceived();
   void addConfirmation(uint8_t confNumber_);
   bool getIPoolClosed();
