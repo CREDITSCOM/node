@@ -35,6 +35,7 @@ namespace slv2
         , pown_hvec(std::make_unique<Credits::HashVector>())
         , pfee(std::make_unique<Credits::Fee>())
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
+        , is_bigbang(false)
         // previous solver version instance
         , pslv_v1(nullptr)
         , pnode(nullptr)

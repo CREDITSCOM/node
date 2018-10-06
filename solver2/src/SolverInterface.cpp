@@ -79,6 +79,7 @@ namespace slv2
             return;
         }
 
+        is_bigbang = status;
         if(!pstate) {
             return;
         }
@@ -200,6 +201,9 @@ namespace slv2
             return;
         }
 
+        // solver-1 logic: clear bigbang status upon block receive
+        is_bigbang = false;
+
         if(!pstate) {
             return;
         }
@@ -246,7 +250,7 @@ namespace slv2
         }
         LOG_DEBUG("SolverCore: got block on my request: " << p.sequence());
         if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
-            pnode->getBlockChain().putBlock(p);
+            pnode->getBlockChain().writeNewBlock(p);
         }
     }
 
@@ -413,6 +417,11 @@ namespace slv2
         }
         if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
             handleTransitions(Event::RoundTable);
+        }
+
+        //TODO: not good solution, to reproduce solver-1 logic only:
+        if(is_bigbang) {
+            gotTransactionList(csdb::Pool {});
         }
     }
 

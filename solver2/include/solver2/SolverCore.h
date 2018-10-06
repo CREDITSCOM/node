@@ -158,6 +158,8 @@ namespace slv2
         std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,PublicKey>> outrunning_blocks;
         // to store unrequested syncro blocks
         std::map <size_t, csdb::Pool> rnd_storage;
+        // store BB status to reproduce solver-1 logic
+        bool is_bigbang;
 
         // previous solver version instance
 

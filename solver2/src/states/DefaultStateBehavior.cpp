@@ -51,7 +51,7 @@ namespace slv2
         auto awaiting_seq = context.node().getBlockChain().getLastWrittenSequence() + 1;
         if(g_seq == awaiting_seq ) {
             if(block.verify_signature()) {
-                context.node().getBlockChain().putBlock(block);
+                context.node().getBlockChain().writeNewBlock(block);
                 // по логике солвера-1 Writer & Main отправку хэша не делают,
                 // для Writer'а вопрос решен автоматически на уровне Node (он не получает блок вообще) и на уровне WriteState (он переопределяет пустой метод onBlock()),
                 // а вот для Main (CollectState) ситуация не очень удобная, приходится не делать здесь отправку хэша.
