@@ -24,7 +24,7 @@ namespace slv2
         : opt_timeouts_enabled(false)
         , opt_repeat_state_enabled(true)
         , opt_spammer_on(false)
-        , opt_is_proxy_v1(true)
+        , opt_is_proxy_v1(false)
         // inner data
         , pcontext(std::make_unique<SolverContext>(*this))
         , tag_state_expired(CallsQueueScheduler::no_tag)
@@ -165,7 +165,7 @@ namespace slv2
         if(it == variants.cend()) {
             // such event is ignored in current state
             if(Consensus::Log) {
-                LOG_DEBUG("SolverCore: event " << static_cast<int>(evt) << "ignored in state " << pstate->name());
+                LOG_DEBUG("SolverCore: event " << static_cast<int>(evt) << " ignored in state " << pstate->name());
             }
             return;
         }
@@ -235,14 +235,24 @@ namespace slv2
         pool.sign(private_key);
     }
 
-    void SolverCore::flushTransactions()
+    size_t SolverCore::flushTransactions()
     {
         // thread-safe with send_wallet_transaction(), suppose to sync with calls from network-related threads
         std::lock_guard<std::mutex> l(trans_mtx);
-        if(transactions.transactions_count() > 0) {
+        //TODO: force  update counter due to possible adding transactions by direct call to push_back(), not to add_transaction() method
+        transactions.recount();
+        size_t tr_cnt = transactions.transactions_count();
+        if(tr_cnt > 0) {
             pnode->sendTransaction(std::move(transactions));
+            if(Consensus::Log) {
+                LOG_DEBUG("SolverCore: " << tr_cnt << " are sent, clear buffer");
+            }
             transactions = csdb::Pool {};
         }
+        else if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: no transactions collected, nothing to send");
+        }
+        return tr_cnt;
     }
 
     bool SolverCore::verify_signature(const csdb::Transaction& tr)
@@ -269,6 +279,13 @@ namespace slv2
             }
             else if(tr.verify_signature(src.public_key())) {
                 good.add_transaction(tr);
+            }
+        }
+        if(Consensus::Log) {
+            auto cnt_before = p.transactions_count();
+            auto cnt_after = good.transactions_count();
+            if(cnt_before != cnt_after) {
+                LOG_WARN("SolverCore: " << cnt_before << " transactions filtered to " << cnt_after << " while test signatures");
             }
         }
         return good;

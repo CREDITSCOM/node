@@ -130,7 +130,7 @@ namespace slv2
         pool = csdb::Pool {};
 
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ") received, updating own hashvector");
+            LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
         }
         // bad tansactions storage:
         csdb::Pool b_pool {};
@@ -141,6 +141,9 @@ namespace slv2
             }
             pfee->CountFeesInPool(pnode, &p);
             auto result = pgen->buildvector(p, pool, b_pool);
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: " << pool.transactions_count() << " are valid, " << b_pool.transactions_count() << " moved to bad pool");
+            }
             pown_hvec->Sender = pnode->getMyConfNumber();
             pown_hvec->hash = result;
         }
@@ -421,7 +424,8 @@ namespace slv2
 
         //TODO: not good solution, to reproduce solver-1 logic only:
         if(is_bigbang) {
-            gotTransactionList(csdb::Pool {});
+            csdb::Pool tmp {};
+            gotTransactionList(tmp);
         }
     }
 
@@ -434,7 +438,12 @@ namespace slv2
 
         // thread-safe with flushTransactions(), suppose to receive calls from network-related threads
         std::lock_guard<std::mutex> l(trans_mtx);
+        //TODO: such a way transactions added in solver-1, ask author about it
         transactions.transactions().push_back(tr);
+        transactions.recount();
+        if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: transaction added, total " << transactions.transactions().size());
+        }
     }
 
 } // slv2

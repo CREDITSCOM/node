@@ -332,10 +332,12 @@ namespace slv2
          * @author  aae
          * @date    03.10.2018
          *
+         * @return count of flushed transactions
+         *
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void flush_transactions();
+        inline size_t flush_transactions();
 
         /**
          * @fn  inline bool SolverContext::verify(const csdb::Transaction& tr) const;
@@ -590,9 +592,9 @@ namespace slv2
         core.send_wallet_transaction(tr);
     }
 
-    void SolverContext::flush_transactions()
+    size_t SolverContext::flush_transactions()
     {
-        core.flushTransactions();
+        return core.flushTransactions();
     }
 
     bool SolverContext::verify(const csdb::Transaction& tr) const

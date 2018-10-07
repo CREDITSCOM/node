@@ -23,6 +23,10 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
+        virtual void onRoundEnd(SolverContext& context) override;
+
+        Result onRoundTable(SolverContext& context, const uint32_t round) override;
+
         Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
 
         const char * name() const override
@@ -45,6 +49,9 @@ namespace slv2
         std::vector<csdb::Address> spam_keys;
         size_t spam_counter { 0 };
         size_t spam_index { 0 };
+
+        // counts flushed transactions during round
+        size_t flushed_counter { 0 };
     };
 
 } // slv2

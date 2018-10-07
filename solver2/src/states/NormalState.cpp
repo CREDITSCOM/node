@@ -54,10 +54,10 @@ namespace slv2
             LOG_NOTICE(name() << ": started flush transactions every " << Consensus::T_coll_trans << " msec");
         }
         tag_flush = context.scheduler().InsertPeriodic(Consensus::T_coll_trans, [this, pctx]() {
-            pctx->flush_transactions();
             if(Consensus::Log) {
                 LOG_DEBUG(name() << ": flushing transactions");
             }
+            flushed_counter += pctx->flush_transactions();
         }, true);
 
     }
@@ -79,6 +79,23 @@ namespace slv2
             context.scheduler().Remove(tag_flush);
             tag_flush = CallsQueueScheduler::no_tag;
         }
+    }
+
+    void NormalState::onRoundEnd(SolverContext & context)
+    {
+        // send not yet flushed transactions if any
+        flushed_counter += context.flush_transactions();
+        if(Consensus::Log) {
+            LOG_NOTICE(name() << ": " << flushed_counter << " transactions where flushed during round");
+        }
+        flushed_counter = 0;
+        DefaultStateBehavior::onRoundEnd(context);
+    }
+
+    Result NormalState::onRoundTable(SolverContext & context, const uint32_t round)
+    {
+        flushed_counter = 0;
+        return DefaultStateBehavior::onRoundTable(context, round);
     }
 
     Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
@@ -112,12 +129,18 @@ namespace slv2
         else {
             ptr->set_source(pctx->address_spammer());
         }
-        if(node.getBlockChain().findWalletId(*(spam_keys.cbegin() + spam_index), id)) {
-            ptr->set_target(csdb::Address::from_wallet_id(id));
-        }
-        else {
-            ptr->set_target(*(spam_keys.cbegin() + spam_index));
-        }
+        
+        //TODO: does not accepted by other nodes
+        //if(node.getBlockChain().findWalletId(*(spam_keys.cbegin() + spam_index), id)) {
+        //    ptr->set_target(csdb::Address::from_wallet_id(id));
+        //}
+        //else {
+        //    ptr->set_target(*(spam_keys.cbegin() + spam_index));
+        //}
+        
+        //TODO: replaces previous commented code
+        ptr->set_target(pctx->address_spammer());
+
         ptr->set_amount(csdb::Amount(randFT(1, 1000), 0));
         ptr->set_max_fee(csdb::AmountCommission(0.1));
         ptr->set_innerID(++spam_counter);

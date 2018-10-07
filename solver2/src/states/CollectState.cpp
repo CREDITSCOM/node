@@ -12,9 +12,17 @@ namespace slv2
         auto cur_round = context.round();
         if(cur_round == 1) {
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": at the 1st round send empty transaction list to initiate consensus");
+                LOG_NOTICE(name() << ": at the 1st round schedule to send empty transaction list to initiate consensus after " << Consensus::T_round << " ms");
             }
-            do_send_tl(context, 0);
+            SolverContext * pctx = &context;
+            context.scheduler().InsertOnce(Consensus::T_round, [this, pctx]() {
+                if(Consensus::Log) {
+                    LOG_NOTICE(name() << ": sending empty transaction list #0 of 0 items");
+                }
+                csdb::Pool p {};
+                p.set_sequence(0);
+                pctx->node().sendTransactionList(p);
+            });
         }
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": starting to collect transactions of round #" << context.round());

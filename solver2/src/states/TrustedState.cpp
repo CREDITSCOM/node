@@ -100,7 +100,7 @@ namespace slv2
             }
         }
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": transaction list received, sending own vector back and processing it myself");
+            LOG_NOTICE(name() << ": reply on transaction list with own vector");
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
         context.node().sendVector(context.hash_vector());

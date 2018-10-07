@@ -18,10 +18,15 @@
 #define FLAG_LOG_DEBUG 64
 
 ///////////////////
-#define LOG_LEVEL                                                              \
-  (FLAG_LOG_NOTICE | FLAG_LOG_WARN | FLAG_LOG_ERROR | 0 | FLAG_LOG_PACKETS |   \
-   (FLAG_LOG_NODES_BUFFER & 0)) |                                              \
-    LOG_DEBUG //(FLAG_LOG_PACKETS & 0)
+#define LOG_LEVEL (             \
+    FLAG_LOG_NOTICE +           \
+    FLAG_LOG_WARN +             \
+    FLAG_LOG_ERROR +            \
+    /*FLAG_LOG_EVENTS +*/           \
+    /*FLAG_LOG_PACKETS +*/          \
+    /*FLAG_LOG_NODES_BUFFER +*/     \
+    /*FLAG_LOG_DEBUG +*/            \
+0)
 ///////////////////
 
 #if LOG_LEVEL & FLAG_LOG_NOTICE

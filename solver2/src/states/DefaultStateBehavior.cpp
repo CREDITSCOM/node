@@ -31,7 +31,7 @@ namespace slv2
         return Result::Finish;
     }
 
-    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender)
+    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& /*sender*/)
     {
 //#ifdef MONITOR_NODE
 //        addTimestampToPool(block);

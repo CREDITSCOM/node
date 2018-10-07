@@ -184,7 +184,8 @@ namespace slv2
         void sendBlock(csdb::Pool& p);
         void storeBlock(csdb::Pool& p);
         void prepareBlock(csdb::Pool& p);
-        void flushTransactions();
+        // returns count of transactions flushed
+        size_t flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);
         csdb::Pool removeTransactionsWithBadSignatures(const csdb::Pool& p);
     };
