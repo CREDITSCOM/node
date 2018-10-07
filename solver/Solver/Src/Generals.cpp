@@ -45,7 +45,7 @@ namespace Credits
         csdb::Transaction tempTransaction;
         size_t transactionsNumber = _pool.transactions_count();
         uint8_t* del1 = new uint8_t [transactionsNumber];
-        uint32_t i = 0;
+        //uint32_t i = 0;
 
         if(transactionsNumber > 0)
         {
@@ -55,18 +55,23 @@ namespace Credits
             boost::dynamic_bitset<> characteristicMask { transactionsNumber };
 
             std::vector <csdb::Transaction>& t_pool = _pool.transactions();
-            for(size_t i = 0; i < t_pool.size(); i++)
+            size_t t_pool_size = t_pool.size();
+            size_t cnt_rejected = 0;
+            for(size_t i = 0; i < t_pool_size; i++)
             {
                 csdb::Transaction& trx = t_pool [i];
 
-                if(!trxValidator_->validateTransaction(trx, i, *(del1 + i)))
+                if(!trxValidator_->validateTransaction(trx, i, *(del1 + i))) {
+                    LOG_WARN("GENERALS> buildVector(): trx[" << i << "] did not pass trxValidator_->validateTransaction()");
+                    ++cnt_rejected;
                     continue;
+                }
                 characteristicMask.set(i, true);
             }
 
             trxValidator_->validateByGraph(characteristicMask, t_pool, new_bpool);
 
-            for(size_t i = 0; i < t_pool.size(); i++)
+            for(size_t i = 0; i < t_pool_size; i++)
             {
                 if(characteristicMask [i])
                     new_pool.add_transaction(t_pool [i]);
@@ -87,6 +92,10 @@ namespace Credits
             Hash_ hash_(hash_s);
             delete[] hash_s;
             delete[] del1;
+            LOG_NOTICE("GENERALS > buildVector(): " << _pool.transactions_count() << " trans => "
+                                                    << new_pool.transactions_count() << " (good) + "
+                                                    << new_bpool.transactions_count() << " (bad) + "
+                                                    << cnt_rejected << " (skip)");
             //   std::cout << "GENERALS> buildVector: hash in hash_: " << byteStreamToHex((const char*)hash_.val, 32) << std::endl;
             return hash_;
         }
