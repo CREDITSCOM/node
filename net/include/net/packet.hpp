@@ -6,6 +6,7 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 
 using namespace boost::asio;
 
@@ -31,7 +32,7 @@ enum Offsets: uint32_t {
 };
 
 enum MsgTypes: uint8_t {
-  RoundTable,
+  RoundTableSS,
   Transactions,
   FirstTransaction,
   TransactionList,
@@ -52,7 +53,7 @@ enum MsgTypes: uint8_t {
   TransactionsPacketRequest,
   TransactionsPacketReply,
   NewCharacteristic,
-  Round,
+  RoundTable,
   WriterNotification
 };
 
@@ -75,7 +76,7 @@ public:
   bool isCompressed() const { return checkFlag(BaseFlags::Compressed); }
   bool isDirect() const { return checkFlag(BaseFlags::Direct); }
 
-  const Hash& getHash() const {
+  const cs::Hash& getHash() const {
     if (!hashed_) {
       hash_ = getBlake2Hash(data_.get(), data_.size());
       hashed_ = true;
@@ -83,19 +84,19 @@ public:
     return hash_;
   }
 
-  bool addressedToMe(const PublicKey& myKey) const {
+  bool addressedToMe(const cs::PublicKey& myKey) const {
     return
       isNetwork() || isDirect() ||
       (isBroadcast() && !(getSender() == myKey)) ||
       getAddressee() == myKey;
   }
 
-  const PublicKey& getSender() const { return getWithOffset<PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle); }
-  const PublicKey& getAddressee() const { return getWithOffset<PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented : Offsets::AddresseeWhenSingle); }
+  const cs::PublicKey& getSender() const { return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle); }
+  const cs::PublicKey& getAddressee() const { return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented : Offsets::AddresseeWhenSingle); }
 
   const uint64_t& getId() const { return getWithOffset<uint64_t>(isFragmented() ? Offsets::IdWhenFragmented : Offsets::IdWhenSingle); }
 
-  const Hash& getHeaderHash() const;
+  const cs::Hash& getHeaderHash() const;
   bool isHeaderValid() const;
 
   const uint16_t& getFragmentId() const { return getWithOffset<uint16_t>(Offsets::FragmentId); }
@@ -129,10 +130,10 @@ private:
   RegionPtr data_;
 
   mutable bool hashed_ = false;
-  mutable Hash hash_;
+  mutable cs::Hash hash_;
 
   mutable bool headerHashed_ = false;
-  mutable Hash headerHash_;
+  mutable cs::Hash headerHash_;
 
   mutable uint32_t headersLength_ = 0;
 
@@ -188,7 +189,7 @@ private:
   uint16_t maxFragment_ = 0;
   Packet packets_[Packet::MaxFragments];
 
-  Hash headerHash_;
+  cs::Hash headerHash_;
 
   mutable RegionPtr fullData_;
 
@@ -212,7 +213,7 @@ private:
   TypedAllocator<Message> msgAllocator_;
 
   std::atomic_flag mLock_ = ATOMIC_FLAG_INIT;
-  FixedHashMap<Hash, MessagePtr, uint16_t, MaxParallelCollections> map_;
+  FixedHashMap<cs::Hash, MessagePtr, uint16_t, MaxParallelCollections> map_;
 
   Message lastMessage_;
   friend class Network;

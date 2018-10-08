@@ -256,7 +256,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
 void Neighbourhood::gotConfirmation(const Connection::Id& my,
                                     const Connection::Id& real,
                                     const ip::udp::endpoint& ep,
-                                    const PublicKey& pk,
+                                    const cs::PublicKey& pk,
                                     RemoteNodePtr node) {
   SpinLock l1(mLockFlag_);
   SpinLock l2(nLockFlag_);
@@ -301,7 +301,7 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 void Neighbourhood::gotRefusal(const Connection::Id& id) {}
  
 void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
-                                       const Hash& hash) {
+                                       const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto conn = node->connection.load(std::memory_order_relaxed);
   if (!conn) return;
@@ -316,7 +316,7 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
-                                        const Hash& hash) {
+                                        const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
   if (!connection) return;
@@ -346,7 +346,7 @@ void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
 }
 
 void Neighbourhood::neighbourSentRenounce(RemoteNodePtr node,
-                                          const Hash& hash) {
+                                          const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
   if (connection) {
@@ -427,7 +427,7 @@ void Neighbourhood::resendPackets() {
   //LOG_DEBUG("TPTR: " << cnt);
 }
 
-ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
+ConnectionPtr Neighbourhood::getNextRequestee(const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
 
   SenderInfo& si = msgSenders_.tryStore(hash);

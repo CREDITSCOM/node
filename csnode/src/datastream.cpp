@@ -132,27 +132,19 @@ void cs::DataStream::addEndpoint(const boost::asio::ip::udp::endpoint& endpoint)
 void cs::DataStream::addTransactionsHash(const cs::TransactionsPacketHash& hash)
 {
     auto hashData = hash.toBinary();
-
-    if (!isAvailable(hashData.size()))
-        return;
     
-    for (const auto item : hashData)
-        setStreamField(item);
+    (*this) << hashData;
 }
 
 cs::TransactionsPacketHash cs::DataStream::transactionsHash()
 {
-    const std::size_t hashSize = cs::Black2HashLength;
+    const std::size_t hashSize = cs::HashLength;
     cs::TransactionsPacketHash hash;
 
-    if (!isAvailable(hashSize))
-        return hash;
-
-    csdb::internal::byte_array bytes;
+    cs::Bytes bytes;
     bytes.reserve(hashSize);
 
-    for (std::size_t i = 0; i < hashSize; ++i)
-        bytes.push_back(streamField<uint8_t>());
+    (*this) >> bytes;
 
     return cs::TransactionsPacketHash::fromBinary(bytes);
 }

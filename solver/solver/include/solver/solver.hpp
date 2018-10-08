@@ -125,7 +125,7 @@ class Solver {
   void gotTransactionsPacket(cs::TransactionsPacket&& packet);
   void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
   void gotPacketHashesReply(cs::TransactionsPacket&& packet);
-  void gotRound(cs::RoundInfo&& round);
+  void gotRound(cs::RoundTable&& round);
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
@@ -154,7 +154,7 @@ class Solver {
   void     addInitialBalance();
 
   cs::RoundNumber currentRoundNumber();
-  const cs::RoundInfo& roundInfo() const;
+  const cs::RoundTable& roundTable() const;
 
   // conveyer start point
   void addTransaction(const csdb::Transaction& transaction);
@@ -235,7 +235,7 @@ class Solver {
   csdb::Pool m_pool;
   csdb::Pool m_uncharacterizedPool;
 
-  cs::RoundInfo m_roundInfo;
+  cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
   csdb::Pool b_pool;

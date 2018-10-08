@@ -223,7 +223,7 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
   uint16_t result = k % nodes_amount;
 
   m_writerPublicKey = confidantNodes.at(result);
-  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.str, 32);
+  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.data(), m_writerPublicKey.size());
 
   delete[] hash_weights;
   delete[] mtr;

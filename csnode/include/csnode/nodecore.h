@@ -13,20 +13,10 @@
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
+#include <lib/system/common.hpp>
 
 namespace cs
 {
-    // solver data
-    using Vector = std::string;
-    using Matrix = std::string;
-
-    // static byte (unsigned char) array
-    template<std::size_t size>
-    using ByteArray = std::array<uint8_t, size>;
-
-    using Byte = uint8_t;
-    using Bytes = std::vector<Byte>;
-
     // hash table for fast transactions storage
     using TransactionsPacketHashTable = cuckoohash_map<TransactionsPacketHash, TransactionsPacket>;
 
@@ -47,18 +37,14 @@ namespace cs
     using SharedLock = std::shared_lock<cs::SharedMutex>;
     using SpinGuard = std::lock_guard<SpinLock>;
 
-    // TODO: find values in another files
     enum NodeConsts : uint32_t
     {
-        PublicKeyLength = 32,
-        Black2HashLength = 32,
-        SignatureLength = 64,
-        PrivateKeyLength = 32
+        PublicKeyLength = PUBLIC_KEY_LENGTH,
+        Black2HashLength = BLAKE2_HASH_LENGTH,
+        HashLength = HASH_LENGTH,
+        SignatureLength = SIGNATURE_LENGTH,
+        PrivateKeyLength = PRIVATE_KEY_LENGTH
     };
-
-    // TODO! replace all   using PublicKey = cs::ByteArray<PublicKeyLength>;
-    using Signature = cs::ByteArray<SignatureLength>;
-    // TODO! replace all   using Hash = cs::ByteArray<Black2HashLength>;
 
     enum SolverConsts : uint32_t
     {
@@ -67,7 +53,7 @@ namespace cs
     };
 
     // all info about round
-    struct RoundInfo
+    struct RoundTable
     {
         RoundNumber round;
         PublicKey general;

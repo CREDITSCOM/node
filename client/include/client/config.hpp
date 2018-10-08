@@ -6,6 +6,7 @@
 #include <boost/program_options.hpp>
 
 #include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 
 namespace po = boost::program_options;
 using namespace boost::asio;
@@ -54,7 +55,7 @@ public:
   NodeType getNodeType() const { return nType_; }
   const std::vector<EndpointData>& getIpList() const { return bList_; }
 
-  const PublicKey& getMyPublicKey() const { return publicKey_; }
+  const cs::PublicKey& getMyPublicKey() const { return publicKey_; }
   const std::string& getPathToDB() const { return pathToDb_; }
 
   bool isGood() const { return good_; }
@@ -90,7 +91,7 @@ private:
   bool server_;
 
   std::string pathToDb_;
-  PublicKey publicKey_;
+  cs::PublicKey publicKey_;
 };
 
 #endif // __CONFIG_HPP__

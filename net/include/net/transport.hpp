@@ -7,7 +7,7 @@
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
-#include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <net/network.hpp>
 
@@ -81,7 +81,7 @@ class Transport {
   void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false, bool sendToNeighbours = true);
   void clearTasks();
 
-  const PublicKey& getMyPublicKey() const {
+  const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
   bool isGood() const {
@@ -104,7 +104,7 @@ class Transport {
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&, const Connection::Id);
   void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
-  void sendPackRenounce(const Hash&, const Connection&);
+  void sendPackRenounce(const cs::Hash&, const Connection&);
   void sendPackInform(const Packet&, const Connection&);
 
   void sendPingPack(const Connection&);
@@ -141,7 +141,7 @@ class Transport {
   bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
   void askForMissingPackages();
-  void requestMissing(const Hash&, const uint16_t, const uint64_t);
+  void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
 
   /* Actions */
   bool   good_;
@@ -163,7 +163,7 @@ class Transport {
   FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, MaxRemoteNodes> remoteNodesMap_;
 
   RegionAllocator netPacksAllocator_;
-  PublicKey       myPublicKey_;
+  cs::PublicKey myPublicKey_;
 
   IPackStream iPackStream_;
 
@@ -202,7 +202,7 @@ class Transport {
   Node*    node_;
 
   Neighbourhood nh_;
-  FixedHashMap<Hash, RoundNum, uint16_t, 10000> fragOnRound_;
+  FixedHashMap<cs::Hash, RoundNum, uint16_t, 10000> fragOnRound_;
 };
 
 #endif  // __TRANSPORT_HPP__

@@ -43,7 +43,7 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
   *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const PublicKey& pk) {
+void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
 
   stream << NetworkCommand::Registration << NODE_VERSION;
@@ -54,7 +54,7 @@ void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackCo
   stream << (ConnectionId)0 << pk;
 }
 
-void formSSConnectPack(const Config& config, OPackStream& stream, const PublicKey& pk) {
+void formSSConnectPack(const Config& config, OPackStream& stream, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
@@ -263,10 +263,10 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   if (!iPackStream_.good())
     return false;
 
-  iPackStream_.safeSkip<PublicKey>(numConf + 1);
+  iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
   auto trFinish = iPackStream_.getCurrPtr();
-  node_->getRoundTable(trStart, (trFinish - trStart), rNum);
+  node_->getRoundTableSS(trStart, (trFinish - trStart), rNum);
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
@@ -284,7 +284,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
       nh_.establishConnection(net_->resolve(ep));
 
-      iPackStream_.safeSkip<PublicKey>();
+      iPackStream_.safeSkip<cs::PublicKey>();
       if (!iPackStream_.good())
         return false;
 
@@ -307,7 +307,7 @@ void Transport::processNodeMessage(const Message& msg) {
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
+  if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
   if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message MSG: Characteristic received" << std::endl;
   if (type == MsgTypes::BigBang) {
@@ -352,7 +352,7 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
   if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
   if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
-  if (type == MsgTypes::RoundTable) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
+  if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
   if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic received" << std::endl;
   if (type == MsgTypes::BigBang) {
@@ -403,10 +403,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     return;
   }
   switch(type) {
+  case MsgTypes::RoundTableSS:
+    return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum);
-  case MsgTypes::Round:
-    return node_->getRoundTableUpdated(data, size, rNum);
   case MsgTypes::Transactions:
     return node_->getTransaction(data, size);
   case MsgTypes::FirstTransaction:
@@ -569,7 +569,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
 
   ConnectionId myCId;
   ConnectionId realCId;
-  PublicKey    key;
+  cs::PublicKey key;
   iPackStream_ >> myCId >> realCId >> key;
 
   if (!iPackStream_.good())
@@ -687,7 +687,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-  Hash hHash;
+  cs::Hash hHash;
   iPackStream_ >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end()) return false;
 
@@ -695,7 +695,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   return true;
 }
 
-void Transport::sendPackRenounce(const Hash& hash, const Connection& addr) {
+void Transport::sendPackRenounce(const cs::Hash& hash, const Connection& addr) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
 
@@ -706,7 +706,7 @@ void Transport::sendPackRenounce(const Hash& hash, const Connection& addr) {
 }
 
 bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-  Hash hHash;
+  cs::Hash hHash;
 
   iPackStream_ >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end())
@@ -772,7 +772,7 @@ void Transport::askForMissingPackages() {
   }
 }
 
-void Transport::requestMissing(const Hash& hash, const uint16_t start, const uint64_t req) {
+void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const uint64_t req) {
   Packet p;
 
   {
@@ -799,7 +799,7 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     return false;
   auto ep = conn->specialOut ? conn->out : conn->in;
 
-  Hash     hHash;
+  cs::Hash hHash;
   uint16_t start;
   uint64_t req;
 

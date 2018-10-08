@@ -34,38 +34,38 @@ class Node {
   void run(const Config&);
 
   /* Incoming requests processing */
-  void getRoundTable(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
+  void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
   void getBigBang(const uint8_t*, const size_t, const RoundNum, uint8_t type);
   void getTransaction(const uint8_t*, const size_t);
   void getFirstTransaction(const uint8_t*, const size_t);
   void getTransactionsList(const uint8_t*, const size_t);
-  void getVector(const uint8_t*, const size_t, const PublicKey& sender);
-  void getMatrix(const uint8_t*, const size_t, const PublicKey& sender);
-  void getBlock(const uint8_t*, const size_t, const PublicKey& sender);
-  void getHash(const uint8_t*, const size_t, const PublicKey& sender);
+  void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getHash(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
   // transaction's pack syncro
-  void getPacketHashesRequest(const uint8_t*, const std::size_t, const PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::PublicKey& sender);
   void getPacketHashesReply(const uint8_t*, const std::size_t);
 
-  void getRoundTableUpdated(const uint8_t*, const size_t, const RoundNum);
-  void getCharacteristic(const uint8_t* data, const size_t size, const PublicKey& sender);
+  void getRoundTable(const uint8_t*, const size_t, const RoundNum);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
-  void getNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey);
-  bool isCorrectNotification(const uint8_t* data, const std::size_t size, const PublicKey& senderPublicKey);
-  void sendNotification(const PublicKey& destination);
+  void getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
+  bool isCorrectNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
+  void sendNotification(const cs::PublicKey& destination);
   std::vector<uint8_t> createNotification();
 
   std::vector<uint8_t> createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const std::vector<uint8_t>& signature, const std::vector<cs::DynamicBufferPtr>& notifications);
 
   /*syncro get functions*/
-  void getBlockRequest(const uint8_t*, const size_t, const PublicKey& sender);
+  void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender);
-  void getRoundTableRequest(const uint8_t* data, const size_t size, const PublicKey& sender);
+  void getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
-  void getBadBlock(const uint8_t*, const size_t, const PublicKey& sender);
+  void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   /* Outcoming requests forming */
   void sendRoundTable();
@@ -75,12 +75,12 @@ class Node {
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
   void sendBlock(const csdb::Pool&);
-  void sendHash(const std::string&, const PublicKey&);
+  void sendHash(const std::string&, const cs::PublicKey&);
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
   void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
-  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const PublicKey& sender);
+  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender);
 
   void sendBadBlock(const csdb::Pool& pool);
   void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const uint32_t maskBitsCount,
@@ -88,13 +88,13 @@ class Node {
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
-  void sendBlockReply(const csdb::Pool&, const PublicKey&);
-  void sendWritingConfirmation(const PublicKey& node);
+  void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
+  void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
-  void sendRoundTableUpdated(const cs::RoundInfo& round);
+  void sendRoundTableUpdated(const cs::RoundTable& round);
 
-  void sendVectorRequest(const PublicKey&);
-  void sendMatrixRequest(const PublicKey&);
+  void sendVectorRequest(const cs::PublicKey&);
+  void sendMatrixRequest(const cs::PublicKey&);
 
   void sendTLRequest();
   void getTlRequest(const uint8_t* data, const size_t size);
@@ -104,13 +104,13 @@ class Node {
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound(const cs::RoundInfo& roundInfo);
+  void initNextRound(const cs::RoundTable& roundInfo);
   bool getSyncroStarted();
 
   enum MessageActions { Process, Postpone, Drop };
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
-  const PublicKey& getMyPublicKey() const {
+  const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
   NodeLevel getMyLevel() const {
@@ -119,7 +119,7 @@ class Node {
   uint32_t getRoundNumber();
   uint8_t getMyConfNumber();
 
-  const std::vector<PublicKey>& getConfidants() const {
+  const std::vector<cs::PublicKey>& getConfidants() const {
     return confidantNodes_;
   }
 
@@ -136,7 +136,7 @@ class Node {
   }
 #endif
 
-  PublicKey writerId;
+  cs::PublicKey writerId;
   void addToPackageTemporaryStorage(const csdb::Pool& pool);
 
 private:
@@ -148,14 +148,14 @@ private:
   bool checkKeysForSig();
 
   inline bool readRoundData(bool);
-  void        onRoundStart();
+  void onRoundStart();
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
   // Info
-  const PublicKey myPublicKey_;
-  bool            good_ = true;
+  const cs::PublicKey myPublicKey_;
+  bool good_ = true;
 
   // syncro variables
   bool     syncro_started = false;
@@ -174,8 +174,8 @@ private:
   RoundNum  roundNum_ = 0;
   NodeLevel myLevel_;
 
-  PublicKey              mainNode_;
-  std::vector<PublicKey> confidantNodes_;
+  cs::PublicKey mainNode_;
+  std::vector<cs::PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
 

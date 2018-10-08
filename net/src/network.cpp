@@ -142,7 +142,7 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 
 void Network::processorRoutine() {
-  FixedHashMap<Hash, uint32_t, uint16_t, 100000> packetMap;
+  FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   for (;;) {
@@ -235,7 +235,7 @@ Network::Network(const Config& config, Transport* transport):
     LOG_ERROR("Cannot start the network: error binding sockets");
 }
 
-bool Network::resendFragment(const Hash& hash,
+bool Network::resendFragment(const cs::Hash& hash,
                              const uint16_t id,
                              const ip::udp::endpoint& ep) {
   //LOG_WARN("Got resend req " << id << " from " << ep);

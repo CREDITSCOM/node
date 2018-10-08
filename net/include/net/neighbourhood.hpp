@@ -5,6 +5,7 @@
 
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 
 #include "packet.hpp"
 
@@ -70,7 +71,7 @@ struct Connection {
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
 
-  PublicKey key;
+  cs::PublicKey key;
   ip::udp::endpoint in;
 
   bool specialOut = false;
@@ -84,7 +85,7 @@ struct Connection {
     uint32_t acceptOrder = 0;
     bool needSend = true;
   };
-  FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
+  FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
@@ -113,7 +114,7 @@ public:
   void gotConfirmation(const Connection::Id& my,
                        const Connection::Id& real,
                        const ip::udp::endpoint&,
-                       const PublicKey&,
+                       const cs::PublicKey&,
                        RemoteNodePtr);
 
   void gotRefusal(const Connection::Id&);
@@ -126,9 +127,9 @@ public:
 
   bool canHaveNewConnection();
 
-  void neighbourHasPacket(RemoteNodePtr, const Hash&);
-  void neighbourSentPacket(RemoteNodePtr, const Hash&);
-  void neighbourSentRenounce(RemoteNodePtr, const Hash&);
+  void neighbourHasPacket(RemoteNodePtr, const cs::Hash&);
+  void neighbourSentPacket(RemoteNodePtr, const cs::Hash&);
+  void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
 
   void redirectByNeighbours(const Packet*);
   void pourByNeighbours(const Packet*, const uint32_t packNum);
@@ -138,7 +139,7 @@ public:
                             const Connection::Id,
                             const ip::udp::endpoint&);
 
-  ConnectionPtr getNextRequestee(const Hash&);
+  ConnectionPtr getNextRequestee(const cs::Hash&);
 
 private:
   struct BroadPackInfo {
@@ -173,8 +174,8 @@ private:
     ConnectionPtr prioritySender;
   };
 
-  FixedHashMap<Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-  FixedHashMap<Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
+  FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
+  FixedHashMap<cs::Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

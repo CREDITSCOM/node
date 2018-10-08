@@ -218,7 +218,7 @@ namespace cs
         }
 
         ///
-        /// Converts data pointer to hex
+        /// Converts const char data pointer to hex
         ///
         inline static std::string byteStreamToHex(const char* stream, const std::size_t length)
         {
@@ -234,6 +234,14 @@ namespace cs
             }
 
             return result;
+        }
+
+        ///
+        /// Converts const unsigned char data pointer to hex
+        ///
+        inline static std::string byteStreamToHex(const unsigned char* stream, const std::size_t length)
+        {
+            return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
         ///

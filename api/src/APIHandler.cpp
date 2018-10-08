@@ -434,7 +434,7 @@ csdb::Transaction
 APIHandler::make_transaction(const Transaction& transaction)
 {
   csdb::Transaction send_transaction;
-  PublicKey from, to;
+  cs::PublicKey from, to;
 
   auto source = BlockChain::getAddressFromKey(transaction.source);
 

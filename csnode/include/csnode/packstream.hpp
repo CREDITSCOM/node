@@ -58,11 +58,11 @@ class IPackStream {
   }
 
   template <size_t Length>
-  IPackStream& operator>>(FixedString<Length>& str) {
+  IPackStream& operator>>(cs::ByteArray<Length>& byteArray) {
     if ((uint32_t)(end_ - ptr_) < Length)
       good_ = false;
     else {
-      memcpy(str.str, ptr_, Length);
+      memcpy(byteArray.data(), ptr_, Length);
       ptr_ += Length;
     }
 
@@ -91,7 +91,7 @@ class IPackStream {
 
 class OPackStream {
  public:
-  OPackStream(RegionAllocator* allocator, const PublicKey& myKey)
+  OPackStream(RegionAllocator* allocator, const cs::PublicKey& myKey)
   : allocator_(allocator)
   , packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet))))
   , packetsEnd_(packets_)
@@ -113,7 +113,7 @@ class OPackStream {
       *this << id_ << senderKey_;
   }
 
-  void init(uint8_t flags, const PublicKey& receiver) {
+  void init(uint8_t flags, const cs::PublicKey& receiver) {
     init(flags);
     *this << receiver;
   }
@@ -146,8 +146,8 @@ class OPackStream {
   }
 
   template <size_t Length>
-  OPackStream& operator<<(const FixedString<Length>& str) {
-    insertBytes(str.str, Length);
+  OPackStream& operator<<(const cs::ByteArray<Length>& byteArray) {
+    insertBytes(byteArray.data(), Length);
     return *this;
   }
 
@@ -211,6 +211,10 @@ class OPackStream {
     }
   }
 
+  void insertBytes(const unsigned char* bytes, uint32_t size) {
+    insertBytes(reinterpret_cast<const char*>(bytes), size);
+  }
+
   uint8_t* ptr_;
   uint8_t* end_;
 
@@ -222,7 +226,7 @@ class OPackStream {
   bool     finished_ = false;
 
   uint64_t  id_ = 0;
-  PublicKey senderKey_;
+  cs::PublicKey senderKey_;
 };
 
 template <>

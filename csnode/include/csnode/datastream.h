@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <type_traits>
 
+#include <lib/system/common.hpp>
+#include <lib/system/structures.hpp>
+
 namespace cs
 {
     ///
@@ -167,6 +170,45 @@ namespace cs
             });
 
             return result;
+        }
+
+        ///
+        /// Adds fixed string to stream.
+        ///
+        /// @param fixedString Template FixedString.
+        ///
+        template<std::size_t size>
+        inline void setFixedString(const FixedString<size>& fixedString)
+        {
+            if (!isAvailable(size))
+                return;
+
+            for (std::size_t i = 0; i < size; ++i)
+                m_data[i + m_index] = fixedString[i];
+
+            m_index += size;
+        }
+
+        ///
+        /// Returns fixed string by template size.
+        ///
+        /// @return Returns template FixedString.
+        /// If stream can not return available bytes size it returns zero FixedString.
+        ///
+        template<std::size_t size>
+        inline FixedString<size> fixedString()
+        {
+            FixedString<size> str;
+
+            if (!isAvailable(size))
+                return str;
+
+            for (std::size_t i = 0; i < size; ++i)
+                str[i] = m_data[i + m_index];
+
+            m_index += size;
+
+            return str;
         }
 
         ///
@@ -351,6 +393,16 @@ namespace cs
     }
 
     ///
+    /// Get size of bytes from stream to fixedString
+    ///
+    template<std::size_t size>
+    inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString)
+    {
+        fixedString = stream.fixedString<size>();
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -414,6 +466,16 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const std::string& data)
     {
         stream.addString(data);
+        return stream;
+    }
+
+    ///
+    /// Writes fixed string to stream
+    ///
+    template<std::size_t size>
+    inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString)
+    {
+        stream.setFixedString(fixedString);
         return stream;
     }
 }

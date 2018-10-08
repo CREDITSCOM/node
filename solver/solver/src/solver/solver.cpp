@@ -153,7 +153,7 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
   {
     cs::SharedLock sharedLock(mSharedMutex);
-    localHashes = m_roundInfo.hashes;
+    localHashes = m_roundTable.hashes;
   }
 
   for (const auto& hash : localHashes) {
@@ -240,8 +240,8 @@ std::vector<uint8_t> Solver::sign(std::vector<uint8_t> data) {
 
 PublicKey Solver::getWriterPublicKey() const {
   PublicKey result;
-  if (m_writerIndex < m_roundInfo.confidants.size()) {
-    result = m_roundInfo.confidants[m_writerIndex];
+  if (m_writerIndex < m_roundTable.confidants.size()) {
+    result = m_roundTable.confidants[m_writerIndex];
   } else {
     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
   }
@@ -428,7 +428,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   }
 }
 
-void Solver::gotRound(cs::RoundInfo&& round) {
+void Solver::gotRound(cs::RoundTable&& round) {
   cslog() << "Solver Got round table";
 
   cs::Hashes localHashes = round.hashes;
@@ -436,7 +436,7 @@ void Solver::gotRound(cs::RoundInfo&& round) {
 
   {
     cs::Lock lock(mSharedMutex);
-    m_roundInfo = std::move(round);
+    m_roundTable = std::move(round);
   }
 
   for (const auto& hash : localHashes) {
@@ -462,7 +462,7 @@ void Solver::buildTransactionList() {
   cslog() << "BuildTransactionlist";
   csdb::Pool pool = csdb::Pool{};  // FIX TO PACKET
 
-  for (const auto& hash : m_roundInfo.hashes) {
+  for (const auto& hash : m_roundTable.hashes) {
     if (!m_hashTable.contains(hash)) {
       cserror() << "Build vector: HASH NOT FOUND";
       return;
@@ -489,7 +489,7 @@ void Solver::buildTransactionList() {
 
   trustedCounterVector++;
 
-  if (trustedCounterVector == m_roundInfo.confidants.size()) {
+  if (trustedCounterVector == m_roundTable.confidants.size()) {
     vectorComplete = true;
 
     memset(receivedVecFrom, 0, 100);
@@ -544,7 +544,7 @@ void Solver::gotVector(HashVector&& vector) {
 
     if (trustedCounterMatrix == numGen) {
       memset(receivedMatFrom, 0, 100);
-      m_writerIndex        = (generals->take_decision(m_roundInfo.confidants,
+      m_writerIndex        = (generals->take_decision(m_roundTable.confidants,
                                                node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
 
@@ -617,7 +617,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   if (trustedCounterMatrix == numGen) {
     memset(receivedMatFrom, 0, 100);
     uint8_t writerIndex  = (generals->take_decision(
-        m_roundInfo.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
+        m_roundTable.confidants, node_->getBlockChain().getHashBySequence(node_->getRoundNumber() - 1)));
     trustedCounterMatrix = 0;
 
     if (writerIndex == 100) {
@@ -810,16 +810,16 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
       }
     }
 
-    m_roundInfo.round++;
-    m_roundInfo.confidants = std::move(ips);
-    m_roundInfo.general    = node_->getMyPublicKey();
-    m_roundInfo.hashes     = std::move(hashes);
+    m_roundTable.round++;
+    m_roundTable.confidants = std::move(ips);
+    m_roundTable.general    = node_->getMyPublicKey();
+    m_roundTable.hashes     = std::move(hashes);
 
     ips.clear();
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
-    node_->initNextRound(m_roundInfo);
+    node_->initNextRound(m_roundTable);
     round_table_sent = true;
   }
 }
@@ -958,11 +958,11 @@ void Solver::addInitialBalance() {
 }
 
 cs::RoundNumber Solver::currentRoundNumber() {
-  return m_roundInfo.round;
+  return m_roundTable.round;
 }
 
-const cs::RoundInfo& Solver::roundInfo() const {
-  return m_roundInfo;
+const cs::RoundTable& Solver::roundTable() const {
+  return m_roundTable;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1070,10 +1070,10 @@ void Solver::addTransaction(const csdb::Transaction& transaction) {
 void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general,
                            const RoundNumber roundNum) {
   cs::Lock lock(mSharedMutex);
-  m_roundInfo.confidants = confidants;
-  m_roundInfo.round      = roundNum;
-  m_roundInfo.hashes.clear();
-  m_roundInfo.general = general;
+  m_roundTable.confidants = confidants;
+  m_roundTable.round      = roundNum;
+  m_roundTable.hashes.clear();
+  m_roundTable.general = general;
 }
 
 const std::vector<uint8_t>& Solver::getPrivateKey() const {
