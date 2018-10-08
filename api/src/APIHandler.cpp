@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cassert>
 #include <type_traits>
+#include <functional>
 
 #include <API.h>
 
@@ -310,17 +311,31 @@ convert_transaction_id(const api::TransactionId& trid)
 }
 
 api::SealedTransaction
-convertTransaction(const csdb::Transaction& transaction)
+APIHandler::convertTransaction(const csdb::Transaction& transaction)
 {
   api::SealedTransaction result;
   csdb::Amount amount = transaction.amount();
   csdb::Currency currency = transaction.currency();
-  csdb::Address target = transaction.target();
-  csdb::TransactionID id = transaction.id();
-  csdb::Address address = transaction.source();
 
-  result.id.index = id.index();
-  result.id.poolHash = fromByteArray(id.pool_hash().to_binary());
+  csdb::Address address = transaction.source();
+  if (address.is_wallet_id()) {
+    BlockChain::WalletData data_to_fetch_pulic_key;
+    s_blockchain.findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+    address = csdb::Address::from_public_key(
+      csdb::internal::byte_array(
+        data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+  }
+
+  csdb::Address target = transaction.target();
+  if (target.is_wallet_id()) {
+    BlockChain::WalletData data_to_fetch_pulic_key;
+    s_blockchain.findWalletData(transaction.target().wallet_id(), data_to_fetch_pulic_key);
+    target = csdb::Address::from_public_key(
+      csdb::internal::byte_array(
+        data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+  }
+
+  result.trxn.id = transaction.innerID();
 
   result.trxn.amount = convertAmount(amount);
   result.trxn.currency = DEFAULT_CURRENCY;
@@ -340,15 +355,16 @@ convertTransaction(const csdb::Transaction& transaction)
 }
 
 std::vector<api::SealedTransaction>
-convertTransactions(const std::vector<csdb::Transaction>& transactions)
+APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions)
 {
   std::vector<api::SealedTransaction> result;
   // reserve vs resize
   result.resize(transactions.size());
+  auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
   std::transform(transactions.begin(),
                  transactions.end(),
                  result.begin(),
-                 convertTransaction);
+                 convert);
   return result;
 }
 
@@ -383,7 +399,7 @@ APIHandler::convertPool(const csdb::PoolHash& poolHash)
 }
 
 std::vector<api::SealedTransaction>
-extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset)
+APIHandler::extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset)
 {
   int64_t transactionsCount = pool.transactions_count();
   assert(transactionsCount >= 0);

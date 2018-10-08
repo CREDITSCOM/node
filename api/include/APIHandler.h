@@ -128,6 +128,15 @@ class APIHandler : public APIHandlerInterface
   private:
     BlockChain& s_blockchain;
 
+    std::vector<api::SealedTransaction>
+    extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
+
+    api::SealedTransaction
+    convertTransaction(const csdb::Transaction& transaction);
+
+    std::vector<api::SealedTransaction>
+    convertTransactions(const std::vector<csdb::Transaction>& transactions);
+
     api::Pool convertPool(const csdb::Pool& pool);
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
@@ -243,8 +252,6 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
 };
 }
 
-api::SealedTransaction
-convertTransaction(const csdb::Transaction& transaction);
 
 template<typename T>
 T
