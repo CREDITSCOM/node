@@ -68,7 +68,6 @@ class Node {
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   /* Outcoming requests forming */
-  void sendRoundTable();
   void sendTransaction(csdb::Pool&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);
@@ -91,7 +90,7 @@ class Node {
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
   void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
-  void sendRoundTableUpdated(const cs::RoundTable& round);
+  void sendRoundTable(const cs::RoundTable& round);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);

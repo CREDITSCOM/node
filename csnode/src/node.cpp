@@ -210,33 +210,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   }
 }
 
-// the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
-void Node::sendRoundTable() {
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::RoundTableSS << roundNum_ << static_cast<uint8_t>(confidantNodes_.size()) << mainNode_;
-
-  for (auto& conf : confidantNodes_) {
-    ostream_ << conf;
-  }
-
-  cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-  cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(mainNode_.data(), mainNode_.size()) << "Confidants: ";
-
-  int i = 0;
-
-  for (auto& e : confidantNodes_) {
-    if (e != mainNode_) {
-      cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
-      i++;
-    }
-  }
-
-  transport_->clearTasks();
-
-  flushCurrentTasks();
-}
-
-void Node::sendRoundTableUpdated(const cs::RoundTable& round) {
+void Node::sendRoundTable(const cs::RoundTable& round) {
   ostream_.init(BaseFlags::Broadcast);
 
   ostream_ << MsgTypes::RoundTable << round.round << round.confidants.size() << round.hashes.size() << round.general;
@@ -306,7 +280,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
     return;
   }
 
-  sendRoundTable();
+  sendRoundTable(solver_->roundTable());
 }
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
@@ -1388,7 +1362,7 @@ void Node::initNextRound(const cs::RoundTable& roundInfo) {
     confidantNodes_.push_back(conf);
   }
 
-  sendRoundTable();  // TODO: sendRoundTableUpdated(solver_->roundInfo());
+  sendRoundTable(solver_->roundTable());
 
   cslog() << "NODE> RoundNumber :" << roundNum_;
 
