@@ -180,15 +180,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
     }
   }
 
-  if (myLevel_ == NodeLevel::Main) {
-    if (!istream_.good()) {
-      cswarning() << "Bad round table format, ignoring";
-      return;
-    }
-  }
-
   cs::RoundTable roundInfo;
-  roundInfo.round      = rNum;
+  roundInfo.round = rNum;
   roundInfo.confidants = confidantNodes_;
   roundInfo.hashes.clear();
   roundInfo.general = mainNode_;
@@ -1317,7 +1310,7 @@ void Node::onRoundStart() {
   }
 
   // Pretty printing...
-  cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_ << "Confidants: ";
+  cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
 
   int i = 0;
   for (auto& e : confidantNodes_) {

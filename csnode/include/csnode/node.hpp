@@ -15,10 +15,8 @@
 
 enum NodeLevel { Normal, Confidant, Main, Writer };
 
-using Vector = std::string;
-using Matrix = std::string;
-
 class Transport;
+
 namespace cs {
 class Solver;
 }
@@ -31,6 +29,7 @@ class Node {
   bool isGood() const {
     return good_;
   }
+
   void run(const Config&);
 
   /* Incoming requests processing */
@@ -157,9 +156,9 @@ private:
   bool good_ = true;
 
   // syncro variables
-  bool     syncro_started = false;
+  bool syncro_started = false;
   uint32_t sendBlockRequestSequence;
-  bool     awaitingSyncroBlock   = false;
+  bool awaitingSyncroBlock = false;
   uint32_t awaitingRecBlockCount = 0;
 
   // signature variables

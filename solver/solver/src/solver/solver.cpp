@@ -521,9 +521,10 @@ void Solver::gotVector(HashVector&& vector) {
     return;
   }
 
-  const std::vector<PublicKey>& confidants = node_->getConfidants();
-  uint8_t                       numGen     = static_cast<uint8_t>(confidants.size());
-  receivedVecFrom[vector.Sender]           = true;
+  const std::vector<PublicKey>& confidants = m_roundTable.confidants;
+  uint8_t numGen = static_cast<uint8_t>(confidants.size());
+
+  receivedVecFrom[vector.Sender] = true;
 
   generals->addvector(vector);  // building matrix
   trustedCounterVector++;
