@@ -13,7 +13,7 @@
 #ifndef MONITOR_NODE
 //#define SPAMMER
 #else
-//#define STATS
+#define STATS
 #endif
 #define SYNCRO
 //#define MYLOG

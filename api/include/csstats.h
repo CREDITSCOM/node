@@ -103,7 +103,7 @@ namespace csstats {
         StatsPerPeriod collectStats(const Periods &periods);
 
         template<class F>
-        void matchPeriod(const Periods& periods, period_t period, F func);
+        void matchPeriod(const Periods& periods, period_t period, F& func);
     };
 }
 
