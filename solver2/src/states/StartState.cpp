@@ -1,11 +1,7 @@
 #include "StartState.h"
 #include "../SolverContext.h"
+#include "../Node.h"
 
 namespace slv2
 {
-    void StartState::on(SolverContext& context)
-    {
-        DefaultStateBehavior::on(context);
-    }
-
 } // slv2

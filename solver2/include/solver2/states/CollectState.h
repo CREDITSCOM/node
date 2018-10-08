@@ -26,7 +26,7 @@ namespace slv2
      * ### remarks  Aae, 30.09.2018.
      */
 
-    class CollectState final : public DefaultStateBehavior
+    class CollectState : public DefaultStateBehavior
     {
     public:
 

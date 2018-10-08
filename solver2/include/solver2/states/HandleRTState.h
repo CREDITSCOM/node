@@ -10,7 +10,7 @@ namespace slv2
     ///
     /// <seealso cref="T:DefaultStateBehavior"/>
 
-    class HandleRTState final : public DefaultStateBehavior
+    class HandleRTState : public DefaultStateBehavior
     {
     public:
 

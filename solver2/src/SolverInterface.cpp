@@ -41,10 +41,6 @@ namespace slv2
         }
         public_key = pub;
         private_key = priv;
-        // "autostart" in node environment
-        if(is_finished()) {
-            start();
-        }
     }
 
     void SolverCore::addInitialBalance()
@@ -418,6 +414,13 @@ namespace slv2
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: nextRound()");
         }
+
+        // update desire count of trusted nodes
+        size_t cnt_trusted = pnode->getConfidants().size();
+        if(cnt_trusted > cnt_trusted_desired) {
+            cnt_trusted_desired = cnt_trusted;
+        }
+
         if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
             handleTransitions(Event::RoundTable);
         }

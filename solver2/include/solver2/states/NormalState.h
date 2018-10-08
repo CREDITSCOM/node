@@ -12,7 +12,7 @@ namespace slv2
     ///
     /// <seealso cref="T:DefaultStateBehavior"/>
 
-    class NormalState final : public DefaultStateBehavior
+    class NormalState : public DefaultStateBehavior
     {
     public:
 

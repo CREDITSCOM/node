@@ -1,5 +1,5 @@
 #pragma once
-#include "DefaultStateBehavior.h"
+#include "HandleRTState.h"
 
 namespace slv2
 {
@@ -9,14 +9,12 @@ namespace slv2
     ///
     /// <seealso cref="T:DefaultStateBehavior"/>
 
-    class StartState final : public DefaultStateBehavior
+    class StartState final : public HandleRTState
     {
     public:
 
         ~StartState() override
         {}
-
-        void on(SolverContext& context) override;
 
         const char * name() const override
         {

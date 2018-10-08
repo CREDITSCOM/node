@@ -27,7 +27,7 @@ namespace slv2
 
         Result onRoundTable(SolverContext& /*context*/, const uint32_t /*round*/) override
         {
-            return Result::Failure;
+            return Result::Finish;
         }
 
         Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
