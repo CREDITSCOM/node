@@ -45,8 +45,12 @@ namespace slv2
 
         constexpr static uint32_t T_spam_trans = 20;
 
-        constexpr static const int CountSpamKeysVariants = 10;
+        constexpr static const size_t CountTransInRound = 100;
+        // every node has unique target spam key
+        constexpr static const size_t CountSpamKeysVariants = 1;
         std::vector<csdb::Address> spam_keys;
+        // every node has unique source key
+        csdb::Address own_key {};
         size_t spam_counter { 0 };
         size_t spam_index { 0 };
 

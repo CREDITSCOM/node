@@ -63,6 +63,7 @@ namespace Credits
 
                 if(!trxValidator_->validateTransaction(trx, i, *(del1 + i))) {
                     LOG_WARN("GENERALS> buildVector(): trx[" << i << "] did not pass trxValidator_->validateTransaction()");
+                    LOG_WARN("InnerID(): " << trx.innerID() << ", src: " << trx.source().to_string() << ", tgt: " << trx.target().to_string());
                     ++cnt_rejected;
                     continue;
                 }

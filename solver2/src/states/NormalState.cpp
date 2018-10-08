@@ -23,14 +23,29 @@ namespace slv2
             if(spam_keys.empty()) {
                 uint8_t sk [64];
                 uint8_t pk [32];
-                csdb::Address pub;
-                for(int i = 0; i < CountSpamKeysVariants; i++)
-                {
+                for(int i = 0; i < CountSpamKeysVariants; i++) {
                     crypto_sign_keypair(pk, sk);
-                    pub = pub.from_public_key((const char*) pk);
+                    csdb::Address pub = csdb::Address::from_public_key((const char*) pk);
                     spam_keys.push_back(pub);
+                    if(Consensus::Log) {
+                        LOG_NOTICE(name() << ": target address " << pub.to_string());
+                    }
+                }
+                crypto_sign_keypair(pk, sk);
+                own_key = csdb::Address::from_public_key((const char*) pk);
+                if(Consensus::Log) {
+                    LOG_NOTICE(name() << ": source address " << own_key.to_string());
                 }
             }
+
+            csdb::Transaction tr;            
+            tr.set_target( csdb::Address::from_public_key((char*) context.public_key().data()));
+            tr.set_source(context.address_start());
+            tr.set_currency(1);
+            tr.set_amount(csdb::Amount(10000, 0));
+            tr.set_balance(csdb::Amount(10000000, 0));
+            tr.set_innerID(1);
+            context.add(tr);
         }
 
         SolverContext * pctx = &context;
@@ -90,6 +105,8 @@ namespace slv2
         }
         flushed_counter = 0;
         DefaultStateBehavior::onRoundEnd(context);
+
+        spam_counter = 0;
     }
 
     Result NormalState::onRoundTable(SolverContext & context, const uint32_t round)
@@ -123,27 +140,24 @@ namespace slv2
         Node& node = pctx->node();
         csdb::internal::WalletId id;
 
-        if(node.getBlockChain().findWalletId(pctx->address_spammer(), id)) {
+        if(node.getBlockChain().findWalletId(own_key, id)) {
             ptr->set_source(csdb::Address::from_wallet_id(id));
         }
         else {
-            ptr->set_source(pctx->address_spammer());
+            ptr->set_source(own_key);
         }
         
         //TODO: does not accepted by other nodes
-        //if(node.getBlockChain().findWalletId(*(spam_keys.cbegin() + spam_index), id)) {
-        //    ptr->set_target(csdb::Address::from_wallet_id(id));
-        //}
-        //else {
-        //    ptr->set_target(*(spam_keys.cbegin() + spam_index));
-        //}
+        if(node.getBlockChain().findWalletId(*(spam_keys.cbegin() + spam_index), id)) {
+            ptr->set_target(csdb::Address::from_wallet_id(id));
+        }
+        else {
+            ptr->set_target(*(spam_keys.cbegin() + spam_index));
+        }
         
-        //TODO: replaces previous commented code
-        ptr->set_target(pctx->address_spammer());
-
         ptr->set_amount(csdb::Amount(randFT(1, 1000), 0));
         ptr->set_max_fee(csdb::AmountCommission(0.1));
-        ptr->set_innerID(++spam_counter);
+        ptr->set_innerID(++spam_counter + CountTransInRound * pctx->round());
 
         ++spam_index;
         if(spam_index >= spam_keys.size()) {
