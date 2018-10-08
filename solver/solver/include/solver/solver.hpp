@@ -268,6 +268,8 @@ class Solver {
   /*to store unrequested syncro blocks*/
   std::map<size_t, csdb::Pool> rndStorage;
 
+  // TODO! Hash m_characteristicHash
+
 #ifdef SPAMMER
   std::atomic_bool spamRunning{false};
   std::thread      spamThread;
