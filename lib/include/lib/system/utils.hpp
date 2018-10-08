@@ -23,9 +23,9 @@
 
 namespace cs
 {
-    /*!
-        Static utils helper class
-    */
+    ///
+    /// Static utils helper class
+    ///
     class Utils
     {
     public:
@@ -36,9 +36,9 @@ namespace cs
             SignatureLength = 64  // <-- right place. TODO: get from right place!
         };
 
-        /*!
-            Generates random value from random generator
-        */
+        ///
+        /// Generates random value from random generator
+        ///
         inline static int generateRandomValue(int min, int max)
         {
             std::random_device randomDevice;
@@ -48,18 +48,19 @@ namespace cs
             return dist(generator);
         }
 
-        /*!
-            Fills hash with first size of symbols
-        */
+        ///
+        /// Fills hash with first size of symbols
+        ///
         inline static void fillHash(std::string& hash, uint32_t size, char symbol = '0')
         {
-            for (decltype(size) i = 0; i < size; ++i)
+            for (decltype(size) i = 0; i < size; ++i) {
                 hash[i] = symbol;
+            }
         }
 
-        /*!
-            Returns current time in string representation
-        */
+        ///
+        /// Returns current time in string representation
+        ///
         static std::string formattedCurrentTime()
         {
             auto now = std::chrono::system_clock::now();
@@ -71,39 +72,40 @@ namespace cs
             return ss.str();
         }
 
-        /*!
-            Returns C-style array size
-        */
+        ///
+        /// Returns C-style array size
+        ///
         template<class T, size_t size>
         static inline constexpr size_t arraySize(const T(&)[size]) noexcept
         {
             return size;
         }
 
-        /*!
-            Inserts value to char array by index
-        */
+        ///
+        /// Inserts value to char array by index
+        ///
         template<typename T>
         inline static void insertToArray(char* data, uint32_t index, T&& value)
         {
             char* ptr = reinterpret_cast<char*>(&value);
 
-            for (uint32_t i = index, k = 0; i < index + sizeof(T); ++i, ++k)
+            for (uint32_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
                 *(data + i) = *(ptr + k);
+            }
         }
 
-        /*!
-            Returns value from char array
-        */
+        ///
+        /// Returns value from char array
+        ///
         template<typename T>
         inline static T getFromArray(char* data, uint32_t index)
         {
             return *(reinterpret_cast<T*>(data + index));
         }
 
-        /*!
-            Represents type T as byte string
-        */
+        ///
+        /// Represents type T as byte string
+        ///
         template<typename T>
         inline static std::string addressToString(T address)
         {
@@ -115,17 +117,17 @@ namespace cs
             return str;
         }
 
-        /*!
-            Returns all file data as string
-        */
+        ///
+        /// Returns all file data as string
+        ///
         inline static std::string readAllFileData(std::ifstream& file)
         {
             return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         }
 
-        /*!
-            Converts char array data to hex into std::string
-        */
+        ///
+        /// Converts char array data to hex into std::string
+        ///
         inline static std::string toHex(char* data, std::size_t size)
         {
             assert(data != nullptr);
@@ -138,27 +140,27 @@ namespace cs
             return ss.str();
         }
 
-        /*!
-            Converts char array data to hex into std::string
-        */
+        ///
+        /// Converts char array data to hex into std::string
+        ///
         template<size_t size>
         inline static std::string toHex(const char(&data)[size])
         {
             return Utils::toHex(static_cast<char*>(data), size);
         }
 
-        /*!
-            Clear memory
-        */
+        ///
+        /// Clear memory
+        ///
         template<typename T>
         inline static void clearMemory(T& object)
         {
-            memset(&object, 0, sizeof(T));
+            std::memset(&object, 0, sizeof(T));
         }
 
-        /*!
-            Coverts string to hex
-        */
+        ///
+        // Coverts string to hex
+        ///
         static std::string stringToHex(const std::string& input)
         {
             static const char* const lut = "0123456789ABCDEF";
@@ -170,6 +172,7 @@ namespace cs
             for (size_t i = 0; i < len; ++i)
             {
                 const unsigned char c = static_cast<unsigned char>(input[i]);
+
                 output.push_back(lut[c >> 4]);
                 output.push_back(lut[c & 15]);
             }
@@ -177,9 +180,9 @@ namespace cs
             return output;
         }
 
-        /*!
-            Converts hex to string
-        */
+        ///
+        /// Converts hex to string
+        ///
         static std::string hexToString(const std::string& input)
         {
             static const char* const lut = "0123456789ABCDEF";
@@ -214,9 +217,9 @@ namespace cs
             return output;
         }
 
-        /*!
-            Converts data pointer to hex
-        */
+        ///
+        /// Converts data pointer to hex
+        ///
         inline static std::string byteStreamToHex(const char* stream, const std::size_t length)
         {
             static const std::string map = "0123456789ABCDEF";
@@ -233,9 +236,9 @@ namespace cs
             return result;
         }
 
-        /*!
-            Same as cs::Utils::byteStreamToHex but calculates only in debug
-        */
+        ///
+        /// Same as cs::Utils::byteStreamToHex but calculates only in debug
+        ///
         inline static std::string debugByteStreamToHex(const char* stream, const std::size_t length)
         {
             csunused(stream);
@@ -248,9 +251,9 @@ namespace cs
             return str;
         }
 
-        /*!
-            Calls std::function after ms time in another thread
-        */
+        ///
+        /// Calls std::function after ms time in another thread
+        ///
         static void runAfter(const std::chrono::milliseconds& ms, std::function<void()> callBack)
         {
             const auto tp = std::chrono::system_clock::now() + ms;
@@ -265,6 +268,9 @@ namespace cs
             tr.detach();
         }
 
+        ///
+        /// Signs data with security key
+        ///
         static std::vector<uint8_t> sign(std::vector<uint8_t> data, const unsigned char* securityKey)
         {
             std::vector<uint8_t> signature(Values::SignatureLength);
@@ -279,16 +285,22 @@ namespace cs
             return data;
         }
 
+        ///
+        /// Returns current time point as string representation
+        ///
         static std::string currentTimestamp()
         {
-          auto now_time = std::chrono::system_clock::now();
-          return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
+            auto now_time = std::chrono::system_clock::now();
+            return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
         }
 
-        static bool verifySignature(uint8_t* signature, uint8_t* public_key, uint8_t* message,
-                                     size_t message_len) {
-          const int ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
-          return ok == 0;
+        ///
+        /// Verifies data signature with public key
+        ///
+        static bool verifySignature(uint8_t* signature, uint8_t* public_key, uint8_t* message, size_t message_len)
+        {
+            const int ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
+            return ok == 0;
         }
     };
 }

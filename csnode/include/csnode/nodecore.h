@@ -22,7 +22,7 @@ namespace cs
 
     // static byte (unsigned char) array
     template<std::size_t size>
-    using ByteArray = std::array<unsigned char, size>;
+    using ByteArray = std::array<uint8_t, size>;
 
     using Byte = uint8_t;
     using Bytes = std::vector<Byte>;
@@ -56,9 +56,9 @@ namespace cs
         PrivateKeyLength = 32
     };
 
-// TODO! replace all   using PublicKey = cs::ByteArray<PublicKeyLength>;
+    // TODO! replace all   using PublicKey = cs::ByteArray<PublicKeyLength>;
     using Signature = cs::ByteArray<SignatureLength>;
-// TODO! replace all   using Hash = cs::ByteArray<Black2HashLength>;
+    // TODO! replace all   using Hash = cs::ByteArray<Black2HashLength>;
 
     enum SolverConsts : uint32_t
     {
@@ -83,8 +83,8 @@ namespace cs
 
     struct PoolMetaInfo
     {
-      std::string timestamp;
-      csdb::Pool::sequence_t sequenceNumber;
+        std::string timestamp;
+        csdb::Pool::sequence_t sequenceNumber;
     };
 }
 

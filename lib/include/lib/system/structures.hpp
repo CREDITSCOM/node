@@ -9,7 +9,6 @@
 #include "allocators.hpp"
 
 /* Containers */
-
 template <typename BufferType>
 class FixedBufferIterator {
 public:
