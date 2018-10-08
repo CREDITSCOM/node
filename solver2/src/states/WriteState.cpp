@@ -18,7 +18,7 @@ namespace slv2
         }
 
         // adjust minimal hashes to await
-        int tmp = static_cast<int>(context.cnt_trusted());
+        int tmp = static_cast<int>(context.cnt_trusted_desired());
         if(tmp > min_count_hashes) {
             min_count_hashes = tmp;
         }
@@ -30,6 +30,30 @@ namespace slv2
         }
         context.store_and_send_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
+
+        // launch timeout control to reduce count of desired candidates on delay
+        if(Consensus::Log) {
+            LOG_NOTICE(name() << ": launch timeout control to test count of hashes every " << Consensus::T_hash << " ms");
+        }
+        SolverContext * pctx = &context;
+        tag_timeout = context.scheduler().InsertPeriodic(Consensus::T_hash, [this,pctx]() {
+            // time to wait for hashes is expired => spawn new round if hashes enough
+            if(pctx->cnt_hash_recv() >= Consensus::MinTrustedNodes) {
+                // we have got minimal required count of hashes, so we can spawn new round
+                if(Consensus::Log) {
+                    LOG_WARN(name() << ": we havent got all desired hashes but enough to request new round");
+                    pctx->spawn_next_round();
+                }
+            }
+        });
+    }
+
+    void WriteState::onRoundEnd(SolverContext & context)
+    {
+        if(tag_timeout != CallsQueueScheduler::no_tag) {
+            context.scheduler().Remove(tag_timeout);
+            tag_timeout = CallsQueueScheduler::no_tag;
+        }
     }
 
     Result WriteState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender)

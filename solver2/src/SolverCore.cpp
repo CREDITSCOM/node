@@ -29,6 +29,7 @@ namespace slv2
         , pcontext(std::make_unique<SolverContext>(*this))
         , tag_state_expired(CallsQueueScheduler::no_tag)
         , req_stop(true)
+        , cnt_trusted_desired(Consensus::MinTrustedNodes)
         // consensus data
         , addr_spam(std::nullopt)
         , cur_round(0)

@@ -1,6 +1,7 @@
 #pragma once
 #include "DefaultStateBehavior.h"
 #include "../Consensus.h"
+#include "../CallsQueueScheduler.h"
 #include <memory>
 
 namespace slv2
@@ -26,6 +27,8 @@ namespace slv2
         {}
 
         void on(SolverContext& context) override;
+
+        virtual void onRoundEnd(SolverContext& context) override;
 
         /**
          * @fn  Result final::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
@@ -79,7 +82,11 @@ namespace slv2
         /** @brief   The pointer to own hash actual this round */
         std::unique_ptr<Hash> pown;
 
+        /** @brief   Minimal required count of hashes in reply after send block */
         int min_count_hashes { static_cast<int>(Consensus::MinTrustedNodes) };
+
+        /** @brief   Timeout control */
+        CallsQueueScheduler::CallTag tag_timeout { CallsQueueScheduler::no_tag };
     };
 
 } // slv2

@@ -27,7 +27,7 @@ namespace slv2
      * @class   SolverContext
      *
      * @brief   A solver context.
-     *          
+     *
      *          "Интерфейсный" класс для обращений из классов состояний к ядру солвера, определяет
      *          подмножество вызовов солвера, которые доступны из классов состояний, д. б.
      *          достаточным, но не избыточным одновременно.
@@ -107,7 +107,7 @@ namespace slv2
          *
          * ### remarks  Aae, 30.09.2018.
          */
-        
+
         inline void vectors_completed();
 
         /**
@@ -184,7 +184,7 @@ namespace slv2
         inline CallsQueueScheduler& scheduler() const;
 
         // Access to common state properties. 
-        
+
         /// <summary>   Public key. </summary>
         ///
         /// <remarks>   Aae, 30.09.2018. </remarks>
@@ -267,6 +267,21 @@ namespace slv2
          */
 
         size_t cnt_trusted() const;
+
+        /**
+         * @fn  size_t SolverContext::cnt_trusted_desired() const;
+         *
+         * @brief   Gets preferred count of trusted nodes for any round.
+         *
+         * @author  aae
+         * @date    03.10.2018
+         *
+         * @return  The desired number of trusted nodes for any round.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
+
+        inline size_t cnt_trusted_desired() const;
 
         /**
          * @fn  inline bool SolverContext::is_spammer() const;
@@ -538,6 +553,11 @@ namespace slv2
     uint32_t SolverContext::round() const
     {
         return core.cur_round;
+    }
+
+    size_t SolverContext::cnt_trusted_desired() const
+    {
+        return core.cnt_trusted_desired;
     }
 
     bool SolverContext::is_spammer() const
