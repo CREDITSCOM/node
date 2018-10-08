@@ -65,50 +65,6 @@ struct HashMatrix {
   HashVector hmatr[5];
   SolverSignature  sig;
 };
-struct NormalState {
-  bool isOn;
-  bool rtStartReceived;
-  bool transactionSend;
-  bool newBlockReceived;
-  bool hashSent;
-};
-struct MainState {
-  bool isOn;
-  bool rtStartReceived;
-  bool transactinReceived;
-  bool newBlockReceived;
-  bool rtFinishReceived;
-  bool tlSent;
-};
-struct TrustedState {
-  bool isOn;
-  bool rtStartReceived;
-  bool tlReceived;
-  bool vectorSent;
-  bool allVectorsReceived;
-  bool matrixSent;
-  bool allMatricesReceived;
-  bool writerConfirmationSent;
-  bool newBlockReceived;
-  bool hashSent;
-};
-struct WriterState {
-  bool isOn;
-  bool writerConfirmationReceived;
-  bool newBlockSent;
-  bool hashesReceived;
-  bool trSent;
-};
-
-struct SolverStates {
-  NormalState  normal;
-  MainState    main;
-  TrustedState trusted;
-  WriterState  writer;
-};
-
-#pragma pack(pop)
-class State {};
 
 class Solver {
  public:
@@ -210,7 +166,7 @@ class Solver {
   std::vector<uint8_t> myPublicKey;
   std::vector<uint8_t> myPrivateKey;
 
-  Node* node_;
+  Node* m_node;
 
   std::unique_ptr<Generals> generals;
 
@@ -218,10 +174,10 @@ class Solver {
 
   cs::Hashes m_neededHashes;
 
-  size_t              lastRoundTransactionsGot;
+  size_t lastRoundTransactionsGot;
   std::set<PublicKey> receivedVec_ips;
-  bool                receivedVecFrom[100];
-  uint8_t             trustedCounterVector;
+  bool receivedVecFrom[100];
+  uint8_t trustedCounterVector;
 
   std::set<PublicKey> receivedMat_ips;
 
