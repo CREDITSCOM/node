@@ -33,7 +33,7 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
+cs::Hash Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
   std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions" << std::endl;
 
   memset(&m_hMatrix, 0, 9700);
@@ -73,7 +73,10 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
   m_new_trusted.fill(0);
   m_hw_total.fill(hash_weight{});
 
-  return hash_s;
+  cs::Hash result;
+  std::copy(hash_s, hash_s + HASH_LENGTH, result.begin());
+
+  return result;
 }
 
 void Generals::addvector(HashVector vector) {
@@ -93,7 +96,7 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
 
   auto*   hw = new hash_weight[nodes_amount];
-  Hash_   temp_hash;
+  cs::Hash temp_hash;
   uint8_t j = matrix.Sender;
   uint8_t i_max;
   bool    found = false;
@@ -104,7 +107,7 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
-      memcpy(hw[0].a_hash, matrix.hmatr[0].hash.val, 32);
+      memcpy(hw[0].a_hash, matrix.hmatr[0].hash.data(), matrix.hmatr[0].hash.size());
 
       cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].a_hash, 32);
 
@@ -115,7 +118,7 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
       found = false;
 
       for (uint8_t ii = 0; ii < i_max; ii++) {
-        if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.val, 32) == 0) {
+        if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.data(), matrix.hmatr[i].hash.size()) == 0) {
           (hw[ii].a_weight)++;
           *(m_find_untrusted.data() + j * 100 + i) = ii;
 
@@ -125,7 +128,7 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
       }
 
       if (!found) {
-        memcpy(hw[i_max].a_hash, matrix.hmatr[i].hash.val, 32);
+        memcpy(hw[i_max].a_hash, matrix.hmatr[i].hash.data(), matrix.hmatr[i].hash.size());
 
         (hw[i_max].a_weight)                     = 1;
         *(m_find_untrusted.data() + j * 100 + i) = i_max;

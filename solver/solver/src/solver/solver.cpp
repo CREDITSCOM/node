@@ -475,7 +475,7 @@ void Solver::buildTransactionList() {
     }
   }
 
-  Hash_ result = generals->buildvector(pool, m_pool);
+  cs::Hash result = generals->buildvector(pool, m_pool);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
 

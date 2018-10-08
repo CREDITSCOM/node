@@ -18,7 +18,9 @@
 #include <lib/system/keys.hpp>
 
 namespace cs {
+
 class Solver;
+
 class Generals {
  public:
   Generals()  = default;
@@ -27,7 +29,7 @@ class Generals {
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  Hash_ buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
+  cs::Hash buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
 
   void addvector(HashVector vector);
   void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);

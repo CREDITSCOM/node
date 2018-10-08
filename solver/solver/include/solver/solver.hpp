@@ -35,14 +35,6 @@ class Node;
 namespace cs {
 
 class Generals;
-struct Hash_ {
-  Hash_(uint8_t* a) {
-    memcpy(val, a, 32);
-  }
-  Hash_() {
-  }
-  uint8_t val[32];
-};
 
 // TODO!!!
 // WARNING!
@@ -54,10 +46,10 @@ struct SolverSignature {
   }
   uint8_t val[64];
 };
-#pragma pack(push, 1)
+
 struct HashVector {
   uint8_t   Sender;
-  Hash_     hash;
+  cs::Hash     hash;
   SolverSignature sig;
 };
 struct HashMatrix {
