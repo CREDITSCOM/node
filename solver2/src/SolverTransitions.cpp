@@ -57,12 +57,12 @@ namespace slv2
             defaultRT, { Event::SetWriter, pWrite }
         } },
         { pCollect, {
-            // commented out direct transition is not correct after BB
-            defaultRT // { Event::RoundTable, pNormal }
+            defaultRT
         } },
         { pWrite, {
             { Event::RoundTable, pCollect }/*defaultRT*/, { Event::Hashes, pCollect }, defaultBB
         } },
+            // transitions for round table handler
         { pRTH, {
             { Event::SetNormal, pNormal }, { Event::SetTrusted, pTrusted }, { Event::SetCollector, pCollect }
         } },
@@ -70,6 +70,7 @@ namespace slv2
             // only option to activate BB is from Write, so we will act almost as Write and finishing round upon receive hashes
             defaultRT
         } },
+            // transition NoState -> Start on event "Start"
         { pstate, {
             { Event::Start, pStart }
         } }
