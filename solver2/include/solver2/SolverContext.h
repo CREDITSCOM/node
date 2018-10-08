@@ -298,10 +298,12 @@ namespace slv2
 
         inline bool is_spammer() const;
 
+        inline void store_block(csdb::Pool & block);
+
         // Common operations, candidates for refactoring:
 
         /**
-         * @fn  inline void SolverContext::store_and_send_block();
+         * @fn  inline void SolverContext::store_and_send_new_block();
          *
          * @brief   Makes a block from inner pool of collected and validated transactions and send it
          *
@@ -311,7 +313,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void store_and_send_block();
+        inline void store_and_send_new_block();
 
         /**
          * @fn  inline void SolverContext::resend_last_block();
@@ -595,7 +597,12 @@ namespace slv2
         core.handleTransitions(SolverCore::Event::Matrices);
     }
 
-    void SolverContext::store_and_send_block()
+    void SolverContext::store_block(csdb::Pool & block)
+    {
+        core.storeBlock(block);
+    }
+
+    void SolverContext::store_and_send_new_block()
     {
         core.prepareBlock(core.pool);
         core.sendBlock(core.pool);

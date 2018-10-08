@@ -28,7 +28,7 @@ namespace slv2
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")");
         }
-        context.store_and_send_block();
+        context.store_and_send_new_block();
         pown = std::make_unique<Hash>((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
 
         // launch timeout control to reduce count of desired candidates on delay
