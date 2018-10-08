@@ -81,7 +81,7 @@ Config Config::read(po::variables_map& vm) {
 
   srand(time(NULL));
   for (int i = 0; i < 32; ++i)
-    *(result.publicKey_.str + i) = (char)(rand() % 255);
+    *(result.publicKey_.data() + i) = (char)(rand() % 255);
 
   return result;
 }
