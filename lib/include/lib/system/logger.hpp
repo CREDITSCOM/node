@@ -25,7 +25,7 @@
     /*FLAG_LOG_EVENTS +*/           \
     /*FLAG_LOG_PACKETS +*/          \
     /*FLAG_LOG_NODES_BUFFER +*/     \
-    FLAG_LOG_DEBUG +            \
+    /*FLAG_LOG_DEBUG +*/            \
 0)
 ///////////////////
 
