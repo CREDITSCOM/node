@@ -16,6 +16,8 @@
 
 #include <limits>
 #include <string>
+#include <sstream>
+
 namespace slv2
 {
 
@@ -246,6 +248,11 @@ namespace slv2
         if(tr_cnt > 0) {
             pnode->sendTransaction(std::move(transactions));
             if(Consensus::Log) {
+				std::ostringstream os;
+				for (const auto& t : transactions.transactions()) {
+					os << " " << t.innerID();
+				}
+				LOG_DEBUG("SolverCore: flush" << os.str());
                 LOG_DEBUG("SolverCore: " << tr_cnt << " are sent, clear buffer");
             }
             transactions = csdb::Pool {};

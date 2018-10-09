@@ -20,31 +20,35 @@ namespace slv2
         DefaultStateBehavior::on(context);
 
         if(context.is_spammer()) {
-            if(spam_keys.empty()) {
+            if(target_wallets.empty()) {
                 uint8_t sk [64];
                 uint8_t pk [32];
-                for(int i = 0; i < CountSpamKeysVariants; i++) {
+                for(int i = 0; i < CountTargetWallets; i++) {
                     crypto_sign_keypair(pk, sk);
                     csdb::Address pub = csdb::Address::from_public_key((const char*) pk);
-                    spam_keys.push_back(pub);
+                    target_wallets.push_back(pub);
                     if(Consensus::Log) {
                         LOG_NOTICE(name() << ": target address " << pub.to_string());
                     }
                 }
                 crypto_sign_keypair(pk, sk);
-                own_key = csdb::Address::from_public_key((const char*) pk);
+                own_wallet = csdb::Address::from_public_key((const char*) pk);
                 if(Consensus::Log) {
-                    LOG_NOTICE(name() << ": source address " << own_key.to_string());
+                    LOG_NOTICE(name() << ": source address " << own_wallet.to_string());
                 }
             }
 
-            csdb::Transaction tr;            
-            tr.set_target( csdb::Address::from_public_key((char*) context.public_key().data()));
-            tr.set_source(context.address_start());
+			// в генезис-блоке на start (innerID 0) и (if defined(SPAMMER)) на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
+			// пробуем взять оттуда
+			
+            csdb::Transaction tr;
+			tr.set_source(context.optimize(context.address_spammer()));
+            tr.set_target(context.optimize(own_wallet));
             tr.set_currency(1);
-            tr.set_amount(csdb::Amount(10000, 0));
-            tr.set_balance(csdb::Amount(10000000, 0));
-            tr.set_innerID(1);
+            tr.set_amount(csdb::Amount(10'000'000, 0));
+			tr.set_max_fee(csdb::AmountCommission(0.1));
+			//TODO: get unique increasing through different nodes ID for the spam_wallet -> own_wallet 1st transaction:
+            tr.set_innerID(context.node().getBlockChain().getLastWrittenSequence() + 1);
             context.add(tr);
         }
 
@@ -137,30 +141,15 @@ namespace slv2
     {
         // based on Solver::spamWithTransactions()
 
-        Node& node = pctx->node();
-        csdb::internal::WalletId id;
+		ptr->set_source(pctx->optimize(own_wallet));
+		ptr->set_target(pctx->optimize(*(target_wallets.cbegin() + spam_index)));
+		ptr->set_innerID(++spam_counter + CountTransInRound * pctx->round());
 
-        if(node.getBlockChain().findWalletId(own_key, id)) {
-            ptr->set_source(csdb::Address::from_wallet_id(id));
-        }
-        else {
-            ptr->set_source(own_key);
-        }
-        
-        //TODO: does not accepted by other nodes
-        if(node.getBlockChain().findWalletId(*(spam_keys.cbegin() + spam_index), id)) {
-            ptr->set_target(csdb::Address::from_wallet_id(id));
-        }
-        else {
-            ptr->set_target(*(spam_keys.cbegin() + spam_index));
-        }
-        
-        ptr->set_amount(csdb::Amount(randFT(1, 1000), 0));
+		ptr->set_amount(csdb::Amount(randFT(1, 100), 0));
         ptr->set_max_fee(csdb::AmountCommission(0.1));
-        ptr->set_innerID(++spam_counter + CountTransInRound * pctx->round());
 
         ++spam_index;
-        if(spam_index >= spam_keys.size()) {
+        if(spam_index >= target_wallets.size()) {
             spam_index = 0;
         }
     }

@@ -518,6 +518,21 @@ namespace slv2
         inline csdb::Address address_genesis() const;
         inline csdb::Address address_start() const;
 
+		/**
+		 * @fn	csdb::Address SolverContext::optimize(const csdb::Address& address) const;
+		 *
+		 * @brief	Optimizes the given address. Tries to get wallet id from blockchain, otherwise return dicrect address
+		 *
+		 * @author	User
+		 * @date	09.10.2018
+		 *
+		 * @param	address	The address to optimize.
+		 *
+		 * @return	The csdb::Address optimized with id if possible
+		 */
+
+		csdb::Address optimize(const csdb::Address& address) const;
+
     private:
         SolverCore& core;
     };

@@ -35,9 +35,9 @@ namespace slv2
         }
 
 
-    private:
+    protected:
 
-        void setup(csdb::Transaction * ptr, SolverContext * pctx);
+		void setup(csdb::Transaction * ptr, SolverContext * pctx);
         int randFT(int min, int max);
 
         CallsQueueScheduler::CallTag tag_spam { CallsQueueScheduler::no_tag };
@@ -47,10 +47,10 @@ namespace slv2
 
         constexpr static const size_t CountTransInRound = 100;
         // every node has unique target spam key
-        constexpr static const size_t CountSpamKeysVariants = 1;
-        std::vector<csdb::Address> spam_keys;
+        constexpr static const size_t CountTargetWallets = 1;
+        std::vector<csdb::Address> target_wallets;
         // every node has unique source key
-        csdb::Address own_key {};
+        csdb::Address own_wallet {};
         size_t spam_counter { 0 };
         size_t spam_index { 0 };
 

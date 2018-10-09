@@ -78,7 +78,7 @@ namespace slv2
     Result DefaultStateBehavior::onVector(SolverContext& /*context*/, const Credits::HashVector& /*vect*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": vector ignored");
+            LOG_DEBUG(name() << ": vector ignored in this state");
         }
         return Result::Ignore;
     }
@@ -86,7 +86,7 @@ namespace slv2
     Result DefaultStateBehavior::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix& /*matr*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": matrix ignored");
+            LOG_DEBUG(name() << ": matrix ignored in this state");
         }
         return Result::Ignore;
     }
@@ -94,15 +94,14 @@ namespace slv2
     Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": hash ignored");
+            LOG_DEBUG(name() << ": hash ignored in this state");
         }
         return Result::Ignore;
     }
 
     Result DefaultStateBehavior::onTransaction(SolverContext& /*context*/, const csdb::Transaction& /*trans*/)
     {
-        if(Consensus::Log && report_ignore_transactions) {
-            report_ignore_transactions = false;
+        if(Consensus::Log) {
             LOG_DEBUG(name() << ": transactions ignored in this state");
         }
         return Result::Ignore;
@@ -111,7 +110,7 @@ namespace slv2
     Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, const csdb::Pool& /*pool*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": transaction list ignored");
+            LOG_DEBUG(name() << ": transaction list ignored in this state");
         }
         return Result::Ignore;
     }
