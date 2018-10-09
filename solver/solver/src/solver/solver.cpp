@@ -913,9 +913,12 @@ void Solver::spamWithTransactions() {
   transaction.set_source(csdb::Address::from_public_key((char*)myPublicKey.data()));
   transaction.set_currency(csdb::Currency("CS"));
 
+  const cs::RoundNumber round = m_roundTable.round;
+
+  // TODO: magic values
   while (true) {
-    if (spamRunning && (node_->getMyLevel() == Normal)) {
-      if ((node_->getRoundNumber() < 10) || (node_->getRoundNumber() > 20)) {
+    if (spamRunning && (m_node->getMyLevel() == Normal)) {
+      if ((round < 10) || (round > 20)) {
         transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
         // transaction.set_comission(csdb::Amount(0, 1, 10));
         transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));

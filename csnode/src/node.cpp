@@ -556,15 +556,10 @@ void Node::getVector(const uint8_t* data, const size_t size, const cs::PublicKey
 
   cslog() << "NODE> Getting vector from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  istream_.init(data, size);
+  cs::DataStream stream(data, size);
 
   cs::HashVector vec;
-  istream_ >> vec;
-
-  if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
-    return;
-  }
+  stream >> vec;
 
   cslog() << "Got vector";
 
@@ -601,18 +596,12 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const cs::PublicKey
     return;
   }
 
-  istream_.init(data, size);
+  cs::DataStream stream(data, size);
 
   cs::HashMatrix mat;
-  istream_ >> mat;
+  stream >> mat;
 
   cslog() << "NODE> Getting matrix from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad matrix packet format";
-    return;
-  }
-
   cslog() << "Got matrix";
 
   solver_->gotMatrix(std::move(mat));
