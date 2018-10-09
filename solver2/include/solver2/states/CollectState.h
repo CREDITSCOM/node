@@ -46,7 +46,7 @@ namespace slv2
          * @param [in,out]  context The context.
          */
 
-        virtual void onRoundEnd(SolverContext& context) override;
+        void onRoundEnd(SolverContext& context) override;
 
         Result onTransaction(SolverContext& context, const csdb::Transaction& tr) override;
 

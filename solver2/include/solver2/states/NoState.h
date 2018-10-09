@@ -13,16 +13,16 @@ namespace slv2
     {
     public:
 
-        virtual void on(SolverContext& /*context*/) override
+        void on(SolverContext& /*context*/) override
         {}
 
-        virtual void off(SolverContext& /*context*/) override
+        void off(SolverContext& /*context*/) override
         {}
 
-        virtual void expired(SolverContext& /*context*/) override
+        void expired(SolverContext& /*context*/) override
         {}
 
-        virtual void onRoundEnd(SolverContext& /*context*/) override
+        void onRoundEnd(SolverContext& /*context*/) override
         {}
 
         Result onRoundTable(SolverContext& /*context*/, const uint32_t /*round*/) override

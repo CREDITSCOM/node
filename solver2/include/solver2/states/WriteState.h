@@ -28,7 +28,7 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        virtual void onRoundEnd(SolverContext& context) override;
+        void onRoundEnd(SolverContext& context) override;
 
         /**
          * @fn  Result final::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;

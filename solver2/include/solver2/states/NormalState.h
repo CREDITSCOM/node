@@ -23,7 +23,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        virtual void onRoundEnd(SolverContext& context) override;
+        void onRoundEnd(SolverContext& context) override;
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
