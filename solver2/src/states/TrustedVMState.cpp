@@ -38,7 +38,7 @@ namespace slv2
         uint8_t wTrusted = context.generals().take_decision(
             context.node().getConfidants(),
             context.node().getMyConfNumber(),
-            context.node().getBlockChain().getHashBySequence(context.node().getRoundNumber() - 1)
+            context.blockchain().getHashBySequence(context.node().getRoundNumber() - 1)
         );
         if(Consensus::GeneralNotSelected == wTrusted) {
             if(Consensus::Log) {

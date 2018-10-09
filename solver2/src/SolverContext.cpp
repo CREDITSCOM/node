@@ -4,6 +4,10 @@
 
 namespace slv2
 {
+	BlockChain& SolverContext::blockchain() const
+	{
+		return core.pnode->getBlockChain();
+	}
 
     uint8_t SolverContext::own_conf_number() const
     {

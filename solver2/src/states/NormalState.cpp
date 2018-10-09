@@ -21,8 +21,8 @@ namespace slv2
 
         if(context.is_spammer()) {
             if(target_wallets.empty()) {
-                uint8_t sk [64];
-                uint8_t pk [32];
+                uint8_t sk[64];
+                uint8_t pk[32];
                 for(int i = 0; i < CountTargetWallets; i++) {
                     crypto_sign_keypair(pk, sk);
                     csdb::Address pub = csdb::Address::from_public_key((const char*) pk);
@@ -36,20 +36,8 @@ namespace slv2
                 if(Consensus::Log) {
                     LOG_NOTICE(name() << ": source address " << own_wallet.to_string());
                 }
+                check_spammer_balance(context);
             }
-
-			// в генезис-блоке на start (innerID 0) и (if defined(SPAMMER)) на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
-			// пробуем взять оттуда
-			
-            csdb::Transaction tr;
-			tr.set_source(context.optimize(context.address_spammer()));
-            tr.set_target(context.optimize(own_wallet));
-            tr.set_currency(1);
-            tr.set_amount(csdb::Amount(10'000'000, 0));
-			tr.set_max_fee(csdb::AmountCommission(0.1));
-			//TODO: get unique increasing through different nodes ID for the spam_wallet -> own_wallet 1st transaction:
-            tr.set_innerID(context.node().getBlockChain().getLastWrittenSequence() + 1);
-            context.add(tr);
         }
 
         SolverContext * pctx = &context;
@@ -116,6 +104,10 @@ namespace slv2
     Result NormalState::onRoundTable(SolverContext & context, const uint32_t round)
     {
         flushed_counter = 0;
+        // test own balance
+        if(context.is_spammer()) {
+            check_spammer_balance(context);
+        }
         return DefaultStateBehavior::onRoundTable(context, round);
     }
 
@@ -123,7 +115,7 @@ namespace slv2
     {
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {
-            Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
+            Hash test_hash((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": sending hash in reply to block sender");
             }
@@ -151,6 +143,35 @@ namespace slv2
         ++spam_index;
         if(spam_index >= target_wallets.size()) {
             spam_index = 0;
+        }
+    }
+
+    void NormalState::check_spammer_balance(SolverContext& context)
+    {
+        BlockChain::WalletData wd;
+        csdb::internal::WalletId id;
+        double balance = 0;
+        if(context.blockchain().findWalletData(own_wallet, wd, id)) {
+            balance = wd.balance_.to_double();
+        }
+        if(balance < 1000.0) {
+            constexpr const int32_t deposit = 1'000'000;
+            constexpr const double max_fee = 0.1;
+            // deposit required
+            // в генезис-блоке на start (innerID 0) и (if defined(SPAMMER)) на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
+            // пробуем взять оттуда
+            csdb::Transaction tr;
+            tr.set_source(context.optimize(context.address_spammer()));
+            tr.set_target(context.optimize(own_wallet));
+            tr.set_currency(1);
+            tr.set_amount(csdb::Amount(deposit, 0));
+            tr.set_max_fee(csdb::AmountCommission(max_fee));
+            //TODO: get unique increasing through different nodes ID for the spam_wallet -> own_wallet 1st transaction:
+            tr.set_innerID(context.blockchain().getLastWrittenSequence() + 1);
+            context.add(tr);
+            if(Consensus::Log) {
+                LOG_NOTICE(name() << ": spammer wallet balance is " << balance << ", trying to deposit " << deposit);
+            }
         }
     }
 

@@ -47,8 +47,8 @@ namespace slv2
             // remove this when the block candidate signing of all trusted will be implemented
             return Result::Ignore;
         }
-        context.node().getBlockChain().setGlobalSequence(static_cast<uint32_t>(g_seq));
-        auto awaiting_seq = context.node().getBlockChain().getLastWrittenSequence() + 1;
+        context.blockchain().setGlobalSequence(static_cast<uint32_t>(g_seq));
+        auto awaiting_seq = context.blockchain().getLastWrittenSequence() + 1;
         if(g_seq == awaiting_seq ) {
             if(block.verify_signature()) {
                 context.store_block(block);

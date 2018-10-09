@@ -37,6 +37,7 @@ namespace slv2
 
     protected:
 
+        void check_spammer_balance(SolverContext& context);
 		void setup(csdb::Transaction * ptr, SolverContext * pctx);
         int randFT(int min, int max);
 

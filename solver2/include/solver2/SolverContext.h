@@ -11,6 +11,8 @@
 
 class CallsQueueScheduler;
 class Node;
+class BlockChain;
+
 namespace Credits
 {
     class Solver;
@@ -137,6 +139,19 @@ namespace slv2
         void spawn_next_round();
 
         // Fast access methods, may be removed at the end
+
+		/**
+		 * @fn	BlockChain& SolverContext::blockchain() const;
+		 *
+		 * @brief	Gets the blockchain
+		 *
+		 * @author	User
+		 * @date	09.10.2018
+		 *
+		 * @return	A reference to a BlockChain.
+		 */
+
+		BlockChain& blockchain() const;
 
         /**
          * @fn  inline Node& SolverContext::node() const;
