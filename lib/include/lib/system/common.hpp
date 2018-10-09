@@ -41,11 +41,13 @@ namespace cs
     using Signature = ByteArray<SIGNATURE_LENGTH>;
     using Hash = ByteArray<HASH_LENGTH>;
     using Blacke2Hash = ByteArray<BLAKE2_HASH_LENGTH>;
+    using PrivateKey = ByteArray<PRIVATE_KEY_LENGTH>;
 #else
     using PublicKey = FixedString<PUBLIC_KEY_LENGTH>;
     using Signature = FixedString<SIGNATURE_LENGTH>;
     using Hash = FixedString<HASH_LENGTH>;
     using Blacke2Hash = FixedString<BLAKE2_HASH_LENGTH>;
+    using PrivateKey = FixedString<PRIVATE_KEY_LENGTH>;
 #endif
 }
 

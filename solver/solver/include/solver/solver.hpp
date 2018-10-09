@@ -36,28 +36,6 @@ namespace cs {
 
 class Generals;
 
-// TODO!!!
-// WARNING!
-struct SolverSignature {
-  SolverSignature(void* a) {
-    memcpy(val, a, 64);
-  }
-  SolverSignature() {
-  }
-  uint8_t val[64];
-};
-
-struct HashVector {
-  uint8_t   Sender;
-  cs::Hash     hash;
-  SolverSignature sig;
-};
-struct HashMatrix {
-  uint8_t    Sender;
-  HashVector hmatr[5];
-  SolverSignature  sig;
-};
-
 class Solver {
  public:
   explicit Solver(Node*);
@@ -129,7 +107,6 @@ class Solver {
   bool getBigBangStatus();
   void setBigBangStatus(bool _status);
   void setRNum(size_t _rNum);
-  void setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general, const RoundNumber roundNum);
 
   const std::vector<uint8_t>& getPrivateKey() const;
 
@@ -160,7 +137,7 @@ class Solver {
 
   Node* m_node;
 
-  std::unique_ptr<Generals> generals;
+  std::unique_ptr<Generals> m_generals;
 
   HashVector hvector;
 
@@ -202,17 +179,18 @@ class Solver {
   bool writingConfGotFrom[100];
 
   uint8_t writingCongGotCurrent;
-  uint32_t  rNum = 0;
+  uint32_t rNum = 0;
 
-  cs::SharedMutex mSharedMutex;
+  cs::SharedMutex m_sharedMutex;
 
   cs::TransactionsPacketHashTable m_hashTable;
-  cs::TransactionsBlock           m_transactionsBlock;
+  cs::TransactionsBlock m_transactionsBlock;
 
   cs::Timer m_sendingPacketTimer;
 
   /*to store new blocks*/
   std::map<size_t, csdb::Pool> tmpStorage;
+
   /*to store unrequested syncro blocks*/
   std::map<size_t, csdb::Pool> rndStorage;
 

@@ -72,6 +72,22 @@ namespace cs
         std::string timestamp;
         csdb::Pool::sequence_t sequenceNumber;
     };
+
+    struct HashVector
+    {
+        uint8_t sender;
+        cs::Hash hash;
+        cs::Signature signature;
+    };
+
+    const std::size_t hashVectorCount = 5;
+
+    struct HashMatrix
+    {
+        uint8_t sender;
+        HashVector hashVector[hashVectorCount];
+        cs::Signature signature;
+    };
 }
 
 namespace std
