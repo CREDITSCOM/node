@@ -2,8 +2,12 @@
 #include <regex>
 #include <stdexcept>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 
 #include <lib/system/logger.hpp>
 #include "config.hpp"
@@ -92,7 +96,17 @@ Config Config::readFromFile(const std::string& fileName) {
   boost::property_tree::ptree config;
 
   try {
-    boost::property_tree::read_ini(fileName, config);
+    auto ext = boost::filesystem::extension(fileName);
+    boost::algorithm::to_lower(ext);
+    if (ext == "json") {
+      boost::property_tree::read_json(fileName, config);
+    }
+    else if (ext == "xml") {
+      boost::property_tree::read_xml(fileName, config);
+    }
+    else {
+      boost::property_tree::read_ini(fileName, config);
+    }
 
     result.inputEp_ = readEndpoint(config,
                                    BLOCK_NAME_HOST_INPUT);
