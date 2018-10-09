@@ -19,6 +19,8 @@ namespace slv2
     {
         DefaultStateBehavior::on(context);
 
+        SolverContext * pctx = &context;
+
         if(context.is_spammer()) {
             if(target_wallets.empty()) {
                 uint8_t sk[64];
@@ -38,11 +40,7 @@ namespace slv2
                 }
                 check_spammer_balance(context);
             }
-        }
 
-        SolverContext * pctx = &context;
-
-        if(context.is_spammer()) {
             // in fact, pctx ic not less "alive" as a context.scheduler itself :-)
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": started spam transactions every " << T_spam_trans << " msec");

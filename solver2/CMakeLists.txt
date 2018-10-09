@@ -23,6 +23,9 @@ add_library(solver2
 	include/solver2/states/NormalState.h
 	include/solver2/states/NoState.h
 	include/solver2/states/StartState.h
+	include/solver2/states/StartNormalState.h
+	include/solver2/states/StartTrustedState.h
+	include/solver2/states/StartCollectState.h
 	include/solver2/states/SyncState.h
 	include/solver2/states/TrustedMState.h
 	include/solver2/states/TrustedState.h
@@ -44,6 +47,7 @@ add_library(solver2
 	src/states/HandleRTState.cpp
 	src/states/NormalState.cpp
 	src/states/StartState.cpp
+	src/states/StartNormalState.cpp
 	src/states/SyncState.cpp
 	src/states/TrustedMState.cpp
 	src/states/TrustedState.cpp

@@ -1,18 +1,20 @@
 #pragma once
 
-#include "NormalState.h"
+#include "DefaultStateBehavior.h"
 
 namespace slv2
 {
 
-    class StartNormalState final : public NormalState
+    class StartNormalState final : public DefaultStateBehavior
     {
     public:
 
-        virtual ~StartNormalState()
+        ~StartNormalState() override
         {}
 
-        virtual const char * name() const
+        Result onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender) override;
+
+        const char * name() const override
         {
             return "StartNormal";
         }
