@@ -33,13 +33,13 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-cs::Hash Generals::buildVector(csdb::Pool& _pool, csdb::Pool& new_pool) {
-  cslog() << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions";
+cs::Hash Generals::buildVector(cs::TransactionsPacket& packet, csdb::Pool& new_pool) {
+  cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
   uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
-  const size_t transactionsCount   = _pool.transactions_count();
+  const size_t transactionsCount   = packet.transactionsCount();
 
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;
@@ -48,7 +48,7 @@ cs::Hash Generals::buildVector(csdb::Pool& _pool, csdb::Pool& new_pool) {
     boost::dynamic_bitset<> characteristicMask { transactionsCount };
 
     for (size_t i = 0; i < transactionsCount; ++i) {
-      const csdb::Transaction& transaction = _pool.transactions().at(i);
+      const csdb::Transaction& transaction = packet.transactions().at(i);
       const csdb::Amount       delta       = transaction.balance() - transaction.amount() - comission;
 
       if (delta > zero_balance) {

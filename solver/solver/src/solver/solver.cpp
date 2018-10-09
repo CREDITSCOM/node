@@ -404,7 +404,6 @@ void Solver::initConfRound() {
 }
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
-  csdebug() << "Got packet hash reply";
   cslog() << "Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
@@ -423,7 +422,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
     }
 
     if (m_neededHashes.empty()) {
-      buildTransactionList();
+      runConsensus(); // TODO: may be something else?
     }
   }
 }
@@ -449,7 +448,7 @@ void Solver::gotRound(cs::RoundTable&& round) {
     m_node->sendPacketHashesRequest(neededHashes);
   } else if (m_node->getMyLevel() == NodeLevel::Confidant) {
     cs::Lock lock(m_sharedMutex);
-    buildTransactionList();
+    runConsensus();
   }
 
   {
@@ -458,9 +457,9 @@ void Solver::gotRound(cs::RoundTable&& round) {
   }
 }
 
-void Solver::buildTransactionList() {
-  cslog() << "BuildTransactionlist";
-  csdb::Pool pool = csdb::Pool{};  // FIX TO PACKET
+void Solver::runConsensus() {
+  cslog() << "Run Consensus";
+  cs::TransactionsPacket packet;  // FIX TO PACKET
 
   for (const auto& hash : m_roundTable.hashes) {
     if (!m_hashTable.contains(hash)) {
@@ -471,11 +470,11 @@ void Solver::buildTransactionList() {
     const auto& transactions = m_hashTable.find(hash).transactions();
 
     for (const auto& transaction : transactions) {
-      pool.add_transaction(transaction);
+      packet.addTransaction(transaction);
     }
   }
 
-  cs::Hash result = m_generals->buildVector(pool, m_pool);
+  cs::Hash result = m_generals->buildVector(packet, m_pool);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
 
@@ -504,7 +503,7 @@ void Solver::buildTransactionList() {
     m_node->sendMatrix(m_generals->getMatrix());
     m_generals->addMatrix(m_generals->getMatrix(), m_roundTable.confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
-    csdebug() << "SOLVER> Matrix added";
+    cslog() << "SOLVER> Matrix added";
   }
 }
 

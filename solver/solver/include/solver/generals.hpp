@@ -29,7 +29,7 @@ class Generals {
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  cs::Hash buildVector(csdb::Pool& _pool, csdb::Pool& new_pool);
+  cs::Hash buildVector(cs::TransactionsPacket& packet, csdb::Pool& new_pool);
 
   void addVector(const HashVector& vector);
   void addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes);

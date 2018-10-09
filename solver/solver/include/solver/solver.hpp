@@ -93,7 +93,7 @@ class Solver {
 
   // remove it!!!
   void buildBlock(csdb::Pool& block);
-  void buildTransactionList();
+  void runConsensus();
 
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
