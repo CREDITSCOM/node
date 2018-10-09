@@ -574,7 +574,7 @@ void Node::sendVector(const cs::HashVector& vector) {
     return;
   }
 
-  ostream_.init(BaseFlags::Broadcast);
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << MsgTypes::ConsVector << roundNum_;
 
   cs::Bytes bytes;
@@ -631,7 +631,7 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
 }
 
 uint32_t Node::getRoundNumber() {
-  return solver_->roundTable().round;
+  return roundNum_;
 }
 
 void Node::getBlock(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
