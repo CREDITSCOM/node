@@ -67,7 +67,6 @@ class Node {
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   /* Outcoming requests forming */
-  void sendTransaction(csdb::Pool&&);
   void sendFirstTransaction(const csdb::Transaction&);
   void sendTransactionList(const csdb::Pool&);
   void sendVector(const cs::HashVector&);
@@ -117,10 +116,6 @@ class Node {
   uint32_t getRoundNumber();
   uint8_t getMyConfNumber();
 
-  const std::vector<cs::PublicKey>& getConfidants() const {
-    return confidantNodes_;
-  }
-
   BlockChain& getBlockChain() {
     return bc_;
   }
@@ -145,7 +140,7 @@ private:
   void generateKeys();
   bool checkKeysForSig();
 
-  inline bool readRoundData(bool);
+  bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart();
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
@@ -171,9 +166,6 @@ private:
   // Current round state
   RoundNum roundNum_ = 0;
   NodeLevel myLevel_;
-
-  cs::PublicKey mainNode_;
-  std::vector<cs::PublicKey> confidantNodes_;
 
   uint8_t myConfNumber;
 

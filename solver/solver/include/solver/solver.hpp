@@ -99,7 +99,6 @@ class Solver {
   HashMatrix getMyMatrix() const;
 
   void initConfRound();
-  void sendZeroVector();
   void checkVectorsReceived(size_t _rNum) const;
   void checkMatrixReceived();
   void addConfirmation(uint8_t confNumber_);
@@ -130,7 +129,8 @@ class Solver {
   csdb::Pool testPool;
 #endif  // SPAM_MAIN
 
-  bool verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
+  // TODO: fix signature
+  bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 
   std::vector<uint8_t> myPublicKey;
   std::vector<uint8_t> myPrivateKey;

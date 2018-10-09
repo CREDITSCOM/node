@@ -137,7 +137,6 @@ namespace cs
         /// Adds char array to data stream.
         ///
         /// @param array Char array.
-        /// If stream can not add char array to stream than method does nothing.
         ///
         template<std::size_t size>
         inline void setStreamArray(const std::array<char, size>& array)
@@ -151,8 +150,7 @@ namespace cs
         /// Adds array to stream.
         ///
         /// @param array Byte array.
-        /// If stream can not add byte array to strem than method does nothing.
-        ///
+        /// 
         template<std::size_t size>
         inline void setByteArray(const ByteArray<size>& array)
         {
@@ -309,16 +307,37 @@ namespace cs
         cs::HashVector hashVector();
 
         ///
-        /// Adds hahs matrix structure to stream.
+        /// Adds hash matrix structure to stream.
+        ///
+        /// @param matrix Hash matrix that should be added to stream.
         ///
         void addHashMatrix(const cs::HashMatrix& matrix);
 
+        ///
+        /// Returns parsed hash matrix.
+        ///
+        /// @return Initialized HashMatrix structure.
+        ///
         cs::HashMatrix hashMatrix();
 
         ///
-        /// Peeks next parameter
+        /// Adds transaction packet to stream.
         ///
-        /// @return Returns next T parameter
+        /// @param packet Packet that should be added to stream.
+        ///
+        void addTransactionsPacket(const cs::TransactionsPacket& packet);
+
+        ///
+        /// Returns parsed transaction packet from stream.
+        ///
+        /// @return Initialized and parsed transaction packet
+        ///
+        cs::TransactionsPacket transactionPacket();
+
+        ///
+        /// Peeks next parameter.
+        ///
+        /// @return Returns next T parameter.
         ///
         template <typename T>
         inline const T& peek() const
@@ -454,6 +473,15 @@ namespace cs
     }
 
     ///
+    /// Gets transaction packet structure from stream.
+    ///
+    inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacket& packet)
+    {
+        packet = stream.transactionPacket();
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -545,6 +573,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& hashMatrix)
     {
         stream.addHashMatrix(hashMatrix);
+        return stream;
+    }
+
+    ///
+    /// Writes hash matrix structure to stream
+    ///
+    inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacket& packet)
+    {
+        stream.addTransactionsPacket(packet);
         return stream;
     }
 }

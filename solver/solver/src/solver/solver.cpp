@@ -367,7 +367,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {  // reviewer: "Ne
     std::string sig_str   = transaction.signature();
     uint8_t*    signature = reinterpret_cast<uint8_t*>(const_cast<char*>(sig_str.c_str()));
 
-    if (verify_signature(signature, public_key, bytes.data(), bytes.size())) {
+    if (verifySignature(signature, public_key, bytes.data(), bytes.size())) {
 #endif
       v_pool.add_transaction(transaction);
 #ifndef SPAMMER
@@ -502,15 +502,9 @@ void Solver::buildTransactionList() {
     ++trustedCounterMatrix;
 
     m_node->sendMatrix(m_generals->getMatrix());
-    m_generals->addMatrix(m_generals->getMatrix(), m_node->getConfidants());  // MATRIX SHOULD BE DECOMPOSED HERE!!!
+    m_generals->addMatrix(m_generals->getMatrix(), m_roundTable.confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
     csdebug() << "SOLVER> Matrix added";
-  }
-}
-
-void Solver::sendZeroVector() {
-  if (transactionListReceived && !getBigBangStatus()) {
-    return;
   }
 }
 
@@ -598,7 +592,7 @@ void Solver::checkVectorsReceived(size_t _rNum) const {
     return;
   }
 
-  const uint8_t numGen = static_cast<uint8_t>(m_node->getConfidants().size());
+  const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
 
   if (trustedCounterVector == numGen) {
     return;
@@ -617,11 +611,12 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
 
   receivedMatFrom[matrix.sender] = true;
   trustedCounterMatrix++;
-  m_generals->addMatrix(matrix, m_node->getConfidants());
+  m_generals->addMatrix(matrix, m_roundTable.confidants);
 
-  const uint8_t numGen = static_cast<uint8_t>(m_node->getConfidants().size());
+  const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
+
   if (trustedCounterMatrix == numGen) {
-    memset(receivedMatFrom, 0, 100);
+    std::memset(receivedMatFrom, 0, 100);
     uint8_t writerIndex  = (m_generals->takeDecision(
         m_roundTable.confidants, m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
     trustedCounterMatrix = 0;
@@ -818,8 +813,8 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     m_roundTable.round++;
     m_roundTable.confidants = std::move(ips);
-    m_roundTable.general    = m_node->getMyPublicKey();
-    m_roundTable.hashes     = std::move(hashes);
+    m_roundTable.general = m_node->getMyPublicKey();
+    m_roundTable.hashes = std::move(hashes);
 
     ips.clear();
 
@@ -1054,7 +1049,7 @@ void Solver::nextRound() {
   }
 }
 
-bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len) {
+bool Solver::verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len) {
   int ver_ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
   return ver_ok == 0;
 }

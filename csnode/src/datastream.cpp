@@ -156,16 +156,20 @@ void cs::DataStream::addTransactionsHash(const cs::TransactionsPacketHash& hash)
 {
     auto hashData = hash.toBinary();
     
+    (*this) << hashData.size();
     (*this) << hashData;
 }
 
 cs::TransactionsPacketHash cs::DataStream::transactionsHash()
 {
-    const std::size_t hashSize = cs::HashLength;
     cs::TransactionsPacketHash hash;
+    
+    std::size_t size;
+
+    (*this) >> size;
 
     cs::Bytes bytes;
-    bytes.resize(hashSize);
+    bytes.resize(size);
 
     (*this) >> bytes;
 
@@ -254,6 +258,25 @@ cs::HashMatrix cs::DataStream::hashMatrix()
     (*this) >> matrix.signature;
 
     return matrix;
+}
+
+void cs::DataStream::addTransactionsPacket(const cs::TransactionsPacket& packet)
+{
+    const cs::Bytes bytes = packet.toBinary();
+
+    (*this) << bytes.size() << bytes;
+}
+
+cs::TransactionsPacket cs::DataStream::transactionPacket()
+{
+    std::size_t size;
+    cs::Bytes bytes;
+
+    (*this) >> size;
+    bytes.resize(size);
+    (*this) >> bytes;
+
+    return cs::TransactionsPacket::fromBinary(bytes);
 }
 
 template<typename T>
