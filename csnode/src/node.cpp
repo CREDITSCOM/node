@@ -208,11 +208,15 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
     }
   }
 
-  transport_->clearTasks();
+  // TODO: think how to improve this code
+  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY), [this, roundTable]() mutable {
 
-  onRoundStart(roundTable);
+      transport_->clearTasks();
 
-  solver_->gotRound(std::move(roundTable));
+      onRoundStart(roundTable);
+      solver_->gotRound(std::move(roundTable));
+
+  });
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
@@ -567,7 +571,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const cs::PublicKey
 }
 
 void Node::sendVector(const cs::HashVector& vector) {
-  cslog() << "NODE> 0 Sending vector ";
+  cslog() << "NODE> 0 Sending vector";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cserror() << "Only confidant nodes can send vectors";
@@ -1294,16 +1298,14 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
           << " ========================================";
   cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());
 
-  const cs::RoundTable& table = roundTable;
-
-  if (table.general == myPublicKey_) {
+  if (roundTable.general == myPublicKey_) {
     myLevel_ = NodeLevel::Main;
   }
   else {
     bool    found   = false;
     uint8_t conf_no = 0;
 
-    for (auto& conf : table.confidants) {
+    for (auto& conf : roundTable.confidants) {
       if (conf == myPublicKey_) {
         myLevel_     = NodeLevel::Confidant;
         myConfNumber = conf_no;
@@ -1323,7 +1325,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
 
   int i = 0;
-  for (auto& e : table.confidants) {
+  for (auto& e : roundTable.confidants) {
     cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
     i++;
   }

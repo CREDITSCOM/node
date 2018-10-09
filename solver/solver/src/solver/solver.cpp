@@ -447,13 +447,8 @@ void Solver::gotRound(cs::RoundTable&& round) {
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
   } else if (m_node->getMyLevel() == NodeLevel::Confidant) {
-
-    // TODO: fix this gag, cuz consensus starts before transport connections should be established
-    cs::Utils::runAfter(std::chrono::milliseconds(100), [this]() {
-        cs::Lock lock(m_sharedMutex);
-        runConsensus();
-    });
-
+    cs::Lock lock(m_sharedMutex);
+    runConsensus();
   }
 
   {
