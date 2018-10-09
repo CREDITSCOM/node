@@ -18,7 +18,7 @@ public:
     constexpr static uint8_t GeneralNotSelected = 100;
 
     /** @brief   Max duration (msec) of the whole round (N, W, G, T) */
-    constexpr static uint32_t T_round = 2000;
+    constexpr static uint32_t T_round = 5000;
 
     /** @brief   Max timeout (msec) to wait next round table (N, W, G, T) */
     constexpr static uint32_t T_rt = 300;
