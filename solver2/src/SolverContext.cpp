@@ -4,6 +4,10 @@
 
 namespace slv2
 {
+	BlockChain& SolverContext::blockchain() const
+	{
+		return core.pnode->getBlockChain();
+	}
 
     uint8_t SolverContext::own_conf_number() const
     {
@@ -19,5 +23,14 @@ namespace slv2
     {
         core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash));
     }
+
+	csdb::Address SolverContext::optimize(const csdb::Address& address) const
+	{
+		csdb::internal::WalletId id;
+		if (core.pnode->getBlockChain().findWalletId(address, id)) {
+			return csdb::Address::from_wallet_id(id);
+		}
+		return address;
+	}
 
 } // slv2

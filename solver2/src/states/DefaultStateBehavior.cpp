@@ -47,11 +47,11 @@ namespace slv2
             // remove this when the block candidate signing of all trusted will be implemented
             return Result::Ignore;
         }
-        context.node().getBlockChain().setGlobalSequence(static_cast<uint32_t>(g_seq));
-        auto awaiting_seq = context.node().getBlockChain().getLastWrittenSequence() + 1;
+        context.blockchain().setGlobalSequence(static_cast<uint32_t>(g_seq));
+        auto awaiting_seq = context.blockchain().getLastWrittenSequence() + 1;
         if(g_seq == awaiting_seq ) {
             if(block.verify_signature()) {
-                context.node().getBlockChain().writeNewBlock(block);
+                context.store_block(block);
                 // по логике солвера-1 Writer & Main отправку хэша не делают,
                 // для Writer'а вопрос решен автоматически на уровне Node (он не получает блок вообще) и на уровне WriteState (он переопределяет пустой метод onBlock()),
                 // а вот для Main (CollectState) ситуация не очень удобная, приходится не делать здесь отправку хэша.
@@ -78,7 +78,7 @@ namespace slv2
     Result DefaultStateBehavior::onVector(SolverContext& /*context*/, const Credits::HashVector& /*vect*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": vector ignored");
+            LOG_DEBUG(name() << ": vector ignored in this state");
         }
         return Result::Ignore;
     }
@@ -86,7 +86,7 @@ namespace slv2
     Result DefaultStateBehavior::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix& /*matr*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": matrix ignored");
+            LOG_DEBUG(name() << ": matrix ignored in this state");
         }
         return Result::Ignore;
     }
@@ -94,15 +94,14 @@ namespace slv2
     Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": hash ignored");
+            LOG_DEBUG(name() << ": hash ignored in this state");
         }
         return Result::Ignore;
     }
 
     Result DefaultStateBehavior::onTransaction(SolverContext& /*context*/, const csdb::Transaction& /*trans*/)
     {
-        if(Consensus::Log && report_ignore_transactions) {
-            report_ignore_transactions = false;
+        if(Consensus::Log) {
             LOG_DEBUG(name() << ": transactions ignored in this state");
         }
         return Result::Ignore;
@@ -111,7 +110,7 @@ namespace slv2
     Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, const csdb::Pool& /*pool*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": transaction list ignored");
+            LOG_DEBUG(name() << ": transaction list ignored in this state");
         }
         return Result::Ignore;
     }

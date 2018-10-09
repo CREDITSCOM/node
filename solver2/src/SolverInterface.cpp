@@ -97,7 +97,7 @@ namespace slv2
         }
         // produces too much output:
         if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotTransaction()");
+            LOG_DEBUG("SolverCore: got transaction " << trans.innerID() << " from " << trans.source().to_string());
         }
         if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
             handleTransitions(Event::Transactions);
@@ -127,6 +127,11 @@ namespace slv2
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
+			std::ostringstream os;
+			for (const auto& t : p.transactions()) {
+				os << " " << t.innerID();
+			}
+			LOG_DEBUG("SolverCore:" << os.str());
         }
         // bad tansactions storage:
         csdb::Pool b_pool {};
@@ -445,7 +450,7 @@ namespace slv2
         transactions.transactions().push_back(tr);
         transactions.recount();
         if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: transaction added, total " << transactions.transactions().size());
+            LOG_DEBUG("SolverCore: transaction " << tr.innerID() << " added, total " << transactions.transactions().size());
         }
     }
 

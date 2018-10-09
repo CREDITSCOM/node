@@ -11,6 +11,8 @@
 
 class CallsQueueScheduler;
 class Node;
+class BlockChain;
+
 namespace Credits
 {
     class Solver;
@@ -137,6 +139,19 @@ namespace slv2
         void spawn_next_round();
 
         // Fast access methods, may be removed at the end
+
+		/**
+		 * @fn	BlockChain& SolverContext::blockchain() const;
+		 *
+		 * @brief	Gets the blockchain
+		 *
+		 * @author	User
+		 * @date	09.10.2018
+		 *
+		 * @return	A reference to a BlockChain.
+		 */
+
+		BlockChain& blockchain() const;
 
         /**
          * @fn  inline Node& SolverContext::node() const;
@@ -298,10 +313,12 @@ namespace slv2
 
         inline bool is_spammer() const;
 
+        inline void store_block(csdb::Pool & block);
+
         // Common operations, candidates for refactoring:
 
         /**
-         * @fn  inline void SolverContext::store_and_send_block();
+         * @fn  inline void SolverContext::store_and_send_new_block();
          *
          * @brief   Makes a block from inner pool of collected and validated transactions and send it
          *
@@ -311,7 +328,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void store_and_send_block();
+        inline void store_and_send_new_block();
 
         /**
          * @fn  inline void SolverContext::resend_last_block();
@@ -516,6 +533,21 @@ namespace slv2
         inline csdb::Address address_genesis() const;
         inline csdb::Address address_start() const;
 
+		/**
+		 * @fn	csdb::Address SolverContext::optimize(const csdb::Address& address) const;
+		 *
+		 * @brief	Optimizes the given address. Tries to get wallet id from blockchain, otherwise return dicrect address
+		 *
+		 * @author	User
+		 * @date	09.10.2018
+		 *
+		 * @param	address	The address to optimize.
+		 *
+		 * @return	The csdb::Address optimized with id if possible
+		 */
+
+		csdb::Address optimize(const csdb::Address& address) const;
+
     private:
         SolverCore& core;
     };
@@ -595,7 +627,12 @@ namespace slv2
         core.handleTransitions(SolverCore::Event::Matrices);
     }
 
-    void SolverContext::store_and_send_block()
+    void SolverContext::store_block(csdb::Pool & block)
+    {
+        core.storeBlock(block);
+    }
+
+    void SolverContext::store_and_send_new_block()
     {
         core.prepareBlock(core.pool);
         core.sendBlock(core.pool);

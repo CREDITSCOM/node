@@ -37,7 +37,7 @@ namespace slv2
     {
         if(context.is_vect_recv_from(vect.Sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated vector received from " << (unsigned int) vect.Sender << ", ignore");
+                LOG_DEBUG(name() << ": duplicated vector received from [" << (unsigned int) vect.Sender << "], ignore");
             }
             return Result::Ignore;
         }
@@ -45,7 +45,7 @@ namespace slv2
         context.generals().addvector(vect); // building matrix
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": vector received from " << (unsigned int) vect.Sender << ",  total " << context.cnt_vect_recv());
+            LOG_NOTICE(name() << ": vector received from [" << (unsigned int) vect.Sender << "],  total " << context.cnt_vect_recv());
         }
         if(test_vectors_completed(context))
         {
@@ -70,7 +70,7 @@ namespace slv2
     {
         if(context.is_matr_recv_from(matr.Sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated matrix received from " << (unsigned int) matr.Sender << ", ignore");
+                LOG_DEBUG(name() << ": duplicated matrix received from [" << (unsigned int) matr.Sender << "], ignore");
             }
             return Result::Ignore;
         }
@@ -78,7 +78,7 @@ namespace slv2
         context.generals().addmatrix(matr, context.node().getConfidants());
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": matrix received from " << (unsigned int) matr.Sender << ", total " << context.cnt_matr_recv());
+            LOG_NOTICE(name() << ": matrix received from [" << (unsigned int) matr.Sender << "], total " << context.cnt_matr_recv());
         }
 
         if(test_matrices_completed(context)) {
@@ -117,7 +117,7 @@ namespace slv2
     {
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {
-            Hash test_hash((char*) (context.node().getBlockChain().getLastWrittenHash().to_binary().data()));
+            Hash test_hash((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": sending hash in reply to block sender");
             }
