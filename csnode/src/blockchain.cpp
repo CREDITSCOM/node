@@ -188,7 +188,7 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_source(genesisAddress_);
 
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_amount(csdb::Amount(100'000'000, 0));
   transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
 
@@ -199,7 +199,7 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_source(genesisAddress_);
 
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_amount(csdb::Amount(100'000'000, 0));
   transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(1);
 
