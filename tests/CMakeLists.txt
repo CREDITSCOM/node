@@ -51,4 +51,4 @@ include_directories("${source_dir}/googletest/include"
 # tests
 
 add_subdirectory(lib_system)
-add_subdirectory(node)
+add_subdirectory(csnode)
