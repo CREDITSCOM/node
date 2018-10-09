@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CollectState.h"
+#include "WriteState.h"
 
 namespace slv2
 {
@@ -8,7 +8,9 @@ namespace slv2
      * @class   StartCollectState
      *
      * @brief   A start collect state. This class cannot be inherited. To be activated mostly on the
-     *          1st round if node level is NodeLevel::Main
+     *          1st round if node level is NodeLevel::Main. Acts as WriteState, sends the first empty
+     *          block after timeout, then collect hashes. Also, on round end sends transactions list
+     *          to activate consensus on the next round
      *
      * @author  Alexander Avramenko
      * @date    09.10.2018
@@ -16,7 +18,7 @@ namespace slv2
      * @sa  T:CollectState
      */
 
-    class StartCollectState final: public CollectState
+    class StartCollectState final: public WriteState
     {
     public:
 
@@ -26,7 +28,7 @@ namespace slv2
         /**
          * @fn  void final::on(SolverContext& context) override;
          *
-         * @brief   When on, sends empty transaction list to initiate consensus.
+         * @brief   When on, sends empty block to initiate consensus.
          *
          * @author  Alexander Avramenko
          * @date    09.10.2018
@@ -39,7 +41,7 @@ namespace slv2
         /**
          * @fn  void final::onRoundEnd(SolverContext& context) override;
          *
-         * @brief   When off, cancel scheduled sending of empty transaction list
+         * @brief   When off, cancel scheduled sending of empty block
          *
          * @author  Alexander Avramenko
          * @date    09.10.2018
@@ -48,25 +50,6 @@ namespace slv2
          */
 
         void onRoundEnd(SolverContext& context) override;
-
-        /**
-         * @fn  Result final::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
-         *
-         * @brief   Executes the base class block action. Also cancel scheduled sending of empty transaction list if any.
-         *          Receiving a block means that consensus in current round has held
-         *          
-         *
-         * @author  Alexander Avramenko
-         * @date    09.10.2018
-         *
-         * @param [in,out]  context The context.
-         * @param [in,out]  block   The block.
-         * @param           sender  The sender.
-         *
-         * @return  A base class method result.
-         */
-
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
 
         const char * name() const override
         {

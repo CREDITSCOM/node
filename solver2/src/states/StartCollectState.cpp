@@ -7,8 +7,6 @@ namespace slv2
 
     void StartCollectState::on(SolverContext & context)
     {
-        CollectState::on(context);
-
         auto cur_round = context.round();
         if(cur_round != 1) {
             if(Consensus::Log) {
@@ -16,29 +14,31 @@ namespace slv2
             }
         }
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": schedule to send empty transaction list to initiate consensus every " << Consensus::T_round << " ms");
+            LOG_NOTICE(name() << ": schedule to send empty block to initiate consensus every " << Consensus::T_round << " ms");
         }
         SolverContext * pctx = &context;
         tag_timeout = context.scheduler().InsertPeriodic(Consensus::T_round, [this, pctx]() {
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": sending empty transaction list #0 of 0 items");
+                LOG_NOTICE(name() << ": sending empty block");
             }
-            csdb::Pool p {};
-            p.set_sequence(0);
-            pctx->node().sendTransactionList(p);
+            WriteState::on(*pctx);
         });
     }
 
     void StartCollectState::onRoundEnd(SolverContext & context)
     {
         cancel_timeout(context);
-        CollectState::onRoundEnd(context);
-    }
 
-    Result StartCollectState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
-    {
-        cancel_timeout(context);
-        return CollectState::onBlock(context, block, sender);
+        WriteState::onRoundEnd(context);
+
+        csdb::Pool pool {};
+        auto sequence = context.round();
+        if(Consensus::Log) {
+            LOG_NOTICE(name() << ": sending transaction list #" << sequence << " of " << pool.transactions_count() << " items");
+        }
+        pool.set_sequence(sequence);
+        context.node().sendTransactionList(pool);
+        
     }
 
     void StartCollectState::cancel_timeout(SolverContext & context)
@@ -47,7 +47,7 @@ namespace slv2
             context.scheduler().Remove(tag_timeout);
             tag_timeout = CallsQueueScheduler::no_tag;
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": cancel sending empty transaction list to initiate consensus");
+                LOG_NOTICE(name() << ": cancel sending empty block to initiate consensus");
             }
         }
     }
