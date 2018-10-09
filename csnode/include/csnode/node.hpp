@@ -101,7 +101,7 @@ class Node {
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound(const cs::RoundTable& roundInfo);
+  void initNextRound(const cs::RoundTable& roundTable);
   bool getSyncroStarted();
 
   enum MessageActions { Process, Postpone, Drop };
@@ -141,7 +141,7 @@ private:
   bool checkKeysForSig();
 
   bool readRoundData(cs::RoundTable& roundTable);
-  void onRoundStart();
+  void onRoundStart(const cs::RoundTable& roundTable);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);

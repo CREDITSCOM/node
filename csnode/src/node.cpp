@@ -210,7 +210,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
 
   transport_->clearTasks();
 
-  onRoundStart();
+  onRoundStart(roundTable);
 
   solver_->gotRound(std::move(roundTable));
 }
@@ -826,8 +826,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   uint16_t hashesCount;
   stream >> hashesCount;
 
-  cs::RoundTable roundInfo;
-  roundInfo.round = round;
+  cs::RoundTable roundTable;
+  roundTable.round = round;
 
   cs::PublicKey general;
   stream >> general;
@@ -852,13 +852,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     hashes.push_back(std::move(hash));
   }
 
-  roundInfo.general = std::move(general);
-  roundInfo.confidants = std::move(confidants);
-  roundInfo.hashes = std::move(hashes);
+  roundTable.general = std::move(general);
+  roundTable.confidants = std::move(confidants);
+  roundTable.hashes = std::move(hashes);
 
-  onRoundStart();
+  onRoundStart(roundTable);
 
-  solver_->gotRound(std::move(roundInfo));
+  solver_->gotRound(std::move(roundTable));
 }
 
 void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const uint32_t maskBitsCount,
@@ -1285,7 +1285,7 @@ void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
 }
 
-void Node::onRoundStart() {
+void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
     solver_->sendTL();
   }
@@ -1294,7 +1294,7 @@ void Node::onRoundStart() {
           << " ========================================";
   cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());
 
-  const cs::RoundTable& table = solver_->roundTable();
+  const cs::RoundTable& table = roundTable;
 
   if (table.general == myPublicKey_) {
     myLevel_ = NodeLevel::Main;
@@ -1355,14 +1355,14 @@ void Node::addToPackageTemporaryStorage(const csdb::Pool& pool) {
   m_packageTemporaryStorage.push_back(pool);
 }
 
-void Node::initNextRound(const cs::RoundTable& roundInfo) {
-  roundNum_ = roundInfo.round;
+void Node::initNextRound(const cs::RoundTable& roundTable) {
+  roundNum_ = roundTable.round;
 
-  sendRoundTable(solver_->roundTable());
+  sendRoundTable(roundTable);
 
   cslog() << "NODE> RoundNumber :" << roundNum_;
 
-  onRoundStart();
+  onRoundStart(roundTable);
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
@@ -1432,7 +1432,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
     return false;
   }
 
-  cslog() << "NODE> RoundNumber :" << roundNum_;
+  cslog() << "NODE> RoundNumber: " << roundNum_;
 
   roundTable.confidants = std::move(confidants);
   roundTable.general = mainNode;
