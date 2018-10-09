@@ -516,6 +516,7 @@ void Solver::sendZeroVector() {
 
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
+
   if (receivedVecFrom[vector.sender] == true) {
     cslog() << "SOLVER> I've already got the vector from this Node";
     return;
@@ -531,7 +532,7 @@ void Solver::gotVector(HashVector&& vector) {
 
   if (trustedCounterVector == numGen) {
     vectorComplete = true;
-    memset(receivedVecFrom, 0, 100);
+    std::memset(receivedVecFrom, 0, sizeof(receivedVecFrom));
     trustedCounterVector = 0;
     // compose and send matrix!!!
     uint8_t confNumber = m_node->getMyConfNumber();
@@ -544,9 +545,9 @@ void Solver::gotVector(HashVector&& vector) {
     m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
     if (trustedCounterMatrix == numGen) {
-      memset(receivedMatFrom, 0, 100);
-      m_writerIndex        = (m_generals->takeDecision(m_roundTable.confidants,
-                                               m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
+      std::memset(receivedMatFrom, 0, sizeof(receivedMatFrom));
+      m_writerIndex = (m_generals->takeDecision(m_roundTable.confidants,
+                                                m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
 
       if (m_writerIndex == 100) {
@@ -558,17 +559,21 @@ void Solver::gotVector(HashVector&& vector) {
 
         if (m_writerIndex == m_node->getMyConfNumber()) {
           m_node->becomeWriter();
+
           cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
+
             PoolMetaInfo poolMetaInfo;
-            poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
+            poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
             poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
 
-            const Characteristic&       characteristic = m_generals->getCharacteristic();
-            const std::vector<uint8_t>& mask           = characteristic.mask;
-            uint32_t                    bitsCount      = characteristic.size;
+            const Characteristic& characteristic = m_generals->getCharacteristic();
+            const std::vector<uint8_t>& mask = characteristic.mask;
+            uint32_t bitsCount = characteristic.size;
 
             m_node->sendCharacteristic(poolMetaInfo, bitsCount, mask);
+
             writeNewBlock();
+
           });
         }
       }

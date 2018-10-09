@@ -169,7 +169,7 @@ private:
   std::string sent_trx_fname = "sent.txt";
 
   // Current round state
-  RoundNum  roundNum_ = 0;
+  RoundNum roundNum_ = 0;
   NodeLevel myLevel_;
 
   cs::PublicKey mainNode_;

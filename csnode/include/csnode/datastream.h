@@ -42,6 +42,7 @@ namespace cs
 
         ///
         /// Constructor to write data
+        ///
         explicit DataStream(cs::Bytes& storage);
 
         ///
@@ -302,8 +303,17 @@ namespace cs
         ///
         void addHashVector(const cs::HashVector& hashVector);
 
-
+        ///
+        /// Returns parsed hash vector structure.
+        ///
         cs::HashVector hashVector();
+
+        ///
+        /// Adds hahs matrix structure to stream.
+        ///
+        void addHashMatrix(const cs::HashMatrix& matrix);
+
+        cs::HashMatrix hashMatrix();
 
         ///
         /// Peeks next parameter
@@ -435,6 +445,15 @@ namespace cs
     }
 
     ///
+    /// Gets hash matrix structure from stream.
+    ///
+    inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& hashMatrix)
+    {
+        hashMatrix = stream.hashMatrix();
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -517,6 +536,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector)
     {
         stream.addHashVector(hashVector);
+        return stream;
+    }
+
+    ///
+    /// Writes hash matrix structure to stream
+    ///
+    inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& hashMatrix)
+    {
+        stream.addHashMatrix(hashMatrix);
         return stream;
     }
 }

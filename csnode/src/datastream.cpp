@@ -218,20 +218,42 @@ std::string cs::DataStream::string(std::size_t size)
 
 void cs::DataStream::addHashVector(const cs::HashVector& hashVector)
 {
-    (*this) << hashVector.sender;
-    (*this) << hashVector.hash;
-    (*this) << hashVector.signature;
+    (*this) << hashVector.sender << hashVector.hash << hashVector.signature;
 }
 
 cs::HashVector cs::DataStream::hashVector()
 {
     cs::HashVector vector;
 
-    (*this) >> vector.sender;
-    (*this) >> vector.hash;
-    (*this) >> vector.signature;
+    (*this) >> vector.sender >> vector.hash >> vector.signature;
 
     return vector;
+}
+
+void cs::DataStream::addHashMatrix(const cs::HashMatrix& matrix)
+{
+    (*this) << matrix.sender;
+
+    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+        (*this) << matrix.hashVector[i];
+    }
+
+    (*this) << matrix.signature;
+}
+
+cs::HashMatrix cs::DataStream::hashMatrix()
+{
+    cs::HashMatrix matrix;
+
+    (*this) >> matrix.sender;
+
+    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+        (*this) >> matrix.hashVector[i];
+    }
+
+    (*this) >> matrix.signature;
+
+    return matrix;
 }
 
 template<typename T>

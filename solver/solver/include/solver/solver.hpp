@@ -75,9 +75,9 @@ class Solver {
   PublicKey getWriterPublicKey() const;
 
   // API methods
-  void     initApi();
+  void initApi();
   uint32_t getTLsize();
-  void     addInitialBalance();
+  void addInitialBalance();
 
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;
