@@ -32,9 +32,17 @@ namespace cs
     class DataStream
     {
     public:
+
+        ///
+        /// Constructors to read data from packet
+        ///
         explicit DataStream(char* packet, std::size_t dataSize);
         explicit DataStream(const char* packet, std::size_t dataSize);
         explicit DataStream(const uint8_t* packet, std::size_t dataSize);
+
+        ///
+        /// Constructor to write data
+        explicit DataStream(cs::Bytes& storage);
 
         ///
         /// Try to get enpoint from data.
@@ -78,6 +86,7 @@ namespace cs
 
             T field = getFromArray<T>(m_data, m_index);
             m_index += sizeof(T);
+
             return field;
         }
 
@@ -89,11 +98,14 @@ namespace cs
         template<typename T>
         inline void setStreamField(const T& streamField)
         {
-            if (!isAvailable(sizeof(T)))
-                return;
+            if (m_bytes)
+            {
+                const char* ptr = reinterpret_cast<const char*>(&streamField);
 
-            insertToArray(m_data, m_index, streamField);
-            m_index += sizeof(T);
+                for (std::size_t i = 0; i < sizeof(T); ++i) {
+                    m_bytes->push_back(*(ptr + i));
+                }
+            }
         }
 
         ///
@@ -107,13 +119,16 @@ namespace cs
         {
             std::array<char, size> array = {0};
 
-            if (!isAvailable(size))
+            if (!isAvailable(size)) {
                 return array;
+            }
 
-            for (std::size_t i = 0; i < size; ++i)
+            for (std::size_t i = 0; i < size; ++i) {
                 array[i] = m_data[i + m_index];
+            }
 
             m_index += size;
+
             return array;
         }
 
@@ -126,13 +141,9 @@ namespace cs
         template<std::size_t size>
         inline void setStreamArray(const std::array<char, size>& array)
         {
-            if (!isAvailable(size))
-                return;
-
-            for (std::size_t i = 0; i < size; ++i)
-                m_data[i + m_index] = array[i];
-
-            m_index += size;
+            if (m_bytes) {
+                m_bytes->insert(m_bytes->end(), array.begin(), array.end());
+            }
         }
 
         ///
@@ -180,13 +191,9 @@ namespace cs
         template<std::size_t size>
         inline void setFixedString(const FixedString<size>& fixedString)
         {
-            if (!isAvailable(size))
-                return;
-
-            for (std::size_t i = 0; i < size; ++i)
-                m_data[i + m_index] = fixedString[i];
-
-            m_index += size;
+            if (m_bytes) {
+                m_bytes->insert(m_bytes->end(), fixedString.begin(), fixedString.end());
+            }
         }
 
         ///
@@ -200,11 +207,13 @@ namespace cs
         {
             FixedString<size> str;
 
-            if (!isAvailable(size))
+            if (!isAvailable(size)) {
                 return str;
+            }
 
-            for (std::size_t i = 0; i < size; ++i)
+            for (std::size_t i = 0; i < size; ++i) {
                 str[i] = m_data[i + m_index];
+            }
 
             m_index += size;
 
@@ -233,8 +242,9 @@ namespace cs
         template<std::size_t size>
         inline void skip()
         {
-            if (!isAvailable(size))
+            if (!isAvailable(size)) {
                 return;
+            }
 
             m_index += size;
         }
@@ -258,7 +268,7 @@ namespace cs
         /// Adds bytes vector to stream.
         /// @param data Vector of bytes to write.
         ///
-        void addVector(const std::vector<uint8_t>& data);
+        void addVector(const cs::Bytes& data);
 
         ///
         /// Returns bytes vector.
@@ -267,7 +277,7 @@ namespace cs
         /// @return Returns byte vector.
         /// If stream can not return size of bytes it returns empty vector.
         ///
-        std::vector<uint8_t> byteVector(std::size_t size);
+        cs::Bytes byteVector(std::size_t size);
 
         ///
         /// Adds std::string chars to stream.
@@ -284,6 +294,16 @@ namespace cs
         /// If stream can not return size of bytes it returns empty std::string.
         ///
         std::string string(std::size_t size);
+
+        ///
+        /// Adds hash vector to stream.
+        ///
+        /// @param hashVector HashVector structure.
+        ///
+        void addHashVector(const cs::HashVector& hashVector);
+
+
+        cs::HashVector hashVector();
 
         ///
         /// Peeks next parameter
@@ -305,6 +325,8 @@ namespace cs
         std::size_t m_index = 0;
         std::size_t m_dataSize = 0;
 
+        cs::Bytes* m_bytes = nullptr;
+
         // creates template address
         template<typename T>
         T createAddress();
@@ -314,8 +336,9 @@ namespace cs
         {
             char* ptr = reinterpret_cast<char*>(&value);
 
-            for (std::size_t i = index, k = 0; i < index + sizeof(T); ++i, ++k)
+            for (std::size_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
                 *(data + i) = *(ptr + k);
+            }
         }
 
         template<typename T>
@@ -377,7 +400,7 @@ namespace cs
     ///
     /// Gets from stream to bytes vector (stream would use data size of vector to create bytes).
     ///
-    inline DataStream& operator>>(DataStream& stream, std::vector<uint8_t>& data)
+    inline DataStream& operator>>(DataStream& stream, cs::Bytes& data)
     {
         data = stream.byteVector(data.size());
         return stream;
@@ -393,12 +416,21 @@ namespace cs
     }
 
     ///
-    /// Get size of bytes from stream to fixedString
+    /// Gets size of bytes from stream to fixedString.
     ///
     template<std::size_t size>
     inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString)
     {
         fixedString = stream.fixedString<size>();
+        return stream;
+    }
+
+    ///
+    /// Gets hashVector structure from stream.
+    ///
+    inline DataStream& operator>>(DataStream& stream, cs::HashVector& hashVector)
+    {
+        hashVector = stream.hashVector();
         return stream;
     }
 
@@ -454,7 +486,7 @@ namespace cs
     ///
     /// Writes vector of bytes to stream.
     ///
-    inline DataStream& operator<<(DataStream& stream, const std::vector<uint8_t>& data)
+    inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data)
     {
         stream.addVector(data);
         return stream;
@@ -476,6 +508,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString)
     {
         stream.setFixedString(fixedString);
+        return stream;
+    }
+
+    ///
+    /// Writes hash vector structure to stream
+    ///
+    inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector)
+    {
+        stream.addHashVector(hashVector);
         return stream;
     }
 }

@@ -253,7 +253,7 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(std::vector<uint8_t>& bytes) {
+inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes) {
   bytes = std::vector<uint8_t>(ptr_, end_);
   ptr_ = end_;
   return *this;
@@ -335,7 +335,7 @@ inline OPackStream& OPackStream::operator<<(const cs::HashMatrix& mat) {
 }
 
 template <>
-inline OPackStream& OPackStream::operator<<(const std::vector<uint8_t>& bytes) {
+inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
   insertBytes((const char*)bytes.data(), bytes.size());
   return *this;
 }
