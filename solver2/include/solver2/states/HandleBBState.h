@@ -6,14 +6,13 @@ namespace slv2
     /**
      * @class   HandleBBState
      *
-     * @brief   A special state to handle a Big Bang. This class cannot be inherited. Acts almost as WriteState
+     * @brief   A special state to handle a Big Bang. This class cannot be inherited. Acts almost as
+     *          WriteState. Currently is not functional as Node grab the BB handling
      *
      * @author  aae
      * @date    02.10.2018
      *
-     * @sa  T:DefaultStateBehavior  
-     *
-     * ### remarks  Aae, 30.09.2018.
+     * @sa  T:WriteState  
      */
 
     class HandleBBState final : public WriteState

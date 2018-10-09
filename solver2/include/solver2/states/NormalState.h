@@ -6,11 +6,18 @@
 
 namespace slv2
 {
-    /// <summary>   A normal node state. This class cannot be inherited. </summary>
-    ///
-    /// <remarks>   Aae, 30.09.2018. </remarks>
-    ///
-    /// <seealso cref="T:DefaultStateBehavior"/>
+    /**
+     * @class   NormalState
+     *
+     * @brief   A normal node state. If spammer mode is on in SolverCore, this state implements spam functionality
+     *
+     * @author  Alexander Avramenko
+     * @date    09.10.2018
+     *
+     * @sa  T:DefaultStateBehavior  
+     *
+     * ### remarks  Aae, 30.09.2018.
+     */
 
     class NormalState : public DefaultStateBehavior
     {

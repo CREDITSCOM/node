@@ -4,6 +4,17 @@
 
 namespace slv2
 {
+    /**
+     * @class   StartNormalState
+     *
+     * @brief   A start normal state. This class cannot be inherited. To be activated mostly on the
+     *          1st round if node level is NodeLevel::Normal
+     *
+     * @author  Alexander Avramenko
+     * @date    09.10.2018
+     *
+     * @sa  T:DefaultStateBehavior
+     */
 
     class StartNormalState final : public DefaultStateBehavior
     {

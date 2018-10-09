@@ -48,6 +48,7 @@ add_library(solver2
 	src/states/NormalState.cpp
 	src/states/StartState.cpp
 	src/states/StartNormalState.cpp
+	src/states/StartCollectState.cpp
 	src/states/SyncState.cpp
 	src/states/TrustedMState.cpp
 	src/states/TrustedState.cpp

@@ -9,7 +9,7 @@ namespace slv2
     /**
      * @class   WriteState
      *
-     * @brief   A write node state. This class cannot be inherited.
+     * @brief   A write node state
      *
      * @author  aae
      * @date    02.10.2018

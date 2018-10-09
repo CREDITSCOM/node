@@ -3,11 +3,19 @@
 
 namespace slv2
 {
-    /// <summary>   A special state of "No state". Used at the very beginning of work. This class cannot be inherited. </summary>
-    ///
-    /// <remarks>   Aae, 30.09.2018. </remarks>
-    ///
-    /// <seealso cref="T:INodeState"/>
+    /**
+     * @class   NoState
+     *
+     * @brief   A special state of "No state". Used at the very beginning of work. This class cannot
+     *          be inherited. Does nothing when activated
+     *
+     * @author  Alexander Avramenko
+     * @date    09.10.2018
+     *
+     * @sa  T:INodeState    
+     *
+     * ### remarks  Aae, 30.09.2018.
+     */
 
     class NoState final : public INodeState
     {
@@ -24,6 +32,20 @@ namespace slv2
 
         void onRoundEnd(SolverContext& /*context*/) override
         {}
+
+        /**
+         * @fn  Result final::onRoundTable(SolverContext& , const uint32_t ) override
+         *
+         * @brief   Handles the round table action
+         *
+         * @author  Alexander Avramenko
+         * @date    09.10.2018
+         *
+         * @param [in,out]  parameter1  The first parameter.
+         * @param           uint32_t    The 32 t.
+         *
+         * @return  A Result::Finish to allow/initiate transition to proper state.
+         */
 
         Result onRoundTable(SolverContext& /*context*/, const uint32_t /*round*/) override
         {

@@ -15,8 +15,7 @@ namespace slv2
     /**
      * @class   CollectState
      *
-     * @brief   A transaction collector node state (so called "main node"). This class cannot be
-     *          inherited.
+     * @brief   A transaction collector node state (so called "main node").
      *
      * @author  aae
      * @date    02.10.2018
@@ -55,11 +54,10 @@ namespace slv2
             return "Collect";
         }
 
-    private:
+    protected:
 
         size_t cnt_transactions { 0 };
         csdb::Pool pool {};
-        CallsQueueScheduler::CallTag tag_timeout;
 
         void do_send_tl(SolverContext& context, uint64_t sequence);
     };

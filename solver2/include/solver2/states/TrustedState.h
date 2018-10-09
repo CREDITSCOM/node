@@ -3,11 +3,19 @@
 
 namespace slv2
 {
-    /// <summary>   A trusted node state. Works itself and inherited by more specific states (TrustedMState, TrustedVState, TrustedVMState)</summary>
-    ///
-    /// <remarks>   Aae, 30.09.2018. </remarks>
-    ///
-    /// <seealso cref="T:DefaultStateBehavior"/>
+    /**
+     * @class   TrustedState
+     *
+     * @brief   A trusted node state. Works itself and inherited by more specific states
+     *          (TrustedMState, TrustedVState, TrustedVMState)
+     *
+     * @author  Alexander Avramenko
+     * @date    09.10.2018
+     *
+     * @sa  T:DefaultStateBehavior  
+     *
+     * ### remarks  Aae, 30.09.2018.
+     */
 
     class TrustedState : public DefaultStateBehavior
     {

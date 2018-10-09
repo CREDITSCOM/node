@@ -3,12 +3,19 @@
 
 namespace slv2
 {
-    /// <summary>   A special state to handle a new round table. This class cannot be inherited.
-    ///             Invoke an immediate further transition according to round table</summary>
-    ///
-    /// <remarks>   Aae, 30.09.2018. </remarks>
-    ///
-    /// <seealso cref="T:DefaultStateBehavior"/>
+    /**
+     * @class   HandleRTState
+     *
+     * @brief   A special state to handle a new round table. This class cannot be inherited. When on,
+     *          invokes immediately further transition according to round table
+     *
+     * @author  Alexander Avramenko
+     * @date    09.10.2018
+     *
+     * @sa  T:DefaultStateBehavior  
+     *
+     * ### remarks  Aae, 30.09.2018.
+     */
 
     class HandleRTState : public DefaultStateBehavior
     {
