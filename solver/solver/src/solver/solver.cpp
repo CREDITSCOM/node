@@ -46,7 +46,7 @@ constexpr short min_nodes = 3;
 
 Solver::Solver(Node* node)
 : m_node(node)
-, generals(std::unique_ptr<Generals>(new Generals()))
+, m_generals(std::unique_ptr<Generals>(new Generals()))
 , m_writerIndex(0) {
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
 }
@@ -152,7 +152,7 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
   cs::Hashes localHashes;
 
   {
-    cs::SharedLock sharedLock(mSharedMutex);
+    cs::SharedLock sharedLock(m_sharedMutex);
     localHashes = m_roundTable.hashes;
   }
 
@@ -181,7 +181,7 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
   }
 
   {
-    cs::Lock lock(mSharedMutex);
+    cs::Lock lock(m_sharedMutex);
 
     m_pool.set_sequence(sequence);
     m_pool.add_user_field(0, timestamp);
@@ -217,11 +217,11 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 }
 
 const Characteristic& Solver::getCharacteristic() const {
-  return generals->getCharacteristic();
+  return m_generals->getCharacteristic();
 }
 
 Hash Solver::getCharacteristicHash() const {
-  const Characteristic& characteristic = generals->getCharacteristic();
+  const Characteristic& characteristic = m_generals->getCharacteristic();
   return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
 }
 
@@ -306,7 +306,7 @@ HashVector Solver::getMyVector() const {
 }
 
 HashMatrix Solver::getMyMatrix() const {
-  return (generals->getMatrix());
+  return (m_generals->getMatrix());
 }
 
 void Solver::flushTransactions() {
@@ -314,7 +314,7 @@ void Solver::flushTransactions() {
     return;
   }
 
-  cs::Lock lock(mSharedMutex);
+  cs::Lock lock(m_sharedMutex);
 
   for (auto& packet : m_transactionsBlock) {
     auto trxCount = packet.transactionsCount();
@@ -414,7 +414,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   }
 
   {
-    cs::Lock lock(mSharedMutex);
+    cs::Lock lock(m_sharedMutex);
 
     auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
 
@@ -435,7 +435,7 @@ void Solver::gotRound(cs::RoundTable&& round) {
   cs::Hashes neededHashes;
 
   {
-    cs::Lock lock(mSharedMutex);
+    cs::Lock lock(m_sharedMutex);
     m_roundTable = std::move(round);
   }
 
@@ -448,12 +448,12 @@ void Solver::gotRound(cs::RoundTable&& round) {
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
   } else if (m_node->getMyLevel() == NodeLevel::Confidant) {
-    cs::Lock lock(mSharedMutex);
+    cs::Lock lock(m_sharedMutex);
     buildTransactionList();
   }
 
   {
-    cs::Lock lock(mSharedMutex);
+    cs::Lock lock(m_sharedMutex);
     m_neededHashes = std::move(neededHashes);
   }
 }
@@ -475,16 +475,16 @@ void Solver::buildTransactionList() {
     }
   }
 
-  cs::Hash result = generals->buildvector(pool, m_pool);
+  cs::Hash result = m_generals->buildVector(pool, m_pool);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
 
-  hvector.Sender = m_node->getMyConfNumber();
+  hvector.sender = m_node->getMyConfNumber();
   hvector.hash   = result;
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
 
-  generals->addvector(hvector);
+  m_generals->addVector(hvector);
   m_node->sendVector(hvector);
 
   trustedCounterVector++;
@@ -496,13 +496,13 @@ void Solver::buildTransactionList() {
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
-    generals->addSenderToMatrix(m_node->getMyConfNumber());
+    m_generals->addSenderToMatrix(m_node->getMyConfNumber());
 
     receivedMatFrom[m_node->getMyConfNumber()] = true;
     ++trustedCounterMatrix;
 
-    m_node->sendMatrix(generals->getMatrix());
-    generals->addmatrix(generals->getMatrix(), m_node->getConfidants());  // MATRIX SHOULD BE DECOMPOSED HERE!!!
+    m_node->sendMatrix(m_generals->getMatrix());
+    m_generals->addMatrix(m_generals->getMatrix(), m_node->getConfidants());  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
     csdebug() << "SOLVER> Matrix added";
   }
@@ -516,7 +516,7 @@ void Solver::sendZeroVector() {
 
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
-  if (receivedVecFrom[vector.Sender] == true) {
+  if (receivedVecFrom[vector.sender] == true) {
     cslog() << "SOLVER> I've already got the vector from this Node";
     return;
   }
@@ -524,9 +524,9 @@ void Solver::gotVector(HashVector&& vector) {
   const std::vector<PublicKey>& confidants = m_roundTable.confidants;
   uint8_t numGen = static_cast<uint8_t>(confidants.size());
 
-  receivedVecFrom[vector.Sender] = true;
+  receivedVecFrom[vector.sender] = true;
 
-  generals->addvector(vector);  // building matrix
+  m_generals->addVector(vector);  // building matrix
   trustedCounterVector++;
 
   if (trustedCounterVector == numGen) {
@@ -535,17 +535,17 @@ void Solver::gotVector(HashVector&& vector) {
     trustedCounterVector = 0;
     // compose and send matrix!!!
     uint8_t confNumber = m_node->getMyConfNumber();
-    generals->addSenderToMatrix(confNumber);
+    m_generals->addSenderToMatrix(confNumber);
     receivedMatFrom[confNumber] = true;
     trustedCounterMatrix++;
 
-    HashMatrix matrix = generals->getMatrix();
+    HashMatrix matrix = m_generals->getMatrix();
     m_node->sendMatrix(matrix);
-    generals->addmatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
+    m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
     if (trustedCounterMatrix == numGen) {
       memset(receivedMatFrom, 0, 100);
-      m_writerIndex        = (generals->take_decision(m_roundTable.confidants,
+      m_writerIndex        = (m_generals->takeDecision(m_roundTable.confidants,
                                                m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
       trustedCounterMatrix = 0;
 
@@ -563,7 +563,7 @@ void Solver::gotVector(HashVector&& vector) {
             poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
             poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
 
-            const Characteristic&       characteristic = generals->getCharacteristic();
+            const Characteristic&       characteristic = m_generals->getCharacteristic();
             const std::vector<uint8_t>& mask           = characteristic.mask;
             uint32_t                    bitsCount      = characteristic.size;
 
@@ -580,7 +580,7 @@ void Solver::gotVector(HashVector&& vector) {
 
 void Solver::checkMatrixReceived() {
   if (trustedCounterMatrix < 2) {
-    m_node->sendMatrix(generals->getMatrix());
+    m_node->sendMatrix(m_generals->getMatrix());
   }
 }
 
@@ -605,19 +605,19 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
     return;
   }
 
-  if (receivedMatFrom[matrix.Sender]) {
+  if (receivedMatFrom[matrix.sender]) {
     cslog() << "SOLVER> I've already got the matrix from this Node";
     return;
   }
 
-  receivedMatFrom[matrix.Sender] = true;
+  receivedMatFrom[matrix.sender] = true;
   trustedCounterMatrix++;
-  generals->addmatrix(matrix, m_node->getConfidants());
+  m_generals->addMatrix(matrix, m_node->getConfidants());
 
   const uint8_t numGen = static_cast<uint8_t>(m_node->getConfidants().size());
   if (trustedCounterMatrix == numGen) {
     memset(receivedMatFrom, 0, 100);
-    uint8_t writerIndex  = (generals->take_decision(
+    uint8_t writerIndex  = (m_generals->takeDecision(
         m_roundTable.confidants, m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
     trustedCounterMatrix = 0;
 
@@ -635,7 +635,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
           poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
           poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
 
-          const Characteristic& characteristic = generals->getCharacteristic();
+          const Characteristic& characteristic = m_generals->getCharacteristic();
 
           const std::vector<uint8_t>& mask = characteristic.mask;
 
@@ -932,7 +932,7 @@ void Solver::spamWithTransactions() {
 ///////////////////
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
-  cs::Lock lock(mSharedMutex);
+  cs::Lock lock(m_sharedMutex);
   m_transactionsBlock.back().addTransaction(transaction);
 }
 
@@ -1055,7 +1055,7 @@ bool Solver::verify_signature(uint8_t signature[64], uint8_t public_key[32], uin
 }
 
 void Solver::addTransaction(const csdb::Transaction& transaction) {
-  cs::Lock lock(mSharedMutex);
+  cs::Lock lock(m_sharedMutex);
 
   if (m_transactionsBlock.empty()) {
     m_transactionsBlock.push_back(cs::TransactionsPacket{});
@@ -1066,15 +1066,6 @@ void Solver::addTransaction(const csdb::Transaction& transaction) {
   }
 
   m_transactionsBlock.back().addTransaction(transaction);
-}
-
-void Solver::setConfidants(const std::vector<PublicKey>& confidants, const PublicKey& general,
-                           const RoundNumber roundNum) {
-  cs::Lock lock(mSharedMutex);
-  m_roundTable.confidants = confidants;
-  m_roundTable.round      = roundNum;
-  m_roundTable.hashes.clear();
-  m_roundTable.general = general;
 }
 
 const std::vector<uint8_t>& Solver::getPrivateKey() const {

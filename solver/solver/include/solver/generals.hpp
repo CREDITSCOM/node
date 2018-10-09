@@ -29,15 +29,15 @@ class Generals {
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  cs::Hash buildvector(csdb::Pool& _pool, csdb::Pool& new_pool);
+  cs::Hash buildVector(csdb::Pool& _pool, csdb::Pool& new_pool);
 
-  void addvector(HashVector vector);
-  void addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes);
+  void addVector(const HashVector& vector);
+  void addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes);
 
   // take desision
-  uint8_t       take_decision(const std::vector<PublicKey>& confidantNodes, const csdb::PoolHash& lasthash);
+  uint8_t takeDecision(const cs::ConfidantsKeys& confidantNodes, const csdb::PoolHash& lasthash);
   static int8_t extractRaisedBitsCount(const csdb::Amount& amount);
-  HashMatrix    getMatrix() const;
+  const HashMatrix& getMatrix() const;
 
   void addSenderToMatrix(uint8_t myConfNum);
 
@@ -45,15 +45,16 @@ class Generals {
   const PublicKey& getWriterPublicKey() const;
 
  private:
-  struct hash_weight {
-    char    a_hash[HASH_LENGTH] = {};
-    uint8_t a_weight            = 0;
+  struct HashWeigth {
+    char hash[HASH_LENGTH] = {};
+    uint8_t weight = 0;
   };
 
-  HashMatrix                   m_hMatrix;
-  std::array<uint8_t, 10000>   m_find_untrusted;
-  std::array<uint8_t, 100>     m_new_trusted;
-  std::array<hash_weight, 100> m_hw_total;
+  HashMatrix m_hMatrix;
+
+  std::array<uint8_t, 10000> m_find_untrusted;
+  std::array<uint8_t, 100> m_new_trusted;
+  std::array<HashWeigth, 100> m_hw_total;
 
   Characteristic m_characteristic;
   PublicKey m_writerPublicKey;
