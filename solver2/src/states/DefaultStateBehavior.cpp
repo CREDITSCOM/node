@@ -1,5 +1,6 @@
 #include "DefaultStateBehavior.h"
 #include "../SolverContext.h"
+#include "../Consensus.h"
 #include "../Node.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)

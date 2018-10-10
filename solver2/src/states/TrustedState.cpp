@@ -1,5 +1,6 @@
 #include "TrustedState.h"
 #include "../SolverContext.h"
+#include "../Consensus.h"
 #include "../SolverCompat.h"
 #include "../Node.h"
 #include "../Generals.h"

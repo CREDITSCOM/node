@@ -1,7 +1,8 @@
 #include "SolverCore.h"
-#include <Solver/Solver.hpp>
+#include "Consensus.h"
+#include "SolverCompat.h"
 #include "Node.h"
-#include <Solver/Generals.hpp>
+#include "Generals.h"
 #include <csdb/currency.h>
 #include <lib/system/logger.hpp>
 

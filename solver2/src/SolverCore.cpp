@@ -1,7 +1,8 @@
 #include "SolverCore.h"
 #include "SolverContext.h"
 #include "CallsQueueScheduler.h"
-#include <Solver/Solver.hpp>
+#include "Consensus.h"
+#include "SolverCompat.h"
 #include <Solver/WalletsState.h>
 #include <Solver/Fee.h>
 #include "Node.h"

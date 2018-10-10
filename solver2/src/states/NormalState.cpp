@@ -1,5 +1,6 @@
 #include "NormalState.h"
 #include "../SolverContext.h"
+#include "../Consensus.h"
 #include "../Node.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
@@ -56,9 +57,9 @@ namespace slv2
         }
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": started flush transactions every " << Consensus::T_coll_trans << " msec");
+            LOG_NOTICE(name() << ": started flush transactions every " << Consensus::T_flush_trans << " msec");
         }
-        tag_flush = context.scheduler().InsertPeriodic(Consensus::T_coll_trans, [this, pctx]() {
+            tag_flush = context.scheduler().InsertPeriodic(Consensus::T_flush_trans, [this, pctx]() {
             if(Consensus::Log) {
                 LOG_DEBUG(name() << ": flushing transactions");
             }

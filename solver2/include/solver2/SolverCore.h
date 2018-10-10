@@ -2,7 +2,6 @@
 
 #include "CallsQueueScheduler.h"
 #include "INodeState.h"
-#include "Consensus.h"
 
 #if defined(SOLVER_USES_PROXY_TYPES)
 #include "ProxyTypes.h"

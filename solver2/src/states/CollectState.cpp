@@ -1,5 +1,6 @@
 #include "CollectState.h"
 #include "../SolverContext.h"
+#include "../Consensus.h"
 #include "../Node.h"
 #include <lib/system/logger.hpp>
 
