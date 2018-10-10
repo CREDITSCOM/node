@@ -189,6 +189,8 @@ bool BlockChain::writeGenesisBlock()
 
   transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(100'000'000, 0));
+  transaction.set_max_fee(csdb::AmountCommission(0.0));
+  transaction.set_counted_fee(csdb::AmountCommission(0.0));
   transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
 
@@ -200,7 +202,9 @@ bool BlockChain::writeGenesisBlock()
 
   transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(100'000'000, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
+  transaction.set_max_fee(csdb::AmountCommission(0.0));
+  transaction.set_counted_fee(csdb::AmountCommission(0.0));
+  //transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(1);
 
   genesis.add_transaction(transaction);
@@ -214,9 +218,11 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_target(test_address);
   transaction.set_source(genesisAddress_);
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_amount(csdb::Amount(100'000'000, 0));
+  transaction.set_max_fee(csdb::AmountCommission(0.0));
+  transaction.set_counted_fee(csdb::AmountCommission(0.0));
   transaction.set_balance(csdb::Amount(100, 0));
-  transaction.set_innerID(0);
+  transaction.set_innerID(2);
 
   genesis.add_transaction(transaction);
 
@@ -369,7 +375,7 @@ csdb::PoolHash BlockChain::getLastWrittenHash() const
 //  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
 //}
 
-uint32_t BlockChain::getGlobalSequence() const
+csdb::Pool::sequence_t BlockChain::getGlobalSequence() const
 {
     return global_sequence;
 }
@@ -534,9 +540,9 @@ void BlockChain::getTransactions(
     bool isToLoadWalletsPoolsCache = 
         hashesArray.empty()  && wallPubKey != genesisAddress_  && wallPubKey != startAddress_;
     if (wallPubKey.is_public_key()) {
-      WalletId id;
-      if (!findWalletId(wallPubKey, id)) return;
-      wallPubKey = csdb::Address::from_wallet_id(id);
+      WalletId _id;
+      if (!findWalletId(wallPubKey, _id)) return;
+      wallPubKey = csdb::Address::from_wallet_id(_id);
     }
     TrxLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
 

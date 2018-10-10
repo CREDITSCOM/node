@@ -14,6 +14,7 @@
 
 #include <csdb/address.h>
 #include <csdb/amount.h>
+#include <csdb/amount_commission.h>
 #include <csdb/pool.h>
 #include <csdb/storage.h>
 
@@ -70,7 +71,7 @@ public:
   uint32_t getRequestedBlockNumber() const;
 
   void setGlobalSequence(uint32_t seq);
-  uint32_t getGlobalSequence() const;
+  csdb::Pool::sequence_t getGlobalSequence() const;
 
   bool getBlockRequestNeed() const;
 
@@ -138,7 +139,7 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  uint32_t global_sequence;
+  csdb::Pool::sequence_t global_sequence;
   bool blockRequestIsNeeded;
 
   std::unique_ptr<Credits::BlockHashes> blockHashes_;
