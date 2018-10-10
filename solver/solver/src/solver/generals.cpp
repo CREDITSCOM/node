@@ -105,7 +105,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   uint8_t max_frec_position;
 
-  cslog() << "GENERALS> HW OUT: nodes amount = " << nodes_amount;
+  cslog() << "GENERALS> HW OUT: nodes amount = " << int(nodes_amount);
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {

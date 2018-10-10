@@ -153,24 +153,13 @@ void cs::DataStream::addEndpoint(const boost::asio::ip::udp::endpoint& endpoint)
 }
 
 void cs::DataStream::addTransactionsHash(const cs::TransactionsPacketHash& hash)
-{
-    auto hashData = hash.toBinary();
-    
-    (*this) << hashData.size();
-    (*this) << hashData;
+{    
+    (*this) << hash.toBinary();
 }
 
 cs::TransactionsPacketHash cs::DataStream::transactionsHash()
 {
-    cs::TransactionsPacketHash hash;
-    
-    std::size_t size;
-
-    (*this) >> size;
-
     cs::Bytes bytes;
-    bytes.resize(size);
-
     (*this) >> bytes;
 
     return cs::TransactionsPacketHash::fromBinary(bytes);
@@ -178,21 +167,29 @@ cs::TransactionsPacketHash cs::DataStream::transactionsHash()
 
 void cs::DataStream::addVector(const cs::Bytes& data)
 {
-    if (m_bytes) {
+    if (m_bytes)
+    {
+        (*this) << data.size();
         m_bytes->insert(m_bytes->end(), data.begin(), data.end());
     }
 }
 
-cs::Bytes cs::DataStream::byteVector(std::size_t size)
+cs::Bytes cs::DataStream::byteVector()
 {
     cs::Bytes result;
     
-    if (size == 0 && !isAvailable(size)) {
+    if (!isAvailable(sizeof(std::size_t))) {
         return result;
     }
 
-    for (std::size_t i = 0; i < size; ++i, ++m_index) {
-        result.push_back(static_cast<uint8_t>(m_data[m_index]));
+    std::size_t size;
+    (*this) >> size;
+
+    if (isAvailable(size))
+    {
+        for (std::size_t i = 0; i < size; ++i, ++m_index) {
+            result.push_back(static_cast<uint8_t>(m_data[m_index]));
+        }
     }
 
     return result;
@@ -200,21 +197,29 @@ cs::Bytes cs::DataStream::byteVector(std::size_t size)
 
 void cs::DataStream::addString(const std::string& string)
 {
-    if (m_bytes) {
+    if (m_bytes)
+    {
+        (*this) << string.size();
         m_bytes->insert(m_bytes->end(), string.begin(), string.end());
     }
 }
 
-std::string cs::DataStream::string(std::size_t size)
+std::string cs::DataStream::string()
 {
     std::string result;
 
-    if (size == 0 && !isAvailable(size)) {
+    if (!isAvailable(sizeof(std::size_t))) {
         return result;
     }
 
-    for (std::size_t i = 0; i < size; ++i, ++m_index) {
-        result.push_back(m_data[m_index]);
+    std::size_t size;
+    (*this) >> size;
+
+    if (isAvailable(size))
+    {
+        for (std::size_t i = 0; i < size; ++i, ++m_index) {
+            result.push_back(m_data[m_index]);
+        }
     }
 
     return result;
@@ -262,18 +267,12 @@ cs::HashMatrix cs::DataStream::hashMatrix()
 
 void cs::DataStream::addTransactionsPacket(const cs::TransactionsPacket& packet)
 {
-    const cs::Bytes bytes = packet.toBinary();
-
-    (*this) << bytes.size() << bytes;
+    (*this) << packet.toBinary();
 }
 
 cs::TransactionsPacket cs::DataStream::transactionPacket()
 {
-    std::size_t size;
     cs::Bytes bytes;
-
-    (*this) >> size;
-    bytes.resize(size);
     (*this) >> bytes;
 
     return cs::TransactionsPacket::fromBinary(bytes);

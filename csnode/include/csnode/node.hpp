@@ -53,10 +53,10 @@ class Node {
 
   void getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
   bool isCorrectNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
-  void sendNotification(const cs::PublicKey& destination);
-  std::vector<uint8_t> createNotification();
+  void sendWriterNotification();
+  cs::Bytes createNotification();
 
-  std::vector<uint8_t> createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const std::vector<uint8_t>& signature, const std::vector<cs::DynamicBufferPtr>& notifications);
+  cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const cs::Signature& signature, const std::vector<cs::Bytes>& notifications);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -80,8 +80,7 @@ class Node {
   void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender);
 
   void sendBadBlock(const csdb::Pool& pool);
-  void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const uint32_t maskBitsCount,
-                          const cs::Bytes& characteristic);
+  void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const cs::Characteristic& characteristic);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
@@ -192,6 +191,6 @@ private:
   IPackStream istream_;
   OPackStream ostream_;
   std::vector<csdb::Pool> m_packageTemporaryStorage;
-  std::vector<cs::DynamicBufferPtr> m_notifications;
+  std::vector<cs::Bytes> m_notifications;
 };
 #endif  // __NODE_HPP__

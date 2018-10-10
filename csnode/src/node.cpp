@@ -865,8 +865,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   solver_->gotRound(std::move(roundTable));
 }
 
-void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const uint32_t maskBitsCount,
-                              const cs::Bytes& characteristic) {
+void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
     cserror() << "Only writer nodes can send blocks";
     return;
@@ -883,13 +882,10 @@ void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const uint32
   std::string time = poolMetaInfo.timestamp;
   uint64_t sequence = poolMetaInfo.sequenceNumber;
 
-  stream << static_cast<uint16_t>(time.size());
   stream << time;
 
-  stream << maskBitsCount;
-
-  stream << static_cast<uint32_t>(characteristic.size());
-  stream << characteristic << sequence;
+  stream << characteristic.size;
+  stream << characteristic.mask << sequence;
 
   ostream_ << bytes;
 
@@ -903,27 +899,15 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   cs::DataStream stream(data, size);
 
-  uint16_t timeSize = 0;
   std::string time;
-
   uint32_t maskBitsCount;
-
-  uint32_t characteristicSize = 0;
-  std::vector<uint8_t> characteristic;
-
+  std::vector<uint8_t> characteristicMask;
   uint64_t sequence = 0;
 
-  cslog() << "Characteristic all data size: " << size;
+  cslog() << "Characteristic data size: " << size;
 
-  stream >> timeSize;
-
-  time.resize(timeSize);
-
-  stream >> time >> maskBitsCount >> characteristicSize;
-
-  characteristic.resize(characteristicSize);
-
-  stream >> characteristic >> sequence;
+  stream >> time >> maskBitsCount;
+  stream >> characteristicMask >> sequence;
 
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = sequence;
@@ -932,38 +916,32 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::Signature signature;
   stream >> signature;
 
-  uint16_t notificationsSize = 0;
+  std::size_t notificationsSize;
   stream >> notificationsSize;
 
-  uint32_t bufferSize = 0;
-  stream >> bufferSize;
-
-  if (m_notifications.empty()) {
-    cserror() << "Get characteristics, logical error";
+  if (notificationsSize == 0) {
+    cserror() << "Get characteristic: notifications count is zero";
   }
 
-  cslog() << "Notifications size " << notificationsSize;
-  cslog() << "Notification buffer size " << bufferSize;
-
   for (std::size_t i = 0; i < notificationsSize; ++i) {
-    cs::Bytes bytes;
-    bytes.resize(bufferSize);
+    cs::Bytes notification;
+    stream >> notification;
 
-    stream >> bytes;
-
-    m_notifications.push_back(cs::DynamicBufferPtr(new cs::DynamicBuffer(bytes.data(), bytes.size())));
+    m_notifications.push_back(notification);
   }
 
   std::vector<cs::Hash> confidantsHashes;
 
-  for (const auto& ptr : m_notifications) {
+  for (const auto& notification : m_notifications) {
     cs::Hash hash;
+    cs::DataStream stream(notification.data(), notification.size());
 
-    std::copy(ptr->begin(), ptr->begin() + HASH_LENGTH, hash.data());
+    stream >> hash;
+
     confidantsHashes.push_back(hash);
   }
 
-  cs::Hash characteristicHash = getBlake2Hash(characteristic.data(), characteristic.size());
+  cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
 
   for (const auto& hash : confidantsHashes) {
     if (hash != characteristicHash) {
@@ -971,10 +949,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
       return;
     }
   }
+
   const cs::RoundTable& roundTable = solver_->roundTable();
+
   for (const auto& confidant : roundTable.confidants) {
-    if (not cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)(confidant.data()),
-                                       (uint8_t*)data, size)) {
+    if (!cs::Utils::verifySignature(signature.data(), confidant.data(), data, size)) {
+      cswarning() << "Confidants signatures verification failed";
       return;
     }
   }
@@ -982,17 +962,24 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
-  solver_->applyCharacteristic(characteristic, maskBitsCount, poolMetaInfo, sender);
+  cs::Characteristic characteristic;
+  characteristic.mask = characteristicMask;
+  characteristic.size = maskBitsCount;
+
+  solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
 }
 
 void Node::getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
   if (!isCorrectNotification(data, size, senderPublicKey)) {
+    cswarning() << "Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
     return;
   }
 
-  m_notifications.push_back(cs::DynamicBufferPtr(new cs::DynamicBuffer(data, size)));
+  m_notifications.emplace_back(data, data + size);
 
-  if (m_notifications.size() < (solver_->roundTable().confidants.size() / 2)) {
+  const std::size_t neededConfidantsCount = (solver_->roundTable().confidants.size() / 2) + 1;
+
+  if (m_notifications.size() < neededConfidantsCount) {
     return;
   }
 
@@ -1000,13 +987,14 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
-  poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
+  poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic.mask, characteristic.size, poolMetaInfo, senderPublicKey);
+  solver_->applyCharacteristic(characteristic, poolMetaInfo, senderPublicKey);
 
-  const std::vector<uint8_t>& poolBinary    = bc_.loadBlock(bc_.getLastHash()).to_binary();
-  const std::vector<uint8_t>  poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());
+  // loading block from blockhain, because write pool to blockchain do something with pool
+  const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();
+  const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
@@ -1016,81 +1004,62 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 }
 
 bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
-  istream_.init(data, size);
-
-  cs::PublicKey writerPublicKey;
-  istream_ >> writerPublicKey;
-
-  const bool isCorrectWriterPublicKey = writerPublicKey == myPublicKey_;
-
-  if (!isCorrectWriterPublicKey) {
-    return false;
-  }
-
-  const auto& confidants = solver_->roundTable().confidants;
-  const auto  iterator   = std::find(confidants.begin(), confidants.end(), senderPublicKey);
-
-  const bool isFoundSenderPublicKey = iterator != std::end(confidants);
-
-  if (!isFoundSenderPublicKey) {
-    return false;
-  }
+  cs::DataStream stream(data, size);
 
   cs::Hash characteristicHash;
-  istream_ >> characteristicHash;
-  const bool isCorrectChararcteristicHash = characteristicHash == solver_->getCharacteristicHash();
+  stream >> characteristicHash;
 
-  if (!isCorrectChararcteristicHash) {
+  if (characteristicHash != solver_->getCharacteristicHash()) {
+    return false;
+  }
+
+  cs::PublicKey writerPublicKey;
+  stream >> writerPublicKey;
+
+  if (writerPublicKey != myPublicKey_) {
     return false;
   }
 
   cs::Signature signature;
-  istream_ >> signature;
+  stream >> signature;
 
-  if (!cs::Utils::verifySignature(reinterpret_cast<uint8_t*>(signature.data()), (uint8_t*)senderPublicKey.data(),
-                                  (uint8_t*)data, size)) {
+  size_t messageSize = size - signature.size();
+
+  if (!cs::Utils::verifySignature(signature.data(), senderPublicKey.data(), data, messageSize)) {
     return false;
   }
 
   return true;
 }
 
-std::vector<uint8_t> Node::createBlockValidatingPacket(const cs::PoolMetaInfo&                  poolMetaInfo,
-                                                       const cs::Characteristic&                characteristic,
-                                                       const std::vector<uint8_t>&              signature,
-                                                       const std::vector<cs::DynamicBufferPtr>& notifications) {
+cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo,
+                                            const cs::Characteristic& characteristic,
+                                            const cs::Signature& signature,
+                                            const std::vector<cs::Bytes>& notifications) {
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
   std::string time = poolMetaInfo.timestamp;
   uint64_t sequence = poolMetaInfo.sequenceNumber;
 
-  stream << static_cast<uint16_t>(time.size());
   stream << time;
-
   stream << characteristic.size;
-
-  stream << static_cast<uint32_t>(characteristic.mask.size());
   stream << characteristic.mask;
   stream << sequence;
 
   stream << signature;
 
-  stream << static_cast<uint16_t>(notifications.size());
+  stream << notifications.size();
 
-  if (!notifications.empty()) {
-    stream << static_cast<uint32_t>(notifications.front()->size());
-  }
-
-  for (const auto& ptr : notifications) {
-    stream << std::vector<uint8_t>(ptr->begin(), ptr->end());
+  for (const auto& notification : notifications) {
+    stream << notification;
   }
 
   return bytes;
 }
 
-void Node::sendNotification(const cs::PublicKey& destination) {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Signed, destination);
+void Node::sendWriterNotification() {
+  ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented, solver_->getWriterPublicKey());
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
 
@@ -1099,17 +1068,20 @@ void Node::sendNotification(const cs::PublicKey& destination) {
   flushCurrentTasks();
 }
 
-std::vector<uint8_t> Node::createNotification() {
-  const cs::Hash&      characteristicHash = solver_->getCharacteristicHash();
-  const cs::PublicKey& writerPublicKey    = solver_->getWriterPublicKey();
+cs::Bytes Node::createNotification() {
+  const cs::Hash& characteristicHash = solver_->getCharacteristicHash();
+  const cs::PublicKey& writerPublicKey = solver_->getWriterPublicKey();
 
-  std::vector<uint8_t> notification(HASH_LENGTH + PUBLIC_KEY_LENGTH);
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
 
-  notification.insert(notification.end(), characteristicHash.begin(), characteristicHash.end());
-  notification.insert(notification.end(), writerPublicKey.begin(), writerPublicKey.end());
+  stream << characteristicHash << writerPublicKey;
 
-  std::vector<uint8_t> signedNotification = cs::Utils::sign(notification, solver_->getPrivateKey().data());
-  return signedNotification;
+  cs::Signature signature = cs::Utils::sign(bytes, solver_->getPrivateKey().data());
+
+  stream << signature;
+
+  return bytes;
 }
 
 void Node::sendHash(const std::string& hash, const cs::PublicKey& target) {

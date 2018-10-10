@@ -16,6 +16,7 @@
 #include <thread>
 #include <functional>
 #include <lib/system/structures.hpp>
+#include <lib/system/common.hpp>
 #include <sodium.h>
 
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
@@ -33,7 +34,6 @@ namespace cs
         {
             MinHashValue = std::numeric_limits<int>::min(),
             MaxHashValue = std::numeric_limits<int>::max(),
-            SignatureLength = 64  // <-- right place. TODO: get from right place!
         };
 
         ///
@@ -279,18 +279,16 @@ namespace cs
         ///
         /// Signs data with security key
         ///
-        static std::vector<uint8_t> sign(std::vector<uint8_t> data, const unsigned char* securityKey)
+        static cs::Signature sign(const cs::Bytes& data, const unsigned char* securityKey)
         {
-            std::vector<uint8_t> signature(Values::SignatureLength);
-            unsigned long long   signLength = 0;
+            cs::Signature signature;
+            unsigned long long signLength = 0;
 
             crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), securityKey);
 
-            assert(Values::SignatureLength == signLength);
+            assert(signature.size() == signLength);
 
-            data.insert(data.end(), signature.begin(), signature.end());
-
-            return data;
+            return signature;
         }
 
         ///
@@ -305,7 +303,7 @@ namespace cs
         ///
         /// Verifies data signature with public key
         ///
-        static bool verifySignature(uint8_t* signature, uint8_t* public_key, uint8_t* message, size_t message_len)
+        static bool verifySignature(const cs::Byte* signature, const cs::Byte* public_key, const cs::Byte* message, size_t message_len)
         {
             const int ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
             return ok == 0;

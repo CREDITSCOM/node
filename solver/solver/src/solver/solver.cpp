@@ -130,7 +130,7 @@ auto Solver::setLastRoundTransactionsGot(size_t trNum) -> void {
   lastRoundTransactionsGot = trNum;
 }
 
-void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uint32_t bitsCount,
+void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
                                  const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
@@ -138,23 +138,25 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
     return;
   }
 
-  gotBigBang        = false;
+  gotBigBang = false;
   gotBlockThisRound = true;
 
   uint64_t sequence = metaInfoPool.sequenceNumber;
 
   cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
-  std::string             timestamp = metaInfoPool.timestamp;
-  boost::dynamic_bitset<> mask{characteristic.begin(), characteristic.end()};
+  std::string timestamp = metaInfoPool.timestamp;
+  boost::dynamic_bitset<> mask{characteristic.mask.begin(), characteristic.mask.end()};
 
-  size_t     maskIndex = 0;
+  size_t maskIndex = 0;
   cs::Hashes localHashes;
 
   {
     cs::SharedLock sharedLock(m_sharedMutex);
     localHashes = m_roundTable.hashes;
   }
+
+  csdb::Pool newPool;
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.contains(hash)) {
@@ -164,32 +166,31 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
     const auto& transactions = m_hashTable.find(hash).transactions();
 
-    if (bitsCount != transactions.size()) {
+    if (characteristic.size != transactions.size()) {
       cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
       return;
     }
 
     for (const auto& transaction : transactions) {
       if (mask.test(maskIndex)) {
-        m_pool.add_transaction(transaction);
+        newPool.add_transaction(transaction);
       }
+
       ++maskIndex;
     }
-
 
     m_hashTable.erase(hash);
   }
 
-  {
-    cs::Lock lock(m_sharedMutex);
+  newPool.set_sequence(sequence);
+  newPool.add_user_field(0, timestamp);
 
-    m_pool.set_sequence(sequence);
-    m_pool.add_user_field(0, timestamp);
-  }
+  // TODO: need to write confidants notifications bytes to csdb::Pool user fields
+
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
 
 #ifdef MONITOR_NODE
-  addTimestampToPool(m_pool);
+  addTimestampToPool(newPool);
 #endif
 
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
@@ -200,9 +201,8 @@ void Solver::applyCharacteristic(const std::vector<uint8_t>& characteristic, uin
 
   m_node->getBlockChain().setGlobalSequence(static_cast<uint32_t>(sequence));
 
-  // TODO: need to write notifications to csdb::Pool
   if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
-    m_node->getBlockChain().putBlock(m_pool);
+    m_node->getBlockChain().putBlock(newPool);
 
 #ifndef MONITOR_NODE
     if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
@@ -547,27 +547,30 @@ void Solver::gotVector(HashVector&& vector) {
         cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
         cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
       } else {
+
+        cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
         cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
         consensusAchieved = true;
 
         if (m_writerIndex == m_node->getMyConfNumber()) {
           m_node->becomeWriter();
 
-          cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
+ /*         cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
 
             PoolMetaInfo poolMetaInfo;
             poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
             poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
 
             const Characteristic& characteristic = m_generals->getCharacteristic();
-            const std::vector<uint8_t>& mask = characteristic.mask;
-            uint32_t bitsCount = characteristic.size;
 
-            m_node->sendCharacteristic(poolMetaInfo, bitsCount, mask);
+            m_node->sendCharacteristic(poolMetaInfo, characteristic);
 
             writeNewBlock();
 
-          });
+          });*/
+        }
+        else {
+          m_node->sendWriterNotification();
         }
       }
     }
@@ -636,11 +639,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
 
           const Characteristic& characteristic = m_generals->getCharacteristic();
 
-          const std::vector<uint8_t>& mask = characteristic.mask;
-
-          uint32_t bitsCount = characteristic.size;
-
-          m_node->sendCharacteristic(poolMetaInfo, bitsCount, mask);
+          m_node->sendCharacteristic(poolMetaInfo, characteristic);
 
           m_pool.set_sequence(poolMetaInfo.sequenceNumber);
           m_pool.add_user_field(0, poolMetaInfo.timestamp);

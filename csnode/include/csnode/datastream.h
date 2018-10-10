@@ -272,11 +272,10 @@ namespace cs
         ///
         /// Returns bytes vector.
         ///
-        /// @param size Stream would take size of arg to form return vector.
         /// @return Returns byte vector.
         /// If stream can not return size of bytes it returns empty vector.
         ///
-        cs::Bytes byteVector(std::size_t size);
+        cs::Bytes byteVector();
 
         ///
         /// Adds std::string chars to stream.
@@ -287,12 +286,10 @@ namespace cs
 
         ///
         /// Returns std::string from stream.
-        ///
-        /// @param size Stream would take size to create string size.
-        /// @return Returns std::string by arguments size.
+        ///        /// @return Returns std::string by arguments size.
         /// If stream can not return size of bytes it returns empty std::string.
         ///
-        std::string string(std::size_t size);
+        std::string string();
 
         ///
         /// Adds hash vector to stream.
@@ -431,7 +428,7 @@ namespace cs
     ///
     inline DataStream& operator>>(DataStream& stream, cs::Bytes& data)
     {
-        data = stream.byteVector(data.size());
+        data = stream.byteVector();
         return stream;
     }
 
@@ -440,7 +437,7 @@ namespace cs
     ///
     inline DataStream& operator>>(DataStream& stream, std::string& data)
     {
-        data = stream.string(data.size());
+        data = stream.string();
         return stream;
     }
 
