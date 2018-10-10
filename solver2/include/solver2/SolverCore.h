@@ -182,9 +182,8 @@ namespace slv2
         void repeatLastBlock();
 
         // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
-        void sendBlock(csdb::Pool& p);
-        void storeBlock(csdb::Pool& p);
-        void prepareBlock(csdb::Pool& p);
+        void createAndSendNewBlock();
+        void storeReceivedBlock(csdb::Pool& p);
         // returns count of transactions flushed
         size_t flushTransactions();
         bool verify_signature(const csdb::Transaction& tr);

@@ -50,7 +50,7 @@ namespace slv2
         // Switch state methods:
 
         /**
-         * @fn  inline void SolverContext::become_normal();
+         * @fn  void SolverContext::become_normal();
          *
          * @brief   Request to become normal node.
          *
@@ -60,10 +60,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void become_normal();
+        void become_normal()
+        {
+            core.handleTransitions(SolverCore::Event::SetNormal);
+        }
 
         /**
-         * @fn  inline void SolverContext::become_trusted();
+         * @fn  void SolverContext::become_trusted();
          *
          * @brief   Request to become trusted node.
          *
@@ -73,10 +76,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void become_trusted();
+        void become_trusted()
+        {
+            core.handleTransitions(SolverCore::Event::SetTrusted);
+        }
 
         /**
-         * @fn  inline void SolverContext::become_writer();
+         * @fn  void SolverContext::become_writer();
          *
          * @brief   Request to become writer node.
          *
@@ -86,10 +92,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void become_writer();
+        void become_writer()
+        {
+            core.handleTransitions(SolverCore::Event::SetWriter);
+        }
 
         /**
-         * @fn  inline void SolverContext::become_collector();
+         * @fn  void SolverContext::become_collector();
          *
          * @brief   Request to become collector (main node)
          *
@@ -97,10 +106,13 @@ namespace slv2
          * @date    01.10.2018
          */
 
-        inline void become_collector();
+        void become_collector()
+        {
+            core.handleTransitions(SolverCore::Event::SetCollector);
+        }
 
         /**
-         * @fn  inline void SolverContext::vectors_completed();
+         * @fn  void SolverContext::vectors_completed();
          *
          * @brief   Inform that receive enough vectors.
          *
@@ -110,10 +122,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void vectors_completed();
+        void vectors_completed()
+        {
+            core.handleTransitions(SolverCore::Event::Vectors);
+        }
 
         /**
-         * @fn  inline void SolverContext::matrices_completed();
+         * @fn  void SolverContext::matrices_completed();
          *
          * @brief   Inform that receive enough matrices.
          *
@@ -123,7 +138,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void matrices_completed();
+        void matrices_completed()
+        {
+            core.handleTransitions(SolverCore::Event::Matrices);
+        }
 
         /**
          * @fn  void SolverContext::spawn_next_round();
@@ -154,7 +172,7 @@ namespace slv2
 		BlockChain& blockchain() const;
 
         /**
-         * @fn  inline Node& SolverContext::node() const;
+         * @fn  Node& SolverContext::node() const;
          *
          * @brief   Gets the node instance.
          *
@@ -166,10 +184,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline Node& node() const;
+        Node& node() const
+        {
+            return *core.pnode;
+        }
 
         /**
-         * @fn  inline Credits::Generals& SolverContext::generals() const;
+         * @fn  Credits::Generals& SolverContext::generals() const;
          *
          * @brief   Gets the generals instance.
          *
@@ -181,10 +202,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline Credits::Generals& generals() const;
+        Credits::Generals& generals() const
+        {
+            return *core.pgen;
+        }
 
         /**
-         * @fn  inline CallsQueueScheduler& SolverContext::scheduler() const;
+         * @fn  CallsQueueScheduler& SolverContext::scheduler() const;
          *
          * @brief   Gets the scheduler instance.
          *
@@ -196,20 +220,33 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline CallsQueueScheduler& scheduler() const;
+        CallsQueueScheduler& scheduler() const
+        {
+            return core.scheduler;
+        }
 
         // Access to common state properties. 
 
-        /// <summary>   Public key. </summary>
-        ///
-        /// <remarks>   Aae, 30.09.2018. </remarks>
-        ///
-        /// <returns>   A reference to a const KeyType public key. </returns>
+        /**
+         * @fn  const KeyType& SolverContext::public_key() const
+         *
+         * @brief   Public key.
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @return  A reference to a const KeyType public key.
+         *
+         * ### remarks  Aae, 30.09.2018.
+         */
 
-        inline const KeyType& public_key() const;
+        const KeyType& public_key() const
+        {
+            return core.public_key;
+        }
 
         /**
-         * @fn  inline const KeyType& SolverContext::private_key() const;
+         * @fn  const KeyType& SolverContext::private_key() const;
          *
          * @brief   Private key.
          *
@@ -221,10 +258,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline const KeyType& private_key() const;
+        const KeyType& private_key() const
+        {
+            return core.private_key;
+        }
 
         /**
-         * @fn  inline const Credits::HashVector& SolverContext::hash_vector() const;
+         * @fn  const Credits::HashVector& SolverContext::hash_vector() const;
          *
          * @brief   Current hash vector.
          *
@@ -236,10 +276,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline const Credits::HashVector& hash_vector() const;
+        const Credits::HashVector& hash_vector() const
+        {
+            return core.getMyVector();
+        }
 
         /**
-         * @fn  inline uint32_t SolverContext::round() const;
+         * @fn  uint32_t SolverContext::round() const;
          *
          * @brief   Gets the current round number.
          *
@@ -251,7 +294,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline uint32_t round() const;
+        uint32_t round() const
+        {
+            return core.cur_round;
+        }
 
         /**
          * @fn  uint8_t SolverContext::own_conf_number() const;
@@ -296,10 +342,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline size_t cnt_trusted_desired() const;
+        size_t cnt_trusted_desired() const
+        {
+            return core.cnt_trusted_desired;
+        }
 
         /**
-         * @fn  inline bool SolverContext::is_spammer() const;
+         * @fn  bool SolverContext::is_spammer() const;
          *
          * @brief   Query if this node is in spammer mode.
          *
@@ -311,14 +360,31 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline bool is_spammer() const;
+        bool is_spammer() const
+        {
+            return core.opt_spammer_on;
+        }
 
-        inline void store_block(csdb::Pool & block);
+        /**
+         * @fn  void SolverContext::store_received_block(csdb::Pool & block);
+         *
+         * @brief   Stores received block
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @param [in,out]  block   The block.
+         */
+
+        void store_received_block(csdb::Pool & block)
+        {
+            core.storeReceivedBlock(block);
+        }
 
         // Common operations, candidates for refactoring:
 
         /**
-         * @fn  inline void SolverContext::store_and_send_new_block();
+         * @fn  void SolverContext::create_and_send_new_block();
          *
          * @brief   Makes a block from inner pool of collected and validated transactions and send it
          *
@@ -328,10 +394,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void store_and_send_new_block();
+        void create_and_send_new_block()
+        {
+            core.createAndSendNewBlock();
+        }
 
         /**
-         * @fn  inline void SolverContext::resend_last_block();
+         * @fn  void SolverContext::repeat_last_block()
          *
          * @brief   Resend last block
          *
@@ -339,10 +408,13 @@ namespace slv2
          * @date    02.10.2018
          */
 
-        inline void repeat_last_block();
+        void repeat_last_block()
+        {
+            core.repeatLastBlock();
+        }
 
         /**
-         * @fn  inline void SolverContext::add(const csdb::Transaction& tr);
+         * @fn  void SolverContext::add(const csdb::Transaction& tr);
          *
          * @brief   Adds transaction to inner list
          *
@@ -354,10 +426,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void add(const csdb::Transaction& tr);
+        void add(const csdb::Transaction& tr)
+        {
+            core.send_wallet_transaction(tr);
+        }
 
         /**
-         * @fn  inline void SolverContext::flush_transactions();
+         * @fn  void SolverContext::flush_transactions();
          *
          * @brief   Sends the transactions in inner list
          *
@@ -369,10 +444,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline size_t flush_transactions();
+        size_t flush_transactions()
+        {
+            return core.flushTransactions();
+        }
 
         /**
-         * @fn  inline bool SolverContext::verify(const csdb::Transaction& tr) const;
+         * @fn  bool SolverContext::verify(const csdb::Transaction& tr) const;
          *
          * @brief   Verifies the given transaction
          *
@@ -386,10 +464,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline bool verify(const csdb::Transaction& tr) const;
+        bool verify(const csdb::Transaction& tr) const
+        {
+            return core.verify_signature(tr);
+        }
 
         /**
-         * @fn  inline bool SolverContext::is_vect_recv_from(uint8_t sender) const;
+         * @fn  bool SolverContext::is_vect_recv_from(uint8_t sender) const;
          *
          * @brief   Query if is vector received from passed sender
          *
@@ -403,10 +484,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline bool is_vect_recv_from(uint8_t sender) const;
+        bool is_vect_recv_from(uint8_t sender) const
+        {
+            return core.recv_vect.find(sender) != core.recv_vect.cend();
+        }
 
         /**
-         * @fn  inline void SolverContext::recv_vect_from(uint8_t sender);
+         * @fn  void SolverContext::recv_vect_from(uint8_t sender);
          *
          * @brief   Inform core to remember that vector from passed sender is received
          *
@@ -418,10 +502,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void recv_vect_from(uint8_t sender);
+        void recv_vect_from(uint8_t sender)
+        {
+            core.recv_vect.insert(sender);
+        }
 
         /**
-         * @fn  inline size_t SolverContext::cnt_vect_recv() const;
+         * @fn  size_t SolverContext::cnt_vect_recv() const;
          *
          * @brief   Count of vectors received
          *
@@ -433,10 +520,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline size_t cnt_vect_recv() const;
+        size_t cnt_vect_recv() const
+        {
+            return core.recv_vect.size();
+        }
 
         /**
-         * @fn  inline bool SolverContext::is_matr_recv_from(uint8_t sender) const;
+         * @fn  bool SolverContext::is_matr_recv_from(uint8_t sender) const;
          *
          * @brief   Query if is matrix received from passed sender
          *
@@ -450,10 +540,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline bool is_matr_recv_from(uint8_t sender) const;
+        bool is_matr_recv_from(uint8_t sender) const
+        {
+            return core.recv_matr.find(sender) != core.recv_matr.cend();
+        }
 
         /**
-         * @fn  inline void SolverContext::recv_matr_from(uint8_t sender);
+         * @fn  void SolverContext::recv_matr_from(uint8_t sender);
          *
          * @brief   Inform core to remember that matrix from passed sender is received
          *
@@ -465,10 +558,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void recv_matr_from(uint8_t sender);
+        void recv_matr_from(uint8_t sender)
+        {
+            core.recv_matr.insert(sender);
+        }
 
         /**
-         * @fn  inline size_t SolverContext::cnt_matr_recv() const;
+         * @fn  size_t SolverContext::cnt_matr_recv() const;
          *
          * @brief   Count of matrices received
          *
@@ -480,10 +576,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline size_t cnt_matr_recv() const;
+        size_t cnt_matr_recv() const
+        {
+            return core.recv_matr.size();
+        }
 
         /**
-         * @fn  inline bool SolverContext::is_hash_recv_from(const PublicKey& sender) const;
+         * @fn  bool SolverContext::is_hash_recv_from(const PublicKey& sender) const;
          *
          * @brief   Query if is hash received from passed sender
          *
@@ -497,10 +596,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline bool is_hash_recv_from(const PublicKey& sender) const;
+        bool is_hash_recv_from(const PublicKey& sender) const
+        {
+            return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
+        }
 
         /**
-         * @fn  inline void SolverContext::recv_hash_from(const PublicKey& sender);
+         * @fn  void SolverContext::recv_hash_from(const PublicKey& sender);
          *
          * @brief   Inform core to remember that hash from passed sender is received
          *
@@ -512,10 +614,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline void recv_hash_from(const PublicKey& sender);
+        void recv_hash_from(const PublicKey& sender)
+        {
+            core.recv_hash.push_back(sender);
+        }
 
         /**
-         * @fn  inline size_t SolverContext::cnt_hash_recv() const;
+         * @fn  size_t SolverContext::cnt_hash_recv() const;
          *
          * @brief   Count of hashes received
          *
@@ -527,11 +632,59 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        inline size_t cnt_hash_recv() const;
+        size_t cnt_hash_recv() const
+        {
+            return core.recv_hash.size();
+        }
 
-        inline csdb::Address address_spammer() const;
-        inline csdb::Address address_genesis() const;
-        inline csdb::Address address_start() const;
+        /**
+         * @fn  csdb::Address SolverContext::address_spammer() const
+         *
+         * @brief   Address spammer
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @return  The csdb::Address.
+         */
+
+        csdb::Address address_spammer() const
+        {
+            return core.addr_spam.value_or(csdb::Address {});
+        }
+
+        /**
+         * @fn  csdb::Address SolverContext::address_genesis() const
+         *
+         * @brief   Address genesis
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @return  The csdb::Address.
+         */
+
+        csdb::Address address_genesis() const
+        {
+            return core.addr_genesis;
+        }
+
+        /**
+         * @fn  csdb::Address SolverContext::address_start() const
+         *
+         * @brief   Address start
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @return  The csdb::Address.
+         */
+
+        csdb::Address address_start() const
+        {
+            return core.addr_start;
+        }
+
 
 		/**
 		 * @fn	csdb::Address SolverContext::optimize(const csdb::Address& address) const;
@@ -551,172 +704,5 @@ namespace slv2
     private:
         SolverCore& core;
     };
-
-    Node& SolverContext::node() const
-    {
-        return *core.pnode;
-    }
-
-    Credits::Generals& SolverContext::generals() const
-    {
-        return *core.pgen;
-    }
-
-    CallsQueueScheduler& SolverContext::scheduler() const
-    {
-        return core.scheduler;
-    }
-
-    const KeyType& SolverContext::public_key() const
-    {
-        return core.public_key;
-    }
-
-    const KeyType& SolverContext::private_key() const
-    {
-        return core.private_key;
-    }
-
-    const Credits::HashVector& SolverContext::hash_vector() const
-    {
-        return core.getMyVector();
-    }
-
-    uint32_t SolverContext::round() const
-    {
-        return core.cur_round;
-    }
-
-    size_t SolverContext::cnt_trusted_desired() const
-    {
-        return core.cnt_trusted_desired;
-    }
-
-    bool SolverContext::is_spammer() const
-    {
-        return core.opt_spammer_on;
-    }
-
-    void SolverContext::become_normal()
-    {
-        core.handleTransitions(SolverCore::Event::SetNormal);
-    }
-
-    void SolverContext::become_trusted()
-    {
-        core.handleTransitions(SolverCore::Event::SetTrusted);
-    }
-
-    void SolverContext::become_writer()
-    {
-        core.handleTransitions(SolverCore::Event::SetWriter);
-    }
-
-    void SolverContext::become_collector()
-    {
-        core.handleTransitions(SolverCore::Event::SetCollector);
-    }
-
-    void SolverContext::vectors_completed()
-    {
-        core.handleTransitions(SolverCore::Event::Vectors);
-    }
-
-    void SolverContext::matrices_completed()
-    {
-        core.handleTransitions(SolverCore::Event::Matrices);
-    }
-
-    void SolverContext::store_block(csdb::Pool & block)
-    {
-        core.storeBlock(block);
-    }
-
-    void SolverContext::store_and_send_new_block()
-    {
-        core.prepareBlock(core.pool);
-        core.sendBlock(core.pool);
-        core.storeBlock(core.pool);
-    }
-
-    void SolverContext::repeat_last_block()
-    {
-        core.repeatLastBlock();
-    }
-
-    void SolverContext::add(const csdb::Transaction& tr)
-    {
-        core.send_wallet_transaction(tr);
-    }
-
-    size_t SolverContext::flush_transactions()
-    {
-        return core.flushTransactions();
-    }
-
-    bool SolverContext::verify(const csdb::Transaction& tr) const
-    {
-        return core.verify_signature(tr);
-    }
-
-    bool SolverContext::is_vect_recv_from(uint8_t sender) const
-    {
-        return core.recv_vect.find(sender) != core.recv_vect.cend();
-    }
-
-    void SolverContext::recv_vect_from(uint8_t sender)
-    {
-        core.recv_vect.insert(sender);
-    }
-
-    size_t SolverContext::cnt_vect_recv() const
-    {
-        return core.recv_vect.size();
-    }
-
-    bool SolverContext::is_matr_recv_from(uint8_t sender) const
-    {
-        return core.recv_matr.find(sender) != core.recv_matr.cend();
-    }
-
-    void SolverContext::recv_matr_from(uint8_t sender)
-    {
-        core.recv_matr.insert(sender);
-    }
-
-    size_t SolverContext::cnt_matr_recv() const
-    {
-        return core.recv_matr.size();
-    }
-
-    bool SolverContext::is_hash_recv_from(const PublicKey& sender) const
-    {
-        return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
-    }
-
-    void SolverContext::recv_hash_from(const PublicKey& sender)
-    {
-        core.recv_hash.push_back(sender);
-    }
-
-    size_t SolverContext::cnt_hash_recv() const
-    {
-        return core.recv_hash.size();
-    }
-
-    csdb::Address SolverContext::address_spammer() const
-    {
-        return core.addr_spam.value_or(csdb::Address {});
-    }
-
-    csdb::Address SolverContext::address_genesis() const
-    {
-        return core.addr_genesis;
-    }
-
-    inline csdb::Address SolverContext::address_start() const
-    {
-        return core.addr_start;
-    }
 
 } // slv2

@@ -9,11 +9,7 @@ namespace slv2
     {
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {
-            Hash test_hash((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
-            if(Consensus::Log) {
-                LOG_NOTICE(name() << ": sending hash in reply to block sender");
-            }
-            context.node().sendHash(test_hash, sender);
+            DefaultStateBehavior::sendLastWrittenHash(context, sender);
         }
         return res;
     }
