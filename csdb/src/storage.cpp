@@ -2,12 +2,13 @@
 
 #include <sstream>
 #include <cstdarg>
-#include <queue>
+#include <deque>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
 #include <cassert>
 #include <stdexcept>
+#include <algorithm>
 
 #include "csdb/address.h"
 #include "csdb/wallet.h"
@@ -134,7 +135,7 @@ private:
   std::thread write_thread;
   bool quit = false;
 
-  std::queue<Pool> write_queue;
+  std::deque<Pool> write_queue;
   std::mutex write_lock;
   std::condition_variable write_cond_var;
 
@@ -274,7 +275,7 @@ void Storage::priv::write_routine() {
       if (last_hash == pool.previous_hash()) {
         last_hash = hash;
       }
-      write_queue.pop();
+      write_queue.pop_front();
     }
   }
 }
@@ -420,24 +421,48 @@ bool Storage::pool_save(Pool pool)
   }
 
   std::unique_lock<std::mutex> lock(d->write_lock);
-  d->write_queue.push(pool);
+  d->write_queue.push_back(pool);
   d->write_cond_var.notify_one();
 
   d->set_last_error();
   return true;
 }
 
+bool Storage::write_queue_search(const PoolHash& hash, Pool& res_pool) const
+{
+  std::unique_lock<std::mutex> lock(d->write_lock, std::defer_lock);
+
+  if (!d->write_queue.empty() && lock.try_lock()) {
+    auto pos = std::find_if(d->write_queue.begin(), d->write_queue.end(),
+      [&](Pool &pool) {
+        return hash == pool.hash();
+      });
+    if (pos != d->write_queue.cend()) {
+      res_pool = *pos;
+      return true;
+    }
+  }
+  return false;
+}
+
 Pool Storage::pool_load(const PoolHash &hash) const
 {
+  Pool empty_Pool{};
+
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
   }
 
-  if(hash.is_empty())
-  {
+  if(hash.is_empty()) {
     d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
     return Pool{};
+  }
+
+  Pool res{};
+  bool found = write_queue_search(hash, res);
+  if (found) {
+    return res;
   }
 
   ::csdb::internal::byte_array data;
@@ -446,13 +471,14 @@ Pool Storage::pool_load(const PoolHash &hash) const
     return Pool{};
   }
 
-  Pool res = Pool::from_binary(data);
+  res = Pool::from_binary(data);
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
   }
   else {
     d->set_last_error();
   }
+
   return res;
 }
 
@@ -463,10 +489,15 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
     return Pool{};
   }
 
-  if (hash.is_empty())
-  {
+  if (hash.is_empty()) {
     d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
     return Pool{};
+  }
+
+  Pool res{};
+  bool found = write_queue_search(hash, res);
+  if (found) {
+    return res;
   }
 
   ::csdb::internal::byte_array data;
@@ -475,7 +506,7 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
     return Pool{};
   }
 
-  Pool res = Pool::meta_from_binary(data, cnt);
+  res = Pool::meta_from_binary(data, cnt);
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
   }

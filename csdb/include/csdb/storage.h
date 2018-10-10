@@ -46,6 +46,7 @@ class Storage final
 {
 private:
   class priv;
+  bool write_queue_search(const PoolHash& hash, Pool& res_pool) const;
 
 public:
   using WeakPtr = ::std::weak_ptr<priv>;
