@@ -115,7 +115,6 @@ void Solver::buildBlock(csdb::Pool& block)
 
   transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(10, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
 
   block.add_transaction(transaction);
@@ -125,7 +124,6 @@ void Solver::buildBlock(csdb::Pool& block)
 
   transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(10, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
 
   block.add_transaction(transaction);

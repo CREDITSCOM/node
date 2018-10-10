@@ -551,7 +551,6 @@ APIHandler::make_transaction(const Transaction& transaction)
   BlockChain::WalletId id{};
   if (!s_blockchain.findWalletData(source, wallData, id))
       return csdb::Transaction{};
-  send_transaction.set_balance(wallData.balance_);
   send_transaction.set_currency(csdb::Currency(1));
   send_transaction.set_source(source);
   send_transaction.set_target(

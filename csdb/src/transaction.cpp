@@ -124,28 +124,7 @@ Transaction::Transaction(int64_t innerID,
                amount,
                max_fee,
                counted_fee,
-               signature,
-               amount))
-{}
-
-Transaction::Transaction(int64_t innerID,
-                         Address source,
-                         Address target,
-                         Currency currency,
-                         Amount amount,
-                         AmountCommission max_fee,
-                         AmountCommission counted_fee,
-                         std::string signature,
-                         Amount balance)
-  : d(new priv(innerID,
-               source,
-               target,
-               currency,
-               amount,
-               max_fee,
-               counted_fee,
-               signature,
-               balance))
+               signature))
 {}
 
 bool
@@ -215,12 +194,6 @@ std::string
 Transaction::signature() const noexcept
 {
   return d->signature_;
-}
-
-Amount
-Transaction::balance() const noexcept
-{
-  return d->balance_;
 }
 
 void
@@ -296,14 +269,6 @@ Transaction::set_signature(std::string signature)
 {
   if (!d.constData()->read_only_) {
     d->signature_ = signature;
-  }
-}
-
-void
-Transaction::set_balance(Amount balance)
-{
-  if (!d.constData()->read_only_) {
-    d->balance_ = balance;
   }
 }
 
