@@ -191,7 +191,6 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_amount(csdb::Amount(100'000'000, 0));
   transaction.set_max_fee(csdb::AmountCommission(0.0));
   transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(0);
 
   genesis.add_transaction(transaction);
@@ -204,7 +203,6 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_amount(csdb::Amount(100'000'000, 0));
   transaction.set_max_fee(csdb::AmountCommission(0.0));
   transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  //transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(1);
 
   genesis.add_transaction(transaction);
@@ -221,7 +219,6 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_amount(csdb::Amount(100'000'000, 0));
   transaction.set_max_fee(csdb::AmountCommission(0.0));
   transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_balance(csdb::Amount(100, 0));
   transaction.set_innerID(2);
 
   genesis.add_transaction(transaction);
