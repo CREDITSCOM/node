@@ -7,42 +7,43 @@ class Consensus
 public:
 
 
-    /** @brief   Set the flag to log solver-with-state info to console*/
+    /** @brief   Set the flag to log solver-with-state messages to console*/
     constexpr static bool Log = true;
 
+    /** @brief   The default state timeout, currently not used */
     constexpr static unsigned int DefaultStateTimeout = 5000;
 
+    /** @brief   The minimum trusted nodes to start consensus */
     constexpr static unsigned int MinTrustedNodes = 3;
 
-    /** @brief   The general (Writer->General) is not selected by "generals" */
+    /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
     constexpr static uint8_t GeneralNotSelected = 100;
 
     /** @brief   Max duration (msec) of the whole round (N, W, G, T) */
-    constexpr static uint32_t T_round = 5000;
+    constexpr static uint32_t T_round = 2000;
 
     /** @brief   Max timeout (msec) to wait next round table (N, W, G, T) */
-    constexpr static uint32_t T_rt = 300;
+    //constexpr static uint32_t T_rt = 300;
 
     /** @brief   Max timeout (msec) to wait transaction list (T) */
-    constexpr static uint32_t T_tl = 200;
+    //constexpr static uint32_t T_tl = 200;
 
     /** @brief   Max timeout (msec) to wait all vectors (T) */
-    constexpr static uint32_t T_vec = 400;
+    //constexpr static uint32_t T_vec = 400;
 
     /** @brief   Max timeout (msec) to wait all matrices (T) */
-    constexpr static uint32_t T_mat = 600;
+    //constexpr static uint32_t T_mat = 600;
 
     /** @brief   Max timeout (msec) to wait block (N, G, T) */
-    constexpr static uint32_t T_blk = 400;
+    //constexpr static uint32_t T_blk = 400;
 
     /** @brief   Max timeout (msec) to wait hashes after write & send block (W) */
     constexpr static uint32_t T_hash = 400;
 
-
     /** @brief   Max time to collect transactions (G) */
-    constexpr static uint32_t T_coll_trans = 200;
+    //constexpr static uint32_t T_coll_trans = 200;
 
     /** @brief   Period between flush transactions (N) */
-    constexpr static uint32_t T_flush_trans = 50;
+    constexpr static uint32_t T_flush_trans = 200;
 
 };
