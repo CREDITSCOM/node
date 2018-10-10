@@ -58,8 +58,14 @@ bool Node::init() {
   if (!checkKeysFile())
     return false;
 
-  solver_->set_keys(myPublicForSig, myPrivateForSig);  // DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
-  solver_->addInitialBalance();
+  cs::PublicKey publicKey; 
+  std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
+
+  cs::PrivateKey privateKey;
+  std::copy(myPrivateForSig.begin(), myPrivateForSig.end(), privateKey.begin());
+
+  solver_->setKeysPair(publicKey, privateKey);
+  //solver_->addInitialBalance();
 
   return true;
 }
@@ -230,26 +236,33 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   }
 }
 
-void Node::sendRoundTable(const cs::RoundTable& round) {
+void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   ostream_.init(BaseFlags::Broadcast);
+  ostream_ << MsgTypes::RoundTable;
 
-  ostream_ << MsgTypes::RoundTable << round.round << round.confidants.size() << round.hashes.size() << round.general;
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
 
-  for (auto& it : round.confidants) {
-    ostream_ << it;
+  stream << roundTable.round;
+  stream << roundTable.confidants.size();
+  stream << roundTable.hashes.size();
+  stream << roundTable.general;
+
+  for (const auto& it : roundTable.confidants) {
+    stream << it;
   }
 
-  for (auto& it : round.hashes) {
-    ostream_ << it;
+  for (const auto& it : roundTable.hashes) {
+    stream << it;
   }
 
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-  cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(round.general.data(), round.general.size()) << "Confidants: ";
+  cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(roundTable.general.data(), roundTable.general.size()) << "Confidants: ";
 
   size_t i = 0;
 
-  for (auto& e : round.confidants) {
-    if (e != round.general) {
+  for (auto& e : roundTable.confidants) {
+    if (e != roundTable.general) {
       cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
       ++i;
     }
@@ -259,10 +272,12 @@ void Node::sendRoundTable(const cs::RoundTable& round) {
 
   cslog() << "Hashes";
 
-  for (auto& e : round.hashes) {
+  for (auto& e : roundTable.hashes) {
     cslog() << i << ". " << e.toString().c_str();
     i++;
   }
+
+  ostream_ << bytes;
 
   transport_->clearTasks();
   flushCurrentTasks();
@@ -819,7 +834,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   cs::DataStream stream(data, size);
 
-  uint8_t confidantsCount = 0;
+  std::size_t confidantsCount = 0;
   stream >> confidantsCount;
 
   if (confidantsCount == 0) {
@@ -827,11 +842,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     return;
   }
 
-  uint16_t hashesCount;
+  std::size_t hashesCount = 0;
   stream >> hashesCount;
 
   cs::RoundTable roundTable;
   roundTable.round = round;
+  roundNum_ = round;
 
   cs::PublicKey general;
   stream >> general;
@@ -952,12 +968,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   const cs::RoundTable& roundTable = solver_->roundTable();
 
-  for (const auto& confidant : roundTable.confidants) {
-    if (!cs::Utils::verifySignature(signature.data(), confidant.data(), data, size)) {
-      cswarning() << "Confidants signatures verification failed";
-      return;
-    }
-  }
+  //for (const auto& confidant : roundTable.confidants) {
+  //  if (!cs::Utils::verifySignature(signature, confidant, data, size)) {
+  //    cswarning() << "Confidants signatures verification failed";
+  //    return;
+  //  }
+  //}
 
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
@@ -994,7 +1010,7 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 
   // loading block from blockhain, because write pool to blockchain do something with pool
   const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();
-  const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey().data());
+  const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
@@ -1023,9 +1039,14 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, co
   cs::Signature signature;
   stream >> signature;
 
-  size_t messageSize = size - signature.size();
+  cs::PublicKey publicKey;
+  stream >> publicKey;
 
-  if (!cs::Utils::verifySignature(signature.data(), senderPublicKey.data(), data, messageSize)) {
+  size_t messageSize = size - signature.size() - publicKey.size();
+
+  if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
+    cserror() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
+    csinfo() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
     return false;
   }
 
@@ -1071,17 +1092,22 @@ void Node::sendWriterNotification() {
 }
 
 cs::Bytes Node::createNotification() {
-  const cs::Hash& characteristicHash = solver_->getCharacteristicHash();
-  const cs::PublicKey& writerPublicKey = solver_->getWriterPublicKey();
+  cs::Hash characteristicHash = solver_->getCharacteristicHash();
+  cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
 
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
   stream << characteristicHash << writerPublicKey;
 
-  cs::Signature signature = cs::Utils::sign(bytes, solver_->getPrivateKey().data());
+  cs::Signature signature = cs::Utils::sign(bytes, solver_->getPrivateKey());
+
+  if (!cs::Utils::verifySignature(signature, solver_->getPublicKey(), bytes.data(), bytes.size())) {
+    cserror() << "Verification failed";
+  }
 
   stream << signature;
+  stream << solver_->getPublicKey();
 
   return bytes;
 }
@@ -1348,6 +1374,10 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
 
   if (type == MsgTypes::TransactionPacket) {
     return MessageActions::Process;
+  }
+
+  if (type == MsgTypes::RoundTable) {
+    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence()) {

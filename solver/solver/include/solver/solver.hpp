@@ -44,7 +44,7 @@ class Solver {
   Solver(const Solver&) = delete;
   Solver& operator=(const Solver&) = delete;
 
-  void set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv);
+  void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
 
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
@@ -70,7 +70,6 @@ class Solver {
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
-  std::vector<uint8_t> sign(std::vector<uint8_t> data);
 
   PublicKey getWriterPublicKey() const;
 
@@ -107,7 +106,8 @@ class Solver {
   void setBigBangStatus(bool _status);
   void setRNum(size_t _rNum);
 
-  const std::vector<uint8_t>& getPrivateKey() const;
+  const cs::PrivateKey& getPrivateKey() const;
+  const cs::PublicKey& getPublicKey() const;
 
  private:
   void _initApi();
@@ -132,8 +132,8 @@ class Solver {
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 
-  std::vector<uint8_t> myPublicKey;
-  std::vector<uint8_t> myPrivateKey;
+  cs::PublicKey myPublicKey;
+  cs::PrivateKey myPrivateKey;
 
   Node* m_node;
 

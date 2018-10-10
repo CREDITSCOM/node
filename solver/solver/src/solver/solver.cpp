@@ -56,9 +56,9 @@ Solver::~Solver() {
   m_sendingPacketTimer.stop();
 }
 
-void Solver::set_keys(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv) {
-  myPublicKey  = pub;
-  myPrivateKey = priv;
+void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
+  myPublicKey = publicKey;
+  myPrivateKey = privateKey;
 }
 
 void Solver::buildBlock(csdb::Pool& block) {
@@ -91,12 +91,12 @@ void Solver::buildBlock(csdb::Pool& block) {
 
 void Solver::prepareBlockForSend(csdb::Pool& block) {
   addTimestampToPool(block);
-  block.set_writer_public_key(myPublicKey);
+  block.set_writer_public_key(cs::Bytes(myPublicKey.begin(), myPublicKey.end()));
   block.set_sequence((m_node->getBlockChain().getLastWrittenSequence()) + 1);
 
   auto prev_hash = csdb::PoolHash::from_string("");
   block.set_previous_hash(prev_hash);
-  block.sign(myPrivateKey);
+  block.sign(cs::Bytes(myPrivateKey.begin(), myPrivateKey.end()));
 
   cslog() << "last sequence: " << (m_node->getBlockChain().getLastWrittenSequence());
   cslog() << "prev_hash: " << m_node->getBlockChain().getLastHash().to_string() << " <- Not sending!!!";
@@ -133,10 +133,6 @@ auto Solver::setLastRoundTransactionsGot(size_t trNum) -> void {
 void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
                                  const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
-
-  if (m_node->getMyLevel() == NodeLevel::Writer) {
-    return;
-  }
 
   gotBigBang = false;
   gotBlockThisRound = true;
@@ -225,26 +221,15 @@ Hash Solver::getCharacteristicHash() const {
   return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
 }
 
-std::vector<uint8_t> Solver::sign(std::vector<uint8_t> data) {
-  std::vector<uint8_t> signature(64);  // 64 is signature length. We need place this as constant!
-  unsigned long long   signLength = 0;
-
-  crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), myPrivateKey.data());
-
-  assert(64 == signLength);  // signature length = 64. Where's constant?
-
-  data.insert(data.end(), signature.begin(), signature.end());
-
-  return data;
-}
-
 PublicKey Solver::getWriterPublicKey() const {
   PublicKey result;
+
   if (m_writerIndex < m_roundTable.confidants.size()) {
     result = m_roundTable.confidants[m_writerIndex];
   } else {
     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
   }
+
   return result;
 }
 
@@ -545,7 +530,6 @@ void Solver::gotVector(HashVector&& vector) {
 
       if (m_writerIndex == 100) {
         cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
-        cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
       } else {
 
         cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
@@ -611,7 +595,6 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
 
     if (writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
-      // cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
     } else {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
@@ -1046,8 +1029,12 @@ void Solver::addTransaction(const csdb::Transaction& transaction) {
   m_transactionsBlock.back().addTransaction(transaction);
 }
 
-const std::vector<uint8_t>& Solver::getPrivateKey() const {
+const cs::PrivateKey& Solver::getPrivateKey() const {
   return myPrivateKey;
+}
+
+const cs::PublicKey& Solver::getPublicKey() const {
+  return myPublicKey;
 }
 
 }  // namespace cs

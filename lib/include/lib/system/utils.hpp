@@ -279,12 +279,14 @@ namespace cs
         ///
         /// Signs data with security key
         ///
-        static cs::Signature sign(const cs::Bytes& data, const unsigned char* securityKey)
+        static cs::Signature sign(const cs::Bytes& data, const cs::PrivateKey& securityKey)
         {
             cs::Signature signature;
+            std::fill(signature.begin(), signature.end(), 0);
+
             unsigned long long signLength = 0;
 
-            crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), securityKey);
+            crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), securityKey.data());
 
             assert(signature.size() == signLength);
 
@@ -303,10 +305,10 @@ namespace cs
         ///
         /// Verifies data signature with public key
         ///
-        static bool verifySignature(const cs::Byte* signature, const cs::Byte* public_key, const cs::Byte* message, size_t message_len)
+        static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message, std::size_t messageSize)
         {
-            const int ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
-            return ok == 0;
+            const int error = crypto_sign_verify_detached(signature.data(), message, messageSize, publicKey.data());
+            return !error;
         }
     };
 }

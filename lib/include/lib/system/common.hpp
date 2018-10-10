@@ -14,7 +14,7 @@
 constexpr std::size_t HASH_LENGTH = 32;
 constexpr std::size_t BLAKE2_HASH_LENGTH = 32;
 constexpr std::size_t PUBLIC_KEY_LENGTH = 32;
-constexpr std::size_t PRIVATE_KEY_LENGTH = 32;
+constexpr std::size_t PRIVATE_KEY_LENGTH = 64;
 constexpr std::size_t SIGNATURE_LENGTH = 64;
 
 namespace cs
