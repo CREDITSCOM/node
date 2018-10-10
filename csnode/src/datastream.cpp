@@ -106,7 +106,7 @@ char* cs::DataStream::data() const
 std::size_t cs::DataStream::size() const
 {
     if (!m_bytes) {
-        return m_index;
+        return m_dataSize;
     }
     else {
         return m_bytes->size();

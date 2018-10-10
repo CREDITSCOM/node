@@ -81,7 +81,7 @@ class Node {
 
   void sendBadBlock(const csdb::Pool& pool);
   void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const uint32_t maskBitsCount,
-                          const std::vector<uint8_t>& characteristic);
+                          const cs::Bytes& characteristic);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);

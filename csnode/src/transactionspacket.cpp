@@ -27,7 +27,7 @@ namespace cs
         return res;
     }
 
-    TransactionsPacketHash TransactionsPacketHash::fromBinary(const internal::Bytes& data)
+    TransactionsPacketHash TransactionsPacketHash::fromBinary(const cs::Bytes& data)
     {
         const size_t size = data.size();
         TransactionsPacketHash resHash;
@@ -41,7 +41,7 @@ namespace cs
         return resHash;
     }
 
-    TransactionsPacketHash TransactionsPacketHash::calcFromData(const internal::Bytes& data)
+    TransactionsPacketHash TransactionsPacketHash::calcFromData(const cs::Bytes& data)
     {
         TransactionsPacketHash resHash;
         resHash.m_bytes = ::csdb::priv::crypto::calc_hash(data);
@@ -67,7 +67,7 @@ namespace cs
         return csdb::internal::to_hex(m_bytes.begin(), m_bytes.end());
     }
 
-    const internal::Bytes& TransactionsPacketHash::toBinary() const noexcept
+    const cs::Bytes& TransactionsPacketHash::toBinary() const noexcept
     {
         return m_bytes;
     }
@@ -93,7 +93,7 @@ namespace cs
     // Static interface
     //
 
-    TransactionsPacket TransactionsPacket::fromBinary(const internal::Bytes& data)
+    TransactionsPacket TransactionsPacket::fromBinary(const cs::Bytes& data)
     {
         return fromByteStream((const char*)(data.data()), data.size());
     }
@@ -116,7 +116,7 @@ namespace cs
     // Interface
     //
 
-    internal::Bytes TransactionsPacket::toBinary() const noexcept
+    cs::Bytes TransactionsPacket::toBinary() const noexcept
     {
         ::csdb::priv::obstream os;
         put(os);

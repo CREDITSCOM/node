@@ -24,14 +24,10 @@ namespace cs
 
     using Byte = uint8_t;
 
-    ///
-    /// Dynamic bytes vector
-    ///
+    // dynamic vector of bytes
     using Bytes = std::vector<Byte>;
 
-    ///
-    /// Static byte array
-    ///
+    // static byte array
     template<std::size_t size>
     using ByteArray = std::array<Byte, size>;
 

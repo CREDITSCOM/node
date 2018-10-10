@@ -866,7 +866,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const uint32_t maskBitsCount,
-                              const std::vector<uint8_t>& characteristic) {
+                              const cs::Bytes& characteristic) {
   if (myLevel_ != NodeLevel::Writer) {
     cserror() << "Only writer nodes can send blocks";
     return;

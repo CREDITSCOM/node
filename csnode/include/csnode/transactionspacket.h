@@ -4,15 +4,10 @@
 #include <vector>
 #include <string>
 #include <csdb/transaction.h>
+#include <lib/system/common.hpp>
 
 namespace cs
 {
-    namespace internal
-    {
-        using byte  = uint8_t;
-        using Bytes = std::vector<byte>;
-    }
-
     ///
     /// Wrapper of std::vector<uint8_t> to represent hash
     ///
@@ -34,14 +29,14 @@ namespace cs
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty hash is returned.
         ///
-        static TransactionsPacketHash fromBinary(const internal::Bytes& data);
+        static TransactionsPacketHash fromBinary(const cs::Bytes& data);
 
         ///
         /// @brief Calculates hash from binary data
         /// @param vector of bytes
         /// @return hash
         ///
-        static TransactionsPacketHash calcFromData(const internal::Bytes& data);
+        static TransactionsPacketHash calcFromData(const cs::Bytes& data);
 
     public: // Interface
 
@@ -67,7 +62,7 @@ namespace cs
         /// @brief  Coverts transactions packet hash to binary.
         /// @return vector of bytes
         ///
-        const internal::Bytes& toBinary() const noexcept;
+        const cs::Bytes& toBinary() const noexcept;
 
         bool operator == (const TransactionsPacketHash& other) const noexcept;
         bool operator != (const TransactionsPacketHash& other) const noexcept;
@@ -75,7 +70,7 @@ namespace cs
 
     private: // Members
 
-        internal::Bytes m_bytes;
+        cs::Bytes m_bytes;
     };
 
     ///
@@ -91,7 +86,7 @@ namespace cs
         /// @return Hash obtained from a binary representation.
         ///         If the binary representation is incorrect, an empty packet is returned.
 		///
-        static TransactionsPacket fromBinary(const internal::Bytes& data);
+        static TransactionsPacket fromBinary(const cs::Bytes& data);
 
         ///
         /// @brief  Gets a transactions packet from a binary representation
@@ -108,7 +103,7 @@ namespace cs
         /// @brief  Coverts transactions packet to binary representation.
         /// @return packet as binary representation
         ///
-        internal::Bytes toBinary() const noexcept;
+        cs::Bytes toBinary() const noexcept;
 
         ///
         /// @brief Generates hash
