@@ -74,6 +74,8 @@ public:
   csdb::PoolHash getHashBySequence(uint32_t seq) const;
   const csdb::PoolHash & getLastWrittenHash() const;
 
+  const csdb::Storage & getStorage() const;
+
 private:
   Headtag ht;
   bool loadCache();

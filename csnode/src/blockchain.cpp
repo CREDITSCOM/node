@@ -371,6 +371,18 @@ void BlockChain::writeGenesisBlock() {
   vchRet.clear();
   genesis.add_transaction(transaction);
 
+  //key11
+  transaction.set_source(csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
+  DecodeBase58("GWe8WZYLBxAqsfPZgejnysXQm5Q697VSsyr3x59RvYBf", vchRet);
+  transaction.set_target(csdb::Address::from_string(byteStreamToHex((const char*)vchRet.data(), 32)));
+
+  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_amount(csdb::Amount(100000000, 0));
+  transaction.set_balance(csdb::Amount(1000000000, 0));
+  transaction.set_innerID(10);
+  vchRet.clear();
+  genesis.add_transaction(transaction);
+
 
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(0);
@@ -617,6 +629,12 @@ const csdb::PoolHash & BlockChain::getLastWrittenHash() const
 {
   return lastHash_;
 }
+
+const csdb::Storage & BlockChain::getStorage() const
+{
+  return storage_;
+}
+
 
 //void
 //BlockChain::wait_for_block()
