@@ -554,20 +554,6 @@ void Solver::gotVector(HashVector&& vector) {
 
         if (m_writerIndex == m_node->getMyConfNumber()) {
           m_node->becomeWriter();
-
- /*         cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
-
-            PoolMetaInfo poolMetaInfo;
-            poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
-            poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
-
-            const Characteristic& characteristic = m_generals->getCharacteristic();
-
-            m_node->sendCharacteristic(poolMetaInfo, characteristic);
-
-            writeNewBlock();
-
-          });*/
         }
         else {
           m_node->sendWriterNotification();
@@ -627,25 +613,16 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
       // cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
     } else {
-      cslog() << "SOLVER> writerIndex = " << static_cast<int>(writerIndex);
+      cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
+      cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
+
       consensusAchieved = true;
 
-      if (writerIndex == m_node->getMyConfNumber()) {
+      if (m_writerIndex == m_node->getMyConfNumber()) {
         m_node->becomeWriter();
-        cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() {
-          PoolMetaInfo poolMetaInfo;
-          poolMetaInfo.timestamp      = cs::Utils::currentTimestamp();
-          poolMetaInfo.sequenceNumber = 1 + m_node->getBlockChain().getLastWrittenSequence();
-
-          const Characteristic& characteristic = m_generals->getCharacteristic();
-
-          m_node->sendCharacteristic(poolMetaInfo, characteristic);
-
-          m_pool.set_sequence(poolMetaInfo.sequenceNumber);
-          m_pool.add_user_field(0, poolMetaInfo.timestamp);
-
-          writeNewBlock();
-        });
+      }
+      else {
+        m_node->sendWriterNotification();
       }
     }
   }

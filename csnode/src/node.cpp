@@ -1065,6 +1065,8 @@ void Node::sendWriterNotification() {
 
   ostream_ << createNotification();
 
+  cslog() << "Notification sent to writer";
+
   flushCurrentTasks();
 }
 
