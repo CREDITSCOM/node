@@ -44,7 +44,7 @@ class AmountCommission {
  private:
   union 
   {
-    uint16_t bits_; // All bits
+    uint16_t bits_ = 0; // All bits
     struct 
     {
 #ifdef BOOST_BIG_ENDIAN
