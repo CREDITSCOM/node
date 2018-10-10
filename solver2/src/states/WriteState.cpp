@@ -25,11 +25,12 @@ namespace slv2
 
         context.node().becomeWriter();
 
-        if(Consensus::Log) {
-            LOG_NOTICE(name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ")");
-        }
-        context.store_and_send_new_block();
+        context.create_and_send_new_block();
         pown = std::make_unique<Hash>((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+        if(Consensus::Log) {
+            constexpr const size_t hash_len = sizeof(pown->str) / sizeof(pown->str[0]);
+            LOG_NOTICE(name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ") = " << byteStreamToHex(pown->str, hash_len));
+        }
 
         // launch timeout control to reduce count of desired candidates on delay
         if(Consensus::Log) {
@@ -70,7 +71,8 @@ namespace slv2
             }
             else {
                 if(Consensus::Log) {
-                    LOG_WARN(name() << ": hash received do not match!!!");
+                    constexpr const size_t hash_len = sizeof(sender.str) / sizeof(sender.str[0]);
+                    LOG_WARN(name() << ": hash received do not match!!! Sender " << byteStreamToHex(sender.str, hash_len));
                 }
             }
         }

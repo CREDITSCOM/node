@@ -173,6 +173,21 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
+    protected:
+
+        /**
+         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& sender);
+         *
+         * @brief   Sends a last written hash to 
+         *
+         * @author  Alexander Avramenko
+         * @date    10.10.2018
+         *
+         * @param [in,out]  context The context.
+         * @param           target  The target receiver of hash sent.
+         */
+
+        void sendLastWrittenHash(SolverContext& context, const PublicKey& target);
     };
 
 } // slv2

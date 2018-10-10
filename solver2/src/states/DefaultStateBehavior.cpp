@@ -51,7 +51,7 @@ namespace slv2
         auto awaiting_seq = context.blockchain().getLastWrittenSequence() + 1;
         if(g_seq == awaiting_seq ) {
             if(block.verify_signature()) {
-                context.store_block(block);
+                context.store_received_block(block);
                 // по логике солвера-1 Writer & Main отправку хэша не делают,
                 // для Writer'а вопрос решен автоматически на уровне Node (он не получает блок вообще) и на уровне WriteState (он переопределяет пустой метод onBlock()),
                 // а вот для Main (CollectState) ситуация не очень удобная, приходится не делать здесь отправку хэша.
@@ -113,6 +113,16 @@ namespace slv2
             LOG_DEBUG(name() << ": transaction list ignored in this state");
         }
         return Result::Ignore;
+    }
+
+    void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& target)
+    {
+        Hash hash_val((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+        if(Consensus::Log) {
+            constexpr const size_t hash_len = sizeof(hash_val.str) / sizeof(hash_val.str[0]);
+            LOG_NOTICE(name() << ": sending hash " << byteStreamToHex(hash_val.str, hash_len) << " in reply to block sender");
+        }
+        context.node().sendHash(hash_val, target);
     }
 
 } // slv2

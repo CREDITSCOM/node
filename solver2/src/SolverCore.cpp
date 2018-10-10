@@ -188,9 +188,10 @@ namespace slv2
         if(cur_round == pool.sequence()) {
             // still actual, send it again
             if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: current block is ready to repeat");
+                LOG_NOTICE("SolverCore: current block is ready to repeat, do it");
+                LOG_NOTICE("SolverCore: sending block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
             }
-            sendBlock(pool);
+            pnode->sendBlock(pool);
         }
         else {
             // load block and send it
@@ -200,42 +201,57 @@ namespace slv2
             auto& bch = pnode->getBlockChain();
             csdb::Pool p = bch.loadBlock(bch.getLastWrittenHash());
             if(p.is_valid()) {
-                sendBlock(p);
+                if(Consensus::Log) {
+                    LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
+                }
+                pnode->sendBlock(p);
             }
         }
     }
 
     // Copied methods from solver.v1
     
-    void SolverCore::sendBlock(csdb::Pool& p)
+    void SolverCore::createAndSendNewBlock()
     {
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
-        }
-        pnode->sendBlock(p);
-    }
+        //core.prepareBlock(core.pool);
 
-    void SolverCore::storeBlock(csdb::Pool& p)
-    {
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
-        }
-        auto& bc = pnode->getBlockChain();
-        bc.finishNewBlock(p);
-        bc.writeNewBlock(p);
-        bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
-    }
-
-    void SolverCore::prepareBlock(csdb::Pool& p)
-    {
-        // add timestamp
-        p.add_user_field(0, std::to_string(
+        // see Solver-1, writeNewBlock() method
+        pnode->getBlockChain().finishNewBlock(pool);
+        // see: Solver-1, addTimestampToPool() method
+        pool.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
         // finalize
+        // see Solver-1, prepareBlockForSend() method
         pool.set_writer_public_key(public_key);
         pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
         pool.sign(private_key);
+
+        //core.sendBlock(core.pool);
+
+        if(Consensus::Log) {
+            LOG_NOTICE("SolverCore: sending block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
+        }
+        pnode->sendBlock(pool);
+
+        //core.storeBlock(core.pool);
+
+        if(Consensus::Log) {
+            LOG_NOTICE("SolverCore: storing block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
+        }
+        auto& bc = pnode->getBlockChain();
+        bc.writeNewBlock(pool);
+        bc.setGlobalSequence(static_cast<uint32_t>(pool.sequence()));
+    }
+
+    void SolverCore::storeReceivedBlock(csdb::Pool& p)
+    {
+        // see: Solver-1, method Solver::gotBlock()
+        if(!pnode->getBlockChain().onBlockReceived(p)) {
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: BlockChain::onBlockReceived() reports an itnernal error");
+            }
+        }
     }
 
     size_t SolverCore::flushTransactions()
