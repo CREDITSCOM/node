@@ -993,7 +993,7 @@ void Solver::nextRound() {
 }
 
 bool Solver::verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len) {
-  int ver_ok = crypto_sign_ed25519_verify_detached(signature, message, message_len, public_key);
+  int ver_ok = crypto_sign_verify_detached(signature, message, message_len, public_key);
   return ver_ok == 0;
 }
 

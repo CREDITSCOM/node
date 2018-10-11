@@ -120,9 +120,6 @@ bool Node::checkKeysFile() {
 }
 
 void Node::generateKeys() {
-  uint8_t private_key[64], public_key[32];
-  crypto_sign_ed25519_keypair(public_key, private_key);
-
   myPublicForSig.clear();
   myPrivateForSig.clear();
 
@@ -133,7 +130,7 @@ void Node::generateKeys() {
   myPublicForSig.resize(32);
   myPrivateForSig.resize(64);
 
-  crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
+  crypto_sign_keypair(myPublicForSig.data(), myPrivateForSig.data());
 
   std::ofstream f_pub("NodePublic.txt");
   f_pub << EncodeBase58(myPublicForSig);
@@ -157,9 +154,9 @@ bool Node::checkKeysForSig() {
   }
 
   uint64_t sig_size;
-  crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long*>(&sig_size), msg, 5, private_key);
+  crypto_sign_detached(signature, &sig_size, msg, 5, private_key);
 
-  int ver_ok = crypto_sign_ed25519_verify_detached(signature, msg, 5, public_key);
+  int ver_ok = crypto_sign_verify_detached(signature, msg, 5, public_key);
 
   if (ver_ok == 0) {
     return true;
