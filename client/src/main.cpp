@@ -44,10 +44,13 @@ int main(int argc, char* argv[]) {
   auto config = Config::read(vm);
   if (!config.isGood()) panic();
 
+  logger::initialize(config.getLoggerSettings());
+
   Node node(config);
   if (!node.isGood()) panic();
 
   node.run(config);
 
+  logger::cleanup();
   return 0;
 }
