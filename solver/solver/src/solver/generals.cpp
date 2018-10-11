@@ -98,7 +98,6 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
 
   auto*   hw = new HashWeigth[nodes_amount];
-  cs::Hash temp_hash;
   uint8_t j = matrix.sender;
   uint8_t i_max;
   bool    found = false;
@@ -119,6 +118,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
     } else {
       found = false;
 
+      // FIXME: i_max uninitialized in this branch!!!!
       for (uint8_t ii = 0; ii < i_max; ii++) {
         if (memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size()) == 0) {
           (hw[ii].weight)++;
@@ -147,7 +147,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   for (int i = 0; i < i_max; i++) {
     if (hw[i].weight > hw_max) {
       hw_max            = hw[i].weight;
-      max_frec_position = i;
+      max_frec_position = cs::numeric_cast<uint8_t>(i);
     }
   }
 
@@ -235,7 +235,7 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   delete[] hash_weights;
   delete[] mtr;
 
-  return result;
+  return cs::numeric_cast<uint8_t>(result);
 }
 
 const HashMatrix& Generals::getMatrix() const {

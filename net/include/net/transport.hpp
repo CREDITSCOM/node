@@ -70,7 +70,7 @@ class Transport {
     delete net_;
   }
 
-  void run();
+  [[noreturn]] void run();
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 

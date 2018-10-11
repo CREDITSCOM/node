@@ -2,6 +2,7 @@
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/utils.hpp>
 
 #include "network.hpp"
 #include "transport.hpp"
@@ -18,27 +19,34 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
       regFlag |= RegFlags::RedirectIP;
-      if (config.getAddressEndpoint().ip.is_v6())
+      if (config.getAddressEndpoint().ip.is_v6()) {
         regFlag |= RegFlags::UsingIPv6;
+      }
     }
 
     regFlag |= RegFlags::RedirectPort;
-  } else if (config.hasTwoSockets())
+  } else if (config.hasTwoSockets()) {
     regFlag |= RegFlags::RedirectPort;
+  }
 
   uint8_t* flagChar = stream.getCurrPtr();
 
   if (!config.isSymmetric()) {
-    if (config.getAddressEndpoint().ipSpecified)
+    if (config.getAddressEndpoint().ipSpecified) {
       stream << config.getAddressEndpoint().ip;
-    else
-      stream << (uint8_t)0;
+    }
+    else {
+      uint8_t c = 0_u8;
+      stream << c;
+    }
 
     stream << config.getAddressEndpoint().port;
-  } else if (config.hasTwoSockets())
-    stream << (uint8_t)0 << config.getInputEndpoint().port;
-  else
-    stream << (uint8_t)0;
+  } else if (config.hasTwoSockets()) {
+    stream << 0_u8 << config.getInputEndpoint().port;
+  }
+  else {
+    stream << 0_u8;
+  }
 
   *flagChar |= initFlagValue | regFlag;
 }
@@ -49,9 +57,9 @@ void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackCo
   stream << NetworkCommand::Registration << NODE_VERSION;
 
   addMyOut(config, stream);
-  *regPackConnId = (uint64_t*)stream.getCurrPtr();
+  *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrPtr());
 
-  stream << (ConnectionId)0 << pk;
+  stream << static_cast<ConnectionId>(0) << pk;
 }
 
 void formSSConnectPack(const Config& config, OPackStream& stream, const cs::PublicKey& pk) {
@@ -66,7 +74,8 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 #endif
          << NODE_VERSION;
 
-  addMyOut(config, stream, (uint8_t)(config.getNodeType() == NodeType::Router ? 8 : 0));
+  uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
+  addMyOut(config, stream, flag);
 
   stream << pk;
 }
@@ -88,7 +97,7 @@ void Transport::run() {
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
-  for (;;) {
+  while (true) {
     ++ctr;
     bool askMissing    = true;
     bool resendPacks   = ctr % 2 == 0;
@@ -97,24 +106,24 @@ void Transport::run() {
     bool checkPending  = ctr % 100 == 0;
     bool checkSilent   = ctr % 150 == 0;
 
-    if (askMissing)
+    if (askMissing) {
       askForMissingPackages();
-
-    if (checkPending)
+    }
+    if (checkPending) {
       nh_.checkPending();
-
-    if (checkSilent)
+    }
+    if (checkSilent) {
       nh_.checkSilent();
-
-    if (resendPacks)
+    }
+    if (resendPacks) {
       nh_.resendPackets();
-
-    if (sendPing)
+    }
+    if (sendPing) {
       nh_.pingNeighbours();
-
-    if (refreshLimits)
+    }
+    if (refreshLimits) {
       nh_.refreshLimits();
-
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 }
@@ -125,11 +134,11 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
 
   if (ep.protocol() == ip::udp::v4()) {
     uint32_t addr = ep.address().to_v4().to_uint();
-    result ^= *(uint16_t*)&addr;
-    result ^= *((uint16_t*)&addr + 1);
+    result ^= *(reinterpret_cast<uint16_t*>(&addr));
+    result ^= *(reinterpret_cast<uint16_t*>(&addr) + 1);
   } else {
     auto bytes    = ep.address().to_v6().to_bytes();
-    auto ptr      = (uint8_t*)&result;
+    auto ptr      = reinterpret_cast<uint8_t*>(&result);
     auto bytesPtr = bytes.data();
     for (size_t i = 0; i < 8; ++i)
       *ptr ^= *(bytesPtr++);
@@ -152,9 +161,9 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 }
 
 void Transport::sendDirect(const Packet* pack, const Connection& conn) {
-  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
+  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + cs::numeric_cast<uint32_t>(pack->size());
   if (nextBytesCount <= conn.BytesLimit) {
-    conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
+    conn.lastBytesCount.fetch_add(cs::numeric_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
     net_->sendDirect(*pack, conn.getOut());
   }
 }
@@ -266,7 +275,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
   auto trFinish = iPackStream_.getCurrPtr();
-  node_->getRoundTableSS(trStart, (trFinish - trStart), rNum);
+  node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
@@ -334,7 +343,7 @@ void Transport::processNodeMessage(const Message& msg) {
 
 bool Transport::shouldSendPacket(const Packet& pack) {
   if (pack.isNetwork()) return false;
-  const auto rLim = std::max(node_->getRoundNumber(), (RoundNum)1) - 1;
+  const auto rLim = std::max(node_->getRoundNumber(), static_cast<RoundNum>(1)) - 1;
 
   if (!pack.isFragmented()) return pack.getRoundNum() >= rLim;
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
@@ -483,7 +492,7 @@ void Transport::clearTasks() {
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
   LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
-  Packet req(netPacksAllocator_.allocateNext(regPack_.size()));
+  Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
 
@@ -593,7 +602,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
   nh_.gotRefusal(id);
 
-  LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << (int)reason);
+  LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << static_cast<int>(reason));
 
   return true;
 }
@@ -671,6 +680,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 
   sendPackInform(pack, *conn);
 
+  // FIXME: result of comparison of constant 100000 with expression of type 'const uint16_t' (aka 'const unsigned short') is always false
   if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
   }
@@ -724,7 +734,7 @@ void Transport::askForMissingPackages() {
   MessagePtr                                      msg;
   uint32_t                                        i = 0;
 
-  const uint64_t maxMask = (uint64_t)1 << 63;
+  const uint64_t maxMask = 1ul << 63;
 
   for (;;) {
     {
@@ -744,7 +754,7 @@ void Transport::askForMissingPackages() {
       SpinLock   l(msg->pLock_);
       const auto end = msg->packets_ + msg->packetsTotal_;
 
-      uint16_t start;
+      uint16_t start = 0;
       uint64_t mask = 0;
       uint64_t req  = 0;
 
@@ -752,7 +762,7 @@ void Transport::askForMissingPackages() {
         if (!*s) {
           if (!mask) {
             mask  = 1;
-            start = s - msg->packets_;
+            start = cs::numeric_cast<uint16_t>(s - msg->packets_);
           }
           req |= mask;
         }
