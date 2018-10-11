@@ -212,14 +212,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
     }
   }
 
+  transport_->clearTasks();
+  onRoundStart(roundTable);
+
   // TODO: think how to improve this code
-  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 2), [this, roundTable]() mutable {
-
-      transport_->clearTasks();
-
-      onRoundStart(roundTable);
+  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 10), [this, roundTable]() mutable {
       solver_->gotRound(std::move(roundTable));
-
   });
 }
 
@@ -876,7 +874,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   onRoundStart(roundTable);
 
-  solver_->gotRound(std::move(roundTable));
+  // TODO: think how to improve this code
+  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY), [this, roundTable]() mutable {
+      solver_->gotRound(std::move(roundTable));
+  });
 }
 
 void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic) {
@@ -994,7 +995,11 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 
   m_notifications.emplace_back(data, data + size);
 
-  const std::size_t neededConfidantsCount = (solver_->roundTable().confidants.size() / 2) + 1;
+  // TODO: + 1 at the end may be?
+  const std::size_t neededConfidantsCount = (solver_->roundTable().confidants.size() / 2);
+
+  cslog() << "Get notification, current notifications count - " << m_notifications.size();
+  cslog() << "Needed confidans count - " << neededConfidantsCount;
 
   if (m_notifications.size() < neededConfidantsCount) {
     return;
@@ -1281,6 +1286,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
 
 void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
+  cslog() << "Became writer";
 }
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {

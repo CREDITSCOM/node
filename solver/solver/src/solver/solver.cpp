@@ -537,7 +537,9 @@ void Solver::gotVector(HashVector&& vector) {
           m_node->becomeWriter();
         }
         else {
-          m_node->sendWriterNotification();
+          cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
+            m_node->sendWriterNotification();
+          });
         }
       }
     }
@@ -584,7 +586,9 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
         m_node->becomeWriter();
       }
       else {
-        m_node->sendWriterNotification();
+        cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
+          m_node->sendWriterNotification();
+        });
       }
     }
   }
