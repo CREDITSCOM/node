@@ -216,8 +216,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   onRoundStart(roundTable);
 
   // TODO: think how to improve this code
-  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 10), [this, roundTable]() mutable {
-      solver_->gotRound(std::move(roundTable));
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this, roundTable]() mutable {
+    solver_->gotRound(std::move(roundTable));
   });
 }
 
@@ -941,12 +941,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::Bytes notification;
     stream >> notification;
 
-    m_notifications.push_back(notification);
+    solver_->addNotification(notification);
   }
 
   std::vector<cs::Hash> confidantsHashes;
 
-  for (const auto& notification : m_notifications) {
+  for (const auto& notification : solver_->notifications()) {
     cs::Hash hash;
     cs::DataStream stream(notification.data(), notification.size());
 
@@ -988,31 +988,36 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
     return;
   }
 
-  if (!isCorrectNotification(data, size, senderPublicKey)) {
+  if (!isCorrectNotification(data, size)) {
     cswarning() << "Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
     return;
   }
 
-  m_notifications.emplace_back(data, data + size);
+  cs::Bytes notification(data, data + size);
+  solver_->addNotification(notification);
 
-  // TODO: + 1 at the end may be?
-  const std::size_t neededConfidantsCount = (solver_->roundTable().confidants.size() / 2);
+  const std::size_t neededConfidantsCount = solver_->neededNotifications();
+  const std::size_t notificationsCount = solver_->notifications().size();
 
-  cslog() << "Get notification, current notifications count - " << m_notifications.size();
+  cslog() << "Get notification, current notifications count - " << notificationsCount;
   cslog() << "Needed confidans count - " << neededConfidantsCount;
 
-  if (m_notifications.size() < neededConfidantsCount) {
+  if (!solver_->isEnoughNotifications()) {
     return;
   }
 
   cslog() << "Confidants count more then 51%";
+  
+  applyNotifications();
+}
 
+void Node::applyNotifications() {
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic, poolMetaInfo, senderPublicKey);
+  solver_->applyCharacteristic(characteristic, poolMetaInfo);
 
   // loading block from blockhain, because write pool to blockchain do something with pool
   const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();
@@ -1020,12 +1025,12 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-  ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, m_notifications);
+  ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, solver_->notifications());
 
   flushCurrentTasks();
 }
 
-bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
+bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::DataStream stream(data, size);
 
   cs::Hash characteristicHash;
@@ -1062,7 +1067,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size, co
 cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo,
                                             const cs::Characteristic& characteristic,
                                             const cs::Signature& signature,
-                                            const std::vector<cs::Bytes>& notifications) {
+                                            const cs::Notifications& notifications) {
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1351,10 +1356,6 @@ bool Node::getSyncroStarted() {
 
 uint8_t Node::getMyConfNumber() {
   return myConfNumber;
-}
-
-void Node::addToPackageTemporaryStorage(const csdb::Pool& pool) {
-  m_packageTemporaryStorage.push_back(pool);
 }
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {
