@@ -1,306 +1,81 @@
 #ifndef __LOGGER_HPP__
 #define __LOGGER_HPP__
+#pragma once
 
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <ctime>
-#include <memory>
+#include <boost/log/attributes/named_scope.hpp>
+#include <boost/log/expressions/keyword.hpp> // include prior trivial.hpp for "Severity" attribute support in config Filter=
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/manipulators/dump.hpp>
+#include <boost/log/utility/setup/settings.hpp>
 
-#define FLAG_LOG_NOTICE 1
-#define FLAG_LOG_WARN 2
-#define FLAG_LOG_ERROR 4
+/*
+* \brief Just a syntax shugar over Boost::Log v2.
+* So you can use all the power of boost \link https://www.boost.org/doc/libs/1_67_0/libs/log/doc/html/index.html
+*
+* Logging can be configured easily with configuration file.
+* \link https://www.boost.org/doc/libs/1_67_0/libs/log/doc/html/log/detailed/utilities.html#log.detailed.utilities.setup.settings_file
+*
+* Severity levels: trace < debug < info < warning < error < fatal
+*
+* Supported configuration formats: ini, json, xml
+*
+* Configuration ini example:
+* [Core]
+* Filter="%Severity% >= info"
+*/
 
-#define FLAG_LOG_EVENTS 8
+namespace logging = boost::log;
 
-#define FLAG_LOG_PACKETS 16
-#define FLAG_LOG_NODES_BUFFER 32
+namespace logger {
+  using severity_level = logging::trivial::severity_level;
 
-#define FLAG_LOG_DEBUG 64
+  void initialize(const logging::settings& settings);
+  void cleanup();
+} // logger
 
-///////////////////
-#define LOG_LEVEL (FLAG_LOG_NOTICE | FLAG_LOG_WARN | FLAG_LOG_ERROR | FLAG_LOG_EVENTS | FLAG_LOG_DEBUG)
-///////////////////
+#define cstrace() BOOST_LOG_FUNCTION(); BOOST_LOG_TRIVIAL(trace)
 
-#if LOG_LEVEL & FLAG_LOG_NOTICE
-#define LOG_NOTICE(TEXT) std::cout << "[NOTICE] " << TEXT << std::endl
-#else
-#define LOG_NOTICE(TEXT)
-#endif
+#define csdebug() BOOST_LOG_TRIVIAL(debug)
 
-#if LOG_LEVEL & FLAG_LOG_WARN
-#define LOG_WARN(TEXT) std::cout << "[WARNING] " << TEXT << std::endl
-#else
-#define LOG_WARN(TEXT)
-#endif
+#define csinfo() BOOST_LOG_TRIVIAL(info)
 
-#if LOG_LEVEL & FLAG_LOG_ERROR
-#define LOG_ERROR(TEXT) std::cout << "[ERROR] " << TEXT << std::endl
-#else
-#define LOG_ERROR(TEXT)
-#endif
+#define cswarning() BOOST_LOG_TRIVIAL(warning)
 
-#if (LOG_LEVEL & FLAG_LOG_EVENTS)
-#define LOG_EVENT(TEXT) std::cout << TEXT << std::endl
-#else
-#define LOG_EVENT(TEXT)
-#endif
+#define cserror() BOOST_LOG_TRIVIAL(error)
 
-#if (false && LOG_LEVEL & FLAG_LOG_PACKETS)
-#define LOG_IN_PACK(DATA, SIZE) std::cout << "-!> " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
-#define LOG_OUT_PACK(DATA, SIZE) std::cout << "<!- " << byteStreamToHex((const char*)(DATA), (SIZE)) << std::endl
-#else
-#define LOG_IN_PACK(DATA, SIZE)
-#define LOG_OUT_PACK(DATA, SIZE)
-#endif
+#define csfatal() BOOST_LOG_TRIVIAL(fatal)
 
-#if LOG_LEVEL & FLAG_LOG_NODES_BUFFER
-#define LOG_NODESBUF_PUSH(ENDPOINT) std::cout << "[+] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port() << std::endl
-#define LOG_NODESBUF_POP(ENDPOINT) std::cout << "[-] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port() << std::endl
-#else
-#define LOG_NODESBUF_PUSH(ENDPOINT)
-#define LOG_NODESBUF_POP(ENDPOINT)
-#endif
+// alias
+#define cslog() csinfo()
 
-#if (LOG_LEVEL & FLAG_LOG_DEBUG)
-#define LOG_DEBUG(TEXT) std::cout << "##" << TEXT << std::endl
-#else
-#define LOG_DEBUG(TEXT)
-#endif
+// deprecated (useless legacy macros)
 
-#ifdef TRACE_ENABLER
-#define TRACE_ENABLED 1
-#else
-#define TRACE_ENABLED 0
-#endif
+#define csfile() csdebug()
 
+#define csderror() cserror()
+
+#define csdinfo() csinfo()
+
+#define csdwarning() cswarning()
+
+// legacy support (should be replaced with csXXX macros)
+//
 extern thread_local bool trace;
-#if LOG_LEVEL & FLAG_TRACE & -TRACE_ENABLED
-#define TRACE(PRINT_ARGS)                                                      \
-  do {                                                                         \
-    if (!trace)                                                                \
-      break;                                                                   \
-    std::ostringstream strstream;                                              \
-    std::clock_t uptime = std::clock() / (CLOCKS_PER_SEC / 1000);              \
-    std::clock_t ss = uptime / 1000;                                           \
-    std::clock_t ms = uptime % 1000;                                           \
-    std::clock_t mins = ss / 60;                                               \
-    ss %= 60;                                                                  \
-    std::clock_t hh = mins / 60;                                               \
-    mins %= 60;                                                                \
-    char buf[16];                                                              \
-    snprintf(buf, sizeof(buf), "[%02d:%02d:%02d.%03d]", hh, mins, ss, ms);     \
-    strstream << buf << " " << std::this_thread::get_id() << "|\t" << __FILE__ \
-              << ":" << __func__ << ":" << __LINE__;                           \
-    strstream << " " << PRINT_ARGS << std::endl;                               \
-    std::clog << strstream.str();                                              \
-  } while (0)
-#else
-#define TRACE(PRINT_ARGS) [&]() -> decltype(auto) {}()
-#endif
+#define TRACE(PRINT_ARGS) if (!trace) ; else { BOOST_LOG_TRIVIAL(trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " " << PRINT_ARGS; }
 
-namespace cs
-{
-    // Represents cs async logger to file, singleton realization
-    class Logger
-    {
-        explicit Logger();
-        Logger(const Logger&) = delete;
-        Logger& operator=(const Logger&) = delete;
+#define LOG_DEBUG(TEXT) csdebug() << TEXT
 
-    public:
-        ~Logger() = default;
+#define LOG_NOTICE(TEXT) csinfo() << TEXT
+#define LOG_EVENT(TEXT) csinfo() << TEXT
 
-        // returns logger single instance
-        static const Logger& instance();
+#define LOG_WARN(TEXT) cswarning() << TEXT
 
-        // adds log
-        template<typename T>
-        inline const cs::Logger& add(const T& log) const noexcept
-        {
-            toFile(log);
-            return *this;
-        }
+#define LOG_ERROR(TEXT) cserror() << TEXT
 
-    private:
+#define LOG_IN_PACK(DATA, SIZE) csdebug() << "-!> " << logging::dump((const char*)(DATA), (SIZE))
+#define LOG_OUT_PACK(DATA, SIZE) csdebug() << "<!- " << logging::dump((const char*)(DATA), (SIZE))
 
-        // pimpl
-        struct Impl;
-        std::unique_ptr<Impl> mPimpl;
-
-        // helpers for string/ss/any types
-        void toFile(const std::string& log) const noexcept;
-        void toFile(const std::stringstream& log) const noexcept;
-    };
-
-    // storage of inline static variables
-    struct InlineLoggerStatic
-    {
-        static const std::string error;
-        static const std::string warning;
-        static const std::string info;
-    };
-
-    // logs info and err
-    class InlineLogger final
-    {
-    public:
-        enum class Settings : uint8_t
-        {
-            Debug,
-            None
-        };
-
-        inline InlineLogger(const std::string& str) noexcept
-        {
-            m_stream << str;
-        }
-
-        inline ~InlineLogger() noexcept
-        {
-            if (m_settings == Settings::Debug) {
-#ifndef NDEBUG
-                m_stream << '\n';
-#endif
-            }
-            else {
-                m_stream << '\n';
-            }
-
-            std::cout << m_stream.rdbuf()->str();
-            std::cout.flush();
-        }
-
-        inline InlineLogger(cs::InlineLogger::Settings settings, const std::string& str = "") noexcept:
-            m_settings(settings)
-        {
-            (void)str;
-#ifndef NDEBUG
-            m_stream << str;
-#endif
-        }
-
-        inline InlineLogger& operator()() noexcept
-        {
-            return *this;
-        }
-
-        template<typename T>
-        inline void log(T&& type) const noexcept
-        {
-            (m_settings == Settings::Debug) ? addDebug(type) : add(type);
-        }
-
-        template<typename T>
-        inline void add(T&& type) const noexcept
-        {
-            m_stream << type;
-        }
-
-        template<typename T>
-        inline void addDebug(T&& type) const noexcept
-        {
-            (void)type;
-#ifndef NDEBUG
-            m_stream << type;
-#endif
-        }
-
-    private:
-        const Settings m_settings = Settings::None;
-        mutable std::stringstream m_stream;
-    };
-
-    // operator << for string
-    inline const cs::Logger& operator<<(const cs::Logger& logger, const std::string& log) noexcept
-    {
-        return logger.add(log);
-    }
-
-    // operator << for stringstream
-    inline const cs::Logger& operator<<(const cs::Logger& logger, const std::stringstream& ss) noexcept
-    {
-        return logger.add(ss);
-    }
-
-    // operator << for inline logger
-    template<typename T>
-    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, T&& message) noexcept
-    {
-        logger.log(message);
-        return logger;
-    }
-
-    // operator << for inline logger and string stream
-    inline const cs::InlineLogger& operator<<(const cs::InlineLogger& logger, const std::stringstream& stream) noexcept
-    {
-        logger.log(stream.rdbuf()->str());
-        return logger;
-    }
-
-///
-/// Macro csfile writes to file if /log folder exists
-///
-/// @example csfile() << "Hello, world";
-///
-#define csfile cs::Logger::instance
-
-///
-/// Macro cslog prints RAII message
-///
-/// @example cslog() << "Some message";
-///
-#define cslog cs::InlineLogger(cs::InlineLogger::Settings::None)
-
-///
-/// Macro csdebug prints message or ss stream only in debug mode
-///
-/// @example csdebug() << "Message sent";
-///
-#define csdebug cs::InlineLogger(cs::InlineLogger::Settings::Debug)
-
-///
-/// Macro cserror prints RAII error message
-///
-/// @example cserror() << "Wrong key";
-///
-#define cserror cs::InlineLogger(cs::InlineLoggerStatic::error)
-
-///
-/// Macro csinfo prints RAII info message
-///
-/// @example csinfo() << "Look at hash table";
-///
-#define csinfo cs::InlineLogger(cs::InlineLoggerStatic::info)
-
-///
-/// Macro cswarning prints RAII warning message
-///
-/// @example cswarning() << "Bad key";
-///
-#define cswarning cs::InlineLogger(cs::InlineLoggerStatic::warning)
-
-///
-/// Macro csderror prints RAII debug mode error message
-///
-/// @example csderror() << "Hello" << ", world!";
-///
-#define csderror cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::error)
-
-///
-/// Macro csdinfo prints RAII debug mode info message
-///
-/// @example csdinfo() << "Hello" << ", world!";
-///
-#define csdinfo cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::info)
-
-///
-/// Macro csdwarning prints RAII debug mode warning message
-///
-/// @example csdwarning() << "Hello" << ", world!";
-///
-#define csdwarning cs::InlineLogger(cs::InlineLogger::Settings::Debug, cs::InlineLoggerStatic::warning)
-    }  // namespace cs
-
+#define LOG_NODESBUF_PUSH(ENDPOINT) csdebug() << "[+] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port()
+#define LOG_NODESBUF_POP(ENDPOINT) csdebug() << "[-] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port()
 
 #endif // __LOGGER_HPP__
