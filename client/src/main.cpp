@@ -33,12 +33,11 @@ void panic() {
 }
 
 inline void mouseSelectionDisable() {
-#ifdef WIN32
-  DWORD prevMode = 0, newMode = 0;
+#if defined(WIN32) && !defined(_DEBUG)
+  DWORD prevMode = 0;
   HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
   GetConsoleMode(hConsole, &prevMode);
-  newMode = prevMode & (~ENABLE_QUICK_EDIT_MODE);
-  SetConsoleMode(hConsole, newMode);
+  SetConsoleMode(hConsole, prevMode & (~ENABLE_QUICK_EDIT_MODE));
 #endif
 }
 
