@@ -41,7 +41,7 @@ public:
     constexpr static uint32_t T_hash = 400;
 
     /** @brief   Max time to collect transactions (G) */
-    //constexpr static uint32_t T_coll_trans = 200;
+    constexpr static uint32_t T_coll_trans = 500;
 
     /** @brief   Period between flush transactions (N) */
     constexpr static uint32_t T_flush_trans = 200;

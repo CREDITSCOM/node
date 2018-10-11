@@ -22,12 +22,27 @@
 namespace slv2
 {
 
+    // initial values for SolverCore options
+
+    // To track timeout for active state
+    constexpr const bool TimeoutsEnabled = false;
+    // To enable make a transition to the same state
+    constexpr const bool RepeatStateEnabled = true;
+    // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
+    constexpr const bool SpammerOn = true;
+    // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
+    constexpr const bool ProxyToOldSolver = false;
+    // Special mode: main node serve as collector and writer through all the rounds, other nodes works as normal
+    constexpr const bool PermanentNodeRole = false;
+
+    // default (test intended) constructor
     SolverCore::SolverCore()
         // options
-        : opt_timeouts_enabled(false)
-        , opt_repeat_state_enabled(true)
-        , opt_spammer_on(false)
-        , opt_is_proxy_v1(false)
+        : opt_timeouts_enabled(TimeoutsEnabled)
+        , opt_repeat_state_enabled(RepeatStateEnabled)
+        , opt_spammer_on(SpammerOn)
+        , opt_is_proxy_v1(ProxyToOldSolver)
+        , opt_is_permanent_roles(PermanentNodeRole)
         // inner data
         , pcontext(std::make_unique<SolverContext>(*this))
         , tag_state_expired(CallsQueueScheduler::no_tag)
@@ -48,9 +63,21 @@ namespace slv2
         , pgen_inst(nullptr)
         , pgen(nullptr)
     {
-        InitTransitions();
+        if(!opt_is_permanent_roles) {
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: use default transition table");
+            }
+            InitTransitions();
+        }
+        else {
+            if(Consensus::Log) {
+                LOG_WARN("SolverCore: opt_permanent_roles is on, so use special transition table");
+            }
+            InitPermanentTransitions();
+        }
     }
 
+    // actual constructor
     SolverCore::SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddress /*= {}*/)
         : SolverCore()
     {
@@ -212,37 +239,39 @@ namespace slv2
 
     // Copied methods from solver.v1
     
-    void SolverCore::createAndSendNewBlock()
+    void SolverCore::createAndSendNewBlockFrom(csdb::Pool & p)
     {
-        //core.prepareBlock(core.pool);
+        pnode->becomeWriter();
+
+        //core.prepareBlock(p);
 
         // see Solver-1, writeNewBlock() method
-        pnode->getBlockChain().finishNewBlock(pool);
+        pnode->getBlockChain().finishNewBlock(p);
         // see: Solver-1, addTimestampToPool() method
-        pool.add_user_field(0, std::to_string(
+        p.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
         // finalize
         // see Solver-1, prepareBlockForSend() method
-        pool.set_writer_public_key(public_key);
-        pool.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
-        pool.sign(private_key);
+        p.set_writer_public_key(public_key);
+        p.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        p.sign(private_key);
 
-        //core.sendBlock(core.pool);
+        //core.sendBlock(p);
 
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: sending block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
+            LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
         }
-        pnode->sendBlock(pool);
+        pnode->sendBlock(p);
 
-        //core.storeBlock(core.pool);
+        //core.storeBlock(p);
 
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: storing block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
+            LOG_NOTICE("SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
         }
         auto& bc = pnode->getBlockChain();
-        bc.writeNewBlock(pool);
-        bc.setGlobalSequence(static_cast<uint32_t>(pool.sequence()));
+        bc.writeNewBlock(p);
+        bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
     }
 
     void SolverCore::storeReceivedBlock(csdb::Pool& p)

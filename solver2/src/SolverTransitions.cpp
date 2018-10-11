@@ -13,6 +13,7 @@
 #include "states//StartNormalState.h"
 #include "states/StartCollectState.h"
 #include "states/StartTrustedState.h"
+#include "states/PermanentCollectWriteState.h"
 #include "states/NoState.h"
 
 namespace slv2
@@ -122,4 +123,43 @@ namespace slv2
         };
     }
 
+    void SolverCore::InitPermanentTransitions()
+    {
+        StatePtr pStart = std::make_shared<StartState>();
+        StatePtr pNormal = std::make_shared<NormalState>();
+        StatePtr pStartNormal = std::make_shared<StartNormalState>();
+        StatePtr pCollectWrite = std::make_shared<PermanentCollectWriteState>();
+        StatePtr pNone = std::make_shared<NoState>();
+        // start with that:
+        pstate = pNone;
+
+        transitions = {
+
+            // transition NoState -> Start on the first round
+        { pNone, {
+            { Event::RoundTable, pStart }
+        } },
+
+            // pStart acts as round table handler on the first round
+        { pStart, {
+            { Event::SetNormal, pStartNormal }, { Event::SetTrusted, pStartNormal }, { Event::SetCollector, pCollectWrite }
+        } },
+
+            // transition StartNormal -> Normal on the first round
+        { pStartNormal, {
+            { Event::RoundTable, pNormal }
+        } },
+
+            // transition Normal -> Normal on the first round
+        { pNormal, {
+            { Event::RoundTable, pNormal }
+        } },
+
+            // transition StartCollect -> StartCollect on the first round
+        { pCollectWrite, {
+            { Event::RoundTable, pCollectWrite }
+        } },
+
+        };
+    }
 } // slv2

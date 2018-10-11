@@ -400,6 +400,22 @@ namespace slv2
         }
 
         /**
+         * @fn  void SolverContext::create_and_send_new_block_from(csdb::Pool& p)
+         *
+         * @brief   Creates and send new block from passed pool of transactions
+         *
+         * @author  Alexander Avramenko
+         * @date    11.10.2018
+         *
+         * @param [in,out]  p   A csdb::Pool to process.
+         */
+
+        void create_and_send_new_block_from(csdb::Pool& p)
+        {
+            core.createAndSendNewBlockFrom(p);
+        }
+
+        /**
          * @fn  void SolverContext::repeat_last_block()
          *
          * @brief   Resend last block

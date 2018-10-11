@@ -115,10 +115,20 @@ namespace slv2
 
         // options
 
+        /** @brief   True to enable, false to disable the option to track timeout of current state */
         bool opt_timeouts_enabled;
+
+        /** @brief   True to enable, false to disable the option repeat the same state */
         bool opt_repeat_state_enabled;
+
+        /** @brief   True to enable, false to disable the option of spammer activation */
         bool opt_spammer_on;
+
+        /** @brief   True if proxy to solver-1 mode is on */
         bool opt_is_proxy_v1;
+
+        /** @brief   True if option is permanent node roles is on */
+        bool opt_is_permanent_roles;
 
         // inner data
 
@@ -171,6 +181,7 @@ namespace slv2
         Credits::Generals * pgen;
 
         void InitTransitions();
+        void InitPermanentTransitions();
         void setState(const StatePtr& pState);
 
         void handleTransitions(Event evt);
@@ -181,7 +192,11 @@ namespace slv2
         void repeatLastBlock();
 
         // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
-        void createAndSendNewBlock();
+        void createAndSendNewBlockFrom(csdb::Pool& p);
+        void createAndSendNewBlock()
+        {
+            createAndSendNewBlockFrom(pool);
+        }
         void storeReceivedBlock(csdb::Pool& p);
         // returns count of transactions flushed
         size_t flushTransactions();

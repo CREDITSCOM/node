@@ -50,23 +50,6 @@ namespace slv2
             pslv_v1->addInitialBalance();
             return;
         }
-
-        // copied from original solver-1
-#if defined(ADD_INITIAL_BALANCE)
-        LOG_DEBUG("===SETTING DB===");
-        const std::string start_address = "0000000000000000000000000000000000000000000000000000000000000002";
-        csdb::Transaction tr;
-        tr.set_target(csdb::Address::from_public_key((char*) public_key.data()));
-        tr.set_source(csdb::Address::from_string(start_address));
-        tr.set_currency(csdb::Currency(1));
-        tr.set_amount(csdb::Amount(10000, 0));
-        tr.set_balance(csdb::Amount(10000000, 0));
-        tr.set_innerID(1);
-        send_wallet_transaction(tr);
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: initial balance added");
-        }
-#endif // ADD_INITIAL_BALANCE
     }
 
     void SolverCore::setBigBangStatus(bool status)
@@ -122,9 +105,6 @@ namespace slv2
             return;
         }
         last_trans_list_recv = tl_seq;
-
-        // чистим для нового списка
-        pool = csdb::Pool {};
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
@@ -252,8 +232,8 @@ namespace slv2
 
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: gotBlockReply()");
+            LOG_DEBUG("SolverCore: got block on my request: " << p.sequence());
         }
-        LOG_DEBUG("SolverCore: got block on my request: " << p.sequence());
         if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
             pnode->getBlockChain().writeNewBlock(p);
         }
@@ -406,6 +386,9 @@ namespace slv2
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: clear all stored senders (vectors, matrices, hashes)");
         }
+
+        // чистим для нового списка
+        pool = csdb::Pool {};
 
         recv_vect.clear();
         recv_matr.clear();

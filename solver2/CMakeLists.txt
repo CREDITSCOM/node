@@ -32,6 +32,7 @@ add_library(solver2
 	include/solver2/states/TrustedVMState.h
 	include/solver2/states/TrustedVState.h
 	include/solver2/states/WriteState.h
+	include/solver2/states/PermanentCollectWriteState.h
 
 	../solver/Solver/Include/Solver/Generals.hpp
 
@@ -55,6 +56,7 @@ add_library(solver2
 	src/states/TrustedVMState.cpp
 	src/states/TrustedVState.cpp
 	src/states/WriteState.cpp
+	src/states/PermanentCollectWriteState.cpp
 )
 
 target_include_directories(solver2 PUBLIC
