@@ -1,6 +1,6 @@
 #pragma once
 
-#define MONITOR_NODE
+//#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
 #define AJAX_IFACE
@@ -16,7 +16,7 @@
 #define STATS
 #endif
 #define SYNCRO
-//#define MYLOG
+#define MYLOG
 //#define LOG_TRANSACTIONS
 
 #define BOTTLENECKED_SMARTS
