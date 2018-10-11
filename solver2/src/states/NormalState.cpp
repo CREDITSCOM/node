@@ -59,7 +59,7 @@ namespace slv2
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": started flush transactions every " << Consensus::T_flush_trans << " msec");
         }
-            tag_flush = context.scheduler().InsertPeriodic(Consensus::T_flush_trans, [this, pctx]() {
+        tag_flush = context.scheduler().InsertPeriodic(Consensus::T_flush_trans, [this, pctx]() {
             if(Consensus::Log) {
                 LOG_DEBUG(name() << ": flushing transactions");
             }
