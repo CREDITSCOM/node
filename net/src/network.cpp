@@ -142,7 +142,7 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 
 void Network::processorRoutine() {
-  FixedHashMap<Hash, uint32_t, uint16_t, 100000> packetMap;
+  FixedHashMap<Hash, uint32_t, uint16_t, 1000000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   for (;;) {

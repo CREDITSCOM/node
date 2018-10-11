@@ -40,7 +40,8 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
     }
 
     if (!found) {
-      sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
+      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundTable))
+        sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
       if (nb->isSignal)  // Assume the SS got this
         *(bp.recEnd++) = nb->id;
       else
@@ -67,9 +68,19 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
   SpinLock l(nLockFlag_);
-  auto& bp = msgBroads_.tryStore(pack->getHash());
-  if (!bp.pack) bp.pack = *pack;
-  dispatch(bp, true);
+  if (pack->isDirect()) {
+    for (auto& nb : neighbours_) {
+      auto& bp = msgDirects_.tryStore(pack->getHash());
+      bp.pack = *pack;
+      bp.receiver = nb;
+      transport_->sendDirect(pack, **nb);
+    }
+  }
+  else {
+    auto& bp = msgBroads_.tryStore(pack->getHash());
+    if (!bp.pack) bp.pack = *pack;
+    dispatch(bp, true);
+  }
 }
 
 bool Neighbourhood::canHaveNewConnection() {
@@ -567,7 +578,6 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
     if (nb->syncSeq == seq) {
       nb->syncSeq = 0;
       nb->syncSeqRetries = 0;
-      return;
     }
   }
 }

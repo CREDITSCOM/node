@@ -529,7 +529,7 @@ void Node::getMatrixRequest(const uint8_t* data, const size_t size)  //, const P
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  //std::cout << __func__ << std::endl;
+  std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -577,7 +577,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  //std::cout << __func__ << std::endl;
+  std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
@@ -626,7 +626,7 @@ uint32_t Node::getRoundNumber() {
 }
 
 void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  //std::cout << __func__ << std::endl;
+  std::cout << __func__ << std::endl;
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get blocks");
     return;
@@ -719,7 +719,7 @@ void Node::sendBadBlock(const csdb::Pool& pool) {
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  //std::cout << __func__ << std::endl;
+  std::cout << __func__ << std::endl;
   if (myLevel_ != NodeLevel::Writer) {
     std::cout << "Non-Writers cannot get hashes" << std::endl;
     return;
@@ -774,6 +774,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicK
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
+  static uint32_t lfReq, lfTimes;
+
   solver_->rndStorageProcessing();
   seq = getBlockChain().getLastWrittenSequence() + 1;
   
@@ -796,6 +798,11 @@ void Node::sendBlockRequest(uint32_t seq) {
 
   uint32_t reqSeq = seq;
 
+  if (lfReq != seq) {
+    lfReq = seq;
+    lfTimes = 0;
+  }
+
   while (reqSeq) {
     bool alreadyRequested = false;
     ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
@@ -808,6 +815,8 @@ void Node::sendBlockRequest(uint32_t seq) {
       ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
+      if (lfReq == reqSeq && ++lfTimes >= 4)
+        transport_->sendBroadcast(ostream_.getPackets());
       ostream_.clear();
     }
     
