@@ -153,7 +153,7 @@ bool Node::checkKeysForSig() {
     private_key[i] = myPrivateForSig[i];
   }
 
-  uint64_t sig_size;
+  unsigned long long sig_size;
   crypto_sign_detached(signature, &sig_size, msg, 5, private_key);
 
   int ver_ok = crypto_sign_verify_detached(signature, msg, 5, public_key);
