@@ -310,6 +310,7 @@ void Transport::processNodeMessage(const Message& msg) {
   if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
   if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message MSG: Characteristic received" << std::endl;
+  if (type == MsgTypes::WriterNotification) std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
   if (type == MsgTypes::BigBang) {
     std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
   }
@@ -355,6 +356,7 @@ void Transport::processNodeMessage(const Packet& pack) {
   if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
   if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
   if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic received" << std::endl;
+  if (type == MsgTypes::WriterNotification) std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
   if (type == MsgTypes::BigBang) {
 	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
   }
