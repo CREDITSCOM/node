@@ -11,7 +11,7 @@
 namespace csstats {
 
 template <class F>
-void csstats::matchPeriod(const Periods& periods, period_t period, F& func) {
+void csstats::matchPeriod(const Periods& periods, period_t period, F func) {
   for (size_t i = 0; i < periods.size(); ++i) {
     if (period < periods[i])
       func(i);
