@@ -1085,3 +1085,15 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
       .wait_for_block(csdb::PoolHash::from_binary(toByteArray(obsolete)))
       .to_binary());
 }
+
+void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) {
+  csdb::Transaction trx;
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+  if(!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+  _return.method = convertTransaction(trx).trxn.smartContract.method;
+  _return.params = convertTransaction(trx).trxn.smartContract.params;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
