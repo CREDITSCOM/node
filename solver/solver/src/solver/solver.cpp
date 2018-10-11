@@ -61,34 +61,6 @@ void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& p
   myPrivateKey = privateKey;
 }
 
-void Solver::buildBlock(csdb::Pool& block) {
-  csdb::Transaction transaction;
-
-  transaction.set_target(
-      csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003"));
-  transaction.set_source(
-      csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(10, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
-  transaction.set_innerID(0);
-
-  block.add_transaction(transaction);
-
-  transaction.set_target(
-      csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000004"));
-  transaction.set_source(
-      csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002"));
-
-  transaction.set_currency(csdb::Currency("CS"));
-  transaction.set_amount(csdb::Amount(10, 0));
-  transaction.set_balance(csdb::Amount(100, 0));
-  transaction.set_innerID(0);
-
-  block.add_transaction(transaction);
-}
-
 void Solver::prepareBlockForSend(csdb::Pool& block) {
   addTimestampToPool(block);
   block.set_writer_public_key(cs::Bytes(myPublicKey.begin(), myPublicKey.end()));
@@ -516,6 +488,7 @@ void Solver::runFinalConsensus()
       }
       else
       {
+        // TODO: make next stage without delay
         cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
           m_node->sendWriterNotification();
         });
@@ -748,18 +721,11 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
-    cs::Utils::runAfter(std::chrono::milliseconds(cs::RoundDelay), [this]() {
+    cs::Timer::singleShot(cs::RoundDelay, [this]() {
       m_node->initNextRound(m_roundTable);
       round_table_sent = true;
     });
   }
-}
-
-void Solver::initApi() {
-  _initApi();
-}
-
-void Solver::_initApi() {
 }
 
 /////////////////////////////
@@ -898,6 +864,28 @@ const cs::RoundTable& Solver::roundTable() const {
   return m_roundTable;
 }
 
+const cs::Notifications& Solver::notifications() const {
+  return m_notifications;
+}
+
+void Solver::addNotification(const cs::Bytes& bytes) {
+  m_notifications.push_back(bytes);
+}
+
+std::size_t Solver::neededNotifications() const {
+  return m_roundTable.confidants.size() / 2;  // TODO: + 1 at the end may be?
+}
+
+bool Solver::isEnoughNotifications() const {
+  const std::size_t neededConfidantsCount = neededNotifications();
+  const std::size_t notificationsCount = notifications().size();
+
+  cslog() << "Get notification, current notifications count - " << notificationsCount;
+  cslog() << "Needed confidans count - " << neededConfidantsCount;
+
+  return notificationsCount >= neededConfidantsCount;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// gotBlockRequest
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
@@ -938,7 +926,7 @@ void Solver::nextRound() {
   ips.clear();
   vector_datas.clear();
 
-  m_node->getNotifications().clear();
+  m_notifications.clear();
 
   vectorComplete          = false;
   consensusAchieved       = false;
