@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DefaultStateBehavior.h"
+#include "../CallsQueueScheduler.h"
 
 namespace slv2
 {
@@ -23,12 +24,22 @@ namespace slv2
         ~StartNormalState() override
         {}
 
+        void on(SolverContext& context) override;
+
+        void onRoundEnd(SolverContext& context) override;
+
         Result onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender) override;
 
         const char * name() const override
         {
             return "StartNormal";
         }
+
+    private:
+
+        CallsQueueScheduler::CallTag tag_timeout {CallsQueueScheduler::no_tag};
+
+        void cancel_timeout(SolverContext& context);
     };
 
 } // slv2
