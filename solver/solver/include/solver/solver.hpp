@@ -66,20 +66,24 @@ class Solver {
   void rndStorageProcessing();
   void tmpStorageProcessing();
   void applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender);
+                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
 
   PublicKey getWriterPublicKey() const;
 
-  // API methods
-  void initApi();
   uint32_t getTLsize();
   void addInitialBalance();
 
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;
+
+  // notifications interface
+  const cs::Notifications& notifications() const;
+  void addNotification(const cs::Bytes& bytes);
+  std::size_t neededNotifications() const;
+  bool isEnoughNotifications() const;
 
   // conveyer start point
   void addTransaction(const csdb::Transaction& transaction);
@@ -90,10 +94,8 @@ class Solver {
   bool isPoolClosed() const;
   void setLastRoundTransactionsGot(size_t trNum);
 
-  // remove it!!!
-  void buildBlock(csdb::Pool& block);
+  // consesnsus evaluation
   void runConsensus();
-
   void runFinalConsensus();
 
   HashVector getMyVector() const;
@@ -109,8 +111,6 @@ class Solver {
   const cs::PublicKey& getPublicKey() const;
 
  private:
-  void _initApi();
-
   void runMainRound();
   void closeMainRound();
 
@@ -149,7 +149,7 @@ class Solver {
 
   std::set<PublicKey> receivedMat_ips;
 
-  bool    receivedMatFrom[100];
+  bool receivedMatFrom[100];
   std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
@@ -184,6 +184,7 @@ class Solver {
 
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
+  cs::Notifications m_notifications;
 
   cs::Timer m_sendingPacketTimer;
 

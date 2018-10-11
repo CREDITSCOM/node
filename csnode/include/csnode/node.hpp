@@ -52,11 +52,14 @@ class Node {
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
   void getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
-  bool isCorrectNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
-  void sendWriterNotification();
-  cs::Bytes createNotification();
+  void applyNotifications();
 
-  cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, const cs::Signature& signature, const std::vector<cs::Bytes>& notifications);
+  bool isCorrectNotification(const uint8_t* data, const std::size_t size);
+  void sendWriterNotification();
+
+  cs::Bytes createNotification();
+  cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+                                        const cs::Signature& signature, const cs::Notifications& notifications);
 
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -122,18 +125,11 @@ class Node {
     return bc_;
   }
 
-  std::vector<cs::Bytes>& getNotifications() {
-    return m_notifications;
-  }
-
 #ifdef NODE_API
   csconnector::connector& getConnector() {
     return api_;
   }
 #endif
-
-  cs::PublicKey writerId;
-  void addToPackageTemporaryStorage(const csdb::Pool& pool);
 
 private:
   bool init();
@@ -176,7 +172,7 @@ private:
   BlockChain bc_;
 
   cs::Solver* solver_;
-  Transport*  transport_;
+  Transport* transport_;
 
 #ifdef MONITOR_NODE
   csstats::csstats       stats_;
@@ -194,7 +190,5 @@ private:
 
   IPackStream istream_;
   OPackStream ostream_;
-  std::vector<csdb::Pool> m_packageTemporaryStorage;
-  std::vector<cs::Bytes> m_notifications;
 };
 #endif  // __NODE_HPP__

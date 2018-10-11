@@ -23,6 +23,9 @@ namespace cs
     // array of packets
     using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 
+    // array of notifications
+    using Notifications = std::vector<cs::Bytes>;
+
     // round data
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
