@@ -114,6 +114,7 @@ bool Node::checkKeysFile() {
 
       return needGenerateKeys;
     }
+
     return checkKeysForSig();
   }
 }
@@ -215,7 +216,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   }
 
   // TODO: think how to improve this code
-  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY), [this, roundTable]() mutable {
+  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 2), [this, roundTable]() mutable {
 
       transport_->clearTasks();
 
@@ -237,7 +238,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
 }
 
 void Node::sendRoundTable(const cs::RoundTable& roundTable) {
-  ostream_.init(BaseFlags::Broadcast);
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << MsgTypes::RoundTable;
 
   cs::Bytes bytes;
@@ -790,7 +791,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 
   cs::DataStream stream(data, size);
 
-  uint32_t hashesCount = 0;
+  std::size_t hashesCount = 0;
   stream >> hashesCount;
 
   cs::Hashes hashes;
@@ -975,7 +976,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   //  }
   //}
 
-  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount" << maskBitsCount;
+  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount " << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
   cs::Characteristic characteristic;
@@ -986,6 +987,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 }
 
 void Node::getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
+  if (myLevel_ != NodeLevel::Writer) {
+    return;
+  }
+
   if (!isCorrectNotification(data, size, senderPublicKey)) {
     cswarning() << "Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
     return;
@@ -1102,10 +1107,6 @@ cs::Bytes Node::createNotification() {
 
   cs::Signature signature = cs::Utils::sign(bytes, solver_->getPrivateKey());
 
-  if (!cs::Utils::verifySignature(signature, solver_->getPublicKey(), bytes.data(), bytes.size())) {
-    cserror() << "Verification failed";
-  }
-
   stream << signature;
   stream << solver_->getPublicKey();
 
@@ -1154,7 +1155,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
-  stream << static_cast<uint32_t>(hashes.size());
+  stream << hashes.size();
 
   for (const auto& hash : hashes) {
     stream << hash;
@@ -1373,6 +1374,14 @@ Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTyp
   }
 
   if (type == MsgTypes::TransactionPacket) {
+    return MessageActions::Process;
+  }
+
+  if (type == MsgTypes::TransactionsPacketRequest) {
+    return MessageActions::Process;
+  }
+
+  if (type == TransactionsPacketReply) {
     return MessageActions::Process;
   }
 

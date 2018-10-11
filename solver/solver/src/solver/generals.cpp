@@ -49,7 +49,7 @@ cs::Hash Generals::buildVector(cs::TransactionsPacket& packet, csdb::Pool& new_p
 
     for (size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = packet.transactions().at(i);
-      const csdb::Amount       delta       = transaction.balance() - transaction.amount() - comission;
+      const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
 
       if (delta > zero_balance) {
         characteristicMask.set(i, true);

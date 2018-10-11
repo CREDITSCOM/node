@@ -97,9 +97,6 @@ class Solver {
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
 
-  void initConfRound();
-  void checkVectorsReceived(size_t _rNum) const;
-  void checkMatrixReceived();
   void addConfirmation(uint8_t confNumber_);
   bool getIPoolClosed();
   bool getBigBangStatus();
@@ -146,12 +143,12 @@ class Solver {
   size_t lastRoundTransactionsGot;
   std::set<PublicKey> receivedVec_ips;
   bool receivedVecFrom[100];
-  uint8_t trustedCounterVector;
+  std::atomic<uint8_t> trustedCounterVector;
 
   std::set<PublicKey> receivedMat_ips;
 
   bool    receivedMatFrom[100];
-  uint8_t trustedCounterMatrix;
+  std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
   std::vector<PublicKey> ips;

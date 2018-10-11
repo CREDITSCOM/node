@@ -1,12 +1,14 @@
 #ifndef DATASTREAM_H
 #define DATASTREAM_H
 
-#include <boost/asio/ip/udp.hpp>
 #include <exception>
 #include <string>
 #include <csnode/nodecore.h>
 #include <algorithm>
 #include <type_traits>
+
+#include <boost/asio/ip/udp.hpp>
+#include <csdb/pool.h>
 
 #include <lib/system/common.hpp>
 #include <lib/system/structures.hpp>
@@ -479,6 +481,19 @@ namespace cs
     }
 
     ///
+    /// Gets transaction packet structure from stream.
+    ///
+    inline DataStream& operator>>(DataStream& stream, csdb::PoolHash& hash)
+    {
+        cs::Bytes bytes;
+        stream >> bytes;
+
+        hash = csdb::PoolHash::from_binary(bytes);
+
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -579,6 +594,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacket& packet)
     {
         stream.addTransactionsPacket(packet);
+        return stream;
+    }
+
+    ///
+    /// Writes hash matrix structure to stream
+    ///
+    inline DataStream& operator<<(DataStream& stream, const csdb::PoolHash& hash)
+    {
+        stream << hash.to_binary();
         return stream;
     }
 }

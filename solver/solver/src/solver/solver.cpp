@@ -182,7 +182,6 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   newPool.add_user_field(0, timestamp);
 
   // TODO: need to write confidants notifications bytes to csdb::Pool user fields
-
   cslog() << "SOLVER> ApplyCharacteristic: pool created";
 
 #ifdef MONITOR_NODE
@@ -295,7 +294,8 @@ HashMatrix Solver::getMyMatrix() const {
 }
 
 void Solver::flushTransactions() {
-  if (m_node->getMyLevel() != NodeLevel::Normal) {
+  if (m_node->getMyLevel() != NodeLevel::Normal &&
+      m_roundTable.round <= TransactionsFlushRound) {
     return;
   }
 
@@ -383,9 +383,6 @@ void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& ha
       csdebug() << "Found hash in hash table, send to requester";
     }
   }
-}
-
-void Solver::initConfRound() {
 }
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
@@ -549,26 +546,8 @@ void Solver::gotVector(HashVector&& vector) {
   cslog() << "Solver>  VECTOR GOT SUCCESSFULLY!!!";
 }
 
-void Solver::checkMatrixReceived() {
-  if (trustedCounterMatrix < 2) {
-    m_node->sendMatrix(m_generals->getMatrix());
-  }
-}
-
 void Solver::setRNum(size_t _rNum) {
   rNum = static_cast<uint32_t>(_rNum);
-}
-
-void Solver::checkVectorsReceived(size_t _rNum) const {
-  if (_rNum < rNum) {
-    return;
-  }
-
-  const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
-
-  if (trustedCounterVector == numGen) {
-    return;
-  }
 }
 
 void Solver::gotMatrix(HashMatrix&& matrix) {
@@ -778,8 +757,10 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
-    m_node->initNextRound(m_roundTable);
-    round_table_sent = true;
+    cs::Utils::runAfter(std::chrono::milliseconds(cs::RoundDelay), [this]() {
+      m_node->initNextRound(m_roundTable);
+      round_table_sent = true;
+    });
   }
 }
 
@@ -901,7 +882,6 @@ void Solver::addInitialBalance() {
   cslog() << "===SETTING DB===";
 
   const std::string start_address = "0000000000000000000000000000000000000000000000000000000000000002";
-  csdb::Pool        pool;
   csdb::Transaction transaction;
   transaction.set_target(csdb::Address::from_public_key((char*)myPublicKey.data()));
   transaction.set_source(csdb::Address::from_string(start_address));
@@ -966,6 +946,8 @@ void Solver::nextRound() {
 
   ips.clear();
   vector_datas.clear();
+
+  m_node->getNotifications().clear();
 
   vectorComplete          = false;
   consensusAchieved       = false;

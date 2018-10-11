@@ -122,6 +122,10 @@ class Node {
     return bc_;
   }
 
+  std::vector<cs::Bytes>& getNotifications() {
+    return m_notifications;
+  }
+
 #ifdef NODE_API
   csconnector::connector& getConnector() {
     return api_;

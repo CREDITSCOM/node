@@ -48,8 +48,10 @@ namespace cs
 
     enum SolverConsts : uint32_t
     {
+        TransactionsFlushRound = 2,
         TransactionsPacketInterval = 50,    // ms
-        MaxPacketTransactions = 500
+        MaxPacketTransactions = 500,
+        RoundDelay = 1000                   // delay
     };
 
     // all info about round
