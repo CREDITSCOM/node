@@ -898,7 +898,6 @@ void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const cs::Ch
   uint64_t sequence = poolMetaInfo.sequenceNumber;
 
   stream << time;
-
   stream << characteristic.size;
   stream << characteristic.mask << sequence;
 
@@ -1067,13 +1066,10 @@ cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
-  std::string time = poolMetaInfo.timestamp;
-  uint64_t sequence = poolMetaInfo.sequenceNumber;
-
-  stream << time;
+  stream << poolMetaInfo.timestamp;
   stream << characteristic.size;
   stream << characteristic.mask;
-  stream << sequence;
+  stream << poolMetaInfo.sequenceNumber;
 
   stream << signature;
 

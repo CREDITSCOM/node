@@ -94,6 +94,8 @@ class Solver {
   void buildBlock(csdb::Pool& block);
   void runConsensus();
 
+  void runFinalConsensus();
+
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
 

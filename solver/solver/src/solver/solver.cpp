@@ -489,6 +489,41 @@ void Solver::runConsensus() {
   }
 }
 
+void Solver::runFinalConsensus()
+{
+  const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
+
+  if (trustedCounterMatrix == numGen)
+  {
+    std::memset(receivedMatFrom, 0, sizeof(receivedMatFrom));
+
+    m_writerIndex = (m_generals->takeDecision(m_roundTable.confidants,
+                                              m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
+    trustedCounterMatrix = 0;
+
+    if (m_writerIndex == 100) {
+      cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
+    }
+    else
+    {
+      cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
+      cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
+
+      consensusAchieved = true;
+
+      if (m_writerIndex == m_node->getMyConfNumber()) {
+        m_node->becomeWriter();
+      }
+      else
+      {
+        cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
+          m_node->sendWriterNotification();
+        });
+      }
+    }
+  }
+}
+
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
 
@@ -519,30 +554,7 @@ void Solver::gotVector(HashVector&& vector) {
     m_node->sendMatrix(matrix);
     m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
-    if (trustedCounterMatrix == numGen) {
-      std::memset(receivedMatFrom, 0, sizeof(receivedMatFrom));
-      m_writerIndex = (m_generals->takeDecision(m_roundTable.confidants,
-                                                m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
-      trustedCounterMatrix = 0;
-
-      if (m_writerIndex == 100) {
-        cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
-      } else {
-
-        cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
-        cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
-        consensusAchieved = true;
-
-        if (m_writerIndex == m_node->getMyConfNumber()) {
-          m_node->becomeWriter();
-        }
-        else {
-          cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-            m_node->sendWriterNotification();
-          });
-        }
-      }
-    }
+    runFinalConsensus();
   }
 
   cslog() << "Solver>  VECTOR GOT SUCCESSFULLY!!!";
@@ -566,32 +578,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   trustedCounterMatrix++;
   m_generals->addMatrix(matrix, m_roundTable.confidants);
 
-  const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
-
-  if (trustedCounterMatrix == numGen) {
-    std::memset(receivedMatFrom, 0, 100);
-    uint8_t writerIndex  = (m_generals->takeDecision(
-        m_roundTable.confidants, m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
-    trustedCounterMatrix = 0;
-
-    if (writerIndex == 100) {
-      cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
-    } else {
-      cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
-      cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
-
-      consensusAchieved = true;
-
-      if (m_writerIndex == m_node->getMyConfNumber()) {
-        m_node->becomeWriter();
-      }
-      else {
-        cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-          m_node->sendWriterNotification();
-        });
-      }
-    }
-  }
+  runFinalConsensus();
 }
 
 void Solver::writeNewBlock() {
@@ -628,7 +615,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
 
   m_node->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == m_node->getBlockChain().getLastWrittenSequence() + 1) {
-    std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
+    cslog() << "Solver -> getblock calls writeLastBlock";
     if (block.verify_signature())  // INCLUDE SIGNATURES!!!
     {
       m_node->getBlockChain().putBlock(block);
@@ -645,23 +632,23 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
 }
 
 void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender) {
-  std::cout << __func__ << std::endl;
+  cslog() << __func__;
   if (tmpStorage.count(block.sequence()) == 0) {
     tmpStorage.emplace(block.sequence(), block);
-    std::cout << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+    cslog() << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence();
   }
 }
 
 void Solver::gotFreeSyncroBlock(csdb::Pool&& block) {
-  std::cout << __func__ << std::endl;
+  cslog() << __func__;
   if (rndStorage.count(block.sequence()) == 0) {
     rndStorage.emplace(block.sequence(), block);
-    std::cout << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence() << std::endl;
+    cslog() << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence();
   }
 }
 
 void Solver::rndStorageProcessing() {
-  std::cout << __func__ << std::endl;
+  cslog() << __func__;
   bool   loop = true;
   size_t newSeq;
 
@@ -677,7 +664,7 @@ void Solver::rndStorageProcessing() {
 }
 
 void Solver::tmpStorageProcessing() {
-  std::cout << __func__ << std::endl;
+  cslog() << __func__;
   bool   loop = true;
   size_t newSeq;
 
@@ -840,7 +827,7 @@ void Solver::createPool() {
 #ifdef SPAMMER
 void Solver::spamWithTransactions() {
   // if (node_->getMyLevel() != Normal) return;
-  std::cout << "STARTING SPAMMER...";
+  cslog() << "STARTING SPAMMER...";
   std::string mp = "1234567890abcdef";
 
   // std::string cachedBlock;
