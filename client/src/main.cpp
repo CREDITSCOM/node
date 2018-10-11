@@ -32,7 +32,18 @@ void panic() {
   exit(1);
 }
 
+inline void mouseSelectionDisable() {
+#ifdef WIN32
+  DWORD prevMode = 0, newMode = 0;
+  HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
+  GetConsoleMode(hConsole, &prevMode);
+  newMode = prevMode & (~ENABLE_QUICK_EDIT_MODE);
+  SetConsoleMode(hConsole, newMode);
+#endif
+}
+
 int main(int argc, char* argv[]) {
+  mouseSelectionDisable();
 #if BUILD_WITH_GPROF
   signal(SIGUSR1, sigUsr1Handler);
 #endif
