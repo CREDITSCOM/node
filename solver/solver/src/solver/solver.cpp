@@ -103,8 +103,8 @@ auto Solver::setLastRoundTransactionsGot(size_t trNum) -> void {
   lastRoundTransactionsGot = trNum;
 }
 
-void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
-                                 const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
+void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool,
+                                 const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   gotBigBang = false;
@@ -166,8 +166,9 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   if (sequence > m_node->getRoundNumber()) {
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
+  assert(sequence <= m_node->getRoundNumber());
 
-  m_node->getBlockChain().setGlobalSequence(static_cast<uint32_t>(sequence));
+  m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
 
   if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
     m_node->getBlockChain().putBlock(newPool);
@@ -713,7 +714,7 @@ void Solver::spamWithTransactions() {
       }
     }
 
-    std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
+    std::this_thread::sleep_for(std::chrono::milliseconds(TRX_SLEEP_TIME));
   }
 }
 #endif

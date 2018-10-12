@@ -94,16 +94,18 @@ void Generals::addSenderToMatrix(uint8_t myConfNum) {
 void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes) {
   cslog() << "GENERALS> Add matrix";
 
-  const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
+  const size_t nodes_amount = confidantNodes.size();
+  const uint8_t confidantsCountMax = 101;  // from technical paper
+  assert(nodes_amount <= confidantsCountMax);
 
-  auto*   hw = new HashWeigth[nodes_amount];
+  HashWeigth hw[nodes_amount];
   uint8_t j = matrix.sender;
   uint8_t i_max;
   bool    found = false;
 
   uint8_t max_frec_position;
 
-  cslog() << "GENERALS> HW OUT: nodes amount = " << int(nodes_amount);
+  cslog() << "GENERALS> HW OUT: nodes amount = " << nodes_amount;
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
@@ -114,7 +116,8 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
       hw[0].weight                       = 1;
       *(m_find_untrusted.data() + j * 100) = 0;
       i_max                                = 1;
-    } else {
+    }
+    else {
       found = false;
 
       // FIXME: i_max uninitialized in this branch!!!!
@@ -155,13 +158,11 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   memcpy(m_hw_total[j].hash, hw[max_frec_position].hash, 32);
 
-  for (int i = 0; i < nodes_amount; i++) {
+  for (size_t i = 0; i < nodes_amount; i++) {
     if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position) {
       *(m_new_trusted.data() + i) += 1;
     }
   }
-
-  delete[] hw;
 }
 
 uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const csdb::PoolHash& lasthash) {

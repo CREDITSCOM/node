@@ -761,7 +761,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   cs::Hash hHash;
   iPackStream_ >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end()) {
-      return false;
+    return false;
   }
 
   nh_.neighbourHasPacket(sender, hHash);
