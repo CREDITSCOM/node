@@ -30,7 +30,7 @@ class Node {
     return good_;
   }
 
-  void run(const Config&);
+  void run(const Config& config);
 
   /* Incoming requests processing */
   void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
@@ -64,7 +64,6 @@ class Node {
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -166,7 +165,7 @@ private:
   RoundNum roundNum_ = 0;
   NodeLevel myLevel_;
 
-  uint8_t myConfNumber;
+  uint8_t myConfidantIndex_;
 
   // Resources
   BlockChain bc_;

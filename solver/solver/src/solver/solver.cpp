@@ -15,6 +15,7 @@
 #include <csdb/wallet.h>
 
 #include <csnode/node.hpp>
+#include <sys/timeb.h>
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +35,7 @@ void addTimestampToPool(csdb::Pool& pool) {
       0, std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count()));
 }
 
-#if defined(SPAM_MAIN) || defined(SPAMMER)
+#if defined(SPAMMER)
 static int randFT(int min, int max) {
   return rand() % (max - min + 1) + min;
 }
@@ -109,14 +110,6 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   gotBigBang = false;
   gotBlockThisRound = true;
 
-  uint64_t sequence = metaInfoPool.sequenceNumber;
-
-  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
-
-  std::string timestamp = metaInfoPool.timestamp;
-  boost::dynamic_bitset<> mask{characteristic.mask.begin(), characteristic.mask.end()};
-
-  size_t maskIndex = 0;
   cs::Hashes localHashes;
 
   {
@@ -125,6 +118,12 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   }
 
   csdb::Pool newPool;
+  size_t maskIndex = 0;
+  std::string timestamp = metaInfoPool.timestamp;
+  uint64_t sequence = metaInfoPool.sequenceNumber;
+  boost::dynamic_bitset<> mask{ characteristic.mask.begin(), characteristic.mask.end() };
+
+  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.contains(hash)) {
@@ -204,57 +203,8 @@ PublicKey Solver::getWriterPublicKey() const {
   return result;
 }
 
-void Solver::closeMainRound() {
-  if (m_node->getRoundNumber() == 1)  // || (lastRoundTransactionsGot==0)) //the condition of getting 0 transactions by
-                                     // previous main node should be added!!!!!!!!!!!!!!!!!!!!!
-  {
-    m_node->becomeWriter();
-    csdebug() << "Solver -> Node Level changed 2 -> 3";
-
-#ifdef SPAM_MAIN
-    createSpam = false;
-    spamThread.join();
-    prepareBlockForSend(testPool);
-    node_->sendBlock(testPool);
-#else
-    prepareBlockForSend(m_pool);
-
-    b_pool.set_sequence((m_node->getBlockChain().getLastWrittenSequence()) + 1);
-    auto prev_hash = csdb::PoolHash::from_string("");
-    b_pool.set_previous_hash(prev_hash);
-
-    cslog() << "Solver -> new sequence: " << m_pool.sequence()
-            << ", new time:" << m_pool.user_field(0).value<std::string>().c_str();
-
-    m_node->sendBlock(m_pool);
-    m_node->sendBadBlock(b_pool);
-
-    cslog() << "Solver -> Block is sent ... awaiting hashes";
-#endif
-    m_node->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
-
-    csdebug() << "Solver -> Global Sequence: " << m_node->getBlockChain().getGlobalSequence();
-    csdebug() << "Solver -> Writing New Block";
-
-    m_node->getBlockChain().putBlock(m_pool);
-  }
-}
-
 bool Solver::isPoolClosed() const {
   return m_isPoolClosed;
-}
-
-void Solver::runMainRound() {
-  m_isPoolClosed = false;
-
-  cslog() << "========================================================================================";
-  cslog() << "VVVVVVVVVVVVVVVVVVVVVVVVV -= TRANSACTION RECEIVING IS ON =- VVVVVVVVVVVVVVVVVVVVVVVVVVVV";
-
-  if (m_node->getRoundNumber() == 1) {
-    cs::Utils::runAfter(std::chrono::milliseconds(2000), [this]() { closeMainRound(); });
-  } else {
-    cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { closeMainRound(); });
-  }
 }
 
 HashVector Solver::getMyVector() const {
@@ -428,7 +378,7 @@ void Solver::runConsensus() {
     }
   }
 
-  cs::Hash result = m_generals->buildVector(packet, m_pool);
+  cs::Hash result = m_generals->buildVector(packet);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
 
@@ -461,12 +411,10 @@ void Solver::runConsensus() {
   }
 }
 
-void Solver::runFinalConsensus()
-{
+void Solver::runFinalConsensus() {
   const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
 
-  if (trustedCounterMatrix == numGen)
-  {
+  if (trustedCounterMatrix == numGen) {
     std::memset(receivedMatFrom, 0, sizeof(receivedMatFrom));
 
     m_writerIndex = (m_generals->takeDecision(m_roundTable.confidants,
@@ -476,8 +424,7 @@ void Solver::runFinalConsensus()
     if (m_writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
     }
-    else
-    {
+    else {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
 
@@ -486,8 +433,7 @@ void Solver::runFinalConsensus()
       if (m_writerIndex == m_node->getMyConfNumber()) {
         m_node->becomeWriter();
       }
-      else
-      {
+      else {
         // TODO: make next stage without delay
         cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
           m_node->sendWriterNotification();
@@ -505,7 +451,7 @@ void Solver::gotVector(HashVector&& vector) {
     return;
   }
 
-  const std::vector<PublicKey>& confidants = m_roundTable.confidants;
+  const cs::ConfidantsKeys &confidants = m_roundTable.confidants;
   uint8_t numGen = static_cast<uint8_t>(confidants.size());
 
   receivedVecFrom[vector.sender] = true;
@@ -552,22 +498,6 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   m_generals->addMatrix(matrix, m_roundTable.confidants);
 
   runFinalConsensus();
-}
-
-void Solver::writeNewBlock() {
-  cslog() << "Solver -> writeNewBlock ... start";
-
-  if (consensusAchieved && m_node->getMyLevel() == NodeLevel::Writer) {
-    m_node->getBlockChain().putBlock(m_pool);
-    m_node->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
-
-    b_pool.set_sequence((m_node->getBlockChain().getLastWrittenSequence()) + 1);
-
-    auto prev_hash = csdb::PoolHash::from_string("");
-    b_pool.set_previous_hash(prev_hash);
-
-    consensusAchieved = false;
-  }
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
@@ -729,75 +659,11 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 }
 
 /////////////////////////////
-
-#ifdef SPAM_MAIN
-void Solver::createPool() {
-  std::string        mp  = "0123456789abcdef";
-  const unsigned int cmd = 6;
-
-  struct timeb tt;
-  ftime(&tt);
-  srand(tt.time * 1000 + tt.millitm);
-
-  testPool = csdb::Pool();
-
-  std::string aStr(64, '0');
-  std::string bStr(64, '0');
-
-  uint32_t limit = randFT(5, 15);
-
-  if (randFT(0, 150) == 42) {
-    csdb::Transaction smart_trans;
-    smart_trans.set_currency(csdb::Currency("CS"));
-
-    smart_trans.set_target(Credits::BlockChain::getAddressFromKey("3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb"));
-    smart_trans.set_source(
-        csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001"));
-
-    smart_trans.set_amount(csdb::Amount(1, 0));
-    smart_trans.set_balance(csdb::Amount(100, 0));
-
-    api::SmartContract sm;
-    sm.address = "3SHCtvpLkBWytVSqkuhnNk9z1LyjQJaRTBiTFZFwKkXb";
-    sm.method  = "store_sum";
-    sm.params  = {"123", "456"};
-
-    smart_trans.add_user_field(0, serialize(sm));
-
-    testPool.add_transaction(smart_trans);
-  }
-
-  csdb::Transaction transaction;
-  transaction.set_currency(csdb::Currency("CS"));
-
-  while (createSpam && limit > 0) {
-    for (size_t i = 0; i < 64; ++i) {
-      aStr[i] = mp[randFT(0, 15)];
-      bStr[i] = mp[randFT(0, 15)];
-    }
-
-    transaction.set_target(csdb::Address::from_string(aStr));
-    transaction.set_source(csdb::Address::from_string(bStr));
-
-    transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-    transaction.set_balance(csdb::Amount(transaction.balance().integral() + 1, 0));
-
-    testPool.add_transaction(transaction);
-    --limit;
-  }
-
-  addTimestampToPool(testPool);
-}
-#endif
-
 #ifdef SPAMMER
 void Solver::spamWithTransactions() {
-  // if (node_->getMyLevel() != Normal) return;
   cslog() << "STARTING SPAMMER...";
   std::string mp = "1234567890abcdef";
 
-  // std::string cachedBlock;
-  // cachedBlock.reserve(64000);
   uint64_t iid = 0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -819,10 +685,12 @@ void Solver::spamWithTransactions() {
         // transaction.set_comission(csdb::Amount(0, 1, 10));
         transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
         transaction.set_innerID(iid);
-        addTransaction(transaction);
         iid++;
+
+        addTransaction(transaction);
       }
     }
+
     std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
   }
 }
@@ -849,7 +717,9 @@ void Solver::addInitialBalance() {
   transaction.set_innerID(1);
 
   addTransaction(transaction);
+}
 
+void Solver::runSpammer() {
 #ifdef SPAMMER
   spamThread = std::thread(&Solver::spamWithTransactions, this);
   spamThread.detach();
@@ -905,18 +775,6 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
     m_node->getBlockChain().putBlock(pool);
 }
 
-void Solver::addConfirmation(uint8_t confNumber_) {
-  if (writingConfGotFrom[confNumber_]) {
-    return;
-  }
-  writingConfGotFrom[confNumber_] = true;
-  writingCongGotCurrent++;
-  if (writingCongGotCurrent == 2) {
-    m_node->becomeWriter();
-    cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
-  }
-}
-
 void Solver::nextRound() {
   cslog() << "SOLVER> next Round : Starting ... nextRound";
 
@@ -928,15 +786,14 @@ void Solver::nextRound() {
 
   m_notifications.clear();
 
-  vectorComplete          = false;
-  consensusAchieved       = false;
-  blockCandidateArrived   = false;
+  vectorComplete = false;
+  consensusAchieved = false;
+  blockCandidateArrived = false;
   transactionListReceived = false;
-  vectorReceived          = false;
-  gotBlockThisRound       = false;
-  round_table_sent        = false;
-  sentTransLastRound      = false;
-  m_pool                  = csdb::Pool{};
+  vectorReceived = false;
+  gotBlockThisRound = false;
+  round_table_sent = false;
+  sentTransLastRound = false;
 
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
@@ -951,10 +808,6 @@ void Solver::nextRound() {
 
     cslog() << "SOLVER> next Round : the variables initialized";
 
-#ifdef SPAM_MAIN
-    createSpam = true;
-    spamThread = std::thread(&Solver::createPool, this);
-#endif
 #ifdef SPAMMER
     spamRunning = false;
 #endif

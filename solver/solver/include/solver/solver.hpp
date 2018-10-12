@@ -75,6 +75,7 @@ class Solver {
 
   uint32_t getTLsize();
   void addInitialBalance();
+  void runSpammer();
 
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;
@@ -101,7 +102,6 @@ class Solver {
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
 
-  void addConfirmation(uint8_t confNumber_);
   bool getIPoolClosed();
   bool getBigBangStatus();
   void setBigBangStatus(bool _status);
@@ -111,22 +111,9 @@ class Solver {
   const cs::PublicKey& getPublicKey() const;
 
  private:
-  void runMainRound();
-  void closeMainRound();
-
   void flushTransactions();
 
-  void writeNewBlock();
   void prepareBlockForSend(csdb::Pool& block);
-
-#ifdef SPAM_MAIN
-  void createPool();
-
-  std::atomic_bool createSpam;
-  std::thread      spamThread;
-
-  csdb::Pool testPool;
-#endif  // SPAM_MAIN
 
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
@@ -156,15 +143,11 @@ class Solver {
   std::vector<PublicKey> ips;
   std::vector<std::string> vector_datas;
 
-  csdb::Pool m_pool;
-  csdb::Pool m_uncharacterizedPool;
-
   cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
-  csdb::Pool b_pool;
 
-  bool m_isPoolClosed         = true;
+  bool m_isPoolClosed          = true;
   bool sentTransLastRound      = false;
   bool vectorComplete          = false;
   bool consensusAchieved       = false;
@@ -175,9 +158,7 @@ class Solver {
   bool gotBlockThisRound       = false;
   bool writingConfirmationGot  = false;
   bool gotBigBang              = false;
-  bool writingConfGotFrom[100];
 
-  uint8_t writingCongGotCurrent;
   uint32_t rNum = 0;
 
   cs::SharedMutex m_sharedMutex;
@@ -197,9 +178,9 @@ class Solver {
   // TODO! Hash m_characteristicHash
 
 #ifdef SPAMMER
-  std::atomic_bool spamRunning{false};
-  std::thread      spamThread;
-  void             spamWithTransactions();
+  std::atomic_bool spamRunning = { false };
+  std::thread spamThread;
+  void spamWithTransactions();
 #endif
 };
 }  // namespace cs

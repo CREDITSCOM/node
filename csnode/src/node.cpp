@@ -42,21 +42,25 @@ Node::~Node() {
 }
 
 bool Node::init() {
-  if (!transport_->isGood())
+  if (!transport_->isGood()) {
     return false;
+  }
 
-  if (!bc_.isGood())
+  if (!bc_.isGood()) {
     return false;
+  }
 
   // Create solver
-  if (!solver_)
+  if (!solver_) {
     return false;
+  }
 
   csdebug() << "Everything init";
 
   // check file with keys
-  if (!checkKeysFile())
+  if (!checkKeysFile()) {
     return false;
+  }
 
   cs::PublicKey publicKey; 
   std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
@@ -66,6 +70,7 @@ bool Node::init() {
 
   solver_->setKeysPair(publicKey, privateKey);
   //solver_->addInitialBalance();
+  solver_->runSpammer();
 
   return true;
 }
@@ -161,23 +166,21 @@ bool Node::checkKeysForSig() {
   if (ver_ok == 0) {
     return true;
   }
-  else {
-    cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
+  cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    if (gen_flag == 'g') {
-      generateKeys();
-      return true;
-    }
-    else {
-      return false;
-    }
+  char gen_flag = 'a';
+  std::cin >> gen_flag;
+
+  if (gen_flag == 'g') {
+    generateKeys();
+    return true;
   }
+
+  return false;
 }
 
-void Node::run(const Config&) {
+void Node::run(const Config& config) {
   transport_->run();
 }
 
@@ -463,28 +466,6 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
 
   flushCurrentTasks();
-}
-
-void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  cslog() << "NODE> Getting WRITING CONFIRMATION from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  istream_.init(data, size);
-
-  uint8_t confNumber_;
-  istream_ >> confNumber_;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad vector packet format";
-    return;
-  }
-
-  if (confNumber_ < 3) {
-    solver_->addConfirmation(confNumber_);
-  }
 }
 
 void Node::sendTLRequest() {
@@ -875,7 +856,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   onRoundStart(roundTable);
 
   // TODO: think how to improve this code
-  cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY), [this, roundTable]() mutable {
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
       solver_->gotRound(std::move(roundTable));
   });
 }
@@ -1272,10 +1253,13 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
-  } else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_))
+  }
+  else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) {
     solver_->gotFreeSyncroBlock(std::move(pool));
-  else
+  }
+  else {
     return;
+  }
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
@@ -1299,40 +1283,42 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     solver_->sendTL();
   }
 
-  cslog() << "======================================== ROUND " << roundNum_
+  cslog() << "======================================== ROUND " << roundTable.round
           << " ========================================";
   cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());
+
+  const cs::ConfidantsKeys& confidants = roundTable.confidants;
 
   if (roundTable.general == myPublicKey_) {
     myLevel_ = NodeLevel::Main;
   }
   else {
-    bool    found   = false;
-    uint8_t conf_no = 0;
+    const auto iter = std::find(confidants.begin(), confidants.end(), myPublicKey_);
 
-    for (auto& conf : roundTable.confidants) {
-      if (conf == myPublicKey_) {
-        myLevel_     = NodeLevel::Confidant;
-        myConfNumber = conf_no;
-        found        = true;
-        break;
-      }
-
-      conf_no++;
+    if (iter != confidants.end()) {
+      myLevel_ = NodeLevel::Confidant;
+      myConfidantIndex_ = std::distance(confidants.begin(), iter);
     }
-
-    if (!found) {
+    else {
       myLevel_ = NodeLevel::Normal;
     }
   }
 
   // Pretty printing...
-  cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
+  cslog() << "Round " << roundTable.round << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
 
-  int i = 0;
-  for (auto& e : roundTable.confidants) {
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
-    i++;
+  for (std::size_t i = 0; i < confidants.size(); ++i) {
+    const auto& confidant = confidants[i];
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+  }
+
+  const cs::Hashes& hashes = roundTable.hashes;
+
+  cslog() << "Transaction packets hashes count: " << hashes.size();
+
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    const auto& hashBinary = hashes[i].toBinary();
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
   }
 
 #ifdef SYNCRO
@@ -1341,7 +1327,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     syncro_started = true;
   }
   if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
-    syncro_started      = false;
+    syncro_started = false;
     awaitingSyncroBlock = false;
   }
 #endif
@@ -1355,7 +1341,7 @@ bool Node::getSyncroStarted() {
 }
 
 uint8_t Node::getMyConfNumber() {
-  return myConfNumber;
+  return myConfidantIndex_;
 }
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {
