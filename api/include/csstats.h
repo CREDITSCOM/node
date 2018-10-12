@@ -51,6 +51,7 @@ using TimeStamp = std::chrono::system_clock::time_point;
         Count transactionsCount = 0;
         BalancePerCurrency balancePerCurrency;
         Count smartContractsCount = 0;
+        Count transactionsSmartCount = 0;
         TimeStamp timeStamp;
     };
 

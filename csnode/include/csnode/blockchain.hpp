@@ -96,7 +96,10 @@ public:
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
   bool putBlock(csdb::Pool& pool);
+  const csdb::Storage & getStorage() const;
+
 private:
+
   bool writeGenesisBlock();
   
   void writeBlock(csdb::Pool& pool);

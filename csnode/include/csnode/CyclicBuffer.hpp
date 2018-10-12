@@ -50,7 +50,7 @@ public:
 private:
     size_t getFrontInd(size_t offset) const
     {
-		decltype(N) frontInd = back_ + 1 - size_;
+        decltype(N) frontInd = back_ + 1 - size_;
         return (frontInd + static_cast<decltype(N)>(offset) + N) % N;
     }
 private:

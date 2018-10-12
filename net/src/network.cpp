@@ -144,7 +144,7 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 
 void Network::processorRoutine() {
-  FixedHashMap<Hash, uint32_t, uint16_t, 100000> packetMap;
+  FixedHashMap<Hash, uint32_t, uint16_t, 1000000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   for (;;) {
@@ -189,9 +189,7 @@ void Network::processorRoutine() {
         transport_->processNodeMessage(task->pack);
     }
 
-    if (!task->pack.isDirect())
-      transport_->redirectPacket(task->pack, remoteSender);
-
+    transport_->redirectPacket(task->pack, remoteSender);
     ++recCounter;
   }
 }

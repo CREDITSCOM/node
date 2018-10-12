@@ -364,6 +364,12 @@ csdb::PoolHash BlockChain::getLastWrittenHash() const
     return lastHash_;
 }
 
+const csdb::Storage & BlockChain::getStorage() const
+{
+  return storage_;
+}
+
+
 //void
 //BlockChain::wait_for_block()
 //{

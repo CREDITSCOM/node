@@ -125,6 +125,8 @@ class APIHandler : public APIHandlerInterface
 
     void WaitForBlock(PoolHash& _return, const PoolHash& obsolete) override;
 
+    void SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) override;
+
   private:
     BlockChain& s_blockchain;
 

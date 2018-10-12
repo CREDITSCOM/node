@@ -9,6 +9,16 @@
 namespace slv2
 {
 
+    uint32_t SolverCore::getNextMissingBlock(const uint32_t fromSeq) {
+    /*
+      for (uint32_t b = fromSeq + 1; b < node_->getRoundNumber(); ++b) {
+        if (tmpStorage.count(b) || rndStorage.count(b)) continue;
+        return b;
+      }
+    */
+      return 0;
+    }
+
     const Credits::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
