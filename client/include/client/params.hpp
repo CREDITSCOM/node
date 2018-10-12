@@ -1,7 +1,6 @@
 #pragma once
 
 //#define MONITOR_NODE
-//#define SPAM_MAIN
 //#define STARTER
 #define NODE_API
 #define AJAX_IFACE
@@ -21,5 +20,5 @@
 #define BINARY_TCP_API
 #define DEFAULT_CURRENCY 1
 
-constexpr auto   SIZE_OF_COMMON_TRANSACTION  = 190;
+constexpr auto SIZE_OF_COMMON_TRANSACTION  = 190;
 constexpr double COST_OF_ONE_TRUSTED_PER_DAY = 17;

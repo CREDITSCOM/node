@@ -111,22 +111,10 @@ class Solver {
   const cs::PublicKey& getPublicKey() const;
 
  private:
-  void runMainRound();
-  void closeMainRound();
-
   void flushTransactions();
 
   void writeNewBlock();
   void prepareBlockForSend(csdb::Pool& block);
-
-#ifdef SPAM_MAIN
-  void createPool();
-
-  std::atomic_bool createSpam;
-  std::thread      spamThread;
-
-  csdb::Pool testPool;
-#endif  // SPAM_MAIN
 
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
@@ -197,9 +185,9 @@ class Solver {
   // TODO! Hash m_characteristicHash
 
 #ifdef SPAMMER
-  std::atomic_bool spamRunning{false};
-  std::thread      spamThread;
-  void             spamWithTransactions();
+  std::atomic_bool spamRunning = { false };
+  std::thread spamThread;
+  void spamWithTransactions();
 #endif
 };
 }  // namespace cs

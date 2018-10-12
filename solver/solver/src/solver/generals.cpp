@@ -33,7 +33,7 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-cs::Hash Generals::buildVector(cs::TransactionsPacket& packet, csdb::Pool& new_pool) {
+cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
   cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
@@ -53,7 +53,6 @@ cs::Hash Generals::buildVector(cs::TransactionsPacket& packet, csdb::Pool& new_p
 
       if (delta > zero_balance) {
         characteristicMask.set(i, true);
-        new_pool.add_transaction(transaction);
       }
     }
 
