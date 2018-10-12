@@ -241,6 +241,14 @@ public:
    */
   std::vector<Transaction> transactions(const Address &addr, size_t limit = 100, const TransactionID &offset = TransactionID()) const;
 
+  /**
+  * @brief is_in_blockchain возвращает true, если транзакция с addr и innerId есть в blockchain
+  * @param addr       адрес кошелька (input)
+  * @param InnerId    id транзакции (input)
+  * @Transaction trx  полученная транзакция (output)
+  * @return содержит ли blockchain транзакцию
+  */
+  bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
 
 private:
   ::std::shared_ptr<priv> d;
