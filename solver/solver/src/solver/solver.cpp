@@ -62,20 +62,6 @@ void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& p
   myPrivateKey = privateKey;
 }
 
-void Solver::prepareBlockForSend(csdb::Pool& block) {
-  addTimestampToPool(block);
-  block.set_writer_public_key(cs::Bytes(myPublicKey.begin(), myPublicKey.end()));
-  block.set_sequence((m_node->getBlockChain().getLastWrittenSequence()) + 1);
-
-  auto prev_hash = csdb::PoolHash::from_string("");
-  block.set_previous_hash(prev_hash);
-  block.sign(cs::Bytes(myPrivateKey.begin(), myPrivateKey.end()));
-
-  cslog() << "last sequence: " << (m_node->getBlockChain().getLastWrittenSequence());
-  cslog() << "prev_hash: " << m_node->getBlockChain().getLastHash().to_string() << " <- Not sending!!!";
-  cslog() << "new sequence: " << block.sequence() << ", new time:" << block.user_field(0).value<std::string>().c_str();
-}
-
 void Solver::sendTL() {
   if (gotBigBang) {
     return;
@@ -97,10 +83,6 @@ void Solver::sendTL() {
 
 uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
-}
-
-auto Solver::setLastRoundTransactionsGot(size_t trNum) -> void {
-  lastRoundTransactionsGot = trNum;
 }
 
 void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
@@ -230,7 +212,6 @@ void Solver::flushTransactions() {
       packet.makeHash();
 
       m_node->sendTransactionsPacket(packet);
-      sentTransLastRound = true;
 
       auto hash = packet.hash();
 
@@ -407,7 +388,6 @@ void Solver::runConsensus() {
   trustedCounterVector++;
 
   if (trustedCounterVector == m_roundTable.confidants.size()) {
-    vectorComplete = true;
 
     memset(receivedVecFrom, 0, 100);
     trustedCounterVector = 0;
@@ -442,8 +422,6 @@ void Solver::runFinalConsensus() {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
 
-      consensusAchieved = true;
-
       if (m_writerIndex == m_node->getMyConfNumber()) {
         m_node->becomeWriter();
       }
@@ -474,7 +452,6 @@ void Solver::gotVector(HashVector&& vector) {
   trustedCounterVector++;
 
   if (trustedCounterVector == numGen) {
-    vectorComplete = true;
     std::memset(receivedVecFrom, 0, sizeof(receivedVecFrom));
     trustedCounterVector = 0;
     // compose and send matrix!!!
@@ -491,10 +468,6 @@ void Solver::gotVector(HashVector&& vector) {
   }
 
   cslog() << "Solver>  VECTOR GOT SUCCESSFULLY!!!";
-}
-
-void Solver::setRNum(size_t _rNum) {
-  rNum = static_cast<uint32_t>(_rNum);
 }
 
 void Solver::gotMatrix(HashMatrix&& matrix) {
@@ -796,22 +769,13 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
 void Solver::nextRound() {
   cslog() << "SOLVER> next Round : Starting ... nextRound";
 
-  receivedVec_ips.clear();
-  receivedMat_ips.clear();
-
   ips.clear();
-  vector_datas.clear();
 
   m_notifications.clear();
 
-  vectorComplete = false;
-  consensusAchieved = false;
   blockCandidateArrived = false;
-  transactionListReceived = false;
-  vectorReceived = false;
   gotBlockThisRound = false;
   round_table_sent = false;
-  sentTransLastRound = false;
 
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
