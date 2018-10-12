@@ -98,7 +98,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   const uint8_t confidantsCountMax = 101;  // from technical paper
   assert(nodes_amount <= confidantsCountMax);
 
-  HashWeigth hw[nodes_amount];
+  std::array<HashWeigth, confidantsCountMax> hw;
   uint8_t j = matrix.sender;
   uint8_t i_max;
   bool    found = false;
