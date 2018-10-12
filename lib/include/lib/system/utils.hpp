@@ -19,6 +19,8 @@
 #include <lib/system/common.hpp>
 #include <sodium.h>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
 #define csunused(x) (void)(x)
 
@@ -311,6 +313,24 @@ namespace cs
             return !error;
         }
     };
+
+    ///
+    /// Сonversion beetwin numeric types with checks based on boost::numeric_cast in DEBUG build
+    ///
+    template<typename Target, typename Source>
+    inline auto numeric_cast(Source arg)
+    {
+    #ifndef NDEBUG
+        return boost::numeric_cast<Target>(arg);
+    #else
+        return static_cast<Target>(arg);
+    #endif
+    }
+
+}
+inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept
+{
+    return static_cast< unsigned char >( arg );
 }
 
 #endif 

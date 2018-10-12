@@ -57,7 +57,7 @@ enum MsgTypes: uint8_t {
   WriterNotification
 };
 
-typedef uint32_t RoundNum;
+using RoundNum = uint32_t;
 
 class Packet {
 public:

@@ -23,7 +23,7 @@ void cs::Timer::start(int msec)
     mMsec = std::chrono::milliseconds(msec);
     mThread = std::thread(&Timer::loop, this);
     mRealMsec = mMsec;
-    mAllowableDifference = RangeDeltaInPercents ? (static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100) : 0;
+    mAllowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
 }
 
 void cs::Timer::stop()

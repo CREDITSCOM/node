@@ -145,11 +145,11 @@ bool Node::checkKeysForSig() {
   const uint8_t msg[] = {255, 0, 0, 0, 255};
   uint8_t signature[64], public_key[32], private_key[64];
 
-  for (int i = 0; i < 32; i++) {
+  for (size_t i = 0; i < 32; i++) {
     public_key[i] = myPublicForSig[i];
   }
 
-  for (int i = 0; i < 64; i++) {
+  for (size_t i = 0; i < 64; i++) {
     private_key[i] = myPrivateForSig[i];
   }
 
@@ -671,7 +671,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const cs::PublicKey&
   size_t blockSeq = pool.sequence();
 
   if (roundNum_ == blockSeq) {
-    getBlockChain().setGlobalSequence(blockSeq);
+    getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(blockSeq));
   }
 
   if (localSeq >= blockSeq) {
@@ -1240,13 +1240,13 @@ void Node::sendBlockRequest(uint32_t seq) {
   lws = getBlockChain().getLastWrittenSequence();
 
   float syncStatus = (1.0f - (globalSequence - lws) / globalSequence) * 100.0f;
-  csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << (int)syncStatus << "%";
+  csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << syncStatus << "%";
 
   sendBlockRequestSequence = seq;
   awaitingSyncroBlock      = true;
   awaitingRecBlockCount    = 0;
 
-  uint8_t requestTo = rand() % (int)(MIN_CONFIDANTS);
+  uint8_t requestTo = rand() % (MIN_CONFIDANTS);
 
   ostream_.init(BaseFlags::Signed, solver_->roundTable().confidants[requestTo]);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
@@ -1465,12 +1465,12 @@ void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) 
 }
 
 void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
-  auto max    = LZ4_compressBound(bSize);
-  auto memPtr = allocator_.allocateNext(max);
+  auto max    = LZ4_compressBound(cs::numeric_cast<int>(bSize));
+  auto memPtr = allocator_.allocateNext(cs::numeric_cast<uint32_t>(max));
 
   auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), bSize, memPtr.size());
 
-  allocator_.shrinkLast(realSize);
+  allocator_.shrinkLast(cs::numeric_cast<uint32_t>(realSize));
   ostream_ << type << roundNum_ << bSize;
   ostream_ << std::string(static_cast<char*>(memPtr.get()), memPtr.size());
 }
