@@ -21,7 +21,7 @@ public:
   MOCK_CONST_METHOD0(getNodeType, NodeType());
   MOCK_CONST_METHOD0(getIpList, const std::vector<EndpointData>&());
 
-  MOCK_CONST_METHOD0(getMyPublicKey, const PublicKey&());
+  MOCK_CONST_METHOD0(getMyPublicKey, const cs::PublicKey&());
   MOCK_CONST_METHOD0(getPathToDB, const std::string&());
 
   MOCK_METHOD0(isGood, bool());

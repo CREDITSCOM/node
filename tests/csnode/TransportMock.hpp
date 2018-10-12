@@ -22,7 +22,7 @@ public:
   MOCK_METHOD4(addTask, void(Packet*, const uint32_t packNum, bool incrementWhenResend, bool sendToNeighbours));
   MOCK_METHOD0(clearTasks, void());
 
-  MOCK_CONST_METHOD0(getMyPublicKey, const PublicKey&());
+  MOCK_CONST_METHOD0(getMyPublicKey, const cs::PublicKey&());
   MOCK_CONST_METHOD0(isGood, bool());
 
   MOCK_METHOD1(sendBroadcast, void(const Packet* pack));
@@ -38,7 +38,7 @@ public:
   MOCK_METHOD1(sendRegistrationRequest, void(Connection&));
   MOCK_METHOD1(sendRegistrationConfirmation, void(const Connection&));
   MOCK_METHOD2(sendRegistrationRefusal, void(const Connection&, const RegistrationRefuseReasons));
-  MOCK_METHOD2(sendPackRenounce, void(const Hash&, const Connection&));
+  MOCK_METHOD2(sendPackRenounce, void(const cs::Hash&, const Connection&));
 
   MOCK_METHOD1(sendPingPack, void(const Connection&));
 
@@ -75,7 +75,7 @@ public:
   MOCK_METHOD2(gotPing, bool(const TaskPtr<IPacMan>&, RemoteNodePtr&));
 
   MOCK_METHOD0(askForMissingPackages, void());
-  MOCK_METHOD3(requestMissing, void(const Hash&, const uint16_t, const uint64_t));
+  MOCK_METHOD3(requestMissing, void(const cs::Hash&, const uint16_t, const uint64_t));
 };
 
 #endif //PROJECT_TRANSPORTMOCK_HPP

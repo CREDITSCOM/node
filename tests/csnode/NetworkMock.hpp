@@ -15,7 +15,7 @@ public:
 
   MOCK_METHOD2(sendDirect, void(const Packet, const ip::udp::endpoint&));
 
-  MOCK_METHOD3(resendFragment, bool(const Hash&, const uint16_t, const ip::udp::endpoint&));
+  MOCK_METHOD3(resendFragment, bool(const cs::Hash&, const uint16_t, const ip::udp::endpoint&));
   MOCK_METHOD2(registerMessage, void(Packet*, const uint32_t size));
 
   // private methods

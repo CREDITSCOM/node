@@ -11,28 +11,28 @@
 class SolverMock : public cs::Solver
 {
 public:
-  MOCK_CONST_METHOD0(getMyPublicKey, PublicKey());
+  MOCK_CONST_METHOD0(getMyPublicKey, cs::PublicKey());
   MOCK_CONST_METHOD0(getPathToDB, std::string());
   MOCK_METHOD2(set_keys, void(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv));
   MOCK_METHOD1(gotTransaction, void(csdb::Transaction&&));
   MOCK_METHOD1(gotTransactionsPacket, void(cs::TransactionsPacket&& packet));
-  MOCK_METHOD2(gotPacketHashesRequest, void(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender));
+  MOCK_METHOD2(gotPacketHashesRequest, void(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender));
   MOCK_METHOD1(gotPacketHashesReply, void(cs::TransactionsPacket&& packet));
-  MOCK_METHOD1(gotRound, void(cs::RoundInfo&& round));
+  MOCK_METHOD1(gotRound, void(cs::RoundTable&& round));
   MOCK_METHOD1(gotBlockCandidate, void(csdb::Pool&&));
   MOCK_METHOD1(gotVector, void(cs::HashVector&&));
   MOCK_METHOD1(gotMatrix, void(cs::HashMatrix&&));
-  MOCK_METHOD2(gotHash, void(Hash&, const PublicKey&));
-  MOCK_METHOD2(gotBlockRequest, void(csdb::PoolHash&&, const PublicKey&));
+  MOCK_METHOD2(gotHash, void(std::string&&, const cs::PublicKey&));
+  MOCK_METHOD2(gotBlockRequest, void(csdb::PoolHash&&, const cs::PublicKey&));
   MOCK_METHOD1(gotBlockReply, void(csdb::Pool&&));
-  MOCK_METHOD2(gotBadBlockHandler, void(csdb::Pool&&, const PublicKey&));
+  MOCK_METHOD2(gotBadBlockHandler, void(csdb::Pool&&, const cs::PublicKey&));
   MOCK_METHOD0(sendTL, void());
   MOCK_METHOD4(applyCharacteristic, void(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
-                       const csdb::Pool& metaInfoPool, const PublicKey& sender));
-  MOCK_CONST_METHOD0(getCharacteristicHash, Hash());
+                       const csdb::Pool& metaInfoPool, const cs::PublicKey& sender));
+  MOCK_CONST_METHOD0(getCharacteristicHash, cs::Hash());
   MOCK_METHOD0(getSignedNotification, std::vector<uint8_t>());
 
-  MOCK_CONST_METHOD0(getWriterPublicKey, PublicKey());
+  MOCK_CONST_METHOD0(getWriterPublicKey, cs::PublicKey());
 
   MOCK_METHOD0(getSignature, const char*());
 
@@ -66,7 +66,7 @@ public:
   MOCK_METHOD0(getBigBangStatus, bool());
   MOCK_METHOD1(setBigBangStatus, void(bool _status));
   MOCK_METHOD1(setRNum, void(size_t _rNum));
-  MOCK_METHOD3(setConfidants, void(const std::vector<PublicKey>& confidants, const PublicKey& general, const cs::RoundNumber roundNum));
+  MOCK_METHOD3(setConfidants, void(const std::vector<cs::PublicKey>& confidants, const cs::PublicKey& general, const cs::RoundNumber roundNum));
 
   // private methods
 
