@@ -129,7 +129,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.contains(hash)) {
-      cserror() << "HASH NOT FOUND";
+      cserror() << "HASH NOT FOUND " << hash.toString();
       return;
     }
 
@@ -237,7 +237,7 @@ void Solver::flushTransactions() {
       auto hash = packet.hash();
 
       if (!m_hashTable.contains(hash)) {
-        m_hashTable.insert(std::move(hash), std::move(packet));
+        m_hashTable.insert(hash, packet);
       } else {
         cslog() << "Transaction compose failed";
       }
@@ -294,7 +294,7 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   cs::TransactionsPacketHash hash = packet.hash();
 
   if (!m_hashTable.contains(hash))
-    m_hashTable.insert(std::move(hash), std::move(packet));
+    m_hashTable.insert(hash, packet);
 }
 
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
@@ -379,6 +379,8 @@ void Solver::runConsensus() {
       packet.addTransaction(transaction);
     }
   }
+
+  cslog() << "Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
   cs::Hash result = m_generals->buildVector(packet);
 
@@ -699,7 +701,7 @@ void Solver::spamWithTransactions() {
 
   const cs::RoundNumber round = m_roundTable.round;
 
-  // TODO: magic values
+  // TODO: fix magic values
   while (true) {
     if (spamRunning && (m_node->getMyLevel() == Normal)) {
       if ((round < 10) || (round > 20)) {
@@ -709,11 +711,15 @@ void Solver::spamWithTransactions() {
         transaction.set_innerID(iid);
         iid++;
 
+        if (!transaction.is_valid()) {
+          cserror() << "Generated transaction is not valid";
+        }
+
         addTransaction(transaction);
       }
     }
 
-    std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
+    std::this_thread::sleep_for(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 3));
   }
 }
 #endif

@@ -38,8 +38,8 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
-  uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
-  const size_t transactionsCount   = packet.transactionsCount();
+  uint8_t hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
+  const size_t transactionsCount = packet.transactionsCount();
 
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;

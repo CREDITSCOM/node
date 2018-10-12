@@ -312,16 +312,40 @@ void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
 
-  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
-  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message MSG: Characteristic received" << std::endl;
-  if (type == MsgTypes::WriterNotification) std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
+  if (type == MsgTypes::BlockHash) {
+    cslog() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::BlockRequest) {
+    cslog() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::FirstTransaction) {
+    cslog() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::RequestedBlock) {
+    cslog() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::RoundTableSS) {
+    cslog() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::TransactionList) {
+    cslog() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
+  }
+
+  if (type == MsgTypes::NewCharacteristic) {
+    cslog() << "TRANSPORT> Process Node Message MSG: Characteristic received";
+  }
+
+  if (type == MsgTypes::WriterNotification) {
+    cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+  }
+
   if (type == MsgTypes::BigBang) {
-    std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
+    cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
@@ -358,16 +382,38 @@ void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
 
-  if (type == MsgTypes::BlockHash) std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
-  if (type == MsgTypes::BlockRequest) std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
-  if (type == MsgTypes::FirstTransaction) std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
-  if (type == MsgTypes::RequestedBlock) std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
-  if (type == MsgTypes::RoundTableSS) std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
-  if (type == MsgTypes::TransactionList) std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
-  if (type == MsgTypes::NewCharacteristic) std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic received" << std::endl;
-  if (type == MsgTypes::WriterNotification) std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
+  if (type == MsgTypes::BlockHash) {
+    cslog() << "TRANSPORT> Process Node Message PKG: BlockHash ";
+  }
+
+  if (type == MsgTypes::BlockRequest) {
+    cslog() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
+  }
+
+  if (type == MsgTypes::FirstTransaction) {
+    cslog() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
+  }
+  if (type == MsgTypes::RequestedBlock) {
+    cslog() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
+  }
+
+  if (type == MsgTypes::RoundTableSS) {
+    cslog()<< "TRANSPORT> Process Node Message PKG: RoundTable ";
+  }
+  if (type == MsgTypes::TransactionList) {
+    cslog() << "TRANSPORT> Process Node Message PKG: TransactionList ";
+  }
+
+  if (type == MsgTypes::NewCharacteristic) {
+    cslog() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
+  }
+
+  if (type == MsgTypes::WriterNotification) {
+    cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+  }
+
   if (type == MsgTypes::BigBang) {
-	  std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+    cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
