@@ -306,19 +306,7 @@ namespace slv2
             return;
         }
 
-        // exactly acts as solver-1 analog
-        const auto seq = p.sequence();
-        if(rnd_storage.count(seq) == 0) {
-            rnd_storage [seq] = p;
-            if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: gotFreeSyncroBlock(" << seq << "), cached in rnd storage");
-            }
-        }
-        else {
-            if(Consensus::Log) {
-                LOG_DEBUG("SolverCore: gotFreeSyncroBlock(" << seq << "), ignored duplicated");
-            }
-        }
+        gotIncorrectBlock(std::move(p), PublicKey {});
     }
 
     void SolverCore::rndStorageProcessing()
@@ -331,26 +319,8 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: rndStorageProcessing()");
         }
-        // acts as solver-1 analog but removes outdated blocks from cache
-        auto& bc = pnode->getBlockChain();
-        while(! rnd_storage.empty()) {
-            size_t new_seq = bc.getLastWrittenSequence() + 1;
-            auto oldest = rnd_storage.begin();
-            if(oldest->first < new_seq) {
-                // erase outdated block
-                rnd_storage.erase(oldest);
-                continue;
-            }
-            else if(oldest->first == new_seq) {
-                // store block and remove it from cache
-                bc.putBlock(oldest->second);
-                rnd_storage.erase(oldest);
-            }
-            else {
-                // stop processing while get required block
-                break;
-            }
-        }
+
+        test_outrunning_blocks();
     }
 
     void SolverCore::addConfirmation(uint8_t own_conf_number)

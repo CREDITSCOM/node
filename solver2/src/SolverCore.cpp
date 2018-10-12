@@ -335,8 +335,9 @@ namespace slv2
             LOG_DEBUG("SolverCore: test_outrunning_blocks()");
         }
         // retrieve blocks until cache empty or block sequence is broken:
+        auto& bc = pnode->getBlockChain();
         while(! outrunning_blocks.empty()) {
-            size_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
+            size_t desired_seq = bc.getLastWrittenSequence() + 1;
             const auto oldest = outrunning_blocks.cbegin();
             if(oldest->first < desired_seq) {
                 // clear outdated block if it is and select next one:
@@ -351,9 +352,15 @@ namespace slv2
                 }
                 // retrieve and use block if it is exactly what we need:
                 auto& data = outrunning_blocks.at(desired_seq);
-                if(stateCompleted(pstate->onBlock(*pcontext, data.first, data.second))) {
-                    // do not forget make proper transitions if they are set in our table
-                    handleTransitions(Event::Block);
+                if(desired_seq == cur_round) {
+                    if(stateCompleted(pstate->onBlock(*pcontext, data.first, data.second))) {
+                        // do not forget make proper transitions if they are set in our table
+                        handleTransitions(Event::Block);
+                    }
+                }
+                else {
+                    // store block and remove it from cache
+                    bc.putBlock(data.first);
                 }
                 outrunning_blocks.erase(desired_seq);
             }
