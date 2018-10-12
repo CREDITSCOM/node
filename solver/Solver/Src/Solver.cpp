@@ -534,8 +534,10 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender)
 #ifdef MYLOG
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
   #endif
-  if(g_seq > node_->getRoundNumber()) return; // remove this line when the block candidate signing of all trusted will be implemented
-  
+  if(g_seq > node_->getRoundNumber()) {
+    return gotIncorrectBlock(std::move(block), sender); // remove this line when the block candidate signing of all trusted will be implemented
+  }
+
   node_->getBlockChain().setGlobalSequence(g_seq);
   if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1)
   {
@@ -636,6 +638,15 @@ void Solver::setBigBangStatus(bool _status)
 void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender)
 {
   //insert code here
+}
+
+uint32_t Solver::getNextMissingBlock(const uint32_t fromSeq) {
+  for (uint32_t b = fromSeq + 1; b < node_->getRoundNumber(); ++b) {
+    if (tmpStorage.count(b) || rndStorage.count(b)) continue;
+    return b;
+  }
+
+  return 0;
 }
 
 void Solver::gotBlockCandidate(csdb::Pool&& block) {

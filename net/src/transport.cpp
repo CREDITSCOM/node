@@ -84,7 +84,6 @@ void Transport::run() {
   }
 
   refillNeighbourhood();
-
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
@@ -101,7 +100,7 @@ void Transport::run() {
       askForMissingPackages();
 
     if (checkPending)
-      nh_.checkPending();
+      nh_.checkPending(config_.getMaxNeighbours());
 
     if (checkSilent)
       nh_.checkSilent();
@@ -151,11 +150,22 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
   return rn;
 }
 
-void Transport::sendDirect(const Packet* pack, const Connection& conn) {
+bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
   uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
-  if (nextBytesCount <= conn.BytesLimit) {
+  if (nextBytesCount <= config_.getConnectionBandwidth()) {
     conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
     net_->sendDirect(*pack, conn.getOut());
+    return true;
+  }
+
+  return false;
+}
+
+void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
+  const auto packEnd = pack + size;
+  for (auto ptr = pack; ptr != packEnd; ++ptr) {
+    nh_.registerDirect(pack, conn);
+    sendDirect(ptr, **conn);
   }
 }
 
@@ -190,6 +200,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       break;
     case NetworkCommand::SSRegistration:
       gotSSRegistration(task, sender);
+      break;
+    case NetworkCommand::SSReRegistration:
+      gotSSReRegistration();
       break;
     case NetworkCommand::SSFirstRound:
       gotSSDispatch(task);
@@ -273,6 +286,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   if (!iPackStream_.good())
     return false;
 
+  uint32_t ctr = nh_.size();
   if (config_.getBootstrapType() == BootstrapType::SignalServer) {
     for (uint8_t i = 0; i < numCirc; ++i) {
       EndpointData ep;
@@ -282,7 +296,8 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
       if (!iPackStream_.good())
         return false;
 
-      nh_.establishConnection(net_->resolve(ep));
+      if (++ctr <= config_.getMaxNeighbours())
+        nh_.establishConnection(net_->resolve(ep));
 
       iPackStream_.safeSkip<PublicKey>();
       if (!iPackStream_.good())
@@ -573,6 +588,17 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
   return true;
 }
 
+bool Transport::gotSSReRegistration()
+{
+  LOG_WARN("ReRegistration on Signal Server");
+  {
+    SpinLock l(oLock_);
+    formSSConnectPack(config_, oPackStream_, myPublicKey_);
+    net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+  }
+  return true;
+}
+
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait)
     LOG_WARN("Unexpected Signal Server response");
@@ -622,17 +648,18 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
-  auto conn = sender->connection.load(std::memory_order_relaxed);
-  if (!conn)
-    return;
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return;
 
-  sendPackInform(pack, *conn);
+  sendPackInform(pack, **conn);
+
+  if (pack.isDirect()) return;  // Do not redirect direct packs
 
   if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
   }
   else {
-    nh_.neighbourHasPacket(sender, pack.getHash());
+    nh_.neighbourHasPacket(sender, pack.getHash(), false);
     sendBroadcast(&pack);
   }
 }
@@ -640,17 +667,18 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::PackInform << pack.getHash();
+  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isDirect() << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
   oPackStream_.clear();
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
+  uint8_t isDirect;
   Hash hHash;
-  iPackStream_ >> hHash;
+  iPackStream_ >> isDirect >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end()) return false;
 
-  nh_.neighbourHasPacket(sender, hHash);
+  nh_.neighbourHasPacket(sender, hHash, isDirect);
   return true;
 }
 
@@ -753,9 +781,8 @@ void Transport::registerMessage(MessagePtr msg) {
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-  Connection* conn = sender->connection.load(std::memory_order_acquire);
-  if (!conn)
-    return false;
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return false;
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   Hash     hHash;

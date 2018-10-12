@@ -24,19 +24,13 @@ using namespace Credits;
 //    good_ = true;
 //}
 
-BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress
-#ifdef SPAMMER
-  , csdb::Address spammerAddress
-#endif
-)
+BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress)
   : good_(false)
   , global_sequence(static_cast<decltype(global_sequence)>(-1))
   , blockRequestIsNeeded(false)
   , genesisAddress_(genesisAddress)
   , startAddress_(startAddress)
-#ifdef SPAMMER
   , spammerAddress_(spammerAddress)
-#endif
   , walletIds_(new WalletsIds)
   , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
@@ -195,7 +189,6 @@ bool BlockChain::writeGenesisBlock()
 
   genesis.add_transaction(transaction);
 
-#ifdef SPAMMER
   transaction.set_target(spammerAddress_);
   transaction.set_source(genesisAddress_);
 
@@ -206,7 +199,6 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_innerID(1);
 
   genesis.add_transaction(transaction);
-#endif
 
   csdb::Address test_address;
   std::string str_addr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
@@ -363,6 +355,12 @@ csdb::PoolHash BlockChain::getLastWrittenHash() const
 {
     return lastHash_;
 }
+
+const csdb::Storage & BlockChain::getStorage() const
+{
+  return storage_;
+}
+
 
 //void
 //BlockChain::wait_for_block()

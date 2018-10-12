@@ -192,6 +192,8 @@ typedef std::string Matrix;
     void setBigBangStatus(bool _status);
     void setRNum(size_t _rNum);
 
+    uint32_t getNextMissingBlock(const uint32_t fromSeq);
+
 	// to be called from node upon receive new RoundTable just before next round start
 	// (instead of conditional call to SendTL())
 	void beforeNextRound();

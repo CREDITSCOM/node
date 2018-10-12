@@ -36,7 +36,8 @@ enum class NetworkCommand : uint8_t {
   SSFirstRound          = 31,
   SSRegistrationRefused = 25,
   SSPingWhiteNode       = 32,
-  SSLastBlock           = 34
+  SSLastBlock           = 34,
+  SSReRegistration		  = 36
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -92,7 +93,9 @@ class Transport {
   void sendBroadcast(const Packet* pack) {
     nh_.sendByNeighbours(pack);
   }
-  void sendDirect(const Packet*, const Connection&);
+
+  bool sendDirect(const Packet*, const Connection&);
+  void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
 
   void gotPacket(const Packet&, RemoteNodePtr&);
   void redirectPacket(const Packet&, RemoteNodePtr&);
@@ -110,8 +113,11 @@ class Transport {
   void sendPingPack(const Connection&);
 
   void registerMessage(MessagePtr);
-
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
+
+  ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested) { return nh_.getNextSyncRequestee(seq, alreadyRequested); }
+  ConnectionPtr getConnectionByKey(const PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
+  void syncReplied(const uint32_t seq) { return nh_.releaseSyncRequestee(seq); }
 
  private:
   void postponePacket(const RoundNum, const MsgTypes, const Packet&);
@@ -129,6 +135,7 @@ class Transport {
   bool gotRegistrationRefusal(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
   bool gotSSRegistration(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+  bool gotSSReRegistration();
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
   bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);

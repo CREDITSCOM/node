@@ -522,6 +522,62 @@ Wallet Storage::wallet(const Address &addr) const
   return Wallet::get(addr);
 }
 
+bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const {
+  Pool curPool;
+  TransactionID::sequence_t curIdx = -1;
+  TransactionID last_trx_id = get_last_by_source(addr).id();
+  bool is_in_blockchain = false;
+
+  if (last_trx_id.is_valid()) {
+    curPool = pool_load(last_trx_id.pool_hash());
+    if (curPool.is_valid() && last_trx_id.index() < curPool.transactions_count())
+      curIdx = last_trx_id.index();
+  }
+
+  auto nextIt = [this, &curPool, &curIdx]() -> bool {
+    if (curPool.is_valid()) {
+      if (curIdx) {
+        curIdx--;
+        return true;
+      }
+      else {
+        do {
+          curPool = pool_load(curPool.previous_hash());
+        } while (curPool.is_valid() && !(curPool.transactions_count()));
+        if (curPool.is_valid()) {
+          curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+          return true;
+        }
+      }
+    }
+    else {
+      curPool = pool_load(last_hash());
+      while (curPool.is_valid() && !(curPool.transactions_count())) {
+        curPool = pool_load(curPool.previous_hash());
+      }
+      if (curPool.is_valid()) {
+        curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (curIdx == -1)
+    return false;
+
+  do {
+    const Transaction trx_curr = curPool.transaction(curIdx);
+    if (trx_curr.source() == addr && trx_curr.innerID() == InnerId) {
+      is_in_blockchain = true;
+      trx = trx_curr;
+      break;
+    }
+  } while (nextIt());
+
+  return is_in_blockchain;
+}
+
 std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit, const TransactionID &offset) const
 {
   std::vector<Transaction> res;

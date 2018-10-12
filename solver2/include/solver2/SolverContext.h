@@ -466,26 +466,6 @@ namespace slv2
         }
 
         /**
-         * @fn  bool SolverContext::verify(const csdb::Transaction& tr) const;
-         *
-         * @brief   Verifies the given transaction
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   tr  The tr.
-         *
-         * @return  True if it succeeds, false if it fails.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        bool verify(const csdb::Transaction& tr) const
-        {
-            return core.verify_signature(tr);
-        }
-
-        /**
          * @fn  bool SolverContext::is_vect_recv_from(uint8_t sender) const;
          *
          * @brief   Query if is vector received from passed sender

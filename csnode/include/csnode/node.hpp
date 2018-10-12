@@ -131,9 +131,7 @@ public:
   // Info
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
-#ifdef SPAMMER
   static const csdb::Address spammerAddress_;
-#endif
   const PublicKey myPublicKey_;
   bool            good_ = true;
 

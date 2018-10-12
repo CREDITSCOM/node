@@ -17,6 +17,8 @@ class Transport;
 class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 32;
+const uint32_t MaxResendTimes = 64;
+const uint32_t MaxSyncAttempts = 8;
 
 struct Connection;
 struct RemoteNode {
@@ -85,6 +87,9 @@ struct Connection {
   };
   FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
+  uint32_t syncSeq = 0;
+  uint32_t syncSeqRetries = 0;
+
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
   }
@@ -118,35 +123,59 @@ public:
   void gotRefusal(const Connection::Id&);
 
   void resendPackets();
-  void checkPending();
+  void checkPending(const uint32_t maxNeighbours);
   void checkSilent();
 
   void refreshLimits();
 
   bool canHaveNewConnection();
 
-  void neighbourHasPacket(RemoteNodePtr, const Hash&);
+  void neighbourHasPacket(RemoteNodePtr, const Hash&, const bool isDirect);
   void neighbourSentPacket(RemoteNodePtr, const Hash&);
   void neighbourSentRenounce(RemoteNodePtr, const Hash&);
 
   void redirectByNeighbours(const Packet*);
   void pourByNeighbours(const Packet*, const uint32_t packNum);
 
+  uint32_t size();
+
   void pingNeighbours();
   void validateConnectionId(RemoteNodePtr,
                             const Connection::Id,
                             const ip::udp::endpoint&);
 
+  ConnectionPtr getConnection(const RemoteNodePtr);
+
   ConnectionPtr getNextRequestee(const Hash&);
+  ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getNeighbourByKey(const PublicKey&);
+
+  void releaseSyncRequestee(const uint32_t seq);
+
+  void registerDirect(const Packet*, ConnectionPtr);
 
 private:
   struct BroadPackInfo {
     Packet pack;
+
+    uint32_t attempts = 0;
+    bool sentLastTime = false;
+
     Connection::Id receivers[MaxNeighbours];
     Connection::Id* recEnd = receivers;
   };
 
-  bool dispatchBroadcast(BroadPackInfo&);
+  struct DirectPackInfo {
+    Packet pack;
+
+    ConnectionPtr receiver;
+    bool received = false;
+
+    uint32_t attempts = 0;
+  };
+
+  bool dispatch(BroadPackInfo&, const bool force);
+  bool dispatch(DirectPackInfo&);
 
   ConnectionPtr getConnection(const ip::udp::endpoint&);
 
@@ -174,6 +203,7 @@ private:
 
   FixedHashMap<Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
   FixedHashMap<Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
+  FixedHashMap<Hash, DirectPackInfo, uint16_t, 10000> msgDirects_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

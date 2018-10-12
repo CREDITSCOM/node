@@ -93,7 +93,7 @@ namespace Credits
             Hash_ hash_(hash_s);
             delete[] hash_s;
             delete[] del1;
-            LOG_NOTICE("GENERALS > buildVector(): " << _pool.transactions_count() << " trans => "
+            LOG_DEBUG("GENERALS > buildVector(): " << _pool.transactions_count() << " trans => "
                                                     << new_pool.transactions_count() << " (good) + "
                                                     << new_bpool.transactions_count() << " (bad) + "
                                                     << cnt_rejected << " (skip)");
