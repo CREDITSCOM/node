@@ -1,3 +1,4 @@
+#include <iostream>
 /* Send blaming letters to @yrtimd */
 #include <regex>
 #include <stdexcept>
@@ -5,6 +6,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/log/utility/setup/settings_parser.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -163,6 +165,7 @@ Config Config::readFromFile(const std::string& fileName) {
         throw std::length_error("No hosts specified");
     }
 
+    result.setLoggerSettings(config);
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
@@ -189,4 +192,29 @@ Config Config::readFromFile(const std::string& fileName) {
   }
 
   return result;
+}
+
+void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
+  boost::property_tree::ptree settings;
+  auto core = config.get_child_optional("Core");
+  if (core) {
+    settings.add_child("Core", *core);
+  }
+  auto sinks = config.get_child_optional("Sinks");
+  if (sinks) {
+    for (const auto& val: *sinks) {
+      settings.add_child(boost::property_tree::ptree::path_type("Sinks." + val.first, '/'), val.second);
+    }
+  }
+  for (const auto& item: config) {
+    if (item.first.find("Sinks.") == 0)  
+      settings.add_child(boost::property_tree::ptree::path_type(item.first, '/'), item.second);
+  }
+  std::stringstream ss;
+  boost::property_tree::write_ini(ss, settings);
+  loggerSettings_ = boost::log::parse_settings(ss);
+}
+
+const boost::log::settings& Config::getLoggerSettings() const {
+  return loggerSettings_;
 }

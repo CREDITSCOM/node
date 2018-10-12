@@ -2,6 +2,7 @@
 #include <lz4.h>
 
 #include "packet.hpp"
+#include <lib/system/utils.hpp>
 
 RegionAllocator Message::allocator_(1 << 26, 4);
 
@@ -104,8 +105,8 @@ void Message::composeFullData() const {
     uint8_t* data = static_cast<uint8_t*>(fullData_.get());
     pack = packets_;
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-      uint32_t cSize = pack->size() - (i == 0 ? 0 : headersLength);
-      memcpy(data, ((const char*)pack->data()) + (i == 0 ? 0 : headersLength), cSize);
+      uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - (i == 0 ? 0 : headersLength);
+      memcpy(data, (reinterpret_cast<const char*>(pack->data())) + (i == 0 ? 0 : headersLength), cSize);
       data+= cSize;
     }
   }

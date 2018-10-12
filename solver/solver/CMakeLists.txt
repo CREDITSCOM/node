@@ -36,4 +36,4 @@ target_link_libraries(solver
 
 target_include_directories(solver PUBLIC include)
 
-target_link_libraries (solver csconnector csdb csnode base58 libsodium)
+target_link_libraries (solver csconnector csdb csnode base58 libsodium lib)

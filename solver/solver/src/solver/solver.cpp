@@ -532,7 +532,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
 #endif
-  uint32_t g_seq = block.sequence();
+  uint32_t g_seq = cs::numeric_cast<uint32_t>(block.sequence());
   csdebug() << "GOT NEW BLOCK: global sequence = " << g_seq;
 
   if (g_seq > m_node->getRoundNumber())
@@ -731,7 +731,7 @@ void Solver::addInitialBalance() {
 
   const std::string start_address = "0000000000000000000000000000000000000000000000000000000000000002";
   csdb::Transaction transaction;
-  transaction.set_target(csdb::Address::from_public_key((char*)myPublicKey.data()));
+  transaction.set_target(csdb::Address::from_public_key(reinterpret_cast<char*>(myPublicKey.data())));
   transaction.set_source(csdb::Address::from_string(start_address));
 
   transaction.set_currency(csdb::Currency("CS"));
