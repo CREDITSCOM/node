@@ -166,7 +166,7 @@ private:
   RoundNum roundNum_ = 0;
   NodeLevel myLevel_;
 
-  uint8_t myConfNumber;
+  uint8_t myConfidantIndex_;
 
   // Resources
   BlockChain bc_;

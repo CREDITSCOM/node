@@ -75,6 +75,7 @@ class Solver {
 
   uint32_t getTLsize();
   void addInitialBalance();
+  void runSpammer();
 
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;

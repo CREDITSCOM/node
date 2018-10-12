@@ -683,12 +683,9 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 /////////////////////////////
 #ifdef SPAMMER
 void Solver::spamWithTransactions() {
-  // if (node_->getMyLevel() != Normal) return;
   cslog() << "STARTING SPAMMER...";
   std::string mp = "1234567890abcdef";
 
-  // std::string cachedBlock;
-  // cachedBlock.reserve(64000);
   uint64_t iid = 0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -710,10 +707,12 @@ void Solver::spamWithTransactions() {
         // transaction.set_comission(csdb::Amount(0, 1, 10));
         transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
         transaction.set_innerID(iid);
-        addTransaction(transaction);
         iid++;
+
+        addTransaction(transaction);
       }
     }
+
     std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
   }
 }
@@ -740,10 +739,13 @@ void Solver::addInitialBalance() {
   transaction.set_innerID(1);
 
   addTransaction(transaction);
+}
 
+void Solver::runSpammer()
+{
 #ifdef SPAMMER
-  spamThread = std::thread(&Solver::spamWithTransactions, this);
-  spamThread.detach();
+    spamThread = std::thread(&Solver::spamWithTransactions, this);
+    spamThread.detach();
 #endif
 }
 
