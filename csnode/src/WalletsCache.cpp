@@ -100,22 +100,21 @@ void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, 
         LOG_ERROR("Cannot find source wallet");
         return;
     }
-
-    WalletId writer_id{};
-    if (!findWalletId(wallAddress, writer_id))
-    {
-      LOG_ERROR("Cannot find writer wallet");
-      return;
-    }
-
     WalletData& wallData = getWalletData(id, tr.source());
-    WalletData& writerWall = getWalletData(writer_id, writer_public_key);
-
     wallData.balance_ -= tr.amount();
     wallData.balance_ -= tr.counted_fee().to_double();
-    writerWall.balance_ += tr.counted_fee().to_double();
     wallData.trxTail_.push(tr.innerID());
     setModified(id);
+
+    WalletId writer_id{};
+    if (!findWalletId(writer_public_key, writer_id))
+    {
+        // maybe we should cache writer public key here
+        LOG_ERROR("Cannot find writer wallet");
+        return;
+    }
+    WalletData& writerWall = getWalletData(writer_id, writer_public_key);
+    writerWall.balance_ += tr.counted_fee().to_double();
 }
 
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr)
