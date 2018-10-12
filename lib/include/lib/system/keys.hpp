@@ -1,16 +1,14 @@
 #ifndef __KEYS_HPP__
 #define __KEYS_HPP__
-#include "hash.hpp"
-#include "structures.hpp"
 
-const size_t BLAKE2_HASH_LENGTH = 32;
-const size_t PUBLIC_KEY_LENGTH = 32;
-using PublicKey = FixedString<PUBLIC_KEY_LENGTH>;
+#include <lib/system/hash.hpp>
+#include <lib/system/structures.hpp>
+#include <lib/system/common.hpp>
 
-inline PublicKey getHashedPublicKey(const char* str) {
-  PublicKey result;
+inline cs::PublicKey getHashedPublicKey(const char* str) {
+  cs::PublicKey result;
 
-  blake2sp(result.str, BLAKE2_HASH_LENGTH, str, PUBLIC_KEY_LENGTH, nullptr, 0);
+  blake2sp(result.data(), BLAKE2_HASH_LENGTH, str, PUBLIC_KEY_LENGTH, nullptr, 0);
 
   return result;
 }

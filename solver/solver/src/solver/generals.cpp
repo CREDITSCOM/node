@@ -33,31 +33,32 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
-  std::cout << "GENERALS> buildVector: " << _pool.transactions_count() << " transactions" << std::endl;
+cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
+  cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
-  memset(&m_hMatrix, 0, 9700);
+  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+
   uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
-  const size_t transactionsCount   = _pool.transactions_count();
+  const size_t transactionsCount   = packet.transactionsCount();
+
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;
     const csdb::Amount zero_balance = 0.0_c;
 
-    boost::dynamic_bitset<> characteristicMask{transactionsCount};
+    boost::dynamic_bitset<> characteristicMask { transactionsCount };
 
     for (size_t i = 0; i < transactionsCount; ++i) {
-      const csdb::Transaction& transaction = _pool.transactions().at(i);
-      const csdb::Amount       delta       = transaction.balance() - transaction.amount() - comission;
+      const csdb::Transaction& transaction = packet.transactions().at(i);
+      const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
 
       if (delta > zero_balance) {
         characteristicMask.set(i, true);
-        new_pool.add_transaction(transaction);
       }
     }
 
     m_characteristic.size = static_cast<uint32_t>(transactionsCount);
 
-    std::vector<uint8_t> serializedCahracteristicMask;
+    cs::Bytes serializedCahracteristicMask;
     boost::to_block_range(characteristicMask, std::back_inserter(serializedCahracteristicMask));
 
     serializedCahracteristicMask.shrink_to_fit();
@@ -71,52 +72,55 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool) {
 
   m_find_untrusted.fill(0);
   m_new_trusted.fill(0);
-  m_hw_total.fill(hash_weight{});
+  m_hw_total.fill(HashWeigth{});
 
-  return hash_s;
+  cs::Hash result;
+  std::copy(hash_s, hash_s + HASH_LENGTH, result.begin());
+
+  return result;
 }
 
-void Generals::addvector(HashVector vector) {
+void Generals::addVector(const HashVector& vector) {
   cslog() << "GENERALS> Add vector";
 
-  m_hMatrix.hmatr[vector.Sender] = vector;
+  m_hMatrix.hashVector[vector.sender] = vector;
   cslog() << "GENERALS> Vector succesfully added";
 }
 
 void Generals::addSenderToMatrix(uint8_t myConfNum) {
-  m_hMatrix.Sender = myConfNum;
+  m_hMatrix.sender = myConfNum;
 }
 
-void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confidantNodes) {
+void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes) {
   cslog() << "GENERALS> Add matrix";
 
   const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
 
-  auto*   hw = new hash_weight[nodes_amount];
-  Hash_   temp_hash;
-  uint8_t j = matrix.Sender;
+  auto*   hw = new HashWeigth[nodes_amount];
+  uint8_t j = matrix.sender;
   uint8_t i_max;
   bool    found = false;
 
   uint8_t max_frec_position;
 
-  cslog() << "GENERALS> HW OUT: nodes amount = " << nodes_amount;
+  cslog() << "GENERALS> HW OUT: nodes amount = " << int(nodes_amount);
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
-      memcpy(hw[0].a_hash, matrix.hmatr[0].hash.val, 32);
+      memcpy(hw[0].hash, matrix.hashVector[0].hash.data(), matrix.hashVector[0].hash.size());
 
-      cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].a_hash, 32);
+      cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].hash, 32);
 
-      hw[0].a_weight                       = 1;
+      hw[0].weight                       = 1;
       *(m_find_untrusted.data() + j * 100) = 0;
       i_max                                = 1;
     } else {
       found = false;
 
+      // FIXME: i_max uninitialized in this branch!!!!
       for (uint8_t ii = 0; ii < i_max; ii++) {
-        if (memcmp(hw[ii].a_hash, matrix.hmatr[i].hash.val, 32) == 0) {
-          (hw[ii].a_weight)++;
+        if (memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size()) == 0) {
+          (hw[ii].weight)++;
           *(m_find_untrusted.data() + j * 100 + i) = ii;
 
           found = true;
@@ -125,9 +129,9 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
       }
 
       if (!found) {
-        memcpy(hw[i_max].a_hash, matrix.hmatr[i].hash.val, 32);
+        memcpy(hw[i_max].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size());
 
-        (hw[i_max].a_weight)                     = 1;
+        (hw[i_max].weight)                     = 1;
         *(m_find_untrusted.data() + j * 100 + i) = i_max;
 
         i_max++;
@@ -140,16 +144,16 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   max_frec_position = 0;
 
   for (int i = 0; i < i_max; i++) {
-    if (hw[i].a_weight > hw_max) {
-      hw_max            = hw[i].a_weight;
-      max_frec_position = i;
+    if (hw[i].weight > hw_max) {
+      hw_max            = hw[i].weight;
+      max_frec_position = cs::numeric_cast<uint8_t>(i);
     }
   }
 
-  j                      = matrix.Sender;
-  m_hw_total[j].a_weight = max_frec_position;
+  j                      = matrix.sender;
+  m_hw_total[j].weight = max_frec_position;
 
-  memcpy(m_hw_total[j].a_hash, hw[max_frec_position].a_hash, 32);
+  memcpy(m_hw_total[j].hash, hw[max_frec_position].hash, 32);
 
   for (int i = 0; i < nodes_amount; i++) {
     if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position) {
@@ -160,29 +164,30 @@ void Generals::addmatrix(HashMatrix matrix, const std::vector<PublicKey>& confid
   delete[] hw;
 }
 
-uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const csdb::PoolHash& lasthash) {
+uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const csdb::PoolHash& lasthash) {
   csdebug() << "GENERALS> Take decision: starting ";
 
   const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
-  auto          hash_weights = new hash_weight[nodes_amount];
-  auto          mtr          = new unsigned char[nodes_amount * 97];
+  auto hash_weights = new HashWeigth[nodes_amount];
+  auto mtr = new unsigned char[nodes_amount * 97];      // what is 97 magic value?
 
   uint8_t j_max, jj;
   j_max = 0;
 
-  memset(mtr, 0, nodes_amount * 97);
+  std::memset(mtr, 0, nodes_amount * 97);
 
   for (uint8_t j = 0; j < nodes_amount; j++) {
     // matrix init
     if (j == 0) {
-      memcpy(hash_weights[0].a_hash, m_hw_total[0].a_hash, 32);
-      (hash_weights[0].a_weight) = 1;
+      memcpy(hash_weights[0].hash, m_hw_total[0].hash, 32);
+      (hash_weights[0].weight) = 1;
       j_max                      = 1;
     } else {
       bool found = false;
+
       for (jj = 0; jj < j_max; jj++) {
-        if (memcmp(hash_weights[jj].a_hash, m_hw_total[j].a_hash, 32) == 0) {
-          (hash_weights[jj].a_weight)++;
+        if (memcmp(hash_weights[jj].hash, m_hw_total[j].hash, 32) == 0) {
+          (hash_weights[jj].weight)++;
           found = true;
 
           break;
@@ -190,9 +195,9 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
       }
 
       if (!found) {
-        memcpy(hash_weights[j_max].a_hash, m_hw_total[j].a_hash, 32);
+        std::memcpy(hash_weights[j_max].hash, m_hw_total[j].hash, 32);
 
-        (m_hw_total[j_max].a_weight) = 1;
+        (m_hw_total[j_max].weight) = 1;
         j_max++;
       }
     }
@@ -218,20 +223,21 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
   cslog() << "Hash : " << lasthash.to_string();
 
   auto hash_t = lasthash.to_binary();
-  int  k      = *(hash_t.begin());
+  int k = *(hash_t.begin());
 
   uint16_t result = k % nodes_amount;
 
   m_writerPublicKey = confidantNodes.at(result);
-  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.str, 32);
+
+  cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.data(), m_writerPublicKey.size());
 
   delete[] hash_weights;
   delete[] mtr;
 
-  return result;
+  return cs::numeric_cast<uint8_t>(result);
 }
 
-HashMatrix Generals::getMatrix() const {
+const HashMatrix& Generals::getMatrix() const {
   return m_hMatrix;
 }
 

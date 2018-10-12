@@ -19,44 +19,83 @@ T getSecureRandom() {
   return result;
 }
 
+bool Neighbourhood::dispatchBroadcast(Neighbourhood::BroadPackInfo& bp) {
+  bool result = false;
+  if (!transport_->shouldSendPacket(bp.pack)) {
+    return result;
+  }
+
+  for (auto& nb : neighbours_) {
+    if (nb->isSignal) {
+      continue;
+    }
+    bool found = false;
+    for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
+      if (*ptr == nb->id) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      result = true;
+      transport_->sendDirect(&(bp.pack), **nb);
+    }
+  }
+
+  return result;
+}
+
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
   SpinLock l(nLockFlag_);
-  for (auto& nb : neighbours_)
-    transport_->sendDirect(pack, **nb);
+  auto& bp = msgBroads_.tryStore(pack->getHash());
+  if (!bp.pack) {
+    bp.pack = *pack;
+  }
+  dispatchBroadcast(bp);
 }
 
 bool Neighbourhood::canHaveNewConnection() {
   SpinLock l(nLockFlag_);
-  SpinLock ll(pLockFlag_);
-  return !((neighbours_.size() + pendingConnections_.size()) >= MaxNeighbours);
+  return neighbours_.size() < MaxNeighbours;
 }
 
 void Neighbourhood::checkPending() {
-  SpinLock l(pLockFlag_);
+  SpinLock l1(mLockFlag_);
   // If the connection cannot be established, retry it
-  for (auto conn = pendingConnections_.begin();
-       conn != pendingConnections_.end();
-       ++conn) {
+  for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
     // Attempt to reconnect if the connection hasn't been established yet
-    if (((*conn)->node &&
-         (*conn)->node->connection.load(std::memory_order_relaxed) != **conn) ||
-        ((*conn)->attempts >= Neighbourhood::MaxConnectAttempts)) {
-      pendingConnections_.remove(conn);
-      --conn;
+    if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
+      transport_->sendRegistrationRequest(****conn);
     }
-    else
-      transport_->sendRegistrationRequest(***conn);
+  }
+}
+
+void Neighbourhood::refreshLimits() {
+  SpinLock l(nLockFlag_);
+  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+    (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
   }
 }
 
 void Neighbourhood::checkSilent() {
-  bool needRefill = false;
   {
-    SpinLock l(nLockFlag_);
+    SpinLock lm(mLockFlag_);
+    SpinLock ln(nLockFlag_);
+
     for (auto conn = neighbours_.begin();
          conn != neighbours_.end();
          ++conn) {
-      if ((*conn)->isSignal) continue;
+      if ((*conn)->isSignal) {
+        continue;
+      }
+
+      if (!(*conn)->node) {
+        ConnectionPtr tc = *conn; 
+        disconnectNode(conn);
+        --conn;
+        continue;
+      }
 
       const auto packetsCount = (*(*conn)->node)->packets.
         load(std::memory_order_relaxed);
@@ -65,45 +104,91 @@ void Neighbourhood::checkSilent() {
         LOG_WARN("Node " << (*conn)->in << " stopped responding");
 
         ConnectionPtr tc = *conn;
-        tc->node->connection.store(nullptr);
-        neighbours_.remove(conn);
+        Connection* c = *tc;
+        tc->node->connection.compare_exchange_strong(c,
+          nullptr,
+          std::memory_order_release,
+          std::memory_order_relaxed);
 
+        disconnectNode(conn);
         --conn;
-
-        {
-          SpinLock ll(pLockFlag_);
-          pendingConnections_.emplace(tc);
-        }
       }
-      else
+      else {
         (*conn)->lastPacketsCount = packetsCount;
+      }
     }
+  }
+}
 
-    SpinLock ll(pLockFlag_);
-    needRefill = ((neighbours_.size() + pendingConnections_.size()) < MinConnections);
+template <typename Vec>
+static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
+  for (auto it = vec.begin(); it != vec.end(); ++it) {
+    if ((*it)->id == id) {
+      return it;
+    }
   }
 
-  if (needRefill) transport_->refillNeighbourhood();
+  return nullptr;
+}
+
+template <typename Vec>
+static ConnectionPtr* findInMap(const Connection::Id& id, Vec& vec) {
+  for (auto it = vec.begin(); it != vec.end(); ++it) {
+    if (it->data->id == id) {
+      return &(it->data);
+    }
+  }
+
+  return nullptr;
+}
+
+static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
+  if (ep.address().is_v6()) {
+    return ep;
+  }
+  return { ip::make_address_v6(ip::v4_mapped, ep.address().to_v4()), ep.port() };
+}
+
+ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
+  LOG_WARN("Getting connection");
+  auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
+
+  if (!conn) {
+    conn = connectionsAllocator_.emplace();
+    conn->in = ep;
+  }
+
+  return conn;
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
-  SpinLock ll(pLockFlag_);
-  ConnectionPtr &conn =
-    pendingConnections_.emplace(connectionsAllocator_.emplace());
+  LOG_WARN("Establishing connection to " << ep);
+  SpinLock lp(mLockFlag_);
 
-  conn->id = getSecureRandom<Connection::Id>();
-  conn->in = ep;
+  auto conn = getConnection(ep);
+  if (!conn->id) {
+    conn->id = getSecureRandom<Connection::Id>();
+  }
 
   transport_->sendRegistrationRequest(**conn);
 }
 
-void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
-  SpinLock l(nLockFlag_);
-  if ((*node)->connection.load(std::memory_order_relaxed)) return;
+void Neighbourhood::addSignalServer(const ip::udp::endpoint& in,
+                                    const ip::udp::endpoint& out,
+                                    RemoteNodePtr node) {
+  SpinLock lp(mLockFlag_);
+  SpinLock ln(nLockFlag_);
 
-  ConnectionPtr conn = connectionsAllocator_.emplace();
+  if ((*node)->connection.load(std::memory_order_relaxed)) {
+    LOG_ERROR("Connection with the SS node has already been established");
+    return;
+  }
 
-  conn->id = getSecureRandom<Connection::Id>();
+  ConnectionPtr conn = getConnection(out);
+  if (!conn->id) {
+    conn->id = getSecureRandom<Connection::Id>();
+  }
+
   conn->in = in;
   if (in != out) {
     conn->specialOut = true;
@@ -111,25 +196,12 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
   }
 
   conn->isSignal = true;
-
-  conn->node = node;
-  node->connection.store(*conn, std::memory_order_release);
-
-  neighbours_.emplace(conn);
+  connectNode(node, conn);
 }
 
-template <typename Vec>
-static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
-  for (auto it = vec.begin(); it != vec.end(); ++it)
-    if ((*it)->id == id)
-      return it;
-
-  return nullptr;
-}
-
-void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
-  conn->node = node;
-
+/* Assuming both the mutexes have been locked */
+void Neighbourhood::connectNode(RemoteNodePtr node,
+                                ConnectionPtr conn) {
   Connection* connection = nullptr;
   while (!node->connection.compare_exchange_strong(connection,
                                                    *conn,
@@ -137,90 +209,124 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
                                                    std::memory_order_relaxed));
 
   if (connection) {
-    LOG_WARN("Reconnected from " << connection->in << " to " << conn->in);
     auto connPtr = findInVec(connection->id, neighbours_);
-    if (connPtr) neighbours_.remove(connPtr);
+    if (connPtr) {
+      disconnectNode(connPtr);
+    }
   }
 
-  LOG_WARN("Connected to " << *conn);
+  conn->node = node;
+
+  if (conn->connected) {
+    return;
+  }
+  conn->connected = true;
   neighbours_.emplace(conn);
+}
+
+void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
+  (*connPtr)->connected = false;
+  (*connPtr)->node = RemoteNodePtr();
+  neighbours_.remove(connPtr);
 }
 
 void Neighbourhood::gotRegistration(Connection&& conn,
                                     RemoteNodePtr node) {
-  // Have we met?
-  {
-    SpinLock l(nLockFlag_);
-    if (auto nh = findInVec(conn.id, neighbours_)) {
-      auto oldConn = node->connection.load(std::memory_order_relaxed);
-      if (oldConn && oldConn != **nh) {
-        LOG_WARN("RemoteNode has a different connection" << oldConn->in << " vs " << (**nh)->in);
-        if (oldConn->id > conn.id)
-          return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
+  SpinLock l1(mLockFlag_);
+  SpinLock l2(nLockFlag_);
 
-        oldConn->id = conn.id;
-      }
-      return transport_->sendRegistrationConfirmation(conn);
+  ConnectionPtr& connPtr = connections_.tryStore(getIndexingEndpoint(conn.getOut()));
+  if (!connPtr) {
+    connPtr = connectionsAllocator_.emplace(std::move(conn));
+  }
+  else {
+    if (conn.id < connPtr->id) {
+      connPtr->id = conn.id;
     }
+    connPtr->key = conn.key;
+
+    connPtr->in = conn.in;
+    connPtr->specialOut = conn.specialOut;
+    connPtr->out = conn.out;
   }
 
-  {
-    SpinLock l(pLockFlag_);
-    if (auto pc = findInVec(conn.id, pendingConnections_))
-        pendingConnections_.remove(pc);
+  connectNode(node, connPtr);
+  transport_->sendRegistrationConfirmation(**connPtr, conn.id);
+}
+
+void Neighbourhood::gotConfirmation(const Connection::Id& my,
+                                    const Connection::Id& real,
+                                    const ip::udp::endpoint& ep,
+                                    const cs::PublicKey& pk,
+                                    RemoteNodePtr node) {
+  SpinLock l1(mLockFlag_);
+  SpinLock l2(nLockFlag_);
+
+  ConnectionPtr* connPtr = findInMap(my, connections_);
+  if (nullptr == connPtr) {
+    LOG_WARN("Connection with ID " << my << " not found");
+    return;
+  }
+  if (ep != (*connPtr)->in) {
+    (*connPtr)->out = (*connPtr)->in;
+    (*connPtr)->specialOut = true;
+    (*connPtr)->in = ep;
   }
 
-  {
-    SpinLock l(nLockFlag_);
-    if (neighbours_.size() == MaxConnections)
-      return transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
+  if (my != real) (*connPtr)->id = real;
 
-    ConnectionPtr newConn = connectionsAllocator_.emplace(std::move(conn));
-    connectNode(node, newConn);
-    transport_->sendRegistrationConfirmation(**newConn);
+  connectNode(node, *connPtr);
+}
+
+void Neighbourhood::validateConnectionId(RemoteNodePtr node,
+                                         const Connection::Id id,
+                                         const ip::udp::endpoint& ep) {
+  SpinLock l1(mLockFlag_);
+  SpinLock l2(nLockFlag_);
+
+  auto realPtr = findInMap(id, connections_);
+  if (nullptr == realPtr) {
+    return;
+  }
+  if (realPtr->get() != node->connection.load(std::memory_order_relaxed)) {
+    if (!(*realPtr)->specialOut && (*realPtr)->in != ep) {
+      (*realPtr)->specialOut = true;
+      (*realPtr)->out = (*realPtr)->in;
+    }
+    (*realPtr)->in = ep;
+    connectNode(node, *realPtr);
   }
 }
 
-void Neighbourhood::gotConfirmation(const Connection::Id& id, const ip::udp::endpoint& ep, const PublicKey& pk, RemoteNodePtr node) {
-  ConnectionPtr tsPtr;
+void Neighbourhood::gotRefusal(const Connection::Id& id) {}
+ 
+void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
+                                       const cs::Hash& hash) {
+  SpinLock l(nLockFlag_);
+  auto conn = node->connection.load(std::memory_order_relaxed);
+  if (!conn) {
+    return;
+  }
 
-  {
-    SpinLock l(pLockFlag_);
-    ConnectionPtr* pc = findInVec(id, pendingConnections_);
-    if (!pc) {
-      LOG_WARN("Got confirmation with an unexpected ID");
+  auto& bp = msgBroads_.tryStore(hash);
+  for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
+    if (*ptr == conn->id) {
       return;
     }
-
-    tsPtr = *pc;
-    pendingConnections_.remove(pc);
   }
 
-  LOG_EVENT("Connection to " << ep << " established");
-
-  if (ep != tsPtr->in) {
-    tsPtr->out = tsPtr->in;
-    tsPtr->specialOut = true;
-    tsPtr->in = ep;
+  if ((bp.recEnd - bp.receivers) < MaxNeighbours) {
+    *(bp.recEnd++) = conn->id;
   }
-
-
-  SpinLock l(nLockFlag_);
-  connectNode(node, tsPtr);
-}
-
-void Neighbourhood::gotRefusal(const Connection::Id& id) {
-  SpinLock l(pLockFlag_);
-  ConnectionPtr* pc = findInVec(id, pendingConnections_);
-  if (pc)
-    pendingConnections_.remove(pc);
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
-                                        const Hash& hash) {
+                                        const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
-  if (!connection) return;
+  if (!connection) {
+    return;
+  }
 
   Connection::MsgRel& rel = connection->msgRels.tryStore(hash);
   SenderInfo& sInfo = msgSenders_.tryStore(hash);
@@ -235,9 +341,11 @@ void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
 
       rel.acceptOrder = sInfo.totalSenders++;
 
-      for (auto& nb : neighbours_)
-        if (nb->id != connection->id)
+      for (auto& nb : neighbours_) {
+        if (nb->id != connection->id) {
           transport_->sendPackRenounce(hash, **nb);
+        }
+      }
     }
   }
   else if (*sInfo.prioritySender != connection) {
@@ -247,7 +355,7 @@ void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
 }
 
 void Neighbourhood::neighbourSentRenounce(RemoteNodePtr node,
-                                          const Hash& hash) {
+                                          const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
   if (connection) {
@@ -268,8 +376,7 @@ void Neighbourhood::redirectByNeighbours(const Packet* pack) {
   }
 }
 
-void Neighbourhood::pourByNeighbours(const Packet* pack,
-                                     const uint32_t packNum) {
+void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum) {
   if (packNum <= Packet::SmartRedirectTreshold) {
     const auto end = pack + packNum;
     for (auto ptr = pack; ptr != end; ++ptr) {
@@ -281,8 +388,9 @@ void Neighbourhood::pourByNeighbours(const Packet* pack,
 
   {
     SpinLock l(nLockFlag_);
-    for (auto& nb : neighbours_)
+    for (auto& nb : neighbours_) {
       transport_->sendPackRenounce(pack->getHeaderHash(), **nb);
+    }
   }
 
   ConnectionPtr* conn;
@@ -290,31 +398,55 @@ void Neighbourhood::pourByNeighbours(const Packet* pack,
   uint32_t tr = 0;
   const Packet* packEnd = pack + packNum;
 
-  for (;;) {
+  while (true) {
     {
       SpinLock l(nLockFlag_);
-      if (i >= neighbours_.size()) i = 0;
+      if (i >= neighbours_.size()) {
+        i = 0;
+      }
       conn = neighbours_.begin() + i;
       ++i;
     }
 
     Connection::MsgRel& rel = (*conn)->msgRels.tryStore(pack->getHeaderHash());
-    if (!rel.needSend) continue;
+    if (!rel.needSend) {
+      continue;
+    }
 
-    for (auto p = pack; p != packEnd; ++p)
+    for (auto p = pack; p != packEnd; ++p) {
       transport_->sendDirect(p, ***conn);
+    }
 
-    if (++tr == 2) break;
+    if (++tr == 2) {
+      break;
+    }
   }
 }
 
 void Neighbourhood::pingNeighbours() {
   SpinLock l(nLockFlag_);
-  for (auto& nb : neighbours_)
+  for (auto& nb : neighbours_) {
     transport_->sendPingPack(**nb);
+  }
 }
 
-ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
+void Neighbourhood::resendPackets() {
+  SpinLock l(nLockFlag_);
+  uint32_t cnt = 0;
+  for (auto& bp : msgBroads_) {
+    if (!bp.data.pack) {
+      continue;
+    }
+    if (!dispatchBroadcast(bp.data)) {
+      bp.data.pack = Packet();
+    }
+    else {
+      ++cnt;
+    }
+  }
+}
+
+ConnectionPtr Neighbourhood::getNextRequestee(const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
 
   SenderInfo& si = msgSenders_.tryStore(hash);
@@ -326,29 +458,14 @@ ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
   }
 
   for (auto& nb : neighbours_) {
-    if (nb->isSignal) continue;
+    if (nb->isSignal) {
+      continue;
+    }
     Connection::MsgRel& rel = nb->msgRels.tryStore(hash);
-    if (rel.acceptOrder == si.reaskTimes) return nb;
+    if (rel.acceptOrder == si.reaskTimes) {
+      return nb;
+    }
   }
 
   return si.prioritySender;
-}
-
-void Neighbourhood::validateConnectionId(RemoteNodePtr node,
-                                         const Connection::Id id,
-                                         const ip::udp::endpoint& ep) {
-  SpinLock l(nLockFlag_);
-  auto connection = node->connection.load(std::memory_order_acquire);
-  if (!connection) {
-    auto realPtr = findInVec(id, neighbours_);
-    if (!realPtr) return;
-
-    if ((*realPtr)->node.get() != node.get()) {
-      (*realPtr)->node->connection.store(nullptr, std::memory_order_release);
-      (*realPtr)->node = node;
-    }
-
-    (*realPtr)->in = ep;
-    node->connection.store(realPtr->get(), std::memory_order_acquire);
-  }
 }

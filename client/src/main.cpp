@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
   desc.add_options()
     ("help", "produce this message")
     ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
-    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")");
+    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\"), supported formats: json, xml, ini");
 
   po::variables_map vm;
 
@@ -44,10 +44,13 @@ int main(int argc, char* argv[]) {
   auto config = Config::read(vm);
   if (!config.isGood()) panic();
 
+  logger::initialize(config.getLoggerSettings());
+
   Node node(config);
   if (!node.isGood()) panic();
 
   node.run(config);
 
+  logger::cleanup();
   return 0;
 }

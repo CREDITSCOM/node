@@ -62,11 +62,23 @@ class IPackStream {
     if ((uint32_t)(end_ - ptr_) < Length)
       good_ = false;
     else {
-      memcpy(str.str, ptr_, Length);
+      std::memcpy(str.data(), ptr_, Length);
       ptr_ += Length;
     }
 
     return *this;
+  }
+
+  template <size_t Length>
+  IPackStream& operator>>(cs::ByteArray<Length>& byteArray) {
+      if ((uint32_t)(end_ - ptr_) < Length)
+          good_ = false;
+      else {
+          std::memcpy(byteArray.data(), ptr_, Length);
+          ptr_ += Length;
+      }
+
+      return *this;
   }
 
   bool good() const {
@@ -91,7 +103,7 @@ class IPackStream {
 
 class OPackStream {
  public:
-  OPackStream(RegionAllocator* allocator, const PublicKey& myKey)
+  OPackStream(RegionAllocator* allocator, const cs::PublicKey& myKey)
   : allocator_(allocator)
   , packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet))))
   , packetsEnd_(packets_)
@@ -113,7 +125,7 @@ class OPackStream {
       *this << id_ << senderKey_;
   }
 
-  void init(uint8_t flags, const PublicKey& receiver) {
+  void init(uint8_t flags, const cs::PublicKey& receiver) {
     init(flags);
     *this << receiver;
   }
@@ -147,8 +159,14 @@ class OPackStream {
 
   template <size_t Length>
   OPackStream& operator<<(const FixedString<Length>& str) {
-    insertBytes(str.str, Length);
+    insertBytes(str.data(), Length);
     return *this;
+  }
+
+  template <size_t Length>
+  OPackStream& operator<<(const cs::ByteArray<Length>& byteArray) {
+      insertBytes(byteArray.data(), Length);
+      return *this;
   }
 
   Packet* getPackets() {
@@ -211,6 +229,10 @@ class OPackStream {
     }
   }
 
+  void insertBytes(const unsigned char* bytes, uint32_t size) {
+    insertBytes(reinterpret_cast<const char*>(bytes), size);
+  }
+
   uint8_t* ptr_;
   uint8_t* end_;
 
@@ -222,7 +244,7 @@ class OPackStream {
   bool     finished_ = false;
 
   uint64_t  id_ = 0;
-  PublicKey senderKey_;
+  cs::PublicKey senderKey_;
 };
 
 template <>
@@ -244,6 +266,13 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
   uint32_t uncompressedSize;
   *this >> uncompressedSize;
   pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
+  ptr_ = end_;
+  return *this;
+}
+
+template <>
+inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes) {
+  bytes = std::vector<uint8_t>(ptr_, end_);
   ptr_ = end_;
   return *this;
 }
@@ -306,20 +335,14 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 template <>
 inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
-  char*   dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  char* dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes(dataPtr, bSize);
   return *this;
 }
 
 template <>
-inline OPackStream& OPackStream::operator<<(const cs::HashVector& vec) {
-  insertBytes((const char*)&vec, sizeof(cs::HashVector));
-  return *this;
-}
-
-template <>
-inline OPackStream& OPackStream::operator<<(const cs::HashMatrix& mat) {
-  insertBytes((const char*)&mat, sizeof(cs::HashMatrix));
+inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
+  insertBytes((const char*)bytes.data(), bytes.size());
   return *this;
 }
 

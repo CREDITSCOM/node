@@ -9,7 +9,6 @@
 #include "allocators.hpp"
 
 /* Containers */
-
 template <typename BufferType>
 class FixedBufferIterator {
 public:
@@ -210,6 +209,8 @@ public:
     KeyType key;
     ArgType data = {};
 
+    ArgType& operator*() { return data; }
+
     Element(const KeyType& _key,
             Element** _bucket): bucket(_bucket),
                                 key(_key) { }
@@ -329,13 +330,16 @@ inline void CallsQueue::insert(std::function<void()> f) {
 
 template <size_t Length>
 struct FixedString {
-  FixedString() { }
+  FixedString() {
+    std::memset(str, 0, Length);
+  }
+
   FixedString(const char* src) {
-    memcpy(str, src, Length);
+    std::memcpy(str, src, Length);
   }
 
   bool operator==(const FixedString& rhs) const {
-    return memcmp(str, rhs.str, Length) == 0;
+    return std::memcmp(str, rhs.str, Length) == 0;
   }
 
   bool operator!=(const FixedString& rhs) const {
@@ -343,7 +347,43 @@ struct FixedString {
   }
 
   bool operator<(const FixedString& rhs) const {
-    return memcmp(str, rhs.str, Length) < 0;
+    return std::memcmp(str, rhs.str, Length) < 0;
+  }
+
+  char* data() {
+    return str;
+  }
+
+  const char* data() const {
+    return str;
+  }
+
+  size_t size() const {
+    return Length;
+  }
+
+  char* begin() {
+    return str;
+  }
+
+  char* end() {
+    return str + Length;
+  }
+
+  const char* begin() const {
+    return str;
+  }
+
+  const char* end() const {
+    return str + Length;
+  }
+
+  char& operator[](size_t index) {
+    return str[index];
+  }
+
+  const char& operator[](size_t index) const {
+    return str[index];
   }
 
   char str[Length];

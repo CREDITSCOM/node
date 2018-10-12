@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (MSVC)
     add_definitions(-DNOMINMAX)
+    add_definitions(-D_WIN32_WINNT=0x0601)
 endif()
 
 option(LEVELDB_BUILD_TESTS "" OFF)
@@ -28,9 +29,11 @@ endif()
 
 # Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
 add_definitions(-DUSE_STD_THREAD)
+
 if (MSVC)
   option(BUILD_COMPILER "" OFF)
 endif(MSVC)
+
 option(WITH_BOOST_STATIC "" ON)
 option(BUILD_TESTING "" OFF)
 option(BUILD_TUTORIALS "" OFF)

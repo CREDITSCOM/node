@@ -7,6 +7,19 @@ cs::DynamicBuffer::DynamicBuffer(size_t size):
     mArray = new char[size];
 }
 
+cs::DynamicBuffer::DynamicBuffer(const char* data, std::size_t size):
+    mSize(size)
+{
+    mArray = new char[size];
+
+    std::copy(data, data + size, mArray);
+}
+
+cs::DynamicBuffer::DynamicBuffer(const unsigned char* data, std::size_t size):
+    DynamicBuffer(reinterpret_cast<const char*>(data), size)
+{
+}
+
 cs::DynamicBuffer::DynamicBuffer(const cs::DynamicBuffer& buffer):
     mSize(buffer.mSize)
 {

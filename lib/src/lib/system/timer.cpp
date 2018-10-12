@@ -1,4 +1,5 @@
 #include "lib/system/timer.hpp"
+#include <lib/system/structures.hpp>
 
 cs::Timer::Timer():
     mIsRunning(false),
@@ -10,7 +11,9 @@ cs::Timer::Timer():
 
 cs::Timer::~Timer()
 {
-    stop();
+    if (isRunning()) {
+        stop();
+    }
 }
 
 void cs::Timer::start(int msec)
@@ -20,7 +23,7 @@ void cs::Timer::start(int msec)
     mMsec = std::chrono::milliseconds(msec);
     mThread = std::thread(&Timer::loop, this);
     mRealMsec = mMsec;
-    mAllowableDifference = RangeDeltaInPercents ? (static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100) : 0;
+    mAllowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
 }
 
 void cs::Timer::stop()
@@ -53,15 +56,13 @@ static void singleShotHelper(int msec, const cs::TimerCallback& callback)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(msec));
 
-    if (callback) {
-        callback();
-    }
+    CallsQueue::instance().insert(callback);
 }
 
 void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback)
 {
-    std::unique_ptr<std::thread> thread = std::make_unique<std::thread>(&singleShotHelper, msec, callback);
-    thread->detach();
+    std::thread thread = std::thread(&singleShotHelper, msec, callback);
+    thread.detach();
 }
 
 void cs::Timer::loop()

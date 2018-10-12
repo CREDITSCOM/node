@@ -5,7 +5,7 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
     const std::size_t p = 16777619;
     std::size_t hash = 2166136261;
 
-    auto data = packetHash.to_binary();
+    auto data = packetHash.toBinary();
     auto size = data.size();
 
     for (std::size_t i = 0; i < size; ++i)
