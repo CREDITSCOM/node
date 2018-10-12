@@ -42,21 +42,25 @@ Node::~Node() {
 }
 
 bool Node::init() {
-  if (!transport_->isGood())
+  if (!transport_->isGood()) {
     return false;
+  }
 
-  if (!bc_.isGood())
+  if (!bc_.isGood()) {
     return false;
+  }
 
   // Create solver
-  if (!solver_)
+  if (!solver_) {
     return false;
+  }
 
   csdebug() << "Everything init";
 
   // check file with keys
-  if (!checkKeysFile())
+  if (!checkKeysFile()) {
     return false;
+  }
 
   cs::PublicKey publicKey; 
   std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
@@ -162,23 +166,21 @@ bool Node::checkKeysForSig() {
   if (ver_ok == 0) {
     return true;
   }
-  else {
-    cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
+  cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    if (gen_flag == 'g') {
-      generateKeys();
-      return true;
-    }
-    else {
-      return false;
-    }
+  char gen_flag = 'a';
+  std::cin >> gen_flag;
+
+  if (gen_flag == 'g') {
+    generateKeys();
+    return true;
   }
+
+  return false;
 }
 
-void Node::run(const Config&) {
+void Node::run(const Config& config) {
   transport_->run();
 }
 
@@ -464,28 +466,6 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
 
   flushCurrentTasks();
-}
-
-void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  cslog() << "NODE> Getting WRITING CONFIRMATION from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  istream_.init(data, size);
-
-  uint8_t confNumber_;
-  istream_ >> confNumber_;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad vector packet format";
-    return;
-  }
-
-  if (confNumber_ < 3) {
-    solver_->addConfirmation(confNumber_);
-  }
 }
 
 void Node::sendTLRequest() {
@@ -1177,6 +1157,7 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  ostream_ << roundNum_;
 
   cs::Bytes bytes = packet.toBinary();
 
@@ -1271,10 +1252,13 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
-  } else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_))
+  }
+  else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) {
     solver_->gotFreeSyncroBlock(std::move(pool));
-  else
+  }
+  else {
     return;
+  }
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
