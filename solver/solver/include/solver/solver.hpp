@@ -93,7 +93,6 @@ class Solver {
 
   void nextRound();
   bool isPoolClosed() const;
-  void setLastRoundTransactionsGot(size_t trNum);
 
   // consesnsus evaluation
   void runConsensus();
@@ -105,15 +104,12 @@ class Solver {
   bool getIPoolClosed();
   bool getBigBangStatus();
   void setBigBangStatus(bool _status);
-  void setRNum(size_t _rNum);
 
   const cs::PrivateKey& getPrivateKey() const;
   const cs::PublicKey& getPublicKey() const;
 
  private:
   void flushTransactions();
-
-  void prepareBlockForSend(csdb::Pool& block);
 
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
@@ -129,37 +125,24 @@ class Solver {
 
   cs::Hashes m_neededHashes;
 
-  size_t lastRoundTransactionsGot;
-  std::set<PublicKey> receivedVec_ips;
   bool receivedVecFrom[100];
   std::atomic<uint8_t> trustedCounterVector;
-
-  std::set<PublicKey> receivedMat_ips;
 
   bool receivedMatFrom[100];
   std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
   std::vector<PublicKey> ips;
-  std::vector<std::string> vector_datas;
 
   cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
 
-  bool m_isPoolClosed          = true;
-  bool sentTransLastRound      = false;
-  bool vectorComplete          = false;
-  bool consensusAchieved       = false;
-  bool blockCandidateArrived   = false;
-  bool round_table_sent        = false;
-  bool transactionListReceived = false;
-  bool vectorReceived          = false;
-  bool gotBlockThisRound       = false;
-  bool writingConfirmationGot  = false;
-  bool gotBigBang              = false;
-
-  uint32_t rNum = 0;
+  bool m_isPoolClosed        = true;
+  bool blockCandidateArrived = false;
+  bool round_table_sent      = false;
+  bool gotBlockThisRound     = false;
+  bool gotBigBang            = false;
 
   cs::SharedMutex m_sharedMutex;
 
