@@ -120,17 +120,17 @@ void cs::DataStream::addEndpoint(const boost::asio::ip::udp::endpoint& endpoint)
     }
 
     char v6 = endpoint.address().is_v6();
-    m_bytes->push_back(v6 | 6);
+    m_bytes->push_back((v6 | 6));
 
     if (v6)
     {
         boost::asio::ip::address_v6::bytes_type bytes = endpoint.address().to_v6().to_bytes();
-        std::copy(bytes.begin(), bytes.end(), std::back_inserter(m_bytes));
+        (*this) << bytes;
     }
     else
     {
         boost::asio::ip::address_v4::bytes_type bytes = endpoint.address().to_v4().to_bytes();
-        std::copy(bytes.begin(), bytes.end(), std::back_inserter(m_bytes));
+        (*this) << bytes;
     }
 
     (*this) << endpoint.port();
