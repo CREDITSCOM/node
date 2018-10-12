@@ -39,7 +39,7 @@ namespace slv2
 //#endif
         auto g_seq = block.sequence();
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": block received (#" << block.sequence() << ", " << block.transactions_count() << " transactions)");
+            LOG_NOTICE(name() << ": block received #" << block.sequence() << ", " << block.transactions_count() << " transactions");
         }
         if(g_seq > context.round()) {
             if(Consensus::Log) {

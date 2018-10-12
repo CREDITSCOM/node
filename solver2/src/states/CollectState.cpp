@@ -20,32 +20,15 @@ namespace slv2
         do_send_tl(context, context.round());
     }
 
-    Result CollectState::onTransaction(SolverContext& context, const csdb::Transaction & tr)
+    Result CollectState::onTransaction(SolverContext& /*context*/, const csdb::Transaction & tr)
     {
         constexpr size_t logging_counter = 20;
-        if(tr.is_valid())
-        {
+        if(tr.is_valid()) {
             ++cnt_transactions;
 
-            if(!context.is_spammer()) {
-                if(context.verify(tr)) {
-                    pool.add_transaction(tr);
-                    if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
-                        LOG_DEBUG(name() << ": transaction accepted (1) x" << logging_counter);
-                    }
-                }
-                else {
-                    if(Consensus::Log) {
-                        LOG_WARN(name() << ": wrong transaction signature");
-                    }
-                }
-            }
-            else {
-                pool.add_transaction(tr);
-                // too much flood
-                if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
-                    LOG_DEBUG(name() << ": spammer transaction accepted (1) x" << logging_counter);
-                }
+            pool.add_transaction(tr);
+            if(Consensus::Log && ((cnt_transactions % logging_counter) == 0)) {
+                LOG_DEBUG(name() << ": transaction accepted (1) x" << logging_counter);
             }
         }
         else {

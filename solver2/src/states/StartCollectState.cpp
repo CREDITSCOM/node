@@ -14,14 +14,24 @@ namespace slv2
             }
         }
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": schedule to send empty block to initiate consensus every " << Consensus::T_round << " ms");
+            LOG_NOTICE(name() << ": schedule to send empty block to initiate consensus in " << Consensus::T_round << " ms");
         }
         SolverContext * pctx = &context;
-        tag_timeout = context.scheduler().InsertPeriodic(Consensus::T_round, [this, pctx]() {
+        context.scheduler().InsertOnce(Consensus::T_round, [this, pctx]() {
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": sending empty block");
             }
             WriteState::on(*pctx);
+
+            if(Consensus::Log) {
+                LOG_NOTICE(name() << ": schedule to repeat empty block consensus every " << Consensus::T_round << " ms");
+            }
+            tag_timeout = pctx->scheduler().InsertPeriodic(Consensus::T_round, [this, pctx]() {
+                if(Consensus::Log) {
+                    LOG_NOTICE(name() << ": sending empty block again");
+                }
+                pctx->repeat_last_block();
+            });
         });
     }
 

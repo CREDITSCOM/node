@@ -243,8 +243,6 @@ namespace slv2
     {
         pnode->becomeWriter();
 
-        //core.prepareBlock(p);
-
         // see Solver-1, writeNewBlock() method
         pnode->getBlockChain().finishNewBlock(p);
         // see: Solver-1, addTimestampToPool() method
@@ -257,18 +255,10 @@ namespace slv2
         p.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
         p.sign(private_key);
 
-        //core.sendBlock(p);
-
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
+            LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
         }
         pnode->sendBlock(p);
-
-        //core.storeBlock(p);
-
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: storing block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
-        }
         auto& bc = pnode->getBlockChain();
         bc.writeNewBlock(p);
         bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
@@ -276,6 +266,9 @@ namespace slv2
 
     void SolverCore::storeReceivedBlock(csdb::Pool& p)
     {
+        if(Consensus::Log) {
+            LOG_NOTICE("SolverCore: store received block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
+        }
         // see: Solver-1, method Solver::gotBlock()
         if(!pnode->getBlockChain().onBlockReceived(p)) {
             if(Consensus::Log) {
@@ -307,11 +300,6 @@ namespace slv2
             LOG_DEBUG("SolverCore: no transactions collected, nothing to send");
         }
         return tr_cnt;
-    }
-
-    bool SolverCore::verify_signature(const csdb::Transaction& tr)
-    {
-        return true;
     }
 
     csdb::Pool SolverCore::removeTransactionsWithBadSignatures(const csdb::Pool& p)
