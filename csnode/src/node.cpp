@@ -247,33 +247,33 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   stream << roundTable.hashes.size();
   stream << roundTable.general;
 
-  for (const auto& it : roundTable.confidants) {
-    stream << it;
+  for (const auto& condidant : roundTable.confidants) {
+    stream << condidant;
   }
 
-  for (const auto& it : roundTable.hashes) {
-    stream << it;
+  for (const auto& hash : roundTable.hashes) {
+    stream << hash;
   }
 
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
   cslog() << "Round " << roundNum_ << ", General: " << cs::Utils::byteStreamToHex(roundTable.general.data(), roundTable.general.size()) << "Confidants: ";
 
-  size_t i = 0;
+  const cs::ConfidantsKeys confidants = roundTable.confidants;
 
-  for (auto& e : roundTable.confidants) {
-    if (e != roundTable.general) {
-      cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
-      ++i;
+  for (std::size_t i = 0; i < confidants.size(); ++i) {
+    const cs::PublicKey& confidant = confidants[i];
+
+    if (confidant != roundTable.general) {
+      cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
     }
   }
 
-  i = 0;
-
   cslog() << "Hashes";
 
-  for (auto& e : roundTable.hashes) {
-    cslog() << i << ". " << e.toString().c_str();
-    i++;
+  const cs::Hashes& hashes = roundTable.hashes;
+
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    cslog() << i << ". " << hashes[i].toString();
   }
 
   ostream_ << bytes;
@@ -749,11 +749,6 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 
   cslog() << "NODE> Transactions amount got " << packet.transactionsCount();
 
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad transactions packet format";
-    return;
-  }
-
   if (packet.hash().isEmpty()) {
     cswarning() << "Received transaction packet hash is empty";
     return;
@@ -763,7 +758,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
-  cslog() << "NODE> getPacketHashesReques ";
+  cslog() << "NODE> getPacketHashesRequest " << size;
 
   cs::DataStream stream(data, size);
 
@@ -777,7 +772,9 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     cs::TransactionsPacketHash hash;
     stream >> hash;
 
-    hashes.push_back(std::move(hash));
+    if (!hash.isEmpty()) {
+      hashes.push_back(std::move(hash));
+    }
   }
 
   cslog() << "NODE> Hashes request got size: " << hashesCount;
@@ -810,7 +807,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   cslog() << "NODE> RoundTableUpdated";
 
   cs::DataStream stream(data, size);
-
+                        
   std::size_t confidantsCount = 0;
   stream >> confidantsCount;
 
@@ -846,12 +843,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
     cs::TransactionsPacketHash hash;
     stream >> hash;
 
-    hashes.push_back(std::move(hash));
+    hashes.push_back(hash);
   }
 
   roundTable.general = std::move(general);
   roundTable.confidants = std::move(confidants);
-  roundTable.hashes = std::move(hashes);
+  roundTable.hashes = hashes;
 
   onRoundStart(roundTable);
 
@@ -1135,6 +1132,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+  ostream_ << roundNum_;
 
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
@@ -1159,6 +1157,7 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  ostream_ << roundNum_;
 
   cs::Bytes bytes = packet.toBinary();
 

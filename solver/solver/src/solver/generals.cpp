@@ -38,8 +38,8 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
-  uint8_t      hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
-  const size_t transactionsCount   = packet.transactionsCount();
+  uint8_t hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
+  const size_t transactionsCount = packet.transactionsCount();
 
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;
@@ -95,7 +95,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   cslog() << "GENERALS> Add matrix";
 
   const size_t nodes_amount = confidantNodes.size();
-  const uint8_t confidantsCountMax = 101;  // from technical paper
+  constexpr uint8_t confidantsCountMax = 101;  // from technical paper
   assert(nodes_amount <= confidantsCountMax);
 
   std::array<HashWeigth, confidantsCountMax> hw;

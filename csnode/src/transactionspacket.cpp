@@ -15,14 +15,16 @@ namespace cs
 
     TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& str)
     {
-        if (str.size() == 0)
+        if (str.size() == 0) {
             return TransactionsPacketHash();
+        }
 
-        TransactionsPacketHash             res;
+        TransactionsPacketHash res;
         const ::csdb::internal::byte_array hash = ::csdb::internal::from_hex(str);
 
-        if (::csdb::priv::crypto::hash_size == hash.size())
+        if (::csdb::priv::crypto::hash_size == hash.size()) {
             res.m_bytes = hash;
+        }
 
         return res;
     }
@@ -32,9 +34,7 @@ namespace cs
         const size_t size = data.size();
         TransactionsPacketHash resHash;
 
-        if ((0 == size) ||
-            (::csdb::priv::crypto::hash_size == size))
-        {
+        if ((0 == size) || (::csdb::priv::crypto::hash_size == size)) {
             resHash.m_bytes = data;
         }
 
@@ -87,8 +87,6 @@ namespace cs
         return (m_bytes != other.m_bytes) && (m_bytes < other.m_bytes);
     }
 
-
-
     //
     // Static interface
     //
@@ -104,8 +102,9 @@ namespace cs
 
         TransactionsPacket res;
 
-        if (!res.get(is))
+        if (!res.get(is)) {
             return TransactionsPacket();
+        }
 
         res.makeHash();
 
@@ -127,8 +126,9 @@ namespace cs
     {
         bool isEmpty = isHashEmpty();
 
-        if (isEmpty)
+        if (isEmpty) {
             m_hash = TransactionsPacketHash::calcFromData(toBinary());
+        }
 
         return isEmpty;
     }
@@ -150,9 +150,7 @@ namespace cs
 
     bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction)
     {
-        if (!transaction.is_valid() &&
-            !isHashEmpty())
-        {
+        if (!transaction.is_valid() && !isHashEmpty()) {
             return false;
         }
 
@@ -179,26 +177,29 @@ namespace cs
     {
         os.put(m_transactions.size());
 
-        for (const auto& it : m_transactions)
+        for (const auto& it : m_transactions) {
             os.put(it);
+        }
     }
 
     bool TransactionsPacket::get(::csdb::priv::ibstream& is)
     {
-        size_t count;
+        std::size_t count;
 
-        if (!is.get(count))
+        if (!is.get(count)) {
             return false;
+        }
 
         m_transactions.clear();
         m_transactions.reserve(count);
 
-        for (size_t i = 0; i < count; ++i)
+        for (std::size_t i = 0; i < count; ++i)
         {
             csdb::Transaction tran;
 
-            if (!is.get(tran))
+            if (!is.get(tran)) {
                 return false;
+            }
 
             m_transactions.push_back(tran);
         }

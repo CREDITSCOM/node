@@ -318,33 +318,34 @@ void Transport::processNodeMessage(const Message& msg) {
 
   switch (type) {
     case MsgTypes::BlockHash:
-      std::cout << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
       break;
     case MsgTypes::BlockRequest:
-      std::cout << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
       break;
     case MsgTypes::FirstTransaction:
-      std::cout << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
       break;
     case MsgTypes::RequestedBlock:
-      std::cout << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
       break;
     case MsgTypes::RoundTableSS:
-      std::cout << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
       break;
     case MsgTypes::TransactionList:
-      std::cout << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
       break;
     case MsgTypes::NewCharacteristic:
-      std::cout << "TRANSPORT> Process Node Message MSG: Characteristic received" << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: Characteristic received";
       break;
     case MsgTypes::WriterNotification:
-      std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
       break;
     case MsgTypes::BigBang:
-      std::cout << "TRANSPORT> Process Node Message MSG: BigBang " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
       break;
-  default: break;
+  default:
+      break;
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
@@ -382,35 +383,37 @@ bool Transport::shouldSendPacket(const Packet& pack) {
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
+
   switch (type) {
     case MsgTypes::BlockHash:
-      std::cout << "TRANSPORT> Process Node Message PKG: BlockHash " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: BlockHash ";
       break;
     case MsgTypes::BlockRequest:
-      std::cout << "TRANSPORT> Process Node Message PKG: BlockRequest " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
       break;
     case MsgTypes::FirstTransaction:
-      std::cout << "TRANSPORT> Process Node Message PKG: FirstTransaction " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
       break;
     case MsgTypes::RequestedBlock:
-      std::cout << "TRANSPORT> Process Node Message PKG: RequestedBlock " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
       break;
     case MsgTypes::RoundTableSS:
-      std::cout << "TRANSPORT> Process Node Message PKG: RoundTable " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: RoundTable ";
       break;
     case MsgTypes::TransactionList:
-      std::cout << "TRANSPORT> Process Node Message PKG: TransactionList " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: TransactionList ";
       break;
     case MsgTypes::NewCharacteristic:
-      std::cout << "TRANSPORT> Process Node Message PKG:  Characteristic received" << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
       break;
     case MsgTypes::WriterNotification:
-      std::cout << "TRANSPORT> Process Node Message MSG: Writer Notification received" << std::endl;
+      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
       break;
     case MsgTypes::BigBang:
-      std::cout << "TRANSPORT> Process Node Message PKG: BigBang " << std::endl;
+      cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
       break;
-    default: break;
+    default:
+        break;
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
