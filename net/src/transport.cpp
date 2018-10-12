@@ -176,8 +176,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
   NetworkCommand cmd;
   iPackStream_ >> cmd;
 
-  if (!iPackStream_.good())
+  if (!iPackStream_.good()) {
     return sender->addStrike();
+  }
 
   bool result = true;
   switch (cmd) {
@@ -226,8 +227,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       LOG_WARN("Unexpected network command");
   }
 
-  if (!result)
+  if (!result) {
     sender->addStrike();
+  }
 }
 
 void Transport::refillNeighbourhood() {
@@ -265,12 +267,12 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
-  // iPackStream_.safeSkip<uint32_t>();
 
   uint8_t numConf;
   iPackStream_ >> numConf;
-  if (!iPackStream_.good())
+  if (!iPackStream_.good()) {
     return false;
+  }
 
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
@@ -279,8 +281,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
-  if (!iPackStream_.good())
+  if (!iPackStream_.good()) {
     return false;
+  }
 
   if (config_.getBootstrapType() == BootstrapType::SignalServer) {
     for (uint8_t i = 0; i < numCirc; ++i) {
@@ -294,11 +297,12 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
       nh_.establishConnection(net_->resolve(ep));
 
       iPackStream_.safeSkip<cs::PublicKey>();
-      if (!iPackStream_.good())
+      if (!iPackStream_.good()) {
         return false;
-
-      if (!nh_.canHaveNewConnection())
+      }
+      if (!nh_.canHaveNewConnection()) {
         break;
+      }
     }
   }
 
@@ -312,40 +316,36 @@ void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
 
-  if (type == MsgTypes::BlockHash) {
-    cslog() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::BlockRequest) {
-    cslog() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::FirstTransaction) {
-    cslog() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::RequestedBlock) {
-    cslog() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::RoundTableSS) {
-    cslog() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::TransactionList) {
-    cslog() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
-  }
-
-  if (type == MsgTypes::NewCharacteristic) {
-    cslog() << "TRANSPORT> Process Node Message MSG: Characteristic received";
-  }
-
-  if (type == MsgTypes::WriterNotification) {
-    cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
-  }
-
-  if (type == MsgTypes::BigBang) {
-    cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
+  switch (type) {
+    case MsgTypes::BlockHash:
+      cslog() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
+      break;
+    case MsgTypes::BlockRequest:
+      cslog() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
+      break;
+    case MsgTypes::FirstTransaction:
+      cslog() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
+      break;
+    case MsgTypes::RequestedBlock:
+      cslog() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
+      break;
+    case MsgTypes::RoundTableSS:
+      cslog() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
+      break;
+    case MsgTypes::TransactionList:
+      cslog() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
+      break;
+    case MsgTypes::NewCharacteristic:
+      cslog() << "TRANSPORT> Process Node Message MSG: Characteristic received";
+      break;
+    case MsgTypes::WriterNotification:
+      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+      break;
+    case MsgTypes::BigBang:
+      cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
+      break;
+  default:
+      break;
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
@@ -355,9 +355,6 @@ void Transport::processNodeMessage(const Message& msg) {
                                msg.getFirstPack(),
                                msg.getFullData() + StrippedDataSize,
                                msg.getFullSize() - StrippedDataSize);
- /*   msg.getFirstPack(),
-      msg.getFullData() + StrippedDataSize,
-      msg.getFullSize() - StrippedDataSize);*/
   case Node::MessageActions::Postpone:
     return postponePacket(rNum, type, msg.extractData());
   case Node::MessageActions::Drop:
@@ -366,14 +363,19 @@ void Transport::processNodeMessage(const Message& msg) {
 }
 
 bool Transport::shouldSendPacket(const Packet& pack) {
-  if (pack.isNetwork()) return false;
+  if (pack.isNetwork()) {
+    return false;
+  }
   const auto rLim = std::max(node_->getRoundNumber(), static_cast<RoundNum>(1)) - 1;
 
-  if (!pack.isFragmented()) return pack.getRoundNum() >= rLim;
+  if (!pack.isFragmented()) {
+    return pack.getRoundNum() >= rLim;
+  }
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
-  if (pack.getFragmentId() == 0)
+  if (pack.getFragmentId() == 0) {
     rn = pack.getRoundNum();
+  }
 
   return !rn || rn >= rLim;
 }
@@ -382,38 +384,36 @@ void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
 
-  if (type == MsgTypes::BlockHash) {
-    cslog() << "TRANSPORT> Process Node Message PKG: BlockHash ";
-  }
-
-  if (type == MsgTypes::BlockRequest) {
-    cslog() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
-  }
-
-  if (type == MsgTypes::FirstTransaction) {
-    cslog() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
-  }
-  if (type == MsgTypes::RequestedBlock) {
-    cslog() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
-  }
-
-  if (type == MsgTypes::RoundTableSS) {
-    cslog()<< "TRANSPORT> Process Node Message PKG: RoundTable ";
-  }
-  if (type == MsgTypes::TransactionList) {
-    cslog() << "TRANSPORT> Process Node Message PKG: TransactionList ";
-  }
-
-  if (type == MsgTypes::NewCharacteristic) {
-    cslog() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
-  }
-
-  if (type == MsgTypes::WriterNotification) {
-    cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
-  }
-
-  if (type == MsgTypes::BigBang) {
-    cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
+  switch (type) {
+    case MsgTypes::BlockHash:
+      cslog() << "TRANSPORT> Process Node Message PKG: BlockHash ";
+      break;
+    case MsgTypes::BlockRequest:
+      cslog() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
+      break;
+    case MsgTypes::FirstTransaction:
+      cslog() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
+      break;
+    case MsgTypes::RequestedBlock:
+      cslog() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
+      break;
+    case MsgTypes::RoundTableSS:
+      cslog() << "TRANSPORT> Process Node Message PKG: RoundTable ";
+      break;
+    case MsgTypes::TransactionList:
+      cslog() << "TRANSPORT> Process Node Message PKG: TransactionList ";
+      break;
+    case MsgTypes::NewCharacteristic:
+      cslog() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
+      break;
+    case MsgTypes::WriterNotification:
+      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+      break;
+    case MsgTypes::BigBang:
+      cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
+      break;
+    default:
+        break;
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
@@ -438,11 +438,13 @@ inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, 
 void Transport::processPostponed(const RoundNum rNum) {
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {
-    if (pp.round > rNum)
+    if (pp.round > rNum) {
       ppBuf.emplace(std::move(pp));
-    else if (pp.round == rNum)
+    }
+    else if (pp.round == rNum) {
       dispatchNodeMessage(pp.type, pp.round, pp.pack, pp.pack.getMsgData() + StrippedDataSize,
                           pp.pack.getMsgSize() - StrippedDataSize);
+    }
   }
 
   (*postponed_)->clear();
@@ -455,10 +457,11 @@ void Transport::processPostponed(const RoundNum rNum) {
 
 void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, const Packet& firstPack,
                                     const uint8_t* data, size_t size) {
-  if (!size) {
+  if (size == 0) {
     LOG_ERROR("Bad packet size, why is it zero?");
     return;
   }
+
   switch(type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
@@ -521,13 +524,15 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 }
 
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend, bool sendToNeighbours) {
-  if (sendToNeighbours)
+  if (sendToNeighbours) {
     nh_.pourByNeighbours(pack, packNum);
+  }
   if (packNum > 1) {
     net_->registerMessage(pack, packNum);
     registerTask(pack, 1, incrementWhenResend);
-  } else if (sendToNeighbours)
+  } else if (sendToNeighbours) {
     registerTask(pack, packNum, incrementWhenResend);
+  }
 }
 
 void Transport::clearTasks() {
@@ -575,8 +580,9 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 
   NodeVersion vers;
   iPackStream_ >> vers;
-  if (!iPackStream_.good())
+  if (!iPackStream_.good()) {
     return false;
+  }
 
   Connection conn;
   conn.in     = task->sender;
@@ -601,10 +607,11 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
       conn.specialOut = true;
       conn.out.address(task->sender.address());
     }
-
     conn.out.port(port);
-  } else if (conn.specialOut)
+  }
+  else if (conn.specialOut) {
     conn.out.port(task->sender.port());
+  }
 
   if (vers != NODE_VERSION) {
     sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
@@ -614,8 +621,9 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
   iPackStream_ >> conn.id;
   iPackStream_ >> conn.key;
 
-  if (!iPackStream_.good() || !iPackStream_.end())
+  if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
 
   nh_.gotRegistration(std::move(conn), sender);
   return true;
@@ -629,8 +637,9 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
   cs::PublicKey key;
   iPackStream_ >> myCId >> realCId >> key;
 
-  if (!iPackStream_.good())
+  if (!iPackStream_.good()) {
     return false;
+  }
 
   nh_.gotConfirmation(myCId, realCId, task->sender, key, sender);
   return true;
@@ -643,8 +652,9 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
   Connection::Id            id;
   iPackStream_ >> id >> reason;
 
-  if (!iPackStream_.good() || !iPackStream_.end())
+  if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
 
   nh_.gotRefusal(id);
 
@@ -663,20 +673,25 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
   nh_.addSignalServer(task->sender, ssEp_, rNode);
 
   if (task->pack.getMsgSize() > 2) {
-    if (!parseSSSignal(task))
+    if (!parseSSSignal(task)) {
       LOG_WARN("Bad Signal Server response");
-  } else
+    }
+  }
+  else {
     ssStatus_ = SSBootstrapStatus::RegisteredWait;
+  }
 
   return true;
 }
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
-  if (ssStatus_ != SSBootstrapStatus::RegisteredWait)
+  if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
     LOG_WARN("Unexpected Signal Server response");
+  }
 
-  if (!parseSSSignal(task))
+  if (!parseSSSignal(task)) {
     LOG_WARN("Bad Signal Server response");
+  }
 
   return true;
 }
@@ -721,8 +736,9 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
   auto conn = sender->connection.load(std::memory_order_relaxed);
-  if (!conn)
+  if (!conn){
     return;
+  }
 
   sendPackInform(pack, *conn);
 
@@ -747,7 +763,9 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   cs::Hash hHash;
   iPackStream_ >> hHash;
-  if (!iPackStream_.good() || !iPackStream_.end()) return false;
+  if (!iPackStream_.good() || !iPackStream_.end()) {
+      return false;
+  }
 
   nh_.neighbourHasPacket(sender, hHash);
   return true;
@@ -767,8 +785,9 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
   cs::Hash hHash;
 
   iPackStream_ >> hHash;
-  if (!iPackStream_.good() || !iPackStream_.end())
+  if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
 
   nh_.neighbourSentRenounce(sender, hHash);
 
@@ -782,7 +801,7 @@ void Transport::askForMissingPackages() {
 
   const uint64_t maxMask = 1ul << 63;
 
-  for (;;) {
+  while(true) {
     {
       SpinLock l(uLock_);
       if (i >= uncollected_.size())
@@ -807,7 +826,7 @@ void Transport::askForMissingPackages() {
       for (auto s = msg->packets_; s != end; ++s) {
         if (!*s) {
           if (!mask) {
-            mask  = 1;
+            mask = 1;
             start = cs::numeric_cast<uint16_t>(s - msg->packets_);
           }
           req |= mask;
@@ -816,16 +835,19 @@ void Transport::askForMissingPackages() {
         if (mask == maxMask) {
           requestMissing(msg->headerHash_, start, req);
 
-          if (s > (msg->packets_ + msg->maxFragment_) && (end - s) > 128)
+          if (s > (msg->packets_ + msg->maxFragment_) && (end - s) > 128) {
             break;
-
+          }
           mask = 0;
-        } else
+        }
+        else {
           mask <<= 1;
+        }
       }
 
-      if (mask)
+      if (mask) {
         requestMissing(msg->headerHash_, start, req);
+      }
     }
   }
 }
@@ -842,8 +864,9 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
   }
 
   ConnectionPtr requestee = nh_.getNextRequestee(hash);
-  if (requestee)
+  if (requestee) {
     sendDirect(&p, **requestee);
+  }
 }
 
 void Transport::registerMessage(MessagePtr msg) {
@@ -853,8 +876,9 @@ void Transport::registerMessage(MessagePtr msg) {
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   Connection* conn = sender->connection.load(std::memory_order_acquire);
-  if (!conn)
+  if (!conn) {
     return false;
+  }
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   cs::Hash hHash;
@@ -862,16 +886,18 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   uint64_t req;
 
   iPackStream_ >> hHash >> start >> req;
-  if (!iPackStream_.good() || !iPackStream_.end())
+  if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
 
   uint32_t reqd = 0, snt = 0;
   uint64_t mask = 1;
   while (mask) {
     if (mask & req) {
       ++reqd;
-      if (net_->resendFragment(hHash, start, ep))
+      if (net_->resendFragment(hHash, start, ep)) {
         ++snt;
+      }
     }
     ++start;
     mask <<= 1;
@@ -892,8 +918,9 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id;
 
   iPackStream_ >> id;
-  if (!iPackStream_.good() || !iPackStream_.end())
+  if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
 
   nh_.validateConnectionId(sender, id, task->sender);
 
