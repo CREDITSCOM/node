@@ -102,7 +102,6 @@ class Solver {
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
 
-  void addConfirmation(uint8_t confNumber_);
   bool getIPoolClosed();
   bool getBigBangStatus();
   void setBigBangStatus(bool _status);
@@ -114,7 +113,6 @@ class Solver {
  private:
   void flushTransactions();
 
-  void writeNewBlock();
   void prepareBlockForSend(csdb::Pool& block);
 
   // TODO: fix signature
@@ -145,15 +143,11 @@ class Solver {
   std::vector<PublicKey> ips;
   std::vector<std::string> vector_datas;
 
-  csdb::Pool m_pool;
-  csdb::Pool m_uncharacterizedPool;
-
   cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
-  csdb::Pool b_pool;
 
-  bool m_isPoolClosed         = true;
+  bool m_isPoolClosed          = true;
   bool sentTransLastRound      = false;
   bool vectorComplete          = false;
   bool consensusAchieved       = false;
@@ -164,9 +158,7 @@ class Solver {
   bool gotBlockThisRound       = false;
   bool writingConfirmationGot  = false;
   bool gotBigBang              = false;
-  bool writingConfGotFrom[100];
 
-  uint8_t writingCongGotCurrent;
   uint32_t rNum = 0;
 
   cs::SharedMutex m_sharedMutex;
