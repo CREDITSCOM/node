@@ -9,16 +9,6 @@
 namespace slv2
 {
 
-    uint32_t SolverCore::getNextMissingBlock(const uint32_t fromSeq) {
-    /*
-      for (uint32_t b = fromSeq + 1; b < node_->getRoundNumber(); ++b) {
-        if (tmpStorage.count(b) || rndStorage.count(b)) continue;
-        return b;
-      }
-    */
-      return 0;
-    }
-
     const Credits::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
@@ -134,7 +124,7 @@ namespace slv2
             pfee->CountFeesInPool(pnode, &p);
             auto result = pgen->buildvector(p, pool, b_pool);
             if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: " << pool.transactions_count() << " are valid, " << b_pool.transactions_count() << " moved to bad pool");
+                LOG_NOTICE("SolverCore: as result  " << pool.transactions_count() << " are valid, " << b_pool.transactions_count() << " moved to bad pool");
             }
             pown_hvec->Sender = pnode->getMyConfNumber();
             pown_hvec->hash = result;
@@ -198,6 +188,12 @@ namespace slv2
 
         // solver-1 logic: clear bigbang status upon block receive
         is_bigbang = false;
+
+        // solver-1: caching, actually duplicates before done caching in Node::getBlock()
+        if(p.sequence() > cur_round) {
+            gotIncorrectBlock(std::move(p), sender); // remove this line when the block candidate signing of all trusted will be implemented
+            return;
+        }
 
         if(!pstate) {
             return;
@@ -446,6 +442,17 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: transaction " << tr.innerID() << " added, total " << transactions.transactions().size());
         }
+    }
+
+    csdb::Pool::sequence_t SolverCore::getNextMissingBlock(const uint32_t starting_after)
+    {
+        for(csdb::Pool::sequence_t b = starting_after + 1; b < cur_round; ++b) {
+            if(outrunning_blocks.count(b) > 0) {
+                continue;
+            }
+            return b;
+        }
+        return 0;
     }
 
 } // slv2

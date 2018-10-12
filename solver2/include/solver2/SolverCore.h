@@ -59,7 +59,6 @@ namespace slv2
         // Solver "public" interface,
         // below are the "required" methods to be implemented by Solver-compatibility issue:
         
-        uint32_t getNextMissingBlock(const uint32_t fromSeq);
         const Credits::HashVector& getMyVector() const;
         const Credits::HashMatrix& getMyMatrix() const;
         void set_keys(const KeyType& pub, const KeyType& priv);
@@ -84,6 +83,8 @@ namespace slv2
         void nextRound();
         // required by api
         void send_wallet_transaction(const csdb::Transaction& tr);
+        // returns the nearest absent in cache block number starting after passed one
+        csdb::Pool::sequence_t getNextMissingBlock(const uint32_t starting_after);
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/)
         {}

@@ -162,7 +162,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   if (roundNum_ < rNum || type == MsgTypes::BigBang)
     roundNum_ = rNum;
   else {
-    LOG_WARN("Bad round number, ignoring");
+    LOG_ERROR("Bad round number, ignoring");
     return;
   }
   if (!readRoundData(false))
@@ -170,7 +170,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   if (myLevel_ == NodeLevel::Main)
     if (!istream_.good()) {
-      LOG_WARN("Bad round table format, ignoring");
+      LOG_ERROR("Bad round table format, ignoring");
       return;
     }
 
@@ -245,7 +245,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   std::cout << "NODE> Get RT request from " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
   if (!istream_.good()) {
-    LOG_WARN("Bad RoundTableRequest format");
+    LOG_ERROR("Bad RoundTableRequest format");
     return;
   }
   sendRoundTable();
@@ -258,7 +258,7 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
   istream_ >> pool;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transaction packet format");
+    LOG_ERROR("Bad transaction packet format");
     return;
   }
 
@@ -288,7 +288,7 @@ void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
   istream_ >> trans;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad transaction packet format");
+    LOG_ERROR("Bad transaction packet format");
     return;
   }
   csdb::Pool pool_;
@@ -300,7 +300,7 @@ void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
 
 void Node::sendFirstTransaction(const csdb::Transaction& trans) {
   if (myLevel_ != NodeLevel::Main) {
-    LOG_ERROR("Only main nodes can initialize the consensus procedure");
+    LOG_WARN("Only main nodes can initialize the consensus procedure");
     return;
   }
 
@@ -329,7 +329,7 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
     // std::cout << "NODE> Get transaction list 3 tNum = " << std::endl;
     istream_ >> pool;
     if (!istream_.good() || !istream_.end()) {
-      LOG_WARN("Bad transactions list packet format");
+      LOG_ERROR("Bad transactions list packet format");
       pool = csdb::Pool{};
     }
 #ifdef MYLOG
@@ -345,7 +345,7 @@ void Node::getTransactionsList(const uint8_t* data, const size_t size) {
 
 void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& target) {
   if ((myLevel_ == NodeLevel::Confidant) || (myLevel_ == NodeLevel::Normal)) {
-    LOG_ERROR("Only main nodes can send transaction lists");
+    LOG_WARN("Only main nodes can send transaction lists");
     return;
   }
 
@@ -364,7 +364,7 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
 // void Node::sendTLConfirmation(size_t tcount)
 //{
 //  if ((myLevel_ == NodeLevel::Confidant) || (myLevel_ == NodeLevel::Normal)) {
-//    LOG_ERROR("Only previous main nodes can send Transaction Lists ");
+//    LOG_WARN("Only previous main nodes can send Transaction Lists ");
 //    return;
 //  }
 //
@@ -381,7 +381,7 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
 //  std::cout << __func__ << std::endl;
 //  std::cout << "NODE> Transactions amount got " << std::endl;
 //  if (myLevel_ != NodeLevel::Main) {
-//    LOG_ERROR("Only main nodes can receive TLSend confirmations");
+//    LOG_WARN("Only main nodes can receive TLSend confirmations");
 //    return;
 //  }
 //  istream_.init(data, size);
@@ -394,7 +394,7 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
 
 void Node::sendVectorRequest(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send vectors");
+    LOG_WARN("Only confidant nodes can send vectors");
     return;
   }
 #ifdef MYLOG
@@ -424,14 +424,14 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size)  //, const P
     sendVector(solver_->getMyVector());
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    LOG_ERROR("Bad vector packet format");
     return;
   }
 }
 
 void Node::sendWritingConfirmation(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send confirmation of the Writer");
+    LOG_WARN("Only confidant nodes can send confirmation of the Writer");
     return;
   }
 #ifdef MYLOG
@@ -456,7 +456,7 @@ void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const 
   uint8_t confNumber_;
   istream_ >> confNumber_;
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    LOG_ERROR("Bad vector packet format");
     return;
   }
   if (confNumber_ < 3)
@@ -465,7 +465,7 @@ void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const 
 
 void Node::sendTLRequest() {
   if ((myLevel_ != NodeLevel::Confidant) || (roundNum_ < 2)) {
-    LOG_ERROR("Only confidant nodes need TransactionList");
+    LOG_WARN("Only confidant nodes need TransactionList");
     return;
   }
 #ifdef MYLOG
@@ -480,7 +480,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey&
   std::cout << __func__ << std::endl;
   // std::cout << "NODE> Getting vector" << std::endl;
   if (myLevel_ != NodeLevel::Main) {
-    LOG_ERROR("Only main nodes can send TransactionList");
+    LOG_WARN("Only main nodes can send TransactionList");
     return;
   }
   // if (myPublicKey_ == sender) return;
@@ -493,7 +493,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey&
   istream_ >> num;
 
   if (!istream_.good() || !istream_.end()) {
-    // LOG_WARN("Bad vector packet format");
+    // LOG_ERROR("Bad vector packet format");
     return;
   }
   if (num < getConfidants().size())
@@ -502,7 +502,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size, const PublicKey&
 
 void Node::sendMatrixRequest(const PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
-    //  LOG_ERROR("Only confidant nodes can send vectors");
+    //  LOG_WARN("Only confidant nodes can send vectors");
     return;
   }
 #ifdef MYLOG
@@ -529,7 +529,7 @@ void Node::getMatrixRequest(const uint8_t* data, const size_t size)  //, const P
   int num;
   istream_ >> num;
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    LOG_ERROR("Bad vector packet format");
     return;
   }
   if (num == 1)
@@ -554,7 +554,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const PublicKey& se
 
   std::cout << "NODE> Hash: " << byteStreamToHex((const char*)vec.hash.val,32) << std::endl;
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad vector packet format");
+    LOG_ERROR("Bad vector packet format");
     return;
   }
 
@@ -570,7 +570,7 @@ void Node::sendVector(const Credits::HashVector& vector) {
   std::cout << "NODE> 0 Sending vector " << std::endl;
 #endif
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send vectors");
+    LOG_WARN("Only confidant nodes can send vectors");
     return;
   }
   // std::cout << "NODE> Sending vector " << std::endl;
@@ -600,7 +600,7 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const PublicKey& se
   std::cout << "NODE> Getting matrix from " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad matrix packet format");
+    LOG_ERROR("Bad matrix packet format");
     return;
   }
 
@@ -613,7 +613,7 @@ void Node::sendMatrix(const Credits::HashMatrix& matrix) {
   std::cout << "NODE> 0 Sending matrix to " << std::endl;
 #endif
   if (myLevel_ != NodeLevel::Confidant) {
-    LOG_ERROR("Only confidant nodes can send matrices");
+    LOG_WARN("Only confidant nodes can send matrices");
     return;
   }
 
@@ -648,7 +648,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
   istream_ >> pool;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad block packet format");
+    LOG_ERROR("Bad block packet format");
     return;
   }
   size_t localSeq = getBlockChain().getLastWrittenSequence();
@@ -672,7 +672,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
 void Node::sendBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send blocks");
+    LOG_WARN("Only writer nodes can send blocks");
     return;
   }
 
@@ -699,7 +699,7 @@ void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& 
   istream_ >> pool;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_WARN("Bad block packet format");
+    LOG_ERROR("Bad block packet format");
     return;
   }
 
@@ -709,7 +709,7 @@ void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& 
 
 void Node::sendBadBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
-    LOG_ERROR("Only writer nodes can send bad blocks");
+    LOG_WARN("Only writer nodes can send bad blocks");
     return;
   }
 
@@ -733,7 +733,7 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
   istream_ >> hash;
 
   if (!istream_.good() || !istream_.end()) {
-    LOG_DEBUG("Bad hash packet format");
+    LOG_ERROR("Bad hash packet format");
     return;
   }
 
@@ -742,11 +742,11 @@ void Node::getHash(const uint8_t* data, const size_t size, const PublicKey& send
 
 void Node::sendHash(const Hash& hash, const PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
-    LOG_ERROR("Writer and Main node shouldn't send hashes");
+    LOG_WARN("Writer and Main node shouldn't send hashes");
     return;
   }
 
-  LOG_WARN("Sending hash of " << roundNum_ << " to " << byteStreamToHex(target.str, 32));
+  LOG_NOTICE("Sending hash of " << roundNum_ << " to " << byteStreamToHex(target.str, 32));
 
   ostream_.init(BaseFlags::Signed | BaseFlags::Encrypted, target);
   ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
@@ -813,7 +813,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     }
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
-      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      LOG_NOTICE("Sending request for block " << reqSeq << " from nbr " << requestee->id);
       ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
@@ -933,9 +933,6 @@ void Node::onRoundStart() {
     i++;
   }
 
-  solver_->nextRound();
-  transport_->processPostponed(roundNum_);
-
 #ifdef SYNCRO
   if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) ||
       (getBlockChain().getBlockRequestNeed()))  // && (!awaitingSyncroBlock))// && (!syncro_started))) vvv
@@ -1024,7 +1021,7 @@ inline bool Node::readRoundData(const bool tail) {
   }
 
   if (!istream_.good() || confidants.size() < confSize) {
-    LOG_WARN("Bad round table format, ignoring");
+    LOG_ERROR("Bad round table format, ignoring");
     return false;
   }
 
