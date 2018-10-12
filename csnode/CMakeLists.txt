@@ -5,6 +5,11 @@ project(csnode)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set (Boost_USE_MULTITHREADED ON)
+set (Boost_USE_STATIC_LIBS ON)
+set (Boost_USE_STATIC_RUNTIME ON)
+set (BOOST_ALL_DYN_LINK OFF)
+
 find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem thread)
 if (Boost_FOUND)
   # From the offical documentation:
