@@ -302,11 +302,6 @@ namespace slv2
         return tr_cnt;
     }
 
-    bool SolverCore::verify_signature(const csdb::Transaction& tr)
-    {
-        return true;
-    }
-
     csdb::Pool SolverCore::removeTransactionsWithBadSignatures(const csdb::Pool& p)
     {
         csdb::Pool good;
