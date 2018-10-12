@@ -110,14 +110,6 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   gotBigBang = false;
   gotBlockThisRound = true;
 
-  uint64_t sequence = metaInfoPool.sequenceNumber;
-
-  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
-
-  std::string timestamp = metaInfoPool.timestamp;
-  boost::dynamic_bitset<> mask{characteristic.mask.begin(), characteristic.mask.end()};
-
-  size_t maskIndex = 0;
   cs::Hashes localHashes;
 
   {
@@ -126,6 +118,12 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic,
   }
 
   csdb::Pool newPool;
+  size_t maskIndex = 0;
+  std::string timestamp = metaInfoPool.timestamp;
+  uint64_t sequence = metaInfoPool.sequenceNumber;
+  boost::dynamic_bitset<> mask{ characteristic.mask.begin(), characteristic.mask.end() };
+
+  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.contains(hash)) {
@@ -413,12 +411,10 @@ void Solver::runConsensus() {
   }
 }
 
-void Solver::runFinalConsensus()
-{
+void Solver::runFinalConsensus() {
   const uint8_t numGen = static_cast<uint8_t>(m_roundTable.confidants.size());
 
-  if (trustedCounterMatrix == numGen)
-  {
+  if (trustedCounterMatrix == numGen) {
     std::memset(receivedMatFrom, 0, sizeof(receivedMatFrom));
 
     m_writerIndex = (m_generals->takeDecision(m_roundTable.confidants,
@@ -428,8 +424,7 @@ void Solver::runFinalConsensus()
     if (m_writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
     }
-    else
-    {
+    else {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
 
@@ -438,8 +433,7 @@ void Solver::runFinalConsensus()
       if (m_writerIndex == m_node->getMyConfNumber()) {
         m_node->becomeWriter();
       }
-      else
-      {
+      else {
         // TODO: make next stage without delay
         cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
           m_node->sendWriterNotification();
@@ -504,22 +498,6 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   m_generals->addMatrix(matrix, m_roundTable.confidants);
 
   runFinalConsensus();
-}
-
-void Solver::writeNewBlock() {
-  cslog() << "Solver -> writeNewBlock ... start";
-
-  if (consensusAchieved && m_node->getMyLevel() == NodeLevel::Writer) {
-    m_node->getBlockChain().putBlock(m_pool);
-    m_node->getBlockChain().setGlobalSequence(static_cast<uint32_t>(m_pool.sequence()));
-
-    b_pool.set_sequence((m_node->getBlockChain().getLastWrittenSequence()) + 1);
-
-    auto prev_hash = csdb::PoolHash::from_string("");
-    b_pool.set_previous_hash(prev_hash);
-
-    consensusAchieved = false;
-  }
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
@@ -797,18 +775,6 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
     m_node->getBlockChain().putBlock(pool);
 }
 
-void Solver::addConfirmation(uint8_t confNumber_) {
-  if (writingConfGotFrom[confNumber_]) {
-    return;
-  }
-  writingConfGotFrom[confNumber_] = true;
-  writingCongGotCurrent++;
-  if (writingCongGotCurrent == 2) {
-    m_node->becomeWriter();
-    cs::Utils::runAfter(std::chrono::milliseconds(TIME_TO_COLLECT_TRXNS), [this]() { writeNewBlock(); });
-  }
-}
-
 void Solver::nextRound() {
   cslog() << "SOLVER> next Round : Starting ... nextRound";
 
@@ -828,7 +794,6 @@ void Solver::nextRound() {
   gotBlockThisRound = false;
   round_table_sent = false;
   sentTransLastRound = false;
-  m_pool = csdb::Pool{};
 
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};

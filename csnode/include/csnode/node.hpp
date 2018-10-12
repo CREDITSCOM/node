@@ -64,7 +64,6 @@ class Node {
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);

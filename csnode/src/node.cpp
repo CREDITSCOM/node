@@ -468,28 +468,6 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   flushCurrentTasks();
 }
 
-void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  cslog() << "NODE> Getting WRITING CONFIRMATION from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  istream_.init(data, size);
-
-  uint8_t confNumber_;
-  istream_ >> confNumber_;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad vector packet format";
-    return;
-  }
-
-  if (confNumber_ < 3) {
-    solver_->addConfirmation(confNumber_);
-  }
-}
-
 void Node::sendTLRequest() {
   if ((myLevel_ != NodeLevel::Confidant) || (roundNum_ < 2)) {
     cserror() << "Only confidant nodes need TransactionList";
