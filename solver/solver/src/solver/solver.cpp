@@ -741,11 +741,10 @@ void Solver::addInitialBalance() {
   addTransaction(transaction);
 }
 
-void Solver::runSpammer()
-{
+void Solver::runSpammer() {
 #ifdef SPAMMER
-    spamThread = std::thread(&Solver::spamWithTransactions, this);
-    spamThread.detach();
+  spamThread = std::thread(&Solver::spamWithTransactions, this);
+  spamThread.detach();
 #endif
 }
 
