@@ -42,21 +42,25 @@ Node::~Node() {
 }
 
 bool Node::init() {
-  if (!transport_->isGood())
+  if (!transport_->isGood()) {
     return false;
+  }
 
-  if (!bc_.isGood())
+  if (!bc_.isGood()) {
     return false;
+  }
 
   // Create solver
-  if (!solver_)
+  if (!solver_) {
     return false;
+  }
 
   csdebug() << "Everything init";
 
   // check file with keys
-  if (!checkKeysFile())
+  if (!checkKeysFile()) {
     return false;
+  }
 
   cs::PublicKey publicKey; 
   std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
@@ -162,23 +166,21 @@ bool Node::checkKeysForSig() {
   if (ver_ok == 0) {
     return true;
   }
-  else {
-    cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
+  cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
-    if (gen_flag == 'g') {
-      generateKeys();
-      return true;
-    }
-    else {
-      return false;
-    }
+  char gen_flag = 'a';
+  std::cin >> gen_flag;
+
+  if (gen_flag == 'g') {
+    generateKeys();
+    return true;
   }
+
+  return false;
 }
 
-void Node::run(const Config&) {
+void Node::run(const Config& config) {
   transport_->run();
 }
 
@@ -1273,10 +1275,13 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
-  } else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_))
+  }
+  else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) {
     solver_->gotFreeSyncroBlock(std::move(pool));
-  else
+  }
+  else {
     return;
+  }
   if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {

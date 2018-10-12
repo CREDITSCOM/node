@@ -66,8 +66,8 @@ public:
 
   static const uint32_t SmartRedirectTreshold = 100000;
 
-  Packet() { }
-  Packet(RegionPtr&& data): data_(std::move(data)) { }
+  Packet() = default;
+  explicit Packet(RegionPtr&& data): data_(std::move(data)) { }
 
   bool isNetwork() const { return checkFlag(BaseFlags::NetworkMsg); }
   bool isFragmented() const { return checkFlag(BaseFlags::Fragmented); }
@@ -115,11 +115,11 @@ public:
 
   uint32_t getHeadersLength() const;
 
-  operator bool() { return data_; }
+  explicit operator bool() { return data_; }
 
 private:
   bool checkFlag(const BaseFlags flag) const {
-    return *static_cast<const uint8_t*>(data_.get()) & flag;
+    return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
   }
 
   template <typename T>
@@ -160,12 +160,16 @@ public:
   const Packet& getFirstPack() const { return *packets_; }
 
   const uint8_t* getFullData() const {
-    if (!fullData_) composeFullData();
+    if (!fullData_) {
+      composeFullData();
+    }
     return static_cast<const uint8_t*>(fullData_.get()) + packets_->getHeadersLength();
   }
 
   size_t getFullSize() const {
-    if (!fullData_) composeFullData();
+    if (!fullData_) {
+        composeFullData();
+    }
     return fullData_.size() - packets_->getHeadersLength();
   }
 
@@ -198,7 +202,7 @@ private:
   friend class Network;
 };
 
-typedef MemPtr<TypedSlot<Message>> MessagePtr;
+using MessagePtr = MemPtr<TypedSlot<Message>>;
 
 class PacketCollector {
 public:

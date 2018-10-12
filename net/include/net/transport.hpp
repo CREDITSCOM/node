@@ -17,8 +17,8 @@
 
 using namespace boost::asio;
 
-typedef uint64_t ConnectionId;
-typedef uint64_t Tick;
+using ConnectionId = uint64_t;
+using Tick = uint64_t;
 
 enum class NetworkCommand : uint8_t {
   Registration = 2,

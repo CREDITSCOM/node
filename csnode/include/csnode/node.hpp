@@ -30,7 +30,7 @@ class Node {
     return good_;
   }
 
-  void run(const Config&);
+  void run(const Config& config);
 
   /* Incoming requests processing */
   void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
