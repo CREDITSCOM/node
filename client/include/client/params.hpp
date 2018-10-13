@@ -9,7 +9,7 @@
 #define TRX_SLEEP_TIME 50000  // microseconds
 
 #ifndef MONITOR_NODE
-#define SPAMMER
+//#define SPAMMER
 #else
 #define STATS
 #endif
