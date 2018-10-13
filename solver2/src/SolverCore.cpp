@@ -360,7 +360,7 @@ namespace slv2
                 }
                 else {
                     // store block and remove it from cache
-                    bc.putBlock(data.first);
+                    storeReceivedBlock(data.first);
                 }
                 outrunning_blocks.erase(desired_seq);
             }
