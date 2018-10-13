@@ -2,10 +2,10 @@
 #include <lib/system/structures.hpp>
 
 cs::Timer::Timer():
-    mIsRunning(false),
-    mInterruption(false),
-    mIsRehabilitation(true),
-    mMsec(std::chrono::milliseconds(0))
+    m_isRunning(false),
+    m_interruption(false),
+    m_isRehabilitation(true),
+    m_msec(std::chrono::milliseconds(0))
 {
 }
 
@@ -18,38 +18,38 @@ cs::Timer::~Timer()
 
 void cs::Timer::start(int msec)
 {
-    mInterruption = false;
-    mIsRunning = true;
-    mMsec = std::chrono::milliseconds(msec);
-    mThread = std::thread(&Timer::loop, this);
-    mRealMsec = mMsec;
-    mAllowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
+    m_interruption = false;
+    m_isRunning = true;
+    m_msec = std::chrono::milliseconds(msec);
+    m_thread = std::thread(&Timer::loop, this);
+    m_realMsec = m_msec;
+    m_allowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
 }
 
 void cs::Timer::stop()
 {
-    mInterruption = true;
+    m_interruption = true;
 
-    if (mThread.joinable())
+    if (m_thread.joinable())
     {
-        mThread.join();
-        mIsRunning = false;
+        m_thread.join();
+        m_isRunning = false;
     }
 }
 
 void cs::Timer::connect(const TimerCallback& callback)
 {
-    mCallbacks.push_back(callback);
+    m_callbacks.push_back(callback);
 }
 
 void cs::Timer::disconnect()
 {
-    mCallbacks.clear();
+    m_callbacks.clear();
 }
 
 bool cs::Timer::isRunning()
 {
-    return mIsRunning;
+    return m_isRunning;
 }
 
 static void singleShotHelper(int msec, const cs::TimerCallback& callback)
@@ -67,19 +67,19 @@ void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback)
 
 void cs::Timer::loop()
 {
-    while (!mInterruption)
+    while (!m_interruption)
     {
-        if (mIsRehabilitation)
+        if (m_isRehabilitation)
         {
-            mIsRehabilitation = false;
-            mRehabilitationStartValue = std::chrono::system_clock::now();
+            m_isRehabilitation = false;
+            m_rehabilitationStartValue = std::chrono::system_clock::now();
         }
 
-        std::this_thread::sleep_for(mMsec);
+        std::this_thread::sleep_for(m_msec);
 
         rehabilitation();
 
-        for (const auto& callback : mCallbacks) {
+        for (const auto& callback : m_callbacks) {
             callback();
         }
     }
@@ -87,23 +87,23 @@ void cs::Timer::loop()
 
 void cs::Timer::rehabilitation()
 {
-    mIsRehabilitation = true;
+    m_isRehabilitation = true;
 
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - mRehabilitationStartValue);
-    auto difference = duration - mRealMsec;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - m_rehabilitationStartValue);
+    auto difference = duration - m_realMsec;
 
-    if (difference >= mRealMsec) {
-        mMsec = std::chrono::milliseconds(0);
+    if (difference >= m_realMsec) {
+        m_msec = std::chrono::milliseconds(0);
     }
     else
     {
-        if (difference.count() > mAllowableDifference) {
-            mMsec = mRealMsec - (difference % mRealMsec);
+        if (difference.count() > m_allowableDifference) {
+            m_msec = m_realMsec - (difference % m_realMsec);
         }
         else
         {
-            if (mMsec != mRealMsec) {
-                mMsec = mRealMsec;
+            if (m_msec != m_realMsec) {
+                m_msec = m_realMsec;
             }
         }
     }

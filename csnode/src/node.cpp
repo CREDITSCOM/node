@@ -772,9 +772,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     cs::TransactionsPacketHash hash;
     stream >> hash;
 
-    if (!hash.isEmpty()) {
-      hashes.push_back(std::move(hash));
-    }
+    hashes.push_back(std::move(hash));
   }
 
   cslog() << "NODE> Hashes request got size: " << hashesCount;
@@ -1134,6 +1132,10 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
   ostream_ << roundNum_;
 
+  for (const auto& hash : hashes) {
+    cslog() << "Need hash please " << hash.toString();
+  }
+
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1316,8 +1318,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   cslog() << "Transaction packets hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    const auto& hashBinary = hashes[i].toBinary();
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+    cslog() << i << ". " << hashes[i].toString();
   }
 
 #ifdef SYNCRO

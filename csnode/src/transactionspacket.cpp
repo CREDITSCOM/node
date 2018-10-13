@@ -111,6 +111,30 @@ namespace cs
         return res;
     }
 
+    TransactionsPacket::TransactionsPacket(const TransactionsPacket& packet):
+        m_hash(packet.m_hash),
+        m_transactions(packet.m_transactions)
+    {
+    }
+
+    TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet):
+        m_hash(std::move(packet.m_hash)),
+        m_transactions(packet.m_transactions)
+    {
+        packet.m_hash = TransactionsPacketHash();
+        packet.m_transactions.clear();
+    }
+
+    TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& packet)
+    {
+        if (this == &packet) {
+            return *this;
+        }
+
+        m_hash = packet.m_hash;
+        m_transactions = packet.m_transactions;
+    }
+
     //
     // Interface
     //

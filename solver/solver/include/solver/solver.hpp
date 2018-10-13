@@ -87,7 +87,7 @@ class Solver {
   bool isEnoughNotifications() const;
 
   // conveyer start point
-  void addTransaction(const csdb::Transaction& transaction);
+  void addConveyerTransaction(const csdb::Transaction& transaction);
 
   void send_wallet_transaction(const csdb::Transaction& transaction);
 

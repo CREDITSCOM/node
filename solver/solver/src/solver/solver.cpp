@@ -216,10 +216,14 @@ void Solver::flushTransactions() {
 
       auto hash = packet.hash();
 
+      if (hash.isEmpty()) {
+        cslog() << "Transaction packet hashing failed";
+      }
+
       if (!m_hashTable.contains(hash)) {
         m_hashTable.insert(hash, packet);
       } else {
-        cslog() << "Transaction compose failed";
+        cserror() << "Logical error, adding transactions packet more than one time";
       }
     }
   }
@@ -273,14 +277,18 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   csdebug() << "Got transaction packet";
   cs::TransactionsPacketHash hash = packet.hash();
 
-  if (!m_hashTable.contains(hash))
+  if (!m_hashTable.contains(hash)) {
     m_hashTable.insert(hash, packet);
+  }
 }
 
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
   cslog() << "Got transactions hash request, try to find in hash table";
 
   for (const auto& hash : hashes) {
+
+    cslog() << "Search hash in my hash table " << hash.toString();
+
     if (m_hashTable.contains(hash)) {
       m_node->sendPacketHashesReply(m_hashTable.find(hash), sender);
 
@@ -334,10 +342,6 @@ void Solver::gotRound(cs::RoundTable&& round) {
     }
   }
 
-  for (const auto& hash : neededHashes) {
-    cslog() << "Need hash please " << hash.toString();
-  }
-
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
   } else if (m_node->getMyLevel() == NodeLevel::Confidant) {
@@ -359,7 +363,7 @@ void Solver::runConsensus() {
 
   for (const auto& hash : m_roundTable.hashes) {
     if (!m_hashTable.contains(hash)) {
-      cserror() << "Build vector: HASH NOT FOUND";
+      cserror() << "Consensus build vector: HASH NOT FOUND";
       return;
     }
 
@@ -679,7 +683,7 @@ void Solver::spamWithTransactions() {
           cserror() << "Generated transaction is not valid";
         }
 
-        addTransaction(transaction);
+        addConveyerTransaction(transaction);
       }
     }
 
@@ -708,7 +712,7 @@ void Solver::addInitialBalance() {
   transaction.set_balance(csdb::Amount(10000000, 0));
   transaction.set_innerID(1);
 
-  addTransaction(transaction);
+  addConveyerTransaction(transaction);
 }
 
 void Solver::runSpammer() {
@@ -812,7 +816,7 @@ bool Solver::verifySignature(uint8_t signature[64], uint8_t public_key[32], uint
   return ver_ok == 0;
 }
 
-void Solver::addTransaction(const csdb::Transaction& transaction) {
+void Solver::addConveyerTransaction(const csdb::Transaction& transaction) {
   cs::Lock lock(m_sharedMutex);
 
   if (m_transactionsBlock.empty()) {
