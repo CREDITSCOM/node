@@ -781,21 +781,18 @@ void Node::sendBlockRequest(uint32_t seq) {
   solver_->rndStorageProcessing();
   seq = getBlockChain().getLastWrittenSequence() + 1;
   
-  size_t lws, gs;
-
-  if (getBlockChain().getGlobalSequence() == 0)
-    gs = roundNum_;
-  else
-    gs = getBlockChain().getGlobalSequence();
-
-  lws = getBlockChain().getLastWrittenSequence();
-
-  const float syncStatus = (1. - (gs * 1. - lws * 1.) / gs) * 100.;
-  if ((int)syncStatus <= 100) {
-    std::cout << "SYNC: [";
-    for (uint32_t i = 0; i < (int)syncStatus; ++i) if (i % 2) std::cout << "#";
-    for (uint32_t i = (int)syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
-    std::cout << "] " << (int)syncStatus << "%" << std::endl;
+  csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
+  csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
+  if(gs == 0) {
+      gs = roundNum_;
+  }
+  csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
+  const uint32_t syncStatus = static_cast<int>( (1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f );
+  if(syncStatus <= 100) {
+      std::cout << "SYNC: [";
+      for(uint32_t i = 0; i < syncStatus; ++i) if(i % 2) std::cout << "#";
+      for(uint32_t i = syncStatus; i < 100; ++i) if(i % 2) std::cout << "-";
+      std::cout << "] " << syncStatus << "%" << std::endl;
   }
 
   uint32_t reqSeq = seq;
