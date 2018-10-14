@@ -42,30 +42,31 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
   const std::size_t transactionsCount = packet.transactionsCount();
 
   if (transactionsCount > 0) {
-    const csdb::Amount comission    = 0.1_c;
+    const csdb::Amount comission = 0.1_c;
     const csdb::Amount zero_balance = 0.0_c;
 
-    boost::dynamic_bitset<> characteristicMask { transactionsCount };
+    cs::Bytes characteristicMask;
+    characteristicMask.reserve(transactionsCount);
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = packet.transactions().at(i);
       const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
 
+      cs::Byte byte = 0;
+
       if (delta > zero_balance) {
-        characteristicMask.set(i, true);
+        byte = 1;
       }
+
+      characteristicMask.push_back(byte);
     }
 
     m_characteristic.size = static_cast<uint32_t>(transactionsCount);
-
-    cs::Bytes serializedCahracteristicMask;
-    boost::to_block_range(characteristicMask, std::back_inserter(serializedCahracteristicMask));
-
-    serializedCahracteristicMask.shrink_to_fit();
-    m_characteristic.mask = std::move(serializedCahracteristicMask);
+    m_characteristic.mask = std::move(characteristicMask);
 
     blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.size, "1234", 4);
-  } else {
+  }
+  else {
     uint32_t a = 0;
     blake2s(hash.data(), hash.size(), static_cast<const void*>(&a), 4, "1234", 4);
   }

@@ -344,6 +344,9 @@ void Transport::processNodeMessage(const Message& msg) {
     case MsgTypes::BigBang:
       cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
       break;
+    case MsgTypes::TransactionsPacketRequest:
+      cslog() << "TRANSPORT> Process Node Message MSG: Transactions packet request";
+      break;
   default:
       break;
   }
@@ -411,6 +414,9 @@ void Transport::processNodeMessage(const Packet& pack) {
       break;
     case MsgTypes::BigBang:
       cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
+      break;
+    case MsgTypes::TransactionsPacketRequest:
+      cslog() << "TRANSPORT> Process Node Message PKG: Transactions packet request";
       break;
     default:
         break;

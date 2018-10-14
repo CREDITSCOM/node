@@ -105,32 +105,39 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   std::size_t maskIndex = 0;
   std::string timestamp = metaInfoPool.timestamp;
   uint64_t sequence = metaInfoPool.sequenceNumber;
-  boost::dynamic_bitset<> mask{ characteristic.mask.begin(), characteristic.mask.end() };
+  const cs::Bytes& mask = characteristic.mask;
 
   cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
-  for (const auto& hash : localHashes) {
-    if (!m_hashTable.count(hash)) {
-      cserror() << "HASH NOT FOUND " << hash.toString();
-      return;
-    }
+  {
+    cs::SharedLock lock(m_sharedMutex);
 
-    const auto& transactions = m_hashTable[hash].transactions();
-
-    for (const auto& transaction : transactions) {
-      if (mask.test(maskIndex)) {
-        newPool.add_transaction(transaction);
+    for (const auto& hash : localHashes) {
+      if (!m_hashTable.count(hash)) {
+        cserror() << "SOLVER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
+        return;
       }
 
-      ++maskIndex;
-    }
+      const auto& transactions = m_hashTable[hash].transactions();
 
-    m_hashTable.erase(hash);
+      for (const auto& transaction : transactions) {
+        if (mask.at(maskIndex)) {
+          newPool.add_transaction(transaction);
+        }
+
+        ++maskIndex;
+      }
+    }
+  }
+
+  {
+    cs::Lock lock(m_sharedMutex);
+    m_hashesToRemove = std::move(localHashes);
   }
 
   if (characteristic.size != newPool.transactions_count()) {
     cslog() << "Characteristic size: " << characteristic.size << ", new pool transactions count: " << newPool.transactions_count();
-    cswarning() << "Some of transactions is not valid";
+    cswarning() << "SOLVER> ApplyCharacteristic: Some of transactions is not valid";
   }
 
   newPool.set_sequence(sequence);
@@ -192,6 +199,37 @@ bool Solver::isPoolClosed() const {
   return m_isPoolClosed;
 }
 
+void Solver::removePreviousHashes()
+{
+  cs::Lock lock(m_sharedMutex);
+
+  for (const auto& hash : m_hashesToRemove) {
+    m_hashTable.erase(hash);
+  }
+
+  m_hashesToRemove.clear();
+}
+
+bool Solver::checkTableHashes(const cs::RoundTable& table)
+{
+  const cs::Hashes& hashes = table.hashes;
+  cs::Hashes neededHashes;
+
+  cs::SharedLock lock(m_sharedMutex);
+  
+  for (const auto& hash : hashes) {
+    if (!m_hashTable.count(hash)) {
+      neededHashes.push_back(hash);
+    }
+  }
+
+  if (!neededHashes.empty()) {
+    m_node->sendPacketHashesRequest(neededHashes);
+  }
+
+  return neededHashes.empty();
+}
+
 HashVector Solver::getMyVector() const {
   return hvector;
 }
@@ -213,6 +251,15 @@ void Solver::flushTransactions() {
 
     if (trxCount != 0 && packet.isHashEmpty()) {
       packet.makeHash();
+
+      const auto& transactions = packet.transactions();
+
+      for (const auto& transaction : transactions) {
+        if (!transaction.is_valid()) {
+          cswarning() << "Can not send not valid transaction, sorry";
+          continue;
+        }
+      }
 
       m_node->sendTransactionsPacket(packet);
 
@@ -346,6 +393,12 @@ void Solver::gotRound(cs::RoundTable&& round) {
 
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
+
+    cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
+      if (!m_neededHashes.empty()) {
+        cs::Solver::gotRound(std::move(m_roundTable));
+      }
+    });
   }
   else if (m_node->getMyLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
@@ -633,10 +686,14 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cs::Hashes hashes;
 
     {
-      const auto& lockTable = m_hashTable;
+      cs::SharedLock lock(m_sharedMutex);
 
-      for (auto& it : lockTable) {
-        hashes.push_back(it.first);
+      for (const auto& element : m_hashTable) {
+        const auto iterator = std::find(m_hashesToRemove.begin(), m_hashesToRemove.end(), element.first);
+
+        if (iterator == m_hashesToRemove.end()) {
+          hashes.push_back(element.first);
+        }
       }
     }
 
@@ -693,7 +750,9 @@ void Solver::spamWithTransactions() {
       }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY * 3));
+    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY * 2, TIME_TO_AWAIT_ACTIVITY * 4);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(awaitTime));
   }
 }
 #endif
@@ -701,8 +760,7 @@ void Solver::spamWithTransactions() {
 ///////////////////
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
-  cs::Lock lock(m_sharedMutex);
-  m_transactionsBlock.back().addTransaction(transaction);
+  cs::Solver::addConveyerTransaction(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -734,6 +792,11 @@ cs::RoundNumber Solver::currentRoundNumber() {
 
 const cs::RoundTable& Solver::roundTable() const {
   return m_roundTable;
+}
+
+const cs::TransactionsPacketHashTable& Solver::transactionsPacketTable() const
+{
+  return m_hashTable;
 }
 
 const cs::Notifications& Solver::notifications() const {
@@ -791,6 +854,8 @@ void Solver::nextRound() {
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
   }
+
+  removePreviousHashes();
 
   if (m_node->getMyLevel() == NodeLevel::Confidant) {
     memset(receivedVecFrom, 0, 100);

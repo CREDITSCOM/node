@@ -79,6 +79,7 @@ class Solver {
 
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;
+  const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
 
   // notifications interface
   const cs::Notifications& notifications() const;
@@ -97,6 +98,10 @@ class Solver {
   // consesnsus evaluation
   void runConsensus();
   void runFinalConsensus();
+
+  // helpers
+  void removePreviousHashes();
+  bool checkTableHashes(const cs::RoundTable& table);
 
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
@@ -151,9 +156,7 @@ class Solver {
   cs::Notifications m_notifications;
 
   // data for requests
-  //cs::Characteristic m_requestCharacteristic;
-  //cs::PoolMetaInfo m_requestPoolMetaInfo;
-  //cs::PublicKey m_requestPublicKey;
+  cs::Hashes m_hashesToRemove;
 
   cs::Timer m_sendingPacketTimer;
 

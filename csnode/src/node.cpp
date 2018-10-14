@@ -282,6 +282,21 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
+void Node::sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable)
+{
+  if (myLevel_ != NodeLevel::Writer) {
+    return;
+  }
+
+  for (const auto& hash : roundTable.hashes) {
+    const auto& hashTable = solver_->transactionsPacketTable();
+
+    if (hashTable.count(hash)) {
+      sendTransactionsPacket(hashTable.find(hash)->second);
+    }
+  }
+}
+
 void Node::sendRoundTableRequest(size_t rNum) {
   if (rNum < roundNum_) {
     return;
@@ -1098,11 +1113,11 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     return;
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast);
   ostream_ << roundNum_;
 
   for (const auto& hash : hashes) {
-    cslog() << "Need hash please " << hash.toString();
+    cslog() << "Transaction packet request, need hash - " << hash.toString();
   }
 
   cs::Bytes bytes;
@@ -1302,6 +1317,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 #endif
 
   solver_->nextRound();
+
+  if (!solver_->checkTableHashes(roundTable)) {
+    cswarning() << "Transactions packet hash table needs to sync";
+  }
+
+#ifdef WRITER_RESEND_HASHES
+  sendAllRoundTransactionsPackets(roundTable);
+#endif
+
   transport_->processPostponed(roundNum_);
 }
 

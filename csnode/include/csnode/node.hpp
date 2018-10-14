@@ -89,6 +89,7 @@ class Node {
   void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
+  void sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
