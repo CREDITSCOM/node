@@ -150,6 +150,11 @@ class Solver {
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
 
+  // data for requests
+  //cs::Characteristic m_requestCharacteristic;
+  //cs::PoolMetaInfo m_requestPoolMetaInfo;
+  //cs::PublicKey m_requestPublicKey;
+
   cs::Timer m_sendingPacketTimer;
 
   /*to store new blocks*/

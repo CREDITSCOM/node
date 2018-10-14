@@ -38,8 +38,8 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
-  uint8_t hash_s[HASH_LENGTH] = {};  // if is array type, each element is zero-initialized en.cppreference.com
-  const size_t transactionsCount = packet.transactionsCount();
+  cs::Hash hash;
+  const std::size_t transactionsCount = packet.transactionsCount();
 
   if (transactionsCount > 0) {
     const csdb::Amount comission    = 0.1_c;
@@ -47,7 +47,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
     boost::dynamic_bitset<> characteristicMask { transactionsCount };
 
-    for (size_t i = 0; i < transactionsCount; ++i) {
+    for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = packet.transactions().at(i);
       const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
 
@@ -64,20 +64,17 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
     serializedCahracteristicMask.shrink_to_fit();
     m_characteristic.mask = std::move(serializedCahracteristicMask);
 
-    blake2s(&hash_s, HASH_LENGTH, m_characteristic.mask.data(), transactionsCount, "1234", 4);
+    blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.size, "1234", 4);
   } else {
     uint32_t a = 0;
-    blake2s(&hash_s, HASH_LENGTH, static_cast<const void*>(&a), 4, "1234", 4);
+    blake2s(hash.data(), hash.size(), static_cast<const void*>(&a), 4, "1234", 4);
   }
 
   m_find_untrusted.fill(0);
   m_new_trusted.fill(0);
   m_hw_total.fill(HashWeigth{});
 
-  cs::Hash result;
-  std::copy(hash_s, hash_s + HASH_LENGTH, result.begin());
-
-  return result;
+  return hash;
 }
 
 void Generals::addVector(const HashVector& vector) {

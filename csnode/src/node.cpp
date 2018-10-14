@@ -856,34 +856,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   });
 }
 
-void Node::sendCharacteristic(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic) {
-  if (myLevel_ != NodeLevel::Writer) {
-    cserror() << "Only writer nodes can send blocks";
-    return;
-  }
-
-  cslog() << "Send Characteristic: seq = " << poolMetaInfo.sequenceNumber;
-
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-
-  cs::Bytes bytes;
-  cs::DataStream stream(bytes);
-
-  std::string time = poolMetaInfo.timestamp;
-  uint64_t sequence = poolMetaInfo.sequenceNumber;
-
-  stream << time;
-  stream << characteristic.size;
-  stream << characteristic.mask << sequence;
-
-  ostream_ << bytes;
-
-  flushCurrentTasks();
-
-  cslog() << "Send Characteristic: DONE size: " << stream.size();
-}
-
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   cslog() << "Characteric has arrived";
 
@@ -891,7 +863,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   std::string time;
   uint32_t maskBitsCount;
-  std::vector<uint8_t> characteristicMask;
+  cs::Bytes characteristicMask;
   uint64_t sequence = 0;
 
   cslog() << "Characteristic data size: " << size;
@@ -959,7 +931,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
 }
 
-void Node::getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
+void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
   if (myLevel_ != NodeLevel::Writer) {
     return;
   }
@@ -974,9 +946,6 @@ void Node::getNotification(const uint8_t* data, const std::size_t size, const cs
 
   const std::size_t neededConfidantsCount = solver_->neededNotifications();
   const std::size_t notificationsCount = solver_->notifications().size();
-
-  cslog() << "Get notification, current notifications count - " << notificationsCount;
-  cslog() << "Needed confidans count - " << neededConfidantsCount;
 
   if (!solver_->isEnoughNotifications()) {
     return;

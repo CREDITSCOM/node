@@ -99,8 +99,10 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
     localHashes = m_roundTable.hashes;
   }
 
+  cslog() << "Solver> Characteristic bytes " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
+
   csdb::Pool newPool;
-  size_t maskIndex = 0;
+  std::size_t maskIndex = 0;
   std::string timestamp = metaInfoPool.timestamp;
   uint64_t sequence = metaInfoPool.sequenceNumber;
   boost::dynamic_bitset<> mask{ characteristic.mask.begin(), characteristic.mask.end() };
@@ -127,8 +129,8 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   }
 
   if (characteristic.size != newPool.transactions_count()) {
-    cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
-    return;
+    cslog() << "Characteristic size: " << characteristic.size << ", new pool transactions count: " << newPool.transactions_count();
+    cswarning() << "Some of transactions is not valid";
   }
 
   newPool.set_sequence(sequence);
@@ -344,11 +346,15 @@ void Solver::gotRound(cs::RoundTable&& round) {
 
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
-  } else if (m_node->getMyLevel() == NodeLevel::Confidant) {
+  }
+  else if (m_node->getMyLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
       cs::Lock lock(m_sharedMutex);
       runConsensus();
     });
+  }
+  else {
+    cslog() << "All round transactions packet hashes in table";
   }
 
   {
@@ -749,7 +755,7 @@ bool Solver::isEnoughNotifications() const {
   cslog() << "Get notification, current notifications count - " << notificationsCount;
   cslog() << "Needed confidans count - " << neededConfidantsCount;
 
-  return notificationsCount >= neededConfidantsCount;
+  return notificationsCount == neededConfidantsCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
