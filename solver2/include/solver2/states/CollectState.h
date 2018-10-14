@@ -2,11 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include "../CallsQueueScheduler.h"
 
-#if defined(SOLVER_USES_PROXY_TYPES)
-#include "ProxyTypes.h"
-#else
 #include <csdb/pool.h>
-#endif
 
 #include <memory>
 

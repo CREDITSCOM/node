@@ -1,12 +1,7 @@
 #pragma once
+
 #include "Result.h"
-
-#if defined(SOLVER_USES_PROXY_TYPES)
-#include "ProxyTypes.h"
-#else
-#include <lib/system/keys.hpp> // Hash, PublicKey
-#endif
-
+#include <lib/system/keys.hpp> // PublicKey, Hash
 #include <cstdint>
 
 namespace csdb

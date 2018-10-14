@@ -3,6 +3,7 @@
 #include "SolverCompat.h"
 #include "Node.h"
 #include "Generals.h"
+#include <Solver/Fee.h>
 #include <csdb/currency.h>
 #include <lib/system/logger.hpp>
 

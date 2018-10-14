@@ -3,11 +3,7 @@
 #include "CallsQueueScheduler.h"
 #include "INodeState.h"
 
-#if defined(SOLVER_USES_PROXY_TYPES)
-#include "ProxyTypes.h"
-#else
 #include <csdb/pool.h>
-#endif
 
 #include <memory>
 #include <map>

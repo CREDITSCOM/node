@@ -3,11 +3,7 @@
 #include "../Consensus.h"
 #include "../Node.h"
 
-#if defined(SOLVER_USES_PROXY_TYPES)
-#include "ProxyTypes.h"
-#else
 #include <csdb/pool.h>
-#endif
 #include <lib/system/logger.hpp>
 
 #include <algorithm>

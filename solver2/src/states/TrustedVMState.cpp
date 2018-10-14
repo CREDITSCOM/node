@@ -2,7 +2,7 @@
 #include "../SolverContext.h"
 #include "../Node.h"
 #include "../Generals.h"
-#include "Consensus.h"
+#include "../Consensus.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2

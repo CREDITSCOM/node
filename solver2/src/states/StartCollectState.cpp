@@ -1,6 +1,7 @@
 #include "StartCollectState.h"
 #include "../SolverContext.h"
 #include "../Node.h"
+#include <lib/system/logger.hpp>
 
 namespace slv2
 {

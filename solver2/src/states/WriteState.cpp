@@ -1,7 +1,7 @@
 #include "WriteState.h"
 #include "../SolverContext.h"
 #include "../Node.h"
-#include "Consensus.h"
+#include "../Consensus.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2

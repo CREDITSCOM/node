@@ -3,11 +3,7 @@
 #include "INodeState.h"
 #include "SolverCore.h"
 
-#if defined(SOLVER_USES_PROXY_TYPES)
-#include "ProxyTypes.h"
-#else
 #include <csdb/pool.h>
-#endif
 
 class CallsQueueScheduler;
 class Node;
