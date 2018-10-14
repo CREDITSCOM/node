@@ -213,13 +213,13 @@ namespace slv2
 
     void SolverCore::repeatLastBlock()
     {
-        if(cur_round == pool.sequence()) {
+        if(cur_round == block_pool.sequence()) {
             // still actual, send it again
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: current block is ready to repeat, do it");
-                LOG_NOTICE("SolverCore: sending block #" << pool.sequence() << " of " << pool.transactions_count() << " transactions");
+                LOG_NOTICE("SolverCore: sending block #" << block_pool.sequence() << " of " << block_pool.transactions_count() << " transactions");
             }
-            pnode->sendBlock(pool);
+            pnode->sendBlock(block_pool);
         }
         else {
             // load block and send it
@@ -282,19 +282,19 @@ namespace slv2
         // thread-safe with send_wallet_transaction(), suppose to sync with calls from network-related threads
         std::lock_guard<std::mutex> l(trans_mtx);
         //TODO: force  update counter due to possible adding transactions by direct call to push_back(), not to add_transaction() method
-        transactions.recount();
-        size_t tr_cnt = transactions.transactions_count();
+        trans_pool.recount();
+        size_t tr_cnt = trans_pool.transactions_count();
         if(tr_cnt > 0) {
-            pnode->sendTransaction(std::move(transactions));
+            pnode->sendTransaction(std::move(trans_pool));
             if(Consensus::Log) {
 				std::ostringstream os;
-				for (const auto& t : transactions.transactions()) {
+				for (const auto& t : trans_pool.transactions()) {
 					os << " " << t.innerID();
 				}
 				LOG_DEBUG("SolverCore: flush" << os.str());
                 LOG_DEBUG("SolverCore: " << tr_cnt << " are sent, clear buffer");
             }
-            transactions = csdb::Pool {};
+            trans_pool = csdb::Pool {};
         }
         else if(Consensus::Log) {
             LOG_DEBUG("SolverCore: no transactions collected, nothing to send");

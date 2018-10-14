@@ -122,9 +122,9 @@ namespace slv2
                 p = removeTransactionsWithBadSignatures(p);
             }
             pfee->CountFeesInPool(pnode, &p);
-            auto result = pgen->buildvector(p, pool, b_pool);
+            auto result = pgen->buildvector(p, block_pool, b_pool);
             if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: as result  " << pool.transactions_count() << " are valid, " << b_pool.transactions_count() << " moved to bad pool");
+                LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
             }
             pown_hvec->Sender = pnode->getMyConfNumber();
             pown_hvec->hash = result;
@@ -367,7 +367,7 @@ namespace slv2
         }
 
         // чистим для нового списка
-        pool = csdb::Pool {};
+        block_pool = csdb::Pool {};
 
         recv_vect.clear();
         recv_matr.clear();
@@ -410,14 +410,14 @@ namespace slv2
         // thread-safe with flushTransactions(), suppose to receive calls from network-related threads
         std::lock_guard<std::mutex> l(trans_mtx);
         //TODO: such a way transactions added in solver-1, ask author about it
-        transactions.transactions().push_back(tr);
-        transactions.recount();
+        trans_pool.transactions().push_back(tr);
+        trans_pool.recount();
         if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: transaction " << tr.innerID() << " added, total " << transactions.transactions().size());
+            LOG_DEBUG("SolverCore: transaction " << tr.innerID() << " added, total " << trans_pool.transactions_count());
         }
     }
 
-    csdb::Pool::sequence_t SolverCore::getNextMissingBlock(const uint32_t starting_after)
+    csdb::Pool::sequence_t SolverCore::getNextMissingBlock(const uint32_t starting_after) const
     {
         for(csdb::Pool::sequence_t b = starting_after + 1; b < cur_round; ++b) {
             if(outrunning_blocks.count(b) > 0) {
@@ -426,6 +426,30 @@ namespace slv2
             return b;
         }
         return 0;
+    }
+
+    csdb::Pool::sequence_t SolverCore::getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end) const
+    {
+        if(outrunning_blocks.empty()) {
+            return 0;
+        }
+        // it - "сквозной" итератор для двух блоков while()
+        auto it = outrunning_blocks.cbegin();
+        // skip outdated blocks if any
+        while(it->first <= starting_after) {
+            if(++it == outrunning_blocks.cend()) {
+                return 0;
+            }
+        }
+        // count useful cached blocks
+        csdb::Pool::sequence_t cnt = 0;
+        while(it->first <= end) {
+            ++cnt;
+            if(++it == outrunning_blocks.cend()) {
+                break;
+            }
+        }
+        return cnt;
     }
 
 } // slv2

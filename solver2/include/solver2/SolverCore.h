@@ -81,12 +81,45 @@ namespace slv2
         void addConfirmation(uint8_t own_conf_number);
         void beforeNextRound();
         void nextRound();
-        // required by api
+
+        /// <summary>   Adds a transaction passed to send pool </summary>
+        ///
+        /// <remarks>   Aae, 14.10.2018. </remarks>
+        ///
+        /// <param name="tr">   The transaction </param>
+
         void send_wallet_transaction(const csdb::Transaction& tr);
-        // returns the nearest absent in cache block number starting after passed one
-        csdb::Pool::sequence_t getNextMissingBlock(const uint32_t starting_after);
+
+        /// <summary>
+        ///     Returns the nearest absent in cache block number starting after passed one. If all
+        ///     required blocks are in cache returns 0.
+        /// </summary>
+        ///
+        /// <remarks>   Aae, 14.10.2018. </remarks>
+        ///
+        /// <param name="starting_after">   The block after which to start search of absent one. </param>
+        ///
+        /// <returns>   The next missing block sequence number or 0 if all blocks are present. </returns>
+
+        csdb::Pool::sequence_t getNextMissingBlock(const uint32_t starting_after) const;
+
+        /// <summary>
+        ///     Gets count of cached block in passed range.
+        /// </summary>
+        ///
+        /// <remarks>   Aae, 14.10.2018. </remarks>
+        ///
+        /// <param name="starting_after">   The block after which to start count cached ones. </param>
+        /// <param name="end">              The block up to which count. </param>
+        ///
+        /// <returns>
+        ///     Count of cached blocks in passed range.
+        /// </returns>
+
+        csdb::Pool::sequence_t getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end ) const;
+
         // empty in Solver
-        void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/)
+        void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/) const
         {}
 
     private:
@@ -161,15 +194,15 @@ namespace slv2
         // sequence number of the last transaction received
         uint64_t last_trans_list_recv;
         // pool for storing transactions list, serve as source for new block
-        // must be managed by SolverCore because consumed by different states (Trusted*, Write...)
-        csdb::Pool pool {};
+        // must be managed by SolverCore because is consumed by different states (Trusted*, Write...)
+        csdb::Pool block_pool {};
         std::mutex trans_mtx;
-        csdb::Pool transactions;
-        // to store outrunning blocks until the time comes
+        // pool for storing individual transactions from wallets and candidates for transaction list,
+        // serve as source for flushTransactions()
+        csdb::Pool trans_pool {};
+        // to store outrunning blocks until the time to insert them comes
         // stores pairs of <block, sender> sorted by sequence number
         std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,PublicKey>> outrunning_blocks;
-        // to store unrequested syncro blocks
-        std::map <size_t, csdb::Pool> rnd_storage;
         // store BB status to reproduce solver-1 logic
         bool is_bigbang;
 
@@ -198,10 +231,17 @@ namespace slv2
         void createAndSendNewBlockFrom(csdb::Pool& p);
         void createAndSendNewBlock()
         {
-            createAndSendNewBlockFrom(pool);
+            createAndSendNewBlockFrom(block_pool);
         }
         void storeReceivedBlock(csdb::Pool& p);
-        // returns count of transactions flushed
+
+        /// <summary>   Flushes transactions stored in inner trans_pool and clears trans_pool for future use. 
+        ///             TODO: maybe clear every transaction individually after confirmation it is in one of future blocks</summary>
+        ///
+        /// <remarks>   Aae, 14.10.2018. </remarks>
+        ///
+        /// <returns>   Count of transactions flushed. </returns>
+
         size_t flushTransactions();
         csdb::Pool removeTransactionsWithBadSignatures(const csdb::Pool& p);
     };
