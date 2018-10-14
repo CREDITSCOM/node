@@ -108,17 +108,12 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
   for (const auto& hash : localHashes) {
-    if (!m_hashTable.contains(hash)) {
+    if (!m_hashTable.count(hash)) {
       cserror() << "HASH NOT FOUND " << hash.toString();
       return;
     }
 
-    const auto& transactions = m_hashTable.find(hash).transactions();
-
-    if (characteristic.size != transactions.size()) {
-      cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
-      return;
-    }
+    const auto& transactions = m_hashTable[hash].transactions();
 
     for (const auto& transaction : transactions) {
       if (mask.test(maskIndex)) {
@@ -129,6 +124,11 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
     }
 
     m_hashTable.erase(hash);
+  }
+
+  if (characteristic.size != newPool.transactions_count()) {
+    cserror() << "MASK SIZE AND TRANSACTIONS HASH COUNT - MUST BE EQUAL";
+    return;
   }
 
   newPool.set_sequence(sequence);
@@ -220,8 +220,8 @@ void Solver::flushTransactions() {
         cslog() << "Transaction packet hashing failed";
       }
 
-      if (!m_hashTable.contains(hash)) {
-        m_hashTable.insert(hash, packet);
+      if (!m_hashTable.count(hash)) {
+        m_hashTable.emplace(hash, packet);
       } else {
         cserror() << "Logical error, adding transactions packet more than one time";
       }
@@ -277,8 +277,8 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   csdebug() << "Got transaction packet";
   cs::TransactionsPacketHash hash = packet.hash();
 
-  if (!m_hashTable.contains(hash)) {
-    m_hashTable.insert(hash, packet);
+  if (!m_hashTable.count(hash)) {
+    m_hashTable.emplace(hash, packet);
   }
 }
 
@@ -289,8 +289,8 @@ void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& ha
 
     cslog() << "Search hash in my hash table " << hash.toString();
 
-    if (m_hashTable.contains(hash)) {
-      m_node->sendPacketHashesReply(m_hashTable.find(hash), sender);
+    if (m_hashTable.count(hash)) {
+      m_node->sendPacketHashesReply(m_hashTable[hash], sender);
 
       cslog() << "Found hash in hash table, send to requester";
     }
@@ -302,8 +302,8 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
 
   cs::TransactionsPacketHash hash = packet.hash();
 
-  if (!m_hashTable.contains(hash)) {
-    m_hashTable.insert(hash, std::move(packet));
+  if (!m_hashTable.count(hash)) {
+    m_hashTable.emplace(hash, std::move(packet));
   }
 
   {
@@ -337,7 +337,7 @@ void Solver::gotRound(cs::RoundTable&& round) {
   }
 
   for (const auto& hash : localHashes) {
-    if (!m_hashTable.contains(hash)) {
+    if (!m_hashTable.count(hash)) {
       neededHashes.push_back(std::move(hash));
     }
   }
@@ -362,12 +362,12 @@ void Solver::runConsensus() {
   cs::TransactionsPacket packet;
 
   for (const auto& hash : m_roundTable.hashes) {
-    if (!m_hashTable.contains(hash)) {
+    if (!m_hashTable.count(hash)) {
       cserror() << "Consensus build vector: HASH NOT FOUND";
       return;
     }
 
-    const auto& transactions = m_hashTable.find(hash).transactions();
+    const auto& transactions = m_hashTable[hash].transactions();
 
     for (const auto& transaction : transactions) {
       if (!packet.addTransaction(transaction)) {
@@ -627,7 +627,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cs::Hashes hashes;
 
     {
-      auto lockTable = m_hashTable.lock_table();
+      const auto& lockTable = m_hashTable;
 
       for (auto& it : lockTable) {
         hashes.push_back(it.first);
