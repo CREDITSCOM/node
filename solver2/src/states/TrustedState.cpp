@@ -37,7 +37,7 @@ namespace slv2
     {
         if(context.is_vect_recv_from(vect.Sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated vector received from [" << (unsigned int) vect.Sender << "], ignore");
+                LOG_DEBUG(name() << ": duplicated vector [" << (unsigned int) vect.Sender << "] received, ignore");
             }
             return Result::Ignore;
         }
@@ -45,12 +45,12 @@ namespace slv2
         context.generals().addvector(vect); // building matrix
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": vector received from [" << (unsigned int) vect.Sender << "],  total " << context.cnt_vect_recv());
+            LOG_NOTICE(name() << ": vector [" << (unsigned int) vect.Sender << "] received,  total " << context.cnt_vect_recv());
         }
         if(test_vectors_completed(context))
         {
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": enough vectors received");
+                LOG_NOTICE(name() << ": vectors completed");
             }
 
             //compose and send matrix!!!
@@ -59,6 +59,9 @@ namespace slv2
             // context.generals().addmatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
             onMatrix(context, context.generals().getMatrix(), PublicKey {});
 
+            if(Consensus::Log) {
+                LOG_NOTICE(name() << ": matrix [" << context.own_conf_number() << "] reply on completed vectors");
+            }
             context.send_own_matrix();
             return Result::Finish;
 
@@ -70,7 +73,7 @@ namespace slv2
     {
         if(context.is_matr_recv_from(matr.Sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated matrix received from [" << (unsigned int) matr.Sender << "], ignore");
+                LOG_DEBUG(name() << ": duplicated matrix [" << (unsigned int) matr.Sender << "] received, ignore");
             }
             return Result::Ignore;
         }
@@ -78,12 +81,12 @@ namespace slv2
         context.generals().addmatrix(matr, context.trusted());
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": matrix received from [" << (unsigned int) matr.Sender << "], total " << context.cnt_matr_recv());
+            LOG_NOTICE(name() << ": matrix [" << (unsigned int) matr.Sender << "] received, total " << context.cnt_matr_recv());
         }
 
         if(test_matrices_completed(context)) {
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": enough matrices received");
+                LOG_NOTICE(name() << ": matrices completed");
             }
             return Result::Finish;
         }
@@ -100,7 +103,7 @@ namespace slv2
             }
         }
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": reply on transaction list with own vector");
+            LOG_NOTICE(name() << ": vector [" << (unsigned int) context.own_conf_number() << "] reply on transaction list");
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
         context.send_own_vector();
