@@ -133,6 +133,8 @@ namespace cs
 
         m_hash = packet.m_hash;
         m_transactions = packet.m_transactions;
+
+        return *this;
     }
 
     //

@@ -20,6 +20,9 @@
 #include <sodium.h>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/bind.hpp>
 
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
 #define csunused(x) (void)(x)
@@ -262,21 +265,25 @@ namespace cs
             return str;
         }
 
+    private:
+        static void runAfterHelper(const std::chrono::milliseconds& ms, const std::function<void()>& callBack)
+        {
+            const auto tp = std::chrono::system_clock::now() + ms;
+            std::this_thread::sleep_until(tp);
+
+            // TODO: call callback without Queue
+            CallsQueue::instance().insert(callBack);
+        }
+
+    public:
+
         ///
         /// Calls std::function after ms time in another thread
         ///
-        static void runAfter(const std::chrono::milliseconds& ms, std::function<void()> callBack)
+        static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack)
         {
-            const auto tp = std::chrono::system_clock::now() + ms;
-
-            std::thread tr([tp, callBack]() {
-
-                std::this_thread::sleep_until(tp);
-                CallsQueue::instance().insert(callBack);
-
-            });
-
-            tr.detach();
+            static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
+            boost::asio::post(threadPool, boost::bind(&cs::Utils::runAfterHelper, ms, callBack));
         }
 
         ///
@@ -337,9 +344,10 @@ namespace cs
     }
 
 }
+
 inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept
 {
-    return static_cast< unsigned char >( arg );
+    return static_cast<unsigned char>( arg );
 }
 
 #endif 
