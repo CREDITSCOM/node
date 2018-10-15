@@ -21,42 +21,49 @@ TEST(DataStream, data)
   ASSERT_FALSE(stream.data() == nullptr);
 }
 
-TEST(DataStream, endpoint) // unfinished test. Probably problem with mIndex field in DataStream class
+TEST(DataStream, endpoint)
 {
-  char* data = new char[100]();
-  cs::DataStream stream(data, 100);
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
   boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string("127.0.0.1"), 80);
   stream << ep;
-  auto endpoint = stream.endpoint();
-//  std::cout << "address: " << endpoint.address().to_v4().to_string() << std::endl;
+  boost::asio::ip::udp::endpoint endpoint;
+//  stream >> endpoint;
+//  endpoint = stream.endpoint();
 
-  delete[] data;
+//  std::cout << "address: " << endpoint.address().to_v4().to_string() << std::endl;
 
   ASSERT_TRUE(true);
 }
 
 TEST(DataStream, streamField)
 {
-  char* data = new char[100]();
-  cs::DataStream stream(data, 100);
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
   stream.setStreamField<int>(13);
 
   int val = stream.data()[0];
-
-  delete[] data;
 
   ASSERT_EQ(13, val);
 }
 
 TEST(DataStream, streamArray)
 {
-  char* data = new char[100]();
-  cs::DataStream stream(data, 100);
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
   std::array<char, 4> ar {{'A', 'B', 'C', 'D'}};
 
   stream.setStreamArray(ar);
 
-  delete[] data;
+  ASSERT_TRUE('A' == stream.data()[0]);
+}
 
-  ASSERT_TRUE(true);
+TEST(DataStream, transactionHash)
+{
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+  TransactionsPacketHash hash = TransactionsPacketHash::fromString("d41d8cd98f00b204e9800998ecf8427ed41d8cd98f00b204e9800998ecf8427e");
+  stream.addTransactionsHash(hash);
+
+  ASSERT_TRUE(stream.size() == 40);
 }
