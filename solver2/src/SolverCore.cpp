@@ -306,16 +306,23 @@ namespace slv2
     {
         csdb::Pool good;
         BlockChain::WalletData data_to_fetch_pulic_key;
+        BlockChain& bc = pnode->getBlockChain();
         for( const auto& tr: p.transactions()) {
             const auto& src = tr.source();
+            csdb::internal::byte_array pk;
             if(src.is_wallet_id()) {
-                pnode->getBlockChain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-                if(tr.verify_signature(csdb::internal::byte_array(
-                    data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()))) {
-                    good.add_transaction(tr);
-                }
+                bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
+                pk.assign(data_to_fetch_pulic_key.address_.cbegin(), data_to_fetch_pulic_key.address_.cend());
             }
-            else if(tr.verify_signature(src.public_key())) {
+            else {
+                const auto& tmpref = src.public_key();
+                pk.assign(tmpref.cbegin(), tmpref.cend());
+            }
+            bool force_permit = (opt_spammer_on && addr_spam.has_value() && pk == addr_spam.value().public_key());
+            if(force_permit || tr.verify_signature(pk)) {
+                if(Consensus::Log && force_permit) {
+                    LOG_WARN("SolverCore: permit drain " << static_cast<uint64_t>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
+                }
                 good.add_transaction(tr);
             }
         }

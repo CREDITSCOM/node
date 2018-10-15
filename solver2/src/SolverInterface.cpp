@@ -118,9 +118,7 @@ namespace slv2
         csdb::Pool b_pool {};
         // update own hash vector
         if(pnode != nullptr && pgen != nullptr) {
-            if(!opt_spammer_on) {
-                p = removeTransactionsWithBadSignatures(p);
-            }
+            p = removeTransactionsWithBadSignatures(p);
             pfee->CountFeesInPool(pnode, &p);
             auto result = pgen->buildvector(p, block_pool, b_pool);
             if(Consensus::Log) {

@@ -44,21 +44,30 @@ namespace slv2
 
     protected:
 
-        void check_spammer_balance(SolverContext& context);
-		void setup(csdb::Transaction * ptr, SolverContext * pctx);
+        // returns true if current balance lets spam transactions
+        bool check_spammer_balance(SolverContext& context);
+		void setup(csdb::Transaction& tr, SolverContext& context);
+        void sign(csdb::Transaction& tr);
         int randFT(int min, int max);
 
         CallsQueueScheduler::CallTag tag_spam { CallsQueueScheduler::no_tag };
         CallsQueueScheduler::CallTag tag_flush { CallsQueueScheduler::no_tag };
 
+        // spammer parameters
         constexpr static uint32_t T_spam_trans = 20;
-
         constexpr static const size_t CountTransInRound = 100;
+        
         // every node has unique target spam key
         constexpr static const size_t CountTargetWallets = 1;
         std::vector<csdb::Address> target_wallets;
+        
         // every node has unique source key
+        constexpr static const size_t PublicKeySize = 32;
+        constexpr static const size_t SecretKeySize = 64;
+        uint8_t own_secret_key[SecretKeySize];
         csdb::Address own_wallet {};
+
+        bool is_spam_balance_valid { false };
         size_t spam_counter { 0 };
         size_t spam_index { 0 };
 
