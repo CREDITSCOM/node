@@ -778,7 +778,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
   solver_->rndStorageProcessing();
   seq = getBlockChain().getLastWrittenSequence() + 1;
-  
+
   size_t lws, gs;
 
   if (getBlockChain().getGlobalSequence() == 0)
@@ -819,7 +819,7 @@ void Node::sendBlockRequest(uint32_t seq) {
         transport_->sendBroadcast(ostream_.getPackets());
       ostream_.clear();
     }
-    
+
     reqSeq = solver_->getNextMissingBlock(reqSeq);
   }
 
@@ -845,6 +845,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   transport_->syncReplied(pool.sequence());
 
+  if (getBlockChain().getGlobalSequence() < pool.sequence())
+    getBlockChain().setGlobalSequence(pool.sequence());
+
   if (pool.sequence() == sendBlockRequestSequence) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
@@ -855,7 +858,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
   else
     solver_->gotFreeSyncroBlock(std::move(pool));
-  
+
   if (getBlockChain().getGlobalSequence() >
       getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
@@ -869,7 +872,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
+  std::cout << "SENDBLOCKREPLY> Sending block to " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
 
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
