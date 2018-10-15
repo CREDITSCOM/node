@@ -245,21 +245,21 @@ namespace slv2
 
         // see Solver-1, writeNewBlock() method
         p.set_writer_public_key(public_key);
-        pnode->getBlockChain().finishNewBlock(p);
+        auto& bc = pnode->getBlockChain();
+        bc.finishNewBlock(p);
         // see: Solver-1, addTimestampToPool() method
         p.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
         // finalize
         // see Solver-1, prepareBlockForSend() method
-        p.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        p.set_sequence((bc.getLastWrittenSequence()) + 1);
         p.sign(private_key);
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
         }
         pnode->sendBlock(p);
-        auto& bc = pnode->getBlockChain();
         bc.writeNewBlock(p);
         bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
     }
