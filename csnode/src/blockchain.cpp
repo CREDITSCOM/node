@@ -673,6 +673,11 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
             addNewWalletToPool(transactions[idx].target(), addressId, *newWallets);
         }
     }
+    if (pool.sequence() != 0)
+    {
+        csdb::Pool::NewWalletInfo::AddressId addressId = { transactions.size(), csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
+        addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
+    }
 }
 
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool)

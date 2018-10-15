@@ -501,8 +501,8 @@ void Solver::writeNewBlock()
   #endif
   if (consensusAchieved &&
     node_->getMyLevel() == NodeLevel::Writer) {
-    node_->getBlockChain().finishNewBlock(m_pool);
     prepareBlockForSend(m_pool);
+    node_->getBlockChain().finishNewBlock(m_pool);
     node_->sendBlock(m_pool);
     node_->getBlockChain().writeNewBlock(m_pool);
     node_->getBlockChain().setGlobalSequence(m_pool.sequence());
