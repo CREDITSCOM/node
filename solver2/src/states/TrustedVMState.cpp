@@ -2,6 +2,7 @@
 #include "../SolverContext.h"
 #include "../Generals.h"
 #include "../Consensus.h"
+#include "../Blockchain.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2

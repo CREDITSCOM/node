@@ -1,5 +1,6 @@
 #include "SolverCore.h"
 #include "Consensus.h"
+#include "Node.h"
 #include "SolverCompat.h"
 #include "Generals.h"
 #include <Solver/Fee.h>
