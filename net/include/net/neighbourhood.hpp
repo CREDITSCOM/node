@@ -6,6 +6,7 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 
 #include "packet.hpp"
 
@@ -44,6 +45,7 @@ struct Connection {
   typedef uint64_t Id;
 
   Connection() = default;
+
   Connection(Connection&& rhs): id(rhs.id),
                                 lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed)),
                                 lastPacketsCount(rhs.lastPacketsCount),
@@ -70,7 +72,7 @@ struct Connection {
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
 
-  PublicKey key;
+  cs::PublicKey key;
   ip::udp::endpoint in;
 
   bool specialOut = false;
@@ -85,7 +87,7 @@ struct Connection {
     uint32_t acceptOrder = 0;
     bool needSend = true;
   };
-  FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
+  FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
   uint32_t syncSeq = 0;
   uint32_t syncSeqRetries = 0;
@@ -117,7 +119,7 @@ public:
   void gotConfirmation(const Connection::Id& my,
                        const Connection::Id& real,
                        const ip::udp::endpoint&,
-                       const PublicKey&,
+                       const cs::PublicKey&,
                        RemoteNodePtr);
 
   void gotRefusal(const Connection::Id&);

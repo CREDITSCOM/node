@@ -1,6 +1,6 @@
-
 /* Send blaming letters to @yrtimd */
-#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+#include <net/logger.hpp>
 #include <sys/timeb.h>
 
 #include "network.hpp"
@@ -12,7 +12,8 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
   try {
     ip::udp::socket sock(context, ipv6 ? ip::udp::v6() : ip::udp::v4());
 
-    if (ipv6) sock.set_option(ip::v6_only(false));
+    if (ipv6)
+      sock.set_option(ip::v6_only(false));
 
     sock.set_option(ip::udp::socket::reuse_address(true));
 
@@ -26,20 +27,20 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
     DWORD dwBytesReturned = 0;
-    WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned, NULL, NULL);
+    WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned,
+             NULL, NULL);
 #endif
 
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
       sock.bind(ep);
     }
-    else
-      sock.bind(ip::udp::endpoint(ipv6 ? ip::udp::v6() : ip::udp::v4(),
-                                  data.port));
-
+    else {
+      sock.bind(ip::udp::endpoint(ipv6 ? ip::udp::v6() : ip::udp::v4(), data.port));
+    }
     return sock;
   }
-  catch(boost::system::system_error& e) {
+  catch (boost::system::system_error& e) {
     LOG_ERROR("Cannot bind socket on " << e.what());
     return ip::udp::socket(context);
   }
@@ -70,38 +71,35 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn,
 }
 
 void Network::readerRoutine(const Config& config) {
-  ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(),
-                                            config.getInputEndpoint(),
-                                            readerStatus_,
-                                            config.useIPv6());
+  ip::udp::socket* sock =
+      getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
 
-  if (!sock) return;
+  if (!sock) {
+    return;
+  }
 
   boost::system::error_code lastError;
 
-  for (;;) {
+  while (true) {
     auto& task = iPacMan_.allocNext();
 
     uint32_t cnt = 0;
     do {
-      task.size =
-        sock->receive_from(buffer(task.pack.data(),
-                                  Packet::MaxSize),
-                           task.sender,
-                           NO_FLAGS,
-                           lastError);
+      task.size = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
       if (++cnt == 10) {
         cnt = 0;
         std::this_thread::yield();
       }
-    }
-    while (lastError == boost::asio::error::would_block);
+    } while (lastError == boost::asio::error::would_block);
 
     if (!lastError) {
       iPacMan_.enQueueLast();
     }
-    else
+    else {
       LOG_ERROR("Cannot receive packet. Error " << lastError);
+    }
+
+    csdebug(logger::Net)<< "Received packet" << std::endl << task.pack;
   }
 }
 
@@ -111,32 +109,30 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 
   uint32_t cnt = 0;
   do {
-    size = sock.send_to(buffer(task->pack.data(), task->pack.size()),
-                        ep,
-                        NO_FLAGS,
-                        lastError);
+    size = sock.send_to(buffer(task->pack.data(), task->pack.size()), ep, NO_FLAGS, lastError);
 
     if (++cnt == 10) {
       cnt = 0;
       std::this_thread::yield();
     }
-  }
-  while (lastError == boost::asio::error::would_block);
+  } while (lastError == boost::asio::error::would_block);
 
-  if (lastError || size < task->pack.size())
+  if (lastError || size < task->pack.size()) {
     LOG_ERROR("Cannot send packet. Error " << lastError);
+  }
 }
 
 void Network::writerRoutine(const Config& config) {
-  ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(),
-                                            config.getOutputEndpoint(),
-                                            writerStatus_,
-                                            config.useIPv6());
+  ip::udp::socket* sock =
+      getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
 
-  if (!sock) return;
+  if (!sock) {
+    return;
+  }
 
-  for (;;) {
+  while (true) {
     auto task = oPacMan_.getNextTask();
+    csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
     sendPack(*sock, task, task->endpoint);
   }
 }
@@ -144,10 +140,10 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 
 void Network::processorRoutine() {
-  FixedHashMap<Hash, uint32_t, uint16_t, 1000000> packetMap;
+  FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
-  for (;;) {
+  while (true) {
     externals.callAll();
 
     auto task = iPacMan_.getNextTask();
@@ -160,7 +156,7 @@ void Network::processorRoutine() {
     }
 
     if (!(task->pack.isHeaderValid())) {
-      LOG_WARN("Header is not valid: " << byteStreamToHex((const char*)task->pack.data(), 100));
+      LOG_WARN("Header is not valid: " << cs::Utils::byteStreamToHex((const char*)task->pack.data(), 100));
       remoteSender->addStrike();
       continue;
     }
@@ -179,14 +175,17 @@ void Network::processorRoutine() {
         MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
         transport_->gotPacket(task->pack, remoteSender);
 
-        if (newFragmentedMsg)
+        if (newFragmentedMsg) {
           transport_->registerMessage(msg);
+        }
 
-        if (msg->isComplete())
+        if (msg->isComplete()) {
           transport_->processNodeMessage(**msg);
+        }
       }
-      else
+      else {
         transport_->processNodeMessage(task->pack);
+      }
     }
 
     transport_->redirectPacket(task->pack, remoteSender);
@@ -203,18 +202,14 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   oPacMan_.enQueueLast(qePtr);
 }
 
-Network::Network(const Config& config, Transport* transport):
-  resolver_(context_),
-  transport_(transport),
-  readerThread_(&Network::readerRoutine, this, config),
-  writerThread_(&Network::writerRoutine, this, config),
-  processorThread_(&Network::processorRoutine, this) {
-
+Network::Network(const Config& config, Transport* transport)
+: resolver_(context_)
+, transport_(transport)
+, readerThread_(&Network::readerRoutine, this, config)
+, writerThread_(&Network::writerRoutine, this, config)
+, processorThread_(&Network::processorRoutine, this) {
   if (!config.hasTwoSockets()) {
-    auto sockPtr = new ip::udp::socket(bindSocket(context_,
-                                                  this,
-                                                  config.getInputEndpoint(),
-                                                  config.useIPv6()));
+    auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 
     if (!sockPtr->is_open()) {
       good_ = false;
@@ -228,14 +223,14 @@ Network::Network(const Config& config, Transport* transport):
   while (readerStatus_.load() == ThreadStatus::NonInit);
   while (writerStatus_.load() == ThreadStatus::NonInit);
 
-  good_ = (readerStatus_.load() == ThreadStatus::Success &&
-           writerStatus_.load() == ThreadStatus::Success);
+  good_ = (readerStatus_.load() == ThreadStatus::Success && writerStatus_.load() == ThreadStatus::Success);
 
-  if (!good_)
+  if (!good_) {
     LOG_ERROR("Cannot start the network: error binding sockets");
+  }
 }
 
-bool Network::resendFragment(const Hash& hash,
+bool Network::resendFragment(const cs::Hash& hash,
                              const uint16_t id,
                              const ip::udp::endpoint& ep) {
   //LOG_WARN("Got resend req " << id << " from " << ep);
@@ -254,7 +249,6 @@ bool Network::resendFragment(const Hash& hash,
     if (id < msg->packetsTotal_ && *(msg->packets_ + id)) {
       sendDirect(*(msg->packets_ + id), ep);
       return true;
-      //LOG_WARN("Resending " << id);
     }
   }
 
@@ -275,8 +269,9 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 
   auto packEnd = msg->packets_ + size;
   auto rPtr = pack;
-  for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr)
+  for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr) {
     *wPtr = *rPtr;
+  }
 
   {
     SpinLock l(collector_.mLock_);

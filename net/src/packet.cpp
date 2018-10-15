@@ -2,6 +2,7 @@
 #include <lz4.h>
 
 #include "packet.hpp"
+#include <lib/system/utils.hpp>
 
 RegionAllocator Message::allocator_(1 << 26, 4);
 
@@ -9,7 +10,7 @@ enum Lengths {
   FragmentedHeader = 36
 };
 
-const Hash& Packet::getHeaderHash() const {
+const cs::Hash& Packet::getHeaderHash() const {
   if (!headerHashed_) {
     headerHash_ = getBlake2Hash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum), Lengths::FragmentedHeader);
     headerHashed_ = true;
@@ -104,8 +105,8 @@ void Message::composeFullData() const {
     uint8_t* data = static_cast<uint8_t*>(fullData_.get());
     pack = packets_;
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-      uint32_t cSize = pack->size() - (i == 0 ? 0 : headersLength);
-      memcpy(data, ((const char*)pack->data()) + (i == 0 ? 0 : headersLength), cSize);
+      uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - (i == 0 ? 0 : headersLength);
+      memcpy(data, (reinterpret_cast<const char*>(pack->data())) + (i == 0 ? 0 : headersLength), cSize);
       data+= cSize;
     }
   }
@@ -117,4 +118,75 @@ Message::~Message() {
     if (ptr) ptr->~Packet();
 
     memset(packets_, 0, sizeof(Packet*) * packetsTotal_);*/
+}
+
+const char* getMsgTypesString(MsgTypes messageType) {
+	switch (messageType) {
+    default:
+		return "-";
+    case RoundTableSS:
+      return "RoundTableSS";
+    case Transactions:
+          return "Transactions";
+    case FirstTransaction:
+      return "FirstTransaction";
+    case TransactionList:
+      return "TransactionList";
+    case ConsVector:
+      return "ConsVector";
+    case ConsMatrix:
+      return "ConsMatrix";
+    case NewBlock:
+      return "NewBlock";
+    case BlockHash:
+      return "BlockHash";
+    case BlockRequest:
+      return "BlockRequest";
+    case RequestedBlock:
+      return "RequestedBlock";
+    case TLConfirmation:
+      return "TLConfirmation";
+    case ConsVectorRequest:
+      return "ConsVectorRequest";
+    case ConsMatrixRequest:
+      return "ConsMatrixRequest";
+    case ConsTLRequest:
+      return "ConsTLRequest";
+    case RoundTableRequest:  
+      return "RoundTableRequest";
+    case NewBadBlock:
+      return "NewBadBlock";
+    case BigBang:
+      return "BigBang";
+    case TransactionPacket:
+      return "TransactionPacket";
+    case TransactionsPacketRequest:
+      return "TransactionsPacketRequest";
+    case TransactionsPacketReply:
+      return "TransactionsPacketReply";
+    case NewCharacteristic:
+      return "NewCharacteristic";
+    case RoundTable:
+      return "RoundTable";
+    case WriterNotification:
+      return "WriterNotification";
+    }
+}
+ 
+std::ostream& operator<<(std::ostream& os, const Packet& packet) {
+  os
+    << "Type:\t\t" << getMsgTypesString(packet.getType()) << "(" << packet.getType() << ")" << std::endl
+    << "Round:\t\t" << packet.getRoundNum() << std::endl
+    << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size()) << std::endl
+    << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size())
+    << std::endl
+    << "Id:\t\t" << packet.getId() << std::endl
+    << "Flags:\t\t"
+      << (packet.isNetwork() ? "net " : "")
+      << (packet.isFragmented() ? "fragmented " : "")
+      << (packet.isBroadcast() ? "broadcast " : "")
+      << (packet.isCompressed() ? "compressed " : "")
+      << (packet.isDirect() ? "direct" : "") << std::endl
+    << cs::Utils::byteStreamToHex(packet.getMsgData(), packet.getMsgSize());
+  return os;
 }

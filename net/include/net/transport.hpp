@@ -7,7 +7,7 @@
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
-#include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/cache.hpp>
 #include <net/network.hpp>
@@ -18,8 +18,8 @@
 
 using namespace boost::asio;
 
-typedef uint64_t ConnectionId;
-typedef uint64_t Tick;
+using ConnectionId = uint64_t;
+using Tick = uint64_t;
 
 enum class NetworkCommand : uint8_t {
   Registration = 2,
@@ -72,7 +72,7 @@ class Transport {
     delete net_;
   }
 
-  void run();
+  [[noreturn]] void run();
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
@@ -83,7 +83,7 @@ class Transport {
   void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false, bool sendToNeighbours = true);
   void clearTasks();
 
-  const PublicKey& getMyPublicKey() const {
+  const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
   bool isGood() const {
@@ -148,7 +148,7 @@ class Transport {
   bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
   void askForMissingPackages();
-  void requestMissing(const Hash&, const uint16_t, const uint64_t);
+  void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
 
   /* Actions */
   bool   good_;
@@ -170,7 +170,7 @@ class Transport {
   FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, MaxRemoteNodes> remoteNodesMap_;
 
   RegionAllocator netPacksAllocator_;
-  PublicKey       myPublicKey_;
+  cs::PublicKey myPublicKey_;
 
   IPackStream iPackStream_;
 

@@ -18,7 +18,7 @@ public:
 
   void sendDirect(const Packet&, const ip::udp::endpoint&);
 
-  bool resendFragment(const Hash&, const uint16_t, const ip::udp::endpoint&);
+  bool resendFragment(const cs::Hash&, const uint16_t, const ip::udp::endpoint&);
   void registerMessage(Packet*, const uint32_t size);
 
   Network(const Network&) = delete;

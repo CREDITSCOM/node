@@ -3,9 +3,11 @@
 #define __CONFIG_HPP__
 #include <string>
 #include <boost/asio.hpp>
+#include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
 
 #include <lib/system/keys.hpp>
+#include <lib/system/common.hpp>
 
 namespace po = boost::program_options;
 using namespace boost::asio;
@@ -57,7 +59,7 @@ public:
   NodeType getNodeType() const { return nType_; }
   const std::vector<EndpointData>& getIpList() const { return bList_; }
 
-  const PublicKey& getMyPublicKey() const { return publicKey_; }
+  const cs::PublicKey& getMyPublicKey() const { return publicKey_; }
   const std::string& getPathToDB() const { return pathToDb_; }
 
   bool isGood() const { return good_; }
@@ -71,9 +73,12 @@ public:
   bool isSymmetric() const { return symmetric_; }
   const EndpointData& getAddressEndpoint() const { return hostAddressEp_; }
 
+  const boost::log::settings& getLoggerSettings() const;
+
 private:
   Config() { }
   static Config readFromFile(const std::string& fileName);
+  void setLoggerSettings(const boost::property_tree::ptree& config);
 
   bool good_ = false;
 
@@ -98,7 +103,9 @@ private:
   bool server_;
 
   std::string pathToDb_;
-  PublicKey publicKey_;
+  cs::PublicKey publicKey_;
+
+  boost::log::settings loggerSettings_;
 };
 
 #endif // __CONFIG_HPP__

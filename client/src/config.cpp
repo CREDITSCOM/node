@@ -1,9 +1,15 @@
+#include <iostream>
 /* Send blaming letters to @yrtimd */
 #include <regex>
 #include <stdexcept>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/log/utility/setup/settings_parser.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 
 #include <lib/system/logger.hpp>
 #include "config.hpp"
@@ -83,7 +89,7 @@ Config Config::read(po::variables_map& vm) {
 
   srand(time(NULL));
   for (int i = 0; i < 32; ++i)
-    *(result.publicKey_.str + i) = (char)(rand() % 255);
+    *(result.publicKey_.data() + i) = (char)(rand() % 255);
 
   return result;
 }
@@ -94,7 +100,17 @@ Config Config::readFromFile(const std::string& fileName) {
   boost::property_tree::ptree config;
 
   try {
-    boost::property_tree::read_ini(fileName, config);
+    auto ext = boost::filesystem::extension(fileName);
+    boost::algorithm::to_lower(ext);
+    if (ext == "json") {
+      boost::property_tree::read_json(fileName, config);
+    }
+    else if (ext == "xml") {
+      boost::property_tree::read_xml(fileName, config);
+    }
+    else {
+      boost::property_tree::read_ini(fileName, config);
+    }
 
     result.inputEp_ = readEndpoint(config,
                                    BLOCK_NAME_HOST_INPUT);
@@ -159,6 +175,7 @@ Config Config::readFromFile(const std::string& fileName) {
         throw std::length_error("No hosts specified");
     }
 
+    result.setLoggerSettings(config);
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
@@ -185,4 +202,29 @@ Config Config::readFromFile(const std::string& fileName) {
   }
 
   return result;
+}
+
+void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
+  boost::property_tree::ptree settings;
+  auto core = config.get_child_optional("Core");
+  if (core) {
+    settings.add_child("Core", *core);
+  }
+  auto sinks = config.get_child_optional("Sinks");
+  if (sinks) {
+    for (const auto& val: *sinks) {
+      settings.add_child(boost::property_tree::ptree::path_type("Sinks." + val.first, '/'), val.second);
+    }
+  }
+  for (const auto& item: config) {
+    if (item.first.find("Sinks.") == 0)  
+      settings.add_child(boost::property_tree::ptree::path_type(item.first, '/'), item.second);
+  }
+  std::stringstream ss;
+  boost::property_tree::write_ini(ss, settings);
+  loggerSettings_ = boost::log::parse_settings(ss);
+}
+
+const boost::log::settings& Config::getLoggerSettings() const {
+  return loggerSettings_;
 }

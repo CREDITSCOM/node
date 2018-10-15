@@ -53,7 +53,7 @@ class APIProcessor;
 class APIFaker : public APINull
 {
   public:
-    APIFaker(BlockChain&, Credits::Solver&) {}
+    APIFaker(BlockChain&, cs::Solver&) {}
 };
 //
 //#ifndef FAKE_API_HANDLING
@@ -234,7 +234,7 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
     {}
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor>
-    getProcessor(const ::apache::thrift::TConnectionInfo& ci) override
+    getProcessor(const ::apache::thrift::TConnectionInfo&) override
     {
         (void)ci;
         // TRACE("");

@@ -11,7 +11,6 @@
 #include "cache.hpp"
 
 /* Containers */
-
 template <typename BufferType>
 class FixedBufferIterator {
 public:
@@ -43,12 +42,12 @@ public:
   using const_iterator = FixedBufferIterator<FixedCircularBuffer>;
 
   FixedCircularBuffer():
-    elements_(static_cast<T*>(malloc(sizeof(T) * Size))) {
+    elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Size])) {
   }
 
   ~FixedCircularBuffer() {
     clear();
-    free(elements_);
+    delete[] elements_;
   }
 
   FixedCircularBuffer(const FixedCircularBuffer&) = delete;
@@ -146,14 +145,14 @@ template <typename T, size_t Capacity>
 class FixedVector {
 public:
   FixedVector():
-    elements_(static_cast<T*>(malloc(sizeof(T) * Capacity))),
+    elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Capacity])),
     end_(elements_) { }
 
   ~FixedVector() {
     for (auto ptr = elements_; ptr != end_; ++ptr)
       ptr->~T();
 
-    free(elements_);
+    delete[] elements_;
   }
 
   FixedVector(const FixedVector&) = delete;
@@ -218,13 +217,14 @@ public:
             Element** _bucket): bucket(_bucket),
                                 key(_key) { }
   };
+  using ElementPtr = Element*;
 
   FixedHashMap() {
     static_assert(MaxSize >= 2, "Your member is too small");
 
-    const size_t bucketsSize = (1 << (sizeof(IndexType) * 8)) * sizeof(Element*);
-    buckets_ = static_cast<Element**>(malloc(bucketsSize));
-    memset(buckets_, 0, bucketsSize);
+    const size_t bucketsSize = 1 << (sizeof(IndexType) * 8);
+    buckets_ = new ElementPtr[bucketsSize];
+    memset(buckets_, 0, bucketsSize * sizeof(ElementPtr));
   }
 
   FixedHashMap(const FixedHashMap&) = delete;
@@ -234,7 +234,7 @@ public:
   }
 
   ~FixedHashMap() {
-    free(buckets_);
+    delete[] buckets_;
   }
 
   ArgType& tryStore(const KeyType& key) {
@@ -353,13 +353,16 @@ inline void CallsQueue::insert(std::function<void()> f) {
 
 template <size_t Length>
 struct FixedString {
-  FixedString() { }
+  FixedString() {
+    std::memset(str, 0, Length);
+  }
+
   FixedString(const char* src) {
-    memcpy(str, src, Length);
+    std::memcpy(str, src, Length);
   }
 
   bool operator==(const FixedString& rhs) const {
-    return memcmp(str, rhs.str, Length) == 0;
+    return std::memcmp(str, rhs.str, Length) == 0;
   }
 
   bool operator!=(const FixedString& rhs) const {
@@ -367,7 +370,43 @@ struct FixedString {
   }
 
   bool operator<(const FixedString& rhs) const {
-    return memcmp(str, rhs.str, Length) < 0;
+    return std::memcmp(str, rhs.str, Length) < 0;
+  }
+
+  char* data() {
+    return str;
+  }
+
+  const char* data() const {
+    return str;
+  }
+
+  size_t size() const {
+    return Length;
+  }
+
+  char* begin() {
+    return str;
+  }
+
+  char* end() {
+    return str + Length;
+  }
+
+  const char* begin() const {
+    return str;
+  }
+
+  const char* end() const {
+    return str + Length;
+  }
+
+  char& operator[](size_t index) {
+    return str[index];
+  }
+
+  const char& operator[](size_t index) const {
+    return str[index];
   }
 
   char str[Length];

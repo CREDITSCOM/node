@@ -373,10 +373,12 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
-                                        const Hash& hash) {
+                                        const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
-  if (!connection) return;
+  if (!connection) {
+    return;
+  }
 
   Connection::MsgRel& rel = connection->msgRels.tryStore(hash);
   SenderInfo& sInfo = msgSenders_.tryStore(hash);
@@ -391,9 +393,11 @@ void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
 
       rel.acceptOrder = sInfo.totalSenders++;
 
-      for (auto& nb : neighbours_)
-        if (nb->id != connection->id)
+      for (auto& nb : neighbours_) {
+        if (nb->id != connection->id) {
           transport_->sendPackRenounce(hash, **nb);
+        }
+      }
     }
   }
   else if (*sInfo.prioritySender != connection) {
@@ -403,7 +407,7 @@ void Neighbourhood::neighbourSentPacket(RemoteNodePtr node,
 }
 
 void Neighbourhood::neighbourSentRenounce(RemoteNodePtr node,
-                                          const Hash& hash) {
+                                          const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
   auto connection = node->connection.load(std::memory_order_acquire);
   if (connection) {
@@ -424,8 +428,7 @@ void Neighbourhood::redirectByNeighbours(const Packet* pack) {
   }
 }
 
-void Neighbourhood::pourByNeighbours(const Packet* pack,
-                                     const uint32_t packNum) {
+void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum) {
   if (packNum <= Packet::SmartRedirectTreshold) {
     const auto end = pack + packNum;
     for (auto ptr = pack; ptr != end; ++ptr) {
@@ -437,8 +440,9 @@ void Neighbourhood::pourByNeighbours(const Packet* pack,
 
   {
     SpinLock l(nLockFlag_);
-    for (auto& nb : neighbours_)
+    for (auto& nb : neighbours_) {
       transport_->sendPackRenounce(pack->getHeaderHash(), **nb);
+    }
   }
 
   ConnectionPtr* conn;
@@ -446,28 +450,52 @@ void Neighbourhood::pourByNeighbours(const Packet* pack,
   uint32_t tr = 0;
   const Packet* packEnd = pack + packNum;
 
-  for (;;) {
+  while (true) {
     {
       SpinLock l(nLockFlag_);
-      if (i >= neighbours_.size()) i = 0;
+      if (i >= neighbours_.size()) {
+        i = 0;
+      }
       conn = neighbours_.begin() + i;
       ++i;
     }
 
     Connection::MsgRel& rel = (*conn)->msgRels.tryStore(pack->getHeaderHash());
-    if (!rel.needSend) continue;
+    if (!rel.needSend) {
+      continue;
+    }
 
-    for (auto p = pack; p != packEnd; ++p)
+    for (auto p = pack; p != packEnd; ++p) {
       transport_->sendDirect(p, ***conn);
+    }
 
-    if (++tr == 2) break;
+    if (++tr == 2) {
+      break;
+    }
   }
 }
 
 void Neighbourhood::pingNeighbours() {
   SpinLock l(nLockFlag_);
-  for (auto& nb : neighbours_)
+  for (auto& nb : neighbours_) {
     transport_->sendPingPack(**nb);
+  }
+}
+
+void Neighbourhood::resendPackets() {
+  SpinLock l(nLockFlag_);
+  uint32_t cnt = 0;
+  for (auto& bp : msgBroads_) {
+    if (!bp.data.pack) {
+      continue;
+    }
+    if (!dispatchBroadcast(bp.data)) {
+      bp.data.pack = Packet();
+    }
+    else {
+      ++cnt;
+    }
+  }
 }
 
 void Neighbourhood::resendPackets() {
@@ -515,9 +543,13 @@ ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
   }
 
   for (auto& nb : neighbours_) {
-    if (nb->isSignal) continue;
+    if (nb->isSignal) {
+      continue;
+    }
     Connection::MsgRel& rel = nb->msgRels.tryStore(hash);
-    if (rel.acceptOrder == si.reaskTimes) return nb;
+    if (rel.acceptOrder == si.reaskTimes) {
+      return nb;
+    }
   }
 
   return si.prioritySender;

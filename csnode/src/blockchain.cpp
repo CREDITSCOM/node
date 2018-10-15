@@ -1,28 +1,14 @@
-#include <limits>
-#include <csdb/currency.h>
 #include <base58.h>
-#include <lib/system/logger.hpp>
+#include <csdb/currency.h>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
-#include <csnode/BlockHashes.h>
-#include <csnode/blockchain.hpp>
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+#include <limits>
 
+#include <csnode/blockchain.hpp>
 using namespace Credits;
 
-//BlockChain::BlockChain(const char* path)
-//{
-//	std::cerr << "Trying to open DB..." << std::endl;
-//    if (!storage_.open(path))
-//    {
-//        LOG_ERROR("Couldn't open database at " << path);
-//        return;
-//    }
-//
-//    if (!loadCache())
-//        return;
-//
-//    good_ = true;
-//}
 
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress)
   : good_(false)
@@ -463,9 +449,10 @@ public:
             }
         }
 
-        prevPoolHash = curr.previous_hash();
-        return true;
-    }
+    prevPoolHash = curr.previous_hash();
+
+    return true;
+  }
 
 private:
     csdb::Address wallPubKey_;

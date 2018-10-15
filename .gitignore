@@ -5,3 +5,4 @@ build64/
 /local
 /CMakeSettings.json
 js-client/js/*
+.idea/
