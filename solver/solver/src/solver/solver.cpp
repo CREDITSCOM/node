@@ -338,14 +338,16 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
   cslog() << "Got transactions hash request, try to find in hash table";
 
+  cs::SharedLock lock(m_sharedMutex);
+
   for (const auto& hash : hashes) {
 
     cslog() << "Search hash in my hash table " << hash.toString();
 
     if (m_hashTable.count(hash)) {
-      m_node->sendPacketHashesReply(m_hashTable[hash], sender);
+      cslog() << "Found hash in hash table, sending to requester";
 
-      cslog() << "Found hash in hash table, send to requester";
+      m_node->sendPacketHashesReply(m_hashTable[hash], sender);
     }
   }
 }
@@ -354,6 +356,8 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   cslog() << "Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
+
+  cs::Lock lock(m_sharedMutex);
 
   if (!m_hashTable.count(hash)) {
     m_hashTable.emplace(hash, std::move(packet));
