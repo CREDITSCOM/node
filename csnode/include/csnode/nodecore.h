@@ -7,6 +7,7 @@
 #include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
 #include <boost/thread/shared_mutex.hpp>
@@ -30,6 +31,7 @@ namespace cs
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
+    using HashesSet = std::unordered_set<cs::TransactionsPacketHash>;
 
     // sync types
     using SharedMutex = boost::shared_mutex;    // C++17 compliler std::shared_mutex

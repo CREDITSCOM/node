@@ -149,7 +149,7 @@ namespace cs
         const std::vector<csdb::Transaction>& transactions() const noexcept;
 
         ///
-        /// @brief Transactions vector clear
+        /// @brief Clears transactions vector
         ///
         void clear() noexcept;
 

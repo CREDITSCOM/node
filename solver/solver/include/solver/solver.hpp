@@ -143,20 +143,18 @@ class Solver {
 
   csdb::Pool v_pool;
 
-  bool m_isPoolClosed        = true;
+  bool m_isPoolClosed = true;
   bool blockCandidateArrived = false;
-  bool round_table_sent      = false;
-  bool gotBlockThisRound     = false;
-  bool gotBigBang            = false;
+  bool round_table_sent = false;
+  bool gotBlockThisRound = false;
+  bool gotBigBang = false;
 
   cs::SharedMutex m_sharedMutex;
 
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
-
-  // data for requests
-  cs::Hashes m_hashesToRemove;
+  cs::HashesSet m_hashesToRemove;
 
   cs::Timer m_sendingPacketTimer;
 

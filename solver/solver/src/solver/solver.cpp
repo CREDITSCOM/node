@@ -132,7 +132,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
 
   {
     cs::Lock lock(m_sharedMutex);
-    m_hashesToRemove = std::move(localHashes);
+    m_hashesToRemove = cs::HashesSet(localHashes.begin(), localHashes.end());
   }
 
   if (characteristic.size != newPool.transactions_count()) {
@@ -155,6 +155,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   if (sequence > m_node->getRoundNumber()) {
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
+
   assert(sequence <= m_node->getRoundNumber());
 
   m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
@@ -188,7 +189,8 @@ PublicKey Solver::getWriterPublicKey() const {
 
   if (m_writerIndex < m_roundTable.confidants.size()) {
     result = m_roundTable.confidants[m_writerIndex];
-  } else {
+  }
+  else {
     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
   }
 
@@ -325,6 +327,8 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {  // reviewer: "Ne
 void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   csdebug() << "Got transaction packet";
   cs::TransactionsPacketHash hash = packet.hash();
+
+  cs::Lock lock(m_sharedMutex);
 
   if (!m_hashTable.count(hash)) {
     m_hashTable.emplace(hash, packet);
