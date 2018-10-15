@@ -1,6 +1,6 @@
 /* Send blaming letters to @yrtimd */
-#include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <net/logger.hpp>
 #include <sys/timeb.h>
 
 #include "network.hpp"
@@ -96,6 +96,8 @@ void Network::readerRoutine(const Config& config) {
     else {
       LOG_ERROR("Cannot receive packet. Error " << lastError);
     }
+
+    csdebug(logger::Net)<< "Received packet" << std::endl << task.pack;
   }
 }
 
@@ -128,6 +130,7 @@ void Network::writerRoutine(const Config& config) {
 
   while (true) {
     auto task = oPacMan_.getNextTask();
+    csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
     sendPack(*sock, task, task->endpoint);
   }
 }

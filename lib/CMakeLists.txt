@@ -30,6 +30,7 @@ set (BOOST_ALL_DYN_LINK OFF)
 
 find_package (Boost REQUIRED COMPONENTS log)
 target_link_libraries (lib
+                       libsodium
                        Boost::log
                        Boost::disable_autolinking
                        )

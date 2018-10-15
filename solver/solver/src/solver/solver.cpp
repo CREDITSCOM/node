@@ -132,7 +132,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
 
   {
     cs::Lock lock(m_sharedMutex);
-    m_hashesToRemove = std::move(localHashes);
+    m_hashesToRemove = cs::HashesSet(localHashes.begin(), localHashes.end());
   }
 
   if (characteristic.size != newPool.transactions_count()) {
@@ -155,6 +155,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   if (sequence > m_node->getRoundNumber()) {
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
+
   assert(sequence <= m_node->getRoundNumber());
 
   m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
@@ -188,7 +189,8 @@ PublicKey Solver::getWriterPublicKey() const {
 
   if (m_writerIndex < m_roundTable.confidants.size()) {
     result = m_roundTable.confidants[m_writerIndex];
-  } else {
+  }
+  else {
     cserror() << "WRITER PUBLIC KEY IS NOT EXIST AT CONFIDANTS. LOGIC ERROR!";
   }
 
@@ -326,6 +328,8 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   csdebug() << "Got transaction packet";
   cs::TransactionsPacketHash hash = packet.hash();
 
+  cs::Lock lock(m_sharedMutex);
+
   if (!m_hashTable.count(hash)) {
     m_hashTable.emplace(hash, packet);
   }
@@ -334,14 +338,16 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
   cslog() << "Got transactions hash request, try to find in hash table";
 
+  cs::SharedLock lock(m_sharedMutex);
+
   for (const auto& hash : hashes) {
 
     cslog() << "Search hash in my hash table " << hash.toString();
 
     if (m_hashTable.count(hash)) {
-      m_node->sendPacketHashesReply(m_hashTable[hash], sender);
+      cslog() << "Found hash in hash table, sending to requester";
 
-      cslog() << "Found hash in hash table, send to requester";
+      m_node->sendPacketHashesReply(m_hashTable[hash], sender);
     }
   }
 }
@@ -350,6 +356,8 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   cslog() << "Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
+
+  cs::Lock lock(m_sharedMutex);
 
   if (!m_hashTable.count(hash)) {
     m_hashTable.emplace(hash, std::move(packet));

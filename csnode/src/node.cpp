@@ -1113,8 +1113,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     return;
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast);
-  ostream_ << roundNum_;
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast | BaseFlags::Compressed);
 
   for (const auto& hash : hashes) {
     cslog() << "Transaction packet request, need hash - " << hash.toString();
@@ -1131,7 +1130,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
   cslog() << "Sending transaction packet request: size: " << bytes.size();
 
-  ostream_ << MsgTypes::TransactionsPacketRequest << bytes;
+  ostream_ << MsgTypes::TransactionsPacketRequest << roundNum_ << bytes;
 
   flushCurrentTasks();
 }
@@ -1143,13 +1142,12 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
-  ostream_ << roundNum_;
 
   cs::Bytes bytes = packet.toBinary();
 
   cslog() << "Sending transaction packet reply: size: " << bytes.size();
 
-  ostream_ << MsgTypes::TransactionsPacketReply << bytes;
+  ostream_ << MsgTypes::TransactionsPacketReply << roundNum_ << bytes;
 
   cslog() << "NODE> Sending " << packet.transactionsCount() << " transaction(s)";
 
