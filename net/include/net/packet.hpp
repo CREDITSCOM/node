@@ -8,6 +8,8 @@
 #include <lib/system/keys.hpp>
 #include <lib/system/common.hpp>
 
+#include <iostream>
+
 using namespace boost::asio;
 
 enum BaseFlags: uint8_t {
@@ -222,5 +224,7 @@ private:
   Message lastMessage_;
   friend class Network;
 };
+
+std::ostream& operator<< (std::ostream& os, const Packet& packet);
 
 #endif // __PACKET_HPP__

@@ -4,6 +4,7 @@
 
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/expressions/keyword.hpp> // include prior trivial.hpp for "Severity" attribute support in config Filter=
+#include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/manipulators/dump.hpp>
 #include <boost/log/utility/setup/settings.hpp>
@@ -31,32 +32,56 @@ namespace logger {
 
   void initialize(const logging::settings& settings);
   void cleanup();
-} // logger
 
-#define cstrace() BOOST_LOG_FUNCTION(); BOOST_LOG_TRIVIAL(trace)
+  template <typename T=logging::trivial::logger>
+  inline auto& getLogger() {
+    return T::get();
+  }
 
-#define csdebug() BOOST_LOG_TRIVIAL(debug)
+  // <None> logger is used to eliminate logger code from build
+  BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(None, logging::trivial::logger::logger_type);
 
-#define csinfo() BOOST_LOG_TRIVIAL(info)
+  template <typename T=logging::trivial::logger>
+  constexpr bool useLogger() {
+    return true;
+  }
+  template <>
+  constexpr bool useLogger<None>() {
+    return false;
+  }
 
-#define cswarning() BOOST_LOG_TRIVIAL(warning)
+} // namespace logger
 
-#define cserror() BOOST_LOG_TRIVIAL(error)
+#define _LOG_SEV(level, ...) \
+  if (!logger::useLogger<__VA_ARGS__>()) ; \
+  else BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::level)
 
-#define csfatal() BOOST_LOG_TRIVIAL(fatal)
+#define cstrace(...) \
+  if (!logger::useLogger<__VA_ARGS__>()) ; \
+  else BOOST_LOG_FUNCTION(); _LOG_SEV(trace, __VA_ARGS__)
+
+#define csdebug(...) _LOG_SEV(debug, __VA_ARGS__)
+
+#define csinfo(...) _LOG_SEV(info, __VA_ARGS__)
+
+#define cswarning(...) _LOG_SEV(warning, __VA_ARGS__)
+
+#define cserror(...) _LOG_SEV(error, __VA_ARGS__)
+
+#define csfatal(...) _LOG_SEV(fatal, __VA_ARGS__)
 
 // alias
-#define cslog() csinfo()
+#define cslog(...) csinfo(__VA_ARGS__)
 
 // deprecated (useless legacy macros)
 
-#define csfile() csdebug()
+#define csfile(...) csdebug(__VA_ARGS__)
 
-#define csderror() cserror()
+#define csderror(...) cserror(__VA_ARGS__)
 
-#define csdinfo() csinfo()
+#define csdinfo(...) csinfo(__VA_ARGS__)
 
-#define csdwarning() cswarning()
+#define csdwarning(...) cswarning(__VA_ARGS__)
 
 // legacy support (should be replaced with csXXX macros)
 //
