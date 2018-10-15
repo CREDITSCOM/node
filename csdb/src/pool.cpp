@@ -686,9 +686,14 @@ bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddres
     const csdb::Pool::Transactions& transactions = this->transactions();
 
     size_t idx = info.addressId_.trxInd_;
-    if (idx >= transactions.size())
+    if (idx > transactions.size())
     {
         return false;
+    }
+    if (idx == transactions.size())
+    {
+        wallAddress = csdb::Address::from_public_key(this->writer_public_key());
+        return true;
     }
 
     csdb::Transaction trx = transactions[idx];

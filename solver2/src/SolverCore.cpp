@@ -244,6 +244,7 @@ namespace slv2
         pnode->becomeWriter();
 
         // see Solver-1, writeNewBlock() method
+        p.set_writer_public_key(public_key);
         pnode->getBlockChain().finishNewBlock(p);
         // see: Solver-1, addTimestampToPool() method
         p.add_user_field(0, std::to_string(
@@ -251,7 +252,6 @@ namespace slv2
         ));
         // finalize
         // see Solver-1, prepareBlockForSend() method
-        p.set_writer_public_key(public_key);
         p.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
         p.sign(private_key);
 
