@@ -1,6 +1,5 @@
 #include "TrustedVMState.h"
 #include "../SolverContext.h"
-#include "../Node.h"
 #include "../Generals.h"
 #include "../Consensus.h"
 #include <lib/system/logger.hpp>
@@ -13,8 +12,8 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": request to become writing node");
             }
-            // let context switch state
-            context.become_writer();
+            // let context switch state to write
+            context.request_role(Role::Write);
         }
         // continue work as trusted node
     }
@@ -36,9 +35,9 @@ namespace slv2
     bool TrustedVMState::decide_to_write(SolverContext& context)
     {
         uint8_t wTrusted = context.generals().take_decision(
-            context.node().getConfidants(),
-            context.node().getMyConfNumber(),
-            context.blockchain().getHashBySequence(context.node().getRoundNumber() - 1)
+            context.trusted(),
+            context.own_conf_number(),
+            context.blockchain().getHashBySequence(context.round() - 1)
         );
         if(Consensus::GeneralNotSelected == wTrusted) {
             if(Consensus::Log) {

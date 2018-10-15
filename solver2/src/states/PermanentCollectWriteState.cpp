@@ -1,6 +1,6 @@
 #include "PermanentCollectWriteState.h"
 #include "../SolverContext.h"
-#include "../Node.h"
+#include "../Blockchain.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2

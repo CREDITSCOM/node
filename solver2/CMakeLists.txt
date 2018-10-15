@@ -12,6 +12,7 @@ add_library(solver2
 	include/solver2/SolverCore.h
 	include/solver2/SolverContext.h
 	include/solver2/Node.h
+	include/solver2/Blockchain.h
 	include/solver2/Generals.h
 	include/solver2/SolverCompat.h
 	include/solver2/CallsQueueScheduler.h
@@ -33,8 +34,6 @@ add_library(solver2
 	include/solver2/states/TrustedVState.h
 	include/solver2/states/WriteState.h
 	include/solver2/states/PermanentCollectWriteState.h
-
-	../solver/Solver/Include/Solver/Generals.hpp
 
 	src/SolverCore.cpp
 	src/SolverContext.cpp

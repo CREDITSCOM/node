@@ -1,7 +1,6 @@
 #include "SolverCore.h"
 #include "Consensus.h"
 #include "SolverCompat.h"
-#include "Node.h"
 #include "Generals.h"
 #include <Solver/Fee.h>
 #include <csdb/currency.h>

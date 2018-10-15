@@ -1,8 +1,7 @@
 #include "DefaultStateBehavior.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include "../Node.h"
-
+#include "../Blockchain.h"
 #include <csdb/pool.h>
 #include <lib/system/logger.hpp>
 
@@ -119,7 +118,7 @@ namespace slv2
             constexpr const size_t hash_len = sizeof(hash_val.str) / sizeof(hash_val.str[0]);
             LOG_NOTICE(name() << ": sending hash " << byteStreamToHex(hash_val.str, hash_len) << " in reply to block sender");
         }
-        context.node().sendHash(hash_val, target);
+        context.send_hash(hash_val, target);
     }
 
 } // slv2

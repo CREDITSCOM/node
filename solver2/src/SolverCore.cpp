@@ -2,10 +2,10 @@
 #include "SolverContext.h"
 #include "CallsQueueScheduler.h"
 #include "Consensus.h"
+#include "Node.h"
 #include "SolverCompat.h"
 #include <Solver/WalletsState.h>
 #include <Solver/Fee.h>
-#include "Node.h"
 #include "Generals.h"
 
 #pragma warning(push)

@@ -1,7 +1,7 @@
 #include "WriteState.h"
 #include "../SolverContext.h"
-#include "../Node.h"
 #include "../Consensus.h"
+#include "../Blockchain.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2
@@ -22,8 +22,6 @@ namespace slv2
         if(tmp > min_count_hashes) {
             min_count_hashes = tmp;
         }
-
-        context.node().becomeWriter();
 
         context.create_and_send_new_block();
         pown = std::make_unique<Hash>((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));

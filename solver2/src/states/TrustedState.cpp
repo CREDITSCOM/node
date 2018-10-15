@@ -2,7 +2,6 @@
 #include "../SolverContext.h"
 #include "../Consensus.h"
 #include "../SolverCompat.h"
-#include "../Node.h"
 #include "../Generals.h"
 #include <lib/system/logger.hpp>
 
@@ -60,7 +59,7 @@ namespace slv2
             // context.generals().addmatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
             onMatrix(context, context.generals().getMatrix(), PublicKey {});
 
-            context.node().sendMatrix(context.generals().getMatrix());
+            context.send_own_matrix();
             return Result::Finish;
 
         }
@@ -76,7 +75,7 @@ namespace slv2
             return Result::Ignore;
         }
         context.recv_matr_from(matr.Sender);
-        context.generals().addmatrix(matr, context.node().getConfidants());
+        context.generals().addmatrix(matr, context.trusted());
 
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": matrix received from [" << (unsigned int) matr.Sender << "], total " << context.cnt_matr_recv());
@@ -104,7 +103,7 @@ namespace slv2
             LOG_NOTICE(name() << ": reply on transaction list with own vector");
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
-        context.node().sendVector(context.hash_vector());
+        context.send_own_vector();
         Result res = onVector(context, context.hash_vector(), PublicKey {});
         if(res == Result::Finish) {
             // let context immediately to decide what to do
@@ -125,12 +124,12 @@ namespace slv2
 
     bool TrustedState::test_vectors_completed(const SolverContext& context) const
     {
-        return context.cnt_vect_recv() == context.node().getConfidants().size();
+        return context.cnt_vect_recv() == context.cnt_trusted();
     }
 
     bool TrustedState::test_matrices_completed(const SolverContext& context) const
     {
-        return context.cnt_matr_recv() == context.node().getConfidants().size();
+        return context.cnt_matr_recv() == context.cnt_trusted();
     }
 
 } // slv2

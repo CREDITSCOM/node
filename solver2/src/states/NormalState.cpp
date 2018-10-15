@@ -1,7 +1,7 @@
 #include "NormalState.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include "../Node.h"
+#include "../Blockchain.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
 #include <csdb/amount.h>

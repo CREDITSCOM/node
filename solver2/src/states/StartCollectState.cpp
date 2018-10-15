@@ -1,6 +1,5 @@
 #include "StartCollectState.h"
 #include "../SolverContext.h"
-#include "../Node.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2
@@ -48,7 +47,7 @@ namespace slv2
             LOG_NOTICE(name() << ": sending transaction list #" << sequence << " of " << pool.transactions_count() << " items");
         }
         pool.set_sequence(sequence);
-        context.node().sendTransactionList(pool);
+        context.send_transaction_list(pool);
         
     }
 
