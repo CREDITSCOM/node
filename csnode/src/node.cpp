@@ -1114,7 +1114,6 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast);
-  ostream_ << roundNum_;
 
   for (const auto& hash : hashes) {
     cslog() << "Transaction packet request, need hash - " << hash.toString();
@@ -1131,7 +1130,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
   cslog() << "Sending transaction packet request: size: " << bytes.size();
 
-  ostream_ << MsgTypes::TransactionsPacketRequest << bytes;
+  ostream_ << MsgTypes::TransactionsPacketRequest << roundNum_ << bytes;
 
   flushCurrentTasks();
 }
