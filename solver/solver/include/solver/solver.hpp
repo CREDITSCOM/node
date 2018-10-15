@@ -148,6 +148,7 @@ class Solver {
   bool round_table_sent = false;
   bool gotBlockThisRound = false;
   bool gotBigBang = false;
+  std::atomic<bool> isConsensusRunning = { false };
 
   cs::SharedMutex m_sharedMutex;
 
