@@ -18,7 +18,7 @@
 namespace cs
 {
     // hash table for fast transactions storage
-    using TransactionsPacketHashTable = cuckoohash_map<TransactionsPacketHash, TransactionsPacket>;
+    using TransactionsPacketHashTable = std::unordered_map<TransactionsPacketHash, TransactionsPacket>;
 
     // array of packets
     using TransactionsBlock = std::vector<cs::TransactionsPacket>;

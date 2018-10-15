@@ -79,16 +79,17 @@ namespace cs
         void rehabilitation();
 
     private:
+        bool m_isRunning;
+        bool m_isRehabilitation;
 
-        bool mIsRunning;
-        std::atomic<bool> mInterruption;
-        bool mIsRehabilitation;
-        std::thread mThread;
-        std::chrono::milliseconds  mMsec;
-        std::vector<TimerCallback> mCallbacks;
-        unsigned int mAllowableDifference;
-        std::chrono::milliseconds  mRealMsec;
-        std::chrono::time_point<std::chrono::system_clock> mRehabilitationStartValue;
+        std::atomic<bool> m_interruption;
+        std::thread m_thread;
+        std::vector<TimerCallback> m_callbacks;
+
+        unsigned int m_allowableDifference;
+        std::chrono::milliseconds m_msec;
+        std::chrono::milliseconds m_realMsec;
+        std::chrono::time_point<std::chrono::system_clock> m_rehabilitationStartValue;
     };
 }
 

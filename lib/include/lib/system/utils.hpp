@@ -136,8 +136,9 @@ namespace cs
 
             std::stringstream ss;
 
-            for (std::size_t i = 0; i < size; ++i)
+            for (std::size_t i = 0; i < size; ++i) {
                 ss << std::hex << static_cast<int>(data[i]);
+            }
 
             return ss.str();
         }
@@ -152,7 +153,7 @@ namespace cs
         }
 
         ///
-        /// Clear memory
+        /// Clears memory
         ///
         template<typename T>
         inline static void clearMemory(T& object)
@@ -161,7 +162,7 @@ namespace cs
         }
 
         ///
-        // Coverts string to hex
+        /// Converts string to hex
         ///
         static std::string stringToHex(const std::string& input)
         {
@@ -312,10 +313,18 @@ namespace cs
             const int error = crypto_sign_verify_detached(signature.data(), message, messageSize, publicKey.data());
             return !error;
         }
+
+        ///
+        /// Verifies data signature with public key
+        ///
+        static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Bytes& bytes)
+        {
+            return cs::Utils::verifySignature(signature, publicKey, bytes.data(), bytes.size());
+        }
     };
 
     ///
-    /// Сonversion beetwin numeric types with checks based on boost::numeric_cast in DEBUG build
+    /// Сonversion between numeric types with checks based on boost::numeric_cast in DEBUG build
     ///
     template<typename Target, typename Source>
     inline auto numeric_cast(Source arg)

@@ -101,7 +101,7 @@ struct RegionPage {
   uint8_t* usedEnd;
   uint32_t sizeLeft;
 
-  ~RegionPage() { free(regions); }
+  ~RegionPage() { delete[] regions; }
 };
 
 class Region {
@@ -240,7 +240,7 @@ private:
     RegionPage* result = new RegionPage;
 
     result->allocator = this;
-    result->regions = static_cast<uint8_t*>(malloc(PageSize));
+    result->regions = new uint8_t[PageSize];
 
 #ifdef TESTING
     ++pagesNum_;
@@ -389,10 +389,10 @@ private:
   IntType** allocateNextPage() {
     ++pages_;
 
-    IntType* page = static_cast<IntType*>(malloc(sizeof(IntType) * PageSize));
+    IntType* page = reinterpret_cast<IntType*>(new uint8_t[sizeof(IntType) * PageSize]);
 
-    free(freeChunks_);
-    freeChunks_ = static_cast<IntType**>(malloc(sizeof(IntType*) * PageSize * pages_));
+    delete[] freeChunks_;
+    freeChunks_ = reinterpret_cast<IntType**>(new uint8_t[sizeof(IntType*) * PageSize * pages_]);
 
     IntType** chunkPtr = static_cast<IntType**>(freeChunks_) + PageSize;
     IntType* pageEnd = static_cast<IntType*>(page) + PageSize;

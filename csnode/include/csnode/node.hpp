@@ -51,7 +51,7 @@ class Node {
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
-  void getNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
+  void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
   void applyNotifications();
 
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
@@ -64,7 +64,6 @@ class Node {
   /*syncro get functions*/
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getWritingConfirmation(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -83,7 +82,6 @@ class Node {
   void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender);
 
   void sendBadBlock(const csdb::Pool& pool);
-  void sendCharacteristic(const cs::PoolMetaInfo& emptyMetaPool, const cs::Characteristic& characteristic);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
@@ -91,6 +89,7 @@ class Node {
   void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
+  void sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
