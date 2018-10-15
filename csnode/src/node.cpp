@@ -806,7 +806,8 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   cs::TransactionsPacket packet;
   stream >> packet;
 
-  cslog() << "NODE> Transactions hashes answer amount got " << packet.transactionsCount();
+  cslog() << "NODE> Get transactions hashes answer amount got " << packet.transactionsCount();
+  cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
 
   if (packet.hash().isEmpty()) {
     cserror() << "Received transaction hashes answer packet hash is empty";
@@ -1142,14 +1143,17 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
   }
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  ostream_ << MsgTypes::TransactionsPacketReply << roundNum_;
 
-  cs::Bytes bytes = packet.toBinary();
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  stream << packet;
 
   cslog() << "Sending transaction packet reply: size: " << bytes.size();
-
-  ostream_ << MsgTypes::TransactionsPacketReply << roundNum_ << bytes;
-
   cslog() << "NODE> Sending " << packet.transactionsCount() << " transaction(s)";
+
+  ostream_ << bytes;
 
   flushCurrentTasks();
 }
