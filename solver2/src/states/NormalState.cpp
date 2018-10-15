@@ -191,13 +191,14 @@ namespace slv2
 
             context.add(tr);
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": spammer wallet balance is " << balance << ", trying to deposit " << deposit);
+                LOG_NOTICE(name() << ": spammer wallet balance is " << static_cast<int>(balance) << ", trying to deposit " << deposit);
             }
             return false;
         }
         if(Consensus::Log) {
+            // this allow print message once after deposit done
             if(!is_spam_balance_valid) {
-                LOG_NOTICE(name() << ": spammer wallet balance " << balance << " is enough to spam transactions");
+                LOG_NOTICE(name() << ": spammer wallet balance " << static_cast<int>(balance) << " is enough to spam transactions");
             }
         }
         return true;

@@ -321,7 +321,7 @@ namespace slv2
             bool force_permit = (opt_spammer_on && addr_spam.has_value() && pk == addr_spam.value().public_key());
             if(force_permit || tr.verify_signature(pk)) {
                 if(Consensus::Log && force_permit) {
-                    LOG_WARN("SolverCore: permit drain " << static_cast<uint64_t>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
+                    LOG_WARN("SolverCore: permit drain " << static_cast<int>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
                 }
                 good.add_transaction(tr);
             }
