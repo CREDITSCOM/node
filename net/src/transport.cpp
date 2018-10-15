@@ -347,6 +347,9 @@ void Transport::processNodeMessage(const Message& msg) {
     case MsgTypes::TransactionsPacketRequest:
       cslog() << "TRANSPORT> Process Node Message MSG: Transactions packet request";
       break;
+    case MsgTypes::TransactionsPacketReply:
+      cslog() << "TRANSPORT> Process Node Message MSG: Transactions packet reply";
+      break;
   default:
       break;
   }
@@ -418,8 +421,11 @@ void Transport::processNodeMessage(const Packet& pack) {
     case MsgTypes::TransactionsPacketRequest:
       cslog() << "TRANSPORT> Process Node Message PKG: Transactions packet request";
       break;
+    case MsgTypes::TransactionsPacketReply:
+      cslog() << "TRANSPORT> Process Node Message PKG: Transactions packet reply";
+      break;
     default:
-        break;
+      break;
   }
 
   switch(node_->chooseMessageAction(rNum, type)) {
@@ -505,12 +511,14 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
     return node_->getPacketHashesRequest(data, size, firstPack.getSender());
+  case MsgTypes::TransactionsPacketReply:
+    return node_->getPacketHashesReply(data, size);
   case MsgTypes::BigBang:
-      return node_->getBigBang(data, size, rNum, type);
+    return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
-      return node_->getCharacteristic(data, size, firstPack.getSender());
+    return node_->getCharacteristic(data, size, firstPack.getSender());
   case MsgTypes::WriterNotification:
-      return node_->getWriterNotification(data, size, firstPack.getSender());
+    return node_->getWriterNotification(data, size, firstPack.getSender());
   default:
     LOG_ERROR("Unknown type");
     break;

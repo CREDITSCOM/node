@@ -363,21 +363,17 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
     m_hashTable.emplace(hash, std::move(packet));
   }
 
-  {
-    cs::Lock lock(m_sharedMutex);
+  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
 
-    auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
+  if (it != m_neededHashes.end()) {
+    m_neededHashes.erase(it);
+  }
 
-    if (it != m_neededHashes.end()) {
-      m_neededHashes.erase(it);
-    }
+  if (m_neededHashes.empty()) {
+    cslog() << "All hashes received";
 
-    if (m_neededHashes.empty()) {
-      cslog() << "All hashes received";
-
-      if (m_node->getMyLevel() == NodeLevel::Confidant) {
-        runConsensus();
-      }
+    if (m_node->getMyLevel() == NodeLevel::Confidant) {
+      runConsensus();
     }
   }
 }
@@ -401,12 +397,6 @@ void Solver::gotRound(cs::RoundTable&& round) {
 
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
-
-    cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-      if (!m_neededHashes.empty()) {
-        cs::Solver::gotRound(std::move(m_roundTable));
-      }
-    });
   }
   else if (m_node->getMyLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
