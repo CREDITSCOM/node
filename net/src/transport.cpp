@@ -628,6 +628,10 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+#ifdef MONITOR_NODE
+  return;
+#endif
+
   Connection conn;
   conn.in         = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
@@ -811,19 +815,39 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 void Transport::sendPingPack(const Connection& conn) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id;
+  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence();
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id;
+  uint32_t lastSeq;
 
-  iPackStream_ >> id;
+  iPackStream_ >> id >> lastSeq;
   if (!iPackStream_.good() || !iPackStream_.end())
     return false;
 
   nh_.validateConnectionId(sender, id, task->sender);
+
+  if (lastSeq > maxBlock_) {
+    maxBlock_ = lastSeq;
+    maxBlockCount_ = 1;
+  }
+  else if (lastSeq == maxBlock_) {
+    if (lastSeq < node_->getBlockChain().getLastWrittenSequence() && ++maxBlockCount_ > ((rand() % 5) + 5)) {
+      auto conn = sender->connection.load(std::memory_order_relaxed);
+      if (!conn) return false;
+
+      SpinLock l(oLock_);
+      oPackStream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
+      sendDirect(oPackStream_.getPackets(), *conn);
+      oPackStream_.clear();
+
+      maxBlockCount_ = 0;
+    }
+  }
 
   return true;
 }
