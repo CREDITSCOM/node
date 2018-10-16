@@ -216,8 +216,6 @@ bool Solver::checkTableHashes(const cs::RoundTable& table)
 {
   const cs::Hashes& hashes = table.hashes;
   cs::Hashes neededHashes;
-
-  cs::SharedLock lock(m_sharedMutex);
   
   for (const auto& hash : hashes) {
     if (!m_hashTable.count(hash)) {
@@ -227,6 +225,10 @@ bool Solver::checkTableHashes(const cs::RoundTable& table)
 
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
+  }
+
+  for (const auto& hash : neededHashes) {
+    cslog() << "Solver> Need hash >>>> " << hash.toString();
   }
 
   return neededHashes.empty();
@@ -353,7 +355,7 @@ void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& ha
 }
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
-  cslog() << "Got packet hash reply";
+  cslog() << "Solver> Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
 
@@ -370,7 +372,11 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   }
 
   if (m_neededHashes.empty()) {
-    cslog() << "All hashes received";
+    cslog() << "Solver> Hashes received, checking hash table again";
+
+    if (!checkTableHashes(m_roundTable)) {
+      return;
+    }
 
     if (m_node->getMyLevel() == NodeLevel::Confidant) {
       runConsensus();
@@ -415,6 +421,12 @@ void Solver::gotRound(cs::RoundTable&& round) {
 }
 
 void Solver::runConsensus() {
+  if (isConsensusRunning) {
+    return;
+  }
+
+  isConsensusRunning = true;
+
   cslog() << "Run Consensus";
   cs::TransactionsPacket packet;
 
@@ -848,6 +860,7 @@ void Solver::nextRound() {
   blockCandidateArrived = false;
   gotBlockThisRound = false;
   round_table_sent = false;
+  isConsensusRunning = false;
 
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
