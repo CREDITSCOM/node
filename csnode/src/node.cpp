@@ -278,7 +278,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 
   ostream_ << bytes;
 
-  transport_->clearTasks();
   flushCurrentTasks();
 }
 
@@ -862,7 +861,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   roundTable.general = std::move(general);
   roundTable.confidants = std::move(confidants);
-  roundTable.hashes = hashes;
+  roundTable.hashes = std::move(hashes);
 
   onRoundStart(roundTable);
 
@@ -889,7 +888,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = sequence;
-  poolMetaInfo.timestamp = time;
+  poolMetaInfo.timestamp = std::move(time);
 
   cs::Signature signature;
   stream >> signature;
@@ -941,7 +940,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
   cs::Characteristic characteristic;
-  characteristic.mask = characteristicMask;
+  characteristic.mask = std::move(characteristicMask);
   characteristic.size = maskBitsCount;
 
   solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
@@ -1093,10 +1092,6 @@ void Node::sendHash(const std::string& hash, const cs::PublicKey& target) {
 }
 
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
-  if (myLevel_ != NodeLevel::Normal) {
-    return;
-  }
-
   if (packet.hash().isEmpty()) {
     cslog() << "Send transaction packet with empty hash failed";
     return;
@@ -1207,7 +1202,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
   lws = getBlockChain().getLastWrittenSequence();
 
-  float syncStatus = (1.0f - (globalSequence - lws) / globalSequence) * 100.0f;
+  float syncStatus = (1.0f - static_cast<float>(globalSequence - lws) / globalSequence) * 100.0f;
   csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << syncStatus << "%";
 
   sendBlockRequestSequence = seq;

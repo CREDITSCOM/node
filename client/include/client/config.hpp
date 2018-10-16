@@ -23,9 +23,8 @@ typedef short unsigned Port;
 
 struct EndpointData {
   bool ipSpecified;
-
-  ip::address ip;
   short unsigned port;
+  ip::address ip;
 
   static EndpointData fromString(const std::string&);
 };

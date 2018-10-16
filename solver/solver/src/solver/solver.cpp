@@ -99,7 +99,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
     localHashes = m_roundTable.hashes;
   }
 
-  cslog() << "Solver> Characteristic bytes " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
+  cslog() << "Solver> Characteristic bytes size " << characteristic.mask.size();
 
   csdb::Pool newPool;
   std::size_t maskIndex = 0;
@@ -243,7 +243,7 @@ HashMatrix Solver::getMyMatrix() const {
 }
 
 void Solver::flushTransactions() {
-  if (m_node->getMyLevel() != NodeLevel::Normal &&
+  if (m_node->getMyLevel() != NodeLevel::Normal ||
       m_roundTable.round <= TransactionsFlushRound) {
     return;
   }
@@ -741,26 +741,33 @@ void Solver::spamWithTransactions() {
   transaction.set_currency(csdb::Currency("CS"));
 
   const cs::RoundNumber round = m_roundTable.round;
+  const std::size_t minTrannsactionsCount = 300;
+  const std::size_t maxTransactionsCount = 500;
 
   // TODO: fix magic values
   while (true) {
-    if (spamRunning && (m_node->getMyLevel() == Normal)) {
-      if ((round < 10) || (round > 20)) {
-        transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-        // transaction.set_comission(csdb::Amount(0, 1, 10));
-        transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
-        transaction.set_innerID(iid);
-        iid++;
+    if (spamRunning) {
 
-        if (!transaction.is_valid()) {
-          cserror() << "Generated transaction is not valid";
+      const std::size_t transactionsCount = cs::Utils::generateRandomValue(minTrannsactionsCount, maxTransactionsCount);
+
+      for (std::size_t i = 0; i < transactionsCount; ++i) {
+        if ((round < 10) || (round > 20)) {
+          transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+          // transaction.set_comission(csdb::Amount(0, 1, 10));
+          transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
+          transaction.set_innerID(iid);
+          iid++;
+
+          if (!transaction.is_valid()) {
+            cserror() << "Generated transaction is not valid";
+          }
+
+          addConveyerTransaction(transaction);
         }
-
-        addConveyerTransaction(transaction);
       }
     }
 
-    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY * 2, TIME_TO_AWAIT_ACTIVITY * 4);
+    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY << 2, TIME_TO_AWAIT_ACTIVITY << 3);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(awaitTime));
   }

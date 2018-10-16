@@ -2,14 +2,14 @@
 
 //#define MONITOR_NODE
 //#define STARTER
-#define NODE_API
+//#define NODE_API
 #define AJAX_IFACE
 #define TIME_TO_COLLECT_TRXNS 50
 #define TIME_TO_AWAIT_ACTIVITY 200
 #define TRX_SLEEP_TIME 50000  // microseconds
 
 #ifndef MONITOR_NODE
-//#define SPAMMER
+#define SPAMMER
 #else
 #define STATS
 #endif
