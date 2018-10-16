@@ -267,18 +267,6 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {
 #endif
 }
 
-void Solver::initConfRound() {
-  memset(receivedVecFrom, 0, 100);
-  memset(receivedMatFrom, 0, 100);
-  trustedCounterVector = 0;
-  trustedCounterMatrix = 0;
-  size_t _rNum         = rNum;
-  if (gotBigBang)
-    sendZeroVector();
-  // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
-  //  [this, _rNum]() { if(!transactionListReceived) node_->sendTLRequest(_rNum); });
-}
-
 void Solver::gotTransactionList(csdb::Pool&& _pool) {
   if (transactionListReceived)
     return;
@@ -543,7 +531,7 @@ void Solver::rndStorageProcessing()
       break;
 
     it = rndStorage.erase(it);
-  }    
+  }
 
   while (loop)
   {
@@ -784,7 +772,8 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   // TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   // TRACE("");
-  m_transactions_.transactions().push_back(transaction);
+  if (m_transactions_.transactions().size() < 20)
+    m_transactions_.transactions().push_back(transaction);
 }
 
 void Solver::addInitialBalance() {
@@ -875,7 +864,10 @@ void Solver::nextRound() {
     trustedCounterVector = 0;
     trustedCounterMatrix = 0;
     if (gotBigBang)
-      sendZeroVector();
+      runAfter(std::chrono::milliseconds(5000),
+               [this]() {
+                 sendZeroVector();
+               });
   }
 #ifdef MYLOG
   std::cout << "SOLVER> next Round : the variables initialized" << std::endl;

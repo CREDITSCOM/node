@@ -264,7 +264,7 @@ uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, co
   // std::cout << "K : " << k << std::endl;
   int      result0 = nodes_amount;
   uint16_t result  = 0;
-  result           = k % (int)result0;
+  //result           = k % (int)result0;
 #ifdef MYLOG
   std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
 #endif
