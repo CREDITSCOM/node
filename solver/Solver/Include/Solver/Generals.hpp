@@ -41,7 +41,7 @@ namespace Credits {
 
         //take desision
         uint8_t take_decision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
-        uint8_t takeUrgentDecision(const std::vector<PublicKey>&, const uint8_t myConfNum, const csdb::PoolHash &lasthash);
+        uint8_t takeUrgentDecision(const size_t confNumber, const csdb::PoolHash &lasthash);
 
         /*returns current hash matrix of TrustedNode state
         */
