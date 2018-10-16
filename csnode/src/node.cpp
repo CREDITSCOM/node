@@ -10,6 +10,8 @@
 
 #include <base58.h>
 
+#include <boost/optional.hpp>
+
 #include <lz4.h>
 #include <sodium.h>
 
@@ -941,7 +943,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   stream >> writerPublicKey;
 
   boost::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
-  if (pool.has_value()) {
+  if (pool) {
     const uint8_t* message = pool->to_binary().data();
     const size_t messageSize = pool->to_binary().size();
 
@@ -1011,7 +1013,7 @@ void Node::applyNotifications() {
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
 
   boost::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo);
-  if (!pool.has_value()) {
+  if (!pool) {
     cserror() << "APPLY CHARACTERISTIC ERROR!";
     return;
   }
