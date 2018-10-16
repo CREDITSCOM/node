@@ -214,6 +214,8 @@ namespace Credits
 
     }
 
+    
+
     uint8_t Generals::take_decision(const std::vector<PublicKey>& confidantNodes, const uint8_t myConfNumber, const csdb::PoolHash &lasthash)
     {
 #ifdef MYLOG
@@ -294,23 +296,26 @@ namespace Credits
             std::cout << "GENERALS> Take decision: CONGRATULATIONS!!! No liars this round!!! " << std::endl;
 #endif
         }
-#ifdef MYLOG
-        std::cout << "Hash : " << lasthash.to_string() << std::endl;
-#endif
-        auto hash_t = lasthash.to_binary();
-        int k = *(hash_t.begin());
-        //std::cout << "K : " << k << std::endl;
-        int result0 = nodes_amount;
-        uint16_t result = 0;
-        result = k % (int) result0;
-#ifdef MYLOG
-        std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
-#endif
-        free(hw);
-        //free(mtr);
-        return result;
+        return takeUrgentDecision(nodes_amount, lasthash);
         //if (myId != confidantNodes[write_id]) return 0;
         //return 100;
+    }
+
+    uint8_t Generals::takeUrgentDecision(const size_t confNumber, const csdb::PoolHash &lasthash)
+    {
+#ifdef MYLOG
+      std::cout << "Hash : " << lasthash.to_string() << std::endl;
+#endif
+      auto hash_t = lasthash.to_binary();
+      int k = *(hash_t.begin());
+      //std::cout << "K : " << k << std::endl;
+      int result0 = (int)confNumber;
+      uint16_t result = 0;
+      result = k % (int)result0;
+#ifdef MYLOG
+      std::cout << "Writing node : " << byteStreamToHex(confidantNodes.at(result).str, 32) << std::endl;
+#endif
+      return result;
     }
 
     const HashMatrix& Generals::getMatrix() const
