@@ -10,9 +10,9 @@ namespace slv2
 		return core.pnode->getBlockChain();
 	}
 
-    uint8_t SolverContext::own_conf_number() const
+    size_t SolverContext::own_conf_number() const
     {
-        return core.pnode->getMyConfNumber();
+        return (size_t) core.pnode->getMyConfNumber();
     }
 
     size_t SolverContext::cnt_trusted() const

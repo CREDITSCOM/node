@@ -37,7 +37,7 @@ namespace slv2
     {
         uint8_t wTrusted = context.generals().take_decision(
             context.trusted(),
-            context.own_conf_number(),
+            (uint8_t) context.own_conf_number(),
             context.blockchain().getHashBySequence(context.round() - 1)
         );
         if(Consensus::GeneralNotSelected == wTrusted) {
@@ -50,7 +50,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": consensus has been reached");
             }
-            return (wTrusted == context.own_conf_number());
+            return (wTrusted == (uint8_t) context.own_conf_number());
         }
         return false;
     }

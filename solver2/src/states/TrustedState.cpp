@@ -54,7 +54,7 @@ namespace slv2
             }
 
             //compose and send matrix!!!
-            context.generals().addSenderToMatrix(context.own_conf_number());
+            context.generals().addSenderToMatrix((uint8_t) context.own_conf_number());
 
             // context.generals().addmatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
             onMatrix(context, context.generals().getMatrix(), PublicKey {});
@@ -103,7 +103,7 @@ namespace slv2
             }
         }
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": vector [" << (unsigned int) context.own_conf_number() << "] reply on transaction list");
+            LOG_NOTICE(name() << ": vector [" << context.own_conf_number() << "] reply on transaction list");
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
         context.send_own_vector();

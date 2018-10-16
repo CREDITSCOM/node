@@ -301,7 +301,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        uint8_t own_conf_number() const;
+        size_t own_conf_number() const;
 
         /**
          * @fn  size_t SolverContext::cnt_trusted() const;
