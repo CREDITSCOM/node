@@ -247,8 +247,9 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   stream << roundTable.hashes.size();
   stream << roundTable.general;
 
-  for (const auto& condidant : roundTable.confidants) {
-    stream << condidant;
+  for (const auto& confidant : roundTable.confidants) {
+    stream << confidant;
+    cslog() << __FUNCTION__ << " confidant: " << confidant.data();
   }
 
   for (const auto& hash : roundTable.hashes) {
@@ -928,15 +929,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     }
   }
 
-  const cs::RoundTable& roundTable = solver_->roundTable();
-
-  //for (const auto& confidant : roundTable.confidants) {
-  //  if (!cs::Utils::verifySignature(signature, confidant, data, size)) {
-  //    cswarning() << "Confidants signatures verification failed";
-  //    return;
-  //  }
-  //}
-
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount " << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
@@ -944,7 +936,50 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   characteristic.mask = characteristicMask;
   characteristic.size = maskBitsCount;
 
-  solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  assert(sequence <= this->getRoundNumber());
+
+  cs::PublicKey writerPublicKey;
+  stream >> writerPublicKey;
+
+  boost::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  if (pool.has_value()) {
+    const uint8_t* message = pool->to_binary().data();
+    const size_t messageSize = pool->to_binary().size();
+
+    if (cs::Utils::verifySignature(signature, writerPublicKey, message, messageSize)) {
+      cswarning() << "RECEIVED KEY Writer verification successfull";
+      writeBlock(pool.get(), sequence, sender);
+    }
+    else {
+      cswarning() << "RECEIVED KEY Writer verification failed";
+    }
+  }
+}
+
+void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {
+  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
+
+  if (sequence > this->getRoundNumber()) {
+    return;  // remove this line when the block candidate signing of all trusted will be implemented
+  }
+
+
+
+  this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
+
+  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
+    this->getBlockChain().putBlock(newPool);
+
+#ifndef MONITOR_NODE
+    if ((this->getMyLevel() != NodeLevel::Writer) && (this->getMyLevel() != NodeLevel::Main)) {
+      auto hash = this->getBlockChain().getLastWrittenHash().to_string();
+
+      this->sendHash(hash, sender);
+
+      cslog() << "SENDING HASH to writer: " << hash;
+    }
+#endif
+  }
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
@@ -959,9 +994,6 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
 
   cs::Bytes notification(data, data + size);
   solver_->addNotification(notification);
-
-  const std::size_t neededConfidantsCount = solver_->neededNotifications();
-  const std::size_t notificationsCount = solver_->notifications().size();
 
   if (!solver_->isEnoughNotifications()) {
     return;
@@ -978,15 +1010,26 @@ void Node::applyNotifications() {
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic, poolMetaInfo);
 
-  // loading block from blockhain, because write pool to blockchain do something with pool
-  const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();
+  boost::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo);
+  if (!pool.has_value()) {
+    cserror() << "APPLY CHARACTERISTIC ERROR!";
+    return;
+  }
+
+  const cs::Bytes& poolBinary = pool->to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
+  cslog() << "applyNotification " << "Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+
+  bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
+  cslog() << "after sign: isVerified == " << isVerified;
+
+  writeBlock(pool.get(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
   ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, solver_->notifications());
+  ostream_ << solver_->getPublicKey();
 
   flushCurrentTasks();
 }
