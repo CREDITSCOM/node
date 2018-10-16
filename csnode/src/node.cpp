@@ -929,6 +929,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   const cs::RoundTable& roundTable = solver_->roundTable();
 
+  // TODO: verify pool signature
   //for (const auto& confidant : roundTable.confidants) {
   //  if (!cs::Utils::verifySignature(signature, confidant, data, size)) {
   //    cswarning() << "Confidants signatures verification failed";
@@ -1314,10 +1315,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 #endif
 
   solver_->nextRound();
-
-  if (!solver_->checkTableHashes(roundTable)) {
-    cswarning() << "Transactions packet hash table needs to sync";
-  }
 
 #ifdef WRITER_RESEND_HASHES
   sendAllRoundTransactionsPackets(roundTable);

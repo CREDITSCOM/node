@@ -250,7 +250,7 @@ namespace cs
             return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
-        ///
+         ///
         /// Same as cs::Utils::byteStreamToHex but calculates only in debug
         ///
         inline static std::string debugByteStreamToHex(const char* stream, const std::size_t length)
@@ -263,6 +263,14 @@ namespace cs
             str = cs::Utils::byteStreamToHex(stream, length);
 #endif
             return str;
+        }
+
+        ///
+        /// Same as cs::Utils::byteStreamToHex but calculates only in debug
+        ///
+        inline static std::string debugByteStreamToHex(const unsigned char* stream, const std::size_t length)
+        {
+            return cs::Utils::debugByteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
     private:
