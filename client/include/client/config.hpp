@@ -11,14 +11,14 @@ namespace po = boost::program_options;
 using namespace boost::asio;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 79;
+const NodeVersion NODE_VERSION = 82;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 
 const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
-const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 20;
+const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 
 typedef short unsigned Port;
 

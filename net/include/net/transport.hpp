@@ -205,6 +205,9 @@ class Transport {
   std::atomic_flag                                                         uLock_ = ATOMIC_FLAG_INIT;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
+  uint32_t maxBlock_ = 0;
+  uint32_t maxBlockCount_;
+
   Network* net_;
   Node*    node_;
 

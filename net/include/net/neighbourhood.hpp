@@ -16,8 +16,8 @@ class Transport;
 
 class BlockChain;
 
-const uint32_t MaxMessagesToKeep = 32;
-const uint32_t MaxResendTimes = 64;
+const uint32_t MaxMessagesToKeep = 128;
+const uint32_t MaxResendTimes = 32;
 const uint32_t MaxSyncAttempts = 8;
 
 struct Connection;

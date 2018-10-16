@@ -818,7 +818,7 @@ void Node::sendBlockRequest(uint32_t seq) {
         transport_->sendBroadcast(ostream_.getPackets());
       ostream_.clear();
     }
-    
+
     reqSeq = solver_->getNextMissingBlock(reqSeq);
   }
 
@@ -842,8 +842,12 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   std::cout << "GETBLOCKREPLY> Getting block " << pool.sequence() << std::endl;
   #endif
 
-  if (pool.sequence() == sendBlockRequestSequence)
-  {
+  transport_->syncReplied(pool.sequence());
+
+  if (getBlockChain().getGlobalSequence() < pool.sequence())
+    getBlockChain().setGlobalSequence(pool.sequence());
+
+  if (pool.sequence() == sendBlockRequestSequence) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
@@ -851,12 +855,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
   }
-  else if((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) solver_->gotFreeSyncroBlock(std::move(pool));
-  else return;
-  std::cout << "GETBLOCKREPLY> GlSeq = " << getBlockChain().getGlobalSequence() << ", GetLSeq = " << getBlockChain().getLastWrittenSequence() << std::endl;
+  else
+    solver_->gotFreeSyncroBlock(std::move(pool));
 
-  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence())//&&(getBlockChain().getGlobalSequence()<=roundNum_))
-  {
+  if (getBlockChain().getGlobalSequence() >
+      getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   }
 
@@ -871,7 +874,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREPLY> Sending block to " << sender.str << std::endl;
+  std::cout << "SENDBLOCKREPLY> Sending block to " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
 
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
