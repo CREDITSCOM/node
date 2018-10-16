@@ -99,7 +99,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
     localHashes = m_roundTable.hashes;
   }
 
-  cslog() << "Solver> Characteristic bytes " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
+  csdebug() << "Solver> Characteristic bytes " << cs::Utils::debugByteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
 
   csdb::Pool newPool;
   std::size_t maskIndex = 0;
@@ -144,8 +144,6 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   newPool.add_user_field(0, timestamp);
 
   // TODO: need to write confidants notifications bytes to csdb::Pool user fields
-  cslog() << "SOLVER> ApplyCharacteristic: pool created";
-
 #ifdef MONITOR_NODE
   addTimestampToPool(newPool);
 #endif
@@ -243,7 +241,7 @@ HashMatrix Solver::getMyMatrix() const {
 }
 
 void Solver::flushTransactions() {
-  if (m_node->getMyLevel() != NodeLevel::Normal &&
+  if (m_node->getMyLevel() != NodeLevel::Normal ||
       m_roundTable.round <= TransactionsFlushRound) {
     return;
   }
@@ -251,9 +249,9 @@ void Solver::flushTransactions() {
   cs::Lock lock(m_sharedMutex);
 
   for (auto& packet : m_transactionsBlock) {
-    auto trxCount = packet.transactionsCount();
+    auto transactionsCount = packet.transactionsCount();
 
-    if (trxCount != 0 && packet.isHashEmpty()) {
+    if (transactionsCount != 0 && packet.isHashEmpty()) {
       packet.makeHash();
 
       const auto& transactions = packet.transactions();
@@ -741,16 +739,20 @@ void Solver::spamWithTransactions() {
   transaction.set_currency(csdb::Currency("CS"));
 
   const cs::RoundNumber round = m_roundTable.round;
+  const std::size_t minTransactionsCount = 100;
+  const std::size_t maxTransactionsCount = 200;
 
   // TODO: fix magic values
   while (true) {
     if (spamRunning && (m_node->getMyLevel() == Normal)) {
-      if ((round < 10) || (round > 20)) {
+      const std::size_t transactionsCount = cs::Utils::generateRandomValue(minTransactionsCount, maxTransactionsCount);
+
+      for (std::size_t i = 0; i < transactionsCount; ++i) {
         transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
         // transaction.set_comission(csdb::Amount(0, 1, 10));
         transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
         transaction.set_innerID(iid);
-        iid++;
+        ++iid;
 
         if (!transaction.is_valid()) {
           cserror() << "Generated transaction is not valid";
@@ -760,15 +762,13 @@ void Solver::spamWithTransactions() {
       }
     }
 
-    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY * 2, TIME_TO_AWAIT_ACTIVITY * 4);
-
+    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY << 1, TIME_TO_AWAIT_ACTIVITY << 2);
     std::this_thread::sleep_for(std::chrono::milliseconds(awaitTime));
   }
 }
 #endif
 
 ///////////////////
-
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   cs::Solver::addConveyerTransaction(transaction);
 }
@@ -902,11 +902,11 @@ void Solver::addConveyerTransaction(const csdb::Transaction& transaction) {
   cs::Lock lock(m_sharedMutex);
 
   if (m_transactionsBlock.empty()) {
-    m_transactionsBlock.push_back(cs::TransactionsPacket{});
+    m_transactionsBlock.push_back(cs::TransactionsPacket());
   }
 
   if (m_transactionsBlock.back().transactionsCount() >= MaxPacketTransactions) {
-    m_transactionsBlock.push_back(cs::TransactionsPacket{});
+    m_transactionsBlock.push_back(cs::TransactionsPacket());
   }
 
   m_transactionsBlock.back().addTransaction(transaction);
