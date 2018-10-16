@@ -858,8 +858,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   else
     solver_->gotFreeSyncroBlock(std::move(pool));
 
-  if (getBlockChain().getGlobalSequence() >
-      getBlockChain().getLastWrittenSequence())  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   }
 
