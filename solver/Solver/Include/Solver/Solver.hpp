@@ -40,6 +40,16 @@ namespace Credits{
 typedef std::string Vector;
 typedef std::string Matrix;
 
+    inline bool contains_only_zeroes(const uint8_t* ptr, size_t cnt)
+    {
+        for(size_t i = 0; i < cnt; ++i) {
+            if(ptr[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     class WalletsState;
     class Generals;
 	struct Hash_
@@ -51,6 +61,10 @@ typedef std::string Matrix;
 		Hash_() {}
 		uint8_t val[32];
 
+        bool is_empty() const
+        {
+            return contains_only_zeroes(val, sizeof(val) / sizeof(val[0]));
+        }
 	};
 	struct Signature
 	{
@@ -61,7 +75,11 @@ typedef std::string Matrix;
 		Signature() {}
 		uint8_t val[64];
 
-	};
+        bool is_empty() const
+        {
+            return contains_only_zeroes(val, sizeof(val) / sizeof(val[0]));
+        }
+    };
  #pragma pack(push, 1)
 	struct HashVector
 	{
@@ -69,13 +87,36 @@ typedef std::string Matrix;
 		//uint32_t roundNum;
 		Hash_ hash;
 		Signature sig;
-	};
+
+        bool is_empty() const
+        {
+            return (0 == Sender && hash.is_empty() && sig.is_empty());
+        }
+    };
 	struct HashMatrix
 	{
 		uint8_t Sender;
 		//uint32_t roundNum;
 		HashVector hmatr[100];
 		Signature sig;
+
+        bool is_empty() const
+        {
+            return (0 == Sender && sig.is_empty() && hmatr[0].is_empty());
+        }
+
+        uint8_t count_vectors() const
+        {
+            constexpr const size_t max_cnt_vect = sizeof(hmatr) / sizeof(hmatr[0]);
+            uint8_t actual_cnt_vect = 0;
+            for(size_t i = 0; i < max_cnt_vect; ++i) {
+                if(hmatr[i].is_empty()) {
+                    break;
+                }
+                ++actual_cnt_vect;
+            }
+            return actual_cnt_vect;
+        }
 	};
   struct NormalState
   {

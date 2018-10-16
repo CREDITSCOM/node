@@ -98,14 +98,16 @@ namespace slv2
         }
 
         auto tl_seq = p.sequence();
-        if(tl_seq == last_trans_list_recv) {
-            // already received
-            if(Consensus::Log) {
-                LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
+        if(!is_bigbang) {
+            if(tl_seq == last_trans_list_recv) {
+                // already received
+                if(Consensus::Log) {
+                    LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
+                }
+                return;
             }
-            return;
+            last_trans_list_recv = tl_seq;
         }
-        last_trans_list_recv = tl_seq;
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
