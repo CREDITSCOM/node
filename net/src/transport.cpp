@@ -90,7 +90,7 @@ void Transport::run() {
   for (;;) {
     ++ctr;
     bool askMissing    = true;
-    bool resendPacks   = ctr % 2 == 0;
+    bool resendPacks   = ctr % 4 == 0;
     bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending  = ctr % 100 == 0;
@@ -835,7 +835,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     maxBlockCount_ = 1;
   }
   else if (lastSeq == maxBlock_) {
-    if (lastSeq < node_->getBlockChain().getLastWrittenSequence() && ++maxBlockCount_ > ((rand() % 5) + 5)) {
+    if (lastSeq > node_->getBlockChain().getLastWrittenSequence() && ++maxBlockCount_ > ((rand() % 5) + 5)) {
       auto conn = sender->connection.load(std::memory_order_relaxed);
       if (!conn) return false;
 
