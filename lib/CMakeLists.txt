@@ -35,3 +35,5 @@ target_link_libraries (lib
                        Boost::log
                        Boost::disable_autolinking
                        )
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

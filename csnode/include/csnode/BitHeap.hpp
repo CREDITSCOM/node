@@ -5,7 +5,7 @@
 #include <limits>
 #include <climits>
 
-namespace Credits
+namespace cs
 {
     template<typename T, size_t BitSize = sizeof(T) * CHAR_BIT, typename = std::enable_if<std::is_integral<T>::value>>
     class BitHeap

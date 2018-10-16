@@ -22,9 +22,15 @@
 #include <lib/system/utils.hpp>
 
 #include <mutex>
-#include "solver/generals.hpp"
+#include <solver/generals.hpp>
+#include <solver/WalletsState.h>
 
 namespace cs {
+Generals::Generals(WalletsState& _walletsState)
+  : walletsState(_walletsState)
+  , trxValidator_(new TransactionsValidator(walletsState, TransactionsValidator::Config {}))
+  {}
+
 int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #ifdef _MSC_VER
   return __popcnt(delta.integral()) + __popcnt64(delta.fraction());
@@ -50,7 +56,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = packet.transactions().at(i);
-      const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
+      const csdb::Amount delta;// = transaction.balance() - transaction.amount() - comission;
 
       cs::Byte byte = 0;
 

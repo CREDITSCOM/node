@@ -1,6 +1,6 @@
 #include <csnode/utils.h>
 
-namespace Credits
+namespace cs
 {
     std::ostream& operator<<(std::ostream& os, Direction dir)
     {

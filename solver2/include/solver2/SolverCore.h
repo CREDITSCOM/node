@@ -4,6 +4,10 @@
 #include "INodeState.h"
 
 #include <csdb/pool.h>
+#include <lib/system/keys.hpp>
+#include <solver/Fee.h>
+#include <solver/solver.hpp>
+#include <solver/WalletsState.h>
 
 #include <memory>
 #include <map>
@@ -54,21 +58,21 @@ namespace slv2
 
         // Solver "public" interface,
         // below are the "required" methods to be implemented by Solver-compatibility issue:
-        
-        const Credits::HashVector& getMyVector() const;
-        const Credits::HashMatrix& getMyMatrix() const;
+
+        const cs::HashVector& getMyVector() const;
+        const cs::HashMatrix& getMyMatrix() const;
         void set_keys(const KeyType& pub, const KeyType& priv);
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
         void gotTransactionList(csdb::Pool& p);
-        void gotVector(const Credits::HashVector& vect);
-        void gotMatrix(const Credits::HashMatrix& matr);
-        void gotBlock(csdb::Pool& p, const PublicKey& sender);
-        void gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender);
-        void gotBlockReply(csdb::Pool& p);
-        void gotHash(const Hash& hash, const PublicKey& sender);
-        void gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender);
+        void gotVector(const cs::HashVector& vect);
+        void gotMatrix(const cs::HashMatrix& matr);
+        void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
+        void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
+        void gotBlockReply(csdb::Pool&& p);
+        void gotHash(const cs::Hash& hash, const cs::PublicKey& sender);
+        void gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         // store outrunning syncro blocks
         void gotFreeSyncroBlock(csdb::Pool&& p);
         // retrieve outrunning syncro blocks and store them
@@ -115,8 +119,34 @@ namespace slv2
         csdb::Pool::sequence_t getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end ) const;
 
         // empty in Solver
-        void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/) const
+        void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const
         {}
+
+        void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
+        void runSpammer();
+        void gotRound(cs::RoundTable&& round);
+        const cs::RoundTable& roundTable() const;
+        const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
+        bool getIPoolClosed();
+        void gotHash(std::string&&, const cs::PublicKey&);
+        void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender);
+        void gotPacketHashesReply(cs::TransactionsPacket&& packet);
+        const cs::Notifications& notifications() const;
+        void addNotification(const cs::Bytes& bytes);
+        std::size_t neededNotifications() const;
+        bool isEnoughNotifications() const;
+        void applyCharacteristic(const cs::Characteristic& characteristic,
+          const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
+        const cs::Characteristic& getCharacteristic() const;
+        cs::Hash getCharacteristicHash() const;
+        const cs::PrivateKey& getPrivateKey() const;
+        const cs::PublicKey& getPublicKey() const;
+        cs::PublicKey getWriterPublicKey() const;
+        bool checkTableHashes(const cs::RoundTable& table);
+        bool getBigBangStatus();
+        void gotTransactionsPacket(cs::TransactionsPacket&& packet);
+        bool isPoolClosed() const;
+        void sendTL();
 
     private:
 
@@ -179,14 +209,14 @@ namespace slv2
         Counter cur_round;
         KeyType public_key;
         KeyType private_key;
-        std::unique_ptr<Credits::HashVector> pown_hvec;
-        std::unique_ptr<Credits::Fee> pfee;
+        std::unique_ptr<cs::HashVector> pown_hvec;
+        std::unique_ptr<cs::Fee> pfee;
         // senders of vectors received this round
         std::set<uint8_t> recv_vect;
         // senders of matrices received this round
         std::set<uint8_t> recv_matr;
         // senders of hashes received this round
-        std::vector<PublicKey> recv_hash;
+        std::vector<cs::PublicKey> recv_hash;
         // sequence number of the last transaction received
         uint64_t last_trans_list_recv;
         // pool for storing transactions list, serve as source for new block
@@ -198,18 +228,18 @@ namespace slv2
         csdb::Pool trans_pool {};
         // to store outrunning blocks until the time to insert them comes
         // stores pairs of <block, sender> sorted by sequence number
-        std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,PublicKey>> outrunning_blocks;
+        std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,cs::PublicKey>> outrunning_blocks;
         // store BB status to reproduce solver-1 logic
         bool is_bigbang;
 
         // previous solver version instance
 
-        std::unique_ptr<Credits::Solver> pslv_v1;
+        std::unique_ptr<cs::Solver> pslv_v1;
         Node * pnode;
-        std::unique_ptr<Credits::WalletsState> pws_inst;
-        Credits::WalletsState * pws;
-        std::unique_ptr<Credits::Generals> pgen_inst;
-        Credits::Generals * pgen;
+        std::unique_ptr<cs::WalletsState> pws_inst;
+        cs::WalletsState * pws;
+        std::unique_ptr<cs::Generals> pgen_inst;
+        cs::Generals * pgen;
 
         void InitTransitions();
         void InitPermanentTransitions();

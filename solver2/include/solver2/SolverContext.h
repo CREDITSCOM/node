@@ -4,6 +4,7 @@
 #include "SolverCore.h"
 
 #include <csdb/pool.h>
+#include <lib/system/keys.hpp>
 
 class CallsQueueScheduler;
 class Node;
@@ -186,19 +187,19 @@ namespace slv2
         }
 
         /**
-         * @fn  Credits::Generals& SolverContext::generals() const;
+         * @fn  cs::Generals& SolverContext::generals() const;
          *
          * @brief   Gets the generals instance.
          *
          * @author  aae
          * @date    03.10.2018
          *
-         * @return  A reference to the Credits::Generals.
+         * @return  A reference to the cs::Generals.
          *
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Credits::Generals& generals() const
+        cs::Generals& generals() const
         {
             return *core.pgen;
         }
@@ -260,19 +261,19 @@ namespace slv2
         }
 
         /**
-         * @fn  const Credits::HashVector& SolverContext::hash_vector() const;
+         * @fn  const cs::HashVector& SolverContext::hash_vector() const;
          *
          * @brief   Current hash vector.
          *
          * @author  aae
          * @date    03.10.2018
          *
-         * @return  A reference to a const Credits::HashVector.
+         * @return  A reference to a const cs::HashVector.
          *
          * ### remarks  Aae, 30.09.2018.
          */
 
-        const Credits::HashVector& hash_vector() const
+        const cs::HashVector& hash_vector() const
         {
             return core.getMyVector();
         }
@@ -574,7 +575,7 @@ namespace slv2
         }
 
         /**
-         * @fn  bool SolverContext::is_hash_recv_from(const PublicKey& sender) const;
+         * @fn  bool SolverContext::is_hash_recv_from(const cs::PublicKey& sender) const;
          *
          * @brief   Query if is hash received from passed sender
          *
@@ -588,13 +589,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        bool is_hash_recv_from(const PublicKey& sender) const
+        bool is_hash_recv_from(const cs::PublicKey& sender) const
         {
             return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
         }
 
         /**
-         * @fn  void SolverContext::recv_hash_from(const PublicKey& sender);
+         * @fn  void SolverContext::recv_hash_from(const cs::PublicKey& sender);
          *
          * @brief   Inform core to remember that hash from passed sender is received
          *
@@ -606,7 +607,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        void recv_hash_from(const PublicKey& sender)
+        void recv_hash_from(const cs::PublicKey& sender)
         {
             core.recv_hash.push_back(sender);
         }

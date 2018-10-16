@@ -110,7 +110,7 @@ namespace slv2
         return DefaultStateBehavior::onRoundTable(context, round);
     }
 
-    Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
+    Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const cs::PublicKey & sender)
     {
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {

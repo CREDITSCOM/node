@@ -17,7 +17,7 @@ namespace csdb
     class Transaction;
 }
 
-namespace Credits
+namespace cs
 {
     class WalletsIds;
 
@@ -62,6 +62,6 @@ namespace Credits
         void* impl_;
     };
 
-} // namespace Credits
+} // namespace cs
 
 #endif

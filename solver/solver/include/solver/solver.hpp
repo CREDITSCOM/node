@@ -29,8 +29,15 @@
 #include <lib/system/timer.hpp>
 #include <client/params.hpp>
 #include <lib/system/keys.hpp>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
 
 class Node;
+
+namespace slv2
+{
+    class SolverCore;
+}
 
 namespace cs {
 
@@ -38,7 +45,11 @@ class Generals;
 
 class Solver {
  public:
-  explicit Solver(Node*);
+  explicit Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres
+#ifdef SPAMMER
+  , csdb::Address spammerAddress
+#endif
+  );
   ~Solver();
 
   Solver(const Solver&) = delete;
@@ -49,29 +60,29 @@ class Solver {
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
   void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-  void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
+  void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender);
   void gotPacketHashesReply(cs::TransactionsPacket&& packet);
   void gotRound(cs::RoundTable&& round);
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
-  void gotBlock(csdb::Pool&&, const PublicKey&);
-  void gotHash(std::string&&, const PublicKey&);
-  void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
+  void gotBlock(csdb::Pool&&, const cs::PublicKey&);
+  void gotHash(std::string&&, const cs::PublicKey&);
+  void gotBlockRequest(csdb::PoolHash&&, const cs::PublicKey&);
   void gotBlockReply(csdb::Pool&&);
-  void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
-  void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+  void gotBadBlockHandler(csdb::Pool&&, const cs::PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&&, const cs::PublicKey&);
   void gotFreeSyncroBlock(csdb::Pool&&);
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
   void applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
+                           const PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
 
-  PublicKey getWriterPublicKey() const;
+  cs::PublicKey getWriterPublicKey() const;
 
   uint32_t getTLsize();
   void addInitialBalance();
@@ -122,9 +133,18 @@ class Solver {
   cs::PublicKey myPublicKey;
   cs::PrivateKey myPrivateKey;
 
+  friend class slv2::SolverCore;
   Node* m_node;
-
+  std::unique_ptr<WalletsState> walletsState;
   std::unique_ptr<Generals> m_generals;
+
+  const csdb::Address genesisAddress;
+  const csdb::Address startAddress;
+#ifdef SPAMMER
+  const csdb::Address spammerAddress;
+#endif
+
+  Fee fee_counter_;
 
   HashVector hvector;
 
@@ -137,11 +157,12 @@ class Solver {
   std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
-  std::vector<PublicKey> ips;
+  std::vector<cs::PublicKey> ips;
 
   cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
+
 
   bool m_isPoolClosed = true;
   bool blockCandidateArrived = false;

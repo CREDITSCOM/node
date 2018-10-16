@@ -107,7 +107,7 @@ class Transport {
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&, const Connection::Id);
   void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
-  void sendPackRenounce(const Hash&, const Connection&);
+  void sendPackRenounce(const cs::Hash&, const Connection&);
   void sendPackInform(const Packet&, const Connection&);
 
   void sendPingPack(const Connection&);
@@ -116,7 +116,7 @@ class Transport {
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
   ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested) { return nh_.getNextSyncRequestee(seq, alreadyRequested); }
-  ConnectionPtr getConnectionByKey(const PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
+  ConnectionPtr getConnectionByKey(const cs::PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
   void syncReplied(const uint32_t seq) { return nh_.releaseSyncRequestee(seq); }
 
  private:
@@ -209,7 +209,7 @@ class Transport {
   Node*    node_;
 
   Neighbourhood nh_;
-  FixedHashMap<Hash, RoundNum, uint16_t, 10000> fragOnRound_;
+  FixedHashMap<cs::Hash, RoundNum, uint16_t, 10000> fragOnRound_;
 };
 
 #endif  // __TRANSPORT_HPP__

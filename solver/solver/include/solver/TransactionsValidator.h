@@ -6,9 +6,9 @@
 #include <boost/dynamic_bitset.hpp>
 #include <csdb/pool.h>
 #include <csdb/transaction.h>
-#include <Solver/WalletsState.h>
+#include <solver/WalletsState.h>
 
-namespace Credits
+namespace cs
 {
     class TransactionsValidator
     {

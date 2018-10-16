@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <list>
 
-namespace Credits {
+namespace cs {
 
 class spinlock
 {
@@ -45,7 +45,7 @@ struct worker_queue
     std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
 #endif
     std::condition_variable_any w;
-    Credits::spinlock lock;
+    cs::spinlock lock;
     S state;
 
   public:
@@ -149,7 +149,7 @@ struct sweet_spot
 #ifdef BOTTLENECKED_SMARTS
   private:
     std::condition_variable_any cv;
-    Credits::spinlock lock;
+    cs::spinlock lock;
     bool occupied = false;
 #endif
 

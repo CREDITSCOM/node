@@ -197,7 +197,7 @@ APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
   _return.walletData.balance.integral = wallData.balance_.integral();
   _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
 
-  const Credits::TransactionsTail& tail = wallData.trxTail_;
+  const cs::TransactionsTail& tail = wallData.trxTail_;
   _return.walletData.lastTransactionId = tail.empty() ? 0 : tail.getLastTransactionId();
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);

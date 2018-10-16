@@ -3,7 +3,7 @@
 #include <csnode/WalletsIds.h>
 using namespace std;
 
-namespace Credits {
+namespace cs {
 
 WalletsIds::WalletsIds()
     : nextId_(0)

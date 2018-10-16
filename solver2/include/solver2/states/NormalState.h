@@ -2,6 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include "../CallsQueueScheduler.h"
 #include <csdb/address.h>
+#include <lib/system/keys.hpp>
 #include <vector>
 
 namespace slv2
@@ -34,7 +35,7 @@ namespace slv2
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {

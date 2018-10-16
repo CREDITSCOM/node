@@ -11,7 +11,7 @@
 
 class BlockChain;
 
-namespace Credits
+namespace cs
 {
     class WalletsCache;
     class WalletsIds;

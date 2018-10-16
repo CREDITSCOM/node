@@ -29,7 +29,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result PermanentCollectWriteState::onHash(SolverContext & context, const Hash & hash, const PublicKey & sender)
+    Result PermanentCollectWriteState::onHash(SolverContext & context, const cs::Hash & hash, const cs::PublicKey & sender)
     {
         // can use Consensus::MinTrustedNodes if timeout occur
         auto not_enough = min_count_hashes - static_cast<int>(context.cnt_hash_recv());
@@ -42,10 +42,12 @@ namespace slv2
                 }
             }
             else {
+            /*
                 if(Consensus::Log) {
                     constexpr const size_t hash_len = sizeof(sender.str) / sizeof(sender.str[0]);
                     LOG_WARN(name() << ": hash received do not match!!! Sender " << byteStreamToHex(sender.str, hash_len));
                 }
+              */ // vshilkin
             }
         }
         if(not_enough <= 0) {
@@ -69,7 +71,7 @@ namespace slv2
 
         // send block
         context.create_and_send_new_block_from(pool);
-        pown = std::make_unique<Hash>((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+        pown = std::make_unique<cs::Hash>(); // ((char*) (context.blockchain().getLastWrittenHash().to_binary().data())); vshilkin
 
         // clear pool
         pool = csdb::Pool {};

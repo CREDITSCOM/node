@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Result.h"
+#include <csnode/nodecore.h>
 #include <lib/system/keys.hpp> // PublicKey, Hash
 #include <cstdint>
 
@@ -113,7 +114,7 @@ namespace slv2
         virtual Result onRoundTable(SolverContext& context, const uint32_t round) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new block is received.
          *
@@ -130,10 +131,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
+        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new vector is received.
          *
@@ -150,10 +151,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) = 0;
+        virtual Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new matrix is received.
          *
@@ -169,10 +170,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) = 0;
+        virtual Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new hash is received.
          *
@@ -189,7 +190,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
+        virtual Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
 
         /**
          * @fn  virtual Result INodeState::onTransaction(SolverContext& context, const csdb::Transaction& trans) = 0;

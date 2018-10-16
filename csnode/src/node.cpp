@@ -32,8 +32,12 @@ Node::Node(const Config& config):
 #endif
   )),
   transport_(new Transport(config, this)),
+#ifdef MONITOR_NODE
   stats_(bc_),
+#endif
+#ifdef NODE_API
   api_(bc_, solver_),
+#endif
   allocator_(1 << 24, 5),
   packStreamAllocator_(1 << 26, 5),
   ostream_(&packStreamAllocator_, myPublicKey_) {
@@ -487,27 +491,6 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   flushCurrentTasks();
 }
 
-void Node::getWritingConfirmation(const uint8_t* data, const size_t size, const PublicKey& sender) {
-  // std::cout << __func__ << std::endl;
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-  // if (myPublicKey_ == sender) return;
-#ifdef MYLOG
-  std::cout << "NODE> Getting WRITING CONFIRMATION from " << byteStreamToHex(sender.str, 32) << std::endl;
-#endif
-  istream_.init(data, size);
-
-  uint8_t confNumber_;
-  istream_ >> confNumber_;
-  if (!istream_.good() || !istream_.end()) {
-    LOG_ERROR("Bad vector packet format");
-    return;
-  }
-  if (confNumber_ < 3)
-    solver_->addConfirmation(confNumber_);
-}
-
 void Node::sendTLRequest() {
   if ((myLevel_ != NodeLevel::Confidant) || (roundNum_ < 2)) {
     cserror() << "Only confidant nodes need TransactionList";
@@ -686,17 +669,6 @@ void Node::getBlock(const uint8_t* data, const size_t size, const cs::PublicKey&
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "Bad block packet format";
     return;
-  }
-  size_t localSeq = getBlockChain().getLastWrittenSequence();
-  size_t blockSeq = pool.sequence();
-  if(roundNum_ == blockSeq) getBlockChain().setGlobalSequence(blockSeq);
-  if(localSeq >= blockSeq) return;
-
-  if (!blocksReceivingStarted_)
-  {
-    blocksReceivingStarted_ = true;
-    lastStartSequence_ = pool.sequence();
-    std::cout << "GETBLOCK> Setting first got block: " << lastStartSequence_ << std::endl;
   }
 
   size_t localSeq = getBlockChain().getLastWrittenSequence();
@@ -1291,6 +1263,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 }
 
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
+  ConnectionPtr conn = transport_->getConnectionByKey(sender);
+  if (!conn) return;
+
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
   transport_->deliverDirect(ostream_.getPackets(),

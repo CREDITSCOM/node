@@ -16,12 +16,12 @@ namespace slv2
 
     size_t SolverContext::cnt_trusted() const
     {
-        return core.pnode->getConfidants().size();
+        return 4;//core.pnode->getConfidants().size(); // vshilkin
     }
 
     void SolverContext::spawn_next_round()
     {
-        core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash));
+        //core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash)); //vshilkin
     }
 
 	csdb::Address SolverContext::optimize(const csdb::Address& address) const

@@ -301,7 +301,7 @@ void Neighbourhood::gotRegistration(Connection&& conn,
 void Neighbourhood::gotConfirmation(const Connection::Id& my,
                                     const Connection::Id& real,
                                     const ip::udp::endpoint& ep,
-                                    const PublicKey& pk,
+                                    const cs::PublicKey& pk,
                                     RemoteNodePtr node) {
   SpinLock l1(mLockFlag_);
   SpinLock l2(nLockFlag_);
@@ -348,7 +348,7 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 void Neighbourhood::gotRefusal(const Connection::Id& id) {}
 
 void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
-                                       const Hash& hash,
+                                       const cs::Hash& hash,
                                        const bool isDirect) {
   SpinLock l(nLockFlag_);
   auto conn = node->connection.load(std::memory_order_relaxed);
@@ -484,22 +484,6 @@ void Neighbourhood::pingNeighbours() {
 
 void Neighbourhood::resendPackets() {
   SpinLock l(nLockFlag_);
-  uint32_t cnt = 0;
-  for (auto& bp : msgBroads_) {
-    if (!bp.data.pack) {
-      continue;
-    }
-    if (!dispatchBroadcast(bp.data)) {
-      bp.data.pack = Packet();
-    }
-    else {
-      ++cnt;
-    }
-  }
-}
-
-void Neighbourhood::resendPackets() {
-  SpinLock l(nLockFlag_);
   uint32_t cnt1 = 0;
   uint32_t cnt2 = 0;
   for (auto& bp : msgBroads_) {
@@ -531,7 +515,7 @@ ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
   return ConnectionPtr();
 }
 
-ConnectionPtr Neighbourhood::getNextRequestee(const Hash& hash) {
+ConnectionPtr Neighbourhood::getNextRequestee(const cs::Hash& hash) {
   SpinLock l(nLockFlag_);
 
   SenderInfo& si = msgSenders_.tryStore(hash);
@@ -583,7 +567,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   return candidate;
 }
 
-ConnectionPtr Neighbourhood::getNeighbourByKey(const PublicKey& pk) {
+ConnectionPtr Neighbourhood::getNeighbourByKey(const cs::PublicKey& pk) {
   SpinLock l(nLockFlag_);
 
   for (auto& nb : neighbours_)

@@ -27,7 +27,7 @@
 #include <condition_variable>
 #include <mutex>
 
-namespace Credits
+namespace cs
 {
     class BlockHashes;
     class WalletsIds;
@@ -39,7 +39,7 @@ public:
   using Transactions = std::vector<csdb::Transaction>;
   using WalletId = csdb::internal::WalletId;
   using WalletAddress = csdb::Address;
-  using WalletData = Credits::WalletsCache::WalletData;
+  using WalletData = cs::WalletsCache::WalletData;
   using Mask = boost::dynamic_bitset<uint64_t>;
 
   BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress);
@@ -100,12 +100,12 @@ private:
   
   void writeBlock(csdb::Pool& pool);
 
-  bool initFromDB(Credits::WalletsCache::Initer& initer);
+  bool initFromDB(cs::WalletsCache::Initer& initer);
 
   template<typename WalletCacheProcessor>
   bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, Credits::WalletsCache::Initer& initer);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, Credits::WalletsCache::Updater& updater);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
   void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
@@ -121,37 +121,37 @@ private:
       csdb::Address address,
       csdb::Address& wallPubKey,
       WalletId& id,
-      Credits::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+      cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
   void getTransactions(
       Transactions & transactions,
       csdb::Address wallPubKey,
       WalletId id,
-      const Credits::WalletsPools::WalletData::PoolsHashes& hashesArray,
+      const cs::WalletsPools::WalletData::PoolsHashes& hashesArray,
       uint64_t offset,
       uint64_t limit);
 
 private:
   bool good_;
 
-  mutable Credits::spinlock dbLock_;
+  mutable cs::spinlock dbLock_;
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
   csdb::Pool::sequence_t global_sequence;
   bool blockRequestIsNeeded;
 
-  std::unique_ptr<Credits::BlockHashes> blockHashes_;
+  std::unique_ptr<cs::BlockHashes> blockHashes_;
 
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
   const csdb::Address spammerAddress_;
-  std::unique_ptr<Credits::WalletsIds> walletIds_;
-  std::unique_ptr<Credits::WalletsCache> walletsCacheStorage_;
-  std::unique_ptr<Credits::WalletsCache::Updater> walletsCacheUpdater_;
-  std::unique_ptr<Credits::WalletsPools> walletsPools_;
-  mutable Credits::spinlock cacheMutex_;
+  std::unique_ptr<cs::WalletsIds> walletIds_;
+  std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
+  std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
+  std::unique_ptr<cs::WalletsPools> walletsPools_;
+  mutable cs::spinlock cacheMutex_;
 
   std::condition_variable_any new_block_cv;
-  Credits::spinlock waiters_locker;
+  cs::spinlock waiters_locker;
 };

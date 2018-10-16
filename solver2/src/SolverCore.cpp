@@ -3,8 +3,8 @@
 #include "CallsQueueScheduler.h"
 #include "Consensus.h"
 #include "SolverCompat.h"
-#include <Solver/WalletsState.h>
-#include <Solver/Fee.h>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
 #include "Node.h"
 #include "Generals.h"
 
@@ -51,8 +51,8 @@ namespace slv2
         // consensus data
         , addr_spam(std::nullopt)
         , cur_round(0)
-        , pown_hvec(std::make_unique<Credits::HashVector>())
-        , pfee(std::make_unique<Credits::Fee>())
+        , pown_hvec(std::make_unique<cs::HashVector>())
+        , pfee(std::make_unique<cs::Fee>())
         , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
         , is_bigbang(false)
         // previous solver version instance
@@ -90,20 +90,20 @@ namespace slv2
 
 #if !defined(SPAMMER) // see: client\include\client\params.hpp
             // thanks to Solver constructor :-), it has 3 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start);
+            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start);
 #else
             // thanks to Solver constructor :-), it has 4 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
+            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
 #endif
 
-            pgen = pslv_v1->generals.get();
+            pgen = pslv_v1->m_generals.get();
             pws = pslv_v1->walletsState.get();
         }
         else {
-            pws_inst = std::make_unique<Credits::WalletsState>(pNode->getBlockChain());
+            pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
             // temp decision until solver-1 may be instantiated:
             pws = pws_inst.get();
-            pgen_inst = std::make_unique<Credits::Generals>(*pws_inst);
+            pgen_inst = std::make_unique<cs::Generals>(*pws_inst);
             // temp decision until solver-1 may be instantiated:
             pgen = pgen_inst.get();
         }
@@ -285,7 +285,7 @@ namespace slv2
         trans_pool.recount();
         size_t tr_cnt = trans_pool.transactions_count();
         if(tr_cnt > 0) {
-            pnode->sendTransaction(std::move(trans_pool));
+            //pnode->sendTransaction(std::move(trans_pool)); //vshilkin
             if(Consensus::Log) {
 				std::ostringstream os;
 				for (const auto& t : trans_pool.transactions()) {

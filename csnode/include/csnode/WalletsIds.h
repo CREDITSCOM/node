@@ -7,7 +7,7 @@
 #include <csdb/address.h>
 #include "csdb/internal/types.h"
 
-namespace Credits
+namespace cs
 {
 
 class WalletsIds

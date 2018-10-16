@@ -22,7 +22,7 @@ namespace std
     };
 }
 
-namespace Credits
+namespace cs
 {
 namespace
 {
@@ -259,4 +259,4 @@ void WalletsPools::convert(const PoolHash& poolHashCache, csdb::PoolHash& poolHa
     poolHashDb = csdb::PoolHash::from_binary(hashBytes);
 }
 
-} // namespace Credits
+} // namespace cs

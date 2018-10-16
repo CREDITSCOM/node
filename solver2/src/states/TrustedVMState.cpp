@@ -19,14 +19,14 @@ namespace slv2
         // continue work as trusted node
     }
 
-    Result TrustedVMState::onVector(SolverContext & context, const Credits::HashVector & vect, const PublicKey & sender)
+    Result TrustedVMState::onVector(SolverContext & context, const cs::HashVector & vect, const cs::PublicKey & sender)
     {
         // continue work as trusted but suppress further events on receive vectors
         TrustedState::onVector(context, vect, sender);
         return Result::Ignore;
     }
 
-    Result TrustedVMState::onMatrix(SolverContext & context, const Credits::HashMatrix & matr, const PublicKey & sender)
+    Result TrustedVMState::onMatrix(SolverContext & context, const cs::HashMatrix & matr, const cs::PublicKey & sender)
     {
         // continue work as trusted but suppress further events on receive matrices
         TrustedState::onMatrix(context, matr, sender);
@@ -35,11 +35,11 @@ namespace slv2
 
     bool TrustedVMState::decide_to_write(SolverContext& context)
     {
-        uint8_t wTrusted = context.generals().take_decision(
+        uint8_t wTrusted = 4;/*context.generals().take_decision(
             context.node().getConfidants(),
             context.node().getMyConfNumber(),
             context.blockchain().getHashBySequence(context.node().getRoundNumber() - 1)
-        );
+        );*/ // vshilkin
         if(Consensus::GeneralNotSelected == wTrusted) {
             if(Consensus::Log) {
                 LOG_WARN(name() << ": consensus has not been reached");

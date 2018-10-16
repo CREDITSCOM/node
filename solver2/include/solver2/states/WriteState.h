@@ -2,6 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include "../Consensus.h"
 #include "../CallsQueueScheduler.h"
+#include <lib/system/keys.hpp>
 #include <memory>
 
 namespace slv2
@@ -31,7 +32,7 @@ namespace slv2
         void onRoundEnd(SolverContext& context) override;
 
         /**
-         * @fn  Result final::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+         * @fn  Result final::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
          *
          * @brief   Executes the hash action
          *
@@ -45,10 +46,10 @@ namespace slv2
          * @return  A Result.
          */
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         /**
-         * @fn  Result final::onBlock(SolverContext& , csdb::Pool& , const PublicKey& ) override
+         * @fn  Result final::onBlock(SolverContext& , csdb::Pool& , const cs::PublicKey& ) override
          *
          * @brief   Override DefaultStateBehavior's method to ignore blocks received
          *
@@ -67,7 +68,7 @@ namespace slv2
          * ### param            sender  not used.
          */
 
-        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Ignore;
         }
@@ -80,7 +81,7 @@ namespace slv2
     protected:
 
         /** @brief   The pointer to own hash actual this round */
-        std::unique_ptr<Hash> pown;
+        std::unique_ptr<cs::Hash> pown;
 
         /** @brief   Minimal required count of hashes in reply after send block */
         int min_count_hashes { static_cast<int>(Consensus::MinTrustedNodes) };

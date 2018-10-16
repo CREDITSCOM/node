@@ -1,6 +1,8 @@
 #pragma once
 #include "INodeState.h"
 
+#include <lib/system/keys.hpp>
+
 namespace slv2
 {
     /**
@@ -52,22 +54,22 @@ namespace slv2
             return Result::Finish;
         }
 
-        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
 
-        Result onVector(SolverContext& /*context*/, const Credits::HashVector& /*vect*/, const PublicKey& /*sender*/) override
+        Result onVector(SolverContext& /*context*/, const cs::HashVector& /*vect*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
 
-        Result onMatrix(SolverContext& /*context*/, const Credits::HashMatrix& /*matr*/, const PublicKey& /*sender*/) override
+        Result onMatrix(SolverContext& /*context*/, const cs::HashMatrix& /*matr*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
 
-        Result onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/) override
+        Result onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }

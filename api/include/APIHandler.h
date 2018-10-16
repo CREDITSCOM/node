@@ -152,25 +152,25 @@ class APIHandler : public APIHandlerInterface
 
     ::executor::ContractExecutorConcurrentClient executor;
 
-    Credits::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
+    cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
       smart_origin;
 
-    using smart_state_entry = Credits::worker_queue<std::string>;
+    using smart_state_entry = cs::worker_queue<std::string>;
 
-    Credits::SpinLockable<std::map<csdb::Address, smart_state_entry>>
+    cs::SpinLockable<std::map<csdb::Address, smart_state_entry>>
       smart_state;
 
     struct smart_trxns_queue
     {
-        Credits::spinlock lock;
+        cs::spinlock lock;
         std::condition_variable_any new_trxn_cv{};
         size_t awaiter_num{ 0 };
         std::deque<csdb::TransactionID> trid_queue{};
     };
-    Credits::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>
+    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>
       smart_last_trxn;
 
-    Credits::SpinLockable<
+    cs::SpinLockable<
       std::map<csdb::Address, std::vector<csdb::TransactionID>>>
       deployed_by_creator;
 
@@ -179,7 +179,7 @@ class APIHandler : public APIHandlerInterface
         std::queue<csdb::Transaction> queue;
         csdb::PoolHash last_pull_hash{};
     };
-    Credits::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+    cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
 
     template<typename Mapper>
     void get_mapped_deployer_smart(
@@ -202,7 +202,7 @@ class APIHandler : public APIHandlerInterface
     void smart_transaction_flow(api::TransactionFlowResult& _return,
                                             const ::api::Transaction&);
 
-    std::map<std::string, Credits::worker_queue<std::tuple<>>> work_queues;
+    std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
 };
 
 class SequentialProcessorFactory;
@@ -212,7 +212,7 @@ class APIProcessor : public api::APIProcessor
 {
   public:
     APIProcessor(::apache::thrift::stdcxx::shared_ptr<APIHandler> iface);
-    Credits::sweet_spot ss;
+    cs::sweet_spot ss;
 
   protected:
     bool dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
@@ -236,7 +236,6 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor>
     getProcessor(const ::apache::thrift::TConnectionInfo&) override
     {
-        (void)ci;
         // TRACE("");
         processor_.ss.occupy();
         // TRACE("");

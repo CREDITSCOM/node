@@ -11,7 +11,7 @@
 // provide find by sequence() capability
 namespace std
 {
-    bool operator==(const std::pair<csdb::Pool, PublicKey>& lhs, uint64_t rhs)
+    bool operator==(const std::pair<csdb::Pool, cs::PublicKey>& lhs, uint64_t rhs)
     {
         return lhs.first.sequence() == rhs;
     }
@@ -28,7 +28,7 @@ namespace slv2
         return Result::Finish;
     }
 
-    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& /*sender*/)
     {
 //#ifdef MONITOR_NODE
 //        addTimestampToPool(block);
@@ -72,7 +72,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onVector(SolverContext& /*context*/, const Credits::HashVector& /*vect*/, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onVector(SolverContext& /*context*/, const cs::HashVector& /*vect*/, const cs::PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": vector ignored in this state");
@@ -80,7 +80,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onMatrix(SolverContext& /*context*/, const Credits::HashMatrix& /*matr*/, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onMatrix(SolverContext& /*context*/, const cs::HashMatrix& /*matr*/, const cs::PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": matrix ignored in this state");
@@ -88,7 +88,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": hash ignored in this state");
@@ -112,13 +112,15 @@ namespace slv2
         return Result::Ignore;
     }
 
-    void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& target)
+    void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target)
     {
-        Hash hash_val((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+        std::string hash_val((char*) (context.blockchain().getLastWrittenHash().to_binary().data()), 32);
+/*
         if(Consensus::Log) {
             constexpr const size_t hash_len = sizeof(hash_val.str) / sizeof(hash_val.str[0]);
             LOG_NOTICE(name() << ": sending hash " << byteStreamToHex(hash_val.str, hash_len) << " in reply to block sender");
         }
+*/ // vshilkin
         context.node().sendHash(hash_val, target);
     }
 

@@ -34,19 +34,19 @@ namespace slv2
         return DefaultStateBehavior::onRoundTable(context, round);
     }
 
-    Result TrustedState::onVector(SolverContext& context, const Credits::HashVector & vect, const PublicKey & /*sender*/)
+    Result TrustedState::onVector(SolverContext& context, const cs::HashVector & vect, const cs::PublicKey & /*sender*/)
     {
-        if(context.is_vect_recv_from(vect.Sender)) {
+        if(context.is_vect_recv_from(vect.sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated vector received from [" << (unsigned int) vect.Sender << "], ignore");
+                LOG_DEBUG(name() << ": duplicated vector received from [" << (unsigned int) vect.sender << "], ignore");
             }
             return Result::Ignore;
         }
-        context.recv_vect_from(vect.Sender);
-        context.generals().addvector(vect); // building matrix
+        context.recv_vect_from(vect.sender);
+        context.generals().addVector(vect); // building matrix
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": vector received from [" << (unsigned int) vect.Sender << "],  total " << context.cnt_vect_recv());
+            LOG_NOTICE(name() << ": vector received from [" << (unsigned int) vect.sender << "],  total " << context.cnt_vect_recv());
         }
         if(test_vectors_completed(context))
         {
@@ -57,8 +57,8 @@ namespace slv2
             //compose and send matrix!!!
             context.generals().addSenderToMatrix(context.own_conf_number());
 
-            // context.generals().addmatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
-            onMatrix(context, context.generals().getMatrix(), PublicKey {});
+            // context.generals().addMatrix(context.generals().getMatrix(), context.node().getConfidants()); is called from next:
+            onMatrix(context, context.generals().getMatrix(), cs::PublicKey {});
 
             context.node().sendMatrix(context.generals().getMatrix());
             return Result::Finish;
@@ -67,19 +67,19 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result TrustedState::onMatrix(SolverContext& context, const Credits::HashMatrix & matr, const PublicKey & /*sender*/)
+    Result TrustedState::onMatrix(SolverContext& context, const cs::HashMatrix & matr, const cs::PublicKey & /*sender*/)
     {
-        if(context.is_matr_recv_from(matr.Sender)) {
+        if(context.is_matr_recv_from(matr.sender)) {
             if(Consensus::Log) {
-                LOG_DEBUG(name() << ": duplicated matrix received from [" << (unsigned int) matr.Sender << "], ignore");
+                LOG_DEBUG(name() << ": duplicated matrix received from [" << (unsigned int) matr.sender << "], ignore");
             }
             return Result::Ignore;
         }
-        context.recv_matr_from(matr.Sender);
-        context.generals().addmatrix(matr, context.node().getConfidants());
+        context.recv_matr_from(matr.sender);
+        //context.generals().addMatrix(matr, context.node().getConfidants()); vshilkin
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": matrix received from [" << (unsigned int) matr.Sender << "], total " << context.cnt_matr_recv());
+            LOG_NOTICE(name() << ": matrix received from [" << (unsigned int) matr.sender << "], total " << context.cnt_matr_recv());
         }
 
         if(test_matrices_completed(context)) {
@@ -105,7 +105,7 @@ namespace slv2
         }
         // the SolverCore updated own vector before call to us, so we can simply send it
         context.node().sendVector(context.hash_vector());
-        Result res = onVector(context, context.hash_vector(), PublicKey {});
+        Result res = onVector(context, context.hash_vector(), cs::PublicKey {});
         if(res == Result::Finish) {
             // let context immediately to decide what to do
             context.vectors_completed();
@@ -114,7 +114,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result TrustedState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
+    Result TrustedState::onBlock(SolverContext & context, csdb::Pool & block, const cs::PublicKey & sender)
     {
         Result res = DefaultStateBehavior::onBlock(context, block, sender);
         if(res == Result::Finish) {
@@ -125,12 +125,14 @@ namespace slv2
 
     bool TrustedState::test_vectors_completed(const SolverContext& context) const
     {
-        return context.cnt_vect_recv() == context.node().getConfidants().size();
+      return true;
+//        return context.cnt_vect_recv() == context.node().getConfidants().size(); // vshilkin
     }
 
     bool TrustedState::test_matrices_completed(const SolverContext& context) const
     {
-        return context.cnt_matr_recv() == context.node().getConfidants().size();
+      return true;
+//        return context.cnt_matr_recv() == context.node().getConfidants().size(); // vshilkin
     }
 
 } // slv2

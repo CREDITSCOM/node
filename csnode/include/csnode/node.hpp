@@ -10,6 +10,7 @@
 
 #include <csnode/datastream.h>
 #include <csnode/dynamicbuffer.h>
+#include <lib/system/keys.hpp>
 
 #include "blockchain.hpp"
 #include "packstream.hpp"
@@ -123,6 +124,13 @@ public:
   const BlockChain& getBlockChain() const {
     return bc_;
   }
+  slv2::SolverCore* getSolver() {
+    return solver_;
+  }
+  const slv2::SolverCore* getSolver() const {
+    return solver_;
+  }
+
 
 #ifdef NODE_API
   csconnector::connector& getConnector() {
@@ -148,7 +156,7 @@ private:
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
   static const csdb::Address spammerAddress_;
-  const PublicKey myPublicKey_;
+  const cs::PublicKey myPublicKey_;
   bool            good_ = true;
 
   // syncro variables
@@ -186,9 +194,6 @@ private:
 
   RegionAllocator allocator_;
   RegionAllocator packStreamAllocator_;
-
-  size_t lastStartSequence_;
-  bool blocksReceivingStarted_ = false;
 
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;

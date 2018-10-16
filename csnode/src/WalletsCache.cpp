@@ -6,7 +6,7 @@
 
 using namespace std;
 
-namespace Credits
+namespace cs
 {
 void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress)
 {
@@ -239,4 +239,4 @@ const WalletsCache::WalletData* WalletsCache::Updater::findWallet(WalletId id) c
     return data_.wallets_[id];
 }
 
-} // namespace Credits
+} // namespace cs

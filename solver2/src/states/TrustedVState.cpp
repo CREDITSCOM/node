@@ -9,7 +9,7 @@ namespace slv2
         TrustedState::on(context);
     }
 
-    Result TrustedVState::onVector(SolverContext & context, const Credits::HashVector & vect, const PublicKey & sender)
+    Result TrustedVState::onVector(SolverContext & context, const cs::HashVector & vect, const cs::PublicKey & sender)
     {
         // continue work as trusted but suppress further events on receive vectors
         TrustedState::onVector(context, vect, sender);

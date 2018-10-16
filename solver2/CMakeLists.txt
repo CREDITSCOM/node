@@ -15,7 +15,6 @@ add_library(solver2
 	include/solver2/Generals.h
 	include/solver2/SolverCompat.h
 	include/solver2/CallsQueueScheduler.h
-
 	include/solver2/states/CollectState.h
 	include/solver2/states/DefaultStateBehavior.h
 	include/solver2/states/HandleBBState.h
@@ -33,15 +32,11 @@ add_library(solver2
 	include/solver2/states/TrustedVState.h
 	include/solver2/states/WriteState.h
 	include/solver2/states/PermanentCollectWriteState.h
-
-	../solver/Solver/Include/Solver/Generals.hpp
-
 	src/SolverCore.cpp
 	src/SolverContext.cpp
 	src/SolverInterface.cpp
 	src/SolverTransitions.cpp
 	src/CallsQueueScheduler.cpp
-
 	src/states/CollectState.cpp
 	src/states/DefaultStateBehavior.cpp
 	src/states/HandleBBState.cpp
@@ -66,7 +61,7 @@ target_include_directories(solver2 PUBLIC
 
 target_link_libraries (
 	solver2
-	Solver
+	solver
 #	csconnector
 #	csdb
 	csnode

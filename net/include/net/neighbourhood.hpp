@@ -132,9 +132,9 @@ public:
 
   bool canHaveNewConnection();
 
-  void neighbourHasPacket(RemoteNodePtr, const Hash&, const bool isDirect);
-  void neighbourSentPacket(RemoteNodePtr, const Hash&);
-  void neighbourSentRenounce(RemoteNodePtr, const Hash&);
+  void neighbourHasPacket(RemoteNodePtr, const cs::Hash&, const bool isDirect);
+  void neighbourSentPacket(RemoteNodePtr, const cs::Hash&);
+  void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
 
   void redirectByNeighbours(const Packet*);
   void pourByNeighbours(const Packet*, const uint32_t packNum);
@@ -148,9 +148,9 @@ public:
 
   ConnectionPtr getConnection(const RemoteNodePtr);
 
-  ConnectionPtr getNextRequestee(const Hash&);
+  ConnectionPtr getNextRequestee(const cs::Hash&);
   ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
-  ConnectionPtr getNeighbourByKey(const PublicKey&);
+  ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
   void releaseSyncRequestee(const uint32_t seq);
 
@@ -203,9 +203,9 @@ private:
     ConnectionPtr prioritySender;
   };
 
-  FixedHashMap<Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-  FixedHashMap<Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
-  FixedHashMap<Hash, DirectPackInfo, uint16_t, 10000> msgDirects_;
+  FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
+  FixedHashMap<cs::Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
+  FixedHashMap<cs::Hash, DirectPackInfo, uint16_t, 10000> msgDirects_;
 };
 
 #endif // __NEIGHBOURHOOD_HPP__

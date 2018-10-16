@@ -26,12 +26,14 @@ namespace slv2
         context.node().becomeWriter();
 
         context.create_and_send_new_block();
-        pown = std::make_unique<Hash>((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+//        pown = std::make_unique<cs::Hash>((char*) (context.blockchain().getLastWrittenHash().to_binary().data())); // vshilkin
+        pown = std::make_unique<cs::Hash>();
+/*
         if(Consensus::Log) {
             constexpr const size_t hash_len = sizeof(pown->str) / sizeof(pown->str[0]);
             LOG_NOTICE(name() << ": writing & sending block, then waiting for hashes (" << context.cnt_trusted() << ") = " << byteStreamToHex(pown->str, hash_len));
         }
-
+*/
         // launch timeout control to reduce count of desired candidates on delay
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": launch timeout control to test count of hashes every " << Consensus::T_hash << " ms");
@@ -57,7 +59,7 @@ namespace slv2
         }
     }
 
-    Result WriteState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender)
+    Result WriteState::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender)
     {
         // can use Consensus::MinTrustedNodes if timeout occur
         auto not_enough = min_count_hashes - static_cast<int>(context.cnt_hash_recv());
@@ -70,10 +72,12 @@ namespace slv2
                 }
             }
             else {
+            /*
                 if(Consensus::Log) {
                     constexpr const size_t hash_len = sizeof(sender.str) / sizeof(sender.str[0]);
                     LOG_WARN(name() << ": hash received do not match!!! Sender " << byteStreamToHex(sender.str, hash_len));
                 }
+              */ // vshilkin
             }
         }
         if(not_enough <= 0) {

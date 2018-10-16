@@ -16,14 +16,17 @@
 
 #include <csnode/node.hpp>
 #include <lib/system/keys.hpp>
+#include <solver/TransactionsValidator.h>
 
 namespace cs {
 
+class WalletsState;
+class TransactionsValidator;
 class Solver;
 
 class Generals {
  public:
-  Generals()  = default;
+  Generals(WalletsState& walletsState);
   ~Generals() = default;
 
   Generals(const Generals&) = delete;
@@ -58,6 +61,9 @@ class Generals {
 
   Characteristic m_characteristic;
   PublicKey m_writerPublicKey;
+
+  WalletsState& walletsState;
+  std::unique_ptr<TransactionsValidator> trxValidator_;
 };
 }  // namespace cs
 #endif

@@ -3,34 +3,42 @@
 #include "SolverCompat.h"
 #include "Node.h"
 #include "Generals.h"
-#include <Solver/Fee.h>
+#include <solver/Fee.h>
 #include <csdb/currency.h>
 #include <lib/system/logger.hpp>
 
 namespace slv2
 {
 
-    const Credits::HashVector& SolverCore::getMyVector() const
+    void SolverCore::setKeysPair(const cs::PublicKey& publicKey,
+      const cs::PrivateKey& privateKey)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->setKeysPair(publicKey, privateKey);
+        }
+    }
+
+    const cs::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->getMyVector();
         }
         if(!pown_hvec) {
             // empty one is for test purpose
-            static Credits::HashVector stub {};
+            static cs::HashVector stub {};
             return stub;
         }
         return *pown_hvec;
     }
 
-    const Credits::HashMatrix& SolverCore::getMyMatrix() const
+    const cs::HashMatrix& SolverCore::getMyMatrix() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->getMyMatrix();
         }
         if(!pgen) {
             // empty one is for test purpose
-            static Credits::HashMatrix stub {};
+            static cs::HashMatrix stub {};
             return stub;
         }
         return pgen->getMatrix();
@@ -39,7 +47,7 @@ namespace slv2
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->set_keys(pub, priv);
+            //pslv_v1->set_keys(pub, priv); //vshilkin
         }
         public_key = pub;
         private_key = priv;
@@ -93,7 +101,7 @@ namespace slv2
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = p;
-            pslv_v1->gotTransactionList(std::move(tmp));
+            //pslv_v1->gotTransactionList(std::move(tmp)); //vshilkin
             return;
         }
 
@@ -123,12 +131,12 @@ namespace slv2
                 p = removeTransactionsWithBadSignatures(p);
             }
             pfee->CountFeesInPool(pnode, &p);
-            auto result = pgen->buildvector(p, block_pool, b_pool);
+            //auto result = pgen->buildVector(p, block_pool, b_pool); //vshilkin
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
             }
-            pown_hvec->Sender = pnode->getMyConfNumber();
-            pown_hvec->hash = result;
+            pown_hvec->sender = pnode->getMyConfNumber();
+            //pown_hvec->hash = result; //vshilkin
         }
 
         if(!pstate) {
@@ -139,10 +147,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotVector(const Credits::HashVector& vect)
+    void SolverCore::gotVector(const cs::HashVector& vect)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Credits::HashVector tmp = vect;
+            cs::HashVector tmp = vect;
             pslv_v1->gotVector(std::move(tmp));
             return;
         }
@@ -154,15 +162,15 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: gotVector()");
         }
-        if(stateCompleted(pstate->onVector(*pcontext, vect, PublicKey {}))) {
+        if(stateCompleted(pstate->onVector(*pcontext, vect, cs::PublicKey {}))) {
             handleTransitions(Event::Vectors);
         }
     }
 
-    void SolverCore::gotMatrix(const Credits::HashMatrix& matr)
+    void SolverCore::gotMatrix(const cs::HashMatrix& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Credits::HashMatrix tmp = matr;
+            cs::HashMatrix tmp = matr;
             pslv_v1->gotMatrix(std::move(tmp));
             return;
         }
@@ -174,16 +182,15 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: gotMatrix()");
         }
-        if(stateCompleted(pstate->onMatrix(*pcontext, matr, PublicKey {}))) {
+        if(stateCompleted(pstate->onMatrix(*pcontext, matr, cs::PublicKey {}))) {
             handleTransitions(Event::Matrices);
         }
     }
 
-    void SolverCore::gotBlock(csdb::Pool& p, const PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::Pool tmp = p;
-            pslv_v1->gotBlock(std::move(tmp), sender);
+            pslv_v1->gotBlock(std::move(p), sender);
             return;
         }
 
@@ -209,7 +216,7 @@ namespace slv2
         test_outrunning_blocks();
     }
 
-    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender)
+    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::PoolHash tmp = p_hash;
@@ -230,7 +237,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotBlockReply(csdb::Pool& p)
+    void SolverCore::gotBlockReply(csdb::Pool&& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotBlockReply(std::move(p));
@@ -245,15 +252,15 @@ namespace slv2
             storeReceivedBlock(p);
         }
         else {
-            gotIncorrectBlock(std::move(p), PublicKey {});
+            gotIncorrectBlock(std::move(p), cs::PublicKey {});
         }
     }
 
-    void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)
+    void SolverCore::gotHash(const cs::Hash& hash, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Hash modifiable = hash;
-            pslv_v1->gotHash(modifiable, sender);
+            cs::Hash modifiable = hash;
+            //pslv_v1->gotHash(modifiable, sender); //vshilkin
             return;
         }
 
@@ -268,7 +275,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender)
+    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotIncorrectBlock(std::move(p), sender);
@@ -310,7 +317,7 @@ namespace slv2
             return;
         }
 
-        gotIncorrectBlock(std::move(p), PublicKey {});
+        gotIncorrectBlock(std::move(p), cs::PublicKey {});
     }
 
     void SolverCore::rndStorageProcessing()
@@ -330,7 +337,7 @@ namespace slv2
     void SolverCore::addConfirmation(uint8_t own_conf_number)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->addConfirmation(own_conf_number);
+            //pslv_v1->addConfirmation(own_conf_number); vshilkin
             return;
         }
 
@@ -345,7 +352,7 @@ namespace slv2
     void SolverCore::beforeNextRound()
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->beforeNextRound();
+            //pslv_v1->beforeNextRound();
             return;
         }
         
@@ -385,7 +392,7 @@ namespace slv2
         }
 
         // update desired count of trusted nodes
-        size_t cnt_trusted = pnode->getConfidants().size();
+        size_t cnt_trusted = 4;//pnode->getConfidants().size(); //vshilkin
         if(cnt_trusted > cnt_trusted_desired) {
             cnt_trusted_desired = cnt_trusted;
         }

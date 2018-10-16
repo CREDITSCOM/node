@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../INodeState.h"
+
+#include <lib/system/keys.hpp>
+
 #include <vector>
 
 namespace slv2
@@ -58,7 +61,7 @@ namespace slv2
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
          *
          * @brief   Do test of block received.
          *          
@@ -78,10 +81,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
          *
          * @brief   Ignores vector received
          *
@@ -97,10 +100,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
+        Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
          *
          * @brief   Ignores the matrix received
          *
@@ -116,10 +119,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+        Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
          *
          * @brief   Ignores the hash received
          *
@@ -135,7 +138,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         /**
          * @fn  Result DefaultStateBehavior::onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
@@ -176,7 +179,7 @@ namespace slv2
     protected:
 
         /**
-         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& sender);
+         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& sender);
          *
          * @brief   Sends a last written hash to 
          *
@@ -187,7 +190,7 @@ namespace slv2
          * @param           target  The target receiver of hash sent.
          */
 
-        void sendLastWrittenHash(SolverContext& context, const PublicKey& target);
+        void sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target);
     };
 
 } // slv2

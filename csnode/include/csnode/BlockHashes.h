@@ -1,7 +1,7 @@
 #include <vector>
 #include <csdb/pool.h> 
 
-namespace Credits
+namespace cs
 {
 class BlockHashes
 {

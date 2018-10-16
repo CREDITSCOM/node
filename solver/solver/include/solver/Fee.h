@@ -14,7 +14,7 @@ namespace csdb {
 class Pool;
 }  // namespace csdb
 
-namespace Credits {
+namespace cs {
 /** @brief This class was designed to count round fee.
 *
 *  The amount of counted fee in round depends on:
@@ -23,6 +23,7 @@ namespace Credits {
 *  - size of transaction
 *  - cost of one node
 */
+
 class Fee {
  public:
   /** @brief Counts fee for each transaction in pool.

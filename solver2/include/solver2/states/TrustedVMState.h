@@ -1,5 +1,7 @@
 #pragma once
 #include "TrustedState.h"
+#include <lib/system/keys.hpp>
+
 
 namespace slv2
 {
@@ -26,9 +28,9 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
-        Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
+        Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
 
-        Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+        Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {

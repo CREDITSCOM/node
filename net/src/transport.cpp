@@ -105,7 +105,7 @@ void Transport::run() {
     bool checkPending  = ctr % 100 == 0;
     bool checkSilent   = ctr % 150 == 0;
 
-    if (askMissing) {
+    if (askMissing)
       askForMissingPackages();
 
     if (checkPending)
@@ -401,19 +401,6 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   return !rn || rn >= rLim;
 }
 
-bool Transport::shouldSendPacket(const Packet& pack) {
-  if (pack.isNetwork()) return false;
-  const auto rLim = std::max(node_->getRoundNumber(), (RoundNum)1) - 1;
-
-  if (!pack.isFragmented()) return pack.getRoundNum() >= rLim;
-  auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
-
-  if (pack.getFragmentId() == 0)
-    rn = pack.getRoundNum();
-
-  return !rn || rn >= rLim;
-}
-
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
@@ -676,12 +663,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
 
   ConnectionId myCId;
   ConnectionId realCId;
-  PublicKey    key;
-  iPackStream_ >> myCId >> realCId >> key;
-
-  ConnectionId myCId;
-  ConnectionId realCId;
-  cs::PublicKey key;
+  cs::PublicKey    key;
   iPackStream_ >> myCId >> realCId >> key;
 
   if (!iPackStream_.good()) {
@@ -793,12 +775,6 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
-  auto conn = sender->connection.load(std::memory_order_relaxed);
-  if (!conn){
-    return;
-  }
-
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
   ConnectionPtr conn = nh_.getConnection(sender);
   if (!conn) return;
 
@@ -825,7 +801,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   uint8_t isDirect;
-  Hash hHash;
+  cs::Hash hHash;
   iPackStream_ >> isDirect >> hHash;
   if (!iPackStream_.good() || !iPackStream_.end()) return false;
 

@@ -2,6 +2,7 @@
 
 #include "DefaultStateBehavior.h"
 #include "../CallsQueueScheduler.h"
+#include <lib/system/keys.hpp>
 
 namespace slv2
 {
@@ -28,7 +29,7 @@ namespace slv2
 
         void onRoundEnd(SolverContext& context) override;
 
-        Result onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender) override;
+        Result onBlock(SolverContext & context, csdb::Pool & block, const cs::PublicKey & sender) override;
 
         const char * name() const override
         {

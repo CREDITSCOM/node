@@ -32,7 +32,11 @@ add_library(csnode
   include/csnode/CyclicBuffer.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
+  include/csnode/datastream.h
+  include/csnode/dynamicbuffer.h
   include/csnode/threading.hpp
+  include/csnode/nodecore.h
+  include/csnode/transactionspacket.h
   include/csnode/TransactionsTail.h
   include/csnode/utils.h
   include/csnode/WalletsCache.h
@@ -41,6 +45,9 @@ add_library(csnode
   include/csnode/BlockHashes.h
   src/blockchain.cpp
   src/node.cpp
+  src/transactionspacket.cpp
+  src/dynamicbuffer.cpp
+  src/datastream.cpp
   src/utils.cpp
   src/WalletsCache.cpp
   src/WalletsIds.cpp

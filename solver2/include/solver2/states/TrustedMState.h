@@ -1,5 +1,7 @@
 #pragma once
 #include "TrustedState.h"
+#include <lib/system/keys.hpp>
+
 
 namespace slv2
 {
@@ -28,7 +30,7 @@ namespace slv2
 
         // onVector() behaviour is completely implemented in TrustesState
 
-        Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+        Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {

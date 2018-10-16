@@ -9,7 +9,7 @@ namespace slv2
         TrustedState::on(context);
     }
 
-    Result TrustedMState::onMatrix(SolverContext & context, const Credits::HashMatrix & matr, const PublicKey & sender)
+    Result TrustedMState::onMatrix(SolverContext & context, const cs::HashMatrix & matr, const cs::PublicKey & sender)
     {
         // continue work as trusted but suppress further events on receive matrices
         TrustedState::onMatrix(context, matr, sender);

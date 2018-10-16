@@ -4,7 +4,7 @@
 #include <array>
 #include <ostream>
 
-namespace Credits
+namespace cs
 {
     enum class Direction : uint8_t
     {

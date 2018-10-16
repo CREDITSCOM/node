@@ -1,8 +1,8 @@
 #include <csnode/blockchain.hpp>
-#include <Solver/WalletsState.h>
+#include <solver/WalletsState.h>
 using namespace std;
 
-namespace Credits
+namespace cs
 {
 
     WalletsState::WalletsState(const BlockChain& blockchain, size_t initialWalletsNum /*=*/)

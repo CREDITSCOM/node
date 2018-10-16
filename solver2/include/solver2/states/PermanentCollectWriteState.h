@@ -2,6 +2,7 @@
 #include "CollectState.h"
 #include "../Consensus.h"
 #include "../CallsQueueScheduler.h"
+#include <lib/system/keys.hpp>
 
 namespace slv2
 {
@@ -29,7 +30,7 @@ namespace slv2
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {
@@ -45,7 +46,7 @@ namespace slv2
         void cancel_collect_hashes(SolverContext& context);
 
         /** @brief   The pointer to own hash actual this round */
-        std::unique_ptr<Hash> pown;
+        std::unique_ptr<cs::Hash> pown;
 
         /** @brief   Minimal required count of hashes in reply after send block */
         int min_count_hashes { static_cast<int>(Consensus::MinTrustedNodes) };

@@ -3,7 +3,7 @@
 #include <csnode/BlockHashes.h>
 using namespace std;
 
-namespace Credits
+namespace cs
 {
 BlockHashes::BlockHashes(std::string dbs_fname)
     : dbs_fname_(dbs_fname)

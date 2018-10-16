@@ -6,8 +6,9 @@
 #include <lib/system/utils.hpp>
 #include <limits>
 
+#include <csnode/BlockHashes.h>
 #include <csnode/blockchain.hpp>
-using namespace Credits;
+using namespace cs;
 
 
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress)
@@ -29,7 +30,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
   }
   std::cout << "DB is opened" << std::endl;
 
-  blockHashes_.reset(new Credits::BlockHashes("test_db/dbs.txt"));
+  blockHashes_.reset(new cs::BlockHashes("test_db/dbs.txt"));
 
   if (storage_.last_hash().is_empty())
   {
@@ -69,7 +70,7 @@ BlockChain::~BlockChain()
 {
 }
 
-bool BlockChain::initFromDB(Credits::WalletsCache::Initer& initer)
+bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer)
 {
     bool res = false;
     try
@@ -117,7 +118,7 @@ bool BlockChain::writeNewBlock(csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool)
 {
-    TRACE("");
+    //TARCE();
 
     {
         std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -143,11 +144,11 @@ void BlockChain::writeBlock(csdb::Pool& pool)
         LOG_ERROR("Couldn't update from next block");
 
     {
-        TRACE("");
+        //TARCE();
         std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-        TRACE("");
+        //TARCE();
         new_block_cv.notify_all();
-        TRACE("");
+        //TARCE();
     }
 }
 
@@ -250,18 +251,18 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
 {
-    TRACE("");
+    //TARCE();
     std::unique_lock<decltype(dbLock_)> l(dbLock_);
-    TRACE("");
+    //TARCE();
     csdb::PoolHash res;
-    TRACE("");
+    //TARCE();
     new_block_cv.wait(l, [this, &obsolete_block, &res]() {
-        TRACE("");
+        //TARCE();
         res = storage_.last_hash();
-        TRACE("");
+        //TARCE();
         return obsolete_block != res;
     });
-    TRACE("");
+    //TARCE();
     return res;
 }
 

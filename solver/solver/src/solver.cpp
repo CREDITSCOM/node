@@ -45,9 +45,20 @@ static int randFT(int min, int max) {
 namespace cs {
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node)
+Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress
+#ifdef SPAMMER
+  , csdb::Address _spammerAddress
+#endif
+  )
 : m_node(node)
-, m_generals(std::unique_ptr<Generals>(new Generals()))
+, walletsState(new WalletsState(node->getBlockChain()))
+, m_generals(std::unique_ptr<Generals>(new Generals(*walletsState)))
+, genesisAddress(_genesisAddress)
+, startAddress(_startAddress)
+#ifdef SPAMMER
+, spammerAddress(_spammerAddress)
+#endif
+, fee_counter_()
 , m_writerIndex(0) {
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
 }
@@ -726,7 +737,7 @@ void Solver::spamWithTransactions() {
   csdb::Transaction transaction;
   transaction.set_target(aaa);
   transaction.set_source(csdb::Address::from_public_key((char*)myPublicKey.data()));
-  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_currency(csdb::Currency(1));
 
   const cs::RoundNumber round = m_roundTable.round;
 
@@ -736,7 +747,6 @@ void Solver::spamWithTransactions() {
       if ((round < 10) || (round > 20)) {
         transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
         // transaction.set_comission(csdb::Amount(0, 1, 10));
-        transaction.set_balance(csdb::Amount(transaction.amount().integral() + 2, 0));
         transaction.set_innerID(iid);
         iid++;
 
@@ -769,9 +779,8 @@ void Solver::addInitialBalance() {
   transaction.set_target(csdb::Address::from_public_key(reinterpret_cast<char*>(myPublicKey.data())));
   transaction.set_source(csdb::Address::from_string(start_address));
 
-  transaction.set_currency(csdb::Currency("CS"));
+  transaction.set_currency(csdb::Currency(1));
   transaction.set_amount(csdb::Amount(10000, 0));
-  transaction.set_balance(csdb::Amount(10000000, 0));
   transaction.set_innerID(1);
 
   addConveyerTransaction(transaction);

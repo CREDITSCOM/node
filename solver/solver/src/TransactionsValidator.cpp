@@ -2,10 +2,10 @@
 #include <intrin.h>
 #endif
 #include <csdb/amount_commission.h>
-#include <Solver/TransactionsValidator.h>
+#include <solver/TransactionsValidator.h>
 using namespace std;
 
-namespace Credits
+namespace cs
 {
     TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
         : config_(config)

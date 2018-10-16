@@ -31,7 +31,7 @@ namespace slv2
         cancel_timeout(context);
     }
 
-    Result slv2::StartNormalState::onBlock(SolverContext& context, csdb::Pool & block, const PublicKey & sender)
+    Result slv2::StartNormalState::onBlock(SolverContext& context, csdb::Pool & block, const cs::PublicKey & sender)
     {
         cancel_timeout(context);
         Result res = DefaultStateBehavior::onBlock(context, block, sender);

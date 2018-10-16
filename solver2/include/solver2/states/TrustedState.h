@@ -1,5 +1,7 @@
 #pragma once
 #include "DefaultStateBehavior.h"
+#include <lib/system/keys.hpp>
+
 
 namespace slv2
 {
@@ -28,13 +30,13 @@ namespace slv2
 
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
-        Result onVector(SolverContext& context, const Credits::HashVector& vect, const PublicKey& sender) override;
+        Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
 
-        Result onMatrix(SolverContext& context, const Credits::HashMatrix& matr, const PublicKey& sender) override;
+        Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
 
         Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {

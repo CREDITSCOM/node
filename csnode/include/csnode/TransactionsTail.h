@@ -3,7 +3,7 @@
 
 #include "BitHeap.hpp"
 
-namespace Credits
+namespace cs
 {
     class TransactionsTail
     {
