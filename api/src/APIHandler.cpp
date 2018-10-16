@@ -263,6 +263,7 @@ convertTransaction(const csdb::Transaction& transaction)
   result.id.index = id.index();
   result.id.poolHash = fromByteArray(id.pool_hash().to_binary());
 
+  result.trxn.id = transaction.innerID();
   result.trxn.amount = convertAmount(amount);
   result.trxn.currency = DEFAULT_CURRENCY;
 

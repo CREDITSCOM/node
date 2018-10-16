@@ -629,7 +629,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
 #ifdef MONITOR_NODE
-  return;
+  return true;
 #endif
 
   Connection conn;
