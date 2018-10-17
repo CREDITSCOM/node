@@ -175,7 +175,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   std::cout << __func__ << std::endl;
-  const_cast<RoundNum&>(rNum)/= 2;
+
+  istream_.init(data, size);
+  Hash h;
+  istream_ >> h;
 
   uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
   if (lastBlock + 1 != rNum) {
@@ -185,7 +188,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   }
 
   solver_->setBigBangStatus(true);
-  getRoundTable(data, size, rNum, type);
+  getRoundTable(istream_.getCurrPtr(), size - Hash::Size, rNum, type);
 }
 
 // the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
