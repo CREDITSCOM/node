@@ -108,6 +108,7 @@ void Solver::prepareBlockForSend(csdb::Pool& block) {
   block.set_writer_public_key(myPublicKey);
   // std::cout << "SOLVER> Before write last sequence" << std::endl;
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
+
   block.set_previous_hash(node_->getBlockChain().getLastWrittenHash());
   /*csdb::PoolHash prev_hash;
   prev_hash.from_string("");
@@ -540,8 +541,17 @@ void Solver::rndStorageProcessing()
 
     if (rndStorage.count(newSeq)>0)
     {
-      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
-      rndStorage.erase(newSeq);
+      auto& block = rndStorage.at(newSeq);
+      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
+        node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+        rndStorage.erase(newSeq);
+      }
+      else {
+        node_->getBlockChain().setLastWrittenSequence(newSeq - 2);
+        node_->getBlockChain().updateLastHash();
+        node_->sendBlockRequest(newSeq - 2);
+        return;
+      }
     }
     else loop = false;
   }
@@ -568,8 +578,17 @@ void Solver::tmpStorageProcessing()
 
     if (tmpStorage.count(newSeq)>0)
     {
-      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
-      tmpStorage.erase(newSeq);
+      auto& block = tmpStorage.at(newSeq);
+      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
+        node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+        tmpStorage.erase(newSeq);
+      }
+      else {
+        node_->getBlockChain().setLastWrittenSequence(newSeq - 2);
+        node_->getBlockChain().updateLastHash();
+        node_->sendBlockRequest(newSeq - 2);
+        return;
+      }
     }
     else loop = false;
   }

@@ -175,16 +175,17 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   std::cout << __func__ << std::endl;
-  uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
-  if (rNum > lastBlock && rNum >= roundNum_) {
-    solver_->setBigBangStatus(true);
-    getRoundTable(data, size, rNum, type);
+  const_cast<RoundNum&>(rNum)/= 2;
 
-  } else {
-#ifdef MYLOG
-    std::cout << "BigBang else" << std::endl;
-#endif
+  uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+  if (lastBlock + 1 != rNum) {
+    getBlockChain().setLastWrittenSequence(std::min(rNum - 1, getBlockChain().getLastWrittenSequence()));
+    getBlockChain().updateLastHash();
+    getBlockChain().setGlobalSequence(rNum - 1);
   }
+
+  solver_->setBigBangStatus(true);
+  getRoundTable(data, size, rNum, type);
 }
 
 // the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
@@ -664,7 +665,17 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   solver_->rndStorageProcessing();
 
-  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) {
+    if (getBlockChain().getLastHash() == pool.previous_hash())
+      solver_->gotBlock(std::move(pool), sender);
+    else {
+      auto nSeq = pool.sequence() > 2 ? (pool.sequence() - 2) : 1;
+      getBlockChain().setLastWrittenSequence(nSeq);
+      getBlockChain().updateLastHash();
+      solver_->gotIncorrectBlock(std::move(pool), sender);
+      sendBlockRequest(nSeq);
+    }
+  }
   else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
@@ -852,9 +863,18 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
-    solver_->gotBlockReply(std::move(pool));
-    awaitingSyncroBlock = false;
-    solver_->rndStorageProcessing();
+
+    if (getBlockChain().getLastHash() == pool.previous_hash()) {
+      solver_->gotBlockReply(std::move(pool));
+      awaitingSyncroBlock = false;
+      solver_->rndStorageProcessing();
+    }
+    else {
+      auto nSeq = pool.sequence() > 2 ? (pool.sequence() - 2) : 1;
+      getBlockChain().setLastWrittenSequence(nSeq);
+      getBlockChain().updateLastHash();
+      solver_->gotFreeSyncroBlock(std::move(pool));
+    }
   }
   else
     solver_->gotFreeSyncroBlock(std::move(pool));

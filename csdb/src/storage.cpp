@@ -171,6 +171,8 @@ void Storage::priv::set_last_error(Storage::Error error, const char* message, ..
 
 bool Storage::priv::rescan(Storage::OpenCallback callback)
 {
+  uint32_t lastSeq = 0;
+
   last_hash = {};
   count_pool = 0;
 
@@ -179,6 +181,8 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
 
   Database::IteratorPtr it = db->new_iterator();
   assert(it);
+
+  std::vector<std::pair<PoolHash, PoolHash>> als;
 
   Storage::OpenProgress progress{0};
   for(it->seek_to_first(); it->is_valid(); it->next())
@@ -212,7 +216,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
       return false;
     }
 
-    update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
+    //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
     count_pool++;
     progress.poolsProcessed++;
     if (nullptr != callback) {
@@ -221,41 +225,22 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
         return false;
       }
     }
-  }
 
-  // Посмотрим, сколько у нас завершённых цепочек.
-  if([this, &heads]() -> bool {
-      for(const auto it : heads)
-      {
-        if(!it.second.next_.is_empty())
-          continue;
-
-        if(!last_hash.is_empty())
-          return false;
-
-        last_hash = it.first;
-      }
-      return true;
-    }()) {
-    set_last_error();
-    return true;
-  }
-
-  std::stringstream ss;
-  ss << "More than one chains or orphan chains. List follows:" << std::endl;
-  for (auto it = heads.begin(); it != heads.end(); ++it) {
-    ss << "  " << it->first.to_string() << " (lenght = " << it->second.len_ << "): ";
-    if (it->second.next_.is_empty()) {
-      ss << "Normal";
-    } else {
-      ss << "Orphan";
+    if (p.sequence() >= lastSeq) {
+      lastSeq = p.sequence();
+      als.resize(lastSeq + 1);
     }
-    ss << std::endl;
-  }
-  ss << std::ends;
-  set_last_error(Storage::ChainError, ss.str());
 
-  return false;
+    als[p.sequence()] = std::make_pair(real_hash, p.previous_hash());
+  }
+
+  // Now check integrity
+  for (uint32_t i = 1; i < als.size(); ++i) {
+    if (i > 0 && als[i].second != als[i-1].first) break;
+    last_hash = als[i].first;
+  }
+
+  return true;
 }
 
 void Storage::priv::write_routine() {
@@ -387,6 +372,11 @@ void Storage::close()
 bool Storage::isOpen() const
 {
   return ((d->db) && (d->db->is_open()));
+}
+
+void Storage::set_last_hash(const csdb::PoolHash& h) noexcept
+{
+  d->last_hash = h;
 }
 
 PoolHash Storage::last_hash() const noexcept

@@ -79,7 +79,7 @@ BlockChain::BlockChain(const char* path) {
 #ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
 #endif
-      std::ifstream f(dbs_fname);
+      /*std::ifstream f(dbs_fname);
       if (f.is_open())
       {
 #ifdef MYLOG
@@ -94,12 +94,15 @@ BlockChain::BlockChain(const char* path) {
       *s_end = '\0';
       ht.head = atoi(s_beg);
       s_beg = s_end + 2;
-      ht.tag = atoi(s_beg);
+      ht.tag = atoi(s_beg);*/
+
+      ht.head = 0;
+      ht.tag = loadBlock(storage_.last_hash()).sequence();
+
 #ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
 #endif
       setLastWrittenSequence(ht.tag);
-      if (loadBlock(storage_.last_hash()).sequence() == ht.tag)
       {
         tempHashes.reserve(ht.tag + 1);
         temp_hash = storage_.last_hash();
@@ -124,46 +127,6 @@ BlockChain::BlockChain(const char* path) {
         //for (uint32_t i = 0; i <= ht.tag; i++)
         //{
         //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
-        //}
-        tempHashes.clear();
-        lastHash_ = storage_.last_hash();
-        good_ = true;
-        return;
-
-      }
-      else
-      {
-        ht.tag = loadBlock(storage_.last_hash()).sequence();
-        tempHashes.reserve(ht.tag + 1);
-        std::ofstream f(dbs_fname, std::ios::out);
-        ht.head = 0;
-        bool file_is = f.is_open();
-        if (file_is)
-        {
-
-#ifdef MYLOG
-          f << ht.head << "->" << ht.tag << std::endl;
-          std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-          std::cout << "DB structure is written succesfully" << std::endl;
-          #endif
-          f.close();
-        }
-        else std::cout << "Error writing DB structure" << std::endl;
-
-        temp_hash = storage_.last_hash();
-        for (uint32_t i = 0; i <= ht.tag; ++i)
-        {
-          tempHashes.push_back(temp_hash);
-          temp_hash = loadBlock(temp_hash).previous_hash();
-          if (temp_hash.is_empty()) break;
-        }
-        for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
-        {
-          blockHashes_.push_back(*iter);
-        }
-        //for (uint32_t i = 0; i <= ht.tag; i++)
-        //{
-        //  std::cout << "READ> " << blockHashes_.at(i).to_string() << std::endl;
         //}
         tempHashes.clear();
         lastHash_ = storage_.last_hash();
@@ -229,6 +192,13 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 void BlockChain::setLastWrittenSequence(uint32_t seq) {
   last_written_sequence = seq;
 }
+
+void BlockChain::updateLastHash() {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  lastHash_ = getHashBySequence(last_written_sequence);
+  storage_.set_last_hash(lastHash_);
+}
+
 
 uint32_t BlockChain::getLastWrittenSequence()
 {

@@ -64,6 +64,8 @@ public:
   void setLastWrittenSequence(uint32_t seq);
   uint32_t getLastWrittenSequence();
 
+  void updateLastHash();
+
   uint32_t getRequestedBlockNumber() const;
 
   void setGlobalSequence(uint32_t seq);
