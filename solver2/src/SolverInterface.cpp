@@ -68,7 +68,7 @@ namespace slv2
 
     const cs::Notifications& SolverCore::notifications() const {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->notifications();
+            return pslv_v1->notifications();
         }
     }
 
