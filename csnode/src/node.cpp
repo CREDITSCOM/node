@@ -181,14 +181,24 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   istream_ >> h;
 
   uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
-  if (lastBlock + 1 != rNum) {
-    getBlockChain().setLastWrittenSequence(std::min(rNum - 1, getBlockChain().getLastWrittenSequence()));
+  if (lastBlock >= rNum) {
+    getBlockChain().setLastWrittenSequence(rNum);
     getBlockChain().updateLastHash();
-    getBlockChain().setGlobalSequence(rNum - 1);
+    lastBlock = rNum - 1;
+    getBlockChain().setGlobalSequence(lastBlock);
+  }
+
+  if (lastBlock == (rNum - 1)) {
+    Hash lHash((const char*)getBlockChain().getLastWrittenHash().to_binary().data());
+    if (lHash != h) {
+      LOG_WARN("Warning: deleting last block since the hashes don't match: " << byteStreamToHex(lHash.str, 32) << " vs " << byteStreamToHex(h.str, 32));
+      getBlockChain().setLastWrittenSequence(lastBlock - 1);
+      getBlockChain().updateLastHash();
+    }
   }
 
   solver_->setBigBangStatus(true);
-  getRoundTable(istream_.getCurrPtr(), size - 32, rNum, type);
+  getRoundTable(istream_.getCurrPtr(), size - HASH_LENGTH, rNum, type);
 }
 
 // the round table should be sent only to trusted nodes, all other should received only round number and Main node ID

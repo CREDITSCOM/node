@@ -883,7 +883,7 @@ void Solver::nextRound() {
     memset(receivedMatFrom, 0, 100);
     trustedCounterVector = 0;
     trustedCounterMatrix = 0;
-    if (gotBigBang)
+    if (gotBigBang && node_->getBlockChain().getLastWrittenSequence() == (node_->getRoundNumber() - 1))
       runAfter(std::chrono::milliseconds(5000),
                [this]() {
                  sendZeroVector();
