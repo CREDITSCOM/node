@@ -172,7 +172,8 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
 
   if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
-    m_node->getBlockChain().putBlock(newPool);
+    m_node->getBlockChain().finishNewBlock(newPool);
+    m_node->getBlockChain().onBlockReceived(newPool);
 
 #ifndef MONITOR_NODE
     if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
@@ -570,7 +571,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     cslog() << "Solver -> getblock calls writeLastBlock";
     if (block.verify_signature())  // INCLUDE SIGNATURES!!!
     {
-      m_node->getBlockChain().putBlock(block);
+      m_node->getBlockChain().onBlockReceived(block);
 #ifndef MONITOR_NODE
       if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
         std::string test_hash = m_node->getBlockChain().getLastWrittenHash().to_string();
@@ -608,7 +609,7 @@ void Solver::rndStorageProcessing() {
     newSeq = m_node->getBlockChain().getLastWrittenSequence() + 1;
 
     if (rndStorage.count(newSeq) > 0) {
-      m_node->getBlockChain().putBlock(rndStorage.at(newSeq));
+      m_node->getBlockChain().onBlockReceived(rndStorage.at(newSeq));
       rndStorage.erase(newSeq);
     } else
       loop = false;
@@ -624,7 +625,7 @@ void Solver::tmpStorageProcessing() {
     newSeq = m_node->getBlockChain().getLastWrittenSequence() + 1;
 
     if (tmpStorage.count(newSeq) > 0) {
-      m_node->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      m_node->getBlockChain().onBlockReceived(tmpStorage.at(newSeq));
       tmpStorage.erase(newSeq);
     } else
       loop = false;
@@ -833,7 +834,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
 void Solver::gotBlockReply(csdb::Pool&& pool) {
   cslog() << "Solver -> Got Block for my Request: " << pool.sequence();
   if (pool.sequence() == m_node->getBlockChain().getLastWrittenSequence() + 1)
-    m_node->getBlockChain().putBlock(pool);
+    m_node->getBlockChain().onBlockReceived(pool);
 }
 
 void Solver::nextRound() {
