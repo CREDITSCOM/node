@@ -358,5 +358,20 @@ inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcep
     return static_cast<unsigned char>( arg );
 }
 
+inline constexpr unsigned char operator "" _i8( unsigned long long arg ) noexcept
+{
+    return static_cast<signed char>( arg );
+}
+
+inline constexpr unsigned char operator "" _u16( unsigned long long arg ) noexcept
+{
+    return static_cast<unsigned short>( arg );
+}
+
+inline constexpr unsigned char operator "" _i16( unsigned long long arg ) noexcept
+{
+    return static_cast<short>( arg );
+}
+
 #endif 
 
