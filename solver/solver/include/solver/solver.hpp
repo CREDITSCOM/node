@@ -126,9 +126,7 @@ class Solver {
 
  private:
   void flushTransactions();
-
-  // TODO: fix signature
-  bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
+  cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
   cs::PublicKey myPublicKey;
   cs::PrivateKey myPrivateKey;

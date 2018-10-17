@@ -446,6 +446,17 @@ void Solver::runConsensus() {
 
   cslog() << "Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
+#ifndef SPAMMER
+  packet = removeTransactionsWithBadSignatures(packet);
+#endif
+  csdb::Pool pool;
+  pool.transactions() = packet.transactions();
+  fee_counter_.CountFeesInPool(m_node, &pool);
+  packet.clear();
+  const auto& transactions_with_fees = pool.transactions();
+  for (int i = 0; i < transactions_with_fees.size(); ++i) {
+    packet.addTransaction(transactions_with_fees[i]);
+  }
   cs::Hash result = m_generals->buildVector(packet);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;
@@ -889,11 +900,6 @@ void Solver::nextRound() {
   }
 }
 
-bool Solver::verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len) {
-  int ver_ok = crypto_sign_verify_detached(signature, message, message_len, public_key);
-  return ver_ok == 0;
-}
-
 void Solver::addConveyerTransaction(const csdb::Transaction& transaction) {
   cs::Lock lock(m_sharedMutex);
 
@@ -914,6 +920,26 @@ const cs::PrivateKey& Solver::getPrivateKey() const {
 
 const cs::PublicKey& Solver::getPublicKey() const {
   return myPublicKey;
+}
+
+cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet)
+{
+  cs::TransactionsPacket good_pool;
+  std::vector<csdb::Transaction> transactions = packet.transactions();
+  BlockChain::WalletData data_to_fetch_pulic_key;
+  for (int i = 0; i < transactions.size(); ++i) {
+    if (transactions[i].source().is_wallet_id()) {
+      m_node->getBlockChain().findWalletData(transactions[i].source().wallet_id(), data_to_fetch_pulic_key);
+      if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),
+        data_to_fetch_pulic_key.address_.end()))) {
+        good_pool.addTransaction(transactions[i]);
+        continue;
+      }
+    }
+    if (transactions[i].verify_signature(transactions[i].source().public_key()))
+      good_pool.addTransaction(transactions[i]);
+  }
+  return good_pool;
 }
 
 }  // namespace cs
