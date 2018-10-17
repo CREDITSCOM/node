@@ -18,6 +18,145 @@ namespace slv2
         }
     }
 
+    void SolverCore::runSpammer() {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->runSpammer();
+        }
+    }
+
+    void SolverCore::gotRound(cs::RoundTable&& round) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotRound(std::move(round));
+        }
+    }
+
+    const cs::RoundTable& SolverCore::roundTable() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->roundTable();
+        }
+    }
+
+    const cs::TransactionsPacketHashTable& SolverCore::transactionsPacketTable() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->transactionsPacketTable();
+        }
+    }
+
+    bool SolverCore::getIPoolClosed() {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getIPoolClosed();
+        }
+    }
+
+    void SolverCore::gotHash(std::string&& hash, const cs::PublicKey& pub) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotHash(std::move(hash), pub);
+        }
+    }
+
+    void SolverCore::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotPacketHashesRequest(std::move(hashes), sender);
+        }
+    }
+
+    void SolverCore::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotPacketHashesReply(std::move(packet));
+        }
+    }
+
+    const cs::Notifications& SolverCore::notifications() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->notifications();
+        }
+    }
+
+    void SolverCore::addNotification(const cs::Bytes& bytes) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->addNotification(bytes);
+        }
+    }
+
+    std::size_t SolverCore::neededNotifications() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->neededNotifications();
+        }
+    }
+
+    bool SolverCore::isEnoughNotifications() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->isEnoughNotifications();
+        }
+    }
+
+    void SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
+      const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
+        }
+    }
+
+    const cs::Characteristic& SolverCore::getCharacteristic() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getCharacteristic();
+        }
+    }
+
+    cs::Hash SolverCore::getCharacteristicHash() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getCharacteristicHash();
+        }
+    }
+
+    const cs::PrivateKey& SolverCore::getPrivateKey() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getPrivateKey();
+        }
+    }
+
+    const cs::PublicKey& SolverCore::getPublicKey() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getPublicKey();
+        }
+    }
+
+    cs::PublicKey SolverCore::getWriterPublicKey() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getWriterPublicKey();
+        }
+    }
+
+    bool SolverCore::checkTableHashes(const cs::RoundTable& table) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->checkTableHashes(table);
+        }
+    }
+
+    bool SolverCore::getBigBangStatus() {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getBigBangStatus();
+        }
+    }
+
+    void SolverCore::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotTransactionsPacket(std::move(packet));
+        }
+    }
+
+    bool SolverCore::isPoolClosed() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->isPoolClosed();
+        }
+    }
+
+    void SolverCore::sendTL() {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->sendTL();
+        }
+    }
+
     const cs::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {

@@ -45,6 +45,7 @@ add_library(csnode
   include/csnode/BlockHashes.h
   src/blockchain.cpp
   src/node.cpp
+  src/nodecore.cpp
   src/transactionspacket.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
