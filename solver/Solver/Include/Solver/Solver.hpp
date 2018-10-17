@@ -93,11 +93,13 @@ typedef std::string Matrix;
             return (0 == Sender && hash.is_empty() && sig.is_empty());
         }
     };
-	struct HashMatrix
+
+    constexpr const size_t HashMatrixMaxGen = 5; // было 100
+    struct HashMatrix
 	{
 		uint8_t Sender;
 		//uint32_t roundNum;
-		HashVector hmatr[100];
+		HashVector hmatr[HashMatrixMaxGen];
 		Signature sig;
 
         bool is_empty() const
