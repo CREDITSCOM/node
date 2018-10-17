@@ -307,29 +307,7 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {  // reviewer: "Ne
   }
 
   if (transaction.is_valid()) {
-#ifndef SPAMMER
-    auto bytes = transaction.to_byte_stream_for_sig();
-
-    auto vec = transaction.source().public_key();
-
-    const std::size_t keyLength = 32;
-    uint8_t           public_key[keyLength];
-
-    for (std::size_t i = 0; i < keyLength; i++) {
-      public_key[i] = vec[i];
-    }
-
-    std::string sig_str   = transaction.signature();
-    uint8_t*    signature = reinterpret_cast<uint8_t*>(const_cast<char*>(sig_str.c_str()));
-
-    if (verifySignature(signature, public_key, bytes.data(), bytes.size())) {
-#endif
       v_pool.add_transaction(transaction);
-#ifndef SPAMMER
-    } else {
-      cserror() << "Wrong signature";
-    }
-#endif
   } else {
     csdebug() << "Invalid transaction received";
   }
