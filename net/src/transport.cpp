@@ -214,8 +214,17 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence());
+      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash().to_string());
+      break;    
+    case NetworkCommand::SSSpecificBlock: {
+      try {
+        uint32_t round;
+        iPackStream_ >> round;
+        gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getHashBySequence(round).to_string());
+      }
+      catch (std::out_of_range) {}
       break;
+    }
     case NetworkCommand::PackInform:
       gotPackInform(task, sender);
       break;
@@ -627,7 +636,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const std::string & lastHash) {
 #ifdef MONITOR_NODE
   return true;
 #endif
@@ -638,7 +647,8 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock)
 
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
-  oPackStream_ << lastBlock << myPublicKey_;
+  FixedString<BLAKE2_HASH_LENGTH> lastHash_(lastHash.data());
+  oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
 
   sendDirect(oPackStream_.getPackets(), conn);
   return true;
