@@ -443,7 +443,7 @@ BlockChain::writeLastBlock(csdb::Pool& pool)
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     pool.set_storage(storage_);
-    pool.set_previous_hash(storage_.last_hash());
+    //pool.set_previous_hash(storage_.last_hash());
     pool.set_sequence(storage_.size());
 
     if (!pool.compose()) {
@@ -577,7 +577,7 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   #endif
   if (pool.sequence() == getLastWrittenSequence() + 1) {
    // std::cout << "OK" << std::endl;
-    pool.set_previous_hash(lastHash_);
+    //pool.set_previous_hash(lastHash_);
 
     std::ofstream f(dbs_fname, std::ios::out);
     ht.head = 0;

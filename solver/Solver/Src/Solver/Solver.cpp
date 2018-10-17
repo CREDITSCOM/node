@@ -108,9 +108,10 @@ void Solver::prepareBlockForSend(csdb::Pool& block) {
   block.set_writer_public_key(myPublicKey);
   // std::cout << "SOLVER> Before write last sequence" << std::endl;
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
-  csdb::PoolHash prev_hash;
+  block.set_previous_hash(node_->getBlockChain().getLastWrittenHash());
+  /*csdb::PoolHash prev_hash;
   prev_hash.from_string("");
-  block.set_previous_hash(prev_hash);
+  block.set_previous_hash(prev_hash);*/
   // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
 #ifdef MYLOG
@@ -227,7 +228,7 @@ void Solver::flushTransactions() {
       return;
     }
   }
-  runAfter(std::chrono::milliseconds(50), [this]() { flushTransactions(); });
+  runAfter(std::chrono::milliseconds(500), [this]() { flushTransactions(); });
 }
 
 bool Solver::getIPoolClosed() {
@@ -806,9 +807,9 @@ void Solver::addInitialBalance() {
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
   csdb::Pool pool = node_->getBlockChain().loadBlock(hash);
   if (pool.is_valid()) {
-    csdb::PoolHash prev_hash;
+    /*csdb::PoolHash prev_hash;
     prev_hash.from_string("");
-    pool.set_previous_hash(prev_hash);
+    pool.set_previous_hash(prev_hash);*/
     node_->sendBlockReply(std::move(pool), nodeId);
   }
 }
