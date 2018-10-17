@@ -195,6 +195,7 @@ void BlockChain::setLastWrittenSequence(uint32_t seq) {
 
 void BlockChain::updateLastHash() {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  blockHashes_.resize(last_written_sequence + 1);
   lastHash_ = getHashBySequence(last_written_sequence);
   storage_.set_last_hash(lastHash_);
 }

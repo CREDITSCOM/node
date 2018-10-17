@@ -188,7 +188,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   }
 
   solver_->setBigBangStatus(true);
-  getRoundTable(istream_.getCurrPtr(), size - Hash::Size, rNum, type);
+  getRoundTable(istream_.getCurrPtr(), size - 32, rNum, type);
 }
 
 // the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
@@ -862,7 +862,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   if (getBlockChain().getGlobalSequence() < pool.sequence())
     getBlockChain().setGlobalSequence(pool.sequence());
 
-  if (pool.sequence() == sendBlockRequestSequence) {
+  if (pool.sequence() == (getBlockChain().getLastWrittenSequence() + 1)) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
@@ -879,7 +879,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
       solver_->gotFreeSyncroBlock(std::move(pool));
     }
   }
-  else
+  else if (pool.sequence() > getBlockChain().getLastWrittenSequence())
     solver_->gotFreeSyncroBlock(std::move(pool));
 
   if (getBlockChain().getGlobalSequence() >
