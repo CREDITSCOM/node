@@ -3,6 +3,7 @@
 #include "CallsQueueScheduler.h"
 #include "INodeState.h"
 
+#include "SolverCompat.h" // temporary, while Credits::HashVector defined there
 #include <csdb/pool.h>
 
 #include <memory>
@@ -11,6 +12,7 @@
 #include <set>
 #include <algorithm>
 #include <optional>
+#include <array>
 
 // forward declarations
 class Node;
@@ -202,6 +204,13 @@ namespace slv2
         // store BB status to reproduce solver-1 logic
         bool is_bigbang;
 
+        // vectors reserve storage (extracted from matrices if any)
+        using VectorVariant = std::pair<Credits::HashVector, size_t>; // {vector -> count}
+        std::map<uint8_t, std::vector<VectorVariant>> vector_cache; // {sender -> vector variants}
+
+        //const static uint8_t NoSender = 0xFF;
+        //std::array<Credits::HashMatrix, Credits::HashMatrixMaxGen> matrices;
+
         // previous solver version instance
 
         std::unique_ptr<Credits::Solver> pslv_v1;
@@ -240,6 +249,16 @@ namespace slv2
 
         size_t flushTransactions();
         csdb::Pool removeTransactionsWithBadSignatures(const csdb::Pool& p);
+
+        // methods to operate with vectors cache
+        void cache_vector(uint8_t sender, const Credits::HashVector& vect);
+        // looks for vector in matrices already received, returns nullptr if vector not found:
+        const Credits::HashVector* lookup_vector(uint8_t sender) const;
+        // 
+        void clear_vectors_cache()
+        {
+            vector_cache.clear();
+        }
     };
 
 } // slv2

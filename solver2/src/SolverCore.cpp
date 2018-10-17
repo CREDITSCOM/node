@@ -18,6 +18,7 @@
 #include <limits>
 #include <string>
 #include <sstream>
+#include <functional>
 
 namespace slv2
 {
@@ -379,6 +380,43 @@ namespace slv2
                 break;
             }
         }
+    }
+
+    void SolverCore::cache_vector(uint8_t sender, const Credits::HashVector& vect)
+    {
+        if(vect.is_empty()) {
+            return;
+        }
+        std::vector<VectorVariant>& variants = vector_cache[sender];
+        bool update_existsing = false;
+        for(auto& v : variants) {
+            if(memcmp(&v.first.hash, &vect.hash, sizeof(Credits::HashVector)) == 0) {
+                v.second++;
+                update_existsing = true;
+                break;
+            }
+        }
+        if(!update_existsing) {
+            variants.push_back(std::make_pair(vect, 1));
+        }
+    }
+
+    const Credits::HashVector * SolverCore::lookup_vector(uint8_t sender) const
+    {
+        const auto it = vector_cache.find(sender);
+        if(it == vector_cache.cend()) {
+            return nullptr;
+        }
+        const auto& variants = it->second;
+        const Credits::HashVector * ptr = nullptr;
+        size_t max_cnt = 0;
+        for(const auto& v : variants) {
+            if(v.second > max_cnt) {
+                ptr = &v.first;
+                max_cnt = v.second;
+            }
+        }
+        return ptr;
     }
 
 } // slv2

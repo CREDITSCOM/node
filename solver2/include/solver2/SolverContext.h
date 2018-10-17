@@ -761,6 +761,24 @@ namespace slv2
 
         void send_transaction_list(csdb::Pool& pool);
 
+        // methods to operate with vectors cache
+
+        void cache_vector(uint8_t sender, const Credits::HashVector& vect)
+        {
+            core.cache_vector(sender, vect);
+        }
+
+        // looks for vector in matrices already received, returns nullptr if vector not found:
+        const Credits::HashVector* lookup_vector(uint8_t sender) const
+        {
+            return core.lookup_vector(sender);
+        }
+
+        void clear_vectors_cache()
+        {
+            core.clear_vectors_cache();
+        }
+
     private:
         SolverCore& core;
     };

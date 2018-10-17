@@ -17,7 +17,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": enough vectors received");
             }
-            context.vectors_completed();
+            context.vectors_completed();    
         }
         if(test_matrices_completed(context)) {
             // let context decide what to do
@@ -28,8 +28,15 @@ namespace slv2
         }
     }
 
+    void TrustedState::off(SolverContext & context)
+    {
+        cancel_timeout_consensus(context);
+        DefaultStateBehavior::off(context);
+    }
+
     Result TrustedState::onRoundTable(SolverContext & context, const uint32_t round)
     {
+        context.clear_vectors_cache();
         return DefaultStateBehavior::onRoundTable(context, round);
     }
 
@@ -66,6 +73,7 @@ namespace slv2
             return Result::Finish;
 
         }
+        start_timeout_consensus(context);
         return Result::Ignore;
     }
 
@@ -84,12 +92,25 @@ namespace slv2
             LOG_NOTICE(name() << ": matrix [" << (unsigned int) matr.Sender << "] received, total " << context.cnt_matr_recv());
         }
 
+        // update cached vectors from matrix
+        uint8_t cnt_trusted = (uint8_t) context.cnt_trusted();
+        for(uint8_t i = 0; i < cnt_trusted; ++i) {
+            if(context.is_vect_recv_from(i)) {
+                continue;
+            }
+            if(matr.hmatr[i].is_empty()) {
+                continue;
+            }
+            context.cache_vector(matr.hmatr[i].Sender, matr.hmatr[i]);
+        }
+
         if(test_matrices_completed(context)) {
             if(Consensus::Log) {
                 LOG_NOTICE(name() << ": matrices completed");
             }
             return Result::Finish;
         }
+        start_timeout_consensus(context);
         return Result::Ignore;
     }
 
@@ -113,6 +134,7 @@ namespace slv2
             context.vectors_completed();
             // then to avoid undesired extra transition simply return Ignore
         }
+        start_timeout_consensus(context);
         return Result::Ignore;
     }
 
@@ -135,4 +157,82 @@ namespace slv2
         return context.cnt_matr_recv() == context.cnt_trusted();
     }
 
+    bool TrustedState::try_restore_cached_vectors(SolverContext & context)
+    {
+        auto cnt = (uint8_t) context.cnt_trusted();
+        for(uint8_t i = 0; i < cnt; ++i) {
+            if(context.is_vect_recv_from(i)) {
+                continue;
+            }
+            auto ptr = context.lookup_vector(i);
+            if(ptr != nullptr) {
+                // last arg actually ignored
+                Result res = onVector(context, *ptr, PublicKey {});
+                if(res == Result::Finish) {
+                    // all vectors restored
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void TrustedState::start_timeout_consensus(SolverContext & context)
+    {
+        if(Consensus::Log) {
+            LOG_NOTICE(name() << ": start control timeout to wait vectors & matrices");
+        }
+        SolverContext * pctx = &context;
+        tag_timeout_consensus = context.scheduler().InsertOnce(Consensus::T_consensus, [this, pctx]() {
+            on_timeout_consensus(*pctx);
+        });
+    }
+
+    void TrustedState::cancel_timeout_consensus(SolverContext & context)
+    {
+        if(tag_timeout_consensus != CallsQueueScheduler::no_tag) {
+            if(Consensus::Log) {
+                LOG_NOTICE(name() << ": cancel control timeout to wait vectors & matrices");
+            }
+            context.scheduler().Remove(tag_timeout_consensus);
+            tag_timeout_consensus = CallsQueueScheduler::no_tag;
+        }
+    }
+
+    void TrustedState::on_timeout_consensus(SolverContext & context)
+    {
+        if(!test_vectors_completed(context)) {
+            if(context.cnt_vect_recv() < context.cnt_trusted()) {
+                if(!try_restore_cached_vectors(context)) {
+                    // actually cannot proceed to wait matrices
+                    start_timeout_consensus(context);
+                    return;
+                }
+            }
+            // vectors completed after restore from cache, force to further state
+            if(Consensus::Log) {
+                LOG_WARN(name() << ": timeout to wait vectors has expired, force switch to further state");
+            }
+            context.vectors_completed();
+            return;
+        }
+        if(!test_matrices_completed(context)) {
+            if(context.cnt_matr_recv() < 1) {
+                // cannot proceed to consensus
+                start_timeout_consensus(context);
+                return;
+            }
+            // force to complete matrices
+            if(Consensus::Log) {
+                LOG_WARN(name() << ": timeout to wait matrices has expired, force switch to further state");
+            }
+            context.matrices_completed();
+            return;
+        }
+        if(Consensus::Log) {
+            LOG_ERROR(name() << ": timeout has expired while we have got all data required for consensus. What do we wait for?");
+        }
+    }
+
 } // slv2
+
