@@ -126,7 +126,7 @@ class Solver {
 
  private:
   void flushTransactions();
-  cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
+  cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
   cs::PublicKey myPublicKey;
   cs::PrivateKey myPrivateKey;

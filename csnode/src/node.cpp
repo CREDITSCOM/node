@@ -1191,6 +1191,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
+  if (solver_->roundTable().confidants.size() < MIN_CONFIDANTS) return;
+
   if (seq == lastStartSequence_) {
     solver_->tmpStorageProcessing();
     return;

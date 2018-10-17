@@ -49,8 +49,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   if (transactionsCount > 0) {
     walletsState.updateFromSource();
-    const csdb::Amount comission = 0.1_c;
-    const csdb::Amount zero_balance = 0.0_c;
+    trxValidator_->reset(transactionsCount);
 
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);

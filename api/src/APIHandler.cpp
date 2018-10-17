@@ -52,26 +52,26 @@ custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
                                    void* callContext)
 {
 #ifndef FAKE_API_HANDLING
-  TRACE("");
+  //TRACE("");
   auto custom_iface_ = std::dynamic_pointer_cast<APIHandler>(iface_);
-  TRACE("");
+  //TRACE("");
   auto it = custom_iface_->work_queues.find(fname);
-  TRACE("");
+  //TRACE("");
   if (it != custom_iface_->work_queues.end()) {
-    TRACE("");
+    //TRACE("");
     it->second.get_position();
-    TRACE("");
+    //TRACE("");
   }
-  TRACE("");
+  //TRACE("");
   ss.leave();
 #else
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(200ms);
 #endif
-  TRACE('\n', fname);
+  //TRACE('\n', fname);
   auto res =
     api::APIProcessor::dispatchCall(iprot, oprot, fname, seqid, callContext);
-  TRACE('\n');
+  //TRACE('\n');
   return res;
 }
 
@@ -85,39 +85,39 @@ APIHandler::APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver)
   , executor(::apache::thrift::stdcxx::make_shared<
              ::apache::thrift::protocol::TBinaryProtocol>(executor_transport))
 {
-  TRACE("");
+  //TRACE("");
   std::cerr << (s_blockchain.isGood() ? "Storage is opened normal"
                                       : "Storage is not opened")
             << std::endl;
-  TRACE("");
+  //TRACE("");
   if (!s_blockchain.isGood()) {
     return;
   }
-  TRACE("");
+  //TRACE("");
 
   work_queues["TransactionFlow"]; // init value with default
                                   // constructors
-  TRACE("");
+  //TRACE("");
   auto lapooh = s_blockchain.getLastHash();
-  trace = false;
+  //TRACE = false;
   while (update_smart_caches_once(lapooh, true)) {
-    TRACE("");
+    //TRACE("");
   }
-  trace = true;
-  TRACE("");
+  //TRACE = true;
+  //TRACE("");
   state_updater_running.test_and_set(std::memory_order_acquire);
   state_updater = std::thread([this]() {
-    // trace = false;
-    TRACE("");
+    // //TRACE = false;
+    //TRACE("");
     auto lapooh = s_blockchain.getLastHash();
-    TRACE("");
+    //TRACE("");
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
       if (!update_smart_caches_once(lapooh)) {
         lapooh = s_blockchain.wait_for_block(lapooh);
       }
     }
   });
-  TRACE("");
+  //TRACE("");
 }
 
 APIHandler::~APIHandler()
@@ -134,10 +134,10 @@ APIHandler::~APIHandler()
 //    if (!init) {
 //        return;
 //    }
-//    TRACE("");
+//    //TRACE("");
 //    auto lapooh = s_blockchain.getLastHash();
 //    while (update_smart_caches_once(lapooh, init)) {
-//        TRACE("");
+//        //TRACE("");
 //    }
 //}
 
@@ -574,12 +574,12 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return,
 {
   work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
-  TRACE("");
+  //TRACE("");
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status,
                     APIRequestStatusType::SUCCESS,
                     get_delimited_transaction_sighex(tr));
-  TRACE("");
+  //TRACE("");
 }
 
 template<typename T>
@@ -596,7 +596,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                                    const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
-  TRACE('\n', '\t', "transaction =", transaction);
+  //TRACE('\n', '\t', "transaction =", transaction);
 
   csdb::Transaction send_transaction = make_transaction(transaction);
 
@@ -608,14 +608,14 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     input_smart.sourceCode = std::string();
   }
 
-  TRACE("");
+  //TRACE("");
 
   bool present = false;
   std::string origin_bytecode;
   {
-    TRACE("");
+    //TRACE("");
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
-    TRACE("");
+    //TRACE("");
     auto it = smart_origin->find(smart_addr);
     if ((present = (it != smart_origin->end()))) {
       origin_bytecode =
@@ -624,7 +624,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   }
 
   if (present == deploy) {
-    TRACE("");
+    //TRACE("");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
@@ -634,35 +634,35 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   bool amnesia = input_smart.forgetNewState;
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
-    TRACE("");
+    //TRACE("");
     auto smart_state(locked_ref(this->smart_state));
-    TRACE("");
+    //TRACE("");
     return (*smart_state)[smart_addr];
   }();
 
   std::string contract_state;
 
-  TRACE("");
+  //TRACE("");
 
   work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
-    TRACE("");
+    //TRACE("");
     contract_state_entry.get_position();
-    TRACE("");
+    //TRACE("");
     return true;
   });
 
-  TRACE("");
+  //TRACE("");
   if (!deploy) {
-    TRACE("");
+    //TRACE("");
     contract_state_entry.wait_till_front([&](std::string& state) {
-      TRACE("");
+      //TRACE("");
       auto res = !state.empty();
       if (res) {
-        TRACE("");
+        //TRACE("");
         contract_state = std::move(state);
         state.clear();
       }
-      TRACE("");
+      //TRACE("");
       return res;
     });
   }
@@ -670,9 +670,9 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   bool trxn_sent = false;
   auto sg = scopeGuard([&]() {
     if (!trxn_sent) {
-      TRACE("");
+      //TRACE("");
       auto fun = [&]() -> decltype(auto) {
-        TRACE("");
+        //TRACE("");
         return std::move(contract_state);
       };
       contract_state_entry.update_state(fun);
@@ -681,13 +681,13 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   executor::APIResponse api_resp;
 
-  TRACE("");
+  //TRACE("");
 
   while (!executor_transport->isOpen()) {
     executor_transport->open();
   }
 
-  TRACE("");
+  //TRACE("");
   executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
@@ -695,10 +695,10 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                            input_smart.method,
                            input_smart.params);
 
-  TRACE("");
+  //TRACE("");
 
   if (api_resp.code) {
-    TRACE("");
+    //TRACE("");
     _return.status.code = api_resp.code;
     _return.status.message = api_resp.message;
     return;
@@ -706,19 +706,19 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   if ((_return.__isset.smart_contract_result =
          api_resp.__isset.ret_val)) { // non-bug = instead of ==
-    TRACE("");
+    //TRACE("");
     _return.smart_contract_result = api_resp.ret_val;
   }
 
-  TRACE("");
+  //TRACE("");
 
   if (amnesia) {
-    TRACE("");
+    //TRACE("");
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
   }
 
-  TRACE("");
+  //TRACE("");
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
@@ -726,16 +726,16 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   trxn_sent = true;
 
-  TRACE("");
+  //TRACE("");
 
   if (deploy) {
-    TRACE("");
+    //TRACE("");
     contract_state_entry.wait_till_front([&](std::string& state) {
-      TRACE("");
+      //TRACE("");
       return !state.empty();
     });
   }
-  TRACE("");
+  //TRACE("");
   SetResponseStatus(_return.status,
                     APIRequestStatusType::SUCCESS,
                     get_delimited_transaction_sighex(send_transaction));
@@ -750,7 +750,7 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
     return;
   }
 
-  TRACE("");
+  //TRACE("");
 
   if (!transaction.__isset.smartContract) {
     dumb_transaction_flow(_return, transaction);
@@ -768,7 +768,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
   ///<<
   /// const_limit << std::endl;
 
-  TRACE(offset, const_limit);
+  //TRACE(offset, const_limit);
 
   if (offset > 100)
     const_cast<int64_t&>(offset) = 100;
@@ -846,7 +846,7 @@ APIHandler::PoolInfoGet(PoolInfoGetResult& _return,
 void
 APIHandler::StatsGet(api::StatsGetResult& _return)
 {
-  TRACE("StatsGet");
+  //TRACE("StatsGet");
 
   csstats::StatsPerPeriod stats = this->stats.getStats();
 
@@ -882,9 +882,9 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
   // smart_rescan();
 
   auto smartrid = [&]() -> decltype(auto) {
-    //   TRACE("");
+    //   //TRACE("");
     auto smart_origin = locked_ref(this->smart_origin);
-    //   TRACE("");
+    //   //TRACE("");
     auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
 
     return it == smart_origin->end() ? csdb::TransactionID() : it->second;
@@ -900,18 +900,18 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
                     !_return.smartContract.address.empty()
                       ? APIRequestStatusType::SUCCESS
                       : APIRequestStatusType::FAILURE);
-  TRACE("");
+  //TRACE("");
   return;
 }
 
 bool
 APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 {
-  auto trace = !init;
-  TRACE("");
+  auto TRACE = !init;
+  //TRACE("");
   auto pending_smart_transactions =
     locked_ref(this->pending_smart_transactions);
-  TRACE("");
+  //TRACE("");
 
   std::stack<csdb::PoolHash> new_blocks;
   auto curph = start;
@@ -924,9 +924,9 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   pending_smart_transactions->last_pull_hash = start;
 
   while (!new_blocks.empty()) {
-    auto trace = false;
+    auto TRACE = false;
 
-    TRACE("");
+    //TRACE("");
     // LOG_ERROR(
     //  "new_blocks.top().to_string(): " << new_blocks.top().to_string());
     auto p = s_blockchain.loadBlock(new_blocks.top());
@@ -935,14 +935,14 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 
     new_blocks.pop();
 
-    TRACE("");
+    //TRACE("");
 
     auto& trs = p.transactions();
     for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
-      TRACE("");
+      //TRACE("");
       auto& tr = *i_tr;
       if (is_smart(tr)) {
-        TRACE("");
+        //TRACE("");
         pending_smart_transactions->queue.push(std::move(tr));
       }
     }
@@ -966,7 +966,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 
       auto& e = [&]() -> decltype(auto) {
         auto smart_state(locked_ref(this->smart_state));
-        TRACE("");
+        //TRACE("");
         return (*smart_state)[address];
       }();
       e.update_state(
@@ -974,7 +974,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     }
 
     if (is_smart_deploy(smart)) {
-      TRACE("");
+      //TRACE("");
       {
         auto smart_origin = locked_ref(this->smart_origin);
         (*smart_origin)[address] = tr.id();
@@ -986,7 +986,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     }
     return true;
   }
-  TRACE("");
+  //TRACE("");
   return false;
 }
 
@@ -997,7 +997,7 @@ APIHandler::get_mapped_deployer_smart(
   Mapper mapper,
   std::vector<decltype(mapper(api::SmartContract()))>& out)
 {
-  TRACE("");
+  //TRACE("");
 
   auto deployed_by_creator = locked_ref(this->deployed_by_creator);
 
@@ -1014,20 +1014,20 @@ APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return,
 {
   // Log("SmartContractsListGet");
 
-  TRACE("");
+  //TRACE("");
 
   csdb::Address addr = BlockChain::getAddressFromKey(deployer);
 
   // std::cerr << "Input address: " << deployer << std::endl;
 
-  TRACE("");
+  //TRACE("");
 
   get_mapped_deployer_smart(
     addr,
     [](const api::SmartContract& smart) { return smart; },
     _return.smartContractsList);
 
-  TRACE("");
+  //TRACE("");
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
@@ -1101,21 +1101,21 @@ void
 APIHandler::WaitForSmartTransaction(api::TransactionId& _return,
                                     const api::Address& smart_public)
 {
-  TRACE(smart_public);
+  //TRACE(smart_public);
   csdb::Address key = BlockChain::getAddressFromKey(smart_public);
 
   decltype(smart_last_trxn)::LockedType::iterator it;
 
   auto& entry = [&]() -> decltype(auto) {
     auto smart_last_trxn = locked_ref(this->smart_last_trxn);
-    TRACE("");
+    //TRACE("");
     std::tie(it, std::ignore) =
       smart_last_trxn->emplace(std::piecewise_construct,
                                std::forward_as_tuple(key),
                                std::forward_as_tuple());
     return std::ref(it->second).get();
   }();
-  TRACE("");
+  //TRACE("");
 
   {
     std::unique_lock<decltype(entry.lock)> l(entry.lock);
@@ -1123,24 +1123,24 @@ APIHandler::WaitForSmartTransaction(api::TransactionId& _return,
     ++entry.awaiter_num;
 
     auto checker = [&]() {
-      TRACE("");
+      //TRACE("");
       if (!entry.trid_queue.empty()) {
-        TRACE("");
+        //TRACE("");
         _return = convert_transaction_id(entry.trid_queue.front());
-        TRACE("");
+        //TRACE("");
         if (--entry.awaiter_num == 0) {
-          TRACE("");
+          //TRACE("");
           entry.trid_queue.pop_front();
         }
-        TRACE("");
+        //TRACE("");
         return true;
       }
-      TRACE("");
+      //TRACE("");
       return false;
     };
     entry.new_trxn_cv.wait(l, checker);
   }
-  TRACE("");
+  //TRACE("");
 }
 
 void
@@ -1155,26 +1155,26 @@ APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return,
   int64_t offset = _offset;
   int64_t limit = _limit;
 
-  TRACE("");
+  //TRACE("");
 
   auto smart_origin = locked_ref(this->smart_origin);
 
   for (auto p : *smart_origin) {
     if (offset) {
-      TRACE("");
+      //TRACE("");
       --offset;
     } else if (limit) {
-      TRACE("");
+      //TRACE("");
       auto trid = p.second;
       auto tr = s_blockchain.loadTransaction(trid);
       _return.smartContractsList.push_back(fetch_smart_body(tr));
       --limit;
     } else
       break;
-    TRACE("");
+    //TRACE("");
   }
 
-  TRACE("");
+  //TRACE("");
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
