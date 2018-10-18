@@ -208,6 +208,12 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+#ifdef MONITOR_NODE
+bool monitorNode = true;
+#else
+bool monitorNode = false;
+#endif
+
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   istream_.init(data, size);
 
@@ -215,7 +221,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
 
   if (roundNum_ < rNum || type == MsgTypes::BigBang) {
     roundNum_ = rNum;
-  } else {
+  }
+  else {
     cswarning() << "Bad round number, ignoring";
     return;
   }
@@ -1443,7 +1450,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
-  if (!conn) return;
+  if (!conn) {
+    LOG_WARN("Cannot get a connection with a specified public key");
+    return;
+  }
 
   ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);

@@ -16,7 +16,8 @@ target_link_libraries (client csnode lib)
 
 target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../net/include)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/base58/include)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
