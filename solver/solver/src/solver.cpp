@@ -911,6 +911,10 @@ const cs::PublicKey& Solver::getPublicKey() const {
   return myPublicKey;
 }
 
+cs::SharedMutex& Solver::getSharedMutex() {
+  return m_sharedMutex;
+}
+
 cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet)
 {
   cs::TransactionsPacket good_pool;

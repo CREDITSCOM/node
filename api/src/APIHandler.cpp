@@ -1195,6 +1195,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
     if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, csdb::Transaction())) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
+      cs::SharedLock sharedLock(solver.getSharedMutex());
       decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
       for (decltype(auto) it : m_hash_tb) {
         const auto &transactions = it.second.transactions();
@@ -1206,7 +1207,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
-      if (!finish_for_idx) // if hash table not contain trx
+      if (!finish_for_idx) // if hash table doesn't contain trx
         _return.states[inner_id] = INVALID;
     }
   }

@@ -124,6 +124,8 @@ class Solver {
   const cs::PrivateKey& getPrivateKey() const;
   const cs::PublicKey& getPublicKey() const;
 
+  cs::SharedMutex &getSharedMutex();
+
  private:
   void flushTransactions();
   cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
