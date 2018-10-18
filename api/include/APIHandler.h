@@ -127,6 +127,8 @@ class APIHandler : public APIHandlerInterface
 
     void SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) override;
 
+    void TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) const;
+
   private:
     BlockChain& s_blockchain;
 
