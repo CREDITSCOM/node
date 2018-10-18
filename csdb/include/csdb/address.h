@@ -39,6 +39,7 @@ public:
   static Address from_public_key(const ::csdb::internal::byte_array &key);
   static Address from_public_key(const char* key);
   static Address from_wallet_id(WalletId id);
+  static std::string csdb_addr_to_api_addr(const Address &addr);
 
   bool operator ==(const Address &other) const noexcept;
   inline bool operator !=(const Address &other) const noexcept;
