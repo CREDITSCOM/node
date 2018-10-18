@@ -3,6 +3,15 @@
 #include <gtest/gtest.h>
 #include "packstream.hpp"
 
+void displayStreamData(IPackStream& stream, const size_t& size)
+{
+  auto ptr = stream.getCurrPtr();
+
+  for(int i = 0; i < size; i++){
+    std::cout << "item " << i << ": " << (int)(*(ptr + i)) << std::endl;
+  }
+}
+
 TEST(IPackStream, init)
 {
   IPackStream iPackStream;
@@ -78,6 +87,21 @@ TEST(IPackStream, input)
   iPackStream >> array;
 
   ASSERT_EQ(14, (int)array.data()[0]);
+
+  cs::Bytes bytes;
+  iPackStream >> bytes;
+
+  ASSERT_EQ(16, (int)bytes[0]);
+
+  uint8_t addrArray[] = {0, 127, 0, 0, 1};
+  iPackStream.init(addrArray, 5);
+
+  boost::asio::ip::address address;
+  iPackStream >> address;
+
+  ASSERT_TRUE(address.is_v4());
+
+  // TODO add v6
 }
 
 TEST(IPackStream, end)
