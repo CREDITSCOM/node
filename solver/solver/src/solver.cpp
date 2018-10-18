@@ -186,13 +186,15 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
 
   if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
+    const auto& writer_public_key = sender;
+    newPool.set_writer_public_key(csdb::internal::byte_array(writer_public_key.begin(), writer_public_key.end()));
     m_node->getBlockChain().finishNewBlock(newPool);
     m_node->getBlockChain().putBlock(newPool);
 
 #ifndef MONITOR_NODE
     if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
       auto hash = m_node->getBlockChain().getLastWrittenHash().to_string();
-
+      
       m_node->sendHash(hash, sender);
 
       cslog() << "SENDING HASH to writer: " << hash;
