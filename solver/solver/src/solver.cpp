@@ -187,7 +187,7 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
 
   if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
     m_node->getBlockChain().finishNewBlock(newPool);
-    m_node->getBlockChain().onBlockReceived(newPool);
+    m_node->getBlockChain().putBlock(newPool);
 
 #ifndef MONITOR_NODE
     if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
