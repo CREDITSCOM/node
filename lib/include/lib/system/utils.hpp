@@ -20,6 +20,9 @@
 #include <sodium.h>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/bind.hpp>
 
 #define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
 #define csunused(x) (void)(x)
@@ -247,7 +250,7 @@ namespace cs
             return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
-        ///
+         ///
         /// Same as cs::Utils::byteStreamToHex but calculates only in debug
         ///
         inline static std::string debugByteStreamToHex(const char* stream, const std::size_t length)
@@ -263,20 +266,32 @@ namespace cs
         }
 
         ///
-        /// Calls std::function after ms time in another thread
+        /// Same as cs::Utils::byteStreamToHex but calculates only in debug
         ///
-        static void runAfter(const std::chrono::milliseconds& ms, std::function<void()> callBack)
+        inline static std::string debugByteStreamToHex(const unsigned char* stream, const std::size_t length)
+        {
+            return cs::Utils::debugByteStreamToHex(reinterpret_cast<const char*>(stream), length);
+        }
+
+    private:
+        static void runAfterHelper(const std::chrono::milliseconds& ms, const std::function<void()>& callBack)
         {
             const auto tp = std::chrono::system_clock::now() + ms;
+            std::this_thread::sleep_until(tp);
 
-            std::thread tr([tp, callBack]() {
+            // TODO: call callback without Queue
+            CallsQueue::instance().insert(callBack);
+        }
 
-                std::this_thread::sleep_until(tp);
-                CallsQueue::instance().insert(callBack);
+    public:
 
-            });
-
-            tr.detach();
+        ///
+        /// Calls std::function after ms time in another thread
+        ///
+        static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack)
+        {
+            static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
+            boost::asio::post(threadPool, boost::bind(&cs::Utils::runAfterHelper, ms, callBack));
         }
 
         ///
@@ -337,9 +352,25 @@ namespace cs
     }
 
 }
+
 inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept
 {
-    return static_cast< unsigned char >( arg );
+    return static_cast<unsigned char>( arg );
+}
+
+inline constexpr unsigned char operator "" _i8( unsigned long long arg ) noexcept
+{
+    return static_cast<signed char>( arg );
+}
+
+inline constexpr unsigned char operator "" _u16( unsigned long long arg ) noexcept
+{
+    return static_cast<unsigned short>( arg );
+}
+
+inline constexpr unsigned char operator "" _i16( unsigned long long arg ) noexcept
+{
+    return static_cast<short>( arg );
 }
 
 #endif 

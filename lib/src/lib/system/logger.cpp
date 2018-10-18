@@ -12,7 +12,12 @@ namespace logger {
   void initialize(const logging::settings& settings) {
     logging::add_common_attributes();
     logging::core::get()->add_thread_attribute("Scope", logging::attributes::named_scope());
-	  logging::register_simple_filter_factory<severity_level>(logging::trivial::tag::severity::get_name());
+
+    // formatters
+    logging::register_simple_formatter_factory<severity_level, char>(logging::trivial::tag::severity::get_name());
+    // filters
+    logging::register_simple_filter_factory<severity_level>(logging::trivial::tag::severity::get_name());
+
     logging::init_from_settings(settings);
   }
 

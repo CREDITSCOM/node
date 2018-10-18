@@ -65,7 +65,7 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  void applyCharacteristic(const cs::Characteristic& characteristic,
+  boost::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
                            const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
@@ -143,20 +143,19 @@ class Solver {
 
   csdb::Pool v_pool;
 
-  bool m_isPoolClosed        = true;
+  bool m_isPoolClosed = true;
   bool blockCandidateArrived = false;
-  bool round_table_sent      = false;
-  bool gotBlockThisRound     = false;
-  bool gotBigBang            = false;
+  bool round_table_sent = false;
+  bool gotBlockThisRound = false;
+  bool gotBigBang = false;
+  std::atomic<bool> isConsensusRunning = { false };
 
   cs::SharedMutex m_sharedMutex;
 
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
-
-  // data for requests
-  cs::Hashes m_hashesToRemove;
+  cs::HashesSet m_hashesToRemove;
 
   cs::Timer m_sendingPacketTimer;
 

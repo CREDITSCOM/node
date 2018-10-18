@@ -1,10 +1,11 @@
 #include "lib/system/timer.hpp"
 #include <lib/system/structures.hpp>
+#include <lib/system/utils.hpp>
 
 cs::Timer::Timer():
     m_isRunning(false),
-    m_interruption(false),
     m_isRehabilitation(true),
+    m_interruption(false),
     m_msec(std::chrono::milliseconds(0))
 {
 }
@@ -52,17 +53,9 @@ bool cs::Timer::isRunning()
     return m_isRunning;
 }
 
-static void singleShotHelper(int msec, const cs::TimerCallback& callback)
-{
-    std::this_thread::sleep_for(std::chrono::milliseconds(msec));
-
-    CallsQueue::instance().insert(callback);
-}
-
 void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback)
 {
-    std::thread thread = std::thread(&singleShotHelper, msec, callback);
-    thread.detach();
+    cs::Utils::runAfter(std::chrono::milliseconds(msec), callback);
 }
 
 void cs::Timer::loop()
