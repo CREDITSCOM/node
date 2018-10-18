@@ -146,6 +146,12 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+#ifdef MONITOR_NODE
+bool monitorNode = true;
+#else
+bool monitorNode = false;
+#endif
+
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   //std::cout << __func__ << std::endl;
   istream_.init(data, size);
@@ -181,11 +187,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNu
   istream_ >> h;
 
   uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
+  getBlockChain().setGlobalSequence(lastBlock);
+  solver_->clearAfterMax();
+
   if (lastBlock >= rNum) {
     getBlockChain().setLastWrittenSequence(rNum);
     getBlockChain().updateLastHash();
     lastBlock = rNum - 1;
-    getBlockChain().setGlobalSequence(lastBlock);
   }
 
   if (lastBlock == (rNum - 1)) {
@@ -679,7 +687,7 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
   solver_->rndStorageProcessing();
 
   if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) {
-    if (getBlockChain().getLastHash() == pool.previous_hash())
+    if (monitorNode || getBlockChain().getLastHash() == pool.previous_hash())
       solver_->gotBlock(std::move(pool), sender);
     else {
       auto nSeq = pool.sequence() > 2 ? (pool.sequence() - 2) : 1;
@@ -853,7 +861,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingRecBlockCount    = 0;
 
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
+  //std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
 #endif
 }
 
@@ -877,7 +885,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
 
-    if (getBlockChain().getLastHash() == pool.previous_hash()) {
+    if (monitorNode || getBlockChain().getLastHash() == pool.previous_hash()) {
       solver_->gotBlockReply(std::move(pool));
       awaitingSyncroBlock = false;
       solver_->rndStorageProcessing();
@@ -905,11 +913,14 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREPLY> Sending block to " << byteStreamToHex(sender.str, 32) << std::endl;
+  std::cout << "SENDBLOCKREPLY> Sending block " << pool.sequence() << " of " << const_cast<csdb::Pool&>(pool).transactions().size() << " trxns to " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
 
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
-  if (!conn) return;
+  if (!conn) {
+    LOG_WARN("Cannot get a connection with a specified public key");
+    return;
+  }
 
   ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);

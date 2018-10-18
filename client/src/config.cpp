@@ -6,6 +6,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 
 #include <lib/system/logger.hpp>
+#include <base58.h>
 #include "config.hpp"
 
 const std::string BLOCK_NAME_PARAMS = "params";
@@ -81,9 +82,29 @@ Config Config::read(po::variables_map& vm) {
     vm["db-path"].as<std::string>() :
     DEFAULT_PATH_TO_DB;
 
-  srand(time(NULL));
-  for (int i = 0; i < 32; ++i)
-    *(result.publicKey_.str + i) = (char)(rand() % 255);
+  const auto keyFile = vm.count("key-file") ?
+    vm["key-file"].as<std::string>() :
+    DEFAULT_PATH_TO_PUBLIC_KEY;
+  std::ifstream pub(keyFile);
+  
+  if (pub.is_open()) {
+    std::string pub58;
+    std::vector<uint8_t> myPublic;
+    std::getline(pub, pub58);
+    pub.close();
+    DecodeBase58(pub58, myPublic);
+    if (myPublic.size() != 32) {
+      result.good_ = false;
+      LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
+    }
+
+    result.publicKey_ = PublicKey((const char*)myPublic.data());
+  }
+  else {
+    srand(time(NULL));
+    for (int i = 0; i < 32; ++i)
+      *(result.publicKey_.str + i) = (char)(rand() % 255);
+  }
 
   return result;
 }

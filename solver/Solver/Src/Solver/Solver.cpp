@@ -60,6 +60,7 @@ Solver::Solver(Node* node)
 , m_pool()
 , v_pool()
 , b_pool() {
+  refreshState();
 }
 
 Solver::~Solver() {
@@ -229,7 +230,20 @@ void Solver::flushTransactions() {
       return;
     }
   }
-  runAfter(std::chrono::milliseconds(500), [this]() { flushTransactions(); });
+}
+
+void Solver::refreshState() {
+  static uint32_t ctr = 0;
+  if (++ctr > 0) {
+    flushTransactions();
+    if (ctr % 2 == 0) {
+      auto nextBlock = node_->getBlockChain().getLastWrittenSequence() + 1;
+      if (nextBlock < node_->getRoundNumber())
+        node_->sendBlockRequest(nextBlock);
+    }
+  }
+  
+  runAfter(std::chrono::milliseconds(500), [this]() { refreshState(); });
 }
 
 bool Solver::getIPoolClosed() {
@@ -522,6 +536,13 @@ void Solver::gotFreeSyncroBlock(csdb::Pool&& block)
   }
 }
 
+#ifdef MONITOR_NODE
+bool monitorNode = true;
+#else
+bool monitorNode = false;
+#endif
+
+
 void Solver::rndStorageProcessing()
 {
   //std::cout << __func__ << std::endl;
@@ -542,7 +563,7 @@ void Solver::rndStorageProcessing()
     if (rndStorage.count(newSeq)>0)
     {
       auto& block = rndStorage.at(newSeq);
-      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
+      if (monitorNode || block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
         node_->getBlockChain().putBlock(rndStorage.at(newSeq));
         rndStorage.erase(newSeq);
       }
@@ -550,6 +571,7 @@ void Solver::rndStorageProcessing()
         node_->getBlockChain().setLastWrittenSequence(newSeq - 2);
         node_->getBlockChain().updateLastHash();
         node_->sendBlockRequest(newSeq - 2);
+        rndStorage.erase(newSeq);
         return;
       }
     }
@@ -579,11 +601,12 @@ void Solver::tmpStorageProcessing()
     if (tmpStorage.count(newSeq)>0)
     {
       auto& block = tmpStorage.at(newSeq);
-      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
+      if (monitorNode || block.previous_hash() == node_->getBlockChain().getLastWrittenHash()) {
         node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
         tmpStorage.erase(newSeq);
       }
       else {
+        tmpStorage.erase(newSeq);
         node_->getBlockChain().setLastWrittenSequence(newSeq - 2);
         node_->getBlockChain().updateLastHash();
         node_->sendBlockRequest(newSeq - 2);
@@ -594,6 +617,21 @@ void Solver::tmpStorageProcessing()
   }
 }
 
+void Solver::clearAfterMax() {
+  for (auto it = tmpStorage.begin(); it != tmpStorage.end(); ++it) {
+    if (it->first > node_->getBlockChain().getGlobalSequence())
+      it = tmpStorage.erase(it);
+    else
+      ++it;
+  }
+
+  for (auto it = rndStorage.begin(); it != rndStorage.end(); ++it) {
+    if (it->first > node_->getBlockChain().getGlobalSequence())
+      it = rndStorage.erase(it);
+    else
+      ++it;
+  }
+}
 
 bool Solver::getBigBangStatus() {
   return gotBigBang;

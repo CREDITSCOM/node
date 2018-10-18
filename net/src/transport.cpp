@@ -164,7 +164,7 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
   const auto packEnd = pack + size;
   for (auto ptr = pack; ptr != packEnd; ++ptr) {
-    nh_.registerDirect(pack, conn);
+    nh_.registerDirect(ptr, conn);
     sendDirect(ptr, **conn);
   }
 }

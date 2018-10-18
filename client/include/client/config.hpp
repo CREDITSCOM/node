@@ -16,6 +16,7 @@ const NodeVersion NODE_VERSION = 84;
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
+const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 
 const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
