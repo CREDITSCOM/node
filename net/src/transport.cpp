@@ -220,7 +220,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       try {
         uint32_t round;
         iPackStream_ >> round;
-        gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getHashBySequence(round));
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
       }
       catch (std::out_of_range) {}
       break;
