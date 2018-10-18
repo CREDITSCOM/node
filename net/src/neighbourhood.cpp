@@ -327,7 +327,9 @@ void Neighbourhood::gotConfirmation(const Connection::Id& my,
 
 void Neighbourhood::validateConnectionId(RemoteNodePtr node,
                                          const Connection::Id id,
-                                         const ip::udp::endpoint& ep) {
+                                         const ip::udp::endpoint& ep,
+                                         const PublicKey& pk,
+                                         const uint32_t lastSeq) {
   SpinLock l1(mLockFlag_);
   SpinLock l2(nLockFlag_);
 
@@ -341,6 +343,8 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
         nConn->specialOut = true;
         nConn->out = nConn->in;
         nConn->in = ep;
+        nConn->key = pk;
+        nConn->lastSeq = lastSeq;
       }
     }
     else {
@@ -357,7 +361,12 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
       (*realPtr)->out = (*realPtr)->in;
     }
     (*realPtr)->in = ep;
+    (*realPtr)->key = pk;
+    (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
+  }
+  else {
+    (*realPtr)->lastSeq = lastSeq;
   }
 }
 
@@ -379,10 +388,10 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 
   if (isDirect) {
     auto& dp = msgDirects_.tryStore(hash);
-    if (dp.receiver && conn->id == dp.receiver->id)
+    //if (dp.receiver && conn->id == dp.receiver->id)
       dp.received = true;
-    else
-      LOG_WARN("Got confirmation from a different connection");
+    //else
+    //  LOG_WARN("Got confirmation from a different connection");
   }
   else {
     auto& bp = msgBroads_.tryStore(hash);
@@ -552,7 +561,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   alreadyRequested = false;
   ConnectionPtr candidate;
   for (auto& nb : neighbours_) {
-    if (nb->isSignal) continue;
+    if (nb->isSignal || nb->lastSeq < seq) continue;
     if (nb->syncSeq == seq) {
       if (nb->syncSeqRetries < MaxSyncAttempts) {
         alreadyRequested = true;

@@ -777,10 +777,10 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
   //std::cout << __func__ << std::endl;
-  if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
-    return;
-  if (sender == myPublicKey_)
-    return;
+  //if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
+  //  return;
+  //if (sender == myPublicKey_)
+  //  return;
   uint32_t requested_seq;
   istream_.init(data, size);
   istream_ >> requested_seq;
@@ -835,7 +835,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     }
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
-      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->in);
       ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);

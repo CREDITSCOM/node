@@ -89,6 +89,8 @@ struct Connection {
   uint32_t syncSeq = 0;
   uint32_t syncSeqRetries = 0;
 
+  uint32_t lastSeq = 0;
+
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
   }
@@ -141,7 +143,9 @@ public:
   void pingNeighbours();
   void validateConnectionId(RemoteNodePtr,
                             const Connection::Id,
-                            const ip::udp::endpoint&);
+                            const ip::udp::endpoint&,
+                            const PublicKey&,
+                            const uint32_t lastSeq);
 
   ConnectionPtr getConnection(const RemoteNodePtr);
 
