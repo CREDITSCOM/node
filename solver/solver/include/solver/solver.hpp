@@ -140,6 +140,7 @@ class Solver {
   const csdb::Address startAddress;
 #ifdef SPAMMER
   const csdb::Address spammerAddress;
+  std::vector<csdb::Address> spam_keys_;
 #endif
 
   Fee fee_counter_;

@@ -39,6 +39,9 @@ void addTimestampToPool(csdb::Pool& pool) {
 static int randFT(int min, int max) {
   return rand() % (max - min + 1) + min;
 }
+
+static const int NUM_OF_SPAM_KEYS = 10;
+
 #endif
 }  // namespace
 
@@ -61,6 +64,17 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 , fee_counter_()
 , m_writerIndex(0) {
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
+#ifdef SPAMMER
+  uint8_t sk[64];
+  uint8_t pk[32];
+  csdb::Address pub;
+  for (int i = 0; i < NUM_OF_SPAM_KEYS; i++)
+  {
+    crypto_sign_keypair(pk, sk);
+    pub = pub.from_public_key((const char*)pk);
+    spam_keys_.push_back(pub);
+  }
+#endif
 }
 
 Solver::~Solver() {
@@ -714,47 +728,43 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
 /////////////////////////////
 #ifdef SPAMMER
-void Solver::spamWithTransactions() {
-  cslog() << "STARTING SPAMMER...";
-  std::string mp = "1234567890abcdef";
+void Solver::spamWithTransactions()
+{
+  std::cout << "STARTING SPAMMER..." << std::endl;
 
+  long counter = 0;
   uint64_t iid = 0;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  auto aaa = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
-  auto bbb = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
-
   csdb::Transaction transaction;
-  transaction.set_target(aaa);
-  transaction.set_source(csdb::Address::from_public_key((char*)myPublicKey.data()));
   transaction.set_currency(csdb::Currency(1));
 
-  const cs::RoundNumber round = m_roundTable.round;
-
-  // TODO: fix magic values
   while (true) {
     if (spamRunning && (m_node->getMyLevel() == Normal)) {
-      if ((round < 10) || (round > 20)) {
-        transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-        // transaction.set_comission(csdb::Amount(0, 1, 10));
-        transaction.set_innerID(iid);
-        iid++;
+      csdb::internal::WalletId id;
 
-        if (!transaction.is_valid()) {
-          cserror() << "Generated transaction is not valid";
-        }
-
-        addConveyerTransaction(transaction);
+      if (m_node->getBlockChain().findWalletId(spammerAddress, id)) {
+        transaction.set_source(csdb::Address::from_wallet_id(id));
+      } else {
+        transaction.set_source(spammerAddress);
       }
+      if (m_node->getBlockChain().findWalletId(spam_keys_[counter], id)) {
+        transaction.set_target(csdb::Address::from_wallet_id(id));
+      } else {
+        transaction.set_target(spam_keys_[counter]);
+      }
+      transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+      transaction.set_max_fee(csdb::AmountCommission(0.1));
+      transaction.set_innerID(iid++);
+
+      addConveyerTransaction(transaction);
+      if (counter++ == NUM_OF_SPAM_KEYS - 1) counter = 0;
     }
 
-    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY * 2, TIME_TO_AWAIT_ACTIVITY * 4);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(awaitTime));
+    std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
   }
 }
 #endif
-
 ///////////////////
 
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
