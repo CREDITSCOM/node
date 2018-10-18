@@ -348,16 +348,6 @@ bool
 Transaction::verify_signature(const internal::byte_array& public_key) const
 {
   // if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
-  csdb::internal::byte_array message = this->to_byte_stream_for_sig();
-  std::string signature = this->signature();
-  std::cout << "message:\n";
-  std::copy(message.begin(), message.end(), std::ostream_iterator<int>(std::cout, " "));
-  std::cout << "\nsingature:\n";
-  std::copy(signature.begin(), signature.end(), std::ostream_iterator<int>(std::cout, " "));
-  std::cout << std::endl;
-  std::cout << "public key:\n";
-  std::copy(public_key.begin(), public_key.end(), std::ostream_iterator<int>(std::cout, " "));
-  std::cout << "\n";
   auto res = crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(this->signature().data()),
                                               this->to_byte_stream_for_sig().data(),
                                               this->to_byte_stream_for_sig().size(),
