@@ -687,13 +687,26 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     executor_transport->open();
   }
 
+  Address pk_source;
+  csdb::Address res_addr;
+  WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
+  if (transaction.source.size() == PUBLIC_KEY_LENGTH)
+    pk_source = transaction.source;
+  else if (s_blockchain.findAddrByWalletId(id, res_addr))
+    pk_source = csdb::Address::csdb_addr_to_api_addr(res_addr);
+  else {
+    LOG_ERROR("Public key of wallet not found by walletId");
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+  }
+  executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+
   //TRACE("");
-  executor.executeByteCode(api_resp,
+  /*executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
                            contract_state,
                            input_smart.method,
-                           input_smart.params);
+                           input_smart.params);*/
 
   //TRACE("");
 
