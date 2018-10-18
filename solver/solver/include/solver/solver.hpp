@@ -119,11 +119,10 @@ class Solver {
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 
-  cs::PublicKey myPublicKey;
-  cs::PrivateKey myPrivateKey;
+  cs::PublicKey m_publicKey;
+  cs::PrivateKey m_privateKey;
 
   Node* m_node;
-
   std::unique_ptr<Generals> m_generals;
 
   HashVector hvector;

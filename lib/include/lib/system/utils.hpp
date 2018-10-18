@@ -316,8 +316,8 @@ namespace cs
         ///
         static std::string currentTimestamp()
         {
-            auto now_time = std::chrono::system_clock::now();
-            return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
+            auto now = std::chrono::system_clock::now();
+            return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
         }
 
         ///

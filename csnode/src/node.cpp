@@ -762,7 +762,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 
   cs::TransactionsPacket packet = cs::TransactionsPacket::fromBinary(bytes);
 
-  cslog() << "NODE> Transactions amount got " << packet.transactionsCount();
+  csdebug() << "NODE> Transactions amount got " << packet.transactionsCount();
 
   if (packet.hash().isEmpty()) {
     cswarning() << "Received transaction packet hash is empty";
@@ -773,8 +773,6 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
-  cslog() << "NODE> getPacketHashesRequest " << size;
-
   cs::DataStream stream(data, size);
 
   std::size_t hashesCount = 0;
@@ -790,7 +788,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     hashes.push_back(std::move(hash));
   }
 
-  cslog() << "NODE> Hashes request got size: " << hashesCount;
+  cslog() << "NODE> Hashes request got hashes count: " << hashesCount;
 
   if (hashesCount != hashes.size()) {
     cserror() << "Bad hashes created";
@@ -867,9 +865,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   onRoundStart(roundTable);
 
   // TODO: think how to improve this code
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
+  //cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
       solver_->gotRound(std::move(roundTable));
-  });
+  //});
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -927,16 +925,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
       return;
     }
   }
-
-  const cs::RoundTable& roundTable = solver_->roundTable();
-
-  // TODO: verify pool signature
-  //for (const auto& confidant : roundTable.confidants) {
-  //  if (!cs::Utils::verifySignature(signature, confidant, data, size)) {
-  //    cswarning() << "Confidants signatures verification failed";
-  //    return;
-  //  }
-  //}
 
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount " << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
@@ -1018,8 +1006,11 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   size_t messageSize = size - signature.size() - publicKey.size();
 
   if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
-    cserror() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
-    csinfo() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
+    cserror() << "NODE> Writer verify signature notification failed";
+
+    csfile() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
+    csfile() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
+
     return false;
   }
 
@@ -1095,7 +1086,7 @@ void Node::sendHash(const std::string& hash, const cs::PublicKey& target) {
 
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
   if (packet.hash().isEmpty()) {
-    cslog() << "Send transaction packet with empty hash failed";
+    cswarning() << "Send transaction packet with empty hash failed";
     return;
   }
 
@@ -1113,10 +1104,6 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast | BaseFlags::Compressed);
 
-  for (const auto& hash : hashes) {
-    cslog() << "Transaction packet request, need hash - " << hash.toString();
-  }
-
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1126,7 +1113,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     stream << hash;
   }
 
-  cslog() << "Sending transaction packet request: size: " << bytes.size();
+  cslog() << "NODE> Sending transaction packet request: size: " << bytes.size();
 
   ostream_ << MsgTypes::TransactionsPacketRequest << roundNum_ << bytes;
 
@@ -1135,7 +1122,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
   if (packet.hash().isEmpty()) {
-    cslog() << "Send transaction packet reply with empty hash failed";
+    cswarning() << "Send transaction packet reply with empty hash failed";
     return;
   }
 
@@ -1147,8 +1134,7 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
 
   stream << packet;
 
-  cslog() << "Sending transaction packet reply: size: " << bytes.size();
-  cslog() << "NODE> Sending " << packet.transactionsCount() << " transaction(s)";
+  cslog() << "Node> Sending transaction packet reply: size: " << bytes.size();
 
   ostream_ << bytes;
 

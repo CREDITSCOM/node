@@ -176,7 +176,7 @@ namespace cs
 
     bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction)
     {
-        if (!transaction.is_valid() && !isHashEmpty()) {
+        if (!transaction.is_valid() || !isHashEmpty()) {
             return false;
         }
 
