@@ -53,6 +53,7 @@ class Node {
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
   void applyNotifications();
+  void writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey &sender);
 
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();

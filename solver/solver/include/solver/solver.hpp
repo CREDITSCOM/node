@@ -5,25 +5,18 @@
 #define SOLVER_HPP
 
 #include <csdb/csdb.h>
+#include <csdb/transaction.h>
+#include <api_types.h>
+
 #include <memory>
 #include <thread>
-
-#include <api_types.h>
 #include <functional>
-
 #include <atomic>
-#include <functional>
-
 #include <shared_mutex>
-
 #include <set>
 #include <string>
-#include <thread>
 #include <vector>
-
-#include <api_types.h>
-#include <csdb/transaction.h>
-#include <boost/asio.hpp>
+#include <optional>
 
 #include <csnode/nodecore.h>
 #include <lib/system/timer.hpp>
@@ -65,7 +58,7 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  void applyCharacteristic(const cs::Characteristic& characteristic,
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
                            const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;

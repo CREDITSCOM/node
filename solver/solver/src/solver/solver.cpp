@@ -85,7 +85,7 @@ uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
 }
 
-void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool,
+std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool,
                                  const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
@@ -95,20 +95,17 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
   cs::Lock lock(m_sharedMutex);
   cs::Hashes localHashes = m_roundTable.hashes;
 
+  cslog() << "Solver> Characteristic bytes size " << characteristic.mask.size();
   csdebug() << "Solver> Characteristic bytes " << cs::Utils::debugByteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
 
   csdb::Pool newPool;
   std::size_t maskIndex = 0;
-  std::string timestamp = metaInfoPool.timestamp;
-  uint64_t sequence = metaInfoPool.sequenceNumber;
   const cs::Bytes& mask = characteristic.mask;
-
-  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << sequence;
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.count(hash)) {
       cserror() << "SOLVER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
-      return;
+      return std::nullopt;
     }
 
     const auto& transactions = m_hashTable[hash].transactions();
@@ -129,37 +126,17 @@ void Solver::applyCharacteristic(const cs::Characteristic& characteristic, const
     cswarning() << "SOLVER> ApplyCharacteristic: Some of transactions is not valid";
   }
                                                            
-  newPool.set_sequence(sequence);
-  newPool.add_user_field(0, timestamp);
+  cslog() << "SOLVER> ApplyCharacteristic : sequence = " << metaInfoPool.sequenceNumber;
+
+  newPool.set_sequence(metaInfoPool.sequenceNumber);
+  newPool.add_user_field(0, metaInfoPool.timestamp);
 
   // TODO: need to write confidants notifications bytes to csdb::Pool user fields
 #ifdef MONITOR_NODE
   addTimestampToPool(newPool);
 #endif
 
-  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
-
-  if (sequence > m_node->getRoundNumber()) {
-    return;  // remove this line when the block candidate signing of all trusted will be implemented
-  }
-
-  assert(sequence <= m_node->getRoundNumber());
-
-  m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
-
-  if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
-    m_node->getBlockChain().putBlock(newPool);
-
-#ifndef MONITOR_NODE
-    if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
-      auto hash = m_node->getBlockChain().getLastWrittenHash().to_string();
-
-      m_node->sendHash(hash, sender);
-
-      cslog() << "SENDING HASH to writer: " << hash;
-    }
-#endif
-  }
+  return newPool;
 }
 
 const Characteristic& Solver::getCharacteristic() const {
@@ -658,6 +635,8 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
   cslog() << "Solver -> My Hash: " << myHash;
   cslog() << "Solver -> Received hash:" << hash;
+
+  cslog() << "Solver -> Received public key: " << sender.data();
 
   if (ips.size() <= min_nodes) {
     if (hash == myHash) {
