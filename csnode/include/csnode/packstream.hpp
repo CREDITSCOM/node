@@ -340,6 +340,12 @@ inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   return *this;
 }
 
+template <>
+inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
+  insertBytes((const char*)bytes.data(), bytes.size());
+  return *this;
+}
+
 #if 0
 // "has data" flag
 constexpr const uint8_t ContainsData = 1;
