@@ -1177,7 +1177,7 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
       .to_binary());
 }
 
-void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) const {
+void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   for (const auto &inner_id : v) {
     bool finish_for_idx = false;
@@ -1214,4 +1214,16 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
   _return.method = convertTransaction(trx).trxn.smartContract.method;
   _return.params = convertTransaction(trx).trxn.smartContract.params;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) {
+  executor::GetContractMethodsResult executor_ret;
+  executor.getContractMethods(executor_ret, bytecode);
+  _return.code = executor_ret.code;
+  _return.message = executor_ret.message;
+  for (int Count = 0; Count < executor_ret.methods.size(); Count++) {
+    _return.methods[Count].name = executor_ret.methods[Count].name;
+    _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
+    _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+  }
 }
