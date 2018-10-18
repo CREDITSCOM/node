@@ -59,6 +59,23 @@ bool WalletsIds::Normal::find(const WalletAddress& address, WalletId& id) const
     return false;
 }
 
+bool WalletsIds::Normal::findaddr(const WalletId& id, WalletAddress& address) const
+{
+  bool flgfind = false;
+  for (auto &it : norm_.data_) {
+    if (it.second == id) {
+      flgfind = true;
+      address = it.first;
+      break;
+    }
+  }
+  if (flgfind)
+    return true;
+
+  LOG_ERROR("Wrong WalletId");
+  return false;
+}
+
 bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id)
 {
     if (address.is_wallet_id())

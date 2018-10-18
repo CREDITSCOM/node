@@ -46,6 +46,7 @@ public:
         // returns true if new id was inserted
         bool insert(const WalletAddress& address, WalletId id);
         bool find(const WalletAddress& address, WalletId& id) const;
+        bool findaddr(const WalletId& id, WalletAddress& address) const;
         // returns true if new id was inserted
         bool get(const WalletAddress& address, WalletId& id);
     private:
