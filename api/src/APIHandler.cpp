@@ -1188,6 +1188,32 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
       .to_binary());
 }
 
+void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) const {
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+  for (const auto &inner_id : v) {
+    bool finish_for_idx = false;
+    if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, csdb::Transaction())) // find in blockchain
+      _return.states[inner_id] = VALID;
+    else {
+      decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
+      for (decltype(auto) it : m_hash_tb) {
+        const auto &transactions = it.second.transactions();
+        for (decltype(auto) transaction : transactions) {
+          if (transaction.innerID() == inner_id) {
+            _return.states[inner_id] = INPROGRESS;
+            finish_for_idx = true;
+            break;
+          }
+        }
+      }
+      if (!finish_for_idx) // if hash table not contain trx
+        _return.states[inner_id] = INVALID;
+    }
+  }
+  _return.roundNum = solver.roundTable().round;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) {
   csdb::Transaction trx;
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
