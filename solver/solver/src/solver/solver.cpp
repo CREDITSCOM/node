@@ -214,6 +214,8 @@ void Solver::flushTransactions() {
     return;
   }
 
+  std::size_t allTransactionsCount = 0;
+
   for (auto& packet : m_transactionsBlock) {
     auto transactionsCount = packet.transactionsCount();
 
@@ -242,11 +244,15 @@ void Solver::flushTransactions() {
       } else {
         cserror() << "Logical error, adding transactions packet more than one time";
       }
+
+      allTransactionsCount += transactionsCount;
     }
   }
 
   if (!m_transactionsBlock.empty()) {
-    csdebug() << "All transaction packets flushed, packet count: " << m_transactionsBlock.size();
+    csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << m_transactionsBlock.size();
+    csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
+
     m_transactionsBlock.clear();
   }
 }
@@ -724,7 +730,7 @@ void Solver::spamWithTransactions() {
       }
     }
 
-    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY << 1, TIME_TO_AWAIT_ACTIVITY << 2);
+    const std::size_t awaitTime = cs::Utils::generateRandomValue(TIME_TO_AWAIT_ACTIVITY, TIME_TO_AWAIT_ACTIVITY << 2);
     std::this_thread::sleep_for(std::chrono::milliseconds(awaitTime));
   }
 }
