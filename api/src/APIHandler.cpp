@@ -337,6 +337,7 @@ APIHandler::convertTransaction(const csdb::Transaction& transaction)
 
   result.trxn.id = transaction.innerID();
 
+  result.trxn.id = transaction.innerID();
   result.trxn.amount = convertAmount(amount);
   result.trxn.currency = DEFAULT_CURRENCY;
 
@@ -1217,7 +1218,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) {
   csdb::Transaction trx;
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
-  if(!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
+  if (!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }

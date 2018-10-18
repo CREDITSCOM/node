@@ -23,6 +23,20 @@ namespace slv2
     using KeyType = csdb::internal::byte_array;
 
     /**
+     * @enum    Role
+     *
+     * @brief   Values that represent roles, repeats analog defined in node.hpp
+     */
+
+    enum class Role
+    {
+        Normal,
+        Trusted,
+        Collect,
+        Write
+    };
+
+    /**
      * @class   SolverContext
      *
      * @brief   A solver context.
@@ -44,74 +58,54 @@ namespace slv2
             : core(core)
         {}
 
-        // Switch state methods:
-
         /**
-         * @fn  void SolverContext::become_normal();
+         * @fn  void SolverContext::request_role(Role role)
          *
-         * @brief   Request to become normal node.
+         * @brief   Request core to activate one of predefined role (@see Role). Obviously it is achieved
+         *          by switching current state. Request may be "ignored" depending on current state and
+         *          content of transition table.
          *
-         * @author  aae
-         * @date    03.10.2018
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
          *
-         * ### remarks  Aae, 30.09.2018.
+         * @param   role    The role requested.
          */
 
-        void become_normal()
+        void request_role(Role role)
         {
-            core.handleTransitions(SolverCore::Event::SetNormal);
+            switch(role) {
+            case Role::Normal:
+                core.handleTransitions(SolverCore::Event::SetNormal);
+                break;
+            case Role::Trusted:
+                core.handleTransitions(SolverCore::Event::SetTrusted);
+                break;
+            case Role::Collect:
+                core.handleTransitions(SolverCore::Event::SetCollector);
+                break;
+            case Role::Write:
+                core.handleTransitions(SolverCore::Event::SetWriter);
+                break;
+            }
         }
 
         /**
-         * @fn  void SolverContext::become_trusted();
+         * @fn  NodeLevel SolverContext::level() const;
          *
-         * @brief   Request to become trusted node.
+         * @brief   Gets the current node role as set in last round table
          *
-         * @author  aae
-         * @date    03.10.2018
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
          *
-         * ### remarks  Aae, 30.09.2018.
+         * @return  A node role set in last round table.
          */
 
-        void become_trusted()
-        {
-            core.handleTransitions(SolverCore::Event::SetTrusted);
-        }
-
-        /**
-         * @fn  void SolverContext::become_writer();
-         *
-         * @brief   Request to become writer node.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void become_writer()
-        {
-            core.handleTransitions(SolverCore::Event::SetWriter);
-        }
-
-        /**
-         * @fn  void SolverContext::become_collector();
-         *
-         * @brief   Request to become collector (main node)
-         *
-         * @author  aae
-         * @date    01.10.2018
-         */
-
-        void become_collector()
-        {
-            core.handleTransitions(SolverCore::Event::SetCollector);
-        }
+        Role role() const;
 
         /**
          * @fn  void SolverContext::vectors_completed();
          *
-         * @brief   Inform that receive enough vectors.
+         * @brief   Inform core that enough vectors are received.
          *
          * @author  aae
          * @date    03.10.2018
@@ -127,7 +121,7 @@ namespace slv2
         /**
          * @fn  void SolverContext::matrices_completed();
          *
-         * @brief   Inform that receive enough matrices.
+         * @brief   Inform core that enough matrices are received.
          *
          * @author  aae
          * @date    03.10.2018
@@ -143,7 +137,7 @@ namespace slv2
         /**
          * @fn  void SolverContext::spawn_next_round();
          *
-         * @brief   Spawn next round.
+         * @brief   Spawn request to next round.
          *
          * @author  aae
          * @date    03.10.2018
@@ -167,24 +161,6 @@ namespace slv2
 		 */
 
 		BlockChain& blockchain() const;
-
-        /**
-         * @fn  Node& SolverContext::node() const;
-         *
-         * @brief   Gets the node instance.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  A reference to a Node.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        Node& node() const
-        {
-            return *core.pnode;
-        }
 
         /**
          * @fn  cs::Generals& SolverContext::generals() const;
@@ -279,6 +255,23 @@ namespace slv2
         }
 
         /**
+         * @fn  const cs::HashMatrix& SolverContext::hash_matrix() const;
+         *
+         * @brief   Hash matrix
+         *          
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         *
+         * @return  A reference to a const cs::HashMatrix.
+         */
+
+        const cs::HashMatrix& hash_matrix() const
+        {
+            return core.getMyMatrix();
+        }
+
+        /**
          * @fn  uint32_t SolverContext::round() const;
          *
          * @brief   Gets the current round number.
@@ -309,7 +302,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        uint8_t own_conf_number() const;
+        size_t own_conf_number() const;
 
         /**
          * @fn  size_t SolverContext::cnt_trusted() const;
@@ -343,6 +336,20 @@ namespace slv2
         {
             return core.cnt_trusted_desired;
         }
+
+        /**
+         * @fn  const std::vector<PublicKey>& SolverContext::trusted() const;
+         *
+         * @brief   Gets the trusted
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         *
+         * @return  A reference to a const std::vector&lt;PublicKey&gt;
+         *          
+         */
+
+        const std::vector<cs::PublicKey>& trusted() const;
 
         /**
          * @fn  bool SolverContext::is_spammer() const;
@@ -425,6 +432,18 @@ namespace slv2
         {
             core.repeatLastBlock();
         }
+
+        /**
+         * @fn  void SolverContext::request_round_table() const;
+         *
+         * @brief   Request round table
+         *          
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         */
+
+        void request_round_table() const;
 
         /**
          * @fn  void SolverContext::add(const csdb::Transaction& tr);
@@ -693,6 +712,73 @@ namespace slv2
 		 */
 
 		csdb::Address optimize(const csdb::Address& address) const;
+
+        /**
+         * @fn  void SolverContext::send_hash(const Hash& hash, const PublicKey& target);
+         *
+         * @brief   Sends a hash to a target
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         *
+         * @param   hash    The hash.
+         * @param   target  Target for the.
+         */
+
+        void send_hash(const cs::Hash& hash, const cs::PublicKey& target);
+
+        /**
+         * @fn  void SolverContext::send_own_vector();
+         *
+         * @brief   Sends the own vector
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         */
+
+        void send_own_vector();
+
+        /**
+         * @fn  void SolverContext::send_own_matrix();
+         *
+         * @brief   Sends the own matrix
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         */
+
+        void send_own_matrix();
+
+        /**
+         * @fn  void SolverContext::send_transaction_list(csdb::Pool& pool);
+         *
+         * @brief   Sends a transaction list
+         *
+         * @author  Alexander Avramenko
+         * @date    15.10.2018
+         *
+         * @param [in,out]  pool    The pool.
+         */
+
+        void send_transaction_list(csdb::Pool& pool);
+
+        // methods to operate with vectors cache
+
+        void cache_vector(uint8_t sender, const cs::HashVector& vect)
+        {
+            core.cache_vector(sender, vect);
+        }
+
+        // looks for vector in matrices already received, returns nullptr if vector not found:
+        const cs::HashVector* lookup_vector(uint8_t sender) const
+        {
+            return core.lookup_vector(sender);
+        }
+
+        void clear_vectors_cache()
+        {
+            core.clear_vectors_cache();
+        }
 
     private:
         SolverCore& core;

@@ -1191,47 +1191,60 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::sendBlockRequest(uint32_t seq) {
-  if (solver_->roundTable().confidants.size() < MIN_CONFIDANTS) return;
+  static uint32_t lfReq, lfTimes;
 
-  if (seq == lastStartSequence_) {
-    solver_->tmpStorageProcessing();
-    return;
+  solver_->rndStorageProcessing();
+  seq = getBlockChain().getLastWrittenSequence() + 1;
+
+  csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
+  csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
+  if (gs == 0) {
+    gs = roundNum_;
+  }
+  csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
+  const uint32_t syncStatus = static_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
+  if (syncStatus <= 100) {
+    std::cout << "SYNC: [";
+    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) std::cout << "#";
+    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) std::cout << "-";
+    std::cout << "] " << syncStatus << "%" << std::endl;
   }
 
-  // FIXME: result of merge cs_dev branch
-  if (awaitingSyncroBlock && awaitingRecBlockCount < 1 && false) {
-    cslog() << "SENDBLOCKREQUEST> New request won't be sent, we're awaiting block:  " << sendBlockRequestSequence;
+  uint32_t reqSeq = seq;
 
-    awaitingRecBlockCount++;
-    return;
+  if (lfReq != seq) {
+    lfReq = seq;
+    lfTimes = 0;
   }
 
-  csdebug() << "SENDBLOCKREQUEST> Composing the request";
+  while (reqSeq) {
+    bool alreadyRequested = false;
+    ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
+    if (!requestee) {
+      break;  // No more free requestees
+    }
 
-  size_t lws;
-  size_t globalSequence = getBlockChain().getGlobalSequence();
+    if (!alreadyRequested) {  // Already requested this block from this guy?
+      LOG_NOTICE("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
+      transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
+      if (lfReq == reqSeq && ++lfTimes >= 4)
+        transport_->sendBroadcast(ostream_.getPackets());
+      ostream_.clear();
+    }
 
-  if (globalSequence == 0) {
-    globalSequence = roundNum_;
+    reqSeq = solver_->getNextMissingBlock(reqSeq);
   }
 
-  lws = getBlockChain().getLastWrittenSequence();
-
-  float syncStatus = (1.0f - (globalSequence - lws) / globalSequence) * 100.0f;
-  csdebug() << "SENDBLOCKREQUEST> Syncro_Status = " << syncStatus << "%";
-
+  //#endif
   sendBlockRequestSequence = seq;
-  awaitingSyncroBlock      = true;
-  awaitingRecBlockCount    = 0;
+  awaitingSyncroBlock = true;
+  awaitingRecBlockCount = 0;
 
-  uint8_t requestTo = rand() % (MIN_CONFIDANTS);
-
-  ostream_.init(BaseFlags::Signed, solver_->roundTable().confidants[requestTo]);
-  ostream_ << MsgTypes::BlockRequest << roundNum_ << seq;
-
-  flushCurrentTasks();
-
-  csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
+#ifdef MYLOG
+  std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
+#endif
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
@@ -1246,21 +1259,29 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   if (pool.sequence() == sendBlockRequestSequence) {
     cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
+  }
 
+  transport_->syncReplied(pool.sequence());
+
+  if (getBlockChain().getGlobalSequence() < pool.sequence()) {
+    getBlockChain().setGlobalSequence(pool.sequence());
+  }
+
+  if (pool.sequence() == sendBlockRequestSequence) {
+    cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
     solver_->gotBlockReply(std::move(pool));
     awaitingSyncroBlock = false;
     solver_->rndStorageProcessing();
   }
-  else if ((pool.sequence() > sendBlockRequestSequence) && (pool.sequence() < lastStartSequence_)) {
+  else {
     solver_->gotFreeSyncroBlock(std::move(pool));
   }
-  else {
-    return;
-  }
-  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {
+
+  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
     syncro_started = false;
+    cslog() << "SYNCRO FINISHED!!!";
   }
 }
 
@@ -1268,7 +1289,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
   if (!conn) return;
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
   transport_->deliverDirect(ostream_.getPackets(),
                             ostream_.getPacketsCount(),

@@ -214,7 +214,8 @@ namespace slv2
         /**
          * @fn  virtual Result INodeState::onTransactionList(SolverContext& context, const csdb::Pool& pool) = 0;
          *
-         * @brief   Is called when new transaction list is received.
+         * @brief   Is called when new transaction list is received. The SolverCore always updates own
+         *          vector before call this method.
          *
          * @author  aae
          * @date    01.10.2018
@@ -224,8 +225,6 @@ namespace slv2
          *
          * @return  A Result of event: Finish - core has to make a transition, Ignore - continue to work
          *          in current state, Failed - error occurs.
-         *
-         * ### remarks  Aae, 30.09.2018.
          */
 
         virtual Result onTransactionList(SolverContext& context, const csdb::Pool& pool) = 0;

@@ -12,6 +12,7 @@ add_library(solver2
 	include/solver2/SolverCore.h
 	include/solver2/SolverContext.h
 	include/solver2/Node.h
+	include/solver2/Blockchain.h
 	include/solver2/Generals.h
 	include/solver2/SolverCompat.h
 	include/solver2/CallsQueueScheduler.h
@@ -42,7 +43,6 @@ add_library(solver2
 	src/states/HandleBBState.cpp
 	src/states/HandleRTState.cpp
 	src/states/NormalState.cpp
-	src/states/StartState.cpp
 	src/states/StartNormalState.cpp
 	src/states/StartCollectState.cpp
 	src/states/SyncState.cpp

@@ -2,10 +2,10 @@
 #include "SolverContext.h"
 #include "CallsQueueScheduler.h"
 #include "Consensus.h"
-#include "SolverCompat.h"
-#include <solver/WalletsState.h>
-#include <solver/Fee.h>
 #include "Node.h"
+#include "SolverCompat.h"
+#include <Solver/WalletsState.h>
+#include <Solver/Fee.h>
 #include "Generals.h"
 
 #pragma warning(push)
@@ -18,6 +18,7 @@
 #include <limits>
 #include <string>
 #include <sstream>
+#include <functional>
 
 namespace slv2
 {
@@ -244,22 +245,22 @@ namespace slv2
         pnode->becomeWriter();
 
         // see Solver-1, writeNewBlock() method
-        pnode->getBlockChain().finishNewBlock(p);
+        p.set_writer_public_key(public_key);
+        auto& bc = pnode->getBlockChain();
+        bc.finishNewBlock(p);
         // see: Solver-1, addTimestampToPool() method
         p.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
         // finalize
         // see Solver-1, prepareBlockForSend() method
-        p.set_writer_public_key(public_key);
-        p.set_sequence((pnode->getBlockChain().getLastWrittenSequence()) + 1);
+        p.set_sequence((bc.getLastWrittenSequence()) + 1);
         p.sign(private_key);
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
         }
         pnode->sendBlock(p);
-        auto& bc = pnode->getBlockChain();
         bc.writeNewBlock(p);
         bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
     }
@@ -306,16 +307,23 @@ namespace slv2
     {
         csdb::Pool good;
         BlockChain::WalletData data_to_fetch_pulic_key;
+        BlockChain& bc = pnode->getBlockChain();
         for( const auto& tr: p.transactions()) {
             const auto& src = tr.source();
+            csdb::internal::byte_array pk;
             if(src.is_wallet_id()) {
-                pnode->getBlockChain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-                if(tr.verify_signature(csdb::internal::byte_array(
-                    data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()))) {
-                    good.add_transaction(tr);
-                }
+                bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
+                pk.assign(data_to_fetch_pulic_key.address_.cbegin(), data_to_fetch_pulic_key.address_.cend());
             }
-            else if(tr.verify_signature(src.public_key())) {
+            else {
+                const auto& tmpref = src.public_key();
+                pk.assign(tmpref.cbegin(), tmpref.cend());
+            }
+            bool force_permit = (opt_spammer_on && addr_spam.has_value() && pk == addr_spam.value().public_key());
+            if(force_permit || tr.verify_signature(pk)) {
+                if(Consensus::Log && force_permit) {
+                    LOG_WARN("SolverCore: permit drain " << static_cast<int>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
+                }
                 good.add_transaction(tr);
             }
         }
@@ -372,6 +380,43 @@ namespace slv2
                 break;
             }
         }
+    }
+
+    void SolverCore::cache_vector(uint8_t sender, const cs::HashVector& vect)
+    {
+        //if(vect.is_empty()) {
+        //    return;
+        //}
+        std::vector<VectorVariant>& variants = vector_cache[sender];
+        bool update_existsing = false;
+        for(auto& v : variants) {
+            if(memcmp(&v.first.hash, &vect.hash, sizeof(cs::HashVector)) == 0) {
+                v.second++;
+                update_existsing = true;
+                break;
+            }
+        }
+        if(!update_existsing) {
+            variants.push_back(std::make_pair(vect, 1));
+        }
+    }
+
+    const cs::HashVector * SolverCore::lookup_vector(uint8_t sender) const
+    {
+        const auto it = vector_cache.find(sender);
+        if(it == vector_cache.cend()) {
+            return nullptr;
+        }
+        const auto& variants = it->second;
+        const cs::HashVector * ptr = nullptr;
+        size_t max_cnt = 0;
+        for(const auto& v : variants) {
+            if(v.second > max_cnt) {
+                ptr = &v.first;
+                max_cnt = v.second;
+            }
+        }
+        return ptr;
     }
 
 } // slv2

@@ -125,9 +125,8 @@ class Pool::priv : public ::csdb::internal::shared_data
         os.put(wall);
     }
 
-    os.put(user_fields_);
-	os.put(writer_public_key_);
-	os.put(signature_);
+	  os.put(writer_public_key_);
+	  os.put(signature_);
   }
 
   void put_for_sig(::csdb::priv::obstream& os)
@@ -137,12 +136,16 @@ class Pool::priv : public ::csdb::internal::shared_data
 
     os.put(user_fields_);
 
-      os.put(newWallets_.size());
-      for (const auto& wall : newWallets_) {
-          os.put(wall);
-      }
+    os.put(transactions_.size());
+    for (const auto& it : transactions_) {
+      os.put(it);
+    }
 
-	  os.put(user_fields_);
+    os.put(newWallets_.size());
+    for (const auto& wall : newWallets_) {
+        os.put(wall);
+    }
+
 	  os.put(writer_public_key_);
   }
 
@@ -210,9 +213,6 @@ class Pool::priv : public ::csdb::internal::shared_data
 
     if (!getNewWallets(is))
         return false;
-
-    if(!is.get(user_fields_))
-      return false;
 
     if (!is.get(writer_public_key_))
       return false;
