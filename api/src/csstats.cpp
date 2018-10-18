@@ -48,8 +48,10 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       periodStats.transactionsCount += static_cast<uint32_t>(transactionsCount);
 
       for (std::size_t i = 0; i < transactionsCount; ++i) {
-        const auto& transaction =
-          pool.transaction(csdb::TransactionID(pool.hash(), i));
+        const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+        if(transaction.user_field(0).is_valid())
+          ++periodStats.transactionsSmartCount; //transactionsSmartCount - amount of transactions associated with smart contracts
 
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
