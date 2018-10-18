@@ -119,6 +119,7 @@ BlockChain::BlockChain(const char* path) {
 #endif
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
+          updateCache(loadBlock(*iter));
           blockHashes_.push_back(*iter);
         }
 #ifdef MYLOG
@@ -518,8 +519,9 @@ csdb::Amount
 BlockChain::calcBalance(const csdb::Address &address) const
 {
     csdb::Amount result(0);
+    return result;
 
-    csdb::Pool curr = loadBlock(getLastHash());
+    /*csdb::Pool curr = loadBlock(getLastHash());
     while (curr.is_valid())
 	{
 		size_t transactions_count = curr.transactions_count();
@@ -533,7 +535,7 @@ BlockChain::calcBalance(const csdb::Address &address) const
         }
         curr = loadBlock(curr.previous_hash());
     }
-    return result;
+    return result;*/
 }
 
 

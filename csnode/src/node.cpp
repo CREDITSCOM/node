@@ -861,7 +861,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingRecBlockCount    = 0;
 
 #ifdef MYLOG
-  //std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
+  std::cout << "SENDBLOCKREQUEST> Done" << std::endl;
 #endif
 }
 

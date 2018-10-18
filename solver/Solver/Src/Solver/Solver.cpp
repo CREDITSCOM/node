@@ -475,7 +475,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   gotBigBang        = false;
   gotBlockThisRound = true;
 #ifdef MONITOR_NODE
-  addTimestampToPool(block);
+  //addTimestampToPool(block);
 #endif
   uint32_t g_seq = block.sequence();
 #ifdef MYLOG
