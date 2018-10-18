@@ -49,6 +49,7 @@ struct worker_queue
     S state;
 
   public:
+    S get_state() const { return state; }
     void get_position()
     {
 #ifdef BOTTLENECKED_SMARTS

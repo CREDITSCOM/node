@@ -872,35 +872,24 @@ APIHandler::StatsGet(api::StatsGetResult& _return)
 }
 
 void
-APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
-                             const api::Address& address)
+APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Address& address)
 {
-  // Log("SmartContractGet");
-
-  // std::cerr << "Input address: " << address << std::endl;
-
-  // smart_rescan();
-
   auto smartrid = [&]() -> decltype(auto) {
-    //   //TRACE("");
     auto smart_origin = locked_ref(this->smart_origin);
-    //   //TRACE("");
     auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
-
     return it == smart_origin->end() ? csdb::TransactionID() : it->second;
   }();
   if (!smartrid.is_valid()) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
-  _return.smartContract =
-    fetch_smart_body(s_blockchain.loadTransaction(smartrid));
+  _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
 
-  SetResponseStatus(_return.status,
-                    !_return.smartContract.address.empty()
-                      ? APIRequestStatusType::SUCCESS
-                      : APIRequestStatusType::FAILURE);
-  //TRACE("");
+  csdb::Address adrs = BlockChain::getAddressFromKey(address);
+  auto smart_state(locked_ref(this->smart_state));
+  _return.smartContract.objectState = (*smart_state)[adrs].get_state();
+
+  SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
   return;
 }
 
