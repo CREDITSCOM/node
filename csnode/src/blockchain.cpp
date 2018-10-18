@@ -780,3 +780,9 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id)
     LOG_ERROR("Wrong address");
     return false;
 }
+
+bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address &addr) const {
+  if (!walletIds_->normal().findaddr(id, addr))
+    return false;
+  return true;
+}

@@ -986,7 +986,7 @@ void Node::applyNotifications() {
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic, poolMetaInfo);
+  solver_->applyCharacteristic(characteristic, poolMetaInfo, myPublicKey_);
 
   // loading block from blockhain, because write pool to blockchain do something with pool
   const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();

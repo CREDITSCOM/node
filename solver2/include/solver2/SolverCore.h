@@ -149,6 +149,7 @@ namespace slv2
         void gotTransactionsPacket(cs::TransactionsPacket&& packet);
         bool isPoolClosed() const;
         void sendTL();
+        cs::SharedMutex& getSharedMutex();
 
     private:
 

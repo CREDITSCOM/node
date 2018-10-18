@@ -138,6 +138,11 @@ namespace slv2
             return pslv_v1->getBigBangStatus();
         }
     }
+    cs::SharedMutex& SolverCore::getSharedMutex() {
+      if (opt_is_proxy_v1 && pslv_v1) {
+        return pslv_v1->getSharedMutex();
+      }
+    }
 
     void SolverCore::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
         if(opt_is_proxy_v1 && pslv_v1) {

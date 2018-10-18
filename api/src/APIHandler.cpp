@@ -688,13 +688,26 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     executor_transport->open();
   }
 
+  Address pk_source;
+  csdb::Address res_addr;
+  WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
+  if (transaction.source.size() == PUBLIC_KEY_LENGTH)
+    pk_source = transaction.source;
+  else if (s_blockchain.findAddrByWalletId(id, res_addr))
+    pk_source = csdb::Address::csdb_addr_to_api_addr(res_addr);
+  else {
+    LOG_ERROR("Public key of wallet not found by walletId");
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+  }
+  executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+
   //TRACE("");
-  executor.executeByteCode(api_resp,
+  /*executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
                            contract_state,
                            input_smart.method,
-                           input_smart.params);
+                           input_smart.params);*/
 
   //TRACE("");
 
@@ -873,35 +886,24 @@ APIHandler::StatsGet(api::StatsGetResult& _return)
 }
 
 void
-APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
-                             const api::Address& address)
+APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Address& address)
 {
-  // Log("SmartContractGet");
-
-  // std::cerr << "Input address: " << address << std::endl;
-
-  // smart_rescan();
-
   auto smartrid = [&]() -> decltype(auto) {
-    //   //TRACE("");
     auto smart_origin = locked_ref(this->smart_origin);
-    //   //TRACE("");
     auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
-
     return it == smart_origin->end() ? csdb::TransactionID() : it->second;
   }();
   if (!smartrid.is_valid()) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
-  _return.smartContract =
-    fetch_smart_body(s_blockchain.loadTransaction(smartrid));
+  _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
 
-  SetResponseStatus(_return.status,
-                    !_return.smartContract.address.empty()
-                      ? APIRequestStatusType::SUCCESS
-                      : APIRequestStatusType::FAILURE);
-  //TRACE("");
+  csdb::Address adrs = BlockChain::getAddressFromKey(address);
+  auto smart_state(locked_ref(this->smart_state));
+  _return.smartContract.objectState = (*smart_state)[adrs].get_state();
+
+  SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
   return;
 }
 
@@ -1189,13 +1191,14 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
       .to_binary());
 }
 
-void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) const {
+void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   for (const auto &inner_id : v) {
     bool finish_for_idx = false;
     if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, csdb::Transaction())) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
+      cs::SharedLock sharedLock(solver.getSharedMutex());
       decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
       for (decltype(auto) it : m_hash_tb) {
         const auto &transactions = it.second.transactions();
@@ -1207,7 +1210,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
-      if (!finish_for_idx) // if hash table not contain trx
+      if (!finish_for_idx) // if hash table doesn't contain trx
         _return.states[inner_id] = INVALID;
     }
   }
@@ -1225,4 +1228,16 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
   _return.method = convertTransaction(trx).trxn.smartContract.method;
   _return.params = convertTransaction(trx).trxn.smartContract.params;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) {
+  executor::GetContractMethodsResult executor_ret;
+  executor.getContractMethods(executor_ret, bytecode);
+  _return.code = executor_ret.code;
+  _return.message = executor_ret.message;
+  for (int Count = 0; Count < executor_ret.methods.size(); Count++) {
+    _return.methods[Count].name = executor_ret.methods[Count].name;
+    _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
+    _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+  }
 }

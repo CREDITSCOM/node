@@ -77,6 +77,7 @@ public:
   // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
+  bool findAddrByWalletId(const WalletId id, csdb::Address &addr) const;
 
   // searches for existing wallet id
   // returns true if found
