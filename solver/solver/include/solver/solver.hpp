@@ -5,25 +5,18 @@
 #define SOLVER_HPP
 
 #include <csdb/csdb.h>
+#include <csdb/transaction.h>
+#include <api_types.h>
+
 #include <memory>
 #include <thread>
-
-#include <api_types.h>
 #include <functional>
-
 #include <atomic>
-#include <functional>
-
 #include <shared_mutex>
-
 #include <set>
 #include <string>
-#include <thread>
 #include <vector>
-
-#include <api_types.h>
-#include <csdb/transaction.h>
-#include <boost/asio.hpp>
+#include <optional>
 
 #include <csnode/nodecore.h>
 #include <lib/system/timer.hpp>
@@ -76,8 +69,8 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  void applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
+                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
@@ -130,8 +123,8 @@ class Solver {
   void flushTransactions();
   cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
-  cs::PublicKey myPublicKey;
-  cs::PrivateKey myPrivateKey;
+  cs::PublicKey m_publicKey;
+  cs::PrivateKey m_privateKey;
 
   friend class slv2::SolverCore;
   Node* m_node;
@@ -170,6 +163,7 @@ class Solver {
   bool round_table_sent = false;
   bool gotBlockThisRound = false;
   bool gotBigBang = false;
+  std::atomic<bool> isConsensusRunning = { false };
 
   cs::SharedMutex m_sharedMutex;
 

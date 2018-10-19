@@ -250,7 +250,7 @@ namespace cs
             return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
-        ///
+         ///
         /// Same as cs::Utils::byteStreamToHex but calculates only in debug
         ///
         inline static std::string debugByteStreamToHex(const char* stream, const std::size_t length)
@@ -263,6 +263,14 @@ namespace cs
             str = cs::Utils::byteStreamToHex(stream, length);
 #endif
             return str;
+        }
+
+        ///
+        /// Same as cs::Utils::byteStreamToHex but calculates only in debug
+        ///
+        inline static std::string debugByteStreamToHex(const unsigned char* stream, const std::size_t length)
+        {
+            return cs::Utils::debugByteStreamToHex(reinterpret_cast<const char*>(stream), length);
         }
 
     private:
@@ -308,8 +316,8 @@ namespace cs
         ///
         static std::string currentTimestamp()
         {
-            auto now_time = std::chrono::system_clock::now();
-            return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count());
+            auto now = std::chrono::system_clock::now();
+            return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
         }
 
         ///
@@ -348,6 +356,21 @@ namespace cs
 inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept
 {
     return static_cast<unsigned char>( arg );
+}
+
+inline constexpr unsigned char operator "" _i8( unsigned long long arg ) noexcept
+{
+    return static_cast<signed char>( arg );
+}
+
+inline constexpr unsigned char operator "" _u16( unsigned long long arg ) noexcept
+{
+    return static_cast<unsigned short>( arg );
+}
+
+inline constexpr unsigned char operator "" _i16( unsigned long long arg ) noexcept
+{
+    return static_cast<short>( arg );
 }
 
 #endif 

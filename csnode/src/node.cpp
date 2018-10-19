@@ -10,6 +10,8 @@
 
 #include <base58.h>
 
+#include <boost/optional.hpp>
+
 #include <lz4.h>
 #include <sodium.h>
 
@@ -255,8 +257,9 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   stream << roundTable.hashes.size();
   stream << roundTable.general;
 
-  for (const auto& condidant : roundTable.confidants) {
-    stream << condidant;
+  for (const auto& confidant : roundTable.confidants) {
+    stream << confidant;
+    cslog() << __FUNCTION__ << " confidant: " << confidant.data();
   }
 
   for (const auto& hash : roundTable.hashes) {
@@ -286,7 +289,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 
   ostream_ << bytes;
 
-  transport_->clearTasks();
   flushCurrentTasks();
 }
 
@@ -770,7 +772,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 
   cs::TransactionsPacket packet = cs::TransactionsPacket::fromBinary(bytes);
 
-  cslog() << "NODE> Transactions amount got " << packet.transactionsCount();
+  csdebug() << "NODE> Transactions amount got " << packet.transactionsCount();
 
   if (packet.hash().isEmpty()) {
     cswarning() << "Received transaction packet hash is empty";
@@ -781,8 +783,6 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
-  cslog() << "NODE> getPacketHashesRequest " << size;
-
   cs::DataStream stream(data, size);
 
   std::size_t hashesCount = 0;
@@ -798,7 +798,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     hashes.push_back(std::move(hash));
   }
 
-  cslog() << "NODE> Hashes request got size: " << hashesCount;
+  cslog() << "NODE> Hashes request got hashes count: " << hashesCount;
 
   if (hashesCount != hashes.size()) {
     cserror() << "Bad hashes created";
@@ -870,14 +870,14 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   roundTable.general = std::move(general);
   roundTable.confidants = std::move(confidants);
-  roundTable.hashes = hashes;
+  roundTable.hashes = std::move(hashes);
 
   onRoundStart(roundTable);
 
   // TODO: think how to improve this code
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
+  //cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
       solver_->gotRound(std::move(roundTable));
-  });
+  //});
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -897,7 +897,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = sequence;
-  poolMetaInfo.timestamp = time;
+  poolMetaInfo.timestamp = std::move(time);
 
   cs::Signature signature;
   stream >> signature;
@@ -936,23 +936,58 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     }
   }
 
-  const cs::RoundTable& roundTable = solver_->roundTable();
-
-  //for (const auto& confidant : roundTable.confidants) {
-  //  if (!cs::Utils::verifySignature(signature, confidant, data, size)) {
-  //    cswarning() << "Confidants signatures verification failed";
-  //    return;
-  //  }
-  //}
-
   cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount " << maskBitsCount;
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
   cs::Characteristic characteristic;
-  characteristic.mask = characteristicMask;
+  characteristic.mask = std::move(characteristicMask);
   characteristic.size = maskBitsCount;
 
-  solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  assert(sequence <= this->getRoundNumber());
+
+  cs::PublicKey writerPublicKey;
+  stream >> writerPublicKey;
+
+  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+
+  if (pool) {
+    const uint8_t* message = pool->to_binary().data();
+    const size_t messageSize = pool->to_binary().size();
+
+    if (cs::Utils::verifySignature(signature, writerPublicKey, message, messageSize)) {
+      cswarning() << "RECEIVED KEY Writer verification successfull";
+      writeBlock(pool.value(), sequence, sender);
+    }
+    else {
+      cswarning() << "RECEIVED KEY Writer verification failed";
+    }
+  }
+}
+
+void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {
+  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
+
+  if (sequence > this->getRoundNumber()) {
+    return;  // remove this line when the block candidate signing of all trusted will be implemented
+  }
+
+
+
+  this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
+
+  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
+    this->getBlockChain().putBlock(newPool);
+
+#ifndef MONITOR_NODE
+    if ((this->getMyLevel() != NodeLevel::Writer) && (this->getMyLevel() != NodeLevel::Main)) {
+      auto hash = this->getBlockChain().getLastWrittenHash().to_string();
+
+      this->sendHash(hash, sender);
+
+      cslog() << "SENDING HASH to writer: " << hash;
+    }
+#endif
+  }
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
@@ -967,9 +1002,6 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
 
   cs::Bytes notification(data, data + size);
   solver_->addNotification(notification);
-
-  const std::size_t neededConfidantsCount = solver_->neededNotifications();
-  const std::size_t notificationsCount = solver_->notifications().size();
 
   if (!solver_->isEnoughNotifications()) {
     return;
@@ -986,15 +1018,27 @@ void Node::applyNotifications() {
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   const cs::Characteristic& characteristic = solver_->getCharacteristic();
-  solver_->applyCharacteristic(characteristic, poolMetaInfo, myPublicKey_);
 
-  // loading block from blockhain, because write pool to blockchain do something with pool
-  const cs::Bytes poolBinary = bc_.loadBlock(bc_.getLastHash()).to_binary();
+  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, myPublicKey_);
+
+  if (!pool) {
+    cserror() << "APPLY CHARACTERISTIC ERROR!";
+    return;
+  }
+
+  const cs::Bytes& poolBinary = pool->to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
+  cslog() << "applyNotification " << "Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+
+  bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
+  cslog() << "after sign: isVerified == " << isVerified;
+
+  writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
   ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, solver_->notifications());
+  ostream_ << solver_->getPublicKey();
 
   flushCurrentTasks();
 }
@@ -1025,8 +1069,11 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   size_t messageSize = size - signature.size() - publicKey.size();
 
   if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
-    cserror() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
-    csinfo() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
+    cserror() << "NODE> Writer verify signature notification failed";
+
+    csfile() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
+    csfile() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
+
     return false;
   }
 
@@ -1101,12 +1148,8 @@ void Node::sendHash(const std::string& hash, const cs::PublicKey& target) {
 }
 
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
-  if (myLevel_ != NodeLevel::Normal) {
-    return;
-  }
-
   if (packet.hash().isEmpty()) {
-    cslog() << "Send transaction packet with empty hash failed";
+    cswarning() << "Send transaction packet with empty hash failed";
     return;
   }
 
@@ -1124,10 +1167,6 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast | BaseFlags::Compressed);
 
-  for (const auto& hash : hashes) {
-    cslog() << "Transaction packet request, need hash - " << hash.toString();
-  }
-
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1137,7 +1176,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     stream << hash;
   }
 
-  cslog() << "Sending transaction packet request: size: " << bytes.size();
+  cslog() << "NODE> Sending transaction packet request: size: " << bytes.size();
 
   ostream_ << MsgTypes::TransactionsPacketRequest << roundNum_ << bytes;
 
@@ -1146,7 +1185,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
   if (packet.hash().isEmpty()) {
-    cslog() << "Send transaction packet reply with empty hash failed";
+    cswarning() << "Send transaction packet reply with empty hash failed";
     return;
   }
 
@@ -1158,8 +1197,7 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
 
   stream << packet;
 
-  cslog() << "Sending transaction packet reply: size: " << bytes.size();
-  cslog() << "NODE> Sending " << packet.transactionsCount() << " transaction(s)";
+  cslog() << "Node> Sending transaction packet reply: size: " << bytes.size();
 
   ostream_ << bytes;
 
@@ -1356,10 +1394,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 #endif
 
   solver_->nextRound();
-
-  if (!solver_->checkTableHashes(roundTable)) {
-    cswarning() << "Transactions packet hash table needs to sync";
-  }
 
 #ifdef WRITER_RESEND_HASHES
   sendAllRoundTransactionsPackets(roundTable);

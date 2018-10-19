@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(csnode)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
@@ -72,6 +74,3 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_BINARY_DIR}/csdb/snappy
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
-
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
-set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

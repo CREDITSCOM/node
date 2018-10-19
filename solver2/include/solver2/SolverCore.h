@@ -137,7 +137,7 @@ namespace slv2
         void addNotification(const cs::Bytes& bytes);
         std::size_t neededNotifications() const;
         bool isEnoughNotifications() const;
-        void applyCharacteristic(const cs::Characteristic& characteristic,
+        std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
           const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
         const cs::Characteristic& getCharacteristic() const;
         cs::Hash getCharacteristicHash() const;

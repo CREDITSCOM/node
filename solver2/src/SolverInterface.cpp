@@ -90,10 +90,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
+    std::optional<csdb::Pool> SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
       const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender) {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
+            return pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
         }
     }
 

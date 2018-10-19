@@ -841,7 +841,7 @@ void Transport::askForMissingPackages() {
   MessagePtr                                      msg;
   uint32_t                                        i = 0;
 
-  const uint64_t maxMask = 1ul << 63;
+  const uint64_t maxMask = 1ull << 63;
 
   while(true) {
     {
