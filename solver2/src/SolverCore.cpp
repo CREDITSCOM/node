@@ -4,8 +4,8 @@
 #include "Consensus.h"
 #include "Node.h"
 #include "SolverCompat.h"
-#include <Solver/WalletsState.h>
-#include <Solver/Fee.h>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
 #include "Generals.h"
 
 #pragma warning(push)

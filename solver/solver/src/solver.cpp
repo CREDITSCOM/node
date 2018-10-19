@@ -157,7 +157,6 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
   newPool.set_sequence(metaInfoPool.sequenceNumber);
   newPool.add_user_field(0, metaInfoPool.timestamp);
 
-
   const auto& writer_public_key = sender;
   newPool.set_writer_public_key(csdb::internal::byte_array(writer_public_key.begin(), writer_public_key.end()));
   m_node->getBlockChain().finishNewBlock(newPool);
@@ -168,25 +167,6 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
 #endif
 
   return newPool;
-}
-
-  std::assert(sequence <= m_node->getRoundNumber());
-
-  m_node->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
-
-  if (sequence == (m_node->getBlockChain().getLastWrittenSequence() + 1)) {
-    m_node->getBlockChain().putBlock(newPool);
-
-#ifndef MONITOR_NODE
-    if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
-      auto hash = m_node->getBlockChain().getLastWrittenHash().to_string();
-
-      m_node->sendHash(hash, sender);
-
-      cslog() << "SENDING HASH to writer: " << hash;
-    }
-#endif
-  }
 }
 
 const Characteristic& Solver::getCharacteristic() const {

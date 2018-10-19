@@ -56,7 +56,7 @@ namespace logger {
     File,
     logging::sources::severity_channel_logger_mt<severity_level>,
     (logging::keywords::channel = "file")
-  );
+  )
 } // namespace logger
 
 #define _LOG_SEV(level, ...) \

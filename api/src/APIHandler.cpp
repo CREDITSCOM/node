@@ -1195,7 +1195,8 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   for (const auto &inner_id : v) {
     bool finish_for_idx = false;
-    if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, csdb::Transaction())) // find in blockchain
+    csdb::Transaction transaction;
+    if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, transaction)) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
       cs::SharedLock sharedLock(solver.getSharedMutex());
