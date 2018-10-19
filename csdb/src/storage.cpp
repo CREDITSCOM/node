@@ -382,6 +382,11 @@ void Storage::set_last_hash(const csdb::PoolHash& h) noexcept
   d->last_hash = h;
 }
 
+void Storage::set_size(const size_t size) noexcept
+{
+  d->count_pool = size;
+}
+
 PoolHash Storage::last_hash() const noexcept
 {
   return d->last_hash;

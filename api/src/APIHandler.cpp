@@ -809,14 +809,31 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     locked_ref(this->pending_smart_transactions);
   //  TRACE("");
 
-  std::stack<csdb::PoolHash> new_blocks;
+  std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
   while (curph != pending_smart_transactions->last_pull_hash) {
     // LOG_ERROR("pm.hash(): " << curph.to_string());
-    new_blocks.push(curph);
+    new_blocks.push_back(curph);
     size_t _;
     curph = s_blockchain.loadBlockMeta(curph, _).previous_hash();
+    if (curph.is_empty()) break;
   }
+
+  if (curph.is_empty() && !pending_smart_transactions->last_pull_hash.is_empty()) {
+    // Fork detected!
+    auto luca = pending_smart_transactions->last_pull_hash;
+    while (!luca.is_empty()) {
+      auto fIt = std::find(new_blocks.begin(), new_blocks.end(), luca);
+      if (fIt != new_blocks.end()) {
+        new_blocks.erase(fIt, new_blocks.end());
+        break;
+      }
+
+      size_t _;
+      luca = s_blockchain.loadBlockMeta(luca, _).previous_hash();
+    }
+  }
+
   pending_smart_transactions->last_pull_hash = start;
 
   while (!new_blocks.empty()) {
@@ -825,11 +842,11 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     //   TRACE("");
     // LOG_ERROR(
     //  "new_blocks.top().to_string(): " << new_blocks.top().to_string());
-    auto p = s_blockchain.loadBlock(new_blocks.top());
+    auto p = s_blockchain.loadBlock(new_blocks.back());
 
     // LOG_ERROR("p.is_valid(): " << p.is_valid());
 
-    new_blocks.pop();
+    new_blocks.pop_back();
 
     //   TRACE("");
 

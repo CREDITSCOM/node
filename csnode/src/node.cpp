@@ -174,7 +174,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
+  std::cout << __func__ << " " << rNum << std::endl;
 
   istream_.init(data, size);
   Hash h;

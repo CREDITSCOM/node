@@ -167,6 +167,7 @@ void BlockChain::updateLastHash() {
   blockHashes_.resize(last_written_sequence + 1);
   lastHash_ = getHashBySequence(last_written_sequence);
   storage_.set_last_hash(lastHash_);
+  storage_.set_size(last_written_sequence + 1);
 }
 
 
@@ -667,10 +668,14 @@ BlockChain::getTransactions(Transactions &transactions,
 }
 
 void BlockChain::revertLastBlock() {
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  if (!last_written_sequence) return;
+  {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    if (!last_written_sequence) return;
+  }
+
   auto lastBlock = loadBlock(lastHash_);
 
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
     walletsCache_->unUpdateFrom(lastBlock);
