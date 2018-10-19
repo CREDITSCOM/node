@@ -236,14 +236,12 @@ void Solver::refreshState() {
   static uint32_t ctr = 0;
   if (++ctr > 0) {
     flushTransactions();
-    if (ctr % 2 == 0) {
-      auto nextBlock = node_->getBlockChain().getLastWrittenSequence() + 1;
-      if (nextBlock < node_->getRoundNumber())
-        node_->sendBlockRequest(nextBlock);
-    }
+    auto nextBlock = node_->getBlockChain().getLastWrittenSequence() + 1;
+    if (nextBlock < node_->getRoundNumber())
+      node_->sendBlockRequest(nextBlock);
   }
 
-  runAfter(std::chrono::milliseconds(500), [this]() { refreshState(); });
+  runAfter(std::chrono::milliseconds(1000), [this]() { refreshState(); });
 }
 
 bool Solver::getIPoolClosed() {
@@ -257,6 +255,8 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {
   if (m_pool_closed) {
 #ifdef MYLOG
     LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+    std::lock_guard<std::mutex> l(m_trans_mut);
+    m_transactions_.transactions().push_back(transaction);
 #endif
     return;
   }
@@ -272,13 +272,13 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {
       v_pool.add_transaction(transaction);
 #ifndef SPAMMER
     } else {
-      LOG_EVENT("Wrong signature");
+      //LOG_EVENT("Wrong signature");
     }
 #endif
   }
 #ifdef MYLOG
   else {
-    LOG_EVENT("Invalid transaction received");
+    //LOG_EVENT("Invalid transaction received");
   }
 #endif
 }
@@ -813,7 +813,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   // TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   // TRACE("");
-  if (m_transactions_.transactions().size() < 20)
+  if (m_transactions_.transactions().size() < 40)
     m_transactions_.transactions().push_back(transaction);
 }
 

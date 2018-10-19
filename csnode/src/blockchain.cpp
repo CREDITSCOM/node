@@ -52,6 +52,7 @@ BlockChain::BlockChain(const char* path) {
       {
         //std::cout << "Storage is empty... writing genesis block" << std::endl;
         writeGenesisBlock();
+        good_ = true;
       }
       else
       {

@@ -235,6 +235,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
   }
 
   // Now check integrity
+  if (!als.size()) return true;
+
+  last_hash = als[0].first;
   for (uint32_t i = 1; i < als.size(); ++i) {
     if (i > 0 && als[i].second != als[i-1].first) break;
     last_hash = als[i].first;

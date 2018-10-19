@@ -346,7 +346,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0)
-    rn = pack.getRoundNum();
+    rn = pack.getRoundNum() + (pack.getType() != MsgTypes::Transactions ? 0 : 5);
 
   return !rn || rn >= rLim;
 }
@@ -399,7 +399,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     case MsgTypes::RoundTable:
       return node_->getRoundTable(data, size, rNum);
     case MsgTypes::Transactions:
-      return node_->getTransaction(data, size);
+      return node_->getTransaction(data, size, rNum);
     case MsgTypes::FirstTransaction:
       return node_->getFirstTransaction(data, size);
     case MsgTypes::TransactionList:

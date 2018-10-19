@@ -254,7 +254,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   sendRoundTable();
 }
 
-void Node::getTransaction(const uint8_t* data, const size_t size) {
+void Node::getTransaction(const uint8_t* data, const size_t size, const RoundNum rNum) {
   istream_.init(data, size);
 
   csdb::Pool pool;
@@ -265,11 +265,12 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
     return;
   }
 
-  for (auto& t : pool.transactions()) {
-    if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer) {
+  if (rNum == roundNum_ && myLevel_ == NodeLevel::Main) {
+    for (auto& t : pool.transactions())
       solver_->gotTransaction(std::move(t));
-    }
   }
+  else if (myLeads_.count(rNum))
+    sendTransaction(std::move(pool));
 }
 
 void Node::sendTransaction(csdb::Pool&& transactions) {
@@ -1000,7 +1001,7 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
-  if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence())
+  if (type == MsgTypes::BigBang || type == MsgTypes::Transactions)
     return MessageActions::Process;
   if (type == MsgTypes::RoundTableRequest)
     return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
@@ -1057,6 +1058,8 @@ inline bool Node::readRoundData(const bool tail) {
 #endif
 
   mainNode_ = mainNode;
+  if (mainNode_ == myPublicKey_) myLeads_.insert(roundNum_);
+  else myLeads_.erase(roundNum_);
 
   return true;
 }
