@@ -11,9 +11,9 @@ namespace csval
 
 namespace cs
 {
-    /*!
-        RAII fixed dynamic memory c-array wrapper
-    */
+    ///
+    /// RAII fixed dynamic memory c-array wrapper
+    ///
     class DynamicBuffer final
     {
     public:
@@ -32,19 +32,19 @@ namespace cs
         char& operator[](std::size_t index);
         const char& operator[](std::size_t index) const;
 
-        /*!
-            Returns pointer to c-array
-        */
+        ///
+        /// Returns pointer to c-array
+        ///
         char* get() const;
 
-        /*!
-            get() method similar
-        */
+        ///
+        /// get() method similar
+        ///
         char* operator*() const;
 
-        /*!
-            Returns c-array fixed size
-        */
+        ///
+        /// Returns c-array fixed size
+        ///
         std::size_t size() const;
 
         // stl - like interace
@@ -54,8 +54,8 @@ namespace cs
         const char* end() const;
 
     private:
-        char* mArray = nullptr;
-        std::size_t mSize = 0;
+        char* m_array = nullptr;
+        std::size_t m_size = 0;
 
         friend void swap(DynamicBuffer&, DynamicBuffer&);
     };
@@ -65,9 +65,9 @@ namespace cs
 
     void swap(DynamicBuffer& lhs, DynamicBuffer& rhs);
 
-    /*!
-        Smart dynamic buffer
-    */
+    ///
+    /// Smart dynamic buffer
+    ///
     using DynamicBufferPtr = std::shared_ptr<DynamicBuffer>;
 }
 

@@ -5,25 +5,18 @@
 #define SOLVER_HPP
 
 #include <csdb/csdb.h>
+#include <csdb/transaction.h>
+#include <api_types.h>
+
 #include <memory>
 #include <thread>
-
-#include <api_types.h>
 #include <functional>
-
 #include <atomic>
-#include <functional>
-
 #include <shared_mutex>
-
 #include <set>
 #include <string>
-#include <thread>
 #include <vector>
-
-#include <api_types.h>
-#include <csdb/transaction.h>
-#include <boost/asio.hpp>
+#include <optional>
 
 #include <csnode/nodecore.h>
 #include <lib/system/timer.hpp>
@@ -65,7 +58,7 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  boost::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
                            const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
@@ -119,11 +112,10 @@ class Solver {
   // TODO: fix signature
   bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
 
-  cs::PublicKey myPublicKey;
-  cs::PrivateKey myPrivateKey;
+  cs::PublicKey m_publicKey;
+  cs::PrivateKey m_privateKey;
 
   Node* m_node;
-
   std::unique_ptr<Generals> m_generals;
 
   HashVector hvector;

@@ -30,5 +30,5 @@ target_include_directories(csconnector
   PRIVATE src
 )
 
-set_property(TARGET csconnector PROPERTY CXX_STANDARD 14)
+set_property(TARGET csconnector PROPERTY CXX_STANDARD 17)
 set_property(TARGET csconnector PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

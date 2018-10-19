@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 project(client)
 
 add_executable(client
@@ -15,7 +18,7 @@ target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/cli
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include)
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (Boost_USE_MULTITHREADED ON)

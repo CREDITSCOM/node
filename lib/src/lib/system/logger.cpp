@@ -3,6 +3,7 @@
 #include <boost/log/core.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/filter_parser.hpp>
+#include <boost/log/utility/setup/formatter_parser.hpp>
 #include <boost/log/utility/setup/from_settings.hpp>
 
 //TODO: legacy, remove it. this flag can be emulated via attribute (eg. SkipLog) that can be processed in filter
