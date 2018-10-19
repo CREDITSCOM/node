@@ -38,12 +38,7 @@ BlockChain::BlockChain(const char* path) {
   std::vector <csdb::PoolHash> tempHashes;
   csdb::PoolHash temp_hash;
   blockHashes_.reserve(1000000);
-
-  dbs_fname = "test_db/dbs.txt";
-  bool file_is;
-  //	hash_offset = 0;
   blockRequestIsNeeded = false;
-
 
   if (storage_.open(path))
   {
@@ -57,14 +52,6 @@ BlockChain::BlockChain(const char* path) {
       {
         //std::cout << "Storage is empty... writing genesis block" << std::endl;
         writeGenesisBlock();
-        std::ofstream f(dbs_fname);
-        file_is = f.is_open();
-        if (file_is)
-        {
-          f << "0->0";
-          good_ = true;
-          f.close();
-        }
       }
       else
       {
@@ -79,22 +66,6 @@ BlockChain::BlockChain(const char* path) {
 #ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
 #endif
-      /*std::ifstream f(dbs_fname);
-      if (f.is_open())
-      {
-#ifdef MYLOG
-        std::cout << "File is opened ... reading" << std::endl;
-#endif
-        f.read(kk, 14);
-        f.close();
-      }
-
-      char* s_beg = kk;
-      char* s_end = strchr(kk, '-');
-      *s_end = '\0';
-      ht.head = atoi(s_beg);
-      s_beg = s_end + 2;
-      ht.tag = atoi(s_beg);*/
 
       ht.head = 0;
       ht.tag = loadBlock(storage_.last_hash()).sequence();
@@ -119,7 +90,8 @@ BlockChain::BlockChain(const char* path) {
 #endif
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
-          updateCache(loadBlock(*iter));
+          auto p = loadBlock(*iter);
+          updateCache(p);
           blockHashes_.push_back(*iter);
         }
 #ifdef MYLOG
@@ -161,18 +133,14 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 
 	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
-	if (!pool.compose())
-		 if (!pool.compose()) {
-		LOG_ERROR("Couldn't compose block");
-		if (!pool.save())
-			 return;
-
+	if (!pool.compose()) {
+          LOG_ERROR("Couldn't compose block");
+          return;
 	}
 
-		if (!pool.save()) {
-		LOG_ERROR("Couldn't save block");
-		return;
-
+        if (!pool.save()) {
+          LOG_ERROR("Couldn't save block");
+          return;
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
@@ -195,7 +163,6 @@ void BlockChain::setLastWrittenSequence(uint32_t seq) {
 }
 
 void BlockChain::updateLastHash() {
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   blockHashes_.resize(last_written_sequence + 1);
   lastHash_ = getHashBySequence(last_written_sequence);
   storage_.set_last_hash(lastHash_);
@@ -408,38 +375,6 @@ BlockChain::updateCache(csdb::Pool& pool)
     return true;
 }
 
-void
-BlockChain::writeLastBlock(csdb::Pool& pool)
-{
-    //TRACE("");
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-
-    pool.set_storage(storage_);
-    //pool.set_previous_hash(storage_.last_hash());
-    pool.set_sequence(storage_.size());
-
-    if (!pool.compose()) {
-        LOG_ERROR("Couldn't compose block");
-        return;
-    }
-
-    if (!pool.save()) {
-        LOG_ERROR("Couldn't save block");
-        return;
-    }
-    {
-        //TRACE("");
-        std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-        //TRACE("");
-        new_block_cv.notify_all();
-        //TRACE("");
-    }
-
-    if (!updateCache(pool)) {
-        LOG_ERROR("Couldn't update cache");
-    }
-}
-
 csdb::PoolHash
 BlockChain::getLastHash() const
 {
@@ -551,26 +486,6 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   if (pool.sequence() == getLastWrittenSequence() + 1) {
    // std::cout << "OK" << std::endl;
     //pool.set_previous_hash(lastHash_);
-
-    std::ofstream f(dbs_fname, std::ios::out);
-    ht.head = 0;
-    ht.tag = getLastWrittenSequence() + 1;
-    bool file_is = f.is_open();
-    if (file_is)
-    {
-
-      f << ht.head << "->" << ht.tag << std::endl;
-#ifdef MYLOG
-      std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
-      //std::cout << "DB structure is written succesfully" << std::endl;
-#endif
-      f.close();
-    }
-    else
-    {
-    // std::cout << "Error writing DB structure" << std::endl;
-     }
-
     writeBlock(pool);
     //std::cout << "Preparing to calculate last hash" << std::endl;
     lastHash_ = pool.hash();
@@ -590,6 +505,8 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
 
     return;
   }
+  else
+    LOG_ERROR("Cannot put block: last sequence incorrect");
  // std::cout << "Failed" << std::endl;
 
   ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
@@ -746,4 +663,18 @@ BlockChain::getTransactions(Transactions &transactions,
         if (!trxLoader.load(currHash, offset, limit, prevHash))
             break;
     }
+}
+
+void BlockChain::revertLastBlock() {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (!last_written_sequence) return;
+  auto lastBlock = loadBlock(lastHash_);
+
+  {
+    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    walletsCache_->unUpdateFrom(lastBlock);
+  }
+
+  --last_written_sequence;
+  updateLastHash();
 }

@@ -49,6 +49,8 @@ namespace Credits
         using PoolHash = std::array<uint8_t, 32>;
         friend std::ostream& operator<<(std::ostream& os, const PoolHash& poolHash);
 
+        void unUpdateFrom(csdb::Pool&);
+
     public:
         struct WalletData
         {

@@ -38,8 +38,7 @@ public:
   BlockChain(const char* path);
 
   void putBlock(csdb::Pool& pool);
-
-  void writeLastBlock(csdb::Pool& pool);
+  void revertLastBlock();
 
   csdb::PoolHash getLastHash() const;
   size_t getSize() const;
@@ -64,8 +63,6 @@ public:
   void setLastWrittenSequence(uint32_t seq);
   uint32_t getLastWrittenSequence();
 
-  void updateLastHash();
-
   uint32_t getRequestedBlockNumber() const;
 
   void setGlobalSequence(uint32_t seq);
@@ -80,6 +77,8 @@ public:
 
 private:
   Headtag ht;
+
+  void updateLastHash();
   bool loadCache();
   bool updateCache(csdb::Pool& pool);
   csdb::Amount calcBalance(const csdb::Address &) const;
