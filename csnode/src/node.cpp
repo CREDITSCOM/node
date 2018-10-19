@@ -886,13 +886,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::DataStream stream(data, size);
 
   std::string time;
-  uint32_t maskBitsCount;
   cs::Bytes characteristicMask;
   uint64_t sequence = 0;
 
   cslog() << "Characteristic data size: " << size;
 
-  stream >> time >> maskBitsCount;
+  stream >> time;
   stream >> characteristicMask >> sequence;
 
   cs::PoolMetaInfo poolMetaInfo;
@@ -936,12 +935,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     }
   }
 
-  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbitCount " << maskBitsCount;
+  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
   cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
-  characteristic.size = maskBitsCount;
 
   assert(sequence <= this->getRoundNumber());
 
@@ -1049,7 +1047,12 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::Hash characteristicHash;
   stream >> characteristicHash;
 
-  if (characteristicHash != solver_->getCharacteristicHash()) {
+  cs::Hash solverCharacteristicHash = solver_->getCharacteristicHash();
+
+  if (characteristicHash != solverCharacteristicHash) {
+    csdebug() << "NODE> Characteristic equals failed";
+    csdebug() << "NODE> Received characteristic - " << cs::Utils::byteStreamToHex(characteristicHash.data(), characteristicHash.size());
+    csdebug() << "NODE> Writer solver chracteristic - " << cs::Utils::byteStreamToHex(solverCharacteristicHash.data(), solverCharacteristicHash.size());
     return false;
   }
 
@@ -1057,6 +1060,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   stream >> writerPublicKey;
 
   if (writerPublicKey != myPublicKey_) {
+    csdebug() << "NODE> Writer public key equals failed";
     return false;
   }
 
@@ -1071,8 +1075,8 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
     cserror() << "NODE> Writer verify signature notification failed";
 
-    csfile() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
-    csfile() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
+    csdebug() << "Data: " << cs::Utils::byteStreamToHex(data, messageSize) << " verification failed";
+    csdebug() << "Signature: " << cs::Utils::byteStreamToHex(signature.data(), signature.size());
 
     return false;
   }
@@ -1088,7 +1092,6 @@ cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo
   cs::DataStream stream(bytes);
 
   stream << poolMetaInfo.timestamp;
-  stream << characteristic.size;
   stream << characteristic.mask;
   stream << poolMetaInfo.sequenceNumber;
 

@@ -76,19 +76,23 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
       characteristicMask.push_back(byte);
     }
 
-    m_characteristic.size = static_cast<uint32_t>(transactionsCount);
     m_characteristic.mask = std::move(characteristicMask);
-
-    blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.size, "1234", 4);
   }
   else {
-    uint32_t a = 0;
-    blake2s(hash.data(), hash.size(), static_cast<const void*>(&a), 4, "1234", 4);
+    m_characteristic.mask = cs::Bytes();
   }
+
+  if (m_characteristic.mask.size() != transactionsCount) {
+    cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
+  }
+
+  blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.mask.size(), nullptr, NULL);
 
   m_find_untrusted.fill(0);
   m_new_trusted.fill(0);
   m_hw_total.fill(HashWeigth{});
+
+  csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
   return hash;
 }

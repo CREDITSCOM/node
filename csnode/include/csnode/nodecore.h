@@ -69,7 +69,6 @@ namespace cs
 
     struct Characteristic
     {
-        uint32_t size = 0;
         cs::Bytes mask;
     };
 

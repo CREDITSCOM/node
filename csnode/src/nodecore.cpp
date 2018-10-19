@@ -8,8 +8,9 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
     auto data = packetHash.toBinary();
     auto size = data.size();
 
-    for (std::size_t i = 0; i < size; ++i)
+    for (std::size_t i = 0; i < size; ++i) {
         hash = (hash ^ data[i]) * p;
+    }
 
     hash += hash << 13;
     hash ^= hash >> 7;

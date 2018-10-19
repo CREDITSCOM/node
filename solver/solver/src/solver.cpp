@@ -147,8 +147,8 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
 
   m_hashesToRemove = cs::HashesSet(localHashes.begin(), localHashes.end());
 
-  if (characteristic.size != newPool.transactions_count()) {
-    cslog() << "Characteristic size: " << characteristic.size << ", new pool transactions count: " << newPool.transactions_count();
+  if (characteristic.mask.size() != newPool.transactions_count()) {
+    cslog() << "Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
     cswarning() << "SOLVER> ApplyCharacteristic: Some of transactions is not valid";
   }
                                                            
