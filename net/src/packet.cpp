@@ -121,9 +121,9 @@ Message::~Message() {
 }
 
 const char* getMsgTypesString(MsgTypes messageType) {
-	switch (messageType) {
+    switch (messageType) {
     default:
-		return "-";
+        return "-";
     case RoundTableSS:
       return "RoundTableSS";
     case Transactions:
