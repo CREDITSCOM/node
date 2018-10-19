@@ -74,7 +74,7 @@ namespace cs
 
     bool TransactionsPacketHash::operator == (const TransactionsPacketHash& other) const noexcept
     {
-        return (m_bytes == other.m_bytes) || (m_bytes == other.m_bytes);
+        return m_bytes == other.m_bytes;
     }
 
     bool TransactionsPacketHash::operator != (const TransactionsPacketHash& other) const noexcept
@@ -84,7 +84,7 @@ namespace cs
 
     bool TransactionsPacketHash::operator < (const TransactionsPacketHash& other) const noexcept
     {
-        return (m_bytes != other.m_bytes) && (m_bytes < other.m_bytes);
+        return m_bytes < other.m_bytes;
     }
 
     //
@@ -176,7 +176,7 @@ namespace cs
 
     bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction)
     {
-        if (!transaction.is_valid() && !isHashEmpty()) {
+        if (!transaction.is_valid() || !isHashEmpty()) {
             return false;
         }
 

@@ -40,6 +40,15 @@ namespace slv2
     private:
 
         bool decide_to_write(SolverContext& context);
+
+        enum class Decision
+        {
+            NotTaken,
+            BecomeWrite,
+            StayTrusted
+        };
+
+        Decision parse_generals_decision(SolverContext& context, uint8_t decision);
     };
 
 } // slv2

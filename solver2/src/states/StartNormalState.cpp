@@ -1,7 +1,6 @@
 #include "StartNormalState.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include  "../Node.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2
@@ -22,7 +21,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_WARN(name() << ": round #" << rn << " is expired, request round table");
             }
-            pctx->node().sendRoundTableRequest(rn);
+            pctx->request_round_table();
         });
     }
 

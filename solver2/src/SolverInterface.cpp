@@ -1,7 +1,7 @@
 #include "SolverCore.h"
 #include "Consensus.h"
-#include "SolverCompat.h"
 #include "Node.h"
+#include "SolverCompat.h"
 #include "Generals.h"
 #include <solver/Fee.h>
 #include <csdb/currency.h>
@@ -90,10 +90,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
+    std::optional<csdb::Pool> SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
       const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender) {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
+            return pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
         }
     }
 
@@ -250,14 +250,16 @@ namespace slv2
         }
 
         auto tl_seq = p.sequence();
-        if(tl_seq == last_trans_list_recv) {
-            // already received
-            if(Consensus::Log) {
-                LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
+        if(!is_bigbang) {
+            if(tl_seq == last_trans_list_recv) {
+                // already received
+                if(Consensus::Log) {
+                    LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
+                }
+                return;
             }
-            return;
+            last_trans_list_recv = tl_seq;
         }
-        last_trans_list_recv = tl_seq;
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
@@ -271,9 +273,7 @@ namespace slv2
         csdb::Pool b_pool {};
         // update own hash vector
         if(pnode != nullptr && pgen != nullptr) {
-            if(!opt_spammer_on) {
-                p = removeTransactionsWithBadSignatures(p);
-            }
+            p = removeTransactionsWithBadSignatures(p);
             pfee->CountFeesInPool(pnode, &p);
             //auto result = pgen->buildVector(p, block_pool, b_pool); //vshilkin
             if(Consensus::Log) {

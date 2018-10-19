@@ -10,7 +10,6 @@
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
-#include <boost/thread/shared_mutex.hpp>
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
@@ -34,7 +33,7 @@ namespace cs
     using HashesSet = std::unordered_set<cs::TransactionsPacketHash>;
 
     // sync types
-    using SharedMutex = boost::shared_mutex;    // C++17 compliler std::shared_mutex
+    using SharedMutex = std::shared_mutex;
     using SpinLock = boost::detail::spinlock;
 
     // RAII locks
@@ -70,7 +69,6 @@ namespace cs
 
     struct Characteristic
     {
-        uint32_t size = 0;
         cs::Bytes mask;
     };
 

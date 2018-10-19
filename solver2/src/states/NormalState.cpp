@@ -1,7 +1,7 @@
 #include "NormalState.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include "../Node.h"
+#include "../Blockchain.h"
 #include <csdb/address.h>
 #include <csdb/currency.h>
 #include <csdb/amount.h>
@@ -23,9 +23,11 @@ namespace slv2
         SolverContext * pctx = &context;
 
         if(context.is_spammer()) {
+            // only once executed block:
             if(target_wallets.empty()) {
-                uint8_t sk[64];
-                uint8_t pk[32];
+                // generate fake target key(s)
+                uint8_t sk[SecretKeySize];
+                uint8_t pk[PublicKeySize];
                 for(int i = 0; i < CountTargetWallets; i++) {
                     crypto_sign_keypair(pk, sk);
                     csdb::Address pub = csdb::Address::from_public_key((const char*) pk);
@@ -34,12 +36,13 @@ namespace slv2
                         LOG_NOTICE(name() << ": target address " << pub.to_string());
                     }
                 }
-                crypto_sign_keypair(pk, sk);
+                // generate fake own keys
+                crypto_sign_keypair(pk, own_secret_key);
                 own_wallet = csdb::Address::from_public_key((const char*) pk);
                 if(Consensus::Log) {
                     LOG_NOTICE(name() << ": source address " << own_wallet.to_string());
                 }
-                check_spammer_balance(context);
+                is_spam_balance_valid = check_spammer_balance(context);
             }
 
             // in fact, pctx ic not less "alive" as a context.scheduler itself :-)
@@ -47,8 +50,14 @@ namespace slv2
                 LOG_NOTICE(name() << ": started spam transactions every " << T_spam_trans << " msec");
             }
             tag_spam = context.scheduler().InsertPeriodic(T_spam_trans, [this, pctx]() {
+                if(!is_spam_balance_valid) {
+                    if(Consensus::Log) {
+                        LOG_DEBUG(name() << ": insufficient balance to spam transaction");
+                    }
+                    return;
+                }
                 csdb::Transaction tr;
-                setup(&tr, pctx);
+                setup(tr, *pctx);
                 pctx->add(tr);
                 if(Consensus::Log) {
                     LOG_DEBUG(name() << ": added spam transaction " << tr.innerID());
@@ -105,7 +114,7 @@ namespace slv2
         flushed_counter = 0;
         // test own balance
         if(context.is_spammer()) {
-            check_spammer_balance(context);
+            is_spam_balance_valid = check_spammer_balance(context);
         }
         return DefaultStateBehavior::onRoundTable(context, round);
     }
@@ -124,16 +133,20 @@ namespace slv2
         return rand() % (max - min + 1) + min;
     }
 
-    void NormalState::setup(csdb::Transaction * ptr, SolverContext * pctx)
+    void NormalState::setup(csdb::Transaction& tr, SolverContext& context)
     {
         // based on Solver::spamWithTransactions()
 
-		ptr->set_source(pctx->optimize(own_wallet));
-		ptr->set_target(pctx->optimize(*(target_wallets.cbegin() + spam_index)));
-		ptr->set_innerID(++spam_counter + CountTransInRound * pctx->round());
+		tr.set_source(context.optimize(own_wallet));
+		tr.set_target(context.optimize(*(target_wallets.cbegin() + spam_index)));
+		tr.set_innerID(++spam_counter + CountTransInRound * context.round());
 
-		ptr->set_amount(csdb::Amount(randFT(1, 100), 0));
-        ptr->set_max_fee(csdb::AmountCommission(0.1));
+        tr.set_currency(1);
+		tr.set_amount(csdb::Amount(randFT(1, 100), 0));
+        tr.set_max_fee(csdb::AmountCommission(0.1));
+
+        // sign the transaction with own secret key:
+        sign(tr);
 
         ++spam_index;
         if(spam_index >= target_wallets.size()) {
@@ -141,7 +154,16 @@ namespace slv2
         }
     }
 
-    void NormalState::check_spammer_balance(SolverContext& context)
+    void NormalState::sign(csdb::Transaction& tr)
+    {
+        unsigned char sig[SecretKeySize];
+        unsigned long long sig_size = 0;
+        auto b = tr.to_byte_stream_for_sig();
+        crypto_sign_ed25519_detached(sig, &sig_size, b.data(), b.size(), own_secret_key);
+        tr.set_signature(std::string(&sig[0], &sig[0] + sig_size));
+    }
+
+    bool NormalState::check_spammer_balance(SolverContext& context)
     {
         BlockChain::WalletData wd;
         csdb::internal::WalletId id;
@@ -153,7 +175,7 @@ namespace slv2
             constexpr const int32_t deposit = 1'000'000;
             constexpr const double max_fee = 0.1;
             // deposit required
-            // в генезис-блоке на start (innerID 0) и (if defined(SPAMMER)) на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
+            // в генезис-блоке на start (innerID 0) и на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
             // пробуем взять оттуда
             csdb::Transaction tr;
             tr.set_source(context.optimize(context.address_spammer()));
@@ -163,11 +185,23 @@ namespace slv2
             tr.set_max_fee(csdb::AmountCommission(max_fee));
             //TODO: get unique increasing through different nodes ID for the spam_wallet -> own_wallet 1st transaction:
             tr.set_innerID(context.blockchain().getLastWrittenSequence() + 1);
+
+            // do not sign the transaction from spammer wallet to ours:
+            //sign(tr);
+
             context.add(tr);
             if(Consensus::Log) {
-                LOG_NOTICE(name() << ": spammer wallet balance is " << balance << ", trying to deposit " << deposit);
+                LOG_NOTICE(name() << ": spammer wallet balance is " << static_cast<int>(balance) << ", trying to deposit " << deposit);
+            }
+            return false;
+        }
+        if(Consensus::Log) {
+            // this allow print message once after deposit done
+            if(!is_spam_balance_valid) {
+                LOG_NOTICE(name() << ": spammer wallet balance " << static_cast<int>(balance) << " is enough to spam transactions");
             }
         }
+        return true;
     }
 
 } // slv2

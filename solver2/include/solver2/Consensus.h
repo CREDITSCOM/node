@@ -28,11 +28,8 @@ public:
     /** @brief   Max timeout (msec) to wait transaction list (T) */
     //constexpr static uint32_t T_tl = 200;
 
-    /** @brief   Max timeout (msec) to wait all vectors (T) */
-    //constexpr static uint32_t T_vec = 400;
-
-    /** @brief   Max timeout (msec) to wait all matrices (T) */
-    //constexpr static uint32_t T_mat = 600;
+    /** @brief   Max timeout (msec) to wait all vectors, then all matrices (T) */
+    constexpr static uint32_t T_consensus = 2500;
 
     /** @brief   Max timeout (msec) to wait block (N, G, T) */
     //constexpr static uint32_t T_blk = 400;

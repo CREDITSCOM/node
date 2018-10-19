@@ -5,6 +5,7 @@
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/expressions/keyword.hpp> // include prior trivial.hpp for "Severity" attribute support in config Filter=
 #include <boost/log/sources/global_logger_storage.hpp>
+#include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/manipulators/dump.hpp>
 #include <boost/log/utility/setup/settings.hpp>
@@ -50,6 +51,12 @@ namespace logger {
     return false;
   }
 
+  // Logger with channel "file", to support legacy csfile() 
+  BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
+    File,
+    logging::sources::severity_channel_logger_mt<severity_level>,
+    (logging::keywords::channel = "file")
+  )
 } // namespace logger
 
 #define _LOG_SEV(level, ...) \
@@ -75,7 +82,7 @@ namespace logger {
 
 // deprecated (useless legacy macros)
 
-#define csfile(...) csdebug(__VA_ARGS__)
+#define csfile() csdebug(logger::File)
 
 #define csderror(...) cserror(__VA_ARGS__)
 

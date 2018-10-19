@@ -267,6 +267,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node,
 
   if (conn->connected) return;
   conn->connected = true;
+  conn->attempts = 0;
   neighbours_.emplace(conn);
 }
 
@@ -331,11 +332,26 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
   SpinLock l2(nLockFlag_);
 
   auto realPtr = findInMap(id, connections_);
+  auto nConn = node->connection.load(std::memory_order_relaxed);
+
   if (!realPtr) {
-    //LOG_WARN("Validation: Connection " << id << " not found");
-    return;
+    if (nConn) {
+      nConn->id = id;
+      if (!nConn->specialOut && nConn->in != ep) {
+        nConn->specialOut = true;
+        nConn->out = nConn->in;
+        nConn->in = ep;
+      }
+    }
+    else {
+      Connection conn;
+      conn.id = id;
+      conn.in = ep;
+      conn.specialOut = false;
+      transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
+    }
   }
-  else if (realPtr->get() != node->connection.load(std::memory_order_relaxed)) {
+  else if (realPtr->get() != nConn) {
     if (!(*realPtr)->specialOut && (*realPtr)->in != ep) {
       (*realPtr)->specialOut = true;
       (*realPtr)->out = (*realPtr)->in;
@@ -345,7 +361,14 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
   }
 }
 
-void Neighbourhood::gotRefusal(const Connection::Id& id) {}
+void Neighbourhood::gotRefusal(const Connection::Id& id) {
+  SpinLock l1(mLockFlag_);
+  SpinLock l2(nLockFlag_);
+
+  auto realPtr = findInMap(id, connections_);
+  if (realPtr)
+    transport_->sendRegistrationRequest(***realPtr);
+}
 
 void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
                                        const cs::Hash& hash,
@@ -509,7 +532,7 @@ ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
   SpinLock l(nLockFlag_);
   Connection* conn = node->connection.load(std::memory_order_acquire);
   if (!conn) return ConnectionPtr();
-  
+
   auto cPtr = findInVec(conn->id, neighbours_);
   if (cPtr) return *cPtr;
   return ConnectionPtr();

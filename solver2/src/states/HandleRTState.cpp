@@ -1,37 +1,35 @@
 #include "HandleRTState.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include "../Node.h"
 #include <lib/system/logger.hpp>
 
 namespace slv2
 {
     void HandleRTState::on(SolverContext& context)
     {
-        switch(context.node().getMyLevel()) {
-            case NodeLevel::Confidant:
-                context.become_trusted();
+        auto role = context.role();
+        switch(role) {
+            case Role::Trusted:
+            case Role::Normal:
+                context.request_role(role);
                 break;
-            case NodeLevel::Normal:
-                context.become_normal();
-                break;
-            case NodeLevel::Writer:
+            case Role::Write:
                 if(Consensus::Log) {
                     LOG_WARN(name() << ": node must not become writer through round table");
                 }
-                context.become_writer();
+                context.request_role(role);
                 break;
-            case NodeLevel::Main:
+            case Role::Collect:
                 if(Consensus::Log) {
                     if(context.round() > 1) {
                         LOG_WARN(name() << ": node may become a main (collector) through round table only as a BB or the 1st round result");
                     }
                 }
-                context.become_collector();
+                context.request_role(role);
                 break;
             default:
                 if(Consensus::Log) {
-                    LOG_ERROR(name() << ": unexpected Node::getMyLevel() result");
+                    LOG_ERROR(name() << ": unknown role requested");
                 }
                 break;
         }

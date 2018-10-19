@@ -251,7 +251,6 @@ public:
   */
   bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
 
-
 private:
   ::std::shared_ptr<priv> d;
 };

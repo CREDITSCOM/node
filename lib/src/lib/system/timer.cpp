@@ -4,8 +4,8 @@
 
 cs::Timer::Timer():
     m_isRunning(false),
-    m_interruption(false),
     m_isRehabilitation(true),
+    m_interruption(false),
     m_msec(std::chrono::milliseconds(0))
 {
 }

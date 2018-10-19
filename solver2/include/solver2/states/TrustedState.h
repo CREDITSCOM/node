@@ -1,6 +1,7 @@
 #pragma once
 #include "DefaultStateBehavior.h"
 #include <lib/system/keys.hpp>
+#include "CallsQueueScheduler.h"
 
 
 namespace slv2
@@ -28,6 +29,8 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
+        void off(SolverContext& context) override;
+
         Result onRoundTable(SolverContext& context, const uint32_t round) override;
 
         Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
@@ -47,7 +50,14 @@ namespace slv2
 
         bool test_vectors_completed(const SolverContext& context) const;
         bool test_matrices_completed(const SolverContext& context) const;
+        bool try_restore_cached_vectors(SolverContext& context);
 
+    private:
+        // not suitable to call in inherited classes
+        void start_timeout_consensus(SolverContext& context);
+        void cancel_timeout_consensus(SolverContext & context);
+        CallsQueueScheduler::CallTag tag_timeout_consensus { CallsQueueScheduler::no_tag };
+        void on_timeout_consensus(SolverContext& context);
     };
 
 } // slv2

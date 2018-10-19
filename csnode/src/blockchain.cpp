@@ -361,7 +361,6 @@ const csdb::Storage & BlockChain::getStorage() const
   return storage_;
 }
 
-
 //void
 //BlockChain::wait_for_block()
 //{
@@ -678,6 +677,11 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
           csdb::Pool::NewWalletInfo::AddressId addressId = { transactions.size(), csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
           addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
         }
+    }
+    if (pool.sequence() != 0)
+    {
+        csdb::Pool::NewWalletInfo::AddressId addressId = { transactions.size(), csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
+        addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
     }
 }
 

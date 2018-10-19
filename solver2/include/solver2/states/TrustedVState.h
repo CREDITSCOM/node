@@ -28,6 +28,8 @@ namespace slv2
 
         void on(SolverContext& context) override;
 
+        void off(SolverContext& context) override;
+
         Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
 
         // onMatrix() behaviour is completely implemented in TrustesState
@@ -36,6 +38,13 @@ namespace slv2
         {
             return "TrustedV";
         }
+
+    private:
+
+        void start_timeout_matrices(SolverContext& context);
+        void cancel_timeout_matrices(SolverContext& context);
+        CallsQueueScheduler::CallTag tag_timeout_matrices { CallsQueueScheduler::no_tag };
+        void on_timeout_matrices(SolverContext& context);
 
     };
 
