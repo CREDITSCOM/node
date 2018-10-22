@@ -159,6 +159,7 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
 
   const auto& writer_public_key = sender;
   newPool.set_writer_public_key(csdb::internal::byte_array(writer_public_key.begin(), writer_public_key.end()));
+  fee_counter_.CountFeesInPool(m_node, &newPool);
   m_node->getBlockChain().finishNewBlock(newPool);
 
   // TODO: need to write confidants notifications bytes to csdb::Pool user fields
