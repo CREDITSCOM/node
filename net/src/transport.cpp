@@ -83,6 +83,7 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 }  // namespace
 
 void Transport::run() {
+  net_->sendInit();
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
   {
