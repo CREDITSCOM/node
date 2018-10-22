@@ -910,6 +910,110 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Ad
 bool
 APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 {
+  auto trace = !init;
+  //  TRACE("");
+  auto pending_smart_transactions =
+    locked_ref(this->pending_smart_transactions);
+  //  TRACE("");
+
+  std::vector<csdb::PoolHash> new_blocks;
+  auto curph = start;
+  while (curph != pending_smart_transactions->last_pull_hash) {
+    // LOG_ERROR("pm.hash(): " << curph.to_string());
+    new_blocks.push_back(curph);
+    size_t _;
+    curph = s_blockchain.loadBlockMeta(curph, _).previous_hash();
+    if (curph.is_empty()) break;
+  }
+
+  if (curph.is_empty() && !pending_smart_transactions->last_pull_hash.is_empty()) {
+    // Fork detected!
+    auto luca = pending_smart_transactions->last_pull_hash;
+    while (!luca.is_empty()) {
+      auto fIt = std::find(new_blocks.begin(), new_blocks.end(), luca);
+      if (fIt != new_blocks.end()) {
+        new_blocks.erase(fIt, new_blocks.end());
+        break;
+      }
+
+      size_t _;
+      luca = s_blockchain.loadBlockMeta(luca, _).previous_hash();
+    }
+  }
+
+  pending_smart_transactions->last_pull_hash = start;
+
+  while (!new_blocks.empty()) {
+    auto trace = false;
+
+    //   TRACE("");
+    // LOG_ERROR(
+    //  "new_blocks.top().to_string(): " << new_blocks.top().to_string());
+    auto p = s_blockchain.loadBlock(new_blocks.back());
+
+    // LOG_ERROR("p.is_valid(): " << p.is_valid());
+
+    new_blocks.pop_back();
+
+    //   TRACE("");
+
+    auto& trs = p.transactions();
+    for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
+      //    TRACE("");
+      auto& tr = *i_tr;
+      if (is_smart(tr)) {
+        //  TRACE("");
+        pending_smart_transactions->queue.push(std::move(tr));
+      }
+    }
+  }
+  if (!pending_smart_transactions->queue.empty()) {
+    auto tr = std::move(pending_smart_transactions->queue.front());
+    pending_smart_transactions->queue.pop();
+    //  TRACE(std::endl << convertTransaction(tr));
+    auto smart = fetch_smart(tr);
+    auto address = tr.target();
+
+    if (!init) {
+      auto& e = [&]() -> decltype(auto) {
+        auto smart_last_trxn = locked_ref(this->smart_last_trxn);
+        return (*smart_last_trxn)[address];
+      }();
+      std::unique_lock<decltype(e.lock)> l(e.lock);
+      e.trid_queue.push_back(tr.id());
+      e.new_trxn_cv.notify_all();
+    }
+    {
+
+      auto& e = [&]() -> decltype(auto) {
+        auto smart_state(locked_ref(this->smart_state));
+        //    TRACE("");
+        return (*smart_state)[address];
+      }();
+      e.update_state(
+        [&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
+    }
+
+    if (is_smart_deploy(smart)) {
+      TRACE("");
+      {
+        auto smart_origin = locked_ref(this->smart_origin);
+        (*smart_origin)[address] = tr.id();
+      }
+      {
+        auto deployed_by_creator = locked_ref(this->deployed_by_creator);
+        (*deployed_by_creator)[tr.source()].push_back(tr.id());
+      }
+    }
+    return true;
+  }
+  TRACE("");
+  return false;
+}
+
+/*bool
+APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
+{
   auto TRACE = !init;
   //TRACE("");
   auto pending_smart_transactions =
@@ -991,7 +1095,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   }
   //TRACE("");
   return false;
-}
+}*/
 
 template<typename Mapper>
 void
