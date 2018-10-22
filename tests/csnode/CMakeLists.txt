@@ -1,5 +1,8 @@
 set(TEST_NAME node)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 file(GLOB SRCS *.cpp)
 list(APPEND SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/../../client/src/config.cpp"
