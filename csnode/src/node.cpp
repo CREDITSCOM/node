@@ -989,7 +989,7 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
   cs::Bytes notification(data, data + size);
   solver_->addNotification(notification);
 
-  if (!solver_->isEnoughNotifications()) {
+  if (!solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal)) {
     return;
   }
 
@@ -1307,7 +1307,7 @@ void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
   cslog() << "NODE> Became writer";
 
-  if (solver_->isEnoughNotifications()) {
+  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::GreaterEqual)) {
     applyNotifications();
   }
 }

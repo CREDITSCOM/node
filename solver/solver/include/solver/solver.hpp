@@ -30,7 +30,12 @@ namespace cs {
 class Generals;
 
 class Solver {
- public:
+public:
+  enum class NotificationState {
+    Equal,
+    GreaterEqual
+  };
+
   explicit Solver(Node*);
   ~Solver();
 
@@ -78,7 +83,7 @@ class Solver {
   const cs::Notifications& notifications() const;
   void addNotification(const cs::Bytes& bytes);
   std::size_t neededNotifications() const;
-  bool isEnoughNotifications() const;
+  bool isEnoughNotifications(NotificationState state) const;
 
   // conveyer start point
   void addConveyerTransaction(const csdb::Transaction& transaction);
@@ -106,7 +111,7 @@ class Solver {
   const cs::PrivateKey& getPrivateKey() const;
   const cs::PublicKey& getPublicKey() const;
 
- private:
+private:
   void flushTransactions();
 
   // TODO: fix signature

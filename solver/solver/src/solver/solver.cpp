@@ -790,14 +790,19 @@ std::size_t Solver::neededNotifications() const {
   return m_roundTable.confidants.size() / 2;  // TODO: + 1 at the end may be?
 }
 
-bool Solver::isEnoughNotifications() const {
+bool Solver::isEnoughNotifications(NotificationState state) const {
   const std::size_t neededConfidantsCount = neededNotifications();
   const std::size_t notificationsCount = notifications().size();
 
   cslog() << "SOlVER> Current notifications count - " << notificationsCount;
   cslog() << "SOLVER> Needed confidans count - " << neededConfidantsCount;
 
-  return notificationsCount == neededConfidantsCount;
+  if (state == NotificationState::Equal) {
+    return notificationsCount == neededConfidantsCount;
+  }
+  else {
+    return notificationsCount >= neededConfidantsCount;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
