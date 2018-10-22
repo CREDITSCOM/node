@@ -24,7 +24,7 @@ namespace cs
             RangeDeltaInPercents = 10
         };
 
-        explicit Timer();
+        Timer();
         ~Timer();
 
         ///
