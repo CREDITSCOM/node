@@ -159,12 +159,9 @@ Address Address::from_public_key(const char* key)
   return res;
 }
 
-std::string Address::csdb_addr_to_api_addr(const Address &addr)
+std::string Address::to_api_addr()
 {
-  char api_addr[::csdb::priv::crypto::public_key_size];
-  memcpy(api_addr, addr.d->data_.public_key.data(), ::csdb::priv::crypto::public_key_size);
-  std::string res(api_addr);
-  return res;
+  return std::string(d->data_.public_key.begin(), d->data_.public_key.end());
 }
 
 Address Address::from_wallet_id(WalletId id)
