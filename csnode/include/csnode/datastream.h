@@ -156,13 +156,9 @@ namespace cs
         template<std::size_t size>
         inline void setByteArray(const ByteArray<size>& array)
         {
-            std::array<char, size> transformed;
-
-            std::transform(array.begin(), array.end(), transformed.begin(), [](const auto element) {
-                return static_cast<char>(element);
-            });
-
-            setStreamArray(transformed);
+            if (m_bytes) {
+                m_bytes->insert(m_bytes->end(), array.begin(), array.end());
+            }
         }
 
         ///
@@ -174,13 +170,17 @@ namespace cs
         template<std::size_t size>
         inline ByteArray<size> byteArray()
         {
-            ByteArray<size> result;
-            decltype(auto) array = streamArray<size>();
+            ByteArray<size> result = { 0 };
 
-            std::transform(array.begin(), array.end(), result.begin(), [](const auto element) {
-                return static_cast<unsigned char>(element);
-            });
+            if (!isAvailable(size)) {
+                return result;
+            }
 
+            for (std::size_t i = 0; i < size; ++i) {
+                result[i] =static_cast<unsigned char>(m_data[i + m_index]);
+            }
+
+            m_index += size;
             return result;
         }
 
