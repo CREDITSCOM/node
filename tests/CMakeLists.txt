@@ -20,12 +20,12 @@ add_dependencies(libgtest gtest)
 
 if (MSVC)
   set_target_properties(libgtest PROPERTIES
-      "IMPORTED_LOCATION" "${binary_dir}/googlemock/gtest/gtestd.lib"
+      "IMPORTED_LOCATION" "${binary_dir}/lib/gtestd.lib"
       "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
   )
 else()
   set_target_properties(libgtest PROPERTIES
-      "IMPORTED_LOCATION" "${binary_dir}/googlemock/gtest/libgtest.a"
+      "IMPORTED_LOCATION" "${binary_dir}/lib/libgtest.a"
       "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
   )
 endif()
@@ -35,12 +35,12 @@ add_dependencies(libgmock gtest)
 
 if (MSVC)
   set_target_properties(libgmock PROPERTIES
-      "IMPORTED_LOCATION" "${binary_dir}/googlemock/gmockd.lib"
+      "IMPORTED_LOCATION" "${binary_dir}/lib/gmockd.lib"
       "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
   )
 else()
   set_target_properties(libgmock PROPERTIES
-      "IMPORTED_LOCATION" "${binary_dir}/googlemock/libgmock.a"
+      "IMPORTED_LOCATION" "${binary_dir}/lib/libgmock.a"
       "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
   )
 endif()
