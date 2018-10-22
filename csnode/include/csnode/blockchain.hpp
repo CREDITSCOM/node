@@ -38,8 +38,7 @@ public:
   BlockChain(const char* path);
 
   void putBlock(csdb::Pool& pool);
-
-  void writeLastBlock(csdb::Pool& pool);
+  void revertLastBlock();
 
   csdb::PoolHash getLastHash() const;
   size_t getSize() const;
@@ -78,6 +77,8 @@ public:
 
 private:
   Headtag ht;
+
+  void updateLastHash();
   bool loadCache();
   bool updateCache(csdb::Pool& pool);
   csdb::Amount calcBalance(const csdb::Address &) const;

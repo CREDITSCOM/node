@@ -82,7 +82,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack,
 
     //if (msg->packetsLeft_ % 100 == 0)
     //if (msg->packetsLeft_ == 0)
-    //  LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
+    //LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
   }
 
   return msg;

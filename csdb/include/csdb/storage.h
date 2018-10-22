@@ -167,6 +167,8 @@ public:
    * Если хранилище пустое, или не содержит законченной цепочки, возвращается пустой хэш.
    */
   PoolHash last_hash() const noexcept;
+  void set_last_hash(const PoolHash&) noexcept;
+  void set_size(const size_t) noexcept;
 
   /**
    * @brief Записавает пул в хранилище

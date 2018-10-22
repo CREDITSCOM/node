@@ -35,7 +35,7 @@ class Node {
   void getInitRing(const uint8_t*, const size_t);
   void getRoundTable(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
   void getBigBang(const uint8_t*, const size_t, const RoundNum, uint8_t type);
-  void getTransaction(const uint8_t*, const size_t);
+  void getTransaction(const uint8_t*, const size_t, const RoundNum);
   void getFirstTransaction(const uint8_t*, const size_t);
   void getTransactionsList(const uint8_t*, const size_t);
   void getVector(const uint8_t*, const size_t, const PublicKey& sender);
@@ -150,6 +150,8 @@ class Node {
 
   PublicKey              mainNode_;
   std::vector<PublicKey> confidantNodes_;
+
+  std::set<RoundNum> myLeads_;
 
   uint8_t myConfNumber;
 

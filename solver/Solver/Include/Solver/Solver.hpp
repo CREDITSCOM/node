@@ -170,6 +170,8 @@ class Solver {
 
   uint32_t          getNextMissingBlock(const uint32_t fromSeq);
 
+  void              clearAfterMax();
+
  private:
   void _initApi();
 
@@ -177,6 +179,7 @@ class Solver {
   void runMainRound();
   void closeMainRound();
 
+  void refreshState();
   void flushTransactions();
 
   void writeNewBlock();

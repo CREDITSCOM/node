@@ -56,6 +56,29 @@ void WalletsCache::updateFrom(csdb::Pool& curr)
     load(curr, Mode::Update);
 }
 
+void WalletsCache::unUpdateFrom(csdb::Pool& curr)
+{
+    PoolHash poolHash;
+    convert(curr.hash(), poolHash);
+
+    auto* walWriter = getWalletData(curr.writer_public_key());
+
+    for (size_t i = 0; i < curr.transactions_count(); i++)
+    {
+        csdb::Transaction tr = curr.transaction(i);
+        auto* walSrc = getWalletData(tr.source().public_key());
+        auto* walTrg = getWalletData(tr.target().public_key());
+
+        if (!walSrc || !walTrg || !walWriter) continue;
+
+        walSrc->balance_ += tr.amount();
+	walSrc->balance_ += tr.counted_fee();
+	walWriter->balance_ -= tr.counted_fee();
+
+        walTrg->balance_ -= tr.amount();
+    }
+}
+
 void WalletsCache::load(csdb::Pool& curr, Mode mode)
 {
     PoolHash poolHash;

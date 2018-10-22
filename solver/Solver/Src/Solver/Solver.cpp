@@ -60,6 +60,7 @@ Solver::Solver(Node* node)
 , m_pool()
 , v_pool()
 , b_pool() {
+  refreshState();
 }
 
 Solver::~Solver() {
@@ -108,9 +109,11 @@ void Solver::prepareBlockForSend(csdb::Pool& block) {
   block.set_writer_public_key(myPublicKey);
   // std::cout << "SOLVER> Before write last sequence" << std::endl;
   block.set_sequence((node_->getBlockChain().getLastWrittenSequence()) + 1);
-  csdb::PoolHash prev_hash;
+
+  block.set_previous_hash(node_->getBlockChain().getLastWrittenHash());
+  /*csdb::PoolHash prev_hash;
   prev_hash.from_string("");
-  block.set_previous_hash(prev_hash);
+  block.set_previous_hash(prev_hash);*/
   // std::cout << "SOLVER> Before private key" << std::endl;
   block.sign(myPrivateKey);
 #ifdef MYLOG
@@ -227,7 +230,18 @@ void Solver::flushTransactions() {
       return;
     }
   }
-  runAfter(std::chrono::milliseconds(50), [this]() { flushTransactions(); });
+}
+
+void Solver::refreshState() {
+  static uint32_t ctr = 0;
+  if (++ctr > 0) {
+    flushTransactions();
+    auto nextBlock = node_->getBlockChain().getLastWrittenSequence() + 1;
+    if (nextBlock < node_->getRoundNumber())
+      node_->sendBlockRequest(nextBlock);
+  }
+
+  runAfter(std::chrono::milliseconds(1000), [this]() { refreshState(); });
 }
 
 bool Solver::getIPoolClosed() {
@@ -241,6 +255,8 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {
   if (m_pool_closed) {
 #ifdef MYLOG
     LOG_EVENT("m_pool_closed already, cannot accept your transactions");
+    std::lock_guard<std::mutex> l(m_trans_mut);
+    m_transactions_.transactions().push_back(transaction);
 #endif
     return;
   }
@@ -256,13 +272,13 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {
       v_pool.add_transaction(transaction);
 #ifndef SPAMMER
     } else {
-      LOG_EVENT("Wrong signature");
+      //LOG_EVENT("Wrong signature");
     }
 #endif
   }
 #ifdef MYLOG
   else {
-    LOG_EVENT("Invalid transaction received");
+    //LOG_EVENT("Invalid transaction received");
   }
 #endif
 }
@@ -459,7 +475,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   gotBigBang        = false;
   gotBlockThisRound = true;
 #ifdef MONITOR_NODE
-  addTimestampToPool(block);
+  //addTimestampToPool(block);
 #endif
   uint32_t g_seq = block.sequence();
 #ifdef MYLOG
@@ -539,7 +555,12 @@ void Solver::rndStorageProcessing()
 
     if (rndStorage.count(newSeq)>0)
     {
-      node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      auto& block = rndStorage.at(newSeq);
+      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash())
+        node_->getBlockChain().putBlock(rndStorage.at(newSeq));
+      else
+        node_->getBlockChain().revertLastBlock();
+
       rndStorage.erase(newSeq);
     }
     else loop = false;
@@ -567,13 +588,33 @@ void Solver::tmpStorageProcessing()
 
     if (tmpStorage.count(newSeq)>0)
     {
-      node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      auto& block = tmpStorage.at(newSeq);
+      if (block.previous_hash() == node_->getBlockChain().getLastWrittenHash())
+        node_->getBlockChain().putBlock(tmpStorage.at(newSeq));
+      else
+        node_->getBlockChain().revertLastBlock();
+
       tmpStorage.erase(newSeq);
     }
     else loop = false;
   }
 }
 
+void Solver::clearAfterMax() {
+  for (auto it = tmpStorage.begin(); it != tmpStorage.end(); ) {
+    if (it->first > node_->getBlockChain().getGlobalSequence())
+      it = tmpStorage.erase(it);
+    else
+      ++it;
+  }
+
+  for (auto it = rndStorage.begin(); it != rndStorage.end(); ) {
+    if (it->first > node_->getBlockChain().getGlobalSequence())
+      it = rndStorage.erase(it);
+    else
+      ++it;
+  }
+}
 
 bool Solver::getBigBangStatus() {
   return gotBigBang;
@@ -772,7 +813,7 @@ void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   // TRACE("");
   std::lock_guard<std::mutex> l(m_trans_mut);
   // TRACE("");
-  if (m_transactions_.transactions().size() < 20)
+  if (m_transactions_.transactions().size() < 40)
     m_transactions_.transactions().push_back(transaction);
 }
 
@@ -806,9 +847,9 @@ void Solver::addInitialBalance() {
 void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
   csdb::Pool pool = node_->getBlockChain().loadBlock(hash);
   if (pool.is_valid()) {
-    csdb::PoolHash prev_hash;
+    /*csdb::PoolHash prev_hash;
     prev_hash.from_string("");
-    pool.set_previous_hash(prev_hash);
+    pool.set_previous_hash(prev_hash);*/
     node_->sendBlockReply(std::move(pool), nodeId);
   }
 }
@@ -863,7 +904,7 @@ void Solver::nextRound() {
     memset(receivedMatFrom, 0, 100);
     trustedCounterVector = 0;
     trustedCounterMatrix = 0;
-    if (gotBigBang)
+    if (gotBigBang && node_->getBlockChain().getLastWrittenSequence() == (node_->getRoundNumber() - 1))
       runAfter(std::chrono::milliseconds(5000),
                [this]() {
                  sendZeroVector();

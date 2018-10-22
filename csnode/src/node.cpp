@@ -174,17 +174,28 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
-  std::cout << __func__ << std::endl;
-  uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
-  if (rNum > lastBlock && rNum >= roundNum_) {
-    solver_->setBigBangStatus(true);
-    getRoundTable(data, size, rNum, type);
+  std::cout << __func__ << " " << rNum << std::endl;
 
-  } else {
-#ifdef MYLOG
-    std::cout << "BigBang else" << std::endl;
-#endif
+  istream_.init(data, size);
+  Hash h;
+  istream_ >> h;
+
+  getBlockChain().setGlobalSequence(getBlockChain().getLastWrittenSequence());
+  solver_->clearAfterMax();
+
+  while (getBlockChain().getLastWrittenSequence() >= rNum)
+    getBlockChain().revertLastBlock();
+
+  if (getBlockChain().getLastWrittenSequence() == (rNum - 1)) {
+    Hash lHash((const char*)getBlockChain().getLastWrittenHash().to_binary().data());
+    if (lHash != h) {
+      LOG_WARN("Warning: deleting last block since the hashes don't match: " << byteStreamToHex(lHash.str, 32) << " vs " << byteStreamToHex(h.str, 32));
+      getBlockChain().revertLastBlock();
+    }
   }
+
+  solver_->setBigBangStatus(true);
+  getRoundTable(istream_.getCurrPtr(), size - HASH_LENGTH, rNum, type);
 }
 
 // the round table should be sent only to trusted nodes, all other should received only round number and Main node ID
@@ -243,7 +254,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const Pu
   sendRoundTable();
 }
 
-void Node::getTransaction(const uint8_t* data, const size_t size) {
+void Node::getTransaction(const uint8_t* data, const size_t size, const RoundNum rNum) {
   istream_.init(data, size);
 
   csdb::Pool pool;
@@ -254,11 +265,12 @@ void Node::getTransaction(const uint8_t* data, const size_t size) {
     return;
   }
 
-  for (auto& t : pool.transactions()) {
-    if (myLevel_ == NodeLevel::Main || myLevel_ == NodeLevel::Writer) {
+  if (rNum == roundNum_ && myLevel_ == NodeLevel::Main) {
+    for (auto& t : pool.transactions())
       solver_->gotTransaction(std::move(t));
-    }
   }
+  else if (myLeads_.count(rNum))
+    sendTransaction(std::move(pool));
 }
 
 void Node::sendTransaction(csdb::Pool&& transactions) {
@@ -664,7 +676,14 @@ void Node::getBlock(const uint8_t* data, const size_t size, const PublicKey& sen
 
   solver_->rndStorageProcessing();
 
-  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) solver_->gotBlock(std::move(pool), sender);
+  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) {
+    if (getBlockChain().getLastHash() == pool.previous_hash())
+      solver_->gotBlock(std::move(pool), sender);
+    else {
+      getBlockChain().revertLastBlock();
+      solver_->gotIncorrectBlock(std::move(pool), sender);
+    }
+  }
   else solver_->gotIncorrectBlock(std::move(pool), sender);
 }
 
@@ -753,10 +772,10 @@ void Node::sendHash(const Hash& hash, const PublicKey& target) {
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const PublicKey& sender) {
   //std::cout << __func__ << std::endl;
-  if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
-    return;
-  if (sender == myPublicKey_)
-    return;
+  //if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant)
+  //  return;
+  //if (sender == myPublicKey_)
+  //  return;
   uint32_t requested_seq;
   istream_.init(data, size);
   istream_ >> requested_seq;
@@ -811,7 +830,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     }
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
-      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      LOG_WARN("Sending request for block " << reqSeq << " from nbr " << requestee->in);
       ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
@@ -829,7 +848,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingRecBlockCount    = 0;
 
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
+  std::cout << "SENDBLOCKREQUEST> Done" << std::endl;
 #endif
 }
 
@@ -848,15 +867,21 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   if (getBlockChain().getGlobalSequence() < pool.sequence())
     getBlockChain().setGlobalSequence(pool.sequence());
 
-  if (pool.sequence() == sendBlockRequestSequence) {
+  if (pool.sequence() == (getBlockChain().getLastWrittenSequence() + 1)) {
 #ifdef MYLOG
     std::cout << "GETBLOCKREPLY> Block Sequence is Ok" << std::endl;
 #endif
-    solver_->gotBlockReply(std::move(pool));
-    awaitingSyncroBlock = false;
-    solver_->rndStorageProcessing();
+
+    if (getBlockChain().getLastHash() == pool.previous_hash()) {
+      solver_->gotBlockReply(std::move(pool));
+      solver_->rndStorageProcessing();
+    }
+    else {
+      getBlockChain().revertLastBlock();
+      solver_->gotFreeSyncroBlock(std::move(pool));
+    }
   }
-  else
+  else if (pool.sequence() > getBlockChain().getLastWrittenSequence())
     solver_->gotFreeSyncroBlock(std::move(pool));
 
   if (getBlockChain().getGlobalSequence() >
@@ -872,11 +897,14 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const PublicKey& sender) {
 #ifdef MYLOG
-  std::cout << "SENDBLOCKREPLY> Sending block to " << byteStreamToHex(sender.str, 32) << std::endl;
+  std::cout << "SENDBLOCKREPLY> Sending block " << pool.sequence() << " of " << const_cast<csdb::Pool&>(pool).transactions().size() << " trxns to " << byteStreamToHex(sender.str, 32) << std::endl;
 #endif
 
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
-  if (!conn) return;
+  if (!conn) {
+    LOG_WARN("Cannot get a connection with a specified public key");
+    return;
+  }
 
   ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
@@ -973,7 +1001,7 @@ void Node::initNextRound(const PublicKey& mainNode, std::vector<PublicKey>&& con
 }
 
 Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
-  if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence())
+  if (type == MsgTypes::BigBang || type == MsgTypes::Transactions)
     return MessageActions::Process;
   if (type == MsgTypes::RoundTableRequest)
     return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
@@ -1030,6 +1058,8 @@ inline bool Node::readRoundData(const bool tail) {
 #endif
 
   mainNode_ = mainNode;
+  if (mainNode_ == myPublicKey_) myLeads_.insert(roundNum_);
+  else myLeads_.erase(roundNum_);
 
   return true;
 }
