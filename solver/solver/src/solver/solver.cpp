@@ -782,6 +782,7 @@ const cs::Notifications& Solver::notifications() const {
 }
 
 void Solver::addNotification(const cs::Bytes& bytes) {
+  csdebug() << "SOLVER> notification added";
   m_notifications.push_back(bytes);
 }
 
@@ -793,8 +794,8 @@ bool Solver::isEnoughNotifications() const {
   const std::size_t neededConfidantsCount = neededNotifications();
   const std::size_t notificationsCount = notifications().size();
 
-  cslog() << "Get notification, current notifications count - " << notificationsCount;
-  cslog() << "Needed confidans count - " << neededConfidantsCount;
+  cslog() << "SOlVER> Current notifications count - " << notificationsCount;
+  cslog() << "SOLVER> Needed confidans count - " << neededConfidantsCount;
 
   return notificationsCount == neededConfidantsCount;
 }

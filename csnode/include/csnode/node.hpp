@@ -13,24 +13,29 @@
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
-enum NodeLevel { Normal, Confidant, Main, Writer };
+enum NodeLevel {
+  Normal,
+  Confidant,
+  Main,
+  Writer
+};
 
 class Transport;
 
 namespace cs {
-class Solver;
+  class Solver;
 }
 
 class Node {
- public:
-  Node(const Config&);
+public:
+  explicit Node(const Config&);
   ~Node();
 
   bool isGood() const {
     return good_;
   }
 
-  void run(const Config& config);
+  void run();
 
   /* Incoming requests processing */
   void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
@@ -106,21 +111,29 @@ class Node {
   void initNextRound(const cs::RoundTable& roundTable);
   bool getSyncroStarted();
 
-  enum MessageActions { Process, Postpone, Drop };
+  enum MessageActions {
+    Process,
+    Postpone,
+    Drop
+  };
+
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
   const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
+
   NodeLevel getMyLevel() const {
     return myLevel_;
   }
+
   uint32_t getRoundNumber();
   uint8_t getMyConfNumber();
 
   BlockChain& getBlockChain() {
     return bc_;
   }
+
   const BlockChain& getBlockChain() const {
     return bc_;
   }

@@ -32,8 +32,8 @@ Node::Node(const Config& config)
 #ifdef NODE_API
 , api_(bc_, solver_)
 #endif
-, packStreamAllocator_(1 << 26, 5)
-, allocator_(1 << 26, 3)
+, packStreamAllocator_(1 << 26, 5)      //TODO: fix me
+, allocator_(1 << 26, 3)                //TODO: fix me
 , ostream_(&packStreamAllocator_, myPublicKey_) {
   good_ = init();
 }
@@ -182,7 +182,7 @@ bool Node::checkKeysForSig() {
   return false;
 }
 
-void Node::run(const Config& config) {
+void Node::run() {
   transport_->run();
 }
 
@@ -981,10 +981,6 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
-  if (myLevel_ != NodeLevel::Writer) {
-    return;
-  }
-
   if (!isCorrectNotification(data, size)) {
     cswarning() << "Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
     return;
@@ -997,12 +993,18 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
     return;
   }
 
+  if (myLevel_ != NodeLevel::Writer) {
+    return;
+  }
+
   cslog() << "Confidants count more then 51%";
   
   applyNotifications();
 }
 
 void Node::applyNotifications() {
+  csdebug() << "NODE> applyNotifications";
+
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
@@ -1012,16 +1014,16 @@ void Node::applyNotifications() {
   std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo);
 
   if (!pool) {
-    cserror() << "APPLY CHARACTERISTIC ERROR!";
+    cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
     return;
   }
 
   const cs::Bytes& poolBinary = pool->to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
-  cslog() << "applyNotification " << "Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+  cslog() << "NODE> applyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
 
-  bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
-  cslog() << "after sign: isVerified == " << isVerified;
+  const bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
+  cslog() << "NODE> after sign: isVerified == " << isVerified;
 
   writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
@@ -1303,7 +1305,11 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
 
 void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
-  cslog() << "Became writer";
+  cslog() << "NODE> Became writer";
+
+  if (solver_->isEnoughNotifications()) {
+    applyNotifications();
+  }
 }
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {

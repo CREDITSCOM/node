@@ -117,7 +117,7 @@ namespace cs
             std::string str;
             str.resize(sizeof(T));
 
-            cs::Utils::insertToArray(str.data(), sizeof(T), 0, address);
+            cs::Utils::insertToArray(str.data(), 0, address);
 
             return str;
         }
