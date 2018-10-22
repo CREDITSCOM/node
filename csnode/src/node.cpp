@@ -911,9 +911,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   for (const auto& notification : solver_->notifications()) {
     cs::Hash hash;
-    cs::DataStream stream(notification.data(), notification.size());
+    cs::DataStream notificationStream(notification.data(), notification.size());
 
-    stream >> hash;
+    notificationStream >> hash;
 
     confidantsHashes.push_back(hash);
   }
@@ -938,7 +938,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::PublicKey writerPublicKey;
   stream >> writerPublicKey;
 
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo);
 
   if (pool) {
     const uint8_t* message = pool->to_binary().data();

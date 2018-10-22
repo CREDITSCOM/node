@@ -63,8 +63,7 @@ public:
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool);
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
@@ -84,6 +83,11 @@ public:
   void addNotification(const cs::Bytes& bytes);
   std::size_t neededNotifications() const;
   bool isEnoughNotifications(NotificationState state) const;
+
+  // characteristic meta
+  void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+  cs::CharacteristicMeta characteristicMeta(const RoundNumber round);
+  bool isCharacteristicMetaReceived(const RoundNumber round);
 
   // conveyer start point
   void addConveyerTransaction(const csdb::Transaction& transaction);
@@ -153,6 +157,8 @@ private:
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
   cs::HashesSet m_hashesToRemove;
+
+  std::vector<cs::CharacteristicMeta> m_characteristicMeta;
 
   cs::Timer m_sendingPacketTimer;
 

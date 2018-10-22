@@ -85,8 +85,7 @@ uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
 }
 
-std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool,
-                                 const PublicKey& sender) {
+std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   gotBigBang = false;
@@ -192,7 +191,7 @@ bool Solver::checkTableHashes(const cs::RoundTable& table)
   }
 
   for (const auto& hash : neededHashes) {
-    csfile() << "SOLVER> Need hash >> " << hash.toString();
+    csdebug() << "SOLVER> Need hash >> " << hash.toString();
   }
 
   return neededHashes.empty();
@@ -803,6 +802,44 @@ bool Solver::isEnoughNotifications(NotificationState state) const {
   else {
     return notificationsCount >= neededConfidantsCount;
   }
+}
+
+void Solver::addCharacteristicMeta(const CharacteristicMeta& meta) {
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+
+  if (iterator != m_characteristicMeta.end()) {
+    m_characteristicMeta.push_back(meta);
+    csdebug() << "SOLVER> Characteristic meta added";
+  }
+  else {
+    csdebug() << "SOLVER> Received meta is currently in meta stack";
+  }
+}
+
+CharacteristicMeta Solver::characteristicMeta(const RoundNumber round) {
+  cs::CharacteristicMeta meta;
+  meta.round = round;
+
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+
+  if (iterator != m_characteristicMeta.end()) {
+    meta = std::move(*iterator);
+    m_characteristicMeta.erase(iterator);
+
+    return meta;
+  }
+  else {
+    cserror() << "SOLVER> characteristic meta not found";
+    return {};
+  }
+}
+
+bool Solver::isCharacteristicMetaReceived(const RoundNumber round) {
+  cs::CharacteristicMeta meta;
+  meta.round = round;
+
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+  return iterator != m_characteristicMeta.end();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

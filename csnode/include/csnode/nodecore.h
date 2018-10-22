@@ -10,7 +10,10 @@
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
+
 #include <boost/smart_ptr/detail/spinlock.hpp>
+#include <boost/circular_buffer.hpp>
+
 #include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
@@ -61,7 +64,7 @@ namespace cs
     // all info about round
     struct RoundTable
     {
-        RoundNumber round;
+        RoundNumber round = 0;
         PublicKey general;
         ConfidantsKeys confidants;
         Hashes hashes;
@@ -70,6 +73,23 @@ namespace cs
     struct Characteristic
     {
         cs::Bytes mask;
+    };
+
+    struct CharacteristicMeta
+    {
+        cs::Bytes bytes;
+        cs::PublicKey sender;
+        cs::RoundNumber round = 0;
+
+        bool operator==(const cs::CharacteristicMeta& meta)
+        {
+            return round == meta.round;
+        }
+
+        bool operator !=(const cs::CharacteristicMeta& meta)
+        {
+            return !((*this) == meta);
+        }
     };
 
     struct PoolMetaInfo
