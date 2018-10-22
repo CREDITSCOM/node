@@ -694,7 +694,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   if (transaction.source.size() == PUBLIC_KEY_LENGTH)
     pk_source = transaction.source;
   else if (s_blockchain.findAddrByWalletId(id, res_addr))
-    pk_source = csdb::Address::csdb_addr_to_api_addr(res_addr);
+    pk_source = res_addr.to_api_addr();
   else {
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
