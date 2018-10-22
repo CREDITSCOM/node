@@ -41,6 +41,7 @@ enum BootstrapType {
 
 class Config {
 public:
+  Config() {} // necessary for testing
   Config(const Config&) = default;
   Config(Config&&) = default;
 
@@ -69,7 +70,6 @@ public:
   const boost::log::settings& getLoggerSettings() const;
 
 private:
-  Config() { }
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
 

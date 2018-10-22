@@ -25,16 +25,18 @@ public:
   Network& operator=(const Network&) = delete;
   Network& operator=(Network&&) = delete;
 
-private:
-  void readerRoutine(const Config&);
-  void writerRoutine(const Config&);
-  void processorRoutine();
-
   enum ThreadStatus {
     NonInit,
     Failed,
     Success
   };
+
+private:
+  void readerRoutine(const Config&);
+  void writerRoutine(const Config&);
+  void processorRoutine();
+
+
   ip::udp::socket* getSocketInThread(const bool,
                                      const EndpointData&,
                                      std::atomic<ThreadStatus>&,

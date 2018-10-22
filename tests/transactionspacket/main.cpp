@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_SUITE(CsNodeTests)
         BOOST_CHECK(tp.hash()              != tpBin.hash());
 
         // test binary stream
-        cs::internal::Bytes buffer  = tp.toBinary();
+        cs::Bytes buffer  = tp.toBinary();
         const size_t        rawSize = buffer.size();
         void*               rawData = buffer.data();
         std::cout << "tp    rawData Size : " << rawSize << "\n";
