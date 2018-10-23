@@ -1,9 +1,10 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
+
 #include <csdb/amount_commission.h>
 #include <solver/TransactionsValidator.h>
-using namespace std;
+#include <lib/system/logger.hpp>
 
 namespace cs
 {
