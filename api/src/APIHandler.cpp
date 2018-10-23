@@ -659,9 +659,10 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
       //TRACE("");
       auto res = !state.empty();
       if (res) {
-        //TRACE("");
-        contract_state = std::move(state);
-        state.clear();
+        //TRACE
+        contract_state = state;
+        //contract_state = std::move(state);
+        //state.clear();
       }
       //TRACE("");
       return res;
