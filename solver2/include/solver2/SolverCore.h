@@ -136,7 +136,7 @@ namespace slv2
         const cs::Notifications& notifications() const;
         void addNotification(const cs::Bytes& bytes);
         std::size_t neededNotifications() const;
-        bool isEnoughNotifications(Solver::NotificationState state) const;
+        bool isEnoughNotifications(cs::Solver::NotificationState state) const;
         std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
           const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
         const cs::Characteristic& getCharacteristic() const;
@@ -150,6 +150,8 @@ namespace slv2
         bool isPoolClosed() const;
         void sendTL();
         cs::SharedMutex& getSharedMutex();
+        bool isPacketSyncFinished() const;
+        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
 
     private:
 

@@ -112,7 +112,8 @@ uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
 }
 
-std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool) {
+std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic,
+    const PoolMetaInfo& metaInfoPool, const PublicKey& sender) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   gotBigBang = false;

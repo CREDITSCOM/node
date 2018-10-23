@@ -957,7 +957,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::PublicKey writerPublicKey;
   stream >> writerPublicKey;
 
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo);
+  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
 
   if (pool) {
     const uint8_t* message = pool->to_binary().data();

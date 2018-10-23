@@ -84,7 +84,7 @@ namespace slv2
         }
     }
 
-    bool SolverCore::isEnoughNotifications(Solver::NotificationState state) const {
+    bool SolverCore::isEnoughNotifications(cs::Solver::NotificationState state) const {
         if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->isEnoughNotifications(state);
         }
@@ -159,6 +159,18 @@ namespace slv2
     void SolverCore::sendTL() {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->sendTL();
+        }
+    }
+
+    bool SolverCore::isPacketSyncFinished() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->isPacketSyncFinished();
+        }
+    }
+
+    void SolverCore::addCharacteristicMeta(const cs::CharacteristicMeta& meta) {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->addCharacteristicMeta(meta);
         }
     }
 

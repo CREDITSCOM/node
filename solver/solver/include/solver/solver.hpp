@@ -78,7 +78,8 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool);
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
+    const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
