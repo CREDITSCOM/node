@@ -72,14 +72,20 @@ int main(int argc, char* argv[]) {
   }
 
   auto config = Config::read(vm);
-  if (!config.isGood()) panic();
+
+  if (!config.isGood()) {
+    panic();
+  }
 
   logger::initialize(config.getLoggerSettings());
 
   Node node(config);
-  if (!node.isGood()) panic();
 
-  node.run(config);
+  if (!node.isGood()) {
+    panic();
+  }
+
+  node.run();
 
   logger::cleanup();
   return 0;

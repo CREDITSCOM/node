@@ -131,12 +131,12 @@ namespace slv2
         const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
         bool getIPoolClosed();
         void gotHash(std::string&&, const cs::PublicKey&);
-        void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender);
+        void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
         void gotPacketHashesReply(cs::TransactionsPacket&& packet);
         const cs::Notifications& notifications() const;
         void addNotification(const cs::Bytes& bytes);
         std::size_t neededNotifications() const;
-        bool isEnoughNotifications() const;
+        bool isEnoughNotifications(Solver::NotificationState state) const;
         std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
           const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
         const cs::Characteristic& getCharacteristic() const;

@@ -10,10 +10,23 @@
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
+
 #include <boost/smart_ptr/detail/spinlock.hpp>
+#include <boost/circular_buffer.hpp>
+
 #include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
+
+namespace std
+{
+    // transactions packet hash specialization
+    template<>
+    struct hash<cs::TransactionsPacketHash>
+    {
+        std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+    };
+}
 
 namespace cs
 {
@@ -30,7 +43,6 @@ namespace cs
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
-    using HashesSet = std::unordered_set<cs::TransactionsPacketHash>;
 
     // sync types
     using SharedMutex = std::shared_mutex;
@@ -61,7 +73,7 @@ namespace cs
     // all info about round
     struct RoundTable
     {
-        RoundNumber round;
+        RoundNumber round = 0;
         PublicKey general;
         ConfidantsKeys confidants;
         Hashes hashes;
@@ -70,6 +82,23 @@ namespace cs
     struct Characteristic
     {
         cs::Bytes mask;
+    };
+
+    struct CharacteristicMeta
+    {
+        cs::Bytes bytes;
+        cs::PublicKey sender;
+        cs::RoundNumber round = 0;
+
+        bool operator==(const cs::CharacteristicMeta& meta)
+        {
+            return round == meta.round;
+        }
+
+        bool operator !=(const cs::CharacteristicMeta& meta)
+        {
+            return !((*this) == meta);
+        }
     };
 
     struct PoolMetaInfo
@@ -93,16 +122,14 @@ namespace cs
         HashVector hashVector[hashVectorCount];
         cs::Signature signature;
     };
-}
 
-namespace std
-{
-    // transactions packet hash specialization
-    template<>
-    struct hash<cs::TransactionsPacketHash>
+    struct StorageElement
     {
-        std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+        cs::RoundNumber round = 0;
+        cs::TransactionsPacketHashTable hashTable;
     };
+
+    using HashTablesStorage = boost::circular_buffer<StorageElement>;
 }
 
 #endif // NODE_CORE_H

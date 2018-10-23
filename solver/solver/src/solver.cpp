@@ -64,6 +64,7 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 #endif
 , fee_counter_()
 , m_writerIndex(0) {
+  m_hashTablesStorage.resize(HashTablesStorageCapacity, { });
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
 #ifdef SPAMMER
   uint8_t sk[64];
@@ -111,18 +112,18 @@ uint32_t Solver::getTLsize() {
   return static_cast<uint32_t>(v_pool.transactions_count());
 }
 
-std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool,
-                                 const PublicKey& sender) {
+std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool) {
   cslog() << "SOLVER> ApplyCharacteristic";
 
   gotBigBang = false;
   gotBlockThisRound = true;
 
   cs::Lock lock(m_sharedMutex);
+
   cs::Hashes localHashes = m_roundTable.hashes;
+  cs::TransactionsPacketHashTable hashTable;
 
   cslog() << "Solver> Characteristic bytes size " << characteristic.mask.size();
-  csdebug() << "Solver> Characteristic bytes " << cs::Utils::debugByteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
 
   csdb::Pool newPool;
   std::size_t maskIndex = 0;
@@ -134,7 +135,8 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
       return std::nullopt;
     }
 
-    const auto& transactions = m_hashTable[hash].transactions();
+    auto& packet = m_hashTable[hash];
+    const auto& transactions = packet.transactions();
 
     for (const auto& transaction : transactions) {
       if (mask.at(maskIndex)) {
@@ -143,9 +145,18 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
 
       ++maskIndex;
     }
+
+    // create storage hash table and remove from current hash table
+    hashTable.emplace(hash, std::move(packet));
+    m_hashTable.erase(hash);
   }
 
-  m_hashesToRemove = cs::HashesSet(localHashes.begin(), localHashes.end());
+  cs::StorageElement element;
+  element.round = m_roundTable.round;
+  element.hashTable = std::move(hashTable);
+
+  // add current round hashes to storage
+  m_hashTablesStorage.push_back(element);
 
   if (characteristic.mask.size() != newPool.transactions_count()) {
     cslog() << "Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
@@ -196,17 +207,6 @@ bool Solver::isPoolClosed() const {
   return m_isPoolClosed;
 }
 
-void Solver::removePreviousHashes()
-{
-  cs::Lock lock(m_sharedMutex);
-
-  for (const auto& hash : m_hashesToRemove) {
-    m_hashTable.erase(hash);
-  }
-
-  m_hashesToRemove.clear();
-}
-
 bool Solver::checkTableHashes(const cs::RoundTable& table)
 {
   const cs::Hashes& hashes = table.hashes;
@@ -223,10 +223,14 @@ bool Solver::checkTableHashes(const cs::RoundTable& table)
   }
 
   for (const auto& hash : neededHashes) {
-    csfile() << "SOLVER> Need hash >> " << hash.toString();
+    csdebug() << "SOLVER> Need hash >> " << hash.toString();
   }
 
   return neededHashes.empty();
+}
+
+bool Solver::isPacketSyncFinished() const {
+  return m_neededHashes.empty();
 }
 
 HashVector Solver::getMyVector() const {
@@ -316,57 +320,98 @@ void Solver::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
   }
 }
 
-void Solver::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender) {
+void Solver::gotPacketHashesRequest(cs::Hashes&& hashes, const RoundNumber round, const PublicKey& sender) {
   cs::SharedLock lock(m_sharedMutex);
+
+  std::size_t foundHashesCount = 0;
+  const auto senderHex = cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   for (const auto& hash : hashes) {
     if (m_hashTable.count(hash)) {
-      cslog() << "Found hash" << hash.toString() << "in hash table, sending to requester";
+      csdebug() << "SOLVER> Found hash at current table in request - " << hash.toString();
+      csdebug() << "SOLVER> Sending hash to requester: " << senderHex;
 
       m_node->sendPacketHashesReply(m_hashTable[hash], sender);
+
+      ++foundHashesCount;
     }
+    }
+
+  if (foundHashesCount == hashes.size()) {
+    cslog() << "SOVLER> All requested hashes found at current table";
+    return;
+  }
+
+  cswarning() << "SOLVER> Not all hashes found in current hash table, searching at hash table storage";
+
+  const auto iterator = std::find_if(m_hashTablesStorage.begin(),
+                                     m_hashTablesStorage.end(),
+                                     [&, this](const cs::StorageElement& element) {
+                                       return element.round == round;
+                                     });
+
+  if (iterator != m_hashTablesStorage.end()) {
+    csdebug() << "SOLVER> Found round hash table in storage, searching hashes";
+
+    for (const auto& hash : hashes) {
+      if (iterator->hashTable.count(hash)) {
+        csdebug() << "SOLVER> Found hash at storage, sending to requester " << senderHex;
+        m_node->sendPacketHashesReply(iterator->hashTable[hash], sender);
+
+        ++foundHashesCount;
+      }
+    }
+
+    if (foundHashesCount == hashes.size()) {
+      csdebug() << "SOVLER> All requested hashes found at storage";
+    }
+  }
+  else {
+    csdebug() << "SOLVER> can not find round in storage, hashes not found";
   }
 }
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
-  csfile() << "Solver> Got packet hash reply";
+  csdebug() << "SOLVER> Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
   cs::Lock lock(m_sharedMutex);
 
-  if (!m_hashTable.count(hash)) {
+  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
+
+  // add needed packet and hash to hash table if it was in needed hashes
+  if (it != m_neededHashes.end()) {
+    m_neededHashes.erase(it);
     m_hashTable.emplace(hash, std::move(packet));
   }
 
-  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
-
-  if (it != m_neededHashes.end()) {
-    m_neededHashes.erase(it);
-  }
-
-  if (m_neededHashes.empty()) {
-    csfile() << "Solver> Hashes received, checking hash table again";
-
-    if (!checkTableHashes(m_roundTable)) {
-      return;
-    }
+  if (isPacketSyncFinished()) {
+    csdebug() << "SOLVER> Hashes received, checking hash table again";
 
     if (m_node->getMyLevel() == NodeLevel::Confidant) {
       runConsensus();
+    }
+
+    const cs::RoundNumber currentRound = m_roundTable.round;
+
+    if (isCharacteristicMetaReceived(currentRound)) {
+      csdebug() << "SOLVER> Run characteristic meta";
+      cs::CharacteristicMeta meta = characteristicMeta(currentRound);
+
+      m_node->getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
     }
   }
 }
 
 void Solver::gotRound(cs::RoundTable&& round) {
-  cslog() << "Solver> Got round table";
+  cslog() << "SOLVER> Got round table";
 
   cs::Hashes localHashes = round.hashes;
   cs::Hashes neededHashes;
 
-  {
     cs::Lock lock(m_sharedMutex);
+
     m_roundTable = std::move(round);
-  }
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.count(hash)) {
@@ -384,13 +429,10 @@ void Solver::gotRound(cs::RoundTable&& round) {
     });
   }
   else {
-    cslog() << "All round transactions packet hashes in table";
+    cslog() << "SOLVER> All round transactions packet hashes in table";
   }
 
-  {
-    cs::Lock lock(m_sharedMutex);
     m_neededHashes = std::move(neededHashes);
-  }
 }
 
 void Solver::runConsensus() {
@@ -664,10 +706,10 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
   cslog() << "Solver -> Received public key: " << sender.data();
 
-  if (ips.size() <= min_nodes) {
+  if (m_hashesReceivedKeys.size() <= min_nodes) {
     if (hash == myHash) {
       csdebug() << "Solver -> Hashes are good";
-      ips.push_back(sender);
+      m_hashesReceivedKeys.push_back(sender);
     } else {
       cslog() << "Hashes do not match!!!";
       return;
@@ -677,7 +719,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     return;
   }
 
-  if ((ips.size() == min_nodes) && (!round_table_sent)) {
+  if ((m_hashesReceivedKeys.size() == min_nodes) && (!round_table_sent)) {
     cslog() << "Solver -> sending NEW ROUND table";
     cs::Hashes hashes;
 
@@ -685,20 +727,16 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
       cs::SharedLock lock(m_sharedMutex);
 
       for (const auto& element : m_hashTable) {
-        const auto iterator = std::find(m_hashesToRemove.begin(), m_hashesToRemove.end(), element.first);
-
-        if (iterator == m_hashesToRemove.end()) {
           hashes.push_back(element.first);
         }
       }
-    }
 
     m_roundTable.round++;
-    m_roundTable.confidants = std::move(ips);
+    m_roundTable.confidants = std::move(m_hashesReceivedKeys);
     m_roundTable.general = m_node->getMyPublicKey();
     m_roundTable.hashes = std::move(hashes);
 
-    ips.clear();
+    m_hashesReceivedKeys.clear();
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
@@ -793,6 +831,7 @@ const cs::Notifications& Solver::notifications() const {
 }
 
 void Solver::addNotification(const cs::Bytes& bytes) {
+  csdebug() << "SOLVER> notification added";
   m_notifications.push_back(bytes);
 }
 
@@ -800,14 +839,57 @@ std::size_t Solver::neededNotifications() const {
   return m_roundTable.confidants.size() / 2;  // TODO: + 1 at the end may be?
 }
 
-bool Solver::isEnoughNotifications() const {
+bool Solver::isEnoughNotifications(NotificationState state) const {
   const std::size_t neededConfidantsCount = neededNotifications();
   const std::size_t notificationsCount = notifications().size();
 
-  cslog() << "Get notification, current notifications count - " << notificationsCount;
-  cslog() << "Needed confidans count - " << neededConfidantsCount;
+  cslog() << "SOlVER> Current notifications count - " << notificationsCount;
+  cslog() << "SOLVER> Needed confidans count - " << neededConfidantsCount;
 
+  if (state == NotificationState::Equal) {
   return notificationsCount == neededConfidantsCount;
+  }
+  else {
+    return notificationsCount >= neededConfidantsCount;
+  }
+}
+
+void Solver::addCharacteristicMeta(const CharacteristicMeta& meta) {
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+
+  if (iterator != m_characteristicMeta.end()) {
+    m_characteristicMeta.push_back(meta);
+    csdebug() << "SOLVER> Characteristic meta added";
+  }
+  else {
+    csdebug() << "SOLVER> Received meta is currently in meta stack";
+  }
+}
+
+CharacteristicMeta Solver::characteristicMeta(const RoundNumber round) {
+  cs::CharacteristicMeta meta;
+  meta.round = round;
+
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+
+  if (iterator != m_characteristicMeta.end()) {
+    meta = std::move(*iterator);
+    m_characteristicMeta.erase(iterator);
+
+    return meta;
+  }
+  else {
+    cserror() << "SOLVER> Characteristic meta not found";
+    return {};
+  }
+}
+
+bool Solver::isCharacteristicMetaReceived(const RoundNumber round) {
+  cs::CharacteristicMeta meta;
+  meta.round = round;
+
+  auto iterator = std::find(m_characteristicMeta.begin(), m_characteristicMeta.end(), meta);
+  return iterator != m_characteristicMeta.end();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -833,7 +915,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
 void Solver::nextRound() {
   cslog() << "SOLVER> next Round : Starting ... nextRound";
 
-  ips.clear();
+  m_hashesReceivedKeys.clear();
 
   m_notifications.clear();
 
@@ -845,8 +927,6 @@ void Solver::nextRound() {
   if (m_isPoolClosed) {
     v_pool = csdb::Pool{};
   }
-
-  removePreviousHashes();
 
   if (m_node->getMyLevel() == NodeLevel::Confidant) {
     cs::Utils::clearMemory(receivedVecFrom);

@@ -15,7 +15,7 @@ namespace cs
 
     TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& str)
     {
-        if (str.size() == 0) {
+        if (str.empty()) {
             return TransactionsPacketHash();
         }
 

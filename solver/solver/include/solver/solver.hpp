@@ -38,6 +38,15 @@ class Generals;
 
 class Solver {
  public:
+   enum class NotificationState {
+     Equal,
+     GreaterEqual
+   };
+
+   enum : unsigned int {
+     HashTablesStorageCapacity = 10
+   };
+
   explicit Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres
 #ifdef SPAMMER
   , csdb::Address spammerAddress
@@ -53,7 +62,7 @@ class Solver {
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
   void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-  void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender);
+  void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
   void gotPacketHashesReply(cs::TransactionsPacket&& packet);
   void gotRound(cs::RoundTable&& round);
   void gotBlockCandidate(csdb::Pool&&);
@@ -69,8 +78,7 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
+  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic, const PoolMetaInfo& metaInfoPool);
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
@@ -89,7 +97,12 @@ class Solver {
   const cs::Notifications& notifications() const;
   void addNotification(const cs::Bytes& bytes);
   std::size_t neededNotifications() const;
-  bool isEnoughNotifications() const;
+  bool isEnoughNotifications(NotificationState state) const;
+
+  // characteristic meta
+  void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+  cs::CharacteristicMeta characteristicMeta(const RoundNumber round);
+  bool isCharacteristicMetaReceived(const RoundNumber round);
 
   // conveyer start point
   void addConveyerTransaction(const csdb::Transaction& transaction);
@@ -104,8 +117,8 @@ class Solver {
   void runFinalConsensus();
 
   // helpers
-  void removePreviousHashes();
   bool checkTableHashes(const cs::RoundTable& table);
+  bool isPacketSyncFinished() const;
 
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
@@ -141,9 +154,6 @@ class Solver {
   Fee fee_counter_;
 
   HashVector hvector;
-
-  cs::Hashes m_neededHashes;
-
   bool receivedVecFrom[100];
   std::atomic<uint8_t> trustedCounterVector;
 
@@ -151,7 +161,7 @@ class Solver {
   std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
-  std::vector<cs::PublicKey> ips;
+  std::vector<PublicKey> m_hashesReceivedKeys;
 
   cs::RoundTable m_roundTable;
 
@@ -162,15 +172,19 @@ class Solver {
   bool blockCandidateArrived = false;
   bool round_table_sent = false;
   bool gotBlockThisRound = false;
-  bool gotBigBang = false;
-  std::atomic<bool> isConsensusRunning = { false };
+
+  std::atomic<bool> gotBigBang = false ;
+  std::atomic<bool> isConsensusRunning = false ;
 
   cs::SharedMutex m_sharedMutex;
 
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
-  cs::HashesSet m_hashesToRemove;
+
+  cs::HashTablesStorage m_hashTablesStorage;
+  cs::Hashes m_neededHashes;
+  std::vector<cs::CharacteristicMeta> m_characteristicMeta;
 
   cs::Timer m_sendingPacketTimer;
 

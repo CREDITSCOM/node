@@ -15,7 +15,12 @@
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
-enum NodeLevel { Normal, Confidant, Main, Writer };
+enum NodeLevel {
+  Normal,
+  Confidant,
+  Main,
+  Writer
+};
 
 class Transport;
 namespace slv2 { class SolverCore; }
@@ -31,7 +36,7 @@ public:
     return good_;
   }
 
-  void run(const Config& config);
+  void run();
 
   /* Incoming requests processing */
   void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
@@ -46,7 +51,7 @@ public:
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
   // transaction's pack syncro
-  void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t);
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
@@ -107,21 +112,29 @@ public:
   void initNextRound(const cs::RoundTable& roundTable);
   bool getSyncroStarted();
 
-  enum MessageActions { Process, Postpone, Drop };
+  enum MessageActions {
+    Process,
+    Postpone,
+    Drop
+  };
+
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
   const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
+
   NodeLevel getMyLevel() const {
     return myLevel_;
   }
+
   uint32_t getRoundNumber();
   uint8_t getMyConfNumber();
 
   BlockChain& getBlockChain() {
     return bc_;
   }
+
   const BlockChain& getBlockChain() const {
     return bc_;
   }

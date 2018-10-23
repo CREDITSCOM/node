@@ -54,9 +54,9 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender) {
+    void SolverCore::gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotPacketHashesRequest(std::move(hashes), sender);
+            pslv_v1->gotPacketHashesRequest(std::move(hashes), round, sender);
         }
     }
 
@@ -84,9 +84,9 @@ namespace slv2
         }
     }
 
-    bool SolverCore::isEnoughNotifications() const {
+    bool SolverCore::isEnoughNotifications(Solver::NotificationState state) const {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->isEnoughNotifications();
+            return pslv_v1->isEnoughNotifications(state);
         }
     }
 
