@@ -16,8 +16,6 @@
 #include "packet.hpp"
 #include "pacmans.hpp"
 
-using namespace boost::asio;
-
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
 

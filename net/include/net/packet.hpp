@@ -10,7 +10,7 @@
 
 #include <iostream>
 
-using namespace boost::asio;
+namespace ip = boost::asio::ip;
 
 enum BaseFlags: uint8_t {
   NetworkMsg = 1,

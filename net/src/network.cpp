@@ -6,6 +6,8 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+using boost::asio::buffer;
+
 const ip::udp::socket::message_flags NO_FLAGS = 0;
 
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {

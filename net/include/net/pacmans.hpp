@@ -7,7 +7,7 @@
 
 #include "packet.hpp"
 
-using namespace boost::asio;
+namespace ip = boost::asio::ip;
 
 template <typename Pacman>
 class TaskPtr {
