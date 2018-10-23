@@ -972,8 +972,6 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     return;  // remove this line when the block candidate signing of all trusted will be implemented
   }
 
-
-
   this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
 
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
@@ -1000,21 +998,14 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
   cs::Bytes notification(data, data + size);
   solver_->addNotification(notification);
 
-  if (!solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal)) {
-    return;
+  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
+    cslog() << "Confidants count more then 51%";
+    applyNotifications();
   }
-
-  if (myLevel_ != NodeLevel::Writer) {
-    return;
-  }
-
-  cslog() << "Confidants count more then 51%";
-  
-  applyNotifications();
 }
 
 void Node::applyNotifications() {
-  csdebug() << "NODE> applyNotifications";
+  csdebug() << "NODE> Apply notifications";
 
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
@@ -1031,10 +1022,10 @@ void Node::applyNotifications() {
 
   const cs::Bytes& poolBinary = pool->to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
-  cslog() << "NODE> applyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+  csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
 
   const bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
-  cslog() << "NODE> after sign: isVerified == " << isVerified;
+  cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
