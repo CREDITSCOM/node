@@ -474,16 +474,18 @@ void Solver::runConsensus() {
   packet = removeTransactionsWithBadSignatures(packet);
 #endif
 
+  // TODO: fix that
   csdb::Pool pool;
   pool.transactions() = packet.transactions();
 
   fee_counter_.CountFeesInPool(m_node, &pool);
   packet.clear();
 
-  const auto& transactions_with_fees = pool.transactions();
+  const auto& transactionsWithFees = pool.transactions();
 
-  for (int i = 0; i < transactions_with_fees.size(); ++i) {
-    packet.addTransaction(transactions_with_fees[i]);
+  // TODO: transaction can be without fee?
+  for (int i = 0; i < transactionsWithFees.size(); ++i) {
+    packet.addTransaction(transactionsWithFees[i]);
   }
 
   cs::Hash result = m_generals->buildVector(packet);

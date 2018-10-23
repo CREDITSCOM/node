@@ -999,7 +999,7 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
   if (!isCorrectNotification(data, size)) {
-    cswarning() << "Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
+    cswarning() << "NODE> Notification failed " << cs::Utils::byteStreamToHex(senderPublicKey.data(), senderPublicKey.size());
     return;
   }
 
@@ -1007,8 +1007,8 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
   solver_->addNotification(notification);
 
   if (solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
-  cslog() << "Confidants count more then 51%";
-  applyNotifications();
+    cslog() << "NODE> Confidants count more then 51%";
+    applyNotifications();
   }
 }
 
@@ -1117,7 +1117,7 @@ void Node::sendWriterNotification() {
 
   ostream_ << createNotification();
 
-  cslog() << "Notification sent to writer";
+  cslog() << "NODE> Notification sent to writer";
 
   flushCurrentTasks();
 }
