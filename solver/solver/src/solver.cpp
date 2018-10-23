@@ -384,6 +384,8 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   if (it != m_neededHashes.end()) {
     m_neededHashes.erase(it);
     m_hashTable.emplace(hash, std::move(packet));
+
+    cslog() << "SOLVER> Sync packet added to current hash table";
   }
 
   if (isPacketSyncFinished()) {
@@ -399,7 +401,12 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
       csdebug() << "SOLVER> Run characteristic meta";
       cs::CharacteristicMeta meta = characteristicMeta(currentRound);
 
+      if (meta.round != 0) {
       m_node->getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
+    }
+      else {
+        csfatal() << "SOLVER> Can not call node get characteristic method";
+      }
     }
   }
 }
@@ -837,7 +844,7 @@ void Solver::addNotification(const cs::Bytes& bytes) {
 }
 
 std::size_t Solver::neededNotifications() const {
-  return m_roundTable.confidants.size() / 2;  // TODO: + 1 at the end may be?
+  return (m_roundTable.confidants.size() / 2) + 1;  // TODO: check +1 correctness
 }
 
 bool Solver::isEnoughNotifications(NotificationState state) const {

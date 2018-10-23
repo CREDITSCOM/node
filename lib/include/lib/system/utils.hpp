@@ -24,7 +24,7 @@
 #include <boost/asio/post.hpp>
 #include <boost/bind.hpp>
 
-#define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
+#define cswatch(x) cslog() << (#x) <<  " is " << (x)
 #define csunused(x) (void)(x)
 
 namespace cs
