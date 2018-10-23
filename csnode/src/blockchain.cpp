@@ -110,9 +110,7 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer)
 }
 
 bool BlockChain::writeNewBlock(csdb::Pool& pool) {
-#ifdef MYLOG
-    std::cout << "writeNewBlock is running" << std::endl;
-#endif
+    csdebug() << "writeNewBlock is running";
     return putBlock(pool);
 }
 
@@ -299,54 +297,55 @@ bool BlockChain::finishNewBlock(csdb::Pool& pool)
 }
 
 bool BlockChain::onBlockReceived(csdb::Pool& pool) {
-#ifdef MYLOG
-    std::cout << "onBlockReceived is running" << std::endl;
-#endif
+    csdebug() << "onBlockReceived is running";
 
     if (!updateWalletIds(pool, *walletsCacheUpdater_))
     {
-        LOG_ERROR("Couldn't update wallet ids");
+        cserror() << "Couldn't update wallet ids";
         return false;
     }
+
     return putBlock(pool);
 }
 
 bool BlockChain::putBlock(csdb::Pool& pool)
 {
     // Put on top
-    std::cout << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions" << " --------------------------------" << std::endl;
-#ifdef MYLOG
-    std::cout << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str() << std::endl;
-    std::cout << " Last      hash: " << lastHash_.to_string() << std::endl;
-    std::cout << "Checking Sequence ... ";
-#endif
+    cslog() << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions" << " --------------------------------";
+
+    csdebug() << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str();
+    csdebug() << " Last      hash: " << lastHash_.to_string();
+    csdebug() << "Checking Sequence ... ";
+
     if (pool.sequence() == getLastWrittenSequence() + 1) {
-        std::cout << "OK" << std::endl;
+        cslog()  << "OK";
+
         pool.set_previous_hash(lastHash_);
 
         writeBlock(pool);
-        //std::cout << "Preparing to calculate last hash" << std::endl;
 
         lastHash_ = pool.hash();
 
-#ifdef MYLOG
-        std::cout << "New last hash: " << lastHash_.to_string() << std::endl;
-        std::cout << "New last storage size: " << storage_.size() << std::endl;
-#endif
+        csdebug() << "New last hash: " << lastHash_.to_string();
+        csdebug() << "New last storage size: " << storage_.size();
+
         if (global_sequence == getLastWrittenSequence())
         {
             blockRequestIsNeeded = false;
         }
+
         return true;
     }
     else
     {
-        std::cout << "Failed" << std::endl;
+        cslog() << "Failed";
 
         ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
-        std::cout << "Chain syncro part ... start " << std::endl;
+        cslog() << "Chain syncro part ... start ";
+
         global_sequence = pool.sequence();
         blockRequestIsNeeded = true;
+
         return false;
     }
 }

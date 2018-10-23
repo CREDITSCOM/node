@@ -417,9 +417,9 @@ void Solver::gotRound(cs::RoundTable&& round) {
   cs::Hashes localHashes = round.hashes;
   cs::Hashes neededHashes;
 
-    cs::Lock lock(m_sharedMutex);
+  cs::Lock lock(m_sharedMutex);
 
-    m_roundTable = std::move(round);
+  m_roundTable = std::move(round);
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.count(hash)) {
@@ -440,7 +440,7 @@ void Solver::gotRound(cs::RoundTable&& round) {
     cslog() << "SOLVER> All round transactions packet hashes in table";
   }
 
-    m_neededHashes = std::move(neededHashes);
+  m_neededHashes = std::move(neededHashes);
 }
 
 void Solver::runConsensus() {
@@ -473,14 +473,19 @@ void Solver::runConsensus() {
 #ifndef SPAMMER
   packet = removeTransactionsWithBadSignatures(packet);
 #endif
+
   csdb::Pool pool;
   pool.transactions() = packet.transactions();
+
   fee_counter_.CountFeesInPool(m_node, &pool);
   packet.clear();
+
   const auto& transactions_with_fees = pool.transactions();
+
   for (int i = 0; i < transactions_with_fees.size(); ++i) {
     packet.addTransaction(transactions_with_fees[i]);
   }
+
   cs::Hash result = m_generals->buildVector(packet);
 
   receivedVecFrom[m_node->getMyConfNumber()] = true;

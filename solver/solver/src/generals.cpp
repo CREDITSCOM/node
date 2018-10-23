@@ -63,8 +63,10 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
       if (!trxValidator_->validateTransaction(transaction, i, del1)) {
         continue;
       }
+
       characteristic_mask.set(i, true);
     }
+
     trxValidator_->validateByGraph(characteristic_mask, packet.transactions(), new_bpool);
 
     Byte byte;

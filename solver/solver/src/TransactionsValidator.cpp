@@ -107,9 +107,8 @@ namespace cs
             return;
         if (removeTransactions_NegativeAll(node, trxs, maskIncluded, trxsExcluded))
             return;
-#ifdef MYLOG
-        std::cout << "removeTransactions: Failed to make balance non-negative " << std::endl;
-#endif
+
+        csdebug() << "removeTransactions: Failed to make balance non-negative ";
     }
 
     bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded)

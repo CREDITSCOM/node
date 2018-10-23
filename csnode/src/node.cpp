@@ -1287,9 +1287,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   awaitingSyncroBlock = true;
   awaitingRecBlockCount = 0;
 
-#ifdef MYLOG
-  std::cout << "SENDBLOCKREQUEST> Sending request for block: " << seq << std::endl;
-#endif
+  csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
