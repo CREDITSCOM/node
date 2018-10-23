@@ -757,21 +757,14 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 }
 
 void
-APIHandler::TransactionFlow(api::TransactionFlowResult& _return,
-                            const Transaction& transaction)
+APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction)
 {
-
-  if (transaction.target == "accXpfvxnZa8txuxpjyPqzBaqYPHqYu2rwn34lL8rjI=") {
-    return;
-  }
-
-  //TRACE("");
-
-  if (!transaction.__isset.smartContract) {
+  if (!transaction.__isset.smartContract)
     dumb_transaction_flow(_return, transaction);
-  } else {
+  else 
     smart_transaction_flow(_return, transaction);
-  }
+
+  _return.roundNum = solver.roundTable().round;
 }
 
 void
