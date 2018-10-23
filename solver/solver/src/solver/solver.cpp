@@ -98,7 +98,6 @@ std::optional<csdb::Pool> Solver::applyCharacteristic(const cs::Characteristic& 
   cs::TransactionsPacketHashTable hashTable;
 
   cslog() << "Solver> Characteristic bytes size " << characteristic.mask.size();
-  csdebug() << "Solver> Characteristic bytes " << cs::Utils::debugByteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
 
   csdb::Pool newPool;
   std::size_t maskIndex = 0;
@@ -197,6 +196,10 @@ bool Solver::checkTableHashes(const cs::RoundTable& table)
   }
 
   return neededHashes.empty();
+}
+
+bool Solver::isPacketSyncFinished() const {
+  return m_neededHashes.empty();
 }
 
 HashVector Solver::getMyVector() const {
@@ -360,44 +363,46 @@ void Solver::gotPacketHashesRequest(cs::Hashes&& hashes, const RoundNumber round
 }
 
 void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
-  csfile() << "Solver> Got packet hash reply";
+  csdebug() << "SOLVER> Got packet hash reply";
 
   cs::TransactionsPacketHash hash = packet.hash();
   cs::Lock lock(m_sharedMutex);
 
-  if (!m_hashTable.count(hash)) {
+  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
+
+  // add needed packet and hash to hash table if it was in needed hashes
+  if (it != m_neededHashes.end()) {
+    m_neededHashes.erase(it);
     m_hashTable.emplace(hash, std::move(packet));
   }
 
-  auto it = std::find(m_neededHashes.begin(), m_neededHashes.end(), hash);
-
-  if (it != m_neededHashes.end()) {
-    m_neededHashes.erase(it);
-  }
-
-  if (m_neededHashes.empty()) {
-    csfile() << "Solver> Hashes received, checking hash table again";
-
-    if (!checkTableHashes(m_roundTable)) {
-      return;
-    }
+  if (isPacketSyncFinished()) {
+    csdebug() << "SOLVER> Hashes received, checking hash table again";
 
     if (m_node->getMyLevel() == NodeLevel::Confidant) {
       runConsensus();
+    }
+
+    const cs::RoundNumber currentRound = m_roundTable.round;
+
+    if (isCharacteristicMetaReceived(currentRound)) {
+      csdebug() << "SOLVER> Run characteristic meta";
+      cs::CharacteristicMeta meta = characteristicMeta(currentRound);
+
+      m_node->getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
     }
   }
 }
 
 void Solver::gotRound(cs::RoundTable&& round) {
-  cslog() << "Solver> Got round table";
+  cslog() << "SOLVER> Got round table";
 
   cs::Hashes localHashes = round.hashes;
   cs::Hashes neededHashes;
 
-  {
-    cs::Lock lock(m_sharedMutex);
-    m_roundTable = std::move(round);
-  }
+  cs::Lock lock(m_sharedMutex);
+
+  m_roundTable = std::move(round);
 
   for (const auto& hash : localHashes) {
     if (!m_hashTable.count(hash)) {
@@ -415,13 +420,10 @@ void Solver::gotRound(cs::RoundTable&& round) {
     });
   }
   else {
-    cslog() << "All round transactions packet hashes in table";
+    cslog() << "SOLVER> All round transactions packet hashes in table";
   }
 
-  {
-    cs::Lock lock(m_sharedMutex);
-    m_neededHashes = std::move(neededHashes);
-  }
+  m_neededHashes = std::move(neededHashes);
 }
 
 void Solver::runConsensus() {
@@ -866,7 +868,7 @@ CharacteristicMeta Solver::characteristicMeta(const RoundNumber round) {
     return meta;
   }
   else {
-    cserror() << "SOLVER> characteristic meta not found";
+    cserror() << "SOLVER> Characteristic meta not found";
     return {};
   }
 }

@@ -810,7 +810,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
   cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
 
   if (packet.hash().isEmpty()) {
-    cserror() << "Received transaction hashes answer packet hash is empty";
+    cserror() << "NODE> Received transaction hashes answer packet hash is empty";
     return;
   }
 
@@ -870,7 +870,21 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  cslog() << "Characteric has arrived";
+  cslog() << "NODE> Characteric has arrived";
+
+  if (!solver_->isPacketSyncFinished()) {
+    cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
+
+    cs::Bytes characteristicBytes;
+    characteristicBytes.assign(data, data + size);
+
+    cs::CharacteristicMeta meta;
+    meta.bytes = std::move(characteristicBytes);
+    meta.round = solver_->roundTable().round;
+    meta.sender = sender;
+
+    solver_->addCharacteristicMeta(meta);
+  }
 
   cs::DataStream stream(data, size);
 
@@ -878,7 +892,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::Bytes characteristicMask;
   uint64_t sequence = 0;
 
-  cslog() << "Characteristic data size: " << size;
+  cslog() << "NODE> Characteristic data size: " << size;
 
   stream >> time;
   stream >> characteristicMask >> sequence;
@@ -894,7 +908,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   stream >> notificationsSize;
 
   if (notificationsSize == 0) {
-    cserror() << "Get characteristic: notifications count is zero";
+    cserror() << "NODE> Get characteristic: notifications count is zero";
   }
 
   for (std::size_t i = 0; i < notificationsSize; ++i) {
@@ -919,13 +933,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   for (const auto& hash : confidantsHashes) {
     if (hash != characteristicHash) {
-      cserror() << "Some of confidants hashes is dirty";
+      cserror() << "NODE> Some of confidants hashes is dirty";
       return;
     }
   }
 
-  cslog() << "GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
-  cslog() << "Time >> " << poolMetaInfo.timestamp << "  << Time";
+  cslog() << "NODE> GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
+  cslog() << "NODE> Time >> " << poolMetaInfo.timestamp << "  << Time";
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
@@ -942,11 +956,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     const size_t messageSize = pool->to_binary().size();
 
     if (cs::Utils::verifySignature(signature, writerPublicKey, message, messageSize)) {
-      cswarning() << "RECEIVED KEY Writer verification successfull";
+      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(pool.value(), sequence, sender);
     }
     else {
-      cswarning() << "RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
     }
   }
 }

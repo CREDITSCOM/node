@@ -107,6 +107,7 @@ public:
 
   // helpers
   bool checkTableHashes(const cs::RoundTable& table);
+  bool isPacketSyncFinished() const;
 
   HashVector getMyVector() const;
   HashMatrix getMyMatrix() const;
@@ -131,9 +132,6 @@ private:
   std::unique_ptr<Generals> m_generals;
 
   HashVector hvector;
-
-  cs::Hashes m_neededHashes;
-
   bool receivedVecFrom[100];
   std::atomic<uint8_t> trustedCounterVector;
 
@@ -160,8 +158,9 @@ private:
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
-  cs::HashTablesStorage m_hashTablesStorage;
 
+  cs::HashTablesStorage m_hashTablesStorage;
+  cs::Hashes m_neededHashes;
   std::vector<cs::CharacteristicMeta> m_characteristicMeta;
 
   cs::Timer m_sendingPacketTimer;
