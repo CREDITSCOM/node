@@ -774,7 +774,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   solver_->gotTransactionsPacket(std::move(packet));
 }
 
-void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
   cs::DataStream stream(data, size);
 
   std::size_t hashesCount = 0;
@@ -797,7 +797,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     return;
   }
 
-  solver_->gotPacketHashesRequest(std::move(hashes), sender);
+  solver_->gotPacketHashesRequest(std::move(hashes), round, sender);
 }
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
@@ -866,10 +866,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   onRoundStart(roundTable);
 
-  // TODO: think how to improve this code
-  //cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this, roundTable]() mutable {
-      solver_->gotRound(std::move(roundTable));
-  //});
+  solver_->gotRound(std::move(roundTable));
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {

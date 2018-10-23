@@ -510,7 +510,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
-    return node_->getPacketHashesRequest(data, size, firstPack.getSender());
+    return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
     return node_->getPacketHashesReply(data, size);
   case MsgTypes::BigBang:

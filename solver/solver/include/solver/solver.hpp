@@ -36,6 +36,10 @@ public:
     GreaterEqual
   };
 
+  enum : unsigned int {
+    HashTablesStorageCapacity = 10
+  };
+
   explicit Solver(Node*);
   ~Solver();
 
@@ -47,7 +51,7 @@ public:
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
   void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-  void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
+  void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const PublicKey& sender);
   void gotPacketHashesReply(cs::TransactionsPacket&& packet);
   void gotRound(cs::RoundTable&& round);
   void gotBlockCandidate(csdb::Pool&&);
@@ -102,7 +106,6 @@ public:
   void runFinalConsensus();
 
   // helpers
-  void removePreviousHashes();
   bool checkTableHashes(const cs::RoundTable& table);
 
   HashVector getMyVector() const;
@@ -138,7 +141,7 @@ private:
   std::atomic<uint8_t> trustedCounterMatrix;
   uint8_t m_writerIndex; // index at confidants
 
-  std::vector<PublicKey> ips;
+  std::vector<PublicKey> m_hashesReceivedKeys;
 
   cs::RoundTable m_roundTable;
 
@@ -148,15 +151,16 @@ private:
   bool blockCandidateArrived = false;
   bool round_table_sent = false;
   bool gotBlockThisRound = false;
-  bool gotBigBang = false;
-  std::atomic<bool> isConsensusRunning = { false };
+
+  std::atomic<bool> gotBigBang = false ;
+  std::atomic<bool> isConsensusRunning = false ;
 
   cs::SharedMutex m_sharedMutex;
 
   cs::TransactionsPacketHashTable m_hashTable;
   cs::TransactionsBlock m_transactionsBlock;
   cs::Notifications m_notifications;
-  cs::HashesSet m_hashesToRemove;
+  cs::HashTablesStorage m_hashTablesStorage;
 
   std::vector<cs::CharacteristicMeta> m_characteristicMeta;
 

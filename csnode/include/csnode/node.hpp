@@ -50,7 +50,7 @@ public:
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
   // transaction's pack syncro
-  void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t);
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
