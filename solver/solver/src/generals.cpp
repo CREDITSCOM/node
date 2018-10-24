@@ -27,8 +27,8 @@
 
 namespace cs {
 Generals::Generals(WalletsState& _walletsState)
-  : walletsState(_walletsState)
-  , trxValidator_(new TransactionsValidator(walletsState, TransactionsValidator::Config {}))
+  : m_walletsState(_walletsState)
+  , m_transactionsValidator(new TransactionsValidator(m_walletsState, TransactionsValidator::Config {}))
   {}
 
 int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
@@ -49,8 +49,8 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
   const auto& transactions = packet.transactions();
 
   if (transactionsCount > 0) {
-    walletsState.updateFromSource();
-    trxValidator_->reset(transactionsCount);
+    m_walletsState.updateFromSource();
+    m_transactionsValidator->reset(transactionsCount);
 
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);
@@ -63,14 +63,14 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
       const csdb::Transaction& transaction = transactions.at(i);
       byte = 0;
 
-      if (trxValidator_->validateTransaction(transaction, i, del1)) {
+      if (m_transactionsValidator->validateTransaction(transaction, i, del1)) {
         byte = 1;
       }
 
       characteristicMask.push_back(byte);
     }
 
-    trxValidator_->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
+    m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
 
     m_characteristic.mask = std::move(characteristicMask);
   }
@@ -84,9 +84,9 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.mask.size(), nullptr, NULL);
 
-  m_find_untrusted.fill(0);
-  m_new_trusted.fill(0);
-  m_hw_total.fill(HashWeigth{});
+  m_findUntrusted.fill(0);
+  m_newTrusted.fill(0);
+  m_hwTotal.fill(HashWeigth{});
 
   csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
@@ -127,7 +127,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
       cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].hash, 32);
 
       hw[0].weight                       = 1;
-      *(m_find_untrusted.data() + j * 100) = 0;
+      *(m_findUntrusted.data() + j * 100) = 0;
       i_max                                = 1;
     }
     else {
@@ -137,7 +137,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
       for (uint8_t ii = 0; ii < i_max; ii++) {
         if (memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size()) == 0) {
           (hw[ii].weight)++;
-          *(m_find_untrusted.data() + j * 100 + i) = ii;
+          *(m_findUntrusted.data() + j * 100 + i) = ii;
 
           found = true;
           break;
@@ -148,7 +148,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
         memcpy(hw[i_max].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size());
 
         (hw[i_max].weight)                     = 1;
-        *(m_find_untrusted.data() + j * 100 + i) = i_max;
+        *(m_findUntrusted.data() + j * 100 + i) = i_max;
 
         i_max++;
 
@@ -167,13 +167,13 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   }
 
   j                      = matrix.sender;
-  m_hw_total[j].weight = max_frec_position;
+  m_hwTotal[j].weight = max_frec_position;
 
-  memcpy(m_hw_total[j].hash, hw[max_frec_position].hash, 32);
+  memcpy(m_hwTotal[j].hash, hw[max_frec_position].hash, 32);
 
   for (size_t i = 0; i < nodes_amount; i++) {
-    if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position) {
-      *(m_new_trusted.data() + i) += 1;
+    if (*(m_findUntrusted.data() + i + j * 100) == max_frec_position) {
+      *(m_newTrusted.data() + i) += 1;
     }
   }
 }
@@ -193,14 +193,14 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   for (uint8_t j = 0; j < nodes_amount; j++) {
     // matrix init
     if (j == 0) {
-      memcpy(hash_weights[0].hash, m_hw_total[0].hash, 32);
+      memcpy(hash_weights[0].hash, m_hwTotal[0].hash, 32);
       (hash_weights[0].weight) = 1;
       j_max                      = 1;
     } else {
       bool found = false;
 
       for (jj = 0; jj < j_max; jj++) {
-        if (memcmp(hash_weights[jj].hash, m_hw_total[j].hash, 32) == 0) {
+        if (memcmp(hash_weights[jj].hash, m_hwTotal[j].hash, 32) == 0) {
           (hash_weights[jj].weight)++;
           found = true;
 
@@ -209,9 +209,9 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
       }
 
       if (!found) {
-        std::memcpy(hash_weights[j_max].hash, m_hw_total[j].hash, 32);
+        std::memcpy(hash_weights[j_max].hash, m_hwTotal[j].hash, 32);
 
-        (m_hw_total[j_max].weight) = 1;
+        (m_hwTotal[j_max].weight) = 1;
         j_max++;
       }
     }
@@ -223,7 +223,7 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   uint8_t j = 0;
 
   for (int i = 0; i < nodes_amount; i++) {
-    if (*(m_new_trusted.data() + i) < trusted_limit) {
+    if (*(m_newTrusted.data() + i) < trusted_limit) {
       cslog() << "GENERALS> Take decision: Liar nodes : " << i;
     } else {
       j++;

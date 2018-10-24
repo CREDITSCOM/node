@@ -29,7 +29,7 @@ class Node;
 
 namespace slv2
 {
-    class SolverCore;
+  class SolverCore;
 }
 
 namespace cs {
@@ -37,7 +37,7 @@ namespace cs {
 class Generals;
 
 class Solver {
- public:
+public:
    enum class NotificationState {
      Equal,
      GreaterEqual
@@ -47,9 +47,9 @@ class Solver {
      HashTablesStorageCapacity = 10
    };
 
-  explicit Solver(Node*, csdb::Address genesisAddress, csdb::Address startAddres
+  explicit Solver(Node*, csdb::Address m_genesisAddress, csdb::Address startAddres
 #ifdef SPAMMER
-  , csdb::Address spammerAddress
+  , csdb::Address m_spammerAddress
 #endif
   );
   ~Solver();
@@ -78,13 +78,14 @@ class Solver {
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
+
   std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
     const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
   const Characteristic& getCharacteristic() const;
   Hash getCharacteristicHash() const;
 
-  cs::PublicKey getWriterPublicKey() const;
+  cs::PublicKey writerPublicKey() const;
 
   uint32_t getTLsize();
   void addInitialBalance();
@@ -107,7 +108,6 @@ class Solver {
 
   // conveyer start point
   void addConveyerTransaction(const csdb::Transaction& transaction);
-
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
   void nextRound();
@@ -121,19 +121,20 @@ class Solver {
   bool checkTableHashes(const cs::RoundTable& table);
   bool isPacketSyncFinished() const;
 
-  HashVector getMyVector() const;
-  HashMatrix getMyMatrix() const;
+  HashVector hashVector() const;
+  HashMatrix hashMatrix() const;
 
-  bool getIPoolClosed();
-  bool getBigBangStatus();
-  void setBigBangStatus(bool _status);
+  bool isPoolClosed();
 
-  const cs::PrivateKey& getPrivateKey() const;
-  const cs::PublicKey& getPublicKey() const;
+  bool bigBangStatus();
+  void setBigBangStatus(bool status);
 
-  cs::SharedMutex& getSharedMutex();
+  const cs::PrivateKey& privateKey() const;
+  const cs::PublicKey& publicKey() const;
 
- private:
+  cs::SharedMutex& sharedMutex();
+
+private:
   void flushTransactions();
   cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
@@ -143,40 +144,41 @@ class Solver {
   friend class slv2::SolverCore;
 
   Node* m_node;
-  std::unique_ptr<WalletsState> walletsState;
+
+  std::unique_ptr<WalletsState> m_walletsState;
   std::unique_ptr<Generals> m_generals;
 
-  const csdb::Address genesisAddress;
-  const csdb::Address startAddress;
+  const csdb::Address m_genesisAddress;
+  const csdb::Address m_startAddress;
 
 #ifdef SPAMMER
-  const csdb::Address spammerAddress;
-  std::vector<csdb::Address> spam_keys_;
+  const csdb::Address m_spammerAddress;
+  std::vector<csdb::Address> m_spamKeys;
 #endif
 
-  Fee fee_counter_;
+  Fee m_feeCounter;
+  HashVector m_hashVector;
 
-  HashVector hvector;
-  bool receivedVecFrom[100];
+  bool m_receivedVectorFrom[100];
   std::atomic<uint8_t> trustedCounterVector;
 
-  bool receivedMatFrom[100];
+  bool m_receivedMatrixFrom[100];
   std::atomic<uint8_t> trustedCounterMatrix;
+
   uint8_t m_writerIndex; // index at confidants
 
   std::vector<PublicKey> m_hashesReceivedKeys;
-
   cs::RoundTable m_roundTable;
 
-  csdb::Pool v_pool;
+  csdb::Pool m_vPool;   // TODO: what is v pool?
 
   bool m_isPoolClosed = true;
-  bool blockCandidateArrived = false;
-  bool round_table_sent = false;
-  bool gotBlockThisRound = false;
+  bool m_blockCandidateArrived = false;
+  bool m_roundTableSent = false;
+  bool m_gotBlockThisRound = false;
 
-  std::atomic<bool> gotBigBang = false ;
-  std::atomic<bool> isConsensusRunning = false ;
+  std::atomic<bool> m_gotBigBang = false;
+  std::atomic<bool> m_isConsensusRunning = false;
 
   cs::SharedMutex m_sharedMutex;
 
@@ -190,15 +192,15 @@ class Solver {
 
   cs::Timer m_sendingPacketTimer;
 
-  /*to store new blocks*/
-  std::map<size_t, csdb::Pool> tmpStorage;
+  // to store new blocks
+  std::map<size_t, csdb::Pool> m_temporaryStorage;
 
-  /*to store unrequested syncro blocks*/
-  std::map<size_t, csdb::Pool> rndStorage;
+  // to store unrequested syncro blocks
+  std::map<size_t, csdb::Pool> m_randomStorage; // TODO: RND pool or random?
 
 #ifdef SPAMMER
-  std::atomic_bool spamRunning = { false };
-  std::thread spamThread;
+  std::atomic_bool m_isSpamRunning = false;
+  std::thread m_spamThread;
   void spamWithTransactions();
 #endif
 };

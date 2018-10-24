@@ -44,7 +44,7 @@ namespace slv2
 
     bool SolverCore::getIPoolClosed() {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getIPoolClosed();
+            return pslv_v1->isPoolClosed();
         }
     }
 
@@ -111,19 +111,19 @@ namespace slv2
 
     const cs::PrivateKey& SolverCore::getPrivateKey() const {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getPrivateKey();
+            return pslv_v1->privateKey();
         }
     }
 
     const cs::PublicKey& SolverCore::getPublicKey() const {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getPublicKey();
+            return pslv_v1->publicKey();
         }
     }
 
     cs::PublicKey SolverCore::getWriterPublicKey() const {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getWriterPublicKey();
+            return pslv_v1->writerPublicKey();
         }
     }
 
@@ -135,12 +135,12 @@ namespace slv2
 
     bool SolverCore::getBigBangStatus() {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getBigBangStatus();
+            return pslv_v1->bigBangStatus();
         }
     }
     cs::SharedMutex& SolverCore::getSharedMutex() {
       if (opt_is_proxy_v1 && pslv_v1) {
-        return pslv_v1->getSharedMutex();
+        return pslv_v1->sharedMutex();
       }
     }
 
@@ -177,7 +177,7 @@ namespace slv2
     const cs::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getMyVector();
+            return pslv_v1->hashVector();
         }
         if(!pown_hvec) {
             // empty one is for test purpose
@@ -190,7 +190,7 @@ namespace slv2
     const cs::HashMatrix& SolverCore::getMyMatrix() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getMyMatrix();
+            return pslv_v1->hashMatrix();
         }
         if(!pgen) {
             // empty one is for test purpose
@@ -530,7 +530,7 @@ namespace slv2
             LOG_NOTICE("SolverCore: clear all stored senders (vectors, matrices, hashes)");
         }
 
-        // ÷èñòèì äëÿ íîâîãî ñïèñêà
+        // Ñ‡Ğ¸ÑÑ‚Ğ¸Ğ¼ Ğ´Ğ»Ñ Ğ½Ğ¾Ğ²Ğ¾Ğ³Ğ¾ ÑĞ¿Ğ¸ÑĞºĞ°
         block_pool = csdb::Pool {};
 
         recv_vect.clear();
@@ -597,7 +597,7 @@ namespace slv2
         if(outrunning_blocks.empty()) {
             return 0;
         }
-        // it - "ñêâîçíîé" èòåğàòîğ äëÿ äâóõ áëîêîâ while()
+        // it - "ÑĞºĞ²Ğ¾Ğ·Ğ½Ğ¾Ğ¹" Ğ¸Ñ‚ĞµÑ€Ğ°Ñ‚Ğ¾Ñ€ Ğ´Ğ»Ñ Ğ´Ğ²ÑƒÑ… Ğ±Ğ»Ğ¾ĞºĞ¾Ğ² while()
         auto it = outrunning_blocks.cbegin();
         // skip outdated blocks if any
         while(it->first <= starting_after) {
