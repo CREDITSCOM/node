@@ -5,6 +5,7 @@
 #include <csdb/amount_commission.h>
 #include <solver/TransactionsValidator.h>
 #include <lib/system/logger.hpp>
+#include <client/params.hpp>
 
 namespace cs
 {
@@ -46,17 +47,21 @@ namespace cs
         int8_t bitcnt = __builtin_popcount(newBalance.integral()) + __builtin_popcountl(newBalance.fraction());
 #endif
 
+#ifndef SPAMMER
         if (!wallState.trxTail_.isAllowed(trx.innerID()))
         {
             del1 = -bitcnt;
             return false;
         }
+#endif
 
         del1 = bitcnt;
         wallState.balance_ = newBalance;
 #else
+#ifndef SPAMMER
         if (!wallState.trxTail_.isAllowed(trx.innerID()))
             return false;
+#endif
 
         wallState.balance_ = wallState.balance_ - trx.amount() - trx.counted_fee();
 #endif
