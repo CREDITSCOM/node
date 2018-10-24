@@ -57,21 +57,15 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
     uint8_t del1;
     csdb::Pool new_bpool;
-    cs::Byte byte = 0;
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
-      const csdb::Transaction& transaction = transactions.at(i);
-      byte = 0;
-
-      if (m_transactionsValidator->validateTransaction(transaction, i, del1)) {
-        byte = 1;
-      }
+      const csdb::Transaction& transaction = transactions[i];
+      cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
 
       characteristicMask.push_back(byte);
     }
 
     m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
-
     m_characteristic.mask = std::move(characteristicMask);
   }
   else {

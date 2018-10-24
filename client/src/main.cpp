@@ -27,7 +27,7 @@ void sigUsr1Handler(int sig) {
 const uint32_t CLOSE_TIMEOUT_SECONDS = 10;
 
 void panic() {
-  LOG_ERROR("Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS << " seconds...");
+  cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS << " seconds...";
   std::this_thread::sleep_for(std::chrono::seconds(CLOSE_TIMEOUT_SECONDS));
   exit(1);
 }
@@ -61,13 +61,13 @@ int main(int argc, char* argv[]) {
     po::notify(vm);
   }
   catch (boost::program_options::unknown_option& e) {
-    LOG_ERROR(e.what());
-    std::cout << desc << std::endl;
+    cserror() << e.what();
+    cslog() << desc;
     return 1;
   }
 
   if (vm.count("help")) {
-    std::cout << desc << std::endl;
+    cslog() << desc;
     return 0;
   }
 

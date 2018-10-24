@@ -1,7 +1,7 @@
 #include <cstring>
 #include <fstream>
 #include <csnode/BlockHashes.h>
-using namespace std;
+#include <lib/system/logger.hpp>
 
 namespace cs
 {
@@ -18,7 +18,7 @@ bool BlockHashes::loadDbStructure()
     if (!f.is_open())
         return false;
 
-    std::cout << "File is opened ... reading" << std::endl;
+    cslog() << "File is opened ... reading";
 
     char  kk[14];
     f.read(kk, 14);
@@ -31,7 +31,7 @@ bool BlockHashes::loadDbStructure()
     s_beg = s_end + 2;
     db_.last_ = atoi(s_beg);
     isDbInited_ = true;
-    std::cout << "DB structure: " << db_.first_ << "->" << db_.last_ << std::endl;
+    cslog() << "DB structure: " << db_.first_ << "->" << db_.last_;
     return true;
 }
 
@@ -67,12 +67,12 @@ void BlockHashes::initFinish()
         size_t lh = 0;
         size_t rh = hashes_.size() - 1;
         while (lh < rh)
-            swap(hashes_[lh++], hashes_[rh--]);
+            std::swap(hashes_[lh++], hashes_[rh--]);
     }
 
     for (const auto& hash : hashes_)
     {
-        std::cout << "READ> " << hash.to_string() << std::endl;
+        cslog() << "READ> " << hash.to_string();
     }
 }
 
@@ -115,8 +115,8 @@ bool BlockHashes::saveDbStructure()
     if (!f.is_open())
         return false;
     f << db_.first_ << "->" << db_.last_ << std::endl;
-    std::cout << "DB structure: " << db_.first_ << "->" << db_.last_ << std::endl;
-    std::cout << "DB structure is written succesfully" << std::endl;
+    cslog() << "DB structure: " << db_.first_ << "->" << db_.last_;
+    cslog() << "DB structure is written succesfully";
     return true;
 }
 }

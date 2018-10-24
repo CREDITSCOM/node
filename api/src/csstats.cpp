@@ -115,7 +115,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
           element.second.fraction;
       }
     } catch (const std::exception& e) {
-      std::cout << e.what() << std::endl;
+      cslog() << e.what();
     }
   }
 
@@ -129,7 +129,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
 
   TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
-  std::cout << "Stats updated\n";
+  cslog() << "Stats updated";
 
   return stats;
 }
