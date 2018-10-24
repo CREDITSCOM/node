@@ -191,7 +191,7 @@ Hash Solver::getCharacteristicHash() const {
   return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
 }
 
-PublicKey Solver::writerPublicKey() const {
+cs::PublicKey Solver::writerPublicKey() const {
   PublicKey result;
 
   if (m_writerIndex < m_roundTable.confidants.size()) {
@@ -503,8 +503,7 @@ void Solver::runConsensus() {
   trustedCounterVector++;
 
   if (trustedCounterVector == m_roundTable.confidants.size()) {
-
-    memset(m_receivedVectorFrom, 0, 100);
+    std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
@@ -558,7 +557,7 @@ void Solver::gotVector(HashVector&& vector) {
     return;
   }
 
-  const cs::ConfidantsKeys &confidants = m_roundTable.confidants;
+  const cs::ConfidantsKeys& confidants = m_roundTable.confidants;
   uint8_t numGen = static_cast<uint8_t>(confidants.size());
 
   m_receivedVectorFrom[vector.sender] = true;
@@ -569,13 +568,16 @@ void Solver::gotVector(HashVector&& vector) {
   if (trustedCounterVector == numGen) {
     std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
     trustedCounterVector = 0;
+
     // compose and send matrix!!!
     uint8_t confNumber = m_node->getMyConfNumber();
     m_generals->addSenderToMatrix(confNumber);
     m_receivedMatrixFrom[confNumber] = true;
+
     trustedCounterMatrix++;
 
     HashMatrix matrix = m_generals->getMatrix();
+
     m_node->sendMatrix(matrix);
     m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
 
@@ -688,8 +690,8 @@ bool Solver::bigBangStatus() {
   return m_gotBigBang;
 }
 
-void Solver::setBigBangStatus(bool status) {
-  m_gotBigBang = status;
+void Solver::setBigBangStatus(bool _status) {
+  m_gotBigBang = _status;
 }
 
 void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender) {
