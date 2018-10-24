@@ -294,6 +294,8 @@ void Solver::gotTransactionList(csdb::Pool&& _pool) {
     t.set_balance(node_->getBlockChain().getBalance(t.source()));
 
   Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
+  b_pool = csdb::Pool{ };
+
   receivedVecFrom[node_->getMyConfNumber()] = true;
   hvector.Sender                            = node_->getMyConfNumber();
   hvector.hash                              = result;
@@ -505,10 +507,11 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
       std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32) << std::endl;
 #endif
     }
-#else
-    node_->getBlockChain().putBlock(block);
-#endif
   }
+#else
+  node_->getBlockChain().putBlock(block);
+#endif
+
   size_t _rNum = rNum;
   // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
