@@ -22,44 +22,53 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
   , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 {
-  std::cout << "Trying to open DB..." << std::endl;
+  cslog() << "Trying to open DB...";
+
   if (!storage_.open(path))
   {
-    LOG_ERROR("Couldn't open database at " << path);
+    cserror() << "Couldn't open database at " << path;
     return;
   }
-  std::cout << "DB is opened" << std::endl;
+
+  cslog() << "DB is opened";
 
   blockHashes_.reset(new cs::BlockHashes("test_db/dbs.txt"));
 
   if (storage_.last_hash().is_empty())
   {
-      std::cout << "Last hash is empty..." << std::endl;
+      cslog() << "Last hash is empty...";
+
       if (storage_.size())
       {
-          std::cout << "failed!!! Delete the Database!!! It will be restored from nothing..." << std::endl;
+          cslog() << "failed!!! Delete the Database!!! It will be restored from nothing...";
           return;
       }
+
       walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+
       if (!writeGenesisBlock())
       {
-          std::cout << "failed!!! Cannot write genesis block" << std::endl;
+          cslog() << "failed!!! Cannot write genesis block";
           return;
       }
   }
   else
   {
-      std::cout << "Last hash is not empty..." << std::endl;
+      cslog() << "Last hash is not empty...";
+
       {
           std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
+
           if (!initFromDB(*initer))
               return;
+
           if (!initer->isFinishedOk())
           {
-              std::cout << "Initialization from DB finished with error" << std::endl;
+              cslog() << "Initialization from DB finished with error";
               return;
           }
       }
+
       walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
   }
 
@@ -99,11 +108,10 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer)
         res = true;
     }
     catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+        cserror() << "Exc=" << e.what();
     }
     catch (...) {
-        LOG_ERROR("Exc=...");
+        cserror() << "Exc=...";
     }
 
     return res;
@@ -116,8 +124,6 @@ bool BlockChain::writeNewBlock(csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool)
 {
-    //TARCE();
-
     {
         std::lock_guard<decltype(dbLock_)> l(dbLock_);
         pool.set_storage(storage_);
@@ -125,28 +131,25 @@ void BlockChain::writeBlock(csdb::Pool& pool)
 
     if (!pool.compose())
         if (!pool.compose()) {
-            LOG_ERROR("Couldn't compose block");
+            cserror() << "Couldn't compose block";
             if (!pool.save())
                 return;
 
         }
 
     if (!pool.save()) {
-        LOG_ERROR("Couldn't save block");
+        cserror() << "Couldn't save block";
         return;
-
     }
-    std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+
+    cslog() << "Block " << pool.sequence() << " saved succesfully";
 
     if (!updateFromNextBlock(pool))
-        LOG_ERROR("Couldn't update from next block");
+        cserror() << "Couldn't update from next block";
 
     {
-        //TARCE();
         std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-        //TARCE();
         new_block_cv.notify_all();
-        //TARCE();
     }
 }
 
@@ -157,7 +160,7 @@ uint32_t BlockChain::getLastWrittenSequence() const
 
 bool BlockChain::writeGenesisBlock()
 {
-  LOG_EVENT("Adding the genesis block");
+  cswarning() << "Adding the genesis block";
 
   csdb::Pool genesis;
   csdb::Transaction transaction;
@@ -215,18 +218,18 @@ bool BlockChain::writeGenesisBlock()
 
   genesis.set_previous_hash(csdb::PoolHash());
   finishNewBlock(genesis);
-  std::cout << "Genesis block completed ... trying to save" << std::endl;
+
+  cslog() << "Genesis block completed ... trying to save";
 
   if (!writeNewBlock(genesis))
       return false;
 
   global_sequence = genesis.sequence();
-  std::cout << genesis.hash().to_string() << std::endl;
+  cslog() << genesis.hash().to_string();
 
   uint32_t bSize;
-  //const char* bl = 
   genesis.to_byte_stream(bSize);
-  //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
+
   return true;
 }
 
@@ -262,18 +265,14 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash &obsolete_block)
 {
-    //TARCE();
     std::unique_lock<decltype(dbLock_)> l(dbLock_);
-    //TARCE();
     csdb::PoolHash res;
-    //TARCE();
+
     new_block_cv.wait(l, [this, &obsolete_block, &res]() {
-        //TARCE();
         res = storage_.last_hash();
-        //TARCE();
         return obsolete_block != res;
     });
-    //TARCE();
+
     return res;
 }
 
@@ -360,14 +359,6 @@ const csdb::Storage & BlockChain::getStorage() const
   return storage_;
 }
 
-//void
-//BlockChain::wait_for_block()
-//{
-//  std::unique_lock<std::mutex> l(dbLock_);
-//  auto ls = storage_.size();
-//  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
-//}
-
 csdb::Pool::sequence_t BlockChain::getGlobalSequence() const
 {
     return global_sequence;
@@ -439,10 +430,6 @@ public:
                 if (transactions_.size() == limit)
                     break;
 
-                // std::cerr << "Ladder: " << trans.target().to_string() << " <-
-                // "
-                //          << trans.source().to_string() << " of "
-                //          << trans.amount().integral() << std::endl;
                 if (trans.target() == wallPubKey_ || trans.source() == wallPubKey_)
                 {
                     hasMyTransactions = true;
@@ -584,24 +571,23 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& p
             csdb::Address newWallAddress;
             if (!pool.getWalletAddress(newWall, newWallAddress))
             {
-                LOG_ERROR("Wrong new wallet data");
+                cserror() << "Wrong new wallet data";
                 return false;
             }
 
             if (!insertNewWalletId(newWallAddress, newWall.walletId_, proc))
             {
-                LOG_ERROR("Wallet was already added as new");
+                cserror() << "Wallet was already added as new";
                 return false;
             }
         }
     }
     catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+        cserror() << "Exc=" << e.what();
         return false;
     }
     catch (...) {
-        LOG_ERROR("Exc=...");
+        cserror() << "Exc=...";
         return false;
     }
     return true;
@@ -610,19 +596,22 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& p
 bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, WalletsCache::Initer& initer)
 {
     WalletId idSpecial{};
+
     if (!walletIds_->special().insertNormal(newWallAddress, newWalletId, idSpecial))
     {
-        LOG_ERROR("Cannot add new wallet");
+        cserror() << "Cannot add new wallet";
         return false;
     }
+
     if (WalletsIds::Special::isSpecial(idSpecial))
     {
         if (!initer.moveData(idSpecial, newWalletId))
         {
-            LOG_ERROR("Cannot move special wallet id data to newWalletId: idSpecial=" << idSpecial << " newWalletId=" << newWalletId);
+            cserror() << "Cannot move special wallet id data to newWalletId: idSpecial=" << idSpecial << " newWalletId=" << newWalletId;
             return false;
         }
     }
+
     return true;
 }
 
@@ -630,9 +619,10 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
 {
     if (!walletIds_->normal().insert(newWallAddress, newWalletId))
     {
-        LOG_ERROR("Cannot add new wallet");
+        cserror() << "Cannot add new wallet";
         return false;
     }
+
     return true;
 }
 
@@ -640,10 +630,12 @@ void BlockChain::addNewWalletToPool(const csdb::Address& walletAddress, const cs
 {
     if (!walletAddress.is_public_key())
         return;
+
     if (walletAddress == genesisAddress_)
         return;
 
     WalletId id{};
+
     if (getWalletId(walletAddress, id))
     {
         newWallets.emplace_back(csdb::Pool::NewWalletInfo{ addressId, id });
@@ -653,14 +645,17 @@ void BlockChain::addNewWalletToPool(const csdb::Address& walletAddress, const cs
 void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
 {
     csdb::Pool::NewWallets* newWallets = pool.newWallets();
+
     if (!newWallets)
     {
-        LOG_ERROR("Pool is read-only");
+        cserror() << "Pool is read-only";
         return;
     }
+
     newWallets->clear();
 
     csdb::Pool::Transactions& transactions = pool.transactions();
+
     for (size_t idx = 0; idx < transactions.size(); ++idx)
     {
         {
@@ -677,6 +672,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
           addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
         }
     }
+
     if (pool.sequence() != 0)
     {
         csdb::Pool::NewWalletInfo::AddressId addressId = { transactions.size(), csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
@@ -688,7 +684,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool)
 {
     if (!walletsCacheUpdater_)
     {
-        LOG_ERROR("!walletsCacheUpdater");
+        cserror() << "!walletsCacheUpdater";
         return false;
     }
 
@@ -699,17 +695,15 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool)
         walletsPools_->loadNextBlock(nextPool);
 
         blockHashes_->loadNextBlock(nextPool);
-        //std::cout << "Hash inserted into the hash-vector" << std::endl;
         if (!blockHashes_->saveDbStructure())
-            std::cout << "Error writing DB structure" << std::endl;
+            cslog() << "Error writing DB structure";
     }
     catch (std::exception& e) {
-        auto msg = e.what();
-        LOG_ERROR("Exc=" << msg);
+        cserror() << "Exc=" << e.what();
         return false;
     }
     catch (...) {
-        LOG_ERROR("Exc=...");
+        cserror() << "Exc=...";
         return false;
     }
     return true;
@@ -773,7 +767,8 @@ bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         return walletIds_->normal().find(address, id);
     }
-    LOG_ERROR("Wrong address");
+
+    cserror() << "Wrong address";
     return false;
 }
 
@@ -789,7 +784,8 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id)
         std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         return walletIds_->normal().get(address, id);
     }
-    LOG_ERROR("Wrong address");
+
+    cserror() << "Wrong address";
     return false;
 }
 

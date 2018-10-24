@@ -98,7 +98,7 @@ namespace slv2
 #endif
 
             pgen = pslv_v1->m_generals.get();
-            pws = pslv_v1->walletsState.get();
+            pws = pslv_v1->m_walletsState.get();
         }
         else {
             pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());

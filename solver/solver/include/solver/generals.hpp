@@ -25,8 +25,8 @@ class TransactionsValidator;
 class Solver;
 
 class Generals {
- public:
-  Generals(WalletsState& walletsState);
+public:
+  Generals(WalletsState& m_walletsState);
   ~Generals() = default;
 
   Generals(const Generals&) = delete;
@@ -47,23 +47,23 @@ class Generals {
   const Characteristic& getCharacteristic() const;
   const PublicKey& getWriterPublicKey() const;
 
- private:
+private:
   struct HashWeigth {
     char hash[HASH_LENGTH] = {};
     uint8_t weight = 0;
   };
 
-  HashMatrix m_hMatrix;
+  cs::HashMatrix m_hMatrix;
 
-  std::array<uint8_t, 10000> m_find_untrusted;
-  std::array<uint8_t, 100> m_new_trusted;
-  std::array<HashWeigth, 100> m_hw_total;
+  std::array<uint8_t, 10000> m_findUntrusted;
+  std::array<uint8_t, 100> m_newTrusted;
+  std::array<HashWeigth, 100> m_hwTotal;
 
   Characteristic m_characteristic;
   PublicKey m_writerPublicKey;
 
-  WalletsState& walletsState;
-  std::unique_ptr<TransactionsValidator> trxValidator_;
+  WalletsState& m_walletsState;
+  std::unique_ptr<TransactionsValidator> m_transactionsValidator;
 };
 }  // namespace cs
 #endif

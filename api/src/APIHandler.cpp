@@ -557,7 +557,7 @@ APIHandler::make_transaction(const Transaction& transaction)
   send_transaction.set_target(
     BlockChain::getAddressFromKey(transaction.target));
   send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
-  send_transaction.set_innerID(transaction.id);
+  send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
   send_transaction.set_signature(transaction.signature);
   return send_transaction;
 }
