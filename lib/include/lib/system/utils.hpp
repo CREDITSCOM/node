@@ -15,6 +15,7 @@
 #include <limits>
 #include <thread>
 #include <functional>
+#include <ostream>
 #include <lib/system/structures.hpp>
 #include <lib/system/common.hpp>
 #include <sodium.h>
@@ -29,6 +30,47 @@
 
 namespace cs
 {
+    enum class Direction : uint8_t
+    {
+        PrevBlock,
+        NextBlock
+    };
+
+    inline std::ostream& operator<<(std::ostream& os, Direction dir)
+    {
+        switch (dir)
+        {
+        case Direction::PrevBlock:
+            return os << "Previous Block";
+
+        case Direction::NextBlock:
+            return os << "Next Block";
+
+        default:
+            return os << "Wrong dir=" << static_cast<int64_t>(dir);
+        }
+    }
+
+    inline std::ostream& printHex(std::ostream& os, const char* bytes, size_t num)
+    {
+        static char hex[] = { '0', '1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
+
+        for (size_t i = 0; i < num; i++)
+        {
+            os << hex[(bytes[i] >> 4) & 0x0F];
+            os << hex[bytes[i] & 0x0F];
+        }
+
+        return os;
+    }
+
+    template<typename T, size_t Size>
+    inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Size>& address)
+    {
+        printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
+        return os;
+    }
+
     ///
     /// Static utils helper class
     ///

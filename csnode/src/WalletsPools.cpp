@@ -3,7 +3,7 @@
 #include <boost/functional/hash.hpp>
 
 #include <lib/system/logger.hpp>
-#include <csnode/utils.h>
+#include <lib/system/utils.hpp>
 #include <csnode/WalletsIds.h>
 #include <csnode/WalletsPools.h>
 

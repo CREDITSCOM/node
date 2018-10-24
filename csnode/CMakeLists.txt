@@ -40,7 +40,6 @@ add_library(csnode
   include/csnode/nodecore.h
   include/csnode/transactionspacket.h
   include/csnode/TransactionsTail.h
-  include/csnode/utils.h
   include/csnode/WalletsCache.h
   include/csnode/WalletsIds.h
   include/csnode/WalletsPools.h
@@ -51,7 +50,6 @@ add_library(csnode
   src/transactionspacket.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
-  src/utils.cpp
   src/WalletsCache.cpp
   src/WalletsIds.cpp
   src/WalletsPools.cpp
