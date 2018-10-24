@@ -1,9 +1,10 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
+
 #include <csdb/amount_commission.h>
 #include <solver/TransactionsValidator.h>
-using namespace std;
+#include <lib/system/logger.hpp>
 
 namespace cs
 {
@@ -107,23 +108,23 @@ namespace cs
             return;
         if (removeTransactions_NegativeAll(node, trxs, maskIncluded, trxsExcluded))
             return;
-#ifdef MYLOG
-        std::cout << "removeTransactions: Failed to make balance non-negative " << std::endl;
-#endif
+
+        csdebug() << "removeTransactions: Failed to make balance non-negative ";
     }
 
     bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded)
     {
         if (node.balance_ >= zeroBalance_)
             return true;
-        const csdb::Amount absBalance = -node.balance_;
 
+        const csdb::Amount absBalance = -node.balance_;
         TransactionIndex* prevNext = &node.lastTrxInd_;
+
         for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext)
         {
             const csdb::Transaction& trx = trxs[trxInd];
-
             const csdb::Amount& trxCost = trx.amount() + trx.counted_fee();
+
             if (trxCost < absBalance)
             {
                 prevNext = &trxList_[trxInd];
@@ -132,14 +133,16 @@ namespace cs
 
             WalletsState::WalletId walletId{};
             Node& destNode = walletsState_.getData(trx.target(), walletId);
+
             const bool isTrxPositive = (trx.amount() <= destNode.balance_);
+
             if (!isTrxPositive)
             {
                 prevNext = &trxList_[trxInd];
                 continue;
             }
 
-            maskIncluded.reset(trxInd);
+            maskIncluded[trxInd] = 0;
 
 #ifndef WITHOUT_BAD_BLOCK
             trxsExcluded.add_transaction(trx);
@@ -155,6 +158,7 @@ namespace cs
 
             return true;
         }
+
         return false;
     }
 
@@ -164,6 +168,7 @@ namespace cs
             return true;
 
         TransactionIndex* prevNext = &node.lastTrxInd_;
+
         for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext)
         {
             const csdb::Transaction& trx = trxs[trxInd];
@@ -171,13 +176,14 @@ namespace cs
             WalletsState::WalletId walletId{};
             Node& destNode = walletsState_.getData(trx.target(), walletId);
             const bool isTrxPositive = (trx.amount() <= destNode.balance_);
+
             if (!isTrxPositive)
             {
                 prevNext = &trxList_[trxInd];
                 continue;
             }
 
-            maskIncluded.reset(trxInd);
+            maskIncluded[trxInd] = 0;
 
 #ifndef WITHOUT_BAD_BLOCK
             trxsExcluded.add_transaction(trx);
@@ -194,6 +200,7 @@ namespace cs
             if (node.balance_ >= zeroBalance_)
                 return true;
         }
+
         return false;
     }
 
@@ -201,14 +208,15 @@ namespace cs
     {
         if (node.balance_ >= zeroBalance_)
             return true;
-        const csdb::Amount absBalance = -node.balance_;
 
+        const csdb::Amount absBalance = -node.balance_;
         TransactionIndex* prevNext = &node.lastTrxInd_;
+
         for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext)
         {
             const csdb::Transaction& trx = trxs[trxInd];
-
             const csdb::Amount& trxCost = trx.amount() + trx.counted_fee();
+
             if (trxCost < absBalance)
             {
                 prevNext = &trxList_[trxInd];
@@ -218,7 +226,7 @@ namespace cs
             WalletsState::WalletId walletId{};
             Node& destNode = walletsState_.getData(trx.target(), walletId);
 
-            maskIncluded.reset(trxInd);
+            maskIncluded[trxInd] = 0;
 
 #ifndef WITHOUT_BAD_BLOCK
             trxsExcluded.add_transaction(trx);
@@ -246,6 +254,7 @@ namespace cs
             return true;
 
         TransactionIndex* prevNext = &node.lastTrxInd_;
+
         for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext)
         {
             const csdb::Transaction& trx = trxs[trxInd];
@@ -253,7 +262,7 @@ namespace cs
             WalletsState::WalletId walletId{};
             Node& destNode = walletsState_.getData(trx.target(), walletId);
 
-            maskIncluded.reset(trxInd);
+            maskIncluded[trxInd] = 0;
 
 #ifndef WITHOUT_BAD_BLOCK
             trxsExcluded.add_transaction(trx);
@@ -273,6 +282,7 @@ namespace cs
             if (node.balance_ >= zeroBalance_)
                 return true;
         }
+
         return false;
     }
 }

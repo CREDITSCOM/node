@@ -7,6 +7,8 @@
 #include <lib/system/cache.hpp>
 #include "pacmans.hpp"
 
+using io_context = boost::asio::io_context;
+
 class Transport;
 class Network {
 public:

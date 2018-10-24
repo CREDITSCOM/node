@@ -3,7 +3,7 @@
 
 #include <limits>
 #include <vector>
-#include <boost/dynamic_bitset.hpp>
+#include <lib/system/common.hpp>
 #include <csdb/pool.h>
 #include <csdb/transaction.h>
 #include <solver/WalletsState.h>
@@ -14,7 +14,7 @@ namespace cs
     {
     public:
         using Transactions = std::vector<csdb::Transaction>;
-        using CharacteristicMask = boost::dynamic_bitset<>;
+        using CharacteristicMask = cs::Bytes;
         using TransactionIndex = WalletsState::TransactionIndex;
     public:
         struct Config

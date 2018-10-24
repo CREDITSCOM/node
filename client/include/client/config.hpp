@@ -10,7 +10,7 @@
 #include <lib/system/common.hpp>
 
 namespace po = boost::program_options;
-using namespace boost::asio;
+namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
 const NodeVersion NODE_VERSION = 82;

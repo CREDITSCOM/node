@@ -46,6 +46,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
   cs::Hash hash;
   const std::size_t transactionsCount = packet.transactionsCount();
+  const auto& transactions = packet.transactions();
 
   if (transactionsCount > 0) {
     walletsState.updateFromSource();
@@ -53,28 +54,23 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);
+
     uint8_t del1;
     csdb::Pool new_bpool;
-    boost::dynamic_bitset<> characteristic_mask{ transactionsCount };
+    cs::Byte byte = 0;
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
-      const csdb::Transaction& transaction = packet.transactions().at(i);
-
-      if (!trxValidator_->validateTransaction(transaction, i, del1)) {
-        continue;
-      }
-      characteristic_mask.set(i, true);
-    }
-    trxValidator_->validateByGraph(characteristic_mask, packet.transactions(), new_bpool);
-
-    Byte byte;
-    for (int i = 0; i < transactionsCount; ++i) {
+      const csdb::Transaction& transaction = transactions.at(i);
       byte = 0;
-      if (characteristic_mask[i]) {
+
+      if (trxValidator_->validateTransaction(transaction, i, del1)) {
         byte = 1;
       }
+
       characteristicMask.push_back(byte);
     }
+
+    trxValidator_->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
 
     m_characteristic.mask = std::move(characteristicMask);
   }

@@ -10,7 +10,7 @@
 
 #include "packet.hpp"
 
-using namespace boost::asio;
+namespace ip = boost::asio::ip;
 
 class Network;
 class Transport;

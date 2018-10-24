@@ -131,7 +131,7 @@ class Solver {
   const cs::PrivateKey& getPrivateKey() const;
   const cs::PublicKey& getPublicKey() const;
 
-  cs::SharedMutex &getSharedMutex();
+  cs::SharedMutex& getSharedMutex();
 
  private:
   void flushTransactions();
@@ -141,12 +141,14 @@ class Solver {
   cs::PrivateKey m_privateKey;
 
   friend class slv2::SolverCore;
+
   Node* m_node;
   std::unique_ptr<WalletsState> walletsState;
   std::unique_ptr<Generals> m_generals;
 
   const csdb::Address genesisAddress;
   const csdb::Address startAddress;
+
 #ifdef SPAMMER
   const csdb::Address spammerAddress;
   std::vector<csdb::Address> spam_keys_;
@@ -167,7 +169,6 @@ class Solver {
   cs::RoundTable m_roundTable;
 
   csdb::Pool v_pool;
-
 
   bool m_isPoolClosed = true;
   bool blockCandidateArrived = false;
@@ -194,8 +195,6 @@ class Solver {
 
   /*to store unrequested syncro blocks*/
   std::map<size_t, csdb::Pool> rndStorage;
-
-  // TODO! Hash m_characteristicHash
 
 #ifdef SPAMMER
   std::atomic_bool spamRunning = { false };
