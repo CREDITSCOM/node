@@ -759,7 +759,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 #ifdef SPAMMER
 void Solver::spamWithTransactions()
 {
-  std::cout << "STARTING SPAMMER..." << std::endl;
+  cslog() << "STARTING SPAMMER...";
 
   long counter = 0;
   uint64_t iid = 0;
@@ -777,17 +777,22 @@ void Solver::spamWithTransactions()
       } else {
         transaction.set_source(spammerAddress);
       }
+
       if (m_node->getBlockChain().findWalletId(spam_keys_[counter], id)) {
         transaction.set_target(csdb::Address::from_wallet_id(id));
       } else {
         transaction.set_target(spam_keys_[counter]);
       }
+
       transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
       transaction.set_max_fee(csdb::AmountCommission(0.1));
       transaction.set_innerID(iid++);
 
       addConveyerTransaction(transaction);
-      if (counter++ == NUM_OF_SPAM_KEYS - 1) counter = 0;
+
+      if (counter++ == NUM_OF_SPAM_KEYS - 1) {
+        counter = 0;
+      }
     }
 
     std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
