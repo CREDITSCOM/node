@@ -26,6 +26,7 @@ namespace cs
 
         bool isAllowed(TransactionId trxId) const
         {
+#ifndef SPAMMER
             if (heap_.empty())
                 return true;
             else
@@ -38,6 +39,9 @@ namespace cs
                 else
                     return !heap_.contains(trxId);
             }
+#else
+            return true;
+#endif
         }
 
     private:
