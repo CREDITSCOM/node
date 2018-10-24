@@ -7,6 +7,7 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+
 enum RegFlags : uint8_t { UsingIPv6 = 1, RedirectIP = 1 << 1, RedirectPort = 1 << 2 };
 
 enum Platform : uint8_t { Linux, MacOS, Windows };
@@ -224,8 +225,22 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence());
+      try {
+        gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash());
+      }
+      catch (std::out_of_range) {}
       break;
+    case NetworkCommand::SSSpecificBlock: {
+      uint32_t round;
+      iPackStream_ >> round;
+      try {
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
+      }
+      catch (std::out_of_range) {
+        LOG_WARN("[WARNING] : [BIGBANG] : [VERY BIG HARD ROUND] : round: " + std::to_string(round));
+      }
+      break;
+    }
     case NetworkCommand::PackInform:
       gotPackInform(task, sender);
       break;
@@ -542,6 +557,15 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
 
 void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool incrementWhenResend) {
   auto end = pack + packNum;
+  
+  // TEMP: SEND TO SIGNAL SERVER
+  if (pack->getType() == MsgTypes::RoundTable) {
+    Connection conn;
+    conn.in = net_->resolve(config_.getSignalServerEndpoint());
+    conn.specialOut = false;
+    sendDirect(pack, conn);
+  }
+  //
 
   for (auto ptr = pack; ptr != end; ++ptr) {
     SpinLock     l(sendPacksFlag_);
@@ -754,7 +778,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash & lastHash) {
 #ifdef MONITOR_NODE
   return true;
 #endif
@@ -765,7 +789,12 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock)
 
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
-  oPackStream_ << lastBlock << myPublicKey_;
+  cs::Hash lastHash_;
+  //std::copy(lastHash.to_binary().begin(), lastHash.to_binary().end(), lastHash_.data());
+  
+  memcpy(lastHash_.data(), ((const uint8_t*)lastHash.to_binary().data()), lastHash_.size());
+  oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
+  //oPackStream_ << lastBlock << myPublicKey_;
 
   sendDirect(oPackStream_.getPackets(), conn);
   return true;
