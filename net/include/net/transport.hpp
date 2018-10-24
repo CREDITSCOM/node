@@ -35,7 +35,9 @@ enum class NetworkCommand : uint8_t {
   SSFirstRound          = 31,
   SSRegistrationRefused = 25,
   SSPingWhiteNode       = 32,
-  SSLastBlock           = 34
+  SSLastBlock           = 34,
+  SSReRegistration      = 36,
+  SSSpecificBlock       = 37,
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -129,10 +131,11 @@ class Transport {
   bool gotRegistrationRefusal(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
   bool gotSSRegistration(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+  bool gotSSReRegistration();
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
   bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
-  bool gotSSLastBlock(const TaskPtr<IPacMan>&, uint32_t lastBlock);
+  bool gotSSLastBlock(const TaskPtr<IPacMan>&, uint32_t, const csdb::PoolHash&);
 
   bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
   bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
