@@ -558,15 +558,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
 void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool incrementWhenResend) {
   auto end = pack + packNum;
   
-  // TEMP: SEND TO SIGNAL SERVER
-  if (pack->getType() == MsgTypes::RoundTable) {
-    Connection conn;
-    conn.in = net_->resolve(config_.getSignalServerEndpoint());
-    conn.specialOut = false;
-    sendDirect(pack, conn);
-  }
-  //
-
   for (auto ptr = pack; ptr != end; ++ptr) {
     SpinLock     l(sendPacksFlag_);
     PackSendTask pst;
