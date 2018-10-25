@@ -143,7 +143,12 @@ class APIHandler : public APIHandlerInterface
     Credits::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
       smart_origin;
 
-    using smart_state_entry = Credits::worker_queue<std::string>;
+	using smart_state_record = struct {
+		std::string state;
+		std::int64_t locker_trx{0xA3};
+	};
+
+    using smart_state_entry = Credits::worker_queue<smart_state_record>;
 
     Credits::SpinLockable<std::map<csdb::Address, smart_state_entry>>
       smart_state;

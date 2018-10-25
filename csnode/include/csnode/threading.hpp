@@ -133,7 +133,7 @@ struct worker_queue
         //TRACE("");
         std::lock_guard<decltype(lock)> l(lock);
         //TRACE("");
-        state = j();
+        j(state);
         //TRACE("");
         w.notify_all();
         //TRACE("");
