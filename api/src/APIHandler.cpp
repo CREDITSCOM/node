@@ -1388,12 +1388,11 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
-  const uint8_t innerid_size = 8*sizeof(uint32_t);
   for (auto inner_id : v) {
     csdb::Transaction transaction;
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    inner_id = ((inner_id << innerid_size >> innerid_size));
+    inner_id &= 0x3fffffffffff;
     bool finish_for_idx = false;    
     if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
       SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
