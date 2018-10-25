@@ -336,7 +336,7 @@ void Solver::gotPacketHashesRequest(cs::Hashes&& hashes, const RoundNumber round
 
       ++foundHashesCount;
     }
-    }
+  }
 
   if (foundHashesCount == hashes.size()) {
     cslog() << "SOVLER> All requested hashes found at current table";

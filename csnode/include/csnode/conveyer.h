@@ -1,6 +1,10 @@
 #ifndef CONVEYER_H
 #define CONVEYER_H
 
+#include <csnode/nodecore.h>
+#include <lib/system/common.hpp>
+#include <lib/system/timer.hpp>
+
 #include <memory>
 
 class Node;
@@ -8,6 +12,11 @@ class Node;
 namespace cs
 {
     class Solver;
+}
+
+namespace csdb
+{
+    class Transaction;
 }
 
 namespace cs
@@ -19,20 +28,39 @@ namespace cs
     class Conveyer
     {
     private:
-        Conveyer();
+        explicit Conveyer();
         ~Conveyer();
 
     public:
-
         ///
         /// @brief Instance of conveyer, singleton
-        /// @return Returns static conveyer object reference, Meyers singleton
+        /// @return Returns static conveyer object pointer, Meyers singleton
         ///
-        const Conveyer& instance() const;
+        static Conveyer* instance();
+
+        ///
+        /// @brief Adds transaction to conveyer, start point of conveyer
+        /// @param transaction csdb Transaction, not valid transavtion would not be
+        /// sent to network
+        ///
+        void addTransaction(const csdb::Transaction& transaction);
+
+    protected:
+
+        /// try to send transactions to network
+        void flushTransactions();
 
     private:
+
+        /// pointer implementation
         struct Impl;
         std::unique_ptr<Impl> pimpl;
+
+        /// sync
+        cs::SharedMutex m_sharedMutex;
+
+        /// sends transactions blocks to network
+        cs::Timer m_sendingTimer;
     };
 }
 

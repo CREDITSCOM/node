@@ -1,12 +1,12 @@
 #pragma once
 
 //#define MONITOR_NODE
-#define NODE_API
+//#define NODE_API
 #define AJAX_IFACE
 #define TIME_TO_COLLECT_TRXNS 500
 #define TIME_TO_AWAIT_ACTIVITY 300
 #define TRX_SLEEP_TIME 70000        //microseconds
-//#define SPAMMER
+#define SPAMMER
 #define SYNCRO
 #define TRANSACTION_VALIDATION
 
