@@ -1388,22 +1388,23 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
-  for (const auto &inner_id : v) {
-    bool finish_for_idx = false;
+  const uint8_t innerid_size = 8*sizeof(uint32_t);
+  for (auto inner_id : v) {
     csdb::Transaction transaction;
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
+    inner_id = ((inner_id << innerid_size >> innerid_size));
+    bool finish_for_idx = false;    
     if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
       SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
       return;
     }
-    csdb::Address addr_id = csdb::Address::from_wallet_id(wallId);
+    auto addr_id = csdb::Address::from_wallet_id(wallId);
     if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transaction)) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
       cs::SharedLock sharedLock(solver.getSharedMutex());
-
-      decltype(auto) trx_block = solver.transactionsBlock();
+      decltype(auto) trx_block = solver.transactionsBlock();  // find in transaction block
       for (decltype(auto) it : solver.transactionsBlock()) {
         const auto &transactions = it.transactions();
         for (decltype(auto) transaction : transactions) {
@@ -1414,7 +1415,6 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
-
       if (!finish_for_idx) {
         decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
         for (decltype(auto) it : m_hash_tb) {
