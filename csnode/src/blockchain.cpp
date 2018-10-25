@@ -137,9 +137,11 @@ bool BlockChain::writeBlock(csdb::Pool& pool) {
           return false;
 	}
 
-        if (!pool.save()) {
-          LOG_ERROR("Couldn't save block");
-          return false;
+  if (!pool.save()) {
+    if (pool.hash().is_empty() || !loadBlock(pool.hash()).is_valid()) {
+      LOG_ERROR("Couldn't save block");
+      return false;
+    }
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;

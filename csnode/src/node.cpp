@@ -704,10 +704,10 @@ void Node::sendBlock(const csdb::Pool& pool) {
 
 void Node::getBadBlock(const uint8_t* data, const size_t size, const PublicKey& sender) {
   //std::cout << __func__ << std::endl;
-  if (myLevel_ == NodeLevel::Writer) {
+  /*if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("Writer cannot get bad blocks");
     return;
-  }
+  }*/
 
   // myLevel_ = NodeLevel::Normal; //test feature
   istream_.init(data, size);
