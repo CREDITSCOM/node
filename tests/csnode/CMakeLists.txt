@@ -22,8 +22,9 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 
 target_link_libraries(${TEST_NAME} net csnode csconnector lib solver
         Boost::program_options
-        libgtest
-        libgmock)
+        ${GTEST_LIBRARIES}
+        ${GMOCK_LIBRARIES}
+        )
 
 add_test(NAME ${TEST_NAME}
         COMMAND ${TEST_NAME})
