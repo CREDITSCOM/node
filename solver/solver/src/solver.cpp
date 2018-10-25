@@ -763,10 +763,12 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
-    cs::Timer::singleShot(cs::RoundDelay, [this]() {
-      m_node->initNextRound(m_roundTable);
+    if (!m_roundTableSent) {
+      cs::Timer::singleShot(cs::RoundDelay, [this]() {
+        m_node->initNextRound(m_roundTable);
+      });
       m_roundTableSent = true;
-    });
+    }
   }
 }
 
