@@ -143,10 +143,16 @@ namespace cs
         bool addTransaction(const csdb::Transaction& transaction);
 
         ///
-        /// @brief Returns trabsactions
+        /// @brief Returns transactions
         /// @return Reference to transactions vector
         ///
         const std::vector<csdb::Transaction>& transactions() const noexcept;
+
+        ///
+        /// @brief Returns trabsactions, non const version
+        /// @return Reference to transactions vector
+        ///
+        std::vector<csdb::Transaction>& transactions();
 
         ///
         /// @brief Clears transactions vector

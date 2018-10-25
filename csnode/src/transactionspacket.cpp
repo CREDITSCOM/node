@@ -190,6 +190,11 @@ namespace cs
         return m_transactions;
     }
 
+    std::vector<csdb::Transaction>& TransactionsPacket::transactions()
+    {
+        return m_transactions;
+    }
+
     void TransactionsPacket::clear() noexcept
     {
         m_transactions.clear();

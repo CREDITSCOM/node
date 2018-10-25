@@ -174,9 +174,9 @@ private:
 
   bool m_isPoolClosed = true;
   bool m_blockCandidateArrived = false;
-  bool m_roundTableSent = false;
   bool m_gotBlockThisRound = false;
 
+  std::atomic<bool> m_roundTableSent = false;
   std::atomic<bool> m_gotBigBang = false;
   std::atomic<bool> m_isConsensusRunning = false;
 

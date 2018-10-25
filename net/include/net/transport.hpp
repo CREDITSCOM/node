@@ -48,7 +48,13 @@ enum class RegistrationRefuseReasons : uint8_t {
   BadResponse
 };
 
-enum class SSBootstrapStatus : uint8_t { Empty, Requested, RegisteredWait, Complete, Denied };
+enum class SSBootstrapStatus : uint8_t {
+  Empty,
+  Requested,
+  RegisteredWait,
+  Complete,
+  Denied
+};
 
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
