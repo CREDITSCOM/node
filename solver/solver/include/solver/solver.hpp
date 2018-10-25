@@ -94,6 +94,7 @@ public:
   cs::RoundNumber currentRoundNumber();
   const cs::RoundTable& roundTable() const;
   const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
+  const cs::TransactionsBlock& transactionsBlock() const;
 
   // notifications interface
   const cs::Notifications& notifications() const;

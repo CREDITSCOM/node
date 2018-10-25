@@ -129,6 +129,7 @@ namespace slv2
         void gotRound(cs::RoundTable&& round);
         const cs::RoundTable& roundTable() const;
         const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
+        const cs::TransactionsBlock& transactionsBlock() const;
         bool getIPoolClosed();
         void gotHash(std::string&&, const cs::PublicKey&);
         void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);

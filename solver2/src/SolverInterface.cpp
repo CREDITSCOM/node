@@ -42,6 +42,13 @@ namespace slv2
         }
     }
 
+    const cs::TransactionsBlock& SolverCore::transactionsBlock() const {
+      if (opt_is_proxy_v1 && pslv_v1) {
+        return pslv_v1->transactionsBlock();
+      }
+    }
+
+
     bool SolverCore::getIPoolClosed() {
         if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->isPoolClosed();

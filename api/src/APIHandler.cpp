@@ -592,6 +592,103 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
+/*void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction)
+{
+  auto input_smart = transaction.smartContract;
+  auto send_transaction = make_transaction(transaction);
+  const auto smart_addr = send_transaction.target();
+
+  bool deploy = is_smart_deploy(input_smart);
+  if (!deploy) {
+    input_smart.byteCode.clear();
+    input_smart.sourceCode.clear();
+  }
+
+  bool present = false;
+  std::string origin_bytecode;
+  {
+    decltype(auto) smart_origin = locked_ref(this->smart_origin);
+    auto it = smart_origin->find(smart_addr);
+    if (it != smart_origin->end()) {
+      present = true;
+      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+    }
+  }
+
+  if (present == deploy) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
+
+  auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
+    auto smart_state(locked_ref(this->smart_state));
+    return (*smart_state)[smart_addr];
+  }();
+
+  std::string contract_state;
+  work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
+    contract_state_entry.get_position();
+    return true;
+  });
+
+  if (!deploy) {
+    contract_state_entry.wait_till_front([&](std::string& state) {
+      auto res = !state.empty();
+      if (res)
+      contract_state = state;
+      return res;
+    });
+  }
+
+  auto sg = scopeGuard([&]() {
+    auto fun = [&]() -> decltype(auto) { return std::move(contract_state); };
+    contract_state_entry.update_state(fun);
+  });
+
+  executor::APIResponse api_resp;
+  while (!executor_transport->isOpen()) {
+    executor_transport->open();
+  }
+
+  Address pk_source;
+  csdb::Address res_addr;
+  WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
+  if (transaction.source.size() == PUBLIC_KEY_LENGTH)
+    pk_source = transaction.source;
+  else if (s_blockchain.findAddrByWalletId(id, res_addr))
+    pk_source = res_addr.to_api_addr();
+  else {
+    LOG_ERROR("Public key of wallet not found by walletId");
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+  }
+  executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+
+  if (api_resp.code) {
+    _return.status.code = api_resp.code;
+    _return.status.message = api_resp.message;
+    return;
+  }
+
+  if ((_return.__isset.smart_contract_result = api_resp.__isset.ret_val)) // non-bug = instead of ==
+    _return.smart_contract_result = api_resp.ret_val;
+
+  if (input_smart.forgetNewState) {
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    return;
+  }
+
+  send_transaction.add_user_field(0, serialize(transaction.smartContract));
+  send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+  solver.send_wallet_transaction(send_transaction);
+
+  if (deploy)
+    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
+}*/
+
 void
 APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                                    const Transaction& transaction)
@@ -703,12 +800,12 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
 
   //TRACE("");
-  /*executor.executeByteCode(api_resp,
-                           transaction.source,
-                           bytecode,
-                           contract_state,
-                           input_smart.method,
-                           input_smart.params);*/
+  //executor.executeByteCode(api_resp,
+  //                         transaction.source,
+  //                         bytecode,
+  //                         contract_state,
+  //                         input_smart.method,
+  //                         input_smart.params);
 
   //TRACE("");
 
@@ -1291,21 +1388,43 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
-  for (const auto &inner_id : v) {
-    bool finish_for_idx = false;
+  const uint8_t innerid_size = 8*sizeof(uint32_t);
+  for (auto inner_id : v) {
     csdb::Transaction transaction;
-    if (s_blockchain.getStorage().get_from_blockchain(addr, inner_id, transaction)) // find in blockchain
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    inner_id = ((inner_id << innerid_size >> innerid_size));
+    bool finish_for_idx = false;    
+    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+      SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+      return;
+    }
+    auto addr_id = csdb::Address::from_wallet_id(wallId);
+    if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transaction)) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
       cs::SharedLock sharedLock(solver.getSharedMutex());
-      decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
-      for (decltype(auto) it : m_hash_tb) {
-        const auto &transactions = it.second.transactions();
+      decltype(auto) trx_block = solver.transactionsBlock();  // find in transaction block
+      for (decltype(auto) it : solver.transactionsBlock()) {
+        const auto &transactions = it.transactions();
         for (decltype(auto) transaction : transactions) {
           if (transaction.innerID() == inner_id) {
             _return.states[inner_id] = INPROGRESS;
             finish_for_idx = true;
             break;
+          }
+        }
+      }
+      if (!finish_for_idx) {
+        decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
+        for (decltype(auto) it : m_hash_tb) {
+          const auto &transactions = it.second.transactions();
+          for (decltype(auto) transaction : transactions) {
+            if (transaction.innerID() == inner_id) {
+              _return.states[inner_id] = INPROGRESS;
+              finish_for_idx = true;
+              break;
+            }
           }
         }
       }

@@ -848,6 +848,11 @@ const cs::TransactionsPacketHashTable& Solver::transactionsPacketTable() const
   return m_hashTable;
 }
 
+const cs::TransactionsBlock& Solver::transactionsBlock() const
+{
+  return m_transactionsBlock;
+}
+
 const cs::Notifications& Solver::notifications() const {
   return m_notifications;
 }
