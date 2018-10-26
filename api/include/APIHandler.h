@@ -7,8 +7,8 @@
 #include <queue>
 
 #include <API.h>
+#include <csnode/conveyer.h>
 #include <solver2/SolverCore.h>
-//#include <csconnector/csconnector.h>
 #include <csstats.h>
 
 #include <ContractExecutor.h>

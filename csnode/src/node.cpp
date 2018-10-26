@@ -302,21 +302,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
-void Node::sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable)
-{
-  if (myLevel_ != NodeLevel::Writer) {
-    return;
-  }
-
-  for (const auto& hash : roundTable.hashes) {
-    const auto& hashTable = solver_->transactionsPacketTable();
-
-    if (hashTable.count(hash)) {
-      sendTransactionsPacket(hashTable.find(hash)->second);
-    }
-  }
-}
-
 void Node::sendRoundTableRequest(size_t rNum) {
   if (rNum < roundNum_) {
     return;
@@ -349,7 +334,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
     return;
   }
 
-  sendRoundTable(solver_->roundTable());
+  sendRoundTable(cs::Conveyer::instance().roundTable());
 }
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
@@ -509,7 +494,7 @@ void Node::sendTLRequest() {
     return;
   }
 
-  const auto& mainNode = solver_->roundTable().general;
+  const auto& mainNode = cs::Conveyer::instance().roundTable().general;
 
   cslog() << "NODE> Sending TransactionList request to  " << cs::Utils::byteStreamToHex(mainNode.data(), mainNode.size());
 
@@ -536,7 +521,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size) {
     return;
   }
 
-  if (num < solver_->roundTable().confidants.size()) {
+  if (num < cs::Conveyer::instance().roundTable().confidants.size()) {
     sendMatrix(solver_->getMyMatrix());
   }
 }
@@ -892,8 +877,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   cslog() << "NODE> Characteric has arrived";
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!solver_->isPacketSyncFinished()) {
+  if (!conveyer.isSyncCompleted()) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
@@ -901,10 +887,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
     cs::CharacteristicMeta meta;
     meta.bytes = std::move(characteristicBytes);
-    meta.round = solver_->roundTable().round;
+    meta.round = conveyer.roundTable().round;
     meta.sender = sender;
 
-    solver_->addCharacteristicMeta(meta);
+    conveyer.addCharacteristicMeta(meta);
   }
 
   cs::DataStream stream(data, size);
@@ -936,12 +922,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::Bytes notification;
     stream >> notification;
 
-    solver_->addNotification(notification);
+    conveyer.addNotification(notification);
   }
 
   std::vector<cs::Hash> confidantsHashes;
 
-  for (const auto& notification : solver_->notifications()) {
+  for (const auto& notification : conveyer.notifications()) {
     cs::Hash hash;
     cs::DataStream notificationStream(notification.data(), notification.size());
 
@@ -970,9 +956,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::PublicKey writerPublicKey;
   stream >> writerPublicKey;
 
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  conveyer.setCharacteristic(characteristic);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, sender);
 
   if (pool) {
+    solver_->countFeesInPool(&pool.value());
+    getBlockChain().finishNewBlock(pool.value());
+
     const uint8_t* message = pool->to_binary().data();
     const size_t messageSize = pool->to_binary().size();
 
@@ -1064,7 +1054,7 @@ void Node::applyNotifications() {
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-  ostream_ << createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, solver_->notifications());
+  ostream_ << createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
   ostream_ << solver_->getPublicKey();
 
   flushCurrentTasks();
@@ -1149,7 +1139,7 @@ void Node::sendWriterNotification() {
 }
 
 cs::Bytes Node::createNotification() {
-  cs::Hash characteristicHash = solver_->getCharacteristicHash();
+  cs::Hash characteristicHash = cs::Conveyer::instance().characteristicHash();
   cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
 
   cs::Bytes bytes;

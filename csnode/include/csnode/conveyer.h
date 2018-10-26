@@ -84,6 +84,12 @@ namespace cs
         ///
         const cs::TransactionsBlock& transactionsBlock() const;
 
+        ///
+        /// @brief Returns transactions packet by hash.
+        /// Search in current hash table
+        ///
+        const cs::TransactionsPacket& packet(const cs::TransactionsPacketHash& hash) const;
+
         // round info
 
         ///
@@ -94,9 +100,20 @@ namespace cs
         void setRound(cs::RoundTable&& table);
 
         ///
+        /// @brief Sets new round table, for writer only
+        /// @param table Created round table
+        ///
+        void setRoundTable(const cs::RoundTable& table);
+
+        ///
         /// @brief Returns current blockchain round table
         ///
         const cs::RoundTable& roundTable() const;
+
+        ///
+        /// @brief Returns current round number
+        ///
+        const cs::RoundNumber roundNumber() const;
 
         ///
         /// @brief Returns safe copy of round table
@@ -197,6 +214,13 @@ namespace cs
         /// @return Returns transactions packet if its found, otherwise returns nothing.
         ///
         std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round);
+
+        // sync, try do not use it :]
+
+        ///
+        /// @brief Returns shared mutex object reference
+        ///
+        cs::SharedMutex& sharedMutex() const;
 
     protected:
 

@@ -129,36 +129,18 @@ namespace slv2
 
         void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
         void runSpammer();
-        void gotRound(cs::RoundTable&& round);
-        const cs::RoundTable& roundTable() const;
-        const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
-        const cs::TransactionsBlock& transactionsBlock() const;
+        void gotRound();
         bool getIPoolClosed();
         void gotHash(std::string&&, const cs::PublicKey&);
-        void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-        void gotPacketHashesReply(cs::TransactionsPacket&& packet);
-        const cs::Notifications& notifications() const;
-        void addNotification(const cs::Bytes& bytes);
-        std::size_t neededNotifications() const;
-        bool isEnoughNotifications(cs::Solver::NotificationState state) const;
-        std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-          const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
-        const cs::Characteristic& getCharacteristic() const;
-        cs::Hash getCharacteristicHash() const;
         const cs::PrivateKey& getPrivateKey() const;
         const cs::PublicKey& getPublicKey() const;
         cs::PublicKey getWriterPublicKey() const;
-        bool checkTableHashes(const cs::RoundTable& table);
         bool getBigBangStatus();
-        void gotTransactionsPacket(cs::TransactionsPacket&& packet);
         bool isPoolClosed() const;
         void sendTL();
-        cs::SharedMutex& getSharedMutex();
-        bool isPacketSyncFinished() const;
-        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
         NodeLevel nodeLevel() const;
         const cs::PublicKey& nodePublicKey() const;
-        const cs::Fee& feeCounter() const;
+        void countFeesInPool(csdb::Pool* pool);
 
     private:
 

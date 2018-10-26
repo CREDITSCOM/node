@@ -55,6 +55,8 @@ cs::Conveyer::Impl::~Impl()
 cs::Conveyer::Conveyer()
 {
     pimpl = std::make_unique<cs::Conveyer::Impl>();
+    pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
+
     m_sendingTimer.connect(std::bind(&cs::Conveyer::flushTransactions, this));
 }
 
@@ -118,6 +120,11 @@ const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
     return pimpl->transactionsBlock;
 }
 
+const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketHash& hash) const
+{
+    return pimpl->hashTable[hash];
+}
+
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
     const cs::Hashes& hashes = table.hashes;
@@ -153,9 +160,21 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     }
 }
 
+void cs::Conveyer::setRoundTable(const cs::RoundTable& table)
+{
+    cs::Lock lock(m_sharedMutex);
+    pimpl->roundTable = table;
+}
+
 const cs::RoundTable& cs::Conveyer::roundTable() const
 {
     return pimpl->roundTable;
+}
+
+const cs::RoundNumber cs::Conveyer::roundNumber() const
+{
+    cs::SharedLock lock(m_sharedMutex);
+    return pimpl->roundTable.round;
 }
 
 const cs::RoundTable cs::Conveyer::roundTableSafe() const
@@ -382,6 +401,11 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 
     csdebug() << "CONVEYER> Can not find round in storage, hash not found";
     return std::nullopt;
+}
+
+cs::SharedMutex &cs::Conveyer::sharedMutex() const
+{
+    return m_sharedMutex;
 }
 
 void cs::Conveyer::flushTransactions()

@@ -44,7 +44,6 @@ public:
 
   void addSenderToMatrix(uint8_t myConfNum);
 
-  const Characteristic& getCharacteristic() const;
   const PublicKey& getWriterPublicKey() const;
 
 private:
@@ -59,7 +58,6 @@ private:
   std::array<uint8_t, 100> m_newTrusted;
   std::array<HashWeigth, 100> m_hwTotal;
 
-  Characteristic m_characteristic;
   PublicKey m_writerPublicKey;
 
   WalletsState& m_walletsState;

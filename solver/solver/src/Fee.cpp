@@ -13,6 +13,7 @@
 #include <csdb/pool.h>
 #include <csdb/amount_commission.h>
 #include <csnode/node.hpp>
+#include <csnode/conveyer.h>
 
 namespace cs {
 namespace {
@@ -48,7 +49,7 @@ inline void Fee::Init(Node* node, csdb::Pool* pool) {
   num_of_last_block_ = node->getBlockChain().getLastWrittenSequence() + 1;
   // Now we don't have tools to estimate number of all nodes in the network.
   // So we use number of trusted. In fact it is a constant. Will be fixed soon.
-  num_of_nodes_ = node->getSolver()->roundTable().confidants.size();
+  num_of_nodes_ = cs::Conveyer::instance().roundTable().confidants.size();
   node_ = node;
 }
 

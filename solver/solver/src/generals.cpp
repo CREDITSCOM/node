@@ -24,6 +24,7 @@
 #include <mutex>
 #include <solver/generals.hpp>
 #include <solver/WalletsState.h>
+#include <csnode/conveyer.h>
 
 namespace cs {
 Generals::Generals(WalletsState& _walletsState)
@@ -47,6 +48,8 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
   cs::Hash hash;
   const std::size_t transactionsCount = packet.transactionsCount();
   const auto& transactions = packet.transactions();
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::Characteristic characteristic;
 
   if (transactionsCount > 0) {
     m_walletsState.updateFromSource();
@@ -73,17 +76,19 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
 #ifdef TRANSACTION_VALIDATION
     m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
 #endif
-    m_characteristic.mask = std::move(characteristicMask);
+
+    characteristic.mask = std::move(characteristicMask);
+    conveyer.setCharacteristic(characteristic);
   }
   else {
-    m_characteristic.mask = cs::Bytes();
+    conveyer.setCharacteristic(characteristic);
   }
 
-  if (m_characteristic.mask.size() != transactionsCount) {
+  if (characteristic.mask.size() != transactionsCount) {
     cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
   }
 
-  blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.mask.size(), nullptr, NULL);
+  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, NULL);
 
   m_findUntrusted.fill(0);
   m_newTrusted.fill(0);
@@ -123,20 +128,20 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
-      memcpy(hw[0].hash, matrix.hashVector[0].hash.data(), matrix.hashVector[0].hash.size());
+      std::memcpy(hw[0].hash, matrix.hashVector[0].hash.data(), 32);
 
       cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].hash, 32);
 
-      hw[0].weight                       = 1;
+      hw[0].weight = 1;
       *(m_findUntrusted.data() + j * 100) = 0;
-      i_max                                = 1;
+      i_max = 1;
     }
     else {
       found = false;
 
       // FIXME: i_max uninitialized in this branch!!!!
       for (uint8_t ii = 0; ii < i_max; ii++) {
-        if (memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size()) == 0) {
+        if (std::memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), 32) == 0) {
           (hw[ii].weight)++;
           *(m_findUntrusted.data() + j * 100 + i) = ii;
 
@@ -146,9 +151,9 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
       }
 
       if (!found) {
-        memcpy(hw[i_max].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size());
+        std::memcpy(hw[i_max].hash, matrix.hashVector[i].hash.data(), 32);
 
-        (hw[i_max].weight)                     = 1;
+        (hw[i_max].weight) = 1;
         *(m_findUntrusted.data() + j * 100 + i) = i_max;
 
         i_max++;
@@ -162,15 +167,15 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   for (int i = 0; i < i_max; i++) {
     if (hw[i].weight > hw_max) {
-      hw_max            = hw[i].weight;
+      hw_max = hw[i].weight;
       max_frec_position = cs::numeric_cast<uint8_t>(i);
     }
   }
 
-  j                      = matrix.sender;
+  j = matrix.sender;
   m_hwTotal[j].weight = max_frec_position;
 
-  memcpy(m_hwTotal[j].hash, hw[max_frec_position].hash, 32);
+  std::memcpy(m_hwTotal[j].hash, hw[max_frec_position].hash, 32);
 
   for (size_t i = 0; i < nodes_amount; i++) {
     if (*(m_findUntrusted.data() + i + j * 100) == max_frec_position) {
@@ -194,14 +199,14 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   for (uint8_t j = 0; j < nodes_amount; j++) {
     // matrix init
     if (j == 0) {
-      memcpy(hash_weights[0].hash, m_hwTotal[0].hash, 32);
+      std::memcpy(hash_weights[0].hash, m_hwTotal[0].hash, 32);
       (hash_weights[0].weight) = 1;
       j_max                      = 1;
     } else {
       bool found = false;
 
       for (jj = 0; jj < j_max; jj++) {
-        if (memcmp(hash_weights[jj].hash, m_hwTotal[j].hash, 32) == 0) {
+        if (std::memcmp(hash_weights[jj].hash, m_hwTotal[j].hash, 32) == 0) {
           (hash_weights[jj].weight)++;
           found = true;
 
@@ -254,10 +259,6 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
 
 const HashMatrix& Generals::getMatrix() const {
   return m_hMatrix;
-}
-
-const Characteristic& Generals::getCharacteristic() const {
-  return m_characteristic;
 }
 
 const PublicKey& Generals::getWriterPublicKey() const {
