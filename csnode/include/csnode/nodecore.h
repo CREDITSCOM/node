@@ -14,7 +14,6 @@
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <boost/circular_buffer.hpp>
 
-#include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
 

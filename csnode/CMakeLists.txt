@@ -59,8 +59,6 @@ add_library(csnode
 target_link_libraries (csnode net csdb solver2 base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libcuckoo
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/libcuckoo
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../api/include
