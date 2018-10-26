@@ -462,7 +462,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cs::Hashes hashes;
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::RoundTable table = conveyer.roundTableSafe();
+    cs::RoundNumber round = conveyer.roundNumber();
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());
@@ -471,6 +471,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
       }
     }
 
+    cs::RoundTable table;
     table.round++;
     table.confidants = std::move(m_hashesReceivedKeys);
     table.general = m_node->getPublicKey();
