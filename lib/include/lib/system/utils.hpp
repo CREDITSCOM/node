@@ -84,7 +84,7 @@ namespace cs
         };
 
         ///
-        /// Generates random value from random generator
+        /// Generates random value from random generator [min, max]
         ///
         inline static int generateRandomValue(int min, int max)
         {

@@ -152,6 +152,7 @@ namespace slv2
         void sendTL();
         cs::SharedMutex& getSharedMutex();
         bool isPacketSyncFinished() const;
+        const cs::Hashes& getNeededHashes() const;
         void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
 
     private:

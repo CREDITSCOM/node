@@ -80,8 +80,11 @@ struct Connection {
 
   RemoteNodePtr node;
 
-  bool isSignal = 0;
+  bool isSignal = false;
   bool connected = false;
+
+  bool isRequested = false;
+  uint32_t syncNeighbourRetries = 0;
 
   struct MsgRel {
     uint32_t acceptOrder = 0;
@@ -150,7 +153,9 @@ public:
 
   ConnectionPtr getNextRequestee(const cs::Hash&);
   ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getRandomSyncNeighbour();
   ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
+  void resetSyncNeighbours();
 
   void releaseSyncRequestee(const uint32_t seq);
 

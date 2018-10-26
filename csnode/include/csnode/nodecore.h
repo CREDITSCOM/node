@@ -59,7 +59,8 @@ namespace cs
         Black2HashLength = BLAKE2_HASH_LENGTH,
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
-        PrivateKeyLength = PRIVATE_KEY_LENGTH
+        PrivateKeyLength = PRIVATE_KEY_LENGTH,
+        PacketHashesRequestDelay = 100 // ms
     };
 
     enum SolverConsts : uint32_t

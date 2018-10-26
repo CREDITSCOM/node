@@ -175,6 +175,15 @@ namespace slv2
         }
     }
 
+    const cs::Hashes& SolverCore::getNeededHashes() const {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getNeededHashes();
+        }
+        else {
+            return cs::Hashes();
+        }
+    }
+
     void SolverCore::addCharacteristicMeta(const cs::CharacteristicMeta& meta) {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->addCharacteristicMeta(meta);

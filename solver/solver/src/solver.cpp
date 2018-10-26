@@ -234,6 +234,10 @@ bool Solver::isPacketSyncFinished() const {
   return m_neededHashes.empty();
 }
 
+const cs::Hashes& Solver::getNeededHashes() const {
+  return m_neededHashes;
+}
+
 HashVector Solver::hashVector() const {
   return m_hashVector;
 }
@@ -336,7 +340,7 @@ void Solver::gotPacketHashesRequest(cs::Hashes&& hashes, const RoundNumber round
 
       ++foundHashesCount;
     }
-    }
+  }
 
   if (foundHashesCount == hashes.size()) {
     cslog() << "SOVLER> All requested hashes found at current table";
@@ -369,6 +373,7 @@ void Solver::gotPacketHashesRequest(cs::Hashes&& hashes, const RoundNumber round
   }
   else {
     csdebug() << "SOLVER> can not find round in storage, hashes not found";
+    m_node->sendPacketHashesReply(cs::TransactionsPacket(), sender);
   }
 }
 
@@ -390,6 +395,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
 
   if (isPacketSyncFinished()) {
     csdebug() << "SOLVER> Hashes received, checking hash table again";
+    m_node->resetNeighbours();
 
     if (m_node->getMyLevel() == NodeLevel::Confidant) {
       runConsensus();
@@ -777,30 +783,36 @@ void Solver::spamWithTransactions()
   csdb::Transaction transaction;
   transaction.set_currency(csdb::Currency(1));
 
+  const std::size_t minTransactionsCount = 50;
+  const std::size_t maxTransactionsCount = 100;
+
   while (true) {
     if (m_isSpamRunning && (m_node->getMyLevel() == Normal)) {
       csdb::internal::WalletId id;
+      const std::size_t transactionsCount = cs::Utils::generateRandomValue(minTransactionsCount, maxTransactionsCount);
 
-      if (m_node->getBlockChain().findWalletId(m_spammerAddress, id)) {
-        transaction.set_source(csdb::Address::from_wallet_id(id));
-      } else {
-        transaction.set_source(m_spammerAddress);
-      }
+      for (std::size_t i = 0; i < transactionsCount; ++i) {
+        if (m_node->getBlockChain().findWalletId(m_spammerAddress, id)) {
+          transaction.set_source(csdb::Address::from_wallet_id(id));
+        } else {
+          transaction.set_source(m_spammerAddress);
+        }
 
-      if (m_node->getBlockChain().findWalletId(m_spamKeys[counter], id)) {
-        transaction.set_target(csdb::Address::from_wallet_id(id));
-      } else {
-        transaction.set_target(m_spamKeys[counter]);
-      }
+        if (m_node->getBlockChain().findWalletId(m_spamKeys[counter], id)) {
+          transaction.set_target(csdb::Address::from_wallet_id(id));
+        } else {
+          transaction.set_target(m_spamKeys[counter]);
+        }
 
-      transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-      transaction.set_max_fee(csdb::AmountCommission(0.1));
-      transaction.set_innerID(iid++);
+        transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
+        transaction.set_max_fee(csdb::AmountCommission(0.1));
+        transaction.set_innerID(iid++);
 
-      addConveyerTransaction(transaction);
+        addConveyerTransaction(transaction);
 
-      if (counter++ == NUM_OF_SPAM_KEYS - 1) {
-        counter = 0;
+        if (counter++ == NUM_OF_SPAM_KEYS - 1) {
+          counter = 0;
+        }
       }
     }
 

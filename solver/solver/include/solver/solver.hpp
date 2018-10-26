@@ -121,6 +121,7 @@ public:
   // helpers
   bool checkTableHashes(const cs::RoundTable& table);
   bool isPacketSyncFinished() const;
+  const cs::Hashes& getNeededHashes() const;
 
   HashVector hashVector() const;
   HashMatrix hashMatrix() const;
