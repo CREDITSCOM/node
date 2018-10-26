@@ -35,6 +35,9 @@ struct cs::Conveyer::Impl
     // hash tables storage
     cs::HashTablesStorage hashTablesStorage;
 
+    // round table
+    cs::RoundTable roundTable;
+
 signals:
     cs::PacketFlushSignal flushPacket;
 };
@@ -61,10 +64,10 @@ cs::Conveyer::~Conveyer()
     m_sendingTimer.stop();
 }
 
-cs::Conveyer* cs::Conveyer::instance()
+cs::Conveyer& cs::Conveyer::instance()
 {
     static cs::Conveyer conveyer;
-    return &conveyer;
+    return conveyer;
 }
 
 void cs::Conveyer::setSolver(slv2::SolverCore* solver)
@@ -96,7 +99,7 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     cs::Lock lock(m_sharedMutex);
 
     if (!pimpl->hashTable.count(hash)) {
-        pimpl->hashTable.emplace(hash, packet);
+        pimpl->hashTable.emplace(hash, std::move(packet));
     }
     else {
         cswarning() << "CONVEYER> Can not add network transactions packet";
@@ -115,7 +118,7 @@ const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
     return pimpl->transactionsBlock;
 }
 
-void cs::Conveyer::newRound(const cs::RoundTable& table)
+void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
     const cs::Hashes& hashes = table.hashes;
     cs::Hashes neededHashes;
@@ -135,12 +138,50 @@ void cs::Conveyer::newRound(const cs::RoundTable& table)
         csdebug() << "CONVEYER> Need hash > " << hash.toString();
     }
 
+    // stoge needed hashes
     pimpl->neededHashes = std::move(neededHashes);
+
+    {
+        cs::Lock lock(m_sharedMutex);
+        pimpl->roundTable = std::move(table);
+    }
+
+    if (!m_sendingTimer.isRunning())
+    {
+        cslog() << "CONVEYER> Transaction timer started";
+        m_sendingTimer.start(TransactionsPacketInterval);
+    }
+}
+
+const cs::RoundTable& cs::Conveyer::roundTable() const
+{
+    return pimpl->roundTable;
+}
+
+const cs::RoundTable cs::Conveyer::roundTableSafe() const
+{
+    cs::SharedLock lock(m_sharedMutex);
+    return pimpl->roundTable;
 }
 
 const cs::Hashes& cs::Conveyer::neededHashes() const
 {
     return pimpl->neededHashes;
+}
+
+void cs::Conveyer::addFoundPacket(cs::TransactionsPacket&& packet)
+{
+    cs::Lock lock(m_sharedMutex);
+    auto& hashes = pimpl->neededHashes;
+
+    if (auto iterator = std::find(hashes.begin(), hashes.end(), packet.hash()); iterator != hashes.end())
+    {
+        csdebug() << "CONVEYER> Adding synced packet";
+        hashes.erase(iterator);
+
+        // add to current table
+        pimpl->hashTable.emplace(packet.hash(), std::move(packet));
+    }
 }
 
 bool cs::Conveyer::isSyncCompleted() const
@@ -162,7 +203,7 @@ void cs::Conveyer::addNotification(const cs::Bytes& bytes)
 std::size_t cs::Conveyer::neededNotificationsCount() const
 {
     // TODO: check if +1 is correct
-    const auto& roundTable = pimpl->solver->roundTable();
+    const auto& roundTable = pimpl->roundTable;
     return (roundTable.confidants.size() / 2) + 1;
 }
 
@@ -253,7 +294,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
     cs::Lock lock(m_sharedMutex);
 
-    const cs::Hashes& localHashes = pimpl->solver->roundTable().hashes;
+    const cs::Hashes& localHashes = pimpl->roundTable.hashes;
     cs::TransactionsPacketHashTable hashTable;
 
     const cs::Characteristic& characteristic = pimpl->characteristic;
@@ -291,7 +332,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     }
 
     cs::StorageElement element;
-    element.round = pimpl->solver->roundTable().round;
+    element.round = pimpl->roundTable.round;
     element.hashTable = std::move(hashTable);
 
     // add current round hashes to storage
@@ -310,21 +351,12 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const auto& writerPublicKey = sender;
     newPool.set_writer_public_key(csdb::internal::byte_array(writerPublicKey.begin(), writerPublicKey.end()));
 
-//    pimpl->solver->feeCounter().CountFeesInPool(m_node, &newPool);
-//    m_node->getBlockChain().finishNewBlock(newPool);
-
-    // TODO: need to write confidants notifications bytes to csdb::Pool user fields
-//#ifdef MONITOR_NODE
-//    addTimestampToPool(newPool);
-//#endif
-
     return newPool;
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash)
+std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round)
 {
     cs::SharedLock lock(m_sharedMutex);
-    const auto round = pimpl->solver->roundTable().round;
 
     if (pimpl->hashTable.count(hash))
     {
@@ -355,7 +387,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 void cs::Conveyer::flushTransactions()
 {
     cs::Lock lock(m_sharedMutex);
-    const auto round = pimpl->solver->roundTable().round;
+    const auto round = pimpl->roundTable.round;
 
     if (pimpl->solver->nodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
         return;

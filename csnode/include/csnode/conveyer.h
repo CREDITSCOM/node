@@ -46,9 +46,9 @@ namespace cs
 
         ///
         /// @brief Instance of conveyer, singleton.
-        /// @return Returns static conveyer object pointer, Meyers singleton.
+        /// @return Returns static conveyer object reference, Meyers singleton.
         ///
-        static Conveyer* instance();
+        static Conveyer& instance();
 
         ///
         /// @brief Sets solver pointer to get info about rounds and consensus.
@@ -84,17 +84,34 @@ namespace cs
         ///
         const cs::TransactionsBlock& transactionsBlock() const;
 
+        // round info
+
         ///
         /// @brief Starts round of conveyer, checks all transactions packet hashes
         /// at round table.
         /// @param table Current blockchain round table.
         ///
-        void newRound(const cs::RoundTable& table);
+        void setRound(cs::RoundTable&& table);
+
+        ///
+        /// @brief Returns current blockchain round table
+        ///
+        const cs::RoundTable& roundTable() const;
+
+        ///
+        /// @brief Returns safe copy of round table
+        ///
+        const cs::RoundTable roundTableSafe() const;
 
         ///
         /// @brief Returns current round needed hashes.
         ///
         const cs::Hashes& neededHashes() const;
+
+        ///
+        /// @brief Adds synced packet to conveyer
+        ///
+        void addFoundPacket(cs::TransactionsPacket&& packet);
 
         ///
         /// @brief Returns state of current round hashes.
@@ -179,7 +196,7 @@ namespace cs
         /// @param hash Created transactions packet hash.
         /// @return Returns transactions packet if its found, otherwise returns nothing.
         ///
-        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash);
+        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round);
 
     protected:
 
