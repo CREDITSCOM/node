@@ -24,9 +24,11 @@ namespace {
 constexpr auto kPublicKeySize = 32;
 constexpr auto kPrivateKeySize = 64;
 constexpr auto kSignatureLength = 64;
+// number of wallets, which will be generated to send transactions to
 constexpr auto kTargetWalletsNum = 10;
 constexpr auto kTimeStartSleepSec = 5;
 constexpr auto kSpammerSleepTimeMicrosec = 70000;
+// from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
 std::string kGenesisPrivate = "3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN";
 } // namespace
