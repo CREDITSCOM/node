@@ -540,7 +540,8 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     return (*smart_state)[smart_addr];
   }();
 
-  smart_state_record *contract_state;
+  smart_state_record _;
+  smart_state_record *contract_state = &_;
 
   TRACE("");
 

@@ -144,8 +144,8 @@ class APIHandler : public APIHandlerInterface
       smart_origin;
 
 	using smart_state_record = struct {
-		std::string state;
-		std::int64_t locker_trx{0xA3};
+		std::string state{};
+		std::int64_t locker_trx{};
 	};
 
     using smart_state_entry = Credits::worker_queue<smart_state_record>;

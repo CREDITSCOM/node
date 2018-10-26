@@ -28,7 +28,7 @@ struct Config
 {
   int port = 9090;
 #ifdef AJAX_IFACE
-  int ajax_port = 8081;
+  int ajax_port = 80;
 #endif
 };
 
