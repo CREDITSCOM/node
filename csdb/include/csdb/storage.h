@@ -248,6 +248,9 @@ public:
   * @param InnerId    id транзакции (input)
   * @Transaction trx  полученная транзакция (output)
   * @return содержит ли blockchain транзакцию
+  *
+  * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
+  * \используется для входного параметра addr в виде id кошелька
   */
   bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
 
