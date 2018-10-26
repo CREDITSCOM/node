@@ -118,12 +118,16 @@ public:
   void runConsensus();
   void runFinalConsensus();
 
+  // node interface
+  NodeLevel nodeLevel() const;
+  const cs::PublicKey& nodePublicKey() const;
+
   // helpers
   bool checkTableHashes(const cs::RoundTable& table);
   bool isPacketSyncFinished() const;
 
-  HashVector hashVector() const;
-  HashMatrix hashMatrix() const;
+  const HashVector& hashVector() const;
+  const HashMatrix& hashMatrix() const;
 
   bool isPoolClosed();
 

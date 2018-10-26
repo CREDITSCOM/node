@@ -65,8 +65,8 @@ class Transport {
   : config_(config)
   , remoteNodes_(MaxRemoteNodes + 1)
   , netPacksAllocator_(1 << 24, 1)
-  , myPublicKey_(node->getMyPublicKey())
-  , oPackStream_(&netPacksAllocator_, node->getMyPublicKey())
+  , myPublicKey_(node->getPublicKey())
+  , oPackStream_(&netPacksAllocator_, node->getPublicKey())
   , net_(new Network(config, this))
   , node_(node)
   , nh_(this) {

@@ -207,6 +207,20 @@ namespace slv2
         return pgen->getMatrix();
     }
 
+    NodeLevel SolverCore::nodeLevel() const
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->nodeLevel();
+        }
+    }
+
+    const cs::PublicKey& SolverCore::nodePublicKey() const
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->nodePublicKey();
+        }
+    }
+
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
         if(opt_is_proxy_v1 && pslv_v1) {

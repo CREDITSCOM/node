@@ -2,16 +2,16 @@
 #define CONVEYER_H
 
 #include <csnode/nodecore.h>
+
 #include <lib/system/common.hpp>
 #include <lib/system/timer.hpp>
+#include <lib/system/signals.hpp>
 
 #include <memory>
 
-class Node;
-
-namespace cs
+namespace slv2
 {
-    class Solver;
+    class SolverCore;
 }
 
 namespace csdb
@@ -21,9 +21,11 @@ namespace csdb
 
 namespace cs
 {
+    using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
+
     ///
     /// @brief The Conveyer class, represents utils and mechanics
-    /// to transfer packets of transactions, consensus helper
+    /// to transfer packets of transactions, consensus helper.
     ///
     class Conveyer
     {
@@ -32,16 +34,35 @@ namespace cs
         ~Conveyer();
 
     public:
+        enum class NotificationState {
+            Equal,
+            GreaterEqual
+        };
+
+        enum : unsigned int {
+            HashTablesStorageCapacity = 10
+        };
+
         ///
-        /// @brief Instance of conveyer, singleton
-        /// @return Returns static conveyer object pointer, Meyers singleton
+        /// @brief Instance of conveyer, singleton.
+        /// @return Returns static conveyer object pointer, Meyers singleton.
         ///
         static Conveyer* instance();
 
         ///
-        /// @brief Adds transaction to conveyer, start point of conveyer
+        /// @brief Sets solver pointer to get info about rounds and consensus.
+        ///
+        void setSolver(slv2::SolverCore* solver);
+
+        ///
+        /// @brief Returns transactions packet flush signal
+        ///
+        cs::PacketFlushSignal& flushSignal();
+
+        ///
+        /// @brief Adds transaction to conveyer, start point of conveyer.
         /// @param transaction csdb Transaction, not valid transavtion would not be
-        /// sent to network
+        /// sent to network.
         ///
         void addTransaction(const csdb::Transaction& transaction);
 

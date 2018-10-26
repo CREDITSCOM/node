@@ -28,6 +28,13 @@ namespace std
     };
 }
 
+enum NodeLevel {
+    Normal,
+    Confidant,
+    Main,
+    Writer
+};
+
 namespace cs
 {
     // hash table for fast transactions storage

@@ -34,7 +34,7 @@ namespace slv2
 
     Role SolverContext::role() const
     {
-        auto v = core.pnode->getMyLevel();
+        auto v = core.pnode->getNodeLevel();
         switch(v) {
         case NodeLevel::Normal:
             return Role::Normal;

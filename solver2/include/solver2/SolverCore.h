@@ -9,6 +9,7 @@
 #include <solver/Fee.h>
 #include <solver/solver.hpp>
 #include <solver/WalletsState.h>
+#include <csnode/nodecore.h>
 
 #include <memory>
 #include <map>
@@ -36,8 +37,6 @@ namespace slv2
     class SolverCore;
 
     using KeyType = csdb::internal::byte_array;
-
-
 
     class SolverCore
     {
@@ -153,6 +152,8 @@ namespace slv2
         cs::SharedMutex& getSharedMutex();
         bool isPacketSyncFinished() const;
         void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+        NodeLevel nodeLevel() const;
+        const cs::PublicKey& nodePublicKey() const;
 
     private:
 
@@ -265,7 +266,7 @@ namespace slv2
         // sends current block if actual otherwise loads block from storage and sends it
         void repeatLastBlock();
 
-        // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
+        // consensus private members (copied from solver.v1): РїРѕ РјРµСЂРµ РїРµСЂРµРЅРѕСЃР° С„СѓРЅРєС†РёРѕРЅР°Р»Р° РёР· СЃРѕР»РІРµСЂР°-1 РјРѕРіСѓС‚ РёР·РјРµРЅРёС‚СЊСЃСЏ РёР»Рё СѓРґР°Р»РёС‚СЊСЃСЏ
 
         void createAndSendNewBlockFrom(csdb::Pool& p);
         void createAndSendNewBlock()

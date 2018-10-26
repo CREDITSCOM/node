@@ -15,13 +15,6 @@
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
-enum NodeLevel {
-  Normal,
-  Confidant,
-  Main,
-  Writer
-};
-
 class Transport;
 namespace slv2 { class SolverCore; }
 
@@ -120,11 +113,11 @@ public:
 
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
-  const cs::PublicKey& getMyPublicKey() const {
+  const cs::PublicKey& getPublicKey() const {
     return myPublicKey_;
   }
 
-  NodeLevel getMyLevel() const {
+  NodeLevel getNodeLevel() const {
     return myLevel_;
   }
 

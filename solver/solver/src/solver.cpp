@@ -234,18 +234,18 @@ bool Solver::isPacketSyncFinished() const {
   return m_neededHashes.empty();
 }
 
-HashVector Solver::hashVector() const {
+const HashVector& Solver::hashVector() const {
   return m_hashVector;
 }
 
-HashMatrix Solver::hashMatrix() const {
+const HashMatrix& Solver::hashMatrix() const {
   return (m_generals->getMatrix());
 }
 
 void Solver::flushTransactions() {
   cs::Lock lock(m_sharedMutex);
 
-  if (m_node->getMyLevel() != NodeLevel::Normal ||
+  if (m_node->getNodeLevel() != NodeLevel::Normal ||
       m_roundTable.round <= TransactionsFlushRound) {
     return;
   }
@@ -391,7 +391,7 @@ void Solver::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
   if (isPacketSyncFinished()) {
     csdebug() << "SOLVER> Hashes received, checking hash table again";
 
-    if (m_node->getMyLevel() == NodeLevel::Confidant) {
+    if (m_node->getNodeLevel() == NodeLevel::Confidant) {
       runConsensus();
     }
 
@@ -430,7 +430,7 @@ void Solver::gotRound(cs::RoundTable&& round) {
   if (!neededHashes.empty()) {
     m_node->sendPacketHashesRequest(neededHashes);
   }
-  else if (m_node->getMyLevel() == NodeLevel::Confidant) {
+  else if (m_node->getNodeLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
       cs::Lock lock(m_sharedMutex);
       runConsensus();
@@ -549,6 +549,14 @@ void Solver::runFinalConsensus() {
   }
 }
 
+NodeLevel Solver::nodeLevel() const {
+  return m_node->getNodeLevel();
+}
+
+const PublicKey& Solver::nodePublicKey() const {
+  return m_node->getPublicKey();
+}
+
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
 
@@ -605,7 +613,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
 }
 
 void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
-  if (m_node->getMyLevel() == NodeLevel::Writer) {
+  if (m_node->getNodeLevel() == NodeLevel::Writer) {
     LOG_WARN("Writer nodes don't get blocks");
     return;
   }
@@ -627,7 +635,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     {
       m_node->getBlockChain().onBlockReceived(block);
 #ifndef MONITOR_NODE
-      if ((m_node->getMyLevel() != NodeLevel::Writer) && (m_node->getMyLevel() != NodeLevel::Main)) {
+      if ((m_node->getNodeLevel() != NodeLevel::Writer) && (m_node->getNodeLevel() != NodeLevel::Main)) {
         std::string test_hash = m_node->getBlockChain().getLastWrittenHash().to_string();
         // HASH!!!
         m_node->sendHash(test_hash, sender);
@@ -750,7 +758,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     m_roundTable.round++;
     m_roundTable.confidants = std::move(m_hashesReceivedKeys);
-    m_roundTable.general = m_node->getMyPublicKey();
+    m_roundTable.general = m_node->getPublicKey();
     m_roundTable.hashes = std::move(hashes);
 
     m_hashesReceivedKeys.clear();
@@ -778,7 +786,7 @@ void Solver::spamWithTransactions()
   transaction.set_currency(csdb::Currency(1));
 
   while (true) {
-    if (m_isSpamRunning && (m_node->getMyLevel() == Normal)) {
+    if (m_isSpamRunning && (m_node->getNodeLevel() == Normal)) {
       csdb::internal::WalletId id;
 
       if (m_node->getBlockChain().findWalletId(m_spammerAddress, id)) {
@@ -955,7 +963,7 @@ void Solver::nextRound() {
     m_vPool = csdb::Pool{};
   }
 
-  if (m_node->getMyLevel() == NodeLevel::Confidant) {
+  if (m_node->getNodeLevel() == NodeLevel::Confidant) {
     cs::Utils::clearMemory(m_receivedVectorFrom);
     cs::Utils::clearMemory(m_receivedMatrixFrom);
 

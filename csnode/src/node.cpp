@@ -2,6 +2,7 @@
 
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
+#include <csnode/conveyer.h>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -81,6 +82,9 @@ bool Node::init() {
   solver_->setKeysPair(publicKey, privateKey);
   //solver_->addInitialBalance();
   solver_->runSpammer();
+
+  cs::Conveyer::instance()->setSolver(solver_);
+  cs::Connector::connect(cs::Conveyer::instance()->flushSignal(), this, &Node::sendTransactionsPacket);
 
   return true;
 }
@@ -986,7 +990,7 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     this->getBlockChain().putBlock(newPool);
 
 #ifndef MONITOR_NODE
-    if ((this->getMyLevel() != NodeLevel::Writer) && (this->getMyLevel() != NodeLevel::Main)) {
+    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
       auto hash = this->getBlockChain().getLastWrittenHash().to_string();
 
       this->sendHash(hash, sender);

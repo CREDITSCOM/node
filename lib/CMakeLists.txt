@@ -15,6 +15,7 @@ add_library(lib
   include/lib/system/utils.hpp
   include/lib/system/common.hpp
   include/lib/system/cache.hpp
+  include/lib/system/signals.hpp
 )
 
 if (MSVC)
