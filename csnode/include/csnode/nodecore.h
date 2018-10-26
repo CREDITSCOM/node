@@ -14,7 +14,6 @@
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <boost/circular_buffer.hpp>
 
-#include <libcuckoo/cuckoohash_map.hh>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
 
@@ -47,7 +46,7 @@ namespace cs
     using Notifications = std::vector<cs::Bytes>;
 
     // round data
-    using RoundNumber = std::atomic<uint32_t>;
+    using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 

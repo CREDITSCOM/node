@@ -24,6 +24,7 @@
 #include <lib/system/keys.hpp>
 #include <solver/WalletsState.h>
 #include <solver/Fee.h>
+#include <solver/spammer.h>
 
 class Node;
 
@@ -152,6 +153,7 @@ private:
   friend class slv2::SolverCore;
 
   Node* m_node;
+  Spammer m_spammer;
 
   std::unique_ptr<WalletsState> m_walletsState;
   std::unique_ptr<Generals> m_generals;
@@ -161,7 +163,6 @@ private:
 
 #ifdef SPAMMER
   const csdb::Address m_spammerAddress;
-  std::vector<csdb::Address> m_spamKeys;
 #endif
 
   Fee m_feeCounter;
@@ -205,12 +206,6 @@ private:
 
   // to store unrequested syncro blocks
   std::map<size_t, csdb::Pool> m_randomStorage; // TODO: RND pool or random?
-
-#ifdef SPAMMER
-  std::atomic_bool m_isSpamRunning = false;
-  std::thread m_spamThread;
-  void spamWithTransactions();
-#endif
 };
 }  // namespace cs
 #endif

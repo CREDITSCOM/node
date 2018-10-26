@@ -15,11 +15,13 @@ add_library(solver
     include/solver/WalletsState.h
     include/solver/Fee.h
     include/solver/TransactionsValidator.h
+    include/solver/spammer.h
     src/solver.cpp
     src/generals.cpp
     src/WalletState.cpp
     src/Fee.cpp
     src/TransactionsValidator.cpp
+    src/spammer.cpp
     ${THRIFT_GENERATED_FILES}
 )
 
