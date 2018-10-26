@@ -301,7 +301,6 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
     if (!updateWalletIds(pool, *walletsCacheUpdater_))
     {
         cserror() << "Couldn't update wallet ids";
-        return false;
     }
 
     return putBlock(pool);

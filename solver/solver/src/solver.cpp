@@ -55,6 +55,7 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 #endif
   )
 : m_node(node)
+, m_spammer()
 , m_walletsState(new WalletsState(node->getBlockChain()))
 , m_generals(std::unique_ptr<Generals>(new Generals(*m_walletsState)))
 , m_genesisAddress(_genesisAddress)
@@ -66,17 +67,6 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 , m_writerIndex(0) {
   m_hashTablesStorage.resize(HashTablesStorageCapacity, { });
   m_sendingPacketTimer.connect(std::bind(&Solver::flushTransactions, this));
-#ifdef SPAMMER
-  uint8_t sk[64];
-  uint8_t pk[32];
-  csdb::Address pub;
-  for (int i = 0; i < NUM_OF_SPAM_KEYS; i++)
-  {
-    crypto_sign_keypair(pk, sk);
-    pub = pub.from_public_key((const char*)pk);
-    m_spamKeys.push_back(pub);
-  }
-#endif
 }
 
 Solver::~Solver() {
@@ -470,9 +460,7 @@ void Solver::runConsensus() {
 
   cslog() << "SOLVER> Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
-#ifndef SPAMMER
   packet = removeTransactionsWithBadSignatures(packet);
-#endif
 
   // TODO: fix that
   csdb::Pool pool;
@@ -757,58 +745,15 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cslog() << "Solver -> NEW ROUND initialization done";
 
-    cs::Timer::singleShot(cs::RoundDelay, [this]() {
-      m_node->initNextRound(m_roundTable);
+    if (!m_roundTableSent) {
+      cs::Timer::singleShot(cs::RoundDelay, [this]() {
+        m_node->initNextRound(m_roundTable);
+      });
       m_roundTableSent = true;
-    });
-  }
-}
-
-/////////////////////////////
-#ifdef SPAMMER
-void Solver::spamWithTransactions()
-{
-  cslog() << "STARTING SPAMMER...";
-
-  long counter = 0;
-  uint64_t iid = 0;
-  std::this_thread::sleep_for(std::chrono::seconds(5));
-
-  csdb::Transaction transaction;
-  transaction.set_currency(csdb::Currency(1));
-
-  while (true) {
-    if (m_isSpamRunning && (m_node->getMyLevel() == Normal)) {
-      csdb::internal::WalletId id;
-
-      if (m_node->getBlockChain().findWalletId(m_spammerAddress, id)) {
-        transaction.set_source(csdb::Address::from_wallet_id(id));
-      } else {
-        transaction.set_source(m_spammerAddress);
-      }
-
-      if (m_node->getBlockChain().findWalletId(m_spamKeys[counter], id)) {
-        transaction.set_target(csdb::Address::from_wallet_id(id));
-      } else {
-        transaction.set_target(m_spamKeys[counter]);
-      }
-
-      transaction.set_amount(csdb::Amount(randFT(1, 1000), 0));
-      transaction.set_max_fee(csdb::AmountCommission(0.1));
-      transaction.set_innerID(iid++);
-
-      addConveyerTransaction(transaction);
-
-      if (counter++ == NUM_OF_SPAM_KEYS - 1) {
-        counter = 0;
-      }
     }
-
-    std::this_thread::sleep_for(std::chrono::microseconds(TRX_SLEEP_TIME));
   }
 }
-#endif
-///////////////////
+
 void Solver::send_wallet_transaction(const csdb::Transaction& transaction) {
   cs::Solver::addConveyerTransaction(transaction);
 }
@@ -830,8 +775,7 @@ void Solver::addInitialBalance() {
 
 void Solver::runSpammer() {
 #ifdef SPAMMER
-  m_spamThread = std::thread(&Solver::spamWithTransactions, this);
-  m_spamThread.detach();
+  m_spammer.StartSpamming(*m_node);
 #endif
 }
 
@@ -963,14 +907,7 @@ void Solver::nextRound() {
     trustedCounterMatrix = 0;
 
     cslog() << "SOLVER> next Round : the variables initialized";
-
-#ifdef SPAMMER
-    m_isSpamRunning = false;
-#endif
   } else {
-#ifdef SPAMMER
-    m_isSpamRunning = true;
-#endif
     m_isPoolClosed = true;
 
     if (!m_sendingPacketTimer.isRunning()) {

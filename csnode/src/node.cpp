@@ -1212,14 +1212,6 @@ void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs:
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Normal && myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  if (sender == myPublicKey_) {
-    return;
-  }
-
   uint32_t requested_seq;
 
   istream_.init(data, size);
