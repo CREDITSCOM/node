@@ -21,6 +21,15 @@ struct cs::Conveyer::Impl
     // current round transactions packets storage
     cs::TransactionsPacketHashTable hashTable;
 
+    // sync fields
+    cs::Hashes neededHashes;
+
+    // writer notifications
+    cs::Notifications notifications;
+
+    // storage of received characteristic for slow motion nodes
+    std::vector<cs::CharacteristicMeta> characteristicMetas;
+
 signals:
     cs::PacketFlushSignal flushPacket;
 };
@@ -72,6 +81,100 @@ void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
     }
 
     pimpl->transactionsBlock.back().addTransaction(transaction);
+}
+
+void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
+{
+    csdebug() << "CONVEYER> Add transactions packet";
+
+    cs::TransactionsPacketHash hash = packet.hash();
+    cs::Lock lock(m_sharedMutex);
+
+    if (!pimpl->hashTable.count(hash)) {
+        pimpl->hashTable.emplace(hash, packet);
+    }
+    else {
+        cswarning() << "CONVEYER> Can not add network transactions packet";
+    }
+}
+
+const cs::TransactionsPacketHashTable& cs::Conveyer::transactionsPacketTable() const
+{
+    cs::SharedLock lock(m_sharedMutex);
+    return pimpl->hashTable;
+}
+
+const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
+{
+    cs::SharedLock lock(m_sharedMutex);
+    return pimpl->transactionsBlock;
+}
+
+void cs::Conveyer::newRound(const cs::RoundTable& table)
+{
+    const cs::Hashes& hashes = table.hashes;
+    cs::Hashes neededHashes;
+
+    {
+        cs::SharedLock lock(m_sharedMutex);
+
+        for (const auto& hash : hashes)
+        {
+            if (!pimpl->hashTable.count(hash)) {
+                neededHashes.push_back(hash);
+            }
+        }
+    }
+
+    for (const auto& hash : neededHashes) {
+        csdebug() << "CONVEYER> Need hash > " << hash.toString();
+    }
+
+    pimpl->neededHashes = std::move(neededHashes);
+}
+
+const cs::Hashes& cs::Conveyer::neededHashes() const
+{
+    return pimpl->neededHashes;
+}
+
+bool cs::Conveyer::isSyncCompleted() const
+{
+    return pimpl->neededHashes.empty();
+}
+
+const cs::Notifications& cs::Conveyer::notifications() const
+{
+    return pimpl->notifications;
+}
+
+void cs::Conveyer::addNotification(const cs::Bytes& bytes)
+{
+    csdebug() << "CONVEYER> Writer notification added";
+    pimpl->notifications.push_back(bytes);
+}
+
+std::size_t cs::Conveyer::neededNotificationsCount() const
+{
+    // TODO: check if +1 is correct
+    const auto& roundTable = pimpl->solver->roundTable();
+    return (roundTable.confidants.size() / 2) + 1;
+}
+
+bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) const
+{
+    const std::size_t neededConfidantsCount = neededNotificationsCount();
+    const std::size_t notificationsCount = pimpl->notifications.size();
+
+    cslog() << "CONVEYER> Current notifications count - " << notificationsCount;
+    cslog() << "CONVEYER> Needed confidans count - " << neededConfidantsCount;
+
+    if (state == NotificationState::Equal) {
+        return notificationsCount == neededConfidantsCount;
+    }
+    else {
+        return notificationsCount >= neededConfidantsCount;
+    }
 }
 
 void cs::Conveyer::flushTransactions()
