@@ -86,8 +86,8 @@ bool Node::init() {
   //solver_->addInitialBalance();
   solver_->runSpammer();
 
-  cs::Conveyer::instance()->setSolver(solver_);
-  cs::Connector::connect(cs::Conveyer::instance()->flushSignal(), this, &Node::onTransactionsPacketFlushed);
+  cs::Conveyer::instance().setSolver(solver_);
+  cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
@@ -233,11 +233,14 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   }
 
   transport_->clearTasks();
+
+  // start round on node
   onRoundStart(roundTable);
+  onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
   cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this, roundTable]() mutable {
-    solver_->gotRound(std::move(roundTable));
+    solver_->gotRound();
   });
 }
 
@@ -786,7 +789,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
     return;
   }
 
-  solver_->gotTransactionsPacket(std::move(packet));
+  processTransactionsPacket(std::move(packet));
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
@@ -812,7 +815,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     return;
   }
 
-  solver_->gotPacketHashesRequest(std::move(hashes), round, sender);
+  processPacketsRequest(std::move(hashes), round, sender);
 }
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
@@ -829,7 +832,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
     return;
   }
 
-  solver_->gotPacketHashesReply(std::move(packet));
+  processPacketsReply(std::move(packet));
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
@@ -882,8 +885,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   roundTable.hashes = std::move(hashes);
 
   onRoundStart(roundTable);
+  onRoundStartConveyer(std::move(roundTable));
 
-  solver_->gotRound(std::move(roundTable));
+  solver_->gotRound();
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1016,10 +1020,11 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
     return;
   }
 
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::Bytes notification(data, data + size);
-  solver_->addNotification(notification);
+  conveyer.addNotification(notification);
 
-  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
+  if (conveyer.isEnoughNotifications(cs::Conveyer::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
     cslog() << "NODE> Confidants count more then 51%";
     applyNotifications();
   }
@@ -1029,19 +1034,26 @@ void Node::applyNotifications() {
   csdebug() << "NODE> Apply notifications";
 
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
+  poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1;
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
-  const cs::Characteristic& characteristic = solver_->getCharacteristic();
-
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, myPublicKey_);
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, myPublicKey_);
 
   if (!pool) {
     cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
     return;
   }
 
-  const cs::Bytes& poolBinary = pool->to_binary();
+  solver_->countFeesInPool(&pool.value());
+  getBlockChain().finishNewBlock(pool.value());
+
+  //TODO: need to write confidants notifications bytes to csdb::Pool user fields
+  #ifdef MONITOR_NODE
+  cs::Solver::addTimestampToPool(pool.value()));
+  #endif
+
+  const cs::Bytes& poolBinary = pool.value().to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
   csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
 
@@ -1052,7 +1064,7 @@ void Node::applyNotifications() {
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-  ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, solver_->notifications());
+  ostream_ << createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, solver_->notifications());
   ostream_ << solver_->getPublicKey();
 
   flushCurrentTasks();
@@ -1064,12 +1076,13 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::Hash characteristicHash;
   stream >> characteristicHash;
 
-  cs::Hash solverCharacteristicHash = solver_->getCharacteristicHash();
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::Hash currentCharacteristicHash = conveyer.characteristicHash();
 
-  if (characteristicHash != solverCharacteristicHash) {
+  if (characteristicHash != currentCharacteristicHash) {
     csdebug() << "NODE> Characteristic equals failed";
     csdebug() << "NODE> Received characteristic - " << cs::Utils::byteStreamToHex(characteristicHash.data(), characteristicHash.size());
-    csdebug() << "NODE> Writer solver chracteristic - " << cs::Utils::byteStreamToHex(solverCharacteristicHash.data(), solverCharacteristicHash.size());
+    csdebug() << "NODE> Writer solver chracteristic - " << cs::Utils::byteStreamToHex(currentCharacteristicHash.data(), currentCharacteristicHash.size());
     return false;
   }
 
@@ -1087,7 +1100,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::PublicKey publicKey;
   stream >> publicKey;
 
-  size_t messageSize = size - signature.size() - publicKey.size();
+  std::size_t messageSize = size - signature.size() - publicKey.size();
 
   if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
     cserror() << "NODE> Writer verify signature notification failed";
@@ -1351,7 +1364,7 @@ void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
   cslog() << "NODE> Became writer";
 
-  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::GreaterEqual)) {
+  if (cs::Conveyer::instance().isEnoughNotifications(cs::Conveyer::NotificationState::GreaterEqual)) {
     applyNotifications();
   }
 }
@@ -1403,19 +1416,72 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
     syncro_started = true;
   }
+
   if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
     syncro_started = false;
     awaitingSyncroBlock = false;
   }
 #endif
 
-  solver_->nextRound();
-
-#ifdef WRITER_RESEND_HASHES
-  sendAllRoundTransactionsPackets(roundTable);
-#endif
-
+  // TODO: check if this removes current tasks? if true - thats bad
   transport_->processPostponed(roundNum_);
+}
+
+void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
+  csdebug() << "NODE> Processing packets sync request";
+
+  for (const auto& hash : hashes){
+    std::optional<cs::TransactionsPacket> packet = cs::Conveyer::instance().searchPacket(hash, round);
+
+    if (packet) {
+      sendPacketHashesReply(packet.value(), sender);
+    }
+  }
+}
+
+void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
+  csdebug() << "NODE> Processing packets reply";
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  conveyer.addFoundPacket(std::move(packet));
+
+  if (conveyer.isSyncCompleted()) {
+    csdebug() << "NODE> Packets sync completed";
+    solver_->gotRound();
+
+    const cs::RoundNumber currentRound = conveyer.roundTable().round;
+
+    if (conveyer.isCharacteristicMetaReceived(currentRound)) {
+      csdebug() << "NODE> Run characteristic meta";
+      cs::CharacteristicMeta meta = conveyer.characteristicMeta(currentRound);
+
+      if (meta.round != 0) {
+        getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
+      }
+      else {
+        csfatal() << "NODE> Can not call node get characteristic method";
+      }
+    }
+  }
+}
+
+void Node::processTransactionsPacket(cs::TransactionsPacket&& packet)
+{
+  csdebug() << "NODE> Process transaction packet";
+  cs::Conveyer::instance().addTransactionsPacket(packet);
+}
+
+void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  conveyer.setRound(std::move(roundTable));
+
+  if (conveyer.isSyncCompleted()) {
+    cslog() << "NODE> All hashes in conveyer";
+  }
+  else {
+    csdebug() << "NODE> Sending packet hashes request";
+    sendPacketHashesRequest(conveyer.neededHashes());
+  }
 }
 
 bool Node::getSyncroStarted() {

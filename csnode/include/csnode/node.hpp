@@ -157,6 +157,12 @@ private:
 
   bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
+  void onRoundStartConveyer(cs::RoundTable&& roundTable);
+
+  // conveyer
+  void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void processPacketsReply(cs::TransactionsPacket&& packet);
+  void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
