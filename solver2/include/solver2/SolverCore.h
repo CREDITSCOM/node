@@ -29,6 +29,10 @@ namespace Credits
     class Fee;
 }
 
+namespace cs {
+    class Fee;
+}
+
 //TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by SolverCore
 
 namespace slv2
@@ -154,6 +158,7 @@ namespace slv2
         void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
         NodeLevel nodeLevel() const;
         const cs::PublicKey& nodePublicKey() const;
+        const cs::Fee& feeCounter() const;
 
     private:
 

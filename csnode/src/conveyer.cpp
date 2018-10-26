@@ -1,6 +1,7 @@
 #include "csnode/conveyer.h"
 
 #include <solver2/SolverCore.h>
+#include <solver/solver.hpp>
 #include <csdb/transaction.h>
 
 #include <lib/system/logger.hpp>
@@ -29,6 +30,10 @@ struct cs::Conveyer::Impl
 
     // storage of received characteristic for slow motion nodes
     std::vector<cs::CharacteristicMeta> characteristicMetas;
+    cs::Characteristic characteristic;
+
+    // hash tables storage
+    cs::HashTablesStorage hashTablesStorage;
 
 signals:
     cs::PacketFlushSignal flushPacket;
@@ -177,12 +182,182 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     }
 }
 
+void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
+{
+    auto& metas = pimpl->characteristicMetas;
+    const auto iterator = std::find(metas.begin(), metas.end(), meta);
+
+    if (iterator != metas.end())
+    {
+        metas.push_back(meta);
+        csdebug() << "CONVEYER> Characteristic meta added";
+    }
+    else {
+        csdebug() << "CONVEYER> Received meta is currently in meta stack";
+    }
+}
+
+cs::CharacteristicMeta cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
+{
+    cs::CharacteristicMeta meta;
+    meta.round = round;
+
+    auto& metas = pimpl->characteristicMetas;
+    const auto iterator = std::find(metas.begin(), metas.end(), meta);
+
+    if (iterator != metas.end())
+    {
+        meta = std::move(*iterator);
+        metas.erase(iterator);
+
+        return meta;
+    }
+    else
+    {
+        cserror() << "CONVEYER> Characteristic meta not found";
+        return {};
+    }
+}
+
+bool cs::Conveyer::isCharacteristicMetaReceived(const cs::RoundNumber round)
+{
+    cs::CharacteristicMeta meta;
+    meta.round = round;
+
+    const auto& metas = pimpl->characteristicMetas;
+    const auto iterator = std::find(metas.begin(), metas.end(), meta);
+
+    return iterator != metas.end();
+}
+
+void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
+{
+    csdebug() << "CONVEYER> Characteristic set to conveyer";
+    pimpl->characteristic = characteristic;
+}
+
+const cs::Characteristic& cs::Conveyer::characteristic() const
+{
+    return pimpl->characteristic;
+}
+
+cs::Hash cs::Conveyer::characteristicHash() const
+{
+    const Characteristic& characteristic = pimpl->characteristic;
+    return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
+}
+
+std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
+{
+    cslog() << "CONVEYER> ApplyCharacteristic";
+
+    cs::Lock lock(m_sharedMutex);
+
+    const cs::Hashes& localHashes = pimpl->solver->roundTable().hashes;
+    cs::TransactionsPacketHashTable hashTable;
+
+    const cs::Characteristic& characteristic = pimpl->characteristic;
+    cs::TransactionsPacketHashTable& currentHashTable = pimpl->hashTable;
+
+    cslog() << "CONVEYER> Characteristic bytes size " << characteristic.mask.size();
+
+    csdb::Pool newPool;
+    std::size_t maskIndex = 0;
+    const cs::Bytes& mask = characteristic.mask;
+
+    for (const auto& hash : localHashes)
+    {
+        if (!currentHashTable.count(hash))
+        {
+            cserror() << "CONVEYER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
+            return std::nullopt;
+        }
+
+        auto& packet = currentHashTable[hash];
+        const auto& transactions = packet.transactions();
+
+        for (const auto& transaction : transactions)
+        {
+            if (mask.at(maskIndex)) {
+                newPool.add_transaction(transaction);
+            }
+
+            ++maskIndex;
+        }
+
+        // create storage hash table and remove from current hash table
+        hashTable.emplace(hash, std::move(packet));
+        pimpl->hashTable.erase(hash);
+    }
+
+    cs::StorageElement element;
+    element.round = pimpl->solver->roundTable().round;
+    element.hashTable = std::move(hashTable);
+
+    // add current round hashes to storage
+    pimpl->hashTablesStorage.push_back(element);
+
+    if (characteristic.mask.size() != newPool.transactions_count()) {
+        cslog() << "CONVEYER> Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
+        cswarning() << "CONVEYER> ApplyCharacteristic: Some of transactions is not valid";
+    }
+
+    cslog() << "CONVEYER> ApplyCharacteristic : sequence = " << metaPoolInfo.sequenceNumber;
+
+    newPool.set_sequence(metaPoolInfo.sequenceNumber);
+    newPool.add_user_field(0, metaPoolInfo.timestamp);
+
+    const auto& writerPublicKey = sender;
+    newPool.set_writer_public_key(csdb::internal::byte_array(writerPublicKey.begin(), writerPublicKey.end()));
+
+//    pimpl->solver->feeCounter().CountFeesInPool(m_node, &newPool);
+//    m_node->getBlockChain().finishNewBlock(newPool);
+
+    // TODO: need to write confidants notifications bytes to csdb::Pool user fields
+//#ifdef MONITOR_NODE
+//    addTimestampToPool(newPool);
+//#endif
+
+    return newPool;
+}
+
+std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash)
+{
+    cs::SharedLock lock(m_sharedMutex);
+    const auto round = pimpl->solver->roundTable().round;
+
+    if (pimpl->hashTable.count(hash))
+    {
+        csdebug() << "CONVEYER> Found hash at current table in request - " << hash.toString();
+        return pimpl->hashTable[hash];
+    }
+
+    const auto& storage = pimpl->hashTablesStorage;
+    const auto iterator = std::find_if(storage.begin(), storage.end(), [&, this](const cs::StorageElement& element) {
+        return element.round == round;
+    });
+
+    if (iterator != storage.end())
+    {
+        csdebug() << "CONVEYER> Found round hash table in storage, searching hash";
+
+        if (auto iter = iterator->hashTable.find(hash); iter != iterator->hashTable.end())
+        {
+            csdebug() << "CONVEYER> Found hash in hash table storage";
+            return iter->second;
+        }
+    }
+
+    csdebug() << "CONVEYER> Can not find round in storage, hash not found";
+    return std::nullopt;
+}
+
 void cs::Conveyer::flushTransactions()
 {
     cs::Lock lock(m_sharedMutex);
-    const auto& roundTable = pimpl->solver->roundTable();
+    const auto round = pimpl->solver->roundTable().round;
 
-    if (pimpl->solver->nodeLevel() != NodeLevel::Normal || roundTable.round <= TransactionsFlushRound) {
+    if (pimpl->solver->nodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
         return;
     }
 
@@ -205,6 +380,7 @@ void cs::Conveyer::flushTransactions()
                 }
             }
 
+            // try to send save in node
             pimpl->flushPacket(packet);
 
             auto hash = packet.hash();

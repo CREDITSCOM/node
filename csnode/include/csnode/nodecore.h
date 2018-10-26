@@ -47,7 +47,7 @@ namespace cs
     using Notifications = std::vector<cs::Bytes>;
 
     // round data
-    using RoundNumber = uint32_t;
+    using RoundNumber = std::atomic<uint32_t>;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 
@@ -97,12 +97,12 @@ namespace cs
         cs::PublicKey sender;
         cs::RoundNumber round = 0;
 
-        bool operator==(const cs::CharacteristicMeta& meta)
+        bool operator==(const cs::CharacteristicMeta& meta) const
         {
             return round == meta.round;
         }
 
-        bool operator !=(const cs::CharacteristicMeta& meta)
+        bool operator !=(const cs::CharacteristicMeta& meta) const
         {
             return !((*this) == meta);
         }

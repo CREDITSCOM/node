@@ -30,19 +30,12 @@
 #include <sodium.h>
 
 namespace {
-void addTimestampToPool(csdb::Pool& pool) {
-  auto now_time = std::chrono::system_clock::now();
-  pool.add_user_field(
-      0, std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count()));
-}
-
 #if defined(SPAMMER)
 static int randFT(int min, int max) {
   return rand() % (max - min + 1) + min;
 }
 
 static const int NUM_OF_SPAM_KEYS = 10;
-
 #endif
 }  // namespace
 
@@ -1008,6 +1001,17 @@ const cs::PublicKey& Solver::publicKey() const {
 
 cs::SharedMutex& Solver::sharedMutex() {
   return m_sharedMutex;
+}
+
+const Fee& Solver::feeCounter() const {
+    return m_feeCounter;
+}
+
+void Solver::addTimestampToPool(csdb::Pool& pool) {
+  const auto now_time = std::chrono::system_clock::now();
+  const auto count = std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count();
+
+  pool.add_user_field(0, std::to_string(count));
 }
 
 cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet)

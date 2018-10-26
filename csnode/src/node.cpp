@@ -84,7 +84,7 @@ bool Node::init() {
   solver_->runSpammer();
 
   cs::Conveyer::instance()->setSolver(solver_);
-  cs::Connector::connect(cs::Conveyer::instance()->flushSignal(), this, &Node::sendTransactionsPacket);
+  cs::Connector::connect(cs::Conveyer::instance()->flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
@@ -847,6 +847,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   cs::RoundTable roundTable;
   roundTable.round = round;
+
+  // to node
   roundNum_ = round;
 
   cs::PublicKey general;
@@ -975,6 +977,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
     }
   }
+}
+
+void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
+  CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
 void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {

@@ -221,6 +221,13 @@ namespace slv2
         }
     }
 
+    const cs::Fee& SolverCore::feeCounter() const
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->feeCounter();
+        }
+    }
+
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
         if(opt_is_proxy_v1 && pslv_v1) {

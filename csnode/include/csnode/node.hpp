@@ -50,6 +50,8 @@ public:
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
+  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
+
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
   void applyNotifications();
   void writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey &sender);

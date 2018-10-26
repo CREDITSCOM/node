@@ -8,6 +8,7 @@
 #include <lib/system/signals.hpp>
 
 #include <memory>
+#include <optional>
 
 namespace slv2
 {
@@ -101,7 +102,7 @@ namespace cs
         ///
         bool isSyncCompleted() const;
 
-        // notifications
+        // writer notifications
 
         ///
         /// @brief Returns confidants notifications to writer.
@@ -121,9 +122,64 @@ namespace cs
 
         ///
         /// @brief Returns current notifications check of needed count.
-        /// @param state Check state of notifications
+        /// @param state Check state of notifications.
         ///
         bool isEnoughNotifications(NotificationState state) const;
+
+        // characteristic meta
+
+        ///
+        /// @brief Adds characteristic meta if early characteristic recevied from network.
+        /// @param meta Created on network characteristic meta information.
+        ///
+        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+
+        ///
+        /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
+        /// @param round Current blockchain round.
+        ///
+        cs::CharacteristicMeta characteristicMeta(const cs::RoundNumber round);
+
+        ///
+        /// @brief Returns characteristic meta recevied status.
+        /// @param round Current blockchain round.
+        ///
+        bool isCharacteristicMetaReceived(const cs::RoundNumber round);
+
+        // characteristic
+
+        ///
+        /// @brief Sets current round characteristic function.
+        /// @param characteristic Created characteristic on network level.
+        ///
+        void setCharacteristic(const cs::Characteristic& characteristic);
+
+        ///
+        /// @brief Returns current round characteristic.
+        ///
+        const cs::Characteristic& characteristic() const;
+
+        ///
+        /// @brief Returns calcualted characteristic hash by blake2.
+        ///
+        cs::Hash characteristicHash() const;
+
+        ///
+        /// @brief Applyies current round characteristic to create csdb::Pool.
+        /// @param metaPoolInfo pool meta information.
+        /// @param sender Sender public key.
+        /// @return pool Returns created csdb::Pool, otherwise returns nothing.
+        ///
+        std::optional<csdb::Pool> applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender = cs::PublicKey());
+
+        // hash table storage
+
+        ///
+        /// @brief Searches transactions packet in current hash table, or in hash table storage.
+        /// @param hash Created transactions packet hash.
+        /// @return Returns transactions packet if its found, otherwise returns nothing.
+        ///
+        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash);
 
     protected:
 

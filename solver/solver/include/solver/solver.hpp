@@ -138,6 +138,9 @@ public:
   const cs::PublicKey& publicKey() const;
 
   cs::SharedMutex& sharedMutex();
+  const Fee& feeCounter() const;
+
+  static void addTimestampToPool(csdb::Pool& pool);
 
 private:
   void flushTransactions();
