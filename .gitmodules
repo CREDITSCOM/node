@@ -16,6 +16,3 @@
 [submodule "third-party/berkeleydb_prebuilt"]
 	path = third-party/berkeleydb_prebuilt
 	url = https://gitlab.com/credits_bc/third_party/berkeleydb_prebuilt.git
-[submodule "third-party/libcuckoo"]
-	path = third-party/libcuckoo
-	url = https://github.com/efficient/libcuckoo.git
