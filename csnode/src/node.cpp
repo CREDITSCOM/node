@@ -1,3 +1,6 @@
+#include <sstream>
+#include <iostream>
+
 #include <solver2/SolverCore.h>
 
 #include <csnode/nodecore.h>
@@ -1240,12 +1243,14 @@ void Node::sendBlockRequest(uint32_t seq) {
   }
   csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
   const uint32_t syncStatus = static_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
+  std::stringstream progress;
   if (syncStatus <= 100) {
-    cslog() << "SYNC: [";
-    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) cslog() << "#";
-    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) cslog() << "-";
-    cslog() << "] " << syncStatus << "%";
+    progress << "SYNC: [";
+    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
+    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
+    progress << "] " << syncStatus << "%";
   }
+  cslog() << progress.str();
 
   uint32_t reqSeq = seq;
 
