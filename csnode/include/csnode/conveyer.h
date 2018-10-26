@@ -100,12 +100,6 @@ namespace cs
         void setRound(cs::RoundTable&& table);
 
         ///
-        /// @brief Sets new round table, for writer only
-        /// @param table Created round table
-        ///
-        void setRoundTable(const cs::RoundTable& table);
-
-        ///
         /// @brief Returns current blockchain round table
         ///
         const cs::RoundTable& roundTable() const;

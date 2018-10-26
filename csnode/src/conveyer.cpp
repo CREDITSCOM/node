@@ -158,12 +158,9 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
         cslog() << "CONVEYER> Transaction timer started";
         m_sendingTimer.start(TransactionsPacketInterval);
     }
-}
 
-void cs::Conveyer::setRoundTable(const cs::RoundTable& table)
-{
-    cs::Lock lock(m_sharedMutex);
-    pimpl->roundTable = table;
+    // clean data
+    pimpl->notifications.clear();
 }
 
 const cs::RoundTable& cs::Conveyer::roundTable() const

@@ -476,7 +476,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     table.general = m_node->getPublicKey();
     table.hashes = std::move(hashes);
 
-    conveyer.setRoundTable(table);
+    conveyer.setRound(std::move(table));
 
     m_hashesReceivedKeys.clear();
 
@@ -484,7 +484,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     if (!m_roundTableSent) {
       cs::Timer::singleShot(cs::RoundDelay, [=]() {
-        m_node->initNextRound(table);
+        m_node->initNextRound(cs::Conveyer::instance().roundTable());
       });
 
       m_roundTableSent = true;

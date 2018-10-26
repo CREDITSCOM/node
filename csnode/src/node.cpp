@@ -239,7 +239,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this, roundTable]() mutable {
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this]() {
     solver_->gotRound();
   });
 }
