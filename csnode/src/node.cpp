@@ -1000,7 +1000,7 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
 
       cslog() << "SENDING HASH to writer: " << hash;
     } else {
-      cslog() << "I'm node " << this->getMyLevel() << " and do not send hash";
+      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
     }
 #endif
   }
