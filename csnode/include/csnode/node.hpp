@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -215,4 +216,7 @@ private:
   IPackStream istream_;
   OPackStream ostream_;
 };
+
+std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
+
 #endif  // __NODE_HPP__

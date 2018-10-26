@@ -455,6 +455,8 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     return;
   }
 
+  csdebug() << "Got " << m_hashesReceivedKeys.size() << " of " << min_nodes << " nodes to start new round";
+  
   if ((m_hashesReceivedKeys.size() == min_nodes) && (!m_roundTableSent)) {
     cslog() << "Solver -> sending NEW ROUND table";
 

@@ -999,6 +999,8 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
       this->sendHash(hash, sender);
 
       cslog() << "SENDING HASH to writer: " << hash;
+    } else {
+      cslog() << "I'm node " << this->getMyLevel() << " and do not send hash";
     }
 #endif
   }
@@ -1596,4 +1598,23 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   allocator_.shrinkLast(cs::numeric_cast<uint32_t>(realSize));
   ostream_ << type << roundNum_ << bSize;
   ostream_ << std::string(static_cast<char*>(memPtr.get()), memPtr.size());
+}
+
+const char* getNodeLevelString(NodeLevel nodeLevel) {
+  switch (nodeLevel) {
+  case NodeLevel::Normal:
+    return "Normal";
+  case NodeLevel::Confidant:
+    return "Confidant";
+  case NodeLevel::Main:
+    return "Main";
+  case NodeLevel::Writer:
+    return "Writer";
+  }
+  return "UNKNOWN";
+}
+
+std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
+  os << getNodeLevelString(nodeLevel);
+  return os;
 }
