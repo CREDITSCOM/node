@@ -30,18 +30,6 @@ void addTimestampToPool(csdb::Pool& pool) {
       0, std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count()));
 }
 
-void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
-  // std::cout << "SOLVER> Before calback" << std::endl;
-  const auto  tp = std::chrono::system_clock::now() + ms;
-  std::thread tr([tp, cb]() {
-    std::this_thread::sleep_until(tp);
-    //  LOG_WARN("Inserting callback");
-    CallsQueue::instance().insert(cb);
-  });
-  // std::cout << "SOLVER> After calback" << std::endl;
-  tr.detach();
-}
-
 #if defined(SPAM_MAIN) || defined(SPAMMER)
 static int randFT(int min, int max) {
   return rand() % (max - min + 1) + min;
@@ -50,6 +38,18 @@ static int randFT(int min, int max) {
 }  // namespace
 
 namespace Credits {
+void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
+	// std::cout << "SOLVER> Before calback" << std::endl;
+	const auto  tp = std::chrono::system_clock::now() + ms;
+	std::thread tr([tp, cb]() {
+		std::this_thread::sleep_until(tp);
+		//  LOG_WARN("Inserting callback");
+		CallsQueue::instance().insert(cb);
+	});
+	// std::cout << "SOLVER> After calback" << std::endl;
+	tr.detach();
+}
+
 using ScopedLock          = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
