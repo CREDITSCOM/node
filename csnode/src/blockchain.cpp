@@ -138,7 +138,7 @@ bool BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 
   if (!pool.save()) {
-    if (pool.hash().is_empty() || !loadBlock(pool.hash()).is_valid()) {
+    if (pool.hash().is_empty() || !storage_.pool_load(pool.hash()).is_valid()) {
       LOG_ERROR("Couldn't save block");
       return false;
     }
