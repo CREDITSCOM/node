@@ -108,7 +108,7 @@ namespace cs
         ///
         /// @brief Returns current round number
         ///
-        const cs::RoundNumber roundNumber() const;
+         cs::RoundNumber roundNumber() const;
 
         ///
         /// @brief Returns safe copy of round table
@@ -213,7 +213,7 @@ namespace cs
         // sync, try do not use it :]
 
         ///
-        /// @brief Returns shared mutex object reference
+        /// @brief Returns shared mutex object reference to lock/unlock outside conveyer behaviour.
         ///
         cs::SharedMutex& sharedMutex() const;
 
@@ -228,7 +228,6 @@ namespace cs
         struct Impl;
         std::unique_ptr<Impl> pimpl;
 
-        /// sync
         mutable cs::SharedMutex m_sharedMutex;
 
         /// sends transactions blocks to network

@@ -484,7 +484,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cslog() << "Solver -> NEW ROUND initialization done";
 
     if (!m_roundTableSent) {
-      cs::Timer::singleShot(cs::RoundDelay, [=]() {
+      cs::Timer::singleShot(ROUND_DELAY, [=]() {
         m_node->initNextRound(cs::Conveyer::instance().roundTable());
       });
 

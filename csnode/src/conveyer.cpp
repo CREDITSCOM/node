@@ -167,7 +167,7 @@ const cs::RoundTable& cs::Conveyer::roundTable() const
     return pimpl->roundTable;
 }
 
-const cs::RoundNumber cs::Conveyer::roundNumber() const
+cs::RoundNumber cs::Conveyer::roundNumber() const
 {
     cs::SharedLock lock(m_sharedMutex);
     return pimpl->roundTable.round;
