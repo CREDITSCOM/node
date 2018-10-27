@@ -17,6 +17,9 @@
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
 
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;       // ms
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 3000;      // ms
+
 namespace std
 {
     // transactions packet hash specialization

@@ -472,7 +472,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     }
 
     cs::RoundTable table;
-    table.round++;
+    table.round = ++round;
     table.confidants = std::move(m_hashesReceivedKeys);
     table.general = m_node->getPublicKey();
     table.hashes = std::move(hashes);

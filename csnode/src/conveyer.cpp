@@ -29,7 +29,7 @@ struct cs::Conveyer::Impl
     cs::Notifications notifications;
 
     // storage of received characteristic for slow motion nodes
-    std::vector<cs::CharacteristicMeta> characteristicMetas;
+    boost::circular_buffer<cs::CharacteristicMeta> characteristicMetas;
     cs::Characteristic characteristic;
 
     // hash tables storage
@@ -56,6 +56,7 @@ cs::Conveyer::Conveyer()
 {
     pimpl = std::make_unique<cs::Conveyer::Impl>();
     pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
+    pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
 
     m_sendingTimer.connect(std::bind(&cs::Conveyer::flushTransactions, this));
 }
@@ -110,13 +111,11 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
 
 const cs::TransactionsPacketHashTable& cs::Conveyer::transactionsPacketTable() const
 {
-    cs::SharedLock lock(m_sharedMutex);
     return pimpl->hashTable;
 }
 
 const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
 {
-    cs::SharedLock lock(m_sharedMutex);
     return pimpl->transactionsBlock;
 }
 
