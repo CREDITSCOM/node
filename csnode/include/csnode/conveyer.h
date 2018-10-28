@@ -10,10 +10,7 @@
 #include <memory>
 #include <optional>
 
-namespace slv2
-{
-    class SolverCore;
-}
+class Node;
 
 namespace csdb
 {
@@ -52,9 +49,9 @@ namespace cs
         static Conveyer& instance();
 
         ///
-        /// @brief Sets solver pointer to get info about rounds and consensus.
+        /// @brief Sets node pointer to get info about node level.
         ///
-        void setSolver(slv2::SolverCore* solver);
+        void setNode(Node* node);
 
         ///
         /// @brief Returns transactions packet flush signal.

@@ -1,6 +1,6 @@
 #include "csnode/conveyer.h"
 
-#include <solver2/SolverCore.h>
+#include <csnode/node.hpp>
 #include <solver/solver.hpp>
 #include <csdb/transaction.h>
 
@@ -14,7 +14,7 @@ struct cs::Conveyer::Impl
     ~Impl();
 
     // other modules pointers
-    slv2::SolverCore* solver;
+    Node* node;
 
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
@@ -43,13 +43,13 @@ signals:
 };
 
 cs::Conveyer::Impl::Impl():
-    solver(nullptr)
+    node(nullptr)
 {
 }
 
 cs::Conveyer::Impl::~Impl()
 {
-    solver = nullptr;
+    node = nullptr;
 }
 
 cs::Conveyer::Conveyer()
@@ -73,9 +73,9 @@ cs::Conveyer& cs::Conveyer::instance()
     return conveyer;
 }
 
-void cs::Conveyer::setSolver(slv2::SolverCore* solver)
+void cs::Conveyer::setNode(Node* node)
 {
-    pimpl->solver = solver;
+    pimpl->node = node;
 }
 
 cs::PacketFlushSignal& cs::Conveyer::flushSignal()
@@ -126,6 +126,12 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
+    if (table.round <= pimpl->roundTable.round)
+    {
+        cserror() << "CONVEYER> Setting round in conveyer failed";
+        return;
+    }
+
     const cs::Hashes& hashes = table.hashes;
     cs::Hashes neededHashes;
 
@@ -409,7 +415,7 @@ void cs::Conveyer::flushTransactions()
     cs::Lock lock(m_sharedMutex);
     const auto round = pimpl->roundTable.round;
 
-    if (pimpl->solver->nodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
+    if (pimpl->node->getNodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
         return;
     }
 

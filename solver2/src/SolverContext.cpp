@@ -12,7 +12,7 @@ namespace slv2
 
     size_t SolverContext::own_conf_number() const
     {
-        return (size_t) core.pnode->getMyConfNumber();
+        return (size_t) core.pnode->getConfidantNumber();
     }
 
     size_t SolverContext::cnt_trusted() const

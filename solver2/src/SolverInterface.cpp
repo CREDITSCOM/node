@@ -216,7 +216,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
             }
-            pown_hvec->sender = pnode->getMyConfNumber();
+            pown_hvec->sender = pnode->getConfidantNumber();
             //pown_hvec->hash = result; //vshilkin
         }
 
