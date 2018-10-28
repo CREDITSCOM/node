@@ -19,3 +19,6 @@
 [submodule "third-party/libcuckoo"]
 	path = third-party/libcuckoo
 	url = https://github.com/efficient/libcuckoo.git
+[submodule "third-party/googletest"]
+	path = third-party/googletest
+	url = https://github.com/google/googletest.git
