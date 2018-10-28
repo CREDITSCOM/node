@@ -48,15 +48,15 @@ find_package(Threads REQUIRED)
 #    "${source_dir}/googlemock/include"
 #)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
-
-find_package(GTest REQUIRED)
-find_package(GMock REQUIRED)
-
-include_directories(
-    ${GTEST_INCLUDE_DIRS}
-    ${GMOCK_INCLUDE_DIRS}
-)
+#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+#
+#find_package(GTest REQUIRED)
+#find_package(GMock REQUIRED)
+#
+#include_directories(
+#    ${GTEST_INCLUDE_DIRS}
+#    ${GMOCK_INCLUDE_DIRS}
+#)
 
 # tests
 

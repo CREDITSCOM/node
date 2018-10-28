@@ -20,10 +20,8 @@ set(Boost_USE_STATIC_RUNTIME ON)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-target_link_libraries(${TEST_NAME} net csnode csconnector lib solver
+target_link_libraries(${TEST_NAME} net csnode csconnector lib solver gtest gmock
         Boost::program_options
-        ${GTEST_LIBRARIES}
-        ${GMOCK_LIBRARIES}
         )
 
 add_test(NAME ${TEST_NAME}
