@@ -10,11 +10,8 @@
 /// pointer implementation realization
 struct cs::Conveyer::Impl
 {
-    Impl();
-    ~Impl();
-
     // other modules pointers
-    Node* node;
+    Node* node{};
 
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
@@ -42,15 +39,6 @@ signals:
     cs::PacketFlushSignal flushPacket;
 };
 
-cs::Conveyer::Impl::Impl():
-    node(nullptr)
-{
-}
-
-cs::Conveyer::Impl::~Impl()
-{
-    node = nullptr;
-}
 
 cs::Conveyer::Conveyer()
 {
@@ -101,8 +89,8 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(m_sharedMutex);
 
-    if (!pimpl->hashTable.count(hash)) {
-        pimpl->hashTable.emplace(hash, std::move(packet));
+    if (pimpl->hashTable.count(hash) == 0u) {
+        pimpl->hashTable.emplace(hash, packet);
     }
     else {
         cswarning() << "CONVEYER> Can not add network transactions packet";
@@ -140,7 +128,7 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
         for (const auto& hash : hashes)
         {
-            if (!pimpl->hashTable.count(hash)) {
+            if (pimpl->hashTable.count(hash) == 0u) {
                 neededHashes.push_back(hash);
             }
         }
@@ -239,9 +227,7 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     if (state == NotificationState::Equal) {
         return notificationsCount == neededConfidantsCount;
     }
-    else {
-        return notificationsCount >= neededConfidantsCount;
-    }
+    return notificationsCount >= neededConfidantsCount;
 }
 
 void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
@@ -315,7 +301,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
     for (const auto& hash : localHashes)
     {
-        if (!currentHashTable.count(hash))
+        if (currentHashTable.count(hash) == 0u)
         {
             cserror() << "CONVEYER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
             return std::nullopt;
@@ -326,7 +312,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         for (const auto& transaction : transactions)
         {
-            if (mask.at(maskIndex)) {
+            if (mask.at(maskIndex) != 0u) {
                 newPool.add_transaction(transaction);
             }
 
@@ -411,7 +397,7 @@ void cs::Conveyer::flushTransactions()
     {
         const std::size_t transactionsCount = packet.transactionsCount();
 
-        if (transactionsCount && packet.isHashEmpty())
+        if ((transactionsCount != 0u) && packet.isHashEmpty())
         {
             packet.makeHash();
 
@@ -433,7 +419,7 @@ void cs::Conveyer::flushTransactions()
                 cserror() << "CONVEYER > Transaction packet hashing failed";
             }
 
-            if (!pimpl->hashTable.count(hash)) {
+            if (pimpl->hashTable.count(hash) == 0u) {
                 pimpl->hashTable.emplace(hash, packet);
             }
             else {
