@@ -99,16 +99,18 @@ public:
 
   template<class... Args>
   bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args);
-  template<>
-  bool sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes);
+
+  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes);
+  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes);
+
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const Args&... args);
-  template<>
-  void sendBroadcast<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes);
+
+  void sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes);
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args);
-  template<>
-  bool sendToRandomNeighbour<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes);
+
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::Bytes& bytes);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
@@ -186,8 +188,6 @@ private:
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
-
-  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes);
 
   template <class T, class... Args>
   void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);

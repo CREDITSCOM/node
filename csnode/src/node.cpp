@@ -444,8 +444,7 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
   return sendDirect(sender, msgType, bytes);
 }
 
-template <>
-bool Node::sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes) {
+bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes) {
   ConnectionPtr connection = transport_->getConnectionByKey(sender);
 
   if (connection) {
@@ -453,6 +452,17 @@ bool Node::sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& ms
   }
 
   return connection;
+}
+
+void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes) {
+  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_ << msgType << roundNum_ << bytes;
+
+  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
+  csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
+
+  ostream_.clear();
 }
 
 template <class... Args>
@@ -465,8 +475,8 @@ void Node::sendBroadcast(const MsgTypes& msgType, const Args&... args) {
   sendBroadcast(msgType, bytes);
 }
 
-template <>
-void Node::sendBroadcast<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes) {
+
+void Node::sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << roundNum_ << bytes;
 
@@ -484,8 +494,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args) {
   return sendToRandomNeighbour(msgType, bytes);
 }
 
-template <>
-bool Node::sendToRandomNeighbour<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes) {
+bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::Bytes& bytes) {
   ConnectionPtr connection = transport_->getRandomNeighbour();
 
   if (connection) {
@@ -1701,16 +1710,7 @@ std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
   return os;
 }
 
-void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes) {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  ostream_ << msgType << roundNum_ << bytes;
 
-  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
-  csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
-  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
-
-  ostream_.clear();
-}
 
 template <class T, class... Args>
 void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args) {
