@@ -124,7 +124,7 @@ public:
   }
 
   uint32_t getRoundNumber();
-  uint8_t getMyConfNumber();
+  uint8_t getConfidantNumber();
 
   BlockChain& getBlockChain() {
     return bc_;

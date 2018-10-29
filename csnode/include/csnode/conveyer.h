@@ -10,10 +10,7 @@
 #include <memory>
 #include <optional>
 
-namespace slv2
-{
-    class SolverCore;
-}
+class Node;
 
 namespace csdb
 {
@@ -41,7 +38,8 @@ namespace cs
         };
 
         enum : unsigned int {
-            HashTablesStorageCapacity = 10
+            HashTablesStorageCapacity = 10,
+            CharacteristicMetaCapacity = HashTablesStorageCapacity
         };
 
         ///
@@ -51,9 +49,9 @@ namespace cs
         static Conveyer& instance();
 
         ///
-        /// @brief Sets solver pointer to get info about rounds and consensus.
+        /// @brief Sets node pointer to get info about node level.
         ///
-        void setSolver(slv2::SolverCore* solver);
+        void setNode(Node* node);
 
         ///
         /// @brief Returns transactions packet flush signal.
@@ -107,7 +105,7 @@ namespace cs
         ///
         /// @brief Returns current round number
         ///
-        const cs::RoundNumber roundNumber() const;
+         cs::RoundNumber roundNumber() const;
 
         ///
         /// @brief Returns safe copy of round table
@@ -212,7 +210,7 @@ namespace cs
         // sync, try do not use it :]
 
         ///
-        /// @brief Returns shared mutex object reference
+        /// @brief Returns shared mutex object reference to lock/unlock outside conveyer behaviour.
         ///
         cs::SharedMutex& sharedMutex() const;
 
@@ -227,7 +225,6 @@ namespace cs
         struct Impl;
         std::unique_ptr<Impl> pimpl;
 
-        /// sync
         mutable cs::SharedMutex m_sharedMutex;
 
         /// sends transactions blocks to network

@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <array>
-#include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,8 +13,20 @@
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <boost/circular_buffer.hpp>
 
+#include <client/params.hpp>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
+#include <lib/system/keys.hpp>
+
+#ifdef NO_DELAYS
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
+const std::size_t ROUND_DELAY = 0;
+#else
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
+const std::size_t ROUND_DELAY = 1000;                   //ms
+#endif
+
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 3000;        // ms
 
 namespace std
 {
@@ -73,7 +84,6 @@ namespace cs
         TransactionsFlushRound = 2,
         TransactionsPacketInterval = 50,    // ms
         MaxPacketTransactions = 500,
-        RoundDelay = 1000                   // delay
     };
 
     // all info about round

@@ -83,10 +83,9 @@ bool Node::init() {
   std::copy(myPrivateForSig.begin(), myPrivateForSig.end(), privateKey.begin());
 
   solver_->setKeysPair(publicKey, privateKey);
-  //solver_->addInitialBalance();
   solver_->runSpammer();
 
-  cs::Conveyer::instance().setSolver(solver_);
+  cs::Conveyer::instance().setNode(this);
   cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
@@ -239,7 +238,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this]() {
+  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this]() {
     solver_->gotRound();
   });
 }
@@ -483,7 +482,7 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   cslog() << "NODE> Sending writing confirmation to  " << cs::Utils::byteStreamToHex(node.data(), node.size());
 
   ostream_.init(BaseFlags::Signed, node);
-  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
+  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getConfidantNumber();
 
   flushCurrentTasks();
 }
@@ -499,7 +498,7 @@ void Node::sendTLRequest() {
   cslog() << "NODE> Sending TransactionList request to  " << cs::Utils::byteStreamToHex(mainNode.data(), mainNode.size());
 
   ostream_.init(BaseFlags::Signed, mainNode);
-  ostream_ << MsgTypes::ConsTLRequest << getMyConfNumber();
+  ostream_ << MsgTypes::ConsTLRequest << getConfidantNumber();
 
   flushCurrentTasks();
 }
@@ -1380,7 +1379,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
     if (iter != confidants.end()) {
       myLevel_ = NodeLevel::Confidant;
-      myConfidantIndex_ = std::distance(confidants.begin(), iter);
+      myConfidantIndex_ = static_cast<uint8_t>(std::distance(confidants.begin(), iter));
     }
     else {
       myLevel_ = NodeLevel::Normal;
@@ -1400,7 +1399,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   cslog() << "Transaction packets hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    cslog() << i << ". " << hashes[i].toString();
+    csdebug() << i << ". " << hashes[i].toString();
   }
 
 #ifdef SYNCRO
@@ -1480,7 +1479,7 @@ bool Node::getSyncroStarted() {
   return syncro_started;
 }
 
-uint8_t Node::getMyConfNumber() {
+uint8_t Node::getConfidantNumber() {
   return myConfidantIndex_;
 }
 

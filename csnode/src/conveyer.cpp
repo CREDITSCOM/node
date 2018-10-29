@@ -1,6 +1,6 @@
 #include "csnode/conveyer.h"
 
-#include <solver2/SolverCore.h>
+#include <csnode/node.hpp>
 #include <solver/solver.hpp>
 #include <csdb/transaction.h>
 
@@ -14,7 +14,7 @@ struct cs::Conveyer::Impl
     ~Impl();
 
     // other modules pointers
-    slv2::SolverCore* solver;
+    Node* node;
 
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
@@ -29,7 +29,7 @@ struct cs::Conveyer::Impl
     cs::Notifications notifications;
 
     // storage of received characteristic for slow motion nodes
-    std::vector<cs::CharacteristicMeta> characteristicMetas;
+    boost::circular_buffer<cs::CharacteristicMeta> characteristicMetas;
     cs::Characteristic characteristic;
 
     // hash tables storage
@@ -43,19 +43,20 @@ signals:
 };
 
 cs::Conveyer::Impl::Impl():
-    solver(nullptr)
+    node(nullptr)
 {
 }
 
 cs::Conveyer::Impl::~Impl()
 {
-    solver = nullptr;
+    node = nullptr;
 }
 
 cs::Conveyer::Conveyer()
 {
     pimpl = std::make_unique<cs::Conveyer::Impl>();
     pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
+    pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
 
     m_sendingTimer.connect(std::bind(&cs::Conveyer::flushTransactions, this));
 }
@@ -72,9 +73,9 @@ cs::Conveyer& cs::Conveyer::instance()
     return conveyer;
 }
 
-void cs::Conveyer::setSolver(slv2::SolverCore* solver)
+void cs::Conveyer::setNode(Node* node)
 {
-    pimpl->solver = solver;
+    pimpl->node = node;
 }
 
 cs::PacketFlushSignal& cs::Conveyer::flushSignal()
@@ -110,13 +111,11 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
 
 const cs::TransactionsPacketHashTable& cs::Conveyer::transactionsPacketTable() const
 {
-    cs::SharedLock lock(m_sharedMutex);
     return pimpl->hashTable;
 }
 
 const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
 {
-    cs::SharedLock lock(m_sharedMutex);
     return pimpl->transactionsBlock;
 }
 
@@ -127,6 +126,12 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
+    if (table.round <= pimpl->roundTable.round)
+    {
+        cserror() << "CONVEYER> Setting round in conveyer failed";
+        return;
+    }
+
     const cs::Hashes& hashes = table.hashes;
     cs::Hashes neededHashes;
 
@@ -168,7 +173,7 @@ const cs::RoundTable& cs::Conveyer::roundTable() const
     return pimpl->roundTable;
 }
 
-const cs::RoundNumber cs::Conveyer::roundNumber() const
+cs::RoundNumber cs::Conveyer::roundNumber() const
 {
     cs::SharedLock lock(m_sharedMutex);
     return pimpl->roundTable.round;
@@ -410,7 +415,7 @@ void cs::Conveyer::flushTransactions()
     cs::Lock lock(m_sharedMutex);
     const auto round = pimpl->roundTable.round;
 
-    if (pimpl->solver->nodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
+    if (pimpl->node->getNodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
         return;
     }
 

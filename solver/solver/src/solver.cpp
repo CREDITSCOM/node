@@ -200,12 +200,12 @@ void Solver::runConsensus() {
 
   cs::Hash result = m_generals->buildVector(packet);
 
-  m_receivedVectorFrom[m_node->getMyConfNumber()] = true;
+  m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
 
-  m_hashVector.sender = m_node->getMyConfNumber();
+  m_hashVector.sender = m_node->getConfidantNumber();
   m_hashVector.hash = result;
 
-  m_receivedVectorFrom[m_node->getMyConfNumber()] = true;
+  m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
 
   m_generals->addVector(m_hashVector);
   m_node->sendVector(m_hashVector);
@@ -217,9 +217,9 @@ void Solver::runConsensus() {
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
-    m_generals->addSenderToMatrix(m_node->getMyConfNumber());
+    m_generals->addSenderToMatrix(m_node->getConfidantNumber());
 
-    m_receivedMatrixFrom[m_node->getMyConfNumber()] = true;
+    m_receivedMatrixFrom[m_node->getConfidantNumber()] = true;
     ++trustedCounterMatrix;
 
     m_node->sendMatrix(m_generals->getMatrix());
@@ -247,7 +247,7 @@ void Solver::runFinalConsensus() {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
       cslog() << "SOLVER> m_writerIndex = " << static_cast<int>(m_writerIndex);
 
-      if (m_writerIndex == m_node->getMyConfNumber()) {
+      if (m_writerIndex == m_node->getConfidantNumber()) {
         m_node->becomeWriter();
       }
       else {
@@ -289,7 +289,7 @@ void Solver::gotVector(HashVector&& vector) {
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
-    uint8_t confNumber = m_node->getMyConfNumber();
+    uint8_t confNumber = m_node->getConfidantNumber();
     m_generals->addSenderToMatrix(confNumber);
     m_receivedMatrixFrom[confNumber] = true;
 
@@ -462,7 +462,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cs::Hashes hashes;
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::RoundTable table = conveyer.roundTableSafe();
+    cs::RoundNumber round = conveyer.roundNumber();
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());
@@ -471,7 +471,8 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
       }
     }
 
-    table.round++;
+    cs::RoundTable table;
+    table.round = ++round;
     table.confidants = std::move(m_hashesReceivedKeys);
     table.general = m_node->getPublicKey();
     table.hashes = std::move(hashes);
@@ -483,7 +484,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cslog() << "Solver -> NEW ROUND initialization done";
 
     if (!m_roundTableSent) {
-      cs::Timer::singleShot(cs::RoundDelay, [=]() {
+      cs::Timer::singleShot(ROUND_DELAY, [=]() {
         m_node->initNextRound(cs::Conveyer::instance().roundTable());
       });
 

@@ -127,10 +127,10 @@ private:
   HashVector m_hashVector;
 
   bool m_receivedVectorFrom[100];
-  std::atomic<uint8_t> trustedCounterVector;
+  std::atomic<uint8_t> trustedCounterVector = 0;
 
   bool m_receivedMatrixFrom[100];
-  std::atomic<uint8_t> trustedCounterMatrix;
+  std::atomic<uint8_t> trustedCounterMatrix = 0;
 
   uint8_t m_writerIndex; // index at confidants
 

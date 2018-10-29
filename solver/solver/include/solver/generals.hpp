@@ -48,15 +48,25 @@ public:
 
 private:
   struct HashWeigth {
-    char hash[HASH_LENGTH] = {};
+    cs::Hash hash;
     uint8_t weight = 0;
+
+    inline HashWeigth() {
+      hash.fill(0);
+    }
   };
 
   cs::HashMatrix m_hMatrix;
 
-  std::array<uint8_t, 10000> m_findUntrusted;
-  std::array<uint8_t, 100> m_newTrusted;
-  std::array<HashWeigth, 100> m_hwTotal;
+  enum : unsigned int {
+    UntrustedSize = 10000,
+    TrustedSize = 100,
+    TotalSize = 100
+  };
+
+  std::array<uint8_t, UntrustedSize> m_findUntrusted;
+  std::array<uint8_t, TrustedSize> m_newTrusted;
+  std::array<HashWeigth, TotalSize> m_hwTotal;
 
   PublicKey m_writerPublicKey;
 
