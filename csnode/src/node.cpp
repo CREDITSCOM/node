@@ -1411,6 +1411,9 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 #endif
 
+  // TODO: think now to improve this code
+  solver_->nextRound();
+
   // TODO: check if this removes current tasks? if true - thats bad
   transport_->processPostponed(roundNum_);
 }

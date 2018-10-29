@@ -143,8 +143,6 @@ void Solver::gotRound() {
 
   cslog() << "SOLVER> Got round";
 
-  nextRound();
-
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
       runConsensus();
