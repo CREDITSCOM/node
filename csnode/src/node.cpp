@@ -1001,6 +1001,9 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     }
 #endif
   }
+  else {
+    solver_->gotIncorrectBlock(std::move(newPool), sender);
+  }
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
