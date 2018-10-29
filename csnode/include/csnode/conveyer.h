@@ -98,17 +98,19 @@ namespace cs
         void setRound(cs::RoundTable&& table);
 
         ///
-        /// @brief Returns current blockchain round table
+        /// @brief Returns current blockchain round table.
         ///
         const cs::RoundTable& roundTable() const;
 
         ///
-        /// @brief Returns current round number
+        /// @brief Returns current round number.
+        /// Locks mutex and returns safe round number.
         ///
          cs::RoundNumber roundNumber() const;
 
         ///
-        /// @brief Returns safe copy of round table
+        /// @brief Returns safe copy of round table.
+        /// Locks mutex and returns deep copy of round table.
         ///
         const cs::RoundTable roundTableSafe() const;
 
@@ -118,7 +120,7 @@ namespace cs
         const cs::Hashes& neededHashes() const;
 
         ///
-        /// @brief Adds synced packet to conveyer
+        /// @brief Adds synced packet to conveyer.
         ///
         void addFoundPacket(cs::TransactionsPacket&& packet);
 
@@ -164,13 +166,7 @@ namespace cs
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
         /// @param round Current blockchain round.
         ///
-        cs::CharacteristicMeta characteristicMeta(const cs::RoundNumber round);
-
-        ///
-        /// @brief Returns characteristic meta recevied status.
-        /// @param round Current blockchain round.
-        ///
-        bool isCharacteristicMetaReceived(const cs::RoundNumber round);
+        std::optional<cs::CharacteristicMeta> characteristicMeta(const cs::RoundNumber round);
 
         // characteristic
 

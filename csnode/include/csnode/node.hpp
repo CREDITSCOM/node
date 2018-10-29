@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
+#include <iostream>
 #include <memory>
 #include <string>
 

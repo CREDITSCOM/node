@@ -1,5 +1,4 @@
 #include <sstream>
-#include <iostream>
 
 #include <solver2/SolverCore.h>
 
@@ -680,8 +679,6 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
     cserror() << "Only confidant nodes can send matrices";
     return;
   }
-
-  cslog() << "NODE> 1 Sending matrix to ";
 
   sendBroadcast(MsgTypes::ConsMatrix, matrix);
 }
@@ -1492,12 +1489,11 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
 
     const cs::RoundNumber currentRound = conveyer.roundTable().round;
 
-    if (conveyer.isCharacteristicMetaReceived(currentRound)) {
+    if (auto meta = conveyer.characteristicMeta(currentRound); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      cs::CharacteristicMeta meta = conveyer.characteristicMeta(currentRound);
 
-      if (meta.round != 0) {
-        getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
+      if (meta->round != 0) {
+        getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
       }
       else {
         csfatal() << "NODE> Can not call node get characteristic method";
