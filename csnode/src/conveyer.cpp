@@ -259,7 +259,7 @@ void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
     }
 }
 
-cs::CharacteristicMeta cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
+std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
 {
     cs::CharacteristicMeta meta;
     meta.round = round;
@@ -267,29 +267,15 @@ cs::CharacteristicMeta cs::Conveyer::characteristicMeta(const cs::RoundNumber ro
     auto& metas = pimpl->characteristicMetas;
     const auto iterator = std::find(metas.begin(), metas.end(), meta);
 
-    if (iterator != metas.end())
-    {
-        meta = std::move(*iterator);
-        metas.erase(iterator);
-
-        return meta;
-    }
-    else
-    {
+    if (iterator == metas.end()) {
         cserror() << "CONVEYER> Characteristic meta not found";
-        return {};
+        return std::nullopt;
     }
-}
 
-bool cs::Conveyer::isCharacteristicMetaReceived(const cs::RoundNumber round)
-{
-    cs::CharacteristicMeta meta;
-    meta.round = round;
+    meta = std::move(*iterator);
+    metas.erase(iterator);
 
-    const auto& metas = pimpl->characteristicMetas;
-    const auto iterator = std::find(metas.begin(), metas.end(), meta);
-
-    return iterator != metas.end();
+    return meta;
 }
 
 void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
@@ -386,7 +372,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     }
 
     const auto& storage = pimpl->hashTablesStorage;
-    const auto iterator = std::find_if(storage.begin(), storage.end(), [&, this](const cs::StorageElement& element) {
+    const auto iterator = std::find_if(storage.begin(), storage.end(), [&](const cs::StorageElement& element) {
         return element.round == round;
     });
 

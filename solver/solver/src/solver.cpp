@@ -604,11 +604,12 @@ cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::Tra
       if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),
         data_to_fetch_pulic_key.address_.end()))) {
         good_pool.addTransaction(transactions[i]);
-        continue;
       }
+      continue;
     }
-    if (transactions[i].verify_signature(transactions[i].source().public_key()))
+    if (transactions[i].verify_signature(transactions[i].source().public_key())) {
       good_pool.addTransaction(transactions[i]);
+    }
   }
   return good_pool;
 }

@@ -166,13 +166,7 @@ namespace cs
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
         /// @param round Current blockchain round.
         ///
-        cs::CharacteristicMeta characteristicMeta(const cs::RoundNumber round);
-
-        ///
-        /// @brief Returns characteristic meta recevied status.
-        /// @param round Current blockchain round.
-        ///
-        bool isCharacteristicMetaReceived(const cs::RoundNumber round);
+        std::optional<cs::CharacteristicMeta> characteristicMeta(const cs::RoundNumber round);
 
         // characteristic
 
