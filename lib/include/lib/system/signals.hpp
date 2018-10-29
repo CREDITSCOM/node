@@ -354,7 +354,7 @@ namespace cs
         Connector(const Connector&) = delete;
         Connector& operator=(const Connector&) = delete;
         Connector(Connector&&) = delete;
-        Connector operator=(Connector&&) = delete;
+        Connector& operator=(Connector&&) = delete;
 
         ~Connector() = default;
 

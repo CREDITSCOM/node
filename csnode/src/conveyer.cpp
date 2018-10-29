@@ -351,7 +351,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 {
     cs::SharedLock lock(m_sharedMutex);
 
-    if (pimpl->hashTable.count(hash))
+    if (pimpl->hashTable.count(hash) != 0u)
     {
         csdebug() << "CONVEYER> Found hash at current table in request - " << hash.toString();
         return pimpl->hashTable[hash];
