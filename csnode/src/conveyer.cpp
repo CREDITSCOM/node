@@ -268,7 +268,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
     const auto iterator = std::find(metas.begin(), metas.end(), meta);
 
     if (iterator == metas.end()) {
-        cserror() << "CONVEYER> Characteristic meta not found";
+        cslog() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
 
