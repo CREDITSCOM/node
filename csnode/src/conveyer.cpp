@@ -372,7 +372,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     }
 
     const auto& storage = pimpl->hashTablesStorage;
-    const auto iterator = std::find_if(storage.begin(), storage.end(), [&, this](const cs::StorageElement& element) {
+    const auto iterator = std::find_if(storage.begin(), storage.end(), [&](const cs::StorageElement& element) {
         return element.round == round;
     });
 
