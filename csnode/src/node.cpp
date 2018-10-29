@@ -288,12 +288,11 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
     }
   }
 
-  cslog() << "Hashes";
-
   const cs::Hashes& hashes = roundTable.hashes;
+  cslog() << "Hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    cslog() << i << ". " << hashes[i].toString();
+    csdebug() << i << ". " << hashes[i].toString();
   }
 
   ostream_ << bytes;
