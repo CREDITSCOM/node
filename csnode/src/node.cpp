@@ -630,8 +630,6 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
     return;
   }
 
-  cslog() << "NODE> 1 Sending matrix to ";
-
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << MsgTypes::ConsMatrix << roundNum_;
 
@@ -1117,7 +1115,6 @@ cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo
   stream << poolMetaInfo.sequenceNumber;
 
   stream << signature;
-
   stream << notifications.size();
 
   for (const auto& notification : notifications) {
@@ -1414,6 +1411,9 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 #endif
 
+  // TODO: think now to improve this code
+  solver_->nextRound();
+
   // TODO: check if this removes current tasks? if true - thats bad
   transport_->processPostponed(roundNum_);
 }
@@ -1442,12 +1442,11 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
 
     const cs::RoundNumber currentRound = conveyer.roundTable().round;
 
-    if (conveyer.isCharacteristicMetaReceived(currentRound)) {
+    if (auto meta = conveyer.characteristicMeta(currentRound); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      cs::CharacteristicMeta meta = conveyer.characteristicMeta(currentRound);
 
-      if (meta.round != 0) {
-        getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
+      if (meta->round != 0) {
+        getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
       }
       else {
         csfatal() << "NODE> Can not call node get characteristic method";

@@ -10,11 +10,8 @@
 /// pointer implementation realization
 struct cs::Conveyer::Impl
 {
-    Impl();
-    ~Impl();
-
     // other modules pointers
-    Node* node;
+    Node* node{};
 
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
@@ -42,15 +39,6 @@ signals:
     cs::PacketFlushSignal flushPacket;
 };
 
-cs::Conveyer::Impl::Impl():
-    node(nullptr)
-{
-}
-
-cs::Conveyer::Impl::~Impl()
-{
-    node = nullptr;
-}
 
 cs::Conveyer::Conveyer()
 {
@@ -101,8 +89,8 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(m_sharedMutex);
 
-    if (!pimpl->hashTable.count(hash)) {
-        pimpl->hashTable.emplace(hash, std::move(packet));
+    if (pimpl->hashTable.count(hash) == 0u) {
+        pimpl->hashTable.emplace(hash, packet);
     }
     else {
         cswarning() << "CONVEYER> Can not add network transactions packet";
@@ -126,7 +114,7 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
-    if (table.round <= pimpl->roundTable.round)
+    if (table.round <= roundNumber())
     {
         cserror() << "CONVEYER> Setting round in conveyer failed";
         return;
@@ -140,7 +128,7 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
         for (const auto& hash : hashes)
         {
-            if (!pimpl->hashTable.count(hash)) {
+            if (pimpl->hashTable.count(hash) == 0u) {
                 neededHashes.push_back(hash);
             }
         }
@@ -239,9 +227,7 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     if (state == NotificationState::Equal) {
         return notificationsCount == neededConfidantsCount;
     }
-    else {
-        return notificationsCount >= neededConfidantsCount;
-    }
+    return notificationsCount >= neededConfidantsCount;
 }
 
 void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
@@ -259,7 +245,7 @@ void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
     }
 }
 
-cs::CharacteristicMeta cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
+std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
 {
     cs::CharacteristicMeta meta;
     meta.round = round;
@@ -267,29 +253,15 @@ cs::CharacteristicMeta cs::Conveyer::characteristicMeta(const cs::RoundNumber ro
     auto& metas = pimpl->characteristicMetas;
     const auto iterator = std::find(metas.begin(), metas.end(), meta);
 
-    if (iterator != metas.end())
-    {
-        meta = std::move(*iterator);
-        metas.erase(iterator);
-
-        return meta;
+    if (iterator == metas.end()) {
+        cslog() << "CONVEYER> Characteristic meta not received";
+        return std::nullopt;
     }
-    else
-    {
-        cserror() << "CONVEYER> Characteristic meta not found";
-        return {};
-    }
-}
 
-bool cs::Conveyer::isCharacteristicMetaReceived(const cs::RoundNumber round)
-{
-    cs::CharacteristicMeta meta;
-    meta.round = round;
+    meta = std::move(*iterator);
+    metas.erase(iterator);
 
-    const auto& metas = pimpl->characteristicMetas;
-    const auto iterator = std::find(metas.begin(), metas.end(), meta);
-
-    return iterator != metas.end();
+    return meta;
 }
 
 void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
@@ -329,7 +301,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
     for (const auto& hash : localHashes)
     {
-        if (!currentHashTable.count(hash))
+        if (currentHashTable.count(hash) == 0u)
         {
             cserror() << "CONVEYER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
             return std::nullopt;
@@ -340,7 +312,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         for (const auto& transaction : transactions)
         {
-            if (mask.at(maskIndex)) {
+            if (mask.at(maskIndex) != 0u) {
                 newPool.add_transaction(transaction);
             }
 
@@ -375,7 +347,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     return newPool;
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round)
+std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
 {
     cs::SharedLock lock(m_sharedMutex);
 
@@ -386,7 +358,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     }
 
     const auto& storage = pimpl->hashTablesStorage;
-    const auto iterator = std::find_if(storage.begin(), storage.end(), [&, this](const cs::StorageElement& element) {
+    const auto iterator = std::find_if(storage.begin(), storage.end(), [&](const cs::StorageElement& element) {
         return element.round == round;
     });
 
@@ -425,7 +397,7 @@ void cs::Conveyer::flushTransactions()
     {
         const std::size_t transactionsCount = packet.transactionsCount();
 
-        if (transactionsCount && packet.isHashEmpty())
+        if ((transactionsCount != 0u) && packet.isHashEmpty())
         {
             packet.makeHash();
 
@@ -447,7 +419,7 @@ void cs::Conveyer::flushTransactions()
                 cserror() << "CONVEYER > Transaction packet hashing failed";
             }
 
-            if (!pimpl->hashTable.count(hash)) {
+            if (pimpl->hashTable.count(hash) == 0u) {
                 pimpl->hashTable.emplace(hash, packet);
             }
             else {
