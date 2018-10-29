@@ -14,6 +14,8 @@
 #include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
+#include <net/neighbourhood.hpp>
+
 #include "blockchain.hpp"
 #include "packstream.hpp"
 
@@ -47,7 +49,7 @@ public:
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey&);
-  void getPacketHashesReply(const uint8_t*, const std::size_t);
+  void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::PublicKey& sender);
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
@@ -84,6 +86,7 @@ public:
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
   void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
   void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender);
+  void resetNeighbours();
 
   void sendBadBlock(const csdb::Pool& pool);
 
@@ -93,6 +96,19 @@ public:
   void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
+
+  template<class... Args>
+  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args);
+  template<>
+  bool sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes);
+  template <class... Args>
+  void sendBroadcast(const MsgTypes& msgType, const Args&... args);
+  template<>
+  void sendBroadcast<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes);
+  template <class... Args>
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args);
+  template<>
+  bool sendToRandomNeighbour<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
@@ -170,6 +186,14 @@ private:
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
+
+  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes);
+
+  template <class T, class... Args>
+  void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);
+
+  template<class T>
+  void writeDefaultStream(cs::DataStream& stream, const T& value);
 
   // Info
   static const csdb::Address genesisAddress_;

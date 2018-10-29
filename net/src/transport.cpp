@@ -542,7 +542,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   case MsgTypes::TransactionsPacketRequest:
     return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
-    return node_->getPacketHashesReply(data, size);
+    return node_->getPacketHashesReply(data, size, firstPack.getSender());
   case MsgTypes::BigBang:
     return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
@@ -582,6 +582,34 @@ void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhen
 void Transport::clearTasks() {
   SpinLock l(sendPacksFlag_);
   sendPacks_.clear();
+}
+
+uint32_t Transport::getMaxNeighbours() const {
+  return config_.getMaxNeighbours();
+}
+
+ConnectionPtr Transport::getSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
+  return nh_.getNextSyncRequestee(seq, alreadyRequested);
+}
+
+ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
+  return nh_.getNeighbourByKey(pk);
+}
+
+ConnectionPtr Transport::getRandomNeighbour()
+{
+  csdebug() << "Transport> Get random neighbour";
+  return nh_.getRandomSyncNeighbour();
+}
+
+void Transport::syncReplied(const uint32_t seq) {
+  return nh_.releaseSyncRequestee(seq);
+}
+
+void Transport::resetNeighbours()
+{
+  csdebug() << "Transport> Reset neighbours";
+  return nh_.resetSyncNeighbours();
 }
 
 /* Sending network tasks */

@@ -1,5 +1,4 @@
 #include <sstream>
-#include <iostream>
 
 #include <solver2/SolverCore.h>
 
@@ -435,6 +434,67 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
   flushCurrentTasks();
 }
 
+template <class... Args>
+bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args) {
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  writeDefaultStream(stream, args...);
+
+  return sendDirect(sender, msgType, bytes);
+}
+
+template <>
+bool Node::sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes) {
+  ConnectionPtr connection = transport_->getConnectionByKey(sender);
+
+  if (connection) {
+    sendDirect(connection, msgType, bytes);
+  }
+
+  return connection;
+}
+
+template <class... Args>
+void Node::sendBroadcast(const MsgTypes& msgType, const Args&... args) {
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  writeDefaultStream(stream, args...);
+
+  sendBroadcast(msgType, bytes);
+}
+
+template <>
+void Node::sendBroadcast<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes) {
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_ << msgType << roundNum_ << bytes;
+
+  csdebug() << "NODE> Sending data Broadcast";
+  transport_->sendBroadcast(ostream_.getPackets());
+}
+
+template <class... Args>
+bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args) {
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  writeDefaultStream(stream, args...);
+
+  return sendToRandomNeighbour(msgType, bytes);
+}
+
+template <>
+bool Node::sendToRandomNeighbour<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& bytes) {
+  ConnectionPtr connection = transport_->getRandomNeighbour();
+
+  if (connection) {
+    sendDirect(connection, msgType, bytes);
+  }
+
+  return connection;
+}
+
 void Node::sendVectorRequest(const cs::PublicKey& node) {
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "Only confidant nodes can send vectors";
@@ -588,17 +648,7 @@ void Node::sendVector(const cs::HashVector& vector) {
     return;
   }
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  ostream_ << MsgTypes::ConsVector << roundNum_;
-
-  cs::Bytes bytes;
-  cs::DataStream stream(bytes);
-
-  stream << vector;
-
-  ostream_ << bytes;
-
-  flushCurrentTasks();
+  sendBroadcast(MsgTypes::ConsVector, vector);
 }
 
 void Node::getMatrix(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -629,17 +679,7 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
     return;
   }
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  ostream_ << MsgTypes::ConsMatrix << roundNum_;
-
-  cs::Bytes bytes;
-  cs::DataStream stream(bytes);
-
-  stream << matrix;
-
-  ostream_ << bytes;
-
-  flushCurrentTasks();
+  sendBroadcast(MsgTypes::ConsMatrix, matrix);
 }
 
 uint32_t Node::getRoundNumber() {
@@ -799,20 +839,30 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
   cs::DataStream stream(data, size);
 
   cs::TransactionsPacket packet;
   stream >> packet;
 
+  cslog() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   cslog() << "NODE> Get transactions hashes answer amount got " << packet.transactionsCount();
-  cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
 
-  if (packet.hash().isEmpty()) {
-    cserror() << "NODE> Received transaction hashes answer packet hash is empty";
+  if (!packet.transactionsCount()) {
+#ifdef DIRECT_TRANSACTIONS_REQUEST
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+    if (!conveyer.isSyncCompleted()) {
+      sendPacketHashesRequest(conveyer.neededHashes());
+    }
+#else
+    cserror() << "NODE> Received transaction hashes answer transactions count is 0";
+#endif
+
     return;
   }
 
+  cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
   processPacketsReply(std::move(packet));
 }
 
@@ -1117,6 +1167,7 @@ cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo
   stream << poolMetaInfo.sequenceNumber;
 
   stream << signature;
+
   stream << notifications.size();
 
   for (const auto& notification : notifications) {
@@ -1188,8 +1239,6 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     return;
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast | BaseFlags::Compressed);
-
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1197,34 +1246,45 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 
   for (const auto& hash : hashes) {
     stream << hash;
+    csdebug() << "NODE> Sending transaction packet request: need hash - " << hash.toString();
   }
 
-  cslog() << "NODE> Sending transaction packet request: size: " << bytes.size();
+  const auto msgType = MsgTypes::TransactionsPacketRequest;
 
-  ostream_ << MsgTypes::TransactionsPacketRequest << roundNum_ << bytes;
+#ifndef DIRECT_TRANSACTIONS_REQUEST
+  sendBroadcast(msgType, bytes);
+  return;
+#endif
 
-  flushCurrentTasks();
+  const bool success = sendToRandomNeighbour(msgType, bytes);
+
+  if (!success) {
+    sendBroadcast(msgType, bytes);
+    return;
+  }
+
+  cs::Timer::singleShot(cs::PacketHashesRequestDelay, [this] {
+                          const cs::Conveyer& conveyer = cs::Conveyer::instance();
+                          if (!conveyer.isSyncCompleted()) {
+                            sendPacketHashesRequest(conveyer.neededHashes());
+                          };
+                       });
 }
 
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
   if (packet.hash().isEmpty()) {
-    cswarning() << "Send transaction packet reply with empty hash failed";
-    return;
+    cswarning() << "NODE> Send transaction packet reply with empty hash failed";
   }
 
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
-  ostream_ << MsgTypes::TransactionsPacketReply << roundNum_;
+  const bool success = sendDirect(sender, MsgTypes::TransactionsPacketReply, packet);
 
-  cs::Bytes bytes;
-  cs::DataStream stream(bytes);
+  if (!success) {
+    cserror() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  }
+}
 
-  stream << packet;
-
-  cslog() << "Node> Sending transaction packet reply: size: " << bytes.size();
-
-  ostream_ << bytes;
-
-  flushCurrentTasks();
+void Node::resetNeighbours() {
+  transport_->resetNeighbours();
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1255,7 +1315,7 @@ void Node::sendBlockRequest(uint32_t seq) {
     gs = roundNum_;
   }
   csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
-  const uint32_t syncStatus = static_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
+  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
   std::stringstream progress;
   if (syncStatus <= 100) {
     progress << "SYNC: [";
@@ -1289,7 +1349,7 @@ void Node::sendBlockRequest(uint32_t seq) {
       ostream_.clear();
     }
 
-    reqSeq = solver_->getNextMissingBlock(reqSeq);
+    reqSeq = cs::numeric_cast<uint32_t>(solver_->getNextMissingBlock(reqSeq));
   }
 
   //#endif
@@ -1314,10 +1374,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
   }
 
-  transport_->syncReplied(pool.sequence());
+  transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
 
   if (getBlockChain().getGlobalSequence() < pool.sequence()) {
-    getBlockChain().setGlobalSequence(pool.sequence());
+    getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
   if (pool.sequence() == sendBlockRequestSequence) {
@@ -1378,7 +1438,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
     if (iter != confidants.end()) {
       myLevel_ = NodeLevel::Confidant;
-      myConfidantIndex_ = static_cast<uint8_t>(std::distance(confidants.begin(), iter));
+      myConfidantIndex_ = cs::numeric_cast<uint8_t>(std::distance(confidants.begin(), iter));
     }
     else {
       myLevel_ = NodeLevel::Normal;
@@ -1386,7 +1446,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   // Pretty printing...
-  cslog() << "Round " << roundTable.round << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
+  cslog() << "Round " << roundTable.round << " started. Mynode_type := " << myLevel_ << " Confidants: ";
 
   for (std::size_t i = 0; i < confidants.size(); ++i) {
     const auto& confidant = confidants[i];
@@ -1428,12 +1488,19 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
 
+  const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
   for (const auto& hash : hashes){
-    std::optional<cs::TransactionsPacket> packet = cs::Conveyer::instance().searchPacket(hash, round);
+    std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
 
     if (packet) {
       sendPacketHashesReply(packet.value(), sender);
     }
+#ifdef DIRECT_TRANSACTIONS_REQUEST
+    else {
+      sendPacketHashesReply(cs::TransactionsPacket(), sender);
+    }
+#endif
   }
 }
 
@@ -1559,7 +1626,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
   uint8_t confSize = 0;
   istream_ >> confSize;
 
-  cslog() << "NODE> Number of confidants :" << static_cast<int>(confSize);
+  cslog() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
 
   if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
     cswarning() << "Bad confidants num";
@@ -1608,11 +1675,11 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   auto max    = LZ4_compressBound(cs::numeric_cast<int>(bSize));
   auto memPtr = allocator_.allocateNext(cs::numeric_cast<uint32_t>(max));
 
-  auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), bSize, memPtr.size());
+  auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), cs::numeric_cast<int>(bSize), cs::numeric_cast<int>(memPtr.size()));
 
   allocator_.shrinkLast(cs::numeric_cast<uint32_t>(realSize));
   ostream_ << type << roundNum_ << bSize;
-  ostream_ << std::string(static_cast<char*>(memPtr.get()), memPtr.size());
+  ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
 const char* getNodeLevelString(NodeLevel nodeLevel) {
@@ -1632,4 +1699,26 @@ const char* getNodeLevelString(NodeLevel nodeLevel) {
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
   os << getNodeLevelString(nodeLevel);
   return os;
+}
+
+void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes) {
+  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_ << msgType << roundNum_ << bytes;
+
+  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
+  csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
+
+  ostream_.clear();
+}
+
+template <class T, class... Args>
+void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args) {
+  stream << value;
+  writeDefaultStream(stream, args...);
+}
+
+template<class T>
+void Node::writeDefaultStream(cs::DataStream& stream, const T& value) {
+  stream << value;
 }

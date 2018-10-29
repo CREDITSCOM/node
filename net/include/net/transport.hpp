@@ -120,9 +120,12 @@ class Transport {
   void registerMessage(MessagePtr);
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
-  ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested) { return nh_.getNextSyncRequestee(seq, alreadyRequested); }
-  ConnectionPtr getConnectionByKey(const cs::PublicKey& pk) { return nh_.getNeighbourByKey(pk); }
-  void syncReplied(const uint32_t seq) { return nh_.releaseSyncRequestee(seq); }
+  uint32_t getMaxNeighbours() const;
+  ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
+  ConnectionPtr getRandomNeighbour();
+  void syncReplied(const uint32_t seq);
+  void resetNeighbours();
 
  private:
   void postponePacket(const RoundNum, const MsgTypes, const Packet&);
