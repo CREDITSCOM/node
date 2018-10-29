@@ -27,14 +27,13 @@ namespace cs
     ///
     class Conveyer
     {
-    public:
         explicit Conveyer();
+        ~Conveyer();
         Conveyer (const Conveyer&) = delete;
         Conveyer& operator=(const Conveyer&) = delete;
         Conveyer (Conveyer&&) = delete;
         Conveyer& operator=(Conveyer&&) = delete;
 
-        ~Conveyer();
 
     public:
         enum class NotificationState {
@@ -171,12 +170,12 @@ namespace cs
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
         /// @param round Current blockchain round.
         ///
-        std::optional<cs::CharacteristicMeta> characteristicMeta(const cs::RoundNumber round);
+        std::optional<cs::CharacteristicMeta> characteristicMeta(cs::RoundNumber round);
 
         // characteristic
 
         ///
-        /// @brief Sets current round characteristic function.
+        /// @brief Sets ct round characteristic function.
         /// @param characteristic Created characteristic on network level.
         ///
         void setCharacteristic(const cs::Characteristic& characteristic);
