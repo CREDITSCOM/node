@@ -46,13 +46,13 @@ namespace cs
         Signal(const Signal&) = delete;
         Signal& operator=(const Signal&) = delete;
 
-        Signal(Signal&& signal):
+        Signal(Signal&& signal) noexcept :
             m_slots(std::move(signal.m_slots))
         {
             signal.m_slots.clear();
         }
 
-        auto& operator=(Signal&& signal)
+        Signal& operator=(Signal&& signal) noexcept
         {
             m_slots = std::move(signal.m_slots);
             signal.m_slots.clear();
@@ -133,12 +133,12 @@ namespace cs
         Signal(const Signal&) = delete;
         Signal& operator=(const Signal&) = delete;
 
-        Signal(Signal&& signal):
+        Signal(Signal&& signal) noexcept :
             m_signal(std::move(signal.m_signal))
         {
         }
 
-        auto& operator=(Signal&& signal)
+        Signal& operator=(Signal&& signal) noexcept
         {
             m_signal = std::move(signal.m_signal);
             return *this;
@@ -350,6 +350,13 @@ namespace cs
     class Connector
     {
     public:
+        explicit Connector() = delete;
+        Connector(const Connector&) = delete;
+        Connector& operator=(const Connector&) = delete;
+        Connector(Connector&&) = delete;
+        Connector operator=(Connector&&) = delete;
+
+        ~Connector() = default;
 
         /*!
             Connects signal with callback
@@ -462,10 +469,6 @@ namespace cs
         {
             return signal.size();
         }
-
-    private:
-        explicit Connector() = delete;
-        Connector(const Connector&) = delete;
     };
 }
 
