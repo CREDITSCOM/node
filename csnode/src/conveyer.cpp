@@ -1,7 +1,5 @@
 #include "csnode/conveyer.h"
 
-#include <csnode/node.hpp>
-#include <solver/solver.hpp>
 #include <csdb/transaction.h>
 
 #include <lib/system/logger.hpp>
@@ -10,9 +8,6 @@
 /// pointer implementation realization
 struct cs::Conveyer::Impl
 {
-    // other modules pointers
-    Node* node{};
-
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
 
@@ -45,24 +40,12 @@ cs::Conveyer::Conveyer()
     pimpl = std::make_unique<cs::Conveyer::Impl>();
     pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
     pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
-
-    cs::Connector::connect(&m_sendingTimer.timeOut, this, &cs::Conveyer::flushTransactions);
-}
-
-cs::Conveyer::~Conveyer()
-{
-    m_sendingTimer.stop();
 }
 
 cs::Conveyer& cs::Conveyer::instance()
 {
     static cs::Conveyer conveyer;
     return conveyer;
-}
-
-void cs::Conveyer::setNode(Node* node)
-{
-    pimpl->node = node;
 }
 
 cs::PacketFlushSignal& cs::Conveyer::flushSignal()
@@ -143,12 +126,6 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     {
         cs::Lock lock(m_sharedMutex);
         pimpl->roundTable = std::move(table);
-    }
-
-    if (!m_sendingTimer.isRunning())
-    {
-        cslog() << "CONVEYER> Transaction timer started";
-        m_sendingTimer.start(TransactionsPacketInterval);
     }
 
     // clean data
@@ -384,12 +361,6 @@ cs::SharedMutex &cs::Conveyer::sharedMutex() const
 void cs::Conveyer::flushTransactions()
 {
     cs::Lock lock(m_sharedMutex);
-    const auto round = pimpl->roundTable.round;
-
-    if (pimpl->node->getNodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
-        return;
-    }
-
     std::size_t allTransactionsCount = 0;
 
     for (auto& packet : pimpl->transactionsBlock)

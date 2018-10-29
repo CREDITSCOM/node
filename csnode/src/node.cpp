@@ -75,7 +75,7 @@ bool Node::init() {
     return false;
   }
 
-  cs::PublicKey publicKey; 
+  cs::PublicKey publicKey;
   std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
 
   cs::PrivateKey privateKey;
@@ -84,7 +84,7 @@ bool Node::init() {
   solver_->setKeysPair(publicKey, privateKey);
   solver_->runSpammer();
 
-  cs::Conveyer::instance().setNode(this);
+  cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
@@ -1473,6 +1473,11 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 #endif
 
+  if (!sendingTimer_.isRunning()) {
+    cslog() << "NODE> Transaction timer started";
+    sendingTimer_.start(cs::TransactionsPacketInterval);
+  }
+
   // TODO: think now to improve this code
   solver_->nextRound();
 
@@ -1548,7 +1553,17 @@ bool Node::getSyncroStarted() {
 }
 
 uint8_t Node::getConfidantNumber() {
-  return myConfidantIndex_;
+    return myConfidantIndex_;
+}
+
+void Node::processTimer() {
+  const auto round = cs::Conveyer::instance().roundNumber();
+
+  if (myLevel_ != NodeLevel::Normal || round <= cs::TransactionsFlushRound) {
+    return;
+  }
+
+  cs::Conveyer::instance().flushTransactions();
 }
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {

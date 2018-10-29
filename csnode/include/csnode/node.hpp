@@ -12,6 +12,7 @@
 #include <csnode/datastream.h>
 #include <csnode/dynamicbuffer.h>
 #include <lib/system/keys.hpp>
+#include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
 
@@ -163,6 +164,9 @@ public:
   }
 #endif
 
+public slots:
+  void processTimer();
+
 private:
   bool init();
 
@@ -239,6 +243,9 @@ private:
 
   IPackStream istream_;
   OPackStream ostream_;
+
+  /// sends transactions blocks to network
+  cs::Timer sendingTimer_;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
