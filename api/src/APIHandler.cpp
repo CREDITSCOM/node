@@ -109,6 +109,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
     //    TRACE("");
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
       if (!update_smart_caches_once(lapooh)) {
+                  TRACE("");
         lapooh = s_blockchain.wait_for_block(lapooh);
       }
     }
@@ -540,9 +541,6 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     return (*smart_state)[smart_addr];
   }();
 
-  smart_state_record _;
-  smart_state_record *contract_state = &_;
-
   TRACE("");
 
   work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
@@ -555,31 +553,27 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   auto inner_id = send_transaction.innerID();
 
   TRACE("");
-  if (!deploy) {
-    TRACE("");
-    contract_state_entry.wait_till_front([&](smart_state_record& state) {
-      //  TRACE("");
-      auto res = state.locker_trx == 0;
-      if (res) {
+  auto &contract_state_record = contract_state_entry.wait_till_front([&](smart_state_record& state) {
+        //  TRACE("");
+        auto res = state.locker_trx == 0;
+        if (res) {
+          TRACE("");
+          state.locker_trx = inner_id;
+        }
         TRACE("");
-		contract_state = &state;
-        state.locker_trx = inner_id;
-      }
-      TRACE("");
 
-      return res;
-    });
-  }
+        return res;
+  });
 
   bool trxn_sent = false;
-  auto sg = scopeGuard([&contract_state_entry, &trxn_sent]() {
-	  TRACE("");
-	  if (trxn_sent) {
-		  contract_state_entry.update_state([](smart_state_record& contract_state) {
-			  TRACE("");
-			  contract_state.locker_trx = 0;
-		  });
-	  }
+  auto sg = scopeGuard([&contract_state_entry, &trxn_sent, amnesia]() {
+          TRACE("");
+          if (trxn_sent || amnesia) {
+                  contract_state_entry.update_state([](smart_state_record& contract_state) {
+                          TRACE("");
+                          contract_state.locker_trx = 0;
+                  });
+          }
   });
 
   executor::APIResponse api_resp;
@@ -594,7 +588,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   executor.executeByteCode(api_resp,
                            transaction.source,
                            bytecode,
-                           contract_state->state,
+                           contract_state_record.state,
                            input_smart.method,
                            input_smart.params);
 
@@ -640,18 +634,18 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     });
   }
   else {
-	  using namespace std::chrono_literals;
-	  runAfter(1000ms, [&contract_state_entry, inner_id]() {
-		  TRACE("");
-		  contract_state_entry.update_state([=](smart_state_record& contract_state) {
-			  TRACE("");
-			  if (contract_state.locker_trx != inner_id) {
-				  return;
-			  }
-			  TRACE("");
-			  contract_state.locker_trx = 0;
-		  });
-	  });
+          using namespace std::chrono_literals;
+          runAfter(10000ms, [&contract_state_entry, inner_id]() {
+                  TRACE("");
+                  contract_state_entry.update_state([=](smart_state_record& contract_state) {
+                          TRACE("");
+                          if (contract_state.locker_trx != inner_id) {
+                                  return;
+                          }
+                          TRACE("");
+                          contract_state.locker_trx = 0;
+                  });
+          });
   }
   TRACE("");
 }
@@ -899,10 +893,10 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         return (*smart_state)[address];
       }();
       e.update_state(
-        [&tr](smart_state_record& rec) { 
-		  rec.state = tr.user_field(smart_state_idx).value<std::string>(); 
-		  rec.locker_trx = 0;
-	  });
+        [&tr](smart_state_record& rec) {
+                  rec.state = tr.user_field(smart_state_idx).value<std::string>();
+                  rec.locker_trx = 0;
+          });
     }
 
     if (is_smart_deploy(smart)) {
