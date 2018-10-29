@@ -143,8 +143,6 @@ void Solver::gotRound() {
 
   cslog() << "SOLVER> Got round";
 
-  nextRound();
-
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
       runConsensus();
@@ -212,8 +210,15 @@ void Solver::runConsensus() {
 
   trustedCounterVector++;
 
-  if (trustedCounterVector == conveyer.roundTable().confidants.size()) {
+  csdebug() << "SOLVER> Trusted counter vector: " << (int)trustedCounterVector;
+
+  auto size = conveyer.roundTable().confidants.size();
+  csdebug() << "SOVLER>: confidants size: " << size;
+
+  if (trustedCounterVector == size) {
     std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
+
+    // all vectors received
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
@@ -236,9 +241,11 @@ void Solver::runFinalConsensus() {
   if (trustedCounterMatrix == numGen) {
     std::memset(m_receivedMatrixFrom, 0, sizeof(m_receivedMatrixFrom));
 
+    // all matrix received
+    trustedCounterMatrix = 0;
+
     m_writerIndex = (m_generals->takeDecision(table.confidants,
                                               m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
-    trustedCounterMatrix = 0;
 
     if (m_writerIndex == 100) {
       cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
@@ -271,7 +278,7 @@ const PublicKey& Solver::nodePublicKey() const {
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
 
-  if (m_receivedVectorFrom[vector.sender] == true) {
+  if (m_receivedVectorFrom[vector.sender]) {
     cslog() << "SOLVER> I've already got the vector from this Node";
     return;
   }
@@ -284,8 +291,13 @@ void Solver::gotVector(HashVector&& vector) {
   m_generals->addVector(vector);  // building matrix
   trustedCounterVector++;
 
+  csdebug() << "SOVLER> Got vector num gen: " << (int)numGen;
+  csdebug() << "SOVLER> Trusted conuter vector: " << (int)trustedCounterVector;
+
   if (trustedCounterVector == numGen) {
     std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
+
+    // all vectors received
     trustedCounterVector = 0;
 
     // compose and send matrix!!!
@@ -554,9 +566,6 @@ void Solver::nextRound() {
     cs::Utils::clearMemory(m_receivedVectorFrom);
     cs::Utils::clearMemory(m_receivedMatrixFrom);
 
-    trustedCounterVector = 0;
-    trustedCounterMatrix = 0;
-
     cslog() << "SOLVER> next Round : the variables initialized";
   } else {
     m_isPoolClosed = true;
@@ -593,11 +602,12 @@ cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::Tra
       if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),
         data_to_fetch_pulic_key.address_.end()))) {
         good_pool.addTransaction(transactions[i]);
-        continue;
       }
+      continue;
     }
-    if (transactions[i].verify_signature(transactions[i].source().public_key()))
+    if (transactions[i].verify_signature(transactions[i].source().public_key())) {
       good_pool.addTransaction(transactions[i]);
+    }
   }
   return good_pool;
 }
