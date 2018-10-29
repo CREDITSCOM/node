@@ -850,11 +850,15 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   cslog() << "NODE> Get transactions hashes answer amount got " << packet.transactionsCount();
 
   if (!packet.transactionsCount()) {
+#ifdef DIRECT_TRANSACTIONS_REQUEST
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     if (!conveyer.isSyncCompleted()) {
       sendPacketHashesRequest(conveyer.neededHashes());
     }
+#else
+    cserror() << "NODE> Received transaction hashes answer transactions count is 0";
+#endif
 
     return;
   }
@@ -1244,6 +1248,12 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   }
 
   const auto msgType = MsgTypes::TransactionsPacketRequest;
+
+#ifndef DIRECT_TRANSACTIONS_REQUEST
+  sendBroadcast(msgType, bytes);
+  return;
+#endif
+
   const bool success = sendToRandomNeighbour(msgType, bytes);
 
   if (!success) {
@@ -1473,7 +1483,14 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   for (const auto& hash : hashes){
     std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
 
-    sendPacketHashesReply(packet ? packet.value() : cs::TransactionsPacket(), sender);
+    if (packet) {
+      sendPacketHashesReply(packet.value(), sender);
+    }
+#ifdef DIRECT_TRANSACTIONS_REQUEST
+    else {
+      sendPacketHashesReply(cs::TransactionsPacket(), sender);
+    }
+#endif
   }
 }
 
