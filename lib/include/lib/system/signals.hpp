@@ -4,8 +4,8 @@
 #include <functional>
 #include <vector>
 
-#define signals public
-#define slots public
+#define signals
+#define slots
 #define emit
 
 namespace cs

@@ -35,7 +35,7 @@ struct cs::Conveyer::Impl
     // round table
     cs::RoundTable roundTable;
 
-signals:
+public signals:
     cs::PacketFlushSignal flushPacket;
 };
 
@@ -46,12 +46,11 @@ cs::Conveyer::Conveyer()
     pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
     pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
 
-    m_sendingTimer.connect(std::bind(&cs::Conveyer::flushTransactions, this));
+    cs::Connector::connect(&m_sendingTimer.timeOut, this, &cs::Conveyer::flushTransactions);
 }
 
 cs::Conveyer::~Conveyer()
 {
-    m_sendingTimer.disconnect();
     m_sendingTimer.stop();
 }
 
