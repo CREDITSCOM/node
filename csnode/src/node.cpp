@@ -1051,6 +1051,9 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     }
 #endif
   }
+  else {
+    solver_->gotIncorrectBlock(std::move(newPool), sender);
+  }
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
@@ -1444,7 +1447,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   // Pretty printing...
-  cslog() << "Round " << roundTable.round << " started. Mynode_type:=" << myLevel_ << " Confidants: ";
+  cslog() << "Round " << roundTable.round << " started. Mynode_type := " << myLevel_ << " Confidants: ";
 
   for (std::size_t i = 0; i < confidants.size(); ++i) {
     const auto& confidant = confidants[i];
@@ -1470,6 +1473,9 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     awaitingSyncroBlock = false;
   }
 #endif
+
+  // TODO: think now to improve this code
+  solver_->nextRound();
 
   // TODO: check if this removes current tasks? if true - thats bad
   transport_->processPostponed(roundNum_);

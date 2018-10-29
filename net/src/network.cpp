@@ -85,9 +85,12 @@ void Network::readerRoutine(const Config& config) {
   while (true) {
     auto& task = iPacMan_.allocNext();
 
+    size_t packetSize = 0;
     uint32_t cnt = 0;
     do {
-      task.size = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+      packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+      task.size = task.pack.decode(packetSize);
+
       if (++cnt == 10) {
         cnt = 0;
         std::this_thread::yield();
@@ -101,17 +104,28 @@ void Network::readerRoutine(const Config& config) {
       LOG_ERROR("Cannot receive packet. Error " << lastError);
     }
 
-    csdebug(logger::Net)<< "Received packet" << std::endl << task.pack;
+    csdebug(logger::Net)
+      << "Received packet" << std::endl
+      << task.pack << std::endl
+      << "Read " << packetSize << std::endl
+      << "Returned " << lastError;
   }
 }
 
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
   boost::system::error_code lastError;
-  size_t size;
+  size_t size = 0;
+  size_t encodedSize = 0;
 
   uint32_t cnt = 0;
   do {
-    size = sock.send_to(buffer(task->pack.data(), task->pack.size()), ep, NO_FLAGS, lastError);
+    // net code was built on this constant (Packet::MaxSize)
+    // and is used it implicitly in a lot of places( 
+    char packetBuffer[Packet::MaxSize];
+    boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
+    encodedSize = encodedPacket.size();
+
+    size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
 
     if (++cnt == 10) {
       cnt = 0;
@@ -119,9 +133,15 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
     }
   } while (lastError == boost::asio::error::would_block);
 
-  if (lastError || size < task->pack.size()) {
+  if (lastError || size < encodedSize) {
     LOG_ERROR("Cannot send packet. Error " << lastError);
   }
+
+  csdebug(logger::Net)
+    << "Sent packet" << std::endl
+    << task->pack << std::endl
+    << "Wrote " << size << " bytes of " << encodedSize << std::endl
+    << "Returned " << lastError;
 }
 
 void Network::writerRoutine(const Config& config) {
@@ -134,7 +154,6 @@ void Network::writerRoutine(const Config& config) {
 
   while (true) {
     auto task = oPacMan_.getNextTask();
-    csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
     sendPack(*sock, task, task->endpoint);
   }
 }
@@ -173,7 +192,7 @@ void Network::processorRoutine() {
     uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
       if (task->pack.isFragmented() || task->pack.isCompressed()) {
-        bool newFragmentedMsg;
+        bool newFragmentedMsg = false;
         MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
         transport_->gotPacket(task->pack, remoteSender);
 

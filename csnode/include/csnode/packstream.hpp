@@ -173,11 +173,16 @@ class OPackStream {
     if (!finished_) {
       allocator_->shrinkLast(ptr_ - static_cast<uint8_t*>((packetsEnd_ - 1)->data()));
 
-      if (packetsCount_ > 1)
-        for (auto p = packets_; p != packetsEnd_; ++p)
-          *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(p->data()) + static_cast<uint32_t>(Offsets::FragmentId) +
-                                       sizeof(packetsCount_)) = packetsCount_;
-
+      if (packetsCount_ > 1) {
+        for (auto p = packets_; p != packetsEnd_; ++p) {
+          uint8_t* data = static_cast<uint8_t*>(p->data());
+          if (!p->isFragmented()) {
+            cswarning() << "No Fragmented flag for packets";
+            *data |= BaseFlags::Fragmented;
+          }
+          *reinterpret_cast<uint16_t*>(data + Offsets::FragmentId + sizeof(packetsCount_)) = packetsCount_;
+        }
+      }
       finished_ = true;
     }
 
