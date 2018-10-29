@@ -12,7 +12,7 @@ namespace slv2
 
     size_t SolverContext::own_conf_number() const
     {
-        return (size_t) core.pnode->getMyConfNumber();
+        return (size_t) core.pnode->getConfidantNumber();
     }
 
     size_t SolverContext::cnt_trusted() const
@@ -34,7 +34,7 @@ namespace slv2
 
     Role SolverContext::role() const
     {
-        auto v = core.pnode->getMyLevel();
+        auto v = core.pnode->getNodeLevel();
         switch(v) {
         case NodeLevel::Normal:
             return Role::Normal;

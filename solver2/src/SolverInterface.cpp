@@ -24,30 +24,11 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotRound(cs::RoundTable&& round) {
+    void SolverCore::gotRound() {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotRound(std::move(round));
+            pslv_v1->gotRound();
         }
     }
-
-    const cs::RoundTable& SolverCore::roundTable() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->roundTable();
-        }
-    }
-
-    const cs::TransactionsPacketHashTable& SolverCore::transactionsPacketTable() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->transactionsPacketTable();
-        }
-    }
-
-    const cs::TransactionsBlock& SolverCore::transactionsBlock() const {
-      if (opt_is_proxy_v1 && pslv_v1) {
-        return pslv_v1->transactionsBlock();
-      }
-    }
-
 
     bool SolverCore::getIPoolClosed() {
         if(opt_is_proxy_v1 && pslv_v1) {
@@ -58,61 +39,6 @@ namespace slv2
     void SolverCore::gotHash(std::string&& hash, const cs::PublicKey& pub) {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotHash(std::move(hash), pub);
-        }
-    }
-
-    void SolverCore::gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotPacketHashesRequest(std::move(hashes), round, sender);
-        }
-    }
-
-    void SolverCore::gotPacketHashesReply(cs::TransactionsPacket&& packet) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotPacketHashesReply(std::move(packet));
-        }
-    }
-
-    const cs::Notifications& SolverCore::notifications() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->notifications();
-        }
-    }
-
-    void SolverCore::addNotification(const cs::Bytes& bytes) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->addNotification(bytes);
-        }
-    }
-
-    std::size_t SolverCore::neededNotifications() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->neededNotifications();
-        }
-    }
-
-    bool SolverCore::isEnoughNotifications(cs::Solver::NotificationState state) const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->isEnoughNotifications(state);
-        }
-    }
-
-    std::optional<csdb::Pool> SolverCore::applyCharacteristic(const cs::Characteristic& characteristic,
-      const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->applyCharacteristic(characteristic, metaInfoPool, sender);
-        }
-    }
-
-    const cs::Characteristic& SolverCore::getCharacteristic() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getCharacteristic();
-        }
-    }
-
-    cs::Hash SolverCore::getCharacteristicHash() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getCharacteristicHash();
         }
     }
 
@@ -134,26 +60,9 @@ namespace slv2
         }
     }
 
-    bool SolverCore::checkTableHashes(const cs::RoundTable& table) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->checkTableHashes(table);
-        }
-    }
-
     bool SolverCore::getBigBangStatus() {
         if(opt_is_proxy_v1 && pslv_v1) {
             return pslv_v1->bigBangStatus();
-        }
-    }
-    cs::SharedMutex& SolverCore::getSharedMutex() {
-      if (opt_is_proxy_v1 && pslv_v1) {
-        return pslv_v1->sharedMutex();
-      }
-    }
-
-    void SolverCore::gotTransactionsPacket(cs::TransactionsPacket&& packet) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotTransactionsPacket(std::move(packet));
         }
     }
 
@@ -166,27 +75,6 @@ namespace slv2
     void SolverCore::sendTL() {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->sendTL();
-        }
-    }
-
-    bool SolverCore::isPacketSyncFinished() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->isPacketSyncFinished();
-        }
-    }
-
-    const cs::Hashes& SolverCore::getNeededHashes() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getNeededHashes();
-        }
-        else {
-            return cs::Hashes();
-        }
-    }
-
-    void SolverCore::addCharacteristicMeta(const cs::CharacteristicMeta& meta) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->addCharacteristicMeta(meta);
         }
     }
 
@@ -214,6 +102,27 @@ namespace slv2
             return stub;
         }
         return pgen->getMatrix();
+    }
+
+    NodeLevel SolverCore::nodeLevel() const
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->nodeLevel();
+        }
+    }
+
+    const cs::PublicKey& SolverCore::nodePublicKey() const
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->nodePublicKey();
+        }
+    }
+
+    void SolverCore::countFeesInPool(csdb::Pool* pool)
+    {
+        if (opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->countFeesInPool(pool);
+        }
     }
 
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
@@ -307,7 +216,7 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
             }
-            pown_hvec->sender = pnode->getMyConfNumber();
+            pown_hvec->sender = pnode->getConfidantNumber();
             //pown_hvec->hash = result; //vshilkin
         }
 
@@ -342,7 +251,7 @@ namespace slv2
     void SolverCore::gotMatrix(const cs::HashMatrix& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            cs::HashMatrix tmp = matr;
+            cs::HashMatrix tmp = matr;  //TODO: what is this?
             pslv_v1->gotMatrix(std::move(tmp));
             return;
         }

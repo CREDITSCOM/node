@@ -861,7 +861,7 @@ APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transacti
   else 
     smart_transaction_flow(_return, transaction);
 
-  _return.roundNum = solver.roundTable().round;
+  _return.roundNum = cs::Conveyer::instance().roundTable().round;
 }
 
 void
@@ -1402,9 +1402,10 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
     if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transaction)) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
-      cs::SharedLock sharedLock(solver.getSharedMutex());
-      decltype(auto) trx_block = solver.transactionsBlock();  // find in transaction block
-      for (decltype(auto) it : solver.transactionsBlock()) {
+      cs::Conveyer& conveyer = cs::Conveyer::instance();
+      cs::SharedLock sharedLock(conveyer.sharedMutex());
+      decltype(auto) trx_block = conveyer.transactionsBlock();  // find in transaction block
+      for (decltype(auto) it : conveyer.transactionsBlock()) {
         const auto &transactions = it.transactions();
         for (decltype(auto) transaction : transactions) {
           if (transaction.innerID() == inner_id) {
@@ -1415,7 +1416,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
         }
       }
       if (!finish_for_idx) {
-        decltype(auto) m_hash_tb = solver.transactionsPacketTable(); // find in hash table
+        decltype(auto) m_hash_tb = conveyer.transactionsPacketTable(); // find in hash table
         for (decltype(auto) it : m_hash_tb) {
           const auto &transactions = it.second.transactions();
           for (decltype(auto) transaction : transactions) {
@@ -1431,7 +1432,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
         _return.states[inner_id] = INVALID;
     }
   }
-  _return.roundNum = solver.roundTable().round;
+  _return.roundNum = cs::Conveyer::instance().roundTable().round;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 

@@ -19,6 +19,7 @@ class Address::priv : public ::csdb::internal::shared_data
   } data_;
   
   bool is_wallet_id_ = false;
+
   friend class ::csdb::Address;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Address)
@@ -65,6 +66,28 @@ bool Address::operator <(const Address &other) const noexcept
 {
   if (d == other.d)
     return false;
+
+  if (d->is_wallet_id_ && other.d->is_wallet_id_) {
+    return d->data_.wallet_id < other.d->data_.wallet_id;
+  }
+  else if (!d->is_wallet_id_ && !other.d->is_wallet_id_) {
+    return d->data_.public_key < other.d->data_.public_key;
+  }
+  else if (d->is_wallet_id_ && !other.d->is_wallet_id_) {
+    return d->data_.public_key < other.d->data_.public_key;
+  }
+  else if (!d->is_wallet_id_ && other.d->is_wallet_id_) {
+    return d->data_.public_key < other.d->data_.public_key;
+  }
+  else{
+    return false;
+  }
+}
+
+/*bool Address::operator <(const Address &other) const noexcept
+{
+  if (d == other.d)
+    return false;
   
   if (d->is_wallet_id_ && other.d->is_wallet_id_) {
     return d->data_.wallet_id < other.d->data_.wallet_id;
@@ -73,7 +96,7 @@ bool Address::operator <(const Address &other) const noexcept
   } else {
     return false;
   }
-}
+}*/
 
 size_t Address::calcHash() const noexcept
 {

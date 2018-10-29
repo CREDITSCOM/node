@@ -12,17 +12,10 @@
 #include <csnode/dynamicbuffer.h>
 #include <lib/system/keys.hpp>
 
-#include "blockchain.hpp"
-#include "packstream.hpp"
-
 #include <net/neighbourhood.hpp>
 
-enum NodeLevel {
-  Normal,
-  Confidant,
-  Main,
-  Writer
-};
+#include "blockchain.hpp"
+#include "packstream.hpp"
 
 class Transport;
 namespace slv2 { class SolverCore; }
@@ -58,6 +51,8 @@ public:
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+
+  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
   void applyNotifications();
@@ -99,7 +94,6 @@ public:
   void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
-  void sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable);
 
   template<class... Args>
   bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args);
@@ -136,16 +130,16 @@ public:
 
   MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
 
-  const cs::PublicKey& getMyPublicKey() const {
+  const cs::PublicKey& getPublicKey() const {
     return myPublicKey_;
   }
 
-  NodeLevel getMyLevel() const {
+  NodeLevel getNodeLevel() const {
     return myLevel_;
   }
 
   uint32_t getRoundNumber();
-  uint8_t getMyConfNumber();
+  uint8_t getConfidantNumber();
 
   BlockChain& getBlockChain() {
     return bc_;
@@ -178,6 +172,12 @@ private:
 
   bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
+  void onRoundStartConveyer(cs::RoundTable&& roundTable);
+
+  // conveyer
+  void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void processPacketsReply(cs::TransactionsPacket&& packet);
+  void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
@@ -239,4 +239,7 @@ private:
   IPackStream istream_;
   OPackStream ostream_;
 };
+
+std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
+
 #endif  // __NODE_HPP__

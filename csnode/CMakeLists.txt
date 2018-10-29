@@ -38,6 +38,7 @@ add_library(csnode
   include/csnode/dynamicbuffer.h
   include/csnode/threading.hpp
   include/csnode/nodecore.h
+  include/csnode/conveyer.h
   include/csnode/transactionspacket.h
   include/csnode/TransactionsTail.h
   include/csnode/WalletsCache.h
@@ -47,6 +48,7 @@ add_library(csnode
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
+  src/conveyer.cpp
   src/transactionspacket.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
@@ -59,8 +61,6 @@ add_library(csnode
 target_link_libraries (csnode net csdb solver2 base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libcuckoo
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/libcuckoo
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../api/include

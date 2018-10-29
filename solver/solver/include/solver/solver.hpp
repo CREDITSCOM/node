@@ -24,6 +24,7 @@
 #include <lib/system/keys.hpp>
 #include <solver/WalletsState.h>
 #include <solver/Fee.h>
+#include <solver/spammer.h>
 
 class Node;
 
@@ -38,15 +39,6 @@ class Generals;
 
 class Solver {
 public:
-   enum class NotificationState {
-     Equal,
-     GreaterEqual
-   };
-
-   enum : unsigned int {
-     HashTablesStorageCapacity = 10
-   };
-
   explicit Solver(Node*, csdb::Address m_genesisAddress, csdb::Address startAddres
 #ifdef SPAMMER
   , csdb::Address m_spammerAddress
@@ -61,10 +53,7 @@ public:
 
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
-  void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-  void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-  void gotPacketHashesReply(cs::TransactionsPacket&& packet);
-  void gotRound(cs::RoundTable&& round);
+  void gotRound();
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
@@ -79,36 +68,12 @@ public:
   void rndStorageProcessing();
   void tmpStorageProcessing();
 
-  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-    const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
-
-  const Characteristic& getCharacteristic() const;
-  Hash getCharacteristicHash() const;
-
   cs::PublicKey writerPublicKey() const;
 
   uint32_t getTLsize();
   void addInitialBalance();
   void runSpammer();
 
-  cs::RoundNumber currentRoundNumber();
-  const cs::RoundTable& roundTable() const;
-  const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
-  const cs::TransactionsBlock& transactionsBlock() const;
-
-  // notifications interface
-  const cs::Notifications& notifications() const;
-  void addNotification(const cs::Bytes& bytes);
-  std::size_t neededNotifications() const;
-  bool isEnoughNotifications(NotificationState state) const;
-
-  // characteristic meta
-  void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
-  cs::CharacteristicMeta characteristicMeta(const RoundNumber round);
-  bool isCharacteristicMetaReceived(const RoundNumber round);
-
-  // conveyer start point
-  void addConveyerTransaction(const csdb::Transaction& transaction);
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
   void nextRound();
@@ -118,13 +83,13 @@ public:
   void runConsensus();
   void runFinalConsensus();
 
-  // helpers
-  bool checkTableHashes(const cs::RoundTable& table);
-  bool isPacketSyncFinished() const;
+  // node interface
+  NodeLevel nodeLevel() const;
+  const cs::PublicKey& nodePublicKey() const;
   const cs::Hashes& getNeededHashes() const;
 
-  HashVector hashVector() const;
-  HashMatrix hashMatrix() const;
+  const HashVector& hashVector() const;
+  const HashMatrix& hashMatrix() const;
 
   bool isPoolClosed();
 
@@ -134,10 +99,11 @@ public:
   const cs::PrivateKey& privateKey() const;
   const cs::PublicKey& publicKey() const;
 
-  cs::SharedMutex& sharedMutex();
+  void countFeesInPool(csdb::Pool* pool);
+
+  static void addTimestampToPool(csdb::Pool& pool);
 
 private:
-  void flushTransactions();
   cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
   cs::PublicKey m_publicKey;
@@ -146,6 +112,7 @@ private:
   friend class slv2::SolverCore;
 
   Node* m_node;
+  Spammer m_spammer;
 
   std::unique_ptr<WalletsState> m_walletsState;
   std::unique_ptr<Generals> m_generals;
@@ -155,22 +122,20 @@ private:
 
 #ifdef SPAMMER
   const csdb::Address m_spammerAddress;
-  std::vector<csdb::Address> m_spamKeys;
 #endif
 
   Fee m_feeCounter;
   HashVector m_hashVector;
 
   bool m_receivedVectorFrom[100];
-  std::atomic<uint8_t> trustedCounterVector;
+  std::atomic<uint8_t> trustedCounterVector = 0;
 
   bool m_receivedMatrixFrom[100];
-  std::atomic<uint8_t> trustedCounterMatrix;
+  std::atomic<uint8_t> trustedCounterMatrix = 0;
 
   uint8_t m_writerIndex; // index at confidants
 
   std::vector<PublicKey> m_hashesReceivedKeys;
-  cs::RoundTable m_roundTable;
 
   csdb::Pool m_vPool;   // TODO: what is v pool?
 
@@ -182,29 +147,11 @@ private:
   std::atomic<bool> m_gotBigBang = false;
   std::atomic<bool> m_isConsensusRunning = false;
 
-  cs::SharedMutex m_sharedMutex;
-
-  cs::TransactionsPacketHashTable m_hashTable;
-  cs::TransactionsBlock m_transactionsBlock;
-  cs::Notifications m_notifications;
-
-  cs::HashTablesStorage m_hashTablesStorage;
-  cs::Hashes m_neededHashes;
-  std::vector<cs::CharacteristicMeta> m_characteristicMeta;
-
-  cs::Timer m_sendingPacketTimer;
-
   // to store new blocks
   std::map<size_t, csdb::Pool> m_temporaryStorage;
 
   // to store unrequested syncro blocks
   std::map<size_t, csdb::Pool> m_randomStorage; // TODO: RND pool or random?
-
-#ifdef SPAMMER
-  std::atomic_bool m_isSpamRunning = false;
-  std::thread m_spamThread;
-  void spamWithTransactions();
-#endif
 };
 }  // namespace cs
 #endif

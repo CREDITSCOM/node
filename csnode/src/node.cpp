@@ -1,7 +1,11 @@
+#include <sstream>
+#include <iostream>
+
 #include <solver2/SolverCore.h>
 
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
+#include <csnode/conveyer.h>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -79,8 +83,10 @@ bool Node::init() {
   std::copy(myPrivateForSig.begin(), myPrivateForSig.end(), privateKey.begin());
 
   solver_->setKeysPair(publicKey, privateKey);
-  //solver_->addInitialBalance();
   solver_->runSpammer();
+
+  cs::Conveyer::instance().setNode(this);
+  cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
@@ -226,11 +232,14 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   }
 
   transport_->clearTasks();
+
+  // start round on node
   onRoundStart(roundTable);
+  onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY * 10, [this, roundTable]() mutable {
-    solver_->gotRound(std::move(roundTable));
+  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this]() {
+    solver_->gotRound();
   });
 }
 
@@ -292,21 +301,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
-void Node::sendAllRoundTransactionsPackets(const cs::RoundTable& roundTable)
-{
-  if (myLevel_ != NodeLevel::Writer) {
-    return;
-  }
-
-  for (const auto& hash : roundTable.hashes) {
-    const auto& hashTable = solver_->transactionsPacketTable();
-
-    if (hashTable.count(hash)) {
-      sendTransactionsPacket(hashTable.find(hash)->second);
-    }
-  }
-}
-
 void Node::sendRoundTableRequest(size_t rNum) {
   if (rNum < roundNum_) {
     return;
@@ -339,7 +333,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
     return;
   }
 
-  sendRoundTable(solver_->roundTable());
+  sendRoundTable(cs::Conveyer::instance().roundTable());
 }
 
 void Node::getTransaction(const uint8_t* data, const size_t size) {
@@ -457,7 +451,7 @@ bool Node::sendDirect<cs::Bytes>(const cs::PublicKey& sender, const MsgTypes& ms
   ConnectionPtr connection = transport_->getConnectionByKey(sender);
 
   if (connection) {
-    sendDirect(connection, msgType, std::move(bytes));
+    sendDirect(connection, msgType, bytes);
   }
 
   return connection;
@@ -478,7 +472,7 @@ void Node::sendBroadcast<cs::Bytes>(const MsgTypes& msgType, const cs::Bytes& by
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << roundNum_ << bytes;
 
-  csdebug() << "NODE> Sending data: Broadcast ";
+  csdebug() << "NODE> Sending data Broadcast";
   transport_->sendBroadcast(ostream_.getPackets());
 }
 
@@ -497,7 +491,7 @@ bool Node::sendToRandomNeighbour<cs::Bytes>(const MsgTypes& msgType, const cs::B
   ConnectionPtr connection = transport_->getRandomNeighbour();
 
   if (connection) {
-    sendDirect(connection, msgType, std::move(bytes));
+    sendDirect(connection, msgType, bytes);
   }
 
   return connection;
@@ -549,7 +543,7 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   cslog() << "NODE> Sending writing confirmation to  " << cs::Utils::byteStreamToHex(node.data(), node.size());
 
   ostream_.init(BaseFlags::Signed, node);
-  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getMyConfNumber();
+  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getConfidantNumber();
 
   flushCurrentTasks();
 }
@@ -560,12 +554,12 @@ void Node::sendTLRequest() {
     return;
   }
 
-  const auto& mainNode = solver_->roundTable().general;
+  const auto& mainNode = cs::Conveyer::instance().roundTable().general;
 
   cslog() << "NODE> Sending TransactionList request to  " << cs::Utils::byteStreamToHex(mainNode.data(), mainNode.size());
 
   ostream_.init(BaseFlags::Signed, mainNode);
-  ostream_ << MsgTypes::ConsTLRequest << getMyConfNumber();
+  ostream_ << MsgTypes::ConsTLRequest << getConfidantNumber();
 
   flushCurrentTasks();
 }
@@ -587,7 +581,7 @@ void Node::getTlRequest(const uint8_t* data, const size_t size) {
     return;
   }
 
-  if (num < solver_->roundTable().confidants.size()) {
+  if (num < cs::Conveyer::instance().roundTable().confidants.size()) {
     sendMatrix(solver_->getMyMatrix());
   }
 }
@@ -820,7 +814,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
     return;
   }
 
-  solver_->gotTransactionsPacket(std::move(packet));
+  processTransactionsPacket(std::move(packet));
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
@@ -846,7 +840,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     return;
   }
 
-  solver_->gotPacketHashesRequest(std::move(hashes), round, sender);
+  processPacketsRequest(std::move(hashes), round, sender);
 }
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
@@ -859,18 +853,17 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   cslog() << "NODE> Get transactions hashes answer amount got " << packet.transactionsCount();
 
   if (!packet.transactionsCount()) {
-    const bool isPacketSyncFinished = solver_->isPacketSyncFinished();
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-    if (!isPacketSyncFinished) {
-      sendPacketHashesRequest(solver_->getNeededHashes());
+    if (!conveyer.isSyncCompleted()) {
+      sendPacketHashesRequest(conveyer.neededHashes());
     }
 
     return;
   }
 
   cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
-
-  solver_->gotPacketHashesReply(std::move(packet));
+  processPacketsReply(std::move(packet));
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
@@ -891,6 +884,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
 
   cs::RoundTable roundTable;
   roundTable.round = round;
+
+  // to node
   roundNum_ = round;
 
   cs::PublicKey general;
@@ -921,14 +916,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   roundTable.hashes = std::move(hashes);
 
   onRoundStart(roundTable);
+  onRoundStartConveyer(std::move(roundTable));
 
-  solver_->gotRound(std::move(roundTable));
+  solver_->gotRound();
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   cslog() << "NODE> Characteric has arrived";
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!solver_->isPacketSyncFinished()) {
+  if (!conveyer.isSyncCompleted()) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
@@ -936,10 +933,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
     cs::CharacteristicMeta meta;
     meta.bytes = std::move(characteristicBytes);
-    meta.round = solver_->roundTable().round;
+    meta.round = conveyer.roundTable().round;
     meta.sender = sender;
 
-    solver_->addCharacteristicMeta(meta);
+    conveyer.addCharacteristicMeta(meta);
   }
 
   cs::DataStream stream(data, size);
@@ -971,12 +968,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::Bytes notification;
     stream >> notification;
 
-    solver_->addNotification(notification);
+    conveyer.addNotification(notification);
   }
 
   std::vector<cs::Hash> confidantsHashes;
 
-  for (const auto& notification : solver_->notifications()) {
+  for (const auto& notification : conveyer.notifications()) {
     cs::Hash hash;
     cs::DataStream notificationStream(notification.data(), notification.size());
 
@@ -1005,9 +1002,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   cs::PublicKey writerPublicKey;
   stream >> writerPublicKey;
 
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, sender);
+  conveyer.setCharacteristic(characteristic);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, sender);
 
   if (pool) {
+    solver_->countFeesInPool(&pool.value());
+    getBlockChain().finishNewBlock(pool.value());
+
     const uint8_t* message = pool->to_binary().data();
     const size_t messageSize = pool->to_binary().size();
 
@@ -1019,6 +1020,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
     }
   }
+}
+
+void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
+  CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
 void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {
@@ -1034,12 +1039,14 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     this->getBlockChain().putBlock(newPool);
 
 #ifndef MONITOR_NODE
-    if ((this->getMyLevel() != NodeLevel::Writer) && (this->getMyLevel() != NodeLevel::Main)) {
+    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
       auto hash = this->getBlockChain().getLastWrittenHash().to_string();
 
       this->sendHash(hash, sender);
 
       cslog() << "SENDING HASH to writer: " << hash;
+    } else {
+      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
     }
 #endif
   }
@@ -1051,10 +1058,11 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
     return;
   }
 
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::Bytes notification(data, data + size);
-  solver_->addNotification(notification);
+  conveyer.addNotification(notification);
 
-  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
+  if (conveyer.isEnoughNotifications(cs::Conveyer::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
     cslog() << "NODE> Confidants count more then 51%";
     applyNotifications();
   }
@@ -1064,19 +1072,26 @@ void Node::applyNotifications() {
   csdebug() << "NODE> Apply notifications";
 
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = 1 + bc_.getLastWrittenSequence();
+  poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1;
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
-  const cs::Characteristic& characteristic = solver_->getCharacteristic();
-
-  std::optional<csdb::Pool> pool = solver_->applyCharacteristic(characteristic, poolMetaInfo, myPublicKey_);
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, myPublicKey_);
 
   if (!pool) {
     cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
     return;
   }
 
-  const cs::Bytes& poolBinary = pool->to_binary();
+  solver_->countFeesInPool(&pool.value());
+  getBlockChain().finishNewBlock(pool.value());
+
+  //TODO: need to write confidants notifications bytes to csdb::Pool user fields
+  #ifdef MONITOR_NODE
+  cs::Solver::addTimestampToPool(pool.value()));
+  #endif
+
+  const cs::Bytes& poolBinary = pool.value().to_binary();
   const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
   csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
 
@@ -1087,7 +1102,7 @@ void Node::applyNotifications() {
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::NewCharacteristic << roundNum_;
-  ostream_ << createBlockValidatingPacket(poolMetaInfo, characteristic, poolSignature, solver_->notifications());
+  ostream_ << createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
   ostream_ << solver_->getPublicKey();
 
   flushCurrentTasks();
@@ -1099,12 +1114,13 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::Hash characteristicHash;
   stream >> characteristicHash;
 
-  cs::Hash solverCharacteristicHash = solver_->getCharacteristicHash();
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::Hash currentCharacteristicHash = conveyer.characteristicHash();
 
-  if (characteristicHash != solverCharacteristicHash) {
+  if (characteristicHash != currentCharacteristicHash) {
     csdebug() << "NODE> Characteristic equals failed";
     csdebug() << "NODE> Received characteristic - " << cs::Utils::byteStreamToHex(characteristicHash.data(), characteristicHash.size());
-    csdebug() << "NODE> Writer solver chracteristic - " << cs::Utils::byteStreamToHex(solverCharacteristicHash.data(), solverCharacteristicHash.size());
+    csdebug() << "NODE> Writer solver chracteristic - " << cs::Utils::byteStreamToHex(currentCharacteristicHash.data(), currentCharacteristicHash.size());
     return false;
   }
 
@@ -1122,7 +1138,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::PublicKey publicKey;
   stream >> publicKey;
 
-  size_t messageSize = size - signature.size() - publicKey.size();
+  std::size_t messageSize = size - signature.size() - publicKey.size();
 
   if (!cs::Utils::verifySignature(signature, publicKey, data, messageSize)) {
     cserror() << "NODE> Writer verify signature notification failed";
@@ -1171,7 +1187,7 @@ void Node::sendWriterNotification() {
 }
 
 cs::Bytes Node::createNotification() {
-  cs::Hash characteristicHash = solver_->getCharacteristicHash();
+  cs::Hash characteristicHash = cs::Conveyer::instance().characteristicHash();
   cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
 
   cs::Bytes bytes;
@@ -1239,8 +1255,9 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   }
 
   cs::Timer::singleShot(cs::PacketHashesRequestDelay, [this] {
-                          if (!solver_->isPacketSyncFinished()) {
-                            sendPacketHashesRequest(solver_->getNeededHashes());
+                          const cs::Conveyer& conveyer = cs::Conveyer::instance();
+                          if (!conveyer.isSyncCompleted()) {
+                            sendPacketHashesRequest(conveyer.neededHashes());
                           };
                        });
 }
@@ -1290,12 +1307,14 @@ void Node::sendBlockRequest(uint32_t seq) {
   }
   csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
   const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
+  std::stringstream progress;
   if (syncStatus <= 100) {
-    cslog() << "SYNC: [";
-    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) cslog() << "#";
-    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) cslog() << "-";
-    cslog() << "] " << syncStatus << "%";
+    progress << "SYNC: [";
+    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
+    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
+    progress << "] " << syncStatus << "%";
   }
+  cslog() << progress.str();
 
   uint32_t reqSeq = seq;
 
@@ -1386,7 +1405,7 @@ void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
   cslog() << "NODE> Became writer";
 
-  if (solver_->isEnoughNotifications(cs::Solver::NotificationState::GreaterEqual)) {
+  if (cs::Conveyer::instance().isEnoughNotifications(cs::Conveyer::NotificationState::GreaterEqual)) {
     applyNotifications();
   }
 }
@@ -1430,7 +1449,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   cslog() << "Transaction packets hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    cslog() << i << ". " << hashes[i].toString();
+    csdebug() << i << ". " << hashes[i].toString();
   }
 
 #ifdef SYNCRO
@@ -1438,26 +1457,79 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
     syncro_started = true;
   }
+
   if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
     syncro_started = false;
     awaitingSyncroBlock = false;
   }
 #endif
 
-  solver_->nextRound();
-
-#ifdef WRITER_RESEND_HASHES
-  sendAllRoundTransactionsPackets(roundTable);
-#endif
-
+  // TODO: check if this removes current tasks? if true - thats bad
   transport_->processPostponed(roundNum_);
+}
+
+void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
+  csdebug() << "NODE> Processing packets sync request";
+
+  const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+  for (const auto& hash : hashes){
+    std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
+
+    sendPacketHashesReply(packet ? packet.value() : cs::TransactionsPacket(), sender);
+  }
+}
+
+void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
+  csdebug() << "NODE> Processing packets reply";
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  conveyer.addFoundPacket(std::move(packet));
+
+  if (conveyer.isSyncCompleted()) {
+    csdebug() << "NODE> Packets sync completed";
+    solver_->gotRound();
+
+    const cs::RoundNumber currentRound = conveyer.roundTable().round;
+
+    if (conveyer.isCharacteristicMetaReceived(currentRound)) {
+      csdebug() << "NODE> Run characteristic meta";
+      cs::CharacteristicMeta meta = conveyer.characteristicMeta(currentRound);
+
+      if (meta.round != 0) {
+        getCharacteristic(meta.bytes.data(), meta.bytes.size(), meta.sender);
+      }
+      else {
+        csfatal() << "NODE> Can not call node get characteristic method";
+      }
+    }
+  }
+}
+
+void Node::processTransactionsPacket(cs::TransactionsPacket&& packet)
+{
+  csdebug() << "NODE> Process transaction packet";
+  cs::Conveyer::instance().addTransactionsPacket(packet);
+}
+
+void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  conveyer.setRound(std::move(roundTable));
+
+  if (conveyer.isSyncCompleted()) {
+    cslog() << "NODE> All hashes in conveyer";
+  }
+  else {
+    csdebug() << "NODE> Sending packet hashes request";
+    sendPacketHashesRequest(conveyer.neededHashes());
+  }
 }
 
 bool Node::getSyncroStarted() {
   return syncro_started;
 }
 
-uint8_t Node::getMyConfNumber() {
+uint8_t Node::getConfidantNumber() {
   return myConfidantIndex_;
 }
 
@@ -1577,12 +1649,31 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
+const char* getNodeLevelString(NodeLevel nodeLevel) {
+  switch (nodeLevel) {
+  case NodeLevel::Normal:
+    return "Normal";
+  case NodeLevel::Confidant:
+    return "Confidant";
+  case NodeLevel::Main:
+    return "Main";
+  case NodeLevel::Writer:
+    return "Writer";
+  }
+  return "UNKNOWN";
+}
+
+std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
+  os << getNodeLevelString(nodeLevel);
+  return os;
+}
+
 void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << roundNum_ << bytes;
 
-  csdebug() << "NODE> Sending data: Direct data size " << bytes.size();
-  csdebug() << "NODE> Sending data: Direct to " << connection->getOut();
+  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
+  csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
 
   ostream_.clear();

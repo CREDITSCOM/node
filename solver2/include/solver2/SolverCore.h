@@ -9,6 +9,7 @@
 #include <solver/Fee.h>
 #include <solver/solver.hpp>
 #include <solver/WalletsState.h>
+#include <csnode/nodecore.h>
 
 #include <memory>
 #include <map>
@@ -28,6 +29,10 @@ namespace Credits
     class Fee;
 }
 
+namespace cs {
+    class Fee;
+}
+
 //TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by SolverCore
 
 namespace slv2
@@ -36,8 +41,6 @@ namespace slv2
     class SolverCore;
 
     using KeyType = csdb::internal::byte_array;
-
-
 
     class SolverCore
     {
@@ -126,34 +129,18 @@ namespace slv2
 
         void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
         void runSpammer();
-        void gotRound(cs::RoundTable&& round);
-        const cs::RoundTable& roundTable() const;
-        const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
-        const cs::TransactionsBlock& transactionsBlock() const;
+        void gotRound();
         bool getIPoolClosed();
         void gotHash(std::string&&, const cs::PublicKey&);
-        void gotPacketHashesRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-        void gotPacketHashesReply(cs::TransactionsPacket&& packet);
-        const cs::Notifications& notifications() const;
-        void addNotification(const cs::Bytes& bytes);
-        std::size_t neededNotifications() const;
-        bool isEnoughNotifications(cs::Solver::NotificationState state) const;
-        std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-          const cs::PoolMetaInfo& metaInfoPool, const cs::PublicKey& sender = cs::PublicKey());
-        const cs::Characteristic& getCharacteristic() const;
-        cs::Hash getCharacteristicHash() const;
         const cs::PrivateKey& getPrivateKey() const;
         const cs::PublicKey& getPublicKey() const;
         cs::PublicKey getWriterPublicKey() const;
-        bool checkTableHashes(const cs::RoundTable& table);
         bool getBigBangStatus();
-        void gotTransactionsPacket(cs::TransactionsPacket&& packet);
         bool isPoolClosed() const;
         void sendTL();
-        cs::SharedMutex& getSharedMutex();
-        bool isPacketSyncFinished() const;
-        const cs::Hashes& getNeededHashes() const;
-        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+        NodeLevel nodeLevel() const;
+        const cs::PublicKey& nodePublicKey() const;
+        void countFeesInPool(csdb::Pool* pool);
 
     private:
 
@@ -266,7 +253,7 @@ namespace slv2
         // sends current block if actual otherwise loads block from storage and sends it
         void repeatLastBlock();
 
-        // consensus private members (copied from solver.v1): по мере переноса функционала из солвера-1 могут измениться или удалиться
+        // consensus private members (copied from solver.v1): РїРѕ РјРµСЂРµ РїРµСЂРµРЅРѕСЃР° С„СѓРЅРєС†РёРѕРЅР°Р»Р° РёР· СЃРѕР»РІРµСЂР°-1 РјРѕРіСѓС‚ РёР·РјРµРЅРёС‚СЊСЃСЏ РёР»Рё СѓРґР°Р»РёС‚СЊСЃСЏ
 
         void createAndSendNewBlockFrom(csdb::Pool& p);
         void createAndSendNewBlock()
