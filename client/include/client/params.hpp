@@ -2,9 +2,9 @@
 #define PARAMS_HPP
 
 //#define MONITOR_NODE
-//#define NODE_API
+#define NODE_API
 #define AJAX_IFACE
-#define SPAMMER
+//#define SPAMMER
 #define SYNCRO
 #define TRANSACTION_VALIDATION
 #define NO_DELAYS
