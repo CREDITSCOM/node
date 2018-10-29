@@ -567,7 +567,8 @@ void Solver::nextRound() {
     cs::Utils::clearMemory(m_receivedMatrixFrom);
 
     cslog() << "SOLVER> next Round : the variables initialized";
-  } else {
+  }
+  else {
     m_isPoolClosed = true;
   }
 }
