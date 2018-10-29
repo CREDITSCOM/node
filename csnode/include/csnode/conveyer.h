@@ -4,13 +4,10 @@
 #include <csnode/nodecore.h>
 
 #include <lib/system/common.hpp>
-#include <lib/system/timer.hpp>
 #include <lib/system/signals.hpp>
 
 #include <memory>
 #include <optional>
-
-class Node;
 
 namespace csdb
 {
@@ -27,13 +24,8 @@ namespace cs
     ///
     class Conveyer
     {
-        explicit Conveyer();
-        ~Conveyer();
-        Conveyer (const Conveyer&) = delete;
-        Conveyer& operator=(const Conveyer&) = delete;
-        Conveyer (Conveyer&&) = delete;
-        Conveyer& operator=(Conveyer&&) = delete;
-
+        Conveyer();
+        ~Conveyer() = default;
 
     public:
         enum class NotificationState {
@@ -51,11 +43,6 @@ namespace cs
         /// @return Returns static conveyer object reference, Meyers singleton.
         ///
         static Conveyer& instance();
-
-        ///
-        /// @brief Sets node pointer to get info about node level.
-        ///
-        void setNode(Node* node);
 
         ///
         /// @brief Returns transactions packet flush signal.
@@ -214,7 +201,7 @@ namespace cs
         ///
         cs::SharedMutex& sharedMutex() const;
 
-    protected:
+    public slots:
 
         /// try to send transactions packets to network
         void flushTransactions();
@@ -226,9 +213,6 @@ namespace cs
         std::unique_ptr<Impl> pimpl;
 
         mutable cs::SharedMutex m_sharedMutex;
-
-        /// sends transactions blocks to network
-        cs::Timer m_sendingTimer;
     };
 }
 
