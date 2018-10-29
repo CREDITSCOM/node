@@ -27,8 +27,13 @@ namespace cs
     ///
     class Conveyer
     {
-    private:
+    public:
         explicit Conveyer();
+        Conveyer (const Conveyer&) = delete;
+        Conveyer& operator=(const Conveyer&) = delete;
+        Conveyer (Conveyer&&) = delete;
+        Conveyer& operator=(Conveyer&&) = delete;
+
         ~Conveyer();
 
     public:
