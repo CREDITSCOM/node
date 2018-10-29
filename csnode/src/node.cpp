@@ -632,7 +632,7 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
 
   cslog() << "NODE> 1 Sending matrix to ";
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << MsgTypes::ConsMatrix << roundNum_;
 
   cs::Bytes bytes;
