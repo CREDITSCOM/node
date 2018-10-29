@@ -30,18 +30,6 @@ void addTimestampToPool(csdb::Pool& pool) {
       0, std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now_time.time_since_epoch()).count()));
 }
 
-void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
-  // std::cout << "SOLVER> Before calback" << std::endl;
-  const auto  tp = std::chrono::system_clock::now() + ms;
-  std::thread tr([tp, cb]() {
-    std::this_thread::sleep_until(tp);
-    //  LOG_WARN("Inserting callback");
-    CallsQueue::instance().insert(cb);
-  });
-  // std::cout << "SOLVER> After calback" << std::endl;
-  tr.detach();
-}
-
 #if defined(SPAM_MAIN) || defined(SPAMMER)
 static int randFT(int min, int max) {
   return rand() % (max - min + 1) + min;
@@ -50,6 +38,18 @@ static int randFT(int min, int max) {
 }  // namespace
 
 namespace Credits {
+void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb) {
+	// std::cout << "SOLVER> Before calback" << std::endl;
+	const auto  tp = std::chrono::system_clock::now() + ms;
+	std::thread tr([tp, cb]() {
+		std::this_thread::sleep_until(tp);
+		//  LOG_WARN("Inserting callback");
+		CallsQueue::instance().insert(cb);
+	});
+	// std::cout << "SOLVER> After calback" << std::endl;
+	tr.detach();
+}
+
 using ScopedLock          = std::lock_guard<std::mutex>;
 constexpr short min_nodes = 3;
 
@@ -294,6 +294,8 @@ void Solver::gotTransactionList(csdb::Pool&& _pool) {
     t.set_balance(node_->getBlockChain().getBalance(t.source()));
 
   Hash_ result = generals->buildvector(_pool, m_pool, node_->getConfidants().size(), b_pool);
+  b_pool = csdb::Pool{ };
+
   receivedVecFrom[node_->getMyConfNumber()] = true;
   hvector.Sender                            = node_->getMyConfNumber();
   hvector.hash                              = result;
@@ -472,48 +474,48 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     LOG_WARN("Writer nodes don't get blocks");
     return;
   }
-  gotBigBang        = false;
-  gotBlockThisRound = true;
+  uint32_t g_seq = block.sequence();
+
+  if (g_seq == node_->getRoundNumber()) {
+    gotBigBang        = false;
+    gotBlockThisRound = true;
+    node_->getBlockChain().setGlobalSequence(g_seq);
+  }
 #ifdef MONITOR_NODE
   //addTimestampToPool(block);
 #endif
-  uint32_t g_seq = block.sequence();
 #ifdef MYLOG
   std::cout << "GOT NEW BLOCK: global sequence = " << g_seq << std::endl;
 #endif
-  if (g_seq > node_->getRoundNumber())
+
+  if (g_seq <= node_->getBlockChain().getLastWrittenSequence())
+    return;
+
+  if (g_seq > (node_->getBlockChain().getLastWrittenSequence() + 1))
     return gotIncorrectBlock(std::move(block), sender);  // remove this line when the block candidate signing of all trusted will be implemented
 
-  node_->getBlockChain().setGlobalSequence(g_seq);
-  if (g_seq == node_->getBlockChain().getLastWrittenSequence() + 1) {
-    std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
+  std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
 #ifndef MONITOR_NODE
-    if (block.verify_signature())  // INCLUDE SIGNATURES!!!
-    {
-      node_->getBlockChain().putBlock(block);
-      if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
+  if (block.verify_signature()) {  // INCLUDE SIGNATURES!!!
+    node_->getBlockChain().putBlock(block);
+    if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
         // std::cout << "Solver -> before sending hash to writer" << std::endl;
-        Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));  // getLastWrittenHash().to_binary().data()));//SENDING
+      Hash test_hash((char*)(node_->getBlockChain().getLastWrittenHash().to_binary().data()));  // getLastWrittenHash().to_binary().data()));//SENDING
                                                                                                   // HASH!!!
-        node_->sendHash(test_hash, sender);
+      node_->sendHash(test_hash, sender);
 #ifdef MYLOG
-        std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32) << std::endl;
+      std::cout << "SENDING HASH: " << byteStreamToHex(test_hash.str, 32) << std::endl;
 #endif
-      }
     }
+  }
 #else
   node_->getBlockChain().putBlock(block);
 #endif
 
-    // std::cout << "Solver -> finishing gotBlock" << std::endl;
-  }
   size_t _rNum = rNum;
   // runAfter(std::chrono::milliseconds(TIME_TO_AWAIT_ACTIVITY),
   //  [this, rNum]() { node_->sendRoundTableRequest(rNum); });
 }
-
-
-
 
 void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender)
 {

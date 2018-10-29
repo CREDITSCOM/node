@@ -74,6 +74,7 @@ void Network::readerRoutine(const Config& config) {
                                             config.useIPv6());
 
   if (!sock) return;
+  while (!initFlag_.load());
 
   boost::system::error_code lastError;
 
@@ -257,6 +258,10 @@ bool Network::resendFragment(const Hash& hash,
   }
 
   return false;
+}
+
+void Network::sendInit() {
+  initFlag_.store(true);
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {

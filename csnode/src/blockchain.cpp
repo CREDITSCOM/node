@@ -125,23 +125,23 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 }
 
 
-void BlockChain::writeBlock(csdb::Pool& pool) {
+bool BlockChain::writeBlock(csdb::Pool& pool) {
 	//TRACE("");
 
-	{
-		std::lock_guard<decltype(dbLock_)> l(dbLock_);
-		pool.set_storage(storage_);
-	}
+        std::lock_guard<decltype(dbLock_)> l(dbLock_);
+        pool.set_storage(storage_);
 
 	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
 	if (!pool.compose()) {
           LOG_ERROR("Couldn't compose block");
-          return;
+          return false;
 	}
 
-        if (!pool.save()) {
-          LOG_ERROR("Couldn't save block");
-          return;
+  if (!pool.save()) {
+    if (pool.hash().is_empty() || !storage_.pool_load(pool.hash()).is_valid()) {
+      LOG_ERROR("Couldn't save block");
+      return false;
+    }
 	}
 
 	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
@@ -155,8 +155,10 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 	}
 
 	if (!updateCache(pool)) {
-		LOG_ERROR("Couldn't update cache");
+          LOG_ERROR("Couldn't update cache");
 	}
+
+        return true;
 }
 
 void BlockChain::setLastWrittenSequence(uint32_t seq) {
@@ -488,10 +490,12 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
   if (pool.sequence() == getLastWrittenSequence() + 1) {
    // std::cout << "OK" << std::endl;
     //pool.set_previous_hash(lastHash_);
-    writeBlock(pool);
+    if (!writeBlock(pool)) {
+      LOG_WARN("Block skiped");
+      return;
+    }
     //std::cout << "Preparing to calculate last hash" << std::endl;
     lastHash_ = pool.hash();
-
     blockHashes_.push_back(lastHash_);
     //std::cout << "Hash inserted into the hash-vector" << std::endl;
 

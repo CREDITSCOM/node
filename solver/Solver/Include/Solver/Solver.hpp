@@ -36,6 +36,9 @@
 class Node;
 
 namespace Credits {
+
+void runAfter(const std::chrono::milliseconds& ms, std::function<void()> cb);
+
 typedef std::string Vector;
 typedef std::string Matrix;
 

@@ -82,7 +82,7 @@ private:
   bool loadCache();
   bool updateCache(csdb::Pool& pool);
   csdb::Amount calcBalance(const csdb::Address &) const;
-  void writeBlock(csdb::Pool& pool);
+  bool writeBlock(csdb::Pool& pool);
   void onBlockReceived(csdb::Pool& pool);
   void writeGenesisBlock();
 
