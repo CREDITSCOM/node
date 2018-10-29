@@ -630,8 +630,6 @@ void Node::sendMatrix(const cs::HashMatrix& matrix) {
     return;
   }
 
-  cslog() << "NODE> 1 Sending matrix to ";
-
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::ConsMatrix << roundNum_;
 
@@ -1117,7 +1115,6 @@ cs::Bytes Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo
   stream << poolMetaInfo.sequenceNumber;
 
   stream << signature;
-
   stream << notifications.size();
 
   for (const auto& notification : notifications) {

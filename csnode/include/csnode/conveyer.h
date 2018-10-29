@@ -98,17 +98,19 @@ namespace cs
         void setRound(cs::RoundTable&& table);
 
         ///
-        /// @brief Returns current blockchain round table
+        /// @brief Returns current blockchain round table.
         ///
         const cs::RoundTable& roundTable() const;
 
         ///
-        /// @brief Returns current round number
+        /// @brief Returns current round number.
+        /// Locks mutex and returns safe round number.
         ///
          cs::RoundNumber roundNumber() const;
 
         ///
-        /// @brief Returns safe copy of round table
+        /// @brief Returns safe copy of round table.
+        /// Locks mutex and returns deep copy of round table.
         ///
         const cs::RoundTable roundTableSafe() const;
 
@@ -118,7 +120,7 @@ namespace cs
         const cs::Hashes& neededHashes() const;
 
         ///
-        /// @brief Adds synced packet to conveyer
+        /// @brief Adds synced packet to conveyer.
         ///
         void addFoundPacket(cs::TransactionsPacket&& packet);
 
@@ -205,7 +207,7 @@ namespace cs
         /// @param hash Created transactions packet hash.
         /// @return Returns transactions packet if its found, otherwise returns nothing.
         ///
-        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round);
+        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
 
         // sync, try do not use it :]
 

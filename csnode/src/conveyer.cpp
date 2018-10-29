@@ -126,7 +126,7 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
-    if (table.round <= pimpl->roundTable.round)
+    if (table.round <= roundNumber())
     {
         cserror() << "CONVEYER> Setting round in conveyer failed";
         return;
@@ -375,7 +375,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     return newPool;
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round)
+std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
 {
     cs::SharedLock lock(m_sharedMutex);
 
