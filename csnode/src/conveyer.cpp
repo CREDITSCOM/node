@@ -107,7 +107,7 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
     {
         cs::SharedLock lock(m_sharedMutex);
-        std::copy_if(hashes.begin(), hashes.end(), neededHashes.begin(), [hashTable = &pimpl->hashTable] (const auto& hash) {
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [hashTable = &pimpl->hashTable] (const auto& hash) {
             return hashTable->count(hash) == 0u;
         });
     }
