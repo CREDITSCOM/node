@@ -714,6 +714,24 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     //TRACE("");
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
     //TRACE("");
+
+    //
+    /*csdb::Address pk_addr;
+    if (smart_addr.is_public_key())
+      pk_addr = smart_addr;
+    else {
+      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(smart_addr.to_api_addr().data());
+      if (!s_blockchain.findAddrByWalletId(id, pk_addr))
+        return;
+    }*/
+
+    if (smart_addr.is_wallet_id()) {
+      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(smart_addr).to_api_addr().data());
+      if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(smart_addr)))
+        return;
+    }
+    //
+
     auto it = smart_origin->find(smart_addr);
     if ((present = (it != smart_origin->end()))) {
       origin_bytecode =
