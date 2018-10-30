@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <boost/test/unit_test.hpp>
-#include <csnode/transactionsPacket.h>
+#include <csnode/transactionspacket.h>
 #include <csdb/transaction.h>
 #include <csdb/address.h>
 #include <csdb/currency.h>
