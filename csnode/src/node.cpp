@@ -1049,10 +1049,10 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
 
   this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
 
+#ifndef MONITOR_NODE
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
     this->getBlockChain().putBlock(newPool);
 
-#ifndef MONITOR_NODE
     if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
       auto hash = this->getBlockChain().getLastWrittenHash().to_string();
 
@@ -1062,11 +1062,17 @@ void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& 
     } else {
       cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
     }
-#endif
   }
   else {
     solver_->gotIncorrectBlock(std::move(newPool), sender);
   }
+#else
+  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
+    this->getBlockChain().putBlock(newPool);
+  } else {
+    solver_->gotIncorrectBlock(std::move(newPool), sender);
+  }
+#endif
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey) {
