@@ -424,6 +424,11 @@ std::vector<uint8_t> Pool::writer_public_key() const noexcept
   return d->writer_public_key_;
 }
 
+std::string Pool::signature() const noexcept
+{
+  return d->signature_;
+}
+
 void Pool::set_sequence(Pool::sequence_t seq) noexcept
 {
   if (d.constData()->read_only_) {
@@ -455,6 +460,17 @@ void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcep
 	priv* data = d.data();
 	data->is_valid_ = true;
 	data->writer_public_key_ = writer_public_key;
+}
+
+void Pool::set_signature(const std::string& signature) noexcept
+{
+  if (d.constData()->read_only_) {
+    return;
+  }
+
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->signature_ = signature;
 }
 
 void Pool::set_storage(Storage storage) noexcept
