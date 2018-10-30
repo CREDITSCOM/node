@@ -19,6 +19,7 @@
 #include <lib/system/structures.hpp>
 #include <lib/system/common.hpp>
 #include <sodium.h>
+#include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/asio/thread_pool.hpp>
@@ -113,9 +114,14 @@ namespace cs
             auto now = std::chrono::system_clock::now();
             auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
+            struct tm result;
             std::stringstream ss;
-            ss << std::put_time(std::localtime(&in_time_t), "%H:%M:%S");
-
+#ifndef _WINDOWS
+            ss << std::put_time(localtime_r(&in_time_t, &result), "%H:%M:%S");
+#else
+            localtime_s(&result, &in_time_t);
+            ss << std::put_time(&result, "%H:%M:%S");
+#endif
             return ss.str();
         }
 
