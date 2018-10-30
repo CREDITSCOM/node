@@ -17,6 +17,7 @@ add_library(lib
 )
 
 if (MSVC)
+  # Boost.Log uses some functions on windows
   find_library(Psapi STATIC IMPORTED)
   target_link_libraries(lib Psapi)
 endif(MSVC)
@@ -29,6 +30,9 @@ set (Boost_USE_STATIC_RUNTIME ON)
 set (BOOST_ALL_DYN_LINK OFF)
 
 find_package (Boost REQUIRED COMPONENTS log)
+# resolve cyclic dependency
+target_link_libraries (Boost::log INTERFACE Boost::log_setup)
+target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
                        libsodium
                        Boost::log
