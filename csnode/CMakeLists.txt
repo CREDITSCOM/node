@@ -10,7 +10,7 @@ set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem log)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
