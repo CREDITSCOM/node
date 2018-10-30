@@ -107,13 +107,9 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
     {
         cs::SharedLock lock(m_sharedMutex);
-
-        for (const auto& hash : hashes)
-        {
-            if (pimpl->hashTable.count(hash) == 0u) {
-                neededHashes.push_back(hash);
-            }
-        }
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [hashTable = &pimpl->hashTable] (const auto& hash) {
+            return hashTable->count(hash) == 0u;
+        });
     }
 
     for (const auto& hash : neededHashes) {
@@ -288,8 +284,16 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         for (const auto& transaction : transactions)
         {
-            if (mask.at(maskIndex) != 0u) {
-                newPool.add_transaction(transaction);
+            if (maskIndex < mask.size())
+            {
+                if (mask[maskIndex] != 0u) {
+                    newPool.add_transaction(transaction);
+                }
+            }
+            else
+            {
+                cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
+                return std::nullopt;
             }
 
             ++maskIndex;

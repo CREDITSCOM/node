@@ -135,11 +135,13 @@ public:
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
   std::vector<uint8_t> writer_public_key() const noexcept;
+  std::string signature() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(sequence_t sequence) noexcept;
   void set_storage(Storage storage) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
+  void set_signature(const std::string& signature) noexcept;
   Transactions& transactions();
   const Transactions& transactions() const;
 
