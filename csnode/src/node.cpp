@@ -445,6 +445,7 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
 }
 
 bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes) {
+#ifdef DIRECT_TRANSACTIONS_REQUEST
   ConnectionPtr connection = transport_->getConnectionByKey(sender);
 
   if (connection) {
@@ -452,6 +453,15 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
   }
 
   return connection;
+#else
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  ostream_ << msgType << roundNum_ << bytes;
+
+  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
+
+  flushCurrentTasks();
+  return true;
+#endif
 }
 
 void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes) {
@@ -461,12 +471,8 @@ void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, 
   csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
   csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
 
-#ifdef DIRECT_TRANSACTIONS_REQUEST
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
   ostream_.clear();
-#else
-  flushCurrentTasks();
-#endif
 }
 
 template <class... Args>
@@ -1028,9 +1034,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     pool.value().set_signature(std::string(signature.data(), signature.data() + SIGNATURE_LENGTH));
     getBlockChain().finishNewBlock(pool.value());
 
-    const uint8_t* message = pool->to_binary().data();
-    const size_t messageSize = pool->to_binary().size();
-
     if (pool.value().verify_signature()) {
       cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(pool.value(), sequence, sender);
@@ -1272,7 +1275,7 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
 #ifndef DIRECT_TRANSACTIONS_REQUEST
   sendBroadcast(msgType, bytes);
   return;
-#endif
+#else
 
   const bool success = sendToRandomNeighbour(msgType, bytes);
 
@@ -1287,11 +1290,15 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
                             sendPacketHashesRequest(conveyer.neededHashes());
                           };
                        });
+#endif
 }
 
 void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
   if (packet.hash().isEmpty()) {
     cswarning() << "NODE> Send transaction packet reply with empty hash failed";
+#ifndef DIRECT_TRANSACTIONS_REQUEST
+    return;
+#endif
   }
 
   const bool success = sendDirect(sender, MsgTypes::TransactionsPacketReply, packet);
@@ -1506,10 +1513,8 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
 
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
   for (const auto& hash : hashes){
-    std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
+    std::optional<cs::TransactionsPacket> packet = cs::Conveyer::instance().searchPacket(hash, round);
 
     if (packet) {
       sendPacketHashesReply(packet.value(), sender);
