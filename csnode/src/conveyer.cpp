@@ -107,8 +107,8 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
     {
         cs::SharedLock lock(m_sharedMutex);
-        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [hashTable = &pimpl->hashTable] (const auto& hash) {
-            return hashTable->count(hash) == 0u;
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this] (const auto& hash) {
+            return (pimpl->hashTable.count(hash) == 0u);
         });
     }
 
@@ -199,6 +199,7 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     if (state == NotificationState::Equal) {
         return notificationsCount == neededConfidantsCount;
     }
+
     return notificationsCount >= neededConfidantsCount;
 }
 
