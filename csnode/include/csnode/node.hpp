@@ -84,7 +84,7 @@ public:
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
+  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes, const cs::RoundNumber round);
   void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
 
@@ -98,17 +98,17 @@ public:
   void sendRoundTable(const cs::RoundTable& round);
 
   template<class... Args>
-  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args);
-  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes);
-  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes);
+  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
-  void sendBroadcast(const MsgTypes& msgType, const Args&... args);
-  void sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes);
+  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args);
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::Bytes& bytes);
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
