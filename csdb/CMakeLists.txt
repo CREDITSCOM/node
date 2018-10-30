@@ -73,6 +73,7 @@ target_link_libraries(
   Boost::filesystem
   Boost::disable_autolinking
   BerkeleyDB
+  lz4
 )
 if (CSDB_PLATFORM_IS_BIG_ENDIAN)
   target_compile_definitions(${PROJECT_NAME} PUBLIC -DCSDB_PLATFORM_IS_BIG_ENDIAN)

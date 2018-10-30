@@ -67,6 +67,7 @@ target_link_libraries (
 	csnode
 #	base58
 	libsodium
+	lib
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
