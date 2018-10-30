@@ -49,7 +49,7 @@ public:
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey&);
-  void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::PublicKey& sender);
+  void getPacketHashesReply(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey& sender);
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
@@ -85,7 +85,7 @@ public:
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
   void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes);
-  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender);
+  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
 
   void sendBadBlock(const csdb::Pool& pool);
@@ -183,7 +183,7 @@ private:
 
   // conveyer
   void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-  void processPacketsReply(cs::TransactionsPacket&& packet);
+  void processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);

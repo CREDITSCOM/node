@@ -852,7 +852,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
   cs::DataStream stream(data, size);
 
   cs::TransactionsPacket packet;
@@ -876,7 +876,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   }
 
   cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
-  processPacketsReply(std::move(packet));
+  processPacketsReply(std::move(packet), round);
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
@@ -1265,7 +1265,9 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
   const auto msgType = MsgTypes::TransactionsPacketRequest;
 
 #ifndef DIRECT_TRANSACTIONS_REQUEST
-  sendBroadcast(msgType, bytes);
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Broadcast | BaseFlags::Compressed);
+  ostream_ << msgType << roundNum_ << bytes;
+  flushCurrentTasks();
   return;
 #endif
 
@@ -1284,10 +1286,27 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
                        });
 }
 
-void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
+void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (packet.hash().isEmpty()) {
     cswarning() << "NODE> Send transaction packet reply with empty hash failed";
   }
+
+#ifndef DIRECT_TRANSACTIONS_REQUEST
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  ostream_ << MsgTypes::TransactionsPacketReply << round;
+
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  stream << packet;
+
+  cslog() << "Node> Sending transaction packet reply: size: " << bytes.size();
+
+  ostream_ << bytes;
+
+  flushCurrentTasks();
+  return;
+#endif
 
   const bool success = sendDirect(sender, MsgTypes::TransactionsPacketReply, packet);
 
@@ -1500,24 +1519,23 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
 void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
-
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   for (const auto& hash : hashes){
     std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
 
     if (packet) {
-      sendPacketHashesReply(packet.value(), sender);
+      sendPacketHashesReply(packet.value(), round, sender);
     }
 #ifdef DIRECT_TRANSACTIONS_REQUEST
     else {
-      sendPacketHashesReply(cs::TransactionsPacket(), sender);
+      sendPacketHashesReply(cs::TransactionsPacket(), round, sender);
     }
 #endif
   }
 }
 
-void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
+void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundNumber round) {
   csdebug() << "NODE> Processing packets reply";
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1527,9 +1545,7 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet) {
     csdebug() << "NODE> Packets sync completed";
     solver_->gotRound();
 
-    const cs::RoundNumber currentRound = conveyer.roundTable().round;
-
-    if (auto meta = conveyer.characteristicMeta(currentRound); meta.has_value()) {
+    if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
 
       if (meta->round != 0) {
