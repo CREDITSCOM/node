@@ -22,6 +22,8 @@ namespace cs
     using Vector = std::string;
     using Matrix = std::string;
 
+    using RoundNumber = uint32_t;
+
     using Byte = uint8_t;
 
     // dynamic vector of bytes

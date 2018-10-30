@@ -57,7 +57,6 @@ namespace cs
     using Notifications = std::vector<cs::Bytes>;
 
     // round data
-    using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 
