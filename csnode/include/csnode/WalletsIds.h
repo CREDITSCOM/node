@@ -49,6 +49,7 @@ public:
         bool findaddr(const WalletId& id, WalletAddress& address) const;
         // returns true if new id was inserted
         bool get(const WalletAddress& address, WalletId& id);
+        bool remove(const WalletAddress& address);
     private:
         WalletsIds& norm_;
     };
