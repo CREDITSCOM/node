@@ -1016,16 +1016,17 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
   stream >> writerPublicKey;
 
   conveyer.setCharacteristic(characteristic);
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, sender);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
   if (pool) {
     solver_->countFeesInPool(&pool.value());
+    pool.value().set_signature(std::string(signature.data(), signature.data() + SIGNATURE_LENGTH));
     getBlockChain().finishNewBlock(pool.value());
 
     const uint8_t* message = pool->to_binary().data();
     const size_t messageSize = pool->to_binary().size();
 
-    if (cs::Utils::verifySignature(signature, writerPublicKey, message, messageSize)) {
+    if (pool.value().verify_signature()) {
       cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(pool.value(), sequence, sender);
     }
@@ -1092,8 +1093,7 @@ void Node::applyNotifications() {
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, myPublicKey_);
-
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, solver_->getPublicKey());
   if (!pool) {
     cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
     return;
@@ -1107,11 +1107,11 @@ void Node::applyNotifications() {
   cs::Solver::addTimestampToPool(pool.value()));
   #endif
 
-  const cs::Bytes& poolBinary = pool.value().to_binary();
-  const cs::Signature poolSignature = cs::Utils::sign(poolBinary, solver_->getPrivateKey());
+  pool.value().sign(myPrivateForSig);
+  cs::Signature poolSignature;
+  memcpy(poolSignature.data(), pool.value().signature().data(), SIGNATURE_LENGTH);
   csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
-
-  const bool isVerified = cs::Utils::verifySignature(poolSignature, solver_->getPublicKey(), poolBinary);
+  const bool isVerified = pool.value().verify_signature();
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
