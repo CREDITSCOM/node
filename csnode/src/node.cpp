@@ -460,9 +460,13 @@ void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, 
 
   csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
   csdebug() << "NODE> Sending data Direct: to " << connection->getOut();
-  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
 
+#ifdef DIRECT_TRANSACTIONS_REQUEST
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), connection);
   ostream_.clear();
+#else
+  flushCurrentTasks();
+#endif
 }
 
 template <class... Args>
@@ -475,13 +479,18 @@ void Node::sendBroadcast(const MsgTypes& msgType, const Args&... args) {
   sendBroadcast(msgType, bytes);
 }
 
-
 void Node::sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << roundNum_ << bytes;
 
   csdebug() << "NODE> Sending data Broadcast";
+
+#ifdef DIRECT_TRANSACTIONS_REQUEST
   transport_->sendBroadcast(ostream_.getPackets());
+  ostream_.clear();
+#else
+  flushCurrentTasks();
+#endif
 }
 
 template <class... Args>

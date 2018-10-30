@@ -99,17 +99,15 @@ public:
 
   template<class... Args>
   bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const Args&... args);
-
   bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::Bytes& bytes);
   void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::Bytes& bytes);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const Args&... args);
-
   void sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes);
+
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const Args&... args);
-
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::Bytes& bytes);
 
   void sendVectorRequest(const cs::PublicKey&);
@@ -246,6 +244,9 @@ private:
 
   /// sends transactions blocks to network
   cs::Timer sendingTimer_;
+
+  static const uint8_t broadcastFlag_ = BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
+  static const uint8_t directFlag_    = BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
