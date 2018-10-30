@@ -664,7 +664,7 @@ Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompress
 
 void Pool::sign(std::vector<uint8_t> private_key)
 {
-	uint8_t signature[64];
+	uint8_t signature[internal::kSignatureLength];
 	auto pool_bytes = this->to_byte_stream_for_sig();
 	uint64_t sig_len;
 	crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_len),
@@ -674,7 +674,7 @@ void Pool::sign(std::vector<uint8_t> private_key)
 
 bool Pool::verify_signature()
 {
-	if (this->writer_public_key().size() != 32 || d->signature_.size() != 64)
+	if (this->writer_public_key().size() != internal::kPublicKeySize || d->signature_.size() != internal::kSignatureLength)
 		return false;
 	const auto& pool_bytes = this->to_byte_stream_for_sig();
 	if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
@@ -686,7 +686,7 @@ bool Pool::verify_signature()
 
 bool Pool::verify_signature(const std::string& signature)
 {
-  if (this->writer_public_key().size() != 32 || signature.size() != 64)
+  if (this->writer_public_key().size() != internal::kPublicKeySize || signature.size() != internal::kSignatureLength)
     return false;
   const auto& pool_bytes = this->to_byte_stream_for_sig();
   if (crypto_sign_ed25519_verify_detached((const uint8_t *)signature.c_str(),

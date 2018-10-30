@@ -16,6 +16,9 @@ namespace internal {
 
 using byte_array = std::vector<std::uint8_t>;
 using WalletId = uint32_t;
+constexpr size_t kPublicKeySize = 32;
+constexpr size_t kPrivateKeySize = 64;
+constexpr size_t kSignatureLength = 64;
 
 } // namespace internal
 } // namespace csdb
