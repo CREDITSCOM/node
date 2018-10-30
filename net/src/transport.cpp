@@ -504,6 +504,40 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     return;
   }
 
+  // если последний номер раунда в блоке у ноды отстаёт пришедшего номера раунда на N
+  // то начинается синхронизация
+  // в противом случае нода собирает блоки из транзакций по таблице раундов
+  constexpr size_t roundNumberLagLimit = 5;  // подобрано экспериментально
+  const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
+  const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
+
+  if (rNum < lastSequenceNumber) {
+      cslog() << "Recived RoundNumber greater then blockchain last sequence";
+      cslog() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+                  << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << ";";
+      return;
+  }
+
+  const bool isRoundNumberLagged = lagBeetweenRounds > roundNumberLagLimit;
+
+  if (isRoundNumberLagged) {
+    cslog() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+            << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << ";";
+    if (type == MsgTypes::RoundTableSS) {
+      cslog() << "RoundTableSS";
+      return node_->getRoundTableSS(data, size, rNum);
+    }
+    else if (type == MsgTypes::BlockRequest) {
+      cslog() << "BlockRequest";
+      return node_->getBlockRequest(data, size, firstPack.getSender());
+    }
+    else if (type == MsgTypes::RequestedBlock) {
+      cslog() << "RequestedBlock";
+      return node_->getBlockReply(data, size);
+    }
+    while (true) {}
+  }
+
   switch(type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
