@@ -1020,7 +1020,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   if (pool) {
     solver_->countFeesInPool(&pool.value());
-    pool.value().set_signature(std::string(signature.data(), signature.data() + SIGNATURE_LENGTH));
+    pool.value().set_signature(std::string(signature.begin(), signature.end()));
     getBlockChain().finishNewBlock(pool.value());
 
     const uint8_t* message = pool->to_binary().data();
@@ -1108,9 +1108,14 @@ void Node::applyNotifications() {
   #endif
 
   pool.value().sign(myPrivateForSig);
+
+  // array
   cs::Signature poolSignature;
-  memcpy(poolSignature.data(), pool.value().signature().data(), SIGNATURE_LENGTH);
+  const auto& signature = pool.value().signature();
+  std::copy(signature.begin(), signature.end(), poolSignature.begin());
+
   csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+
   const bool isVerified = pool.value().verify_signature();
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
