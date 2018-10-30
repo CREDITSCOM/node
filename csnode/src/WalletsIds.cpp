@@ -99,6 +99,18 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id)
     return false;
 }
 
+bool WalletsIds::Normal::remove(const WalletAddress& address)
+{
+    if (address.is_public_key()) {
+        return false;
+    }
+    norm_.data_.erase(address);
+    if (norm_.nextId_ > 0) {
+        --norm_.nextId_;
+    }
+    return true;
+}
+
 WalletsIds::WalletId WalletsIds::Special::makeSpecial(WalletId id)
 {
     return (id | maskSpecial_);

@@ -1044,6 +1044,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> remove wallets from wallets cache";
+      getBlockChain().removeWalletsInPoolFromCache(pool.value());
     }
   }
 }
