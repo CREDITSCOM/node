@@ -684,6 +684,19 @@ bool Pool::verify_signature()
 	return false;
 }
 
+bool Pool::verify_signature(const std::string& signature)
+{
+  if (this->writer_public_key().size() != 32 || signature.size() != 64)
+    return false;
+  const auto& pool_bytes = this->to_byte_stream_for_sig();
+  if (crypto_sign_ed25519_verify_detached((const uint8_t *)signature.c_str(),
+    pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
+    d->signature_ = signature;
+    return true;
+  }
+  return false;
+}
+
 Pool Pool::load(PoolHash hash, Storage storage)
 {
   if (!storage.isOpen()) {

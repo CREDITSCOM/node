@@ -1020,14 +1020,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
 
   if (pool) {
     solver_->countFeesInPool(&pool.value());
-    pool.value().set_signature(std::string(signature.begin(), signature.end()));
     pool.value().set_previous_hash(bc_.getLastWrittenHash());
     getBlockChain().finishNewBlock(pool.value());
 
     const uint8_t* message = pool->to_binary().data();
     const size_t messageSize = pool->to_binary().size();
 
-    if (pool.value().verify_signature()) {
+    if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
       cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(pool.value(), sequence, sender);
     }
