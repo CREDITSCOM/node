@@ -85,7 +85,10 @@ bool Node::init() {
   solver_->runSpammer();
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
+
+#ifdef FLUSH_PACKETS_TO_NETWORK
   cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+#endif
 
   return true;
 }
@@ -482,6 +485,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::Bytes& bytes) {
 
   csdebug() << "NODE> Sending data Broadcast";
   transport_->sendBroadcast(ostream_.getPackets());
+  ostream_.clear();
 }
 
 template <class... Args>
