@@ -284,8 +284,16 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         for (const auto& transaction : transactions)
         {
-            if (mask.at(maskIndex) != 0u) {
-                newPool.add_transaction(transaction);
+            if (maskIndex < mask.size())
+            {
+                if (mask[maskIndex] != 0u) {
+                    newPool.add_transaction(transaction);
+                }
+            }
+            else
+            {
+                cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
+                return std::nullopt;
             }
 
             ++maskIndex;
