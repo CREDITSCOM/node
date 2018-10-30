@@ -4,23 +4,23 @@
 #include <functional>
 #include <vector>
 
-#define signals public
-#define slots public
+#define signals
+#define slots
 #define emit
 
 namespace cs
 {
     class Connector;
 
-    /*!
-        Base preudo signal
-    */
+    ///
+    /// Base preudo signal
+    ///
     template<typename T>
     class Signal;
 
-    /*!
-        Signal needed specialization
-    */
+    ///
+    /// Signal needed specialization
+    ///
     template <typename Return, typename... InArgs>
     class Signal<Return(InArgs...)>
     {
@@ -29,11 +29,10 @@ namespace cs
         using Signature = Return(InArgs...);
         using Slots = std::vector<Argument>;
 
-        /*!
-            Generates signal
-
-            @param args Any count of template parameters
-        */
+        ///
+        /// @brief Generates signal.
+        /// @param args Any count of template parameters.
+        ///
         template<typename... Args>
         inline void operator() (Args&&... args) const
         {
@@ -106,9 +105,9 @@ namespace cs
         friend class Signal;
     };
 
-    /*!
-        Signal for function prototype
-    */
+    ///
+    /// Signal for function prototype
+    ///
     template<typename T>
     class Signal<std::function<T>>
     {
@@ -117,11 +116,10 @@ namespace cs
         using Signature = T;
         using Slots = std::vector<Argument>;
 
-        /*!
-            Generates signal
-
-            @param args Any count of template parameters
-        */
+        ///
+        /// @brief Generates signal.
+        /// @param args Any count of template parameters.
+        ///
         template<typename... Args>
         inline void operator() (Args&&... args) const
         {
@@ -344,9 +342,9 @@ namespace cs
         };
     }
 
-    /*!
-        Signal - slot connection entity
-    */
+    ///
+    /// Signal - slot connection entity
+    ///
     class Connector
     {
     public:
@@ -354,17 +352,16 @@ namespace cs
         Connector(const Connector&) = delete;
         Connector& operator=(const Connector&) = delete;
         Connector(Connector&&) = delete;
-        Connector operator=(Connector&&) = delete;
+        Connector& operator=(Connector&&) = delete;
 
         ~Connector() = default;
 
-        /*!
-            Connects signal with callback
-
-            @param signal Any signal object
-            @param slotObj Method object owner
-            @param slot Pointer to method
-        */
+        ///
+        /// @brief Connects signal with callback.
+        /// @param signal Any signal object.
+        /// @param slotObj Method object owner.
+        /// @param slot Pointer to method.
+        ///
         template<typename Signal, typename T, typename Slot>
         inline static void connect(Signal& signal, const T& slotObj, Slot&& slot)
         {
@@ -372,13 +369,12 @@ namespace cs
             signal.add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)));
         }
 
-        /*!
-            Connects signal with callback
-
-            @param signal Any signal object
-            @param slotObj Method object owner
-            @param slot Pointer to method
-        */
+        ///
+        /// @brief Connects signal with callback.
+        /// @param signal Any signal object.
+        /// @param slotObj Method object owner.
+        /// @param slot Pointer to method.
+        ///
         template<typename Signal, typename T, typename Slot>
         inline static void connect(const Signal& signal, const T& slotObj, Slot&& slot)
         {
@@ -386,84 +382,77 @@ namespace cs
             const_cast<Signal*>(&signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)));
         }
 
-        /*!
-            Connects signal with callback
-
-            @param signal Any signal object
-            @param slot Function/lambda/closure
-        */
+        ///
+        /// @brief Connects signal with callback.
+        /// @param signal Any signal object.
+        /// @param slot Function/lambda/closure.
+        ///
         template<typename Signal, typename Slot>
         inline static void connect(Signal& signal, Slot&& slot)
         {
             signal.add(std::forward<Slot>(slot));
         }
 
-        /*!
-            Connects signal with lambda or function
-
-            @param signal Any signal object
-            @param slot Function or lambda/closure
-        */
+        ///
+        /// @brief Connects signal with lambda or function.
+        /// @param signal Any signal object.
+        /// @param slot Function or lambda/closure.
+        ///
         template<typename Signal, typename Slot>
         inline static void connect(const Signal& signal, Slot&& slot)
         {
             const_cast<Signal*>(&signal)->add(std::forward<Slot>(slot));
         }
 
-        /*!
-            Connects signal pointer with lambda or function
-
-            @param signal Any signal pointer
-            @param slot Function or lambda/closure
-        */
+        ///
+        /// @brief Connects signal pointer with lambda or function.
+        /// @param signal Any signal pointer.
+        /// @param slot Function or lambda/closure.
+        ///
         template<typename Signal, typename Slot>
         inline static void connect(Signal* signal, Slot&& slot)
         {
             cs::Connector::connect(*signal, std::forward<Slot>(slot));
         }
 
-        /*!
-            Connects signal pointer with objects method
-
-            @param signal Any signal pointer
-            @param slotObj Pointer to slot object
-            @param slot Method pointer
-        */
+        ////
+        /// @brief Connects signal pointer with objects method.
+        /// @param signal Any signal pointer.
+        /// @param slotObj Pointer to slot object.
+        /// @param slot Method pointer.
+        ///
         template<typename Signal, typename T, typename Slot>
         inline static void connect(Signal* signal, const T& slotObj, Slot&& slot)
         {
             cs::Connector::connect(*signal, slotObj, std::forward<Slot>(slot));
         }
 
-        /*!
-            Connects const signal pointer with objects method
-
-            @param signal Any const signal pointer
-            @param slotObj Pointer to slot object
-            @param slot Method pointer
-        */
+        ///
+        /// @brief Connects const signal pointer with objects method.
+        /// @param signal Any const signal pointer.
+        /// @param slotObj Pointer to slot object.
+        /// @param slot Method pointer.
+        ///
         template<typename Signal, typename T, typename Slot>
         inline static void connect(const Signal* signal, const T& slotObj, Slot&& slot)
         {
             cs::Connector::connect(*signal, slotObj, std::forward<Slot>(slot));
         }
 
-        /*!
-            Drops all signal connections
-
-            @param signal Any signal object
-        */
+        ///
+        /// @brief Drops all signal connections.
+        /// @param signal Any signal object.
+        ///
         template<typename Signal>
         inline static void disconnect(Signal& signal)
         {
             signal = nullptr;
         }
 
-        /*!
-            Returns signal callbacks size
-
-            @return Returns any signal object callbacks count
-        */
+        ///
+        /// @brief Returns signal callbacks size.
+        /// @return Returns any signal object callbacks count.
+        ///
         template<typename Signal>
         inline static std::size_t callbacks(Signal& signal)
         {

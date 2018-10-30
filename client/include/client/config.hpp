@@ -67,8 +67,8 @@ public:
   bool useIPv6() const { return ipv6_; }
   bool hasTwoSockets() const { return twoSockets_; }
 
-  uint32_t getMaxNeighbours() { return maxNeighbours_; }
-  uint64_t getConnectionBandwidth() { return connectionBandwidth_; }
+  uint32_t getMaxNeighbours() const { return maxNeighbours_; }
+  uint64_t getConnectionBandwidth() const { return connectionBandwidth_; }
 
   bool isSymmetric() const { return symmetric_; }
   const EndpointData& getAddressEndpoint() const { return hostAddressEp_; }

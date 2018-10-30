@@ -1,7 +1,5 @@
 #include "csnode/conveyer.h"
 
-#include <csnode/node.hpp>
-#include <solver/solver.hpp>
 #include <csdb/transaction.h>
 
 #include <lib/system/logger.hpp>
@@ -10,9 +8,6 @@
 /// pointer implementation realization
 struct cs::Conveyer::Impl
 {
-    // other modules pointers
-    Node* node{};
-
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
 
@@ -35,7 +30,7 @@ struct cs::Conveyer::Impl
     // round table
     cs::RoundTable roundTable;
 
-signals:
+public signals:
     cs::PacketFlushSignal flushPacket;
 };
 
@@ -45,25 +40,12 @@ cs::Conveyer::Conveyer()
     pimpl = std::make_unique<cs::Conveyer::Impl>();
     pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
     pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
-
-    m_sendingTimer.connect(std::bind(&cs::Conveyer::flushTransactions, this));
-}
-
-cs::Conveyer::~Conveyer()
-{
-    m_sendingTimer.disconnect();
-    m_sendingTimer.stop();
 }
 
 cs::Conveyer& cs::Conveyer::instance()
 {
     static cs::Conveyer conveyer;
     return conveyer;
-}
-
-void cs::Conveyer::setNode(Node* node)
-{
-    pimpl->node = node;
 }
 
 cs::PacketFlushSignal& cs::Conveyer::flushSignal()
@@ -125,13 +107,9 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
 
     {
         cs::SharedLock lock(m_sharedMutex);
-
-        for (const auto& hash : hashes)
-        {
-            if (pimpl->hashTable.count(hash) == 0u) {
-                neededHashes.push_back(hash);
-            }
-        }
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this] (const auto& hash) {
+            return (pimpl->hashTable.count(hash) == 0u);
+        });
     }
 
     for (const auto& hash : neededHashes) {
@@ -144,12 +122,6 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     {
         cs::Lock lock(m_sharedMutex);
         pimpl->roundTable = std::move(table);
-    }
-
-    if (!m_sendingTimer.isRunning())
-    {
-        cslog() << "CONVEYER> Transaction timer started";
-        m_sendingTimer.start(TransactionsPacketInterval);
     }
 
     // clean data
@@ -227,6 +199,7 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     if (state == NotificationState::Equal) {
         return notificationsCount == neededConfidantsCount;
     }
+
     return notificationsCount >= neededConfidantsCount;
 }
 
@@ -312,8 +285,16 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         for (const auto& transaction : transactions)
         {
-            if (mask.at(maskIndex) != 0u) {
-                newPool.add_transaction(transaction);
+            if (maskIndex < mask.size())
+            {
+                if (mask[maskIndex] != 0u) {
+                    newPool.add_transaction(transaction);
+                }
+            }
+            else
+            {
+                cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
+                return std::nullopt;
             }
 
             ++maskIndex;
@@ -351,7 +332,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 {
     cs::SharedLock lock(m_sharedMutex);
 
-    if (pimpl->hashTable.count(hash))
+    if (pimpl->hashTable.count(hash) != 0u)
     {
         csdebug() << "CONVEYER> Found hash at current table in request - " << hash.toString();
         return pimpl->hashTable[hash];
@@ -385,12 +366,6 @@ cs::SharedMutex &cs::Conveyer::sharedMutex() const
 void cs::Conveyer::flushTransactions()
 {
     cs::Lock lock(m_sharedMutex);
-    const auto round = pimpl->roundTable.round;
-
-    if (pimpl->node->getNodeLevel() != NodeLevel::Normal || round <= TransactionsFlushRound) {
-        return;
-    }
-
     std::size_t allTransactionsCount = 0;
 
     for (auto& packet : pimpl->transactionsBlock)

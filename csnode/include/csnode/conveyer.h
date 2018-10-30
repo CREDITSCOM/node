@@ -4,13 +4,10 @@
 #include <csnode/nodecore.h>
 
 #include <lib/system/common.hpp>
-#include <lib/system/timer.hpp>
 #include <lib/system/signals.hpp>
 
 #include <memory>
 #include <optional>
-
-class Node;
 
 namespace csdb
 {
@@ -27,9 +24,8 @@ namespace cs
     ///
     class Conveyer
     {
-    private:
-        explicit Conveyer();
-        ~Conveyer();
+        Conveyer();
+        ~Conveyer() = default;
 
     public:
         enum class NotificationState {
@@ -47,11 +43,6 @@ namespace cs
         /// @return Returns static conveyer object reference, Meyers singleton.
         ///
         static Conveyer& instance();
-
-        ///
-        /// @brief Sets node pointer to get info about node level.
-        ///
-        void setNode(Node* node);
 
         ///
         /// @brief Returns transactions packet flush signal.
@@ -166,12 +157,12 @@ namespace cs
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
         /// @param round Current blockchain round.
         ///
-        std::optional<cs::CharacteristicMeta> characteristicMeta(const cs::RoundNumber round);
+        std::optional<cs::CharacteristicMeta> characteristicMeta(cs::RoundNumber round);
 
         // characteristic
 
         ///
-        /// @brief Sets current round characteristic function.
+        /// @brief Sets ct round characteristic function.
         /// @param characteristic Created characteristic on network level.
         ///
         void setCharacteristic(const cs::Characteristic& characteristic);
@@ -210,7 +201,7 @@ namespace cs
         ///
         cs::SharedMutex& sharedMutex() const;
 
-    protected:
+    public slots:
 
         /// try to send transactions packets to network
         void flushTransactions();
@@ -222,9 +213,6 @@ namespace cs
         std::unique_ptr<Impl> pimpl;
 
         mutable cs::SharedMutex m_sharedMutex;
-
-        /// sends transactions blocks to network
-        cs::Timer m_sendingTimer;
     };
 }
 

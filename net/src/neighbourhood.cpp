@@ -590,6 +590,33 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   return candidate;
 }
 
+ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
+  SpinLock l(nLockFlag_);
+
+  ConnectionPtr candidate;
+
+  for (auto& nb : neighbours_) {
+    if (nb->isSignal ||
+        nb->isRequested) {
+      continue;
+    }
+    if (!nb->syncNeighbourRetries) {
+      nb->syncNeighbourRetries = (rand() % (MaxSyncAttempts / 2)) + 1; // min == 1
+    }
+    candidate = nb;
+    break;
+  }
+
+  if (candidate) {
+    --(candidate->syncNeighbourRetries);
+    if (candidate->syncNeighbourRetries == 0) {
+      candidate->isRequested = true;
+    }
+  }
+
+  return candidate;
+}
+
 ConnectionPtr Neighbourhood::getNeighbourByKey(const cs::PublicKey& pk) {
   SpinLock l(nLockFlag_);
 
@@ -598,6 +625,13 @@ ConnectionPtr Neighbourhood::getNeighbourByKey(const cs::PublicKey& pk) {
         return nb;
 
   return ConnectionPtr();
+}
+
+void Neighbourhood::resetSyncNeighbours() {
+  for (auto& nb : neighbours_) {
+    nb->isRequested = false;
+    nb->syncNeighbourRetries = 0;
+  }
 }
 
 void Neighbourhood::registerDirect(const Packet* packPtr,
