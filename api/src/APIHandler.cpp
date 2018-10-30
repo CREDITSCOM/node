@@ -1092,8 +1092,19 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         (*smart_origin)[address] = tr.id();
       }
       {
+        csdb::Address pk_addr;
+        if (tr.source().is_public_key())
+          pk_addr = tr.source();
+        else {
+          WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(tr.source().to_api_addr().data());
+          if (!s_blockchain.findAddrByWalletId(id, pk_addr))
+            return false;
+        }
         auto deployed_by_creator = locked_ref(this->deployed_by_creator);
-        (*deployed_by_creator)[tr.source()].push_back(tr.id());
+        (*deployed_by_creator)[pk_addr].push_back(tr.id());
+
+        //auto deployed_by_creator = locked_ref(this->deployed_by_creator);
+        //(*deployed_by_creator)[tr.source()].push_back(tr.id());
       }
     }
     return true;
