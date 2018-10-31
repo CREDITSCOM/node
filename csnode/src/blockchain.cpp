@@ -295,6 +295,14 @@ bool BlockChain::finishNewBlock(csdb::Pool& pool)
     return true;
 }
 
+void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool)
+{
+    const auto& new_wallets = pool.newWallets();
+    for (const auto& it : new_wallets) {
+      walletIds_->normal().remove(csdb::Address::from_wallet_id(it.walletId_));
+    }
+}
+
 bool BlockChain::onBlockReceived(csdb::Pool& pool) {
     csdebug() << "onBlockReceived is running";
 
