@@ -48,6 +48,7 @@ public:
   bool isGood() const { return good_; }
 
   bool finishNewBlock(csdb::Pool& pool);
+  void removeWalletsInPoolFromCache(const csdb::Pool& pool);
   bool writeNewBlock(csdb::Pool& pool);
   bool onBlockReceived(csdb::Pool& pool);
 

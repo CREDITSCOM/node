@@ -271,6 +271,7 @@ public:
 
   void sign(std::vector<uint8_t> private_key);
   bool verify_signature();
+  bool verify_signature(const std::string& signature);
 
   friend class Storage;
 };

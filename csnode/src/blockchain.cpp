@@ -295,6 +295,14 @@ bool BlockChain::finishNewBlock(csdb::Pool& pool)
     return true;
 }
 
+void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool)
+{
+    const auto& new_wallets = pool.newWallets();
+    for (const auto& it : new_wallets) {
+      walletIds_->normal().remove(csdb::Address::from_wallet_id(it.walletId_));
+    }
+}
+
 bool BlockChain::onBlockReceived(csdb::Pool& pool) {
     csdebug() << "onBlockReceived is running";
 
@@ -664,11 +672,6 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool)
         {
             csdb::Pool::NewWalletInfo::AddressId addressId = { idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
             addNewWalletToPool(transactions[idx].target(), addressId, *newWallets);
-        }
-        if (pool.sequence() != 0)
-        {
-          csdb::Pool::NewWalletInfo::AddressId addressId = { transactions.size(), csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
-          addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
         }
     }
 
