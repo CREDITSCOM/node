@@ -15,8 +15,10 @@
 
 #include <client/params.hpp>
 #include <csnode/transactionspacket.h>
+
 #include <lib/system/common.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/metastorage.hpp>
 
 #ifdef NO_DELAYS
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
@@ -104,18 +106,9 @@ namespace cs
     {
         cs::Bytes bytes;
         cs::PublicKey sender;
-        cs::RoundNumber round = 0;
-
-        bool operator==(const cs::CharacteristicMeta& meta) const
-        {
-            return round == meta.round;
-        }
-
-        bool operator !=(const cs::CharacteristicMeta& meta) const
-        {
-            return !((*this) == meta);
-        }
     };
+
+    using CharacteristicMetaStorage = cs::MetaStorage<CharacteristicMeta>;
 
     struct PoolMetaInfo
     {

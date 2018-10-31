@@ -151,7 +151,7 @@ namespace cs
         /// @brief Adds characteristic meta if early characteristic recevied from network.
         /// @param meta Created on network characteristic meta information.
         ///
-        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+        void addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta);
 
         ///
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.

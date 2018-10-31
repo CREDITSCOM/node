@@ -959,12 +959,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::Bytes characteristicBytes;
     characteristicBytes.assign(data, data + size);
 
-    cs::CharacteristicMeta meta;
-    meta.bytes = std::move(characteristicBytes);
-    meta.round = conveyer.roundTable().round;
-    meta.sender = sender;
+    cs::CharacteristicMetaStorage::MetaElement metaElement;
+    metaElement.meta.bytes = std::move(characteristicBytes);
+    metaElement.meta.sender = sender;
+    metaElement.round = conveyer.roundNumber();
 
-    conveyer.addCharacteristicMeta(meta);
+    conveyer.addCharacteristicMeta(std::move(metaElement));
   }
 
   cs::DataStream stream(data, size);
@@ -1553,15 +1553,10 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundN
     csdebug() << "NODE> Packets sync completed";
     solver_->gotRound();
 
-    if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
+    if (auto meta = conveyer.characteristicMeta(round); meta.has_value())
+    {
       csdebug() << "NODE> Run characteristic meta";
-
-      if (meta->round != 0) {
-        getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
-      }
-      else {
-        csfatal() << "NODE> Can not call node get characteristic method";
-      }
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
     }
   }
 }

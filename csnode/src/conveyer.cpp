@@ -21,7 +21,7 @@ struct cs::Conveyer::Impl
     cs::Notifications notifications;
 
     // storage of received characteristic for slow motion nodes
-    boost::circular_buffer<cs::CharacteristicMeta> characteristicMetas;
+    cs::CharacteristicMetaStorage characteristicMetas;
     cs::Characteristic characteristic;
 
     // hash tables storage
@@ -203,38 +203,23 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     return notificationsCount >= neededConfidantsCount;
 }
 
-void cs::Conveyer::addCharacteristicMeta(const cs::CharacteristicMeta& meta)
+void cs::Conveyer::addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta)
 {
-    auto& metas = pimpl->characteristicMetas;
-    const auto iterator = std::find(metas.begin(), metas.end(), meta);
-
-    if (iterator != metas.end())
-    {
-        metas.push_back(meta);
-        csdebug() << "CONVEYER> Characteristic meta added";
-    }
-    else {
+    if (!pimpl->characteristicMetas.append(meta)) {
         csdebug() << "CONVEYER> Received meta is currently in meta stack";
     }
 }
 
 std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
 {
-    cs::CharacteristicMeta meta;
-    meta.round = round;
+    auto result = pimpl->characteristicMetas.extract(round);
 
-    auto& metas = pimpl->characteristicMetas;
-    const auto iterator = std::find(metas.begin(), metas.end(), meta);
-
-    if (iterator == metas.end()) {
+    if (result.has_value()) {
         cslog() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
 
-    meta = std::move(*iterator);
-    metas.erase(iterator);
-
-    return meta;
+    return std::make_optional<cs::CharacteristicMeta>((std::move(result)).value().meta);
 }
 
 void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
