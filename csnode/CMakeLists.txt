@@ -45,7 +45,6 @@ add_library(csnode
   include/csnode/WalletsIds.h
   include/csnode/WalletsPools.h
   include/csnode/BlockHashes.h
-  include/csnode/metastorage.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
