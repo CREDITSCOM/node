@@ -59,7 +59,7 @@ namespace cs
             const auto result = (iterator == m_buffer.end());
 
             if (result) {
-                m_buffer.push_back(std:move(value));
+                m_buffer.push_back(std::move(value));
             }
 
             return result;
@@ -67,7 +67,7 @@ namespace cs
 
         ///
         /// @brief Appends meta element to buffer.
-        /// @param element Created from outside no need lvalue, cuz it would be moved.
+        /// @param element Created from outside no needed lvalue, cuz it would be moved.
         /// @return Returns true if append is success, otherwise returns false.
         ///
         bool append(MetaElement& value)
@@ -92,7 +92,7 @@ namespace cs
         /// @param round Round number to get element from storage.
         /// @return Returns optional parameter.
         ///
-        std::optional<MetaElement> get(RoundNumber round)
+        std::optional<MetaElement> value(RoundNumber round)
         {
             const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
                 return value.round == round;
@@ -110,20 +110,20 @@ namespace cs
         /// @param round Round number to get element from storage.
         /// @return Returns meta element of storage if found, otherwise default constructed meta element.
         ///.
-        MetaElement pop(RoundNumber round)
+        std::optional<MetaElement> extract(RoundNumber round)
         {
-            MetaElement result;
-
             const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
                 return value.round == round;
             });
 
-            if (iterator != m_buffer.end()) {
-                result = std::move(*iterator);
-                m_buffer.erase(iterator);
+            if (iterator == m_buffer.end()) {
+                return std::nullopt;
             }
 
-            return result;
+            MetaElement result = std::move(*iterator);
+            m_buffer.erase(iterator);
+
+            return std::make_optional<MetaElement>(std::move(result));
         }
 
     private:
