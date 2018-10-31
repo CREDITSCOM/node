@@ -60,7 +60,7 @@ struct worker_queue
     }
 
     template<typename J>
-    void wait_till_front(const J& j)
+    S& wait_till_front(const J& j)
     {
         //TRACE("");
         std::unique_lock<decltype(lock)> l(lock);
@@ -95,6 +95,7 @@ struct worker_queue
             return false;
         });
         //TRACE("");
+        return state;
     }
     void yield()
     {
@@ -111,21 +112,21 @@ struct worker_queue
             return;
         }
         //TRACE("");
-        
+
         //TRACE("");
         bool needNotifyAll = tit->second == tids.begin();
         tids.erase(tit->second);
         //TRACE("");
         tid_map.erase(tit);
-        //TRACE("");       
+        //TRACE("");
 
         if (needNotifyAll) {
-          //TRACE("");          
+          //TRACE("");
           w.notify_all();
           //TRACE("");
         }
-         
-#endif     
+
+#endif
     }
     template<typename J>
     void update_state(const J& j)

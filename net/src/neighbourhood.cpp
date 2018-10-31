@@ -388,10 +388,7 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 
   if (isDirect) {
     auto& dp = msgDirects_.tryStore(hash);
-    //if (dp.receiver && conn->id == dp.receiver->id)
-      dp.received = true;
-    //else
-    //  LOG_WARN("Got confirmation from a different connection");
+    dp.received = true;
   }
   else {
     auto& bp = msgBroads_.tryStore(hash);
