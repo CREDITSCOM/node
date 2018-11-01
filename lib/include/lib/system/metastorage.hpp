@@ -30,6 +30,9 @@ namespace cs
             RoundNumber round;
             T meta;
 
+            MetaElement() = default;
+            MetaElement(RoundNumber r, T&& v) noexcept : round(r), v(std::move(v)) {}
+
             bool operator ==(const MetaElement& element) const
             {
                 return round == element.round;
@@ -97,6 +100,22 @@ namespace cs
         }
 
         ///
+        /// @brief Appends value with round key.
+        /// @param round Current round to add as a key.
+        /// @param value Movable value created from outside.
+        /// @return Returns true if append is success, otherwise returns false.
+        ///
+        bool append(RoundNumber round, T&& value)
+        {
+            MetaElement element = {
+                round,
+                std::move(value)
+            };
+
+            append(std::move(element));
+        }
+
+        ///
         /// @brief Returns contains meta storage this round or not.
         ///
         bool contains(RoundNumber round)
@@ -111,16 +130,16 @@ namespace cs
         ///
         /// @brief Returns meta element if this round exists at storage, otherwise returns nothing.
         /// @param round Round number to get element from storage.
-        /// @return Returns optional parameter.
+        /// @return Returns optional parameter with T type.
         ///
-        std::optional<MetaElement> value(RoundNumber round) const
+        std::optional<T> value(RoundNumber round) const
         {
             const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
                 return value.round == round;
             });
 
             if (iterator != m_buffer.end()) {
-                return *iterator;
+                return std::make_optional<T>(iterator->meta);
             }
 
             return std::nullopt;
@@ -131,7 +150,7 @@ namespace cs
         /// @param round Round number to get element from storage.
         /// @return Returns meta element of storage if found, otherwise default constructed meta element.
         ///.
-        std::optional<MetaElement> extract(RoundNumber round)
+        std::optional<T> extract(RoundNumber round)
         {
             const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
                 return value.round == round;
@@ -144,7 +163,7 @@ namespace cs
             MetaElement result = std::move(*iterator);
             m_buffer.erase(iterator);
 
-            return std::make_optional<MetaElement>(std::move(result));
+            return std::make_optional<T>(std::move(result.meta));
         }
 
     private:
