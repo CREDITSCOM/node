@@ -186,7 +186,19 @@ bool cs::Conveyer::isSyncCompleted() const
     auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
 
     if (!pointer) {
-        cserror() << "CONVEYER> Needed hashes of current round if not found";
+        cserror() << "CONVEYER> Needed hashes of current round not found";
+        return false;
+    }
+
+    return pointer->empty();
+}
+
+bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
+{
+    auto pointer = pimpl->neededHashesMeta.get(round);
+
+    if (!pointer) {
+        cserror() << "CONVEYER> Needed hashes of" + std::to_string(round) + " round not found";
         return false;
     }
 

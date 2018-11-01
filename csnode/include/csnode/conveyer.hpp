@@ -115,6 +115,11 @@ namespace cs
         ///
         bool isSyncCompleted() const;
 
+        ///
+        /// @brief Returns state of arg round hashes sync.
+        ///
+        bool isSyncCompleted(cs::RoundNumber round) const;
+
         // writer notifications
 
         ///

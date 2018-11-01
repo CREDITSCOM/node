@@ -1549,7 +1549,7 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundN
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.addFoundPacket(round, std::move(packet));
 
-  if (conveyer.isSyncCompleted()) {
+  if (conveyer.isSyncCompleted(round)) {
     csdebug() << "NODE> Packets sync completed";
     solver_->gotRound();
 
