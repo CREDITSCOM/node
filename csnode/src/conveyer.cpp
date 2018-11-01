@@ -315,7 +315,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
             ++maskIndex;
         }
 
-        if (maskIndex >= mask.size())
+        if (maskIndex > mask.size())
         {
             cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
             return std::nullopt;
