@@ -34,8 +34,8 @@ namespace cs
         };
 
         enum : unsigned int {
-            HashTablesStorageCapacity = 10,
-            CharacteristicMetaCapacity = HashTablesStorageCapacity
+            HashTablesStorageCapacity = 5,
+            CharacteristicMetaCapacity = HashTablesStorageCapacity,
         };
 
         ///

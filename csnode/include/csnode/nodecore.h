@@ -108,8 +108,6 @@ namespace cs
         cs::PublicKey sender;
     };
 
-    using CharacteristicMetaStorage = cs::MetaStorage<CharacteristicMeta>;
-
     struct PoolMetaInfo
     {
         std::string timestamp;
@@ -132,7 +130,11 @@ namespace cs
         cs::Signature signature;
     };
 
-    using HashTablesStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
+    // metas
+    using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
+    using HashTablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
+    using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
+    using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
 }
 
 #endif // NODE_CORE_H

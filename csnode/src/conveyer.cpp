@@ -25,7 +25,7 @@ struct cs::Conveyer::Impl
     cs::Characteristic characteristic;
 
     // hash tables storage
-    cs::HashTablesStorage hashTablesStorage;
+    cs::HashTablesMetaStorage hashTablesStorage;
 
     // round table
     cs::RoundTable roundTable;
@@ -290,7 +290,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         pimpl->hashTable.erase(hash);
     }
 
-    cs::HashTablesStorage::MetaElement element;
+    cs::HashTablesMetaStorage::MetaElement element;
     element.round = pimpl->roundTable.round;
     element.meta = std::move(hashTable);
 
