@@ -16,7 +16,7 @@
 #include <csdb/wallet.h>
 
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 #include <sys/timeb.h>
 
 #include <algorithm>

@@ -13,7 +13,7 @@
 #include <csdb/pool.h>
 #include <csdb/amount_commission.h>
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 namespace cs {
 namespace {

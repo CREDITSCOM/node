@@ -24,7 +24,7 @@
 #include <mutex>
 #include <solver/generals.hpp>
 #include <solver/WalletsState.h>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 namespace cs {
 Generals::Generals(WalletsState& _walletsState)

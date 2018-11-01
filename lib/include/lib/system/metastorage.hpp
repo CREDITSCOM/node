@@ -5,7 +5,7 @@
 #include <lib/system/common.hpp>
 #include <boost/circular_buffer.hpp>
 
-/// nested namespace c++ 17
+/// nested namespace
 namespace cs::values
 {
     constexpr std::size_t defaultMetaStorageSize = 5;

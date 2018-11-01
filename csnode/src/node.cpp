@@ -4,7 +4,7 @@
 
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>

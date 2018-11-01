@@ -7,7 +7,7 @@
 #include <queue>
 
 #include <API.h>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 #include <solver2/SolverCore.h>
 #include <csstats.h>
 
