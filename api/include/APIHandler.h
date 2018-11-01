@@ -131,6 +131,8 @@ class APIHandler : public APIHandlerInterface
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
 
+    void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) override;
+
   private:
     BlockChain& s_blockchain;
 

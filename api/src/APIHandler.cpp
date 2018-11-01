@@ -470,6 +470,15 @@ APIHandler::TransactionsGet(TransactionsGetResult& _return,
 
   _return.transactions = convertTransactions(transactions);
 
+
+  //for test
+  /*MembersSmartContractGetResult ret;
+  api::TransactionId api_id;
+  api_id.index = transactions.back().id().index();
+  api_id.poolHash = fromByteArray(transactions.back().id().pool_hash().to_binary());
+  MembersSmartContractGet(ret, api_id);*/
+   //
+
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -592,9 +601,35 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
-//std::string contractStatePrev;
-//std::vector<std::string> v_stats;
+void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) {
+  auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
+  auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+  auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
+  auto smart = fetch_smart_body(transaction);
+  auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
+  auto api_addr = transaction.source().to_api_addr();
 
+  executor::APIResponse api_resp;
+  //name
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
+  _return.name = api_resp.ret_val.v_string;
+  //decimal
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
+  _return.decimal = api_resp.ret_val.v_string;
+  //total coins
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
+  _return.totalCoins = api_resp.ret_val.v_string;
+  //symbol
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
+  _return.symbol = api_resp.ret_val.v_string;
+  //owner
+  _return.owner = api_resp.contractVariables["owner"].v_string;
+}
+
+api::TransactionId api_id;
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
@@ -678,25 +713,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
   executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
-
-  ////
-  /*bool flg = false;
-  for (auto &it : v_stats) {
-    if (it == api_resp.contractState)
-      flg = true;
-  }
-  if (!flg) {
-    v_stats.push_back(api_resp.contractState);
-  }
-  for (auto &it : v_stats) {
-    if (it == contract_state) {
-      int a = 1; //equal
-    }
-    else {
-      int a = 1; //not equal
-    }
-  }*/
-  ////
 
   if (api_resp.code) {
     _return.status.code = api_resp.code;
