@@ -128,7 +128,7 @@ namespace cs
         }
 
         ///
-        /// @brief Returns meta element if this round exists at storage, otherwise returns nothing.
+        /// @brief Returns copy of meta element if this round exists at storage, otherwise returns nothing.
         /// @param round Round number to get element from storage.
         /// @return Returns optional parameter with T type.
         ///
@@ -164,6 +164,25 @@ namespace cs
             m_buffer.erase(iterator);
 
             return std::make_optional<T>(std::move(result.meta));
+        }
+
+        ///
+        /// @brief Returns reference to existing element, otherwise returns nullptr.
+        /// @param round Round of searching element.
+        /// @return Reference to element.
+        /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr
+        ///
+        T* get(RoundNumber round)
+        {
+            const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
+                return round == value.round;
+            });
+
+            if (iterator == m_buffer.end()) {
+                return nullptr;
+            }
+
+            return &(iterator->meta);
         }
 
     private:
