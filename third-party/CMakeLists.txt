@@ -8,8 +8,5 @@ add_subdirectory(base58)
 add_subdirectory(snappy)
 add_subdirectory(berkeleydb_prebuilt)
 add_subdirectory(lz4)
-<<<<<<< HEAD
-add_subdirectory(libcuckoo)
+#add_subdirectory(libcuckoo)
 add_subdirectory(googletest)
-=======
->>>>>>> cs_dev_merge_sws_conv
