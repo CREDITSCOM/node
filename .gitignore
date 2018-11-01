@@ -6,3 +6,4 @@ build64/
 /CMakeSettings.json
 js-client/js/*
 .idea/
+/CMakeLists.txt.user

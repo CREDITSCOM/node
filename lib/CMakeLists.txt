@@ -14,6 +14,8 @@ add_library(lib
   include/lib/system/timer.hpp
   include/lib/system/utils.hpp
   include/lib/system/common.hpp
+  include/lib/system/cache.hpp
+  include/lib/system/signals.hpp
 )
 
 if (MSVC)
@@ -38,3 +40,5 @@ target_link_libraries (lib
                        Boost::log
                        Boost::disable_autolinking
                        )
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

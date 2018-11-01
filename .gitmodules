@@ -1,21 +1,21 @@
 [submodule "third-party/blake2"]
 	path = third-party/blake2
-	url = https://gitlab.com/credits_bc/third_party/blake2.git
+	url = ../../credits_bc/third_party/blake2.git
 [submodule "third-party/thrift-interface-definitions"]
 	path = third-party/thrift-interface-definitions
-	url = https://gitlab.com/main-credits-dev/thrift-interface-definitions
+	url = ../../main-credits-dev/thrift-interface-definitions
 [submodule "third-party/thrift"]
 	path = third-party/thrift
-	url = https://gitlab.com/credits_bc/third_party/thrift.git
+	url = ../../credits_bc/third_party/thrift.git
 [submodule "third-party/ed25519"]
 	path = third-party/ed25519
-	url = https://gitlab.com/credits_bc/third_party/ed25519
+	url = ../../credits_bc/third_party/ed25519
 [submodule "third-party/libsodium.git"]
 	path = third-party/libsodium
-	url = https://gitlab.com/main-credits-dev/libsodium.git
+	url = ../../main-credits-dev/libsodium.git
 [submodule "third-party/berkeleydb_prebuilt"]
 	path = third-party/berkeleydb_prebuilt
-	url = https://gitlab.com/credits_bc/third_party/berkeleydb_prebuilt.git
+	url = ../../credits_bc/third_party/berkeleydb_prebuilt.git
 [submodule "third-party/libcuckoo"]
 	path = third-party/libcuckoo
 	url = https://github.com/efficient/libcuckoo.git

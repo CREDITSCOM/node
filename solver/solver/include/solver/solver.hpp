@@ -22,8 +22,16 @@
 #include <lib/system/timer.hpp>
 #include <client/params.hpp>
 #include <lib/system/keys.hpp>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
+#include <solver/spammer.h>
 
 class Node;
+
+namespace slv2
+{
+  class SolverCore;
+}
 
 namespace cs {
 
@@ -31,12 +39,11 @@ class Generals;
 
 class Solver {
 public:
-  enum class NotificationState {
-    Equal,
-    GreaterEqual
-  };
-
-  explicit Solver(Node*);
+  explicit Solver(Node*, csdb::Address m_genesisAddress, csdb::Address startAddres
+#ifdef SPAMMER
+  , csdb::Address m_spammerAddress
+#endif
+  );
   ~Solver();
 
   Solver(const Solver&) = delete;
@@ -46,47 +53,26 @@ public:
 
   // Solver solves stuff
   void gotTransaction(csdb::Transaction&&);
-  void gotTransactionsPacket(cs::TransactionsPacket&& packet);
-  void gotPacketHashesRequest(std::vector<cs::TransactionsPacketHash>&& hashes, const PublicKey& sender);
-  void gotPacketHashesReply(cs::TransactionsPacket&& packet);
-  void gotRound(cs::RoundTable&& round);
+  void gotRound();
   void gotBlockCandidate(csdb::Pool&&);
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
-  void gotBlock(csdb::Pool&&, const PublicKey&);
-  void gotHash(std::string&&, const PublicKey&);
-  void gotBlockRequest(csdb::PoolHash&&, const PublicKey&);
+  void gotBlock(csdb::Pool&&, const cs::PublicKey&);
+  void gotHash(std::string&&, const cs::PublicKey&);
+  void gotBlockRequest(csdb::PoolHash&&, const cs::PublicKey&);
   void gotBlockReply(csdb::Pool&&);
-  void gotBadBlockHandler(csdb::Pool&&, const PublicKey&);
-  void gotIncorrectBlock(csdb::Pool&&, const PublicKey&);
+  void gotBadBlockHandler(csdb::Pool&&, const cs::PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&&, const cs::PublicKey&);
   void gotFreeSyncroBlock(csdb::Pool&&);
   void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
-  std::optional<csdb::Pool> applyCharacteristic(const cs::Characteristic& characteristic,
-                           const PoolMetaInfo& metaInfoPool, const PublicKey& sender = cs::PublicKey());
 
-  const Characteristic& getCharacteristic() const;
-  Hash getCharacteristicHash() const;
-
-  PublicKey getWriterPublicKey() const;
+  cs::PublicKey writerPublicKey() const;
 
   uint32_t getTLsize();
   void addInitialBalance();
   void runSpammer();
-
-  cs::RoundNumber currentRoundNumber();
-  const cs::RoundTable& roundTable() const;
-  const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
-
-  // notifications interface
-  const cs::Notifications& notifications() const;
-  void addNotification(const cs::Bytes& bytes);
-  std::size_t neededNotifications() const;
-  bool isEnoughNotifications(NotificationState state) const;
-
-  // conveyer start point
-  void addConveyerTransaction(const csdb::Transaction& transaction);
 
   void send_wallet_transaction(const csdb::Transaction& transaction);
 
@@ -97,78 +83,75 @@ public:
   void runConsensus();
   void runFinalConsensus();
 
-  // helpers
-  void removePreviousHashes();
-  bool checkTableHashes(const cs::RoundTable& table);
+  // node interface
+  NodeLevel nodeLevel() const;
+  const cs::PublicKey& nodePublicKey() const;
+  const cs::Hashes& getNeededHashes() const;
 
-  HashVector getMyVector() const;
-  HashMatrix getMyMatrix() const;
+  const HashVector& hashVector() const;
+  const HashMatrix& hashMatrix() const;
 
-  bool getIPoolClosed();
-  bool getBigBangStatus();
-  void setBigBangStatus(bool _status);
+  bool isPoolClosed();
 
-  const cs::PrivateKey& getPrivateKey() const;
-  const cs::PublicKey& getPublicKey() const;
+  bool bigBangStatus();
+  void setBigBangStatus(bool status);
+
+  const cs::PrivateKey& privateKey() const;
+  const cs::PublicKey& publicKey() const;
+
+  void countFeesInPool(csdb::Pool* pool);
+
+  static void addTimestampToPool(csdb::Pool& pool);
 
 private:
-  void flushTransactions();
-
-  // TODO: fix signature
-  bool verifySignature(uint8_t signature[64], uint8_t public_key[32], uint8_t* message, size_t message_len);
+  cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
 
   cs::PublicKey m_publicKey;
   cs::PrivateKey m_privateKey;
 
+  friend class slv2::SolverCore;
+
   Node* m_node;
+  Spammer m_spammer;
+
+  std::unique_ptr<WalletsState> m_walletsState;
   std::unique_ptr<Generals> m_generals;
 
-  HashVector hvector;
-
-  cs::Hashes m_neededHashes;
-
-  bool receivedVecFrom[100];
-  std::atomic<uint8_t> trustedCounterVector;
-
-  bool receivedMatFrom[100];
-  std::atomic<uint8_t> trustedCounterMatrix;
-  uint8_t m_writerIndex; // index at confidants
-
-  std::vector<PublicKey> ips;
-
-  cs::RoundTable m_roundTable;
-
-  csdb::Pool v_pool;
-
-  bool m_isPoolClosed = true;
-  bool blockCandidateArrived = false;
-  bool round_table_sent = false;
-  bool gotBlockThisRound = false;
-  bool gotBigBang = false;
-  std::atomic<bool> isConsensusRunning = { false };
-
-  cs::SharedMutex m_sharedMutex;
-
-  cs::TransactionsPacketHashTable m_hashTable;
-  cs::TransactionsBlock m_transactionsBlock;
-  cs::Notifications m_notifications;
-  cs::HashesSet m_hashesToRemove;
-
-  cs::Timer m_sendingPacketTimer;
-
-  /*to store new blocks*/
-  std::map<size_t, csdb::Pool> tmpStorage;
-
-  /*to store unrequested syncro blocks*/
-  std::map<size_t, csdb::Pool> rndStorage;
-
-  // TODO! Hash m_characteristicHash
+  const csdb::Address m_genesisAddress;
+  const csdb::Address m_startAddress;
 
 #ifdef SPAMMER
-  std::atomic_bool spamRunning = { false };
-  std::thread spamThread;
-  void spamWithTransactions();
+  const csdb::Address m_spammerAddress;
 #endif
+
+  Fee m_feeCounter;
+  HashVector m_hashVector;
+
+  bool m_receivedVectorFrom[100];
+  std::atomic<uint8_t> trustedCounterVector = 0;
+
+  bool m_receivedMatrixFrom[100];
+  std::atomic<uint8_t> trustedCounterMatrix = 0;
+
+  uint8_t m_writerIndex; // index at confidants
+
+  std::vector<PublicKey> m_hashesReceivedKeys;
+
+  csdb::Pool m_vPool;   // TODO: what is v pool?
+
+  bool m_isPoolClosed = true;
+  bool m_blockCandidateArrived = false;
+  bool m_gotBlockThisRound = false;
+
+  std::atomic<bool> m_roundTableSent = false;
+  std::atomic<bool> m_gotBigBang = false;
+  std::atomic<bool> m_isConsensusRunning = false;
+
+  // to store new blocks
+  std::map<size_t, csdb::Pool> m_temporaryStorage;
+
+  // to store unrequested syncro blocks
+  std::map<size_t, csdb::Pool> m_randomStorage; // TODO: RND pool or random?
 };
 }  // namespace cs
 #endif

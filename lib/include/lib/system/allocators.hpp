@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <thread>
 
+#include "cache.hpp"
 #include "logger.hpp"
 
 /* First of all, here is a base unmovable smart pointer to a memory
@@ -93,8 +94,8 @@ class RegionAllocator;
 struct RegionPage {
   RegionAllocator* allocator;
 
-  std::atomic<RegionPage*> next = { nullptr };
-  std::atomic<uint32_t> usedSize = { 0 };
+  __cacheline_aligned std::atomic<RegionPage*> next = { nullptr };
+  __cacheline_aligned std::atomic<uint32_t> usedSize = { 0 };
 
   uint8_t* regions;
 
@@ -132,7 +133,7 @@ private:
   Region& operator=(const Region&) = delete;
   Region& operator=(Region&&) = delete;
 
-  std::atomic<uint32_t> users_ = { 0 };
+  __cacheline_aligned std::atomic<uint32_t> users_ = { 0 };
   RegionPage* page_;
 
   void* data_;
@@ -176,6 +177,7 @@ public:
    - shrinkLast is called before the last allocation gets unuse()d */
   RegionPtr allocateNext(const uint32_t size) {
     uint32_t regSize = size + sizeof(Region);
+    regSize += (-(int)regSize) & 0x3f;
 
     if (!activePage_->usedSize.load(std::memory_order_acquire)) {
       activePage_->sizeLeft = PageSize;
@@ -207,7 +209,11 @@ public:
 
   void shrinkLast(const uint32_t size) {
     assert(lastReg_->size_ >= size);
-    auto diff = lastReg_->size_ - size;
+    int32_t prevSize = lastReg_->size_ + sizeof(Region);
+    prevSize += (-prevSize) & 0x3f;
+    int32_t newSize = size + sizeof(Region);
+    newSize += (-newSize) & 0x3f;
+    int32_t diff = prevSize - newSize;
 
     lastReg_->size_ = size;
     lastReg_->page_->sizeLeft += diff;
@@ -226,7 +232,8 @@ private:
     auto page = region->page_;
     region->~Region();
 
-    const uint32_t toSub = region->size_ + sizeof(Region);
+    uint32_t toSub = region->size_ + sizeof(Region);
+    toSub += (-(int)toSub) & 0x3f;
     if (page->usedSize.fetch_sub(toSub, std::memory_order_relaxed) == toSub) {
       // Since it was us who freed up all the memory, we're the only
       // ones accessing *page...
@@ -295,7 +302,7 @@ public:
   }
 
 private:
-  std::atomic_flag& flag_;
+  __cacheline_aligned std::atomic_flag& flag_;
 };
 
 /* Not, TypedAllocator is a completely different thing. It allocates

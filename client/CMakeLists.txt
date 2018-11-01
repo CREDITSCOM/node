@@ -36,3 +36,8 @@ target_link_libraries (client
                        Boost::disable_autolinking
                        ${CMAKE_THREAD_LIBS_INIT}
                        )
+
+if (NOT MSVC AND WITH_GPROF)
+add_definitions(-DBUILD_WITH_GPROF)
+target_link_libraries (client dl)
+endif()

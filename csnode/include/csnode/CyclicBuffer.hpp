@@ -1,7 +1,7 @@
 #ifndef CYCLIC_BUFFER_H
 #define CYCLIC_BUFFER_H
 
-template<typename T, size_t N>
+template<typename T, uint32_t N>
 class CyclicBuffer
 {
 public:
@@ -50,13 +50,13 @@ public:
 private:
     size_t getFrontInd(size_t offset) const
     {
-        size_t frontInd = back_ + 1 - size_;
-        return (frontInd + offset + N) % N;
+        decltype(N) frontInd = back_ + 1 - size_;
+        return (frontInd + static_cast<decltype(N)>(offset) + N) % N;
     }
 private:
     T data_[N];
-    size_t size_;
-    size_t back_;
+    decltype(N) size_;
+    decltype(N) back_;
 };
 
 #endif

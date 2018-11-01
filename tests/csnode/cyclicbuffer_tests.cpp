@@ -1,7 +1,7 @@
 #define TESTING
 
 #include <gtest/gtest.h>
-#include "cyclic_buffer.hpp"
+#include "CyclicBuffer.hpp"
 
 TEST(CyclicBuffer, push_back)
 {

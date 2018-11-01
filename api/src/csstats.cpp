@@ -1,10 +1,12 @@
-#define TRACE_ENABLED
+//#define TRACE_ENABLER
 
 #include <csdb/currency.h>
 #include <csstats.h>
 #include <algorithm>
 #include <cassert>
 #include <client/params.hpp>
+#include <csdb/currency.h>
+#include <csstats.h>
 
 #include <APIHandler.h>
 
@@ -24,55 +26,201 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
   TRACE("Collecting stats: started");
 
+  auto stats = currentStats;
   auto startTime = std::chrono::high_resolution_clock::now();
+  auto blockHash = blockchain.getLastWrittenHash();
 
-  StatsPerPeriod stats;
-  for (auto& period : periods) {
-    PeriodStats p;
-    p.periodSec = period;
+  PeriodStats periodStats;
+  periodStats.timeStamp = std::chrono::system_clock::now();
 
-    stats.push_back(p);
+  {
+    auto future_last_hash = blockHash;
+
+    if (blockHash.is_empty())
+      LOG_ERROR("Stats: no bricks in the wall (last hash is empty)");
+
+    while (blockHash != lastHash && !blockHash.is_empty()) {
+      csdb::Pool pool = blockchain.loadBlock(blockHash);
+
+      periodStats.poolsCount++;
+
+      std::size_t transactionsCount = pool.transactions_count();
+      periodStats.transactionsCount += static_cast<uint32_t>(transactionsCount);
+
+      for (std::size_t i = 0; i < transactionsCount; ++i) {
+        const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+        if(transaction.user_field(0).is_valid())
+          ++periodStats.transactionsSmartCount; //transactionsSmartCount - amount of transactions associated with smart contracts
+
+        if (is_deploy_transaction(transaction))
+          ++periodStats.smartContractsCount;
+
+        Currency currency =
+          currencies_indexed[transaction.currency().to_string()];
+
+        const auto& amount = transaction.amount();
+
+        periodStats.balancePerCurrency[currency].integral += amount.integral();
+        periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+      }
+
+      blockHash = pool.previous_hash();
+    }
+
+    lastHash = future_last_hash;
   }
 
-  std::string prevHash;
+  // total
+  auto& total = stats[PeriodIndex::Total];
+  total.poolsCount += periodStats.poolsCount;
+  total.transactionsCount += periodStats.transactionsCount;
+  total.smartContractsCount += periodStats.smartContractsCount;
 
+  for (auto& element : periodStats.balancePerCurrency) {
+    total.balancePerCurrency[element.first].integral += element.second.integral;
+    total.balancePerCurrency[element.first].fraction += element.second.fraction;
+  }
+
+  for (size_t i = 0; i < periods.size(); ++i) {
+    assert(updateTimeSec != 0);
+
+    std::size_t index = (periods[i] / updateTimeSec) - 1;
+
+    try {
+      auto& lastPeriodStats = statsCut.at(index);
+      auto& stat = stats.at(i);
+
+      // remove last stats
+      stat.poolsCount -= lastPeriodStats.poolsCount;
+      stat.smartContractsCount -= lastPeriodStats.smartContractsCount;
+      stat.transactionsCount -= lastPeriodStats.transactionsCount;
+
+      for (auto& element : lastPeriodStats.balancePerCurrency) {
+        stat.balancePerCurrency[element.first].integral -=
+          element.second.integral;
+        stat.balancePerCurrency[element.first].fraction -=
+          element.second.fraction;
+      }
+
+      // add new stats
+      stat.poolsCount += periodStats.poolsCount;
+      stat.smartContractsCount += periodStats.smartContractsCount;
+      stat.transactionsCount += periodStats.transactionsCount;
+
+      for (auto& element : periodStats.balancePerCurrency) {
+        stat.balancePerCurrency[element.first].integral +=
+          element.second.integral;
+        stat.balancePerCurrency[element.first].fraction +=
+          element.second.fraction;
+      }
+    } catch (const std::exception& e) {
+      cslog() << e.what();
+    }
+  }
+
+  // update cuts
+  statsCut.push_front(periodStats);
+  statsCut.pop_back();
+
+  auto finishTime = std::chrono::high_resolution_clock::now();
+
+  using Seconds = std::chrono::seconds;
+  Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
+
+  TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
+  cslog() << "Stats updated";
+
+  return stats;
+}
+
+AllStats
+csstats::collectAllStats(const Periods& periods)
+{
+  assert(
+    std::is_sorted(std::begin(periods),
+                   std::end(periods),
+                   [](const Period& l, const Period& r) { return l < r; }));
+
+  TRACE("Collecting All stats: started");
+
+  AllStats stats;
+  stats.second.resize(periods.size());
+
+  auto nowGlobal = std::chrono::system_clock::now();
+  auto lastTimePoint =
+    nowGlobal - std::chrono::seconds(collectionPeriods[PeriodIndex::Month]);
+
+  for (auto time = nowGlobal; time > lastTimePoint;
+       time -= std::chrono::seconds(updateTimeSec)) {
+    PeriodStats cut;
+    cut.timeStamp = time;
+
+    stats.first.push_back(cut);
+  }
+
+  auto startTime = std::chrono::system_clock::now();
   auto blockHash = blockchain.getLastHash();
+  unsigned int currentCutIndex = 0;
+  auto startCutTime = stats.first[currentCutIndex].timeStamp;
+  auto endCutTime = stats.first[currentCutIndex + 1].timeStamp;
 
   while (!blockHash.is_empty() && !quit) {
-    typedef std::vector<csdb::Transaction> Transactions;
-    Transactions                           transactions;
-
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
 
     auto now        = std::chrono::system_clock::now();
     auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
     auto poolTime   = std::chrono::system_clock::from_time_t(poolTime_t);
 
-    std::chrono::seconds poolAgeSec = std::chrono::duration_cast<std::chrono::seconds>(now - poolTime);
+    using Seconds = std::chrono::seconds;
+    Seconds poolAgeSec = std::chrono::duration_cast<Seconds>(now - poolTime);
 
-    matchPeriod(periods, (Period)poolAgeSec.count(), [&stats, &pool](size_t periodIndex) {
-      PeriodStats& periodStats = stats[periodIndex];
-      periodStats.poolsCount++;
+    if (startCutTime <= poolTime && poolTime < endCutTime) {
+      PeriodStats& periodStats = stats.first[currentCutIndex];
+      ++periodStats.poolsCount;
 
       size_t transactionsCount = pool.transactions_count();
-      periodStats.transactionsCount += transactionsCount;
+      periodStats.transactionsCount += (uint32_t)transactionsCount;
+
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-        TRACE("");
-
-        auto scuf = transaction.user_field(0);
-
-        TRACE("");
-
-        if (scuf.is_valid() && is_smart_deploy(deserialize<api::SmartContractInvocation>(scuf.value<std::string>()))) {
-          TRACE("");
+        if (is_deploy_transaction(transaction)) {
           ++periodStats.smartContractsCount;
         }
 
-        TRACE("");
+        Currency currency =
+          currencies_indexed[transaction.currency().to_string()];
 
-        Currency currency = DEFAULT_CURRENCY;
+        const auto& amount = transaction.amount();
+
+        periodStats.balancePerCurrency[currency].integral += amount.integral();
+        periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+      }
+    } else if ((currentCutIndex + 1) < stats.first.size()) {
+      startCutTime = stats.first[currentCutIndex].timeStamp;
+      endCutTime = stats.first[currentCutIndex + 1].timeStamp;
+
+      ++currentCutIndex;
+      continue;
+    }
+
+    matchPeriod(periods, (Period)poolAgeSec.count(), [&](size_t periodIndex) {
+      PeriodStats& periodStats = stats.second[periodIndex];
+      periodStats.poolsCount++;
+
+      size_t transactionsCount = pool.transactions_count();
+      periodStats.transactionsCount += (uint32_t)transactionsCount;
+
+      for (size_t i = 0; i < transactionsCount; ++i) {
+        const auto& transaction =
+          pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+        if (is_deploy_transaction(transaction))
+          ++periodStats.smartContractsCount;
+
+        Currency currency =
+          currencies_indexed[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -81,49 +229,87 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       }
     });
 
-    TRACE("");
-
     blockHash = pool.previous_hash();
   }
 
-  auto finishTime = std::chrono::high_resolution_clock::now();
+  lastHash = blockchain.getLastWrittenHash();
 
-  std::chrono::seconds seconds = std::chrono::duration_cast<std::chrono::seconds>(finishTime - startTime);
+  auto finishTime = std::chrono::system_clock::now();
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+    finishTime - startTime);
+
+  TRACE("Collecting All stats: finished (took ", milliseconds.count(), "ms)");
 
   return stats;
 }
 
-csstats::csstats(BlockChain& blockchain, const Config& config)
-: blockchain(blockchain) {
-#ifndef STATS
+csstats::csstats(BlockChain& blockchain)
+  : blockchain(blockchain)
+{
+  TRACE("csstats start ", "update interval is ", updateTimeSec, " sec");
+
+#ifndef MONITOR_NODE
   return;
 #endif
+
   ScopedLock lock(mutex);
 
-  thread = std::thread([=]() {
+  thread = std::thread([this]() {
     TRACE("csstats thread started");
+
+    AllStats allStats = collectAllStats(::csstats::collectionPeriods);
+
+    currentStats = std::move(allStats.second);
+    statsCut = std::move(allStats.first);
+
+    assert(currentStats.size() == collectionPeriods.size());
+
+    for (auto i = 0ull; i < currentStats.size(); ++i)
+      currentStats[i].periodSec = collectionPeriods[i];
 
     while (!quit) {
       using namespace std::chrono_literals;
 
-      std::unique_lock<std::mutex> lock(quitCVMutex);
-
-      auto nextUpdateTime = lastUpdateTime + config.updateIntervalSec * 1000ms;
-
-      quitCV.wait_until(lock, nextUpdateTime, [this]() { return quit; });
-
       if (!quit) {
-        const uint32_t secondsPerDay = 24 * 60 * 60;
-        StatsPerPeriod stats =
-            collectStats({secondsPerDay, secondsPerDay * 7, secondsPerDay * 30, secondsPerDay * 365 * 100});
+        auto periods = collectionPeriods;
+        periods.pop_back();
+
+        StatsPerPeriod stats = collectStats(periods);
+
+        for (auto& s : stats) {
+          std::stringstream ss;
+          ss << "Period " << s.periodSec << " collected ";
+          ss << s.poolsCount << " pools, " << s.transactionsCount;
+          ss << " transactions";
+
+          TRACE(ss.str());
+#ifdef LOG_STATS_TO_FILE
+          TRACE(ss.str());
+
+          ss.str(std::string());
+
+          ss << "Blockchain size:";
+          ss << this->blockchain.getSize();
+
+          TRACE(ss.str());
+#endif
+          for (auto& t : s.balancePerCurrency) {
+            TRACE("'",
+                t.first,
+                "' = ",
+                std::to_string(t.second.integral),
+                ".",
+                std::to_string(t.second.fraction));
+          }
+        }
 
         {
           ScopedLock lock(currentStatsMutex);
           currentStats = std::move(stats);
         }
-
-        lastUpdateTime = std::chrono::system_clock::now();
       }
+
+      std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
     TRACE("csstats thread stopped");
@@ -136,7 +322,6 @@ csstats::~csstats() {
   ScopedLock lock(mutex);
 
   quit = true;
-  quitCV.notify_all();
 
   if (thread.joinable())
     thread.join();

@@ -23,7 +23,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csnode/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/thrift/lib/cpp/src
-                                      ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libcuckoo
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../csdb
                                       ${CMAKE_BINARY_DIR}/csdb/snappy
                                       ${CMAKE_BINARY_DIR}/api/api_gen
@@ -32,6 +31,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
                                       ${CMAKE_BINARY_DIR}/third-party/libsodium/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../solver/solver/include
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/../solver2/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)

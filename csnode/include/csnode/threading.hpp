@@ -1,19 +1,22 @@
 #pragma once
 
+#include <assert.h>
 #include <lib/system/logger.hpp>
+#include <lib/system/cache.hpp>
 #include <client/params.hpp>
 
 #define BOTTLENECKED_SMARTS
 
+#include <condition_variable>
 #include <thread>
 #include <unordered_map>
 #include <list>
 
-namespace Credits {
+namespace cs {
 
 class spinlock
 {
-    std::atomic_flag af = ATOMIC_FLAG_INIT;
+    __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
 
   public:
     void lock()
@@ -42,10 +45,11 @@ struct worker_queue
     std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
 #endif
     std::condition_variable_any w;
-    Credits::spinlock lock;
+    cs::spinlock lock;
     S state;
 
   public:
+    S get_state() const { return state; }
     void get_position()
     {
 #ifdef BOTTLENECKED_SMARTS
@@ -146,7 +150,7 @@ struct sweet_spot
 #ifdef BOTTLENECKED_SMARTS
   private:
     std::condition_variable_any cv;
-    Credits::spinlock lock;
+    cs::spinlock lock;
     bool occupied = false;
 #endif
 
@@ -245,7 +249,7 @@ struct SpinLockable
     {}
 
 private:
-    std::atomic_flag af = ATOMIC_FLAG_INIT;
+    __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
     T t;
 
     friend struct SpinLockedRef<T>;

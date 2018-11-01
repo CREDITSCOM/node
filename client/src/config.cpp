@@ -24,6 +24,8 @@ const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
+const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
+const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
@@ -128,6 +130,14 @@ Config Config::readFromFile(const std::string& fileName) {
 
     result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) &&
                      params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
+
+    result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ?
+      params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) :
+      DEFAULT_MAX_NEIGHBOURS;
+
+    result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ?
+      params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) :
+      DEFAULT_CONNECTION_BANDWIDTH;
 
     result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE),
                                NODE_TYPES_MAP);

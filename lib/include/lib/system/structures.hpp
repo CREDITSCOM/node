@@ -2,11 +2,13 @@
 #ifndef __STRUCTURES_HPP__
 #define __STRUCTURES_HPP__
 #include <cstdint>
+#include <cstring>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 
 #include "allocators.hpp"
+#include "cache.hpp"
 
 /* Containers */
 template <typename BufferType>
@@ -289,7 +291,10 @@ private:
 
 class CallsQueue {
 public:
-  static const uint32_t MAX_SIZE = 32;
+  struct Call {
+    __cacheline_aligned std::atomic<Call*> next;
+    std::function<void()> func;
+  };
 
   static CallsQueue& instance() {
     static CallsQueue inst;
@@ -302,31 +307,48 @@ public:
 
 private:
   CallsQueue() { }
-
-  std::atomic<uint32_t> size_ = { 0 };
-  std::atomic_flag lock_ = ATOMIC_FLAG_INIT;
-  std::function<void()> calls_[MAX_SIZE];
+  __cacheline_aligned std::atomic<Call*> head_ = { nullptr };
 };
 
 inline void CallsQueue::callAll() {
-  if (size_.load(std::memory_order_relaxed)) {
-    SpinLock l(lock_);
-    const auto end = calls_ + size_.load(std::memory_order_relaxed);
+  Call* startHead = head_.load(std::memory_order_relaxed);
+  if (!startHead) return;
+  Call* newHead = startHead;
+  head_.compare_exchange_strong(newHead,
+                                nullptr,
+                                std::memory_order_relaxed,
+                                std::memory_order_relaxed);
+  Call* elt = startHead;
+  do {
+    elt->func();
+    Call* rem = elt;
+    elt = rem->next.load(std::memory_order_relaxed);
+    delete rem;
+  } while (elt);
 
-    for (auto ptr = calls_; ptr != end; ++ptr)
-      (*ptr)();
-
-    size_.store(0, std::memory_order_relaxed);
+  if (newHead != startHead) {
+    do {
+      Call *next = newHead->next.load(std::memory_order_relaxed);
+      if (next == startHead) break;
+      newHead = next;
+    } while (true);
+    newHead->next.store(nullptr, std::memory_order_relaxed);
   }
 }
 
 inline void CallsQueue::insert(std::function<void()> f) {
-  SpinLock l(lock_);
-  auto sz = size_.load(std::memory_order_relaxed);
-  if (sz >= MAX_SIZE) return;
+  Call* newElt = new Call;
+  newElt->func = f;
 
-  calls_[sz] = f;
-  size_.fetch_add(1, std::memory_order_release);
+  Call* head = head_.load(std::memory_order_relaxed);
+  do {
+    newElt->next.store(head, std::memory_order_relaxed);
+  } while (!head_.compare_exchange_weak(head,
+                                        newElt,
+                                        std::memory_order_acquire,
+                                        std::memory_order_relaxed));
+
+  //LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
 }
 
 template <size_t Length>

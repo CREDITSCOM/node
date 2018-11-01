@@ -8,9 +8,12 @@
 #include <chrono>
 #include <vector>
 
+#include <lib/system/signals.hpp>
+
 namespace cs
 {
     using TimerCallback = std::function<void()>;
+    using TimeOutSignal = cs::Signal<TimerCallback>;
 
     ///
     /// Represents standard timer that calls callbacks every msec with time correction.
@@ -42,20 +45,6 @@ namespace cs
         void stop();
 
         ///
-        /// Registers callback to timer
-        ///
-        /// @param callback is any functor, lambda, closure, function object.
-        /// @brief You can add any count of callbacks to call.
-        /// Method should be called only if isRunning returns false.
-        ///
-        void connect(const TimerCallback& callback);
-
-        ///
-        /// Unregisters all callbacks.
-        ///
-        void disconnect();
-
-        ///
         /// Returns timer status.
         ///
         /// @return Returns timer running state.
@@ -69,6 +58,11 @@ namespace cs
         /// @param callback is any functor, lambda, closure, function object.
         ///
         static void singleShot(int msec, const TimerCallback& callback);
+
+    public signals:
+
+        /// generates when timer ticks
+        TimeOutSignal timeOut;
 
     protected:
 

@@ -22,14 +22,21 @@
 #include <lib/system/utils.hpp>
 
 #include <mutex>
-#include "solver/generals.hpp"
+#include <solver/generals.hpp>
+#include <solver/WalletsState.h>
+#include <csnode/conveyer.h>
 
 namespace cs {
+Generals::Generals(WalletsState& _walletsState)
+  : m_walletsState(_walletsState)
+  , m_transactionsValidator(new TransactionsValidator(m_walletsState, TransactionsValidator::Config {}))
+  {}
+
 int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #ifdef _MSC_VER
-  return __popcnt(delta.integral()) + __popcnt64(delta.fraction());
+  return static_cast<int8_t>(__popcnt(delta.integral()) + __popcnt64(delta.fraction()));
 #else
-  return __builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction());
+  return static_cast<int8_t>(__builtin_popcount(delta.integral()) + __builtin_popcountl(delta.fraction()));
 #endif
 }
 
@@ -39,43 +46,55 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
   cs::Hash hash;
+
   const std::size_t transactionsCount = packet.transactionsCount();
+  const auto& transactions = packet.transactions();
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::Characteristic characteristic;
 
   if (transactionsCount > 0) {
-    const csdb::Amount comission = 0.1_c;
-    const csdb::Amount zero_balance = 0.0_c;
+    m_walletsState.updateFromSource();
+    m_transactionsValidator->reset(transactionsCount);
 
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);
 
+#ifdef TRANSACTION_VALIDATION
+    uint8_t del1;
+    csdb::Pool new_bpool;
+#endif
+
     for (std::size_t i = 0; i < transactionsCount; ++i) {
-      const csdb::Transaction& transaction = packet.transactions().at(i);
-      const csdb::Amount delta = transaction.balance() - transaction.amount() - comission;
-
-      cs::Byte byte = 0;
-
-      if (delta > zero_balance) {
-        byte = 1;
-      }
-
+      const csdb::Transaction& transaction = transactions[i];
+#ifdef TRANSACTION_VALIDATION
+      cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
+#else
+      cs::Byte byte = static_cast<cs::Byte>(transaction.is_valid());
+#endif
       characteristicMask.push_back(byte);
     }
 
-    m_characteristic.mask = std::move(characteristicMask);
+#ifdef TRANSACTION_VALIDATION
+    m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
+#endif
+
+    characteristic.mask = std::move(characteristicMask);
+    conveyer.setCharacteristic(characteristic);
   }
   else {
-    m_characteristic.mask = cs::Bytes();
+    conveyer.setCharacteristic(characteristic);
   }
 
-  if (m_characteristic.mask.size() != transactionsCount) {
+  if (characteristic.mask.size() != transactionsCount) {
     cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
   }
 
-  blake2s(hash.data(), hash.size(), m_characteristic.mask.data(), m_characteristic.mask.size(), nullptr, NULL);
+  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
 
-  m_find_untrusted.fill(0);
-  m_new_trusted.fill(0);
-  m_hw_total.fill(HashWeigth{});
+  m_findUntrusted.fill(0);
+  m_newTrusted.fill(0);
+  m_hwTotal.fill(HashWeigth{});
 
   csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
@@ -97,13 +116,13 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
   cslog() << "GENERALS> Add matrix";
 
   const size_t nodes_amount = confidantNodes.size();
-  constexpr uint8_t confidantsCountMax = 101;  // from technical paper
+  constexpr uint8_t confidantsCountMax = TrustedSize + 1;  // from technical paper
   assert(nodes_amount <= confidantsCountMax);
 
   std::array<HashWeigth, confidantsCountMax> hw;
   uint8_t j = matrix.sender;
-  uint8_t i_max;
-  bool    found = false;
+  uint8_t i_max = 0;
+  bool found = false;
 
   uint8_t max_frec_position;
 
@@ -111,22 +130,23 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   for (uint8_t i = 0; i < nodes_amount; i++) {
     if (i == 0) {
-      memcpy(hw[0].hash, matrix.hashVector[0].hash.data(), matrix.hashVector[0].hash.size());
+      hw[0].hash = matrix.hashVector[0].hash;
 
-      cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hw[i].hash, 32);
+      const auto& hash = hw[i].hash;
+      cslog() << "GENERALS> HW OUT: writing initial hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
-      hw[0].weight                       = 1;
-      *(m_find_untrusted.data() + j * 100) = 0;
-      i_max                                = 1;
+      hw[0].weight = 1;
+      *(m_findUntrusted.data() + j * TrustedSize) = 0;
+      i_max = 1;
     }
     else {
       found = false;
 
       // FIXME: i_max uninitialized in this branch!!!!
       for (uint8_t ii = 0; ii < i_max; ii++) {
-        if (memcmp(hw[ii].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size()) == 0) {
+        if (hw[ii].hash == matrix.hashVector[i].hash) {
           (hw[ii].weight)++;
-          *(m_find_untrusted.data() + j * 100 + i) = ii;
+          *(m_findUntrusted.data() + j * TrustedSize + i) = ii;
 
           found = true;
           break;
@@ -134,10 +154,10 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
       }
 
       if (!found) {
-        memcpy(hw[i_max].hash, matrix.hashVector[i].hash.data(), matrix.hashVector[i].hash.size());
+        hw[i_max].hash = matrix.hashVector[i].hash;
 
-        (hw[i_max].weight)                     = 1;
-        *(m_find_untrusted.data() + j * 100 + i) = i_max;
+        (hw[i_max].weight) = 1;
+        *(m_findUntrusted.data() + j * TrustedSize + i) = i_max;
 
         i_max++;
 
@@ -145,24 +165,23 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
     }
   }
 
-  uint8_t hw_max    = 0;
+  uint8_t hw_max = 0;
   max_frec_position = 0;
 
   for (int i = 0; i < i_max; i++) {
     if (hw[i].weight > hw_max) {
-      hw_max            = hw[i].weight;
+      hw_max = hw[i].weight;
       max_frec_position = cs::numeric_cast<uint8_t>(i);
     }
   }
 
-  j                      = matrix.sender;
-  m_hw_total[j].weight = max_frec_position;
-
-  memcpy(m_hw_total[j].hash, hw[max_frec_position].hash, 32);
+  j = matrix.sender;
+  m_hwTotal[j].weight = max_frec_position;
+  m_hwTotal[j].hash = hw[max_frec_position].hash;
 
   for (size_t i = 0; i < nodes_amount; i++) {
-    if (*(m_find_untrusted.data() + i + j * 100) == max_frec_position) {
-      *(m_new_trusted.data() + i) += 1;
+    if (*(m_findUntrusted.data() + i + j * TrustedSize) == max_frec_position) {
+      *(m_newTrusted.data() + i) += 1;
     }
   }
 }
@@ -182,14 +201,14 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   for (uint8_t j = 0; j < nodes_amount; j++) {
     // matrix init
     if (j == 0) {
-      memcpy(hash_weights[0].hash, m_hw_total[0].hash, 32);
+      hash_weights[0].hash = m_hwTotal[0].hash;
       (hash_weights[0].weight) = 1;
       j_max                      = 1;
     } else {
       bool found = false;
 
       for (jj = 0; jj < j_max; jj++) {
-        if (memcmp(hash_weights[jj].hash, m_hw_total[j].hash, 32) == 0) {
+        if (hash_weights[jj].hash == m_hwTotal[j].hash) {
           (hash_weights[jj].weight)++;
           found = true;
 
@@ -198,21 +217,19 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
       }
 
       if (!found) {
-        std::memcpy(hash_weights[j_max].hash, m_hw_total[j].hash, 32);
+        hash_weights[j_max].hash = m_hwTotal[j].hash;
 
-        (m_hw_total[j_max].weight) = 1;
+        (m_hwTotal[j_max].weight) = 1;
         j_max++;
       }
     }
   }
 
-  uint8_t trusted_limit;
-  trusted_limit = nodes_amount / 2 + 1;
-
+  uint8_t trusted_limit = nodes_amount / 2 + 1;
   uint8_t j = 0;
 
   for (int i = 0; i < nodes_amount; i++) {
-    if (*(m_new_trusted.data() + i) < trusted_limit) {
+    if (*(m_newTrusted.data() + i) < trusted_limit) {
       cslog() << "GENERALS> Take decision: Liar nodes : " << i;
     } else {
       j++;
@@ -242,10 +259,6 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
 
 const HashMatrix& Generals::getMatrix() const {
   return m_hMatrix;
-}
-
-const Characteristic& Generals::getCharacteristic() const {
-  return m_characteristic;
 }
 
 const PublicKey& Generals::getWriterPublicKey() const {

@@ -38,16 +38,6 @@ void cs::Timer::stop()
     }
 }
 
-void cs::Timer::connect(const TimerCallback& callback)
-{
-    m_callbacks.push_back(callback);
-}
-
-void cs::Timer::disconnect()
-{
-    m_callbacks.clear();
-}
-
 bool cs::Timer::isRunning()
 {
     return m_isRunning;
@@ -72,9 +62,7 @@ void cs::Timer::loop()
 
         rehabilitation();
 
-        for (const auto& callback : m_callbacks) {
-            callback();
-        }
+        emit timeOut();
     }
 }
 

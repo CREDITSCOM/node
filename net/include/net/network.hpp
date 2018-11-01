@@ -4,7 +4,10 @@
 #include <boost/asio.hpp>
 
 #include <client/config.hpp>
+#include <lib/system/cache.hpp>
 #include "pacmans.hpp"
+
+using io_context = boost::asio::io_context;
 
 class Transport;
 class Network {
@@ -15,7 +18,7 @@ public:
   bool isGood() const { return good_; }
   ip::udp::endpoint resolve(const EndpointData&);
 
-  void sendDirect(const Packet, const ip::udp::endpoint&);
+  void sendDirect(const Packet&, const ip::udp::endpoint&);
 
   bool resendFragment(const cs::Hash&, const uint16_t, const ip::udp::endpoint&);
   void registerMessage(Packet*, const uint32_t size);
@@ -53,11 +56,11 @@ private:
   Transport* transport_;
 
   // Only needed in a one-socket configuration
-  std::atomic<bool> singleSockOpened_ = { false };
-  std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
+  __cacheline_aligned std::atomic<bool> singleSockOpened_ = { false };
+  __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
 
-  std::atomic<ThreadStatus> readerStatus_ = { NonInit };
-  std::atomic<ThreadStatus> writerStatus_ = { NonInit };
+  __cacheline_aligned std::atomic<ThreadStatus> readerStatus_ = { NonInit };
+  __cacheline_aligned std::atomic<ThreadStatus> writerStatus_ = { NonInit };
 
   std::thread readerThread_;
   std::thread writerThread_;

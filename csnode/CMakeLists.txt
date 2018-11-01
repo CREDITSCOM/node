@@ -29,33 +29,43 @@ if (Boost_FOUND)
 endif ()
 
 add_library(csnode
+  include/csnode/BitHeap.hpp
   include/csnode/blockchain.hpp
+  include/csnode/CyclicBuffer.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
-  include/csnode/wallets_cache.hpp
-  include/csnode/dynamicbuffer.h
   include/csnode/datastream.h
+  include/csnode/dynamicbuffer.h
+  include/csnode/threading.hpp
   include/csnode/nodecore.h
+  include/csnode/conveyer.h
   include/csnode/transactionspacket.h
+  include/csnode/TransactionsTail.h
+  include/csnode/WalletsCache.h
+  include/csnode/WalletsIds.h
+  include/csnode/WalletsPools.h
+  include/csnode/BlockHashes.h
   src/blockchain.cpp
   src/node.cpp
-  src/wallets_cache.cpp
+  src/nodecore.cpp
+  src/conveyer.cpp
+  src/transactionspacket.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
-  src/nodecore.cpp
-  src/transactionspacket.cpp
+  src/WalletsCache.cpp
+  src/WalletsIds.cpp
+  src/WalletsPools.cpp
+  src/BlockHashes.cpp
 )
 
-target_link_libraries (csnode net csdb solver lib base58 lz4 Boost::thread)
+target_link_libraries (csnode net csdb solver2 lib base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libcuckoo
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/libcuckoo
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../api/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver/solver/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver2/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/

@@ -2,6 +2,7 @@
 #include <lz4.h>
 
 #include "packet.hpp"
+#include "transport.hpp" // for NetworkCommand
 #include <lib/system/utils.hpp>
 
 RegionAllocator Message::allocator_(1 << 26, 4);
@@ -121,72 +122,153 @@ Message::~Message() {
 }
 
 const char* getMsgTypesString(MsgTypes messageType) {
-    switch (messageType) {
-    default:
-        return "-";
-    case RoundTableSS:
-      return "RoundTableSS";
-    case Transactions:
-          return "Transactions";
-    case FirstTransaction:
-      return "FirstTransaction";
-    case TransactionList:
-      return "TransactionList";
-    case ConsVector:
-      return "ConsVector";
-    case ConsMatrix:
-      return "ConsMatrix";
-    case NewBlock:
-      return "NewBlock";
-    case BlockHash:
-      return "BlockHash";
-    case BlockRequest:
-      return "BlockRequest";
-    case RequestedBlock:
-      return "RequestedBlock";
-    case TLConfirmation:
-      return "TLConfirmation";
-    case ConsVectorRequest:
-      return "ConsVectorRequest";
-    case ConsMatrixRequest:
-      return "ConsMatrixRequest";
-    case ConsTLRequest:
-      return "ConsTLRequest";
-    case RoundTableRequest:  
-      return "RoundTableRequest";
-    case NewBadBlock:
-      return "NewBadBlock";
-    case BigBang:
-      return "BigBang";
-    case TransactionPacket:
-      return "TransactionPacket";
-    case TransactionsPacketRequest:
-      return "TransactionsPacketRequest";
-    case TransactionsPacketReply:
-      return "TransactionsPacketReply";
-    case NewCharacteristic:
-      return "NewCharacteristic";
-    case RoundTable:
-      return "RoundTable";
-    case WriterNotification:
-      return "WriterNotification";
-    }
+  switch (messageType) {
+  default:
+    return "-";
+  case RoundTableSS:
+    return "RoundTableSS";
+  case Transactions:
+    return "Transactions";
+  case FirstTransaction:
+    return "FirstTransaction";
+  case TransactionList:
+    return "TransactionList";
+  case ConsVector:
+    return "ConsVector";
+  case ConsMatrix:
+    return "ConsMatrix";
+  case NewBlock:
+    return "NewBlock";
+  case BlockHash:
+    return "BlockHash";
+  case BlockRequest:
+    return "BlockRequest";
+  case RequestedBlock:
+    return "RequestedBlock";
+  case TLConfirmation:
+    return "TLConfirmation";
+  case ConsVectorRequest:
+    return "ConsVectorRequest";
+  case ConsMatrixRequest:
+    return "ConsMatrixRequest";
+  case ConsTLRequest:
+    return "ConsTLRequest";
+  case RoundTableRequest:  
+    return "RoundTableRequest";
+  case NewBadBlock:
+    return "NewBadBlock";
+  case BigBang:
+    return "BigBang";
+  case TransactionPacket:
+    return "TransactionPacket";
+  case TransactionsPacketRequest:
+    return "TransactionsPacketRequest";
+  case TransactionsPacketReply:
+    return "TransactionsPacketReply";
+  case NewCharacteristic:
+    return "NewCharacteristic";
+  case RoundTable:
+    return "RoundTable";
+  case WriterNotification:
+    return "WriterNotification";
+  }
 }
+
+const char* getNetworkCommandString(NetworkCommand command) {
+  switch (command) {
+  default:
+    return "-";
+  case NetworkCommand::Registration:
+    return "Registration";
+  case NetworkCommand::ConfirmationRequest:
+    return "ConfirmationRequest";
+  case NetworkCommand::ConfirmationResponse:
+    return "ConfirmationResponse";
+  case NetworkCommand::RegistrationConfirmed:
+    return "RegistrationConfirmed";
+  case NetworkCommand::RegistrationRefused:
+    return "RegistrationRefused";
+  case NetworkCommand::Ping:
+    return "Ping";
+  case NetworkCommand::PackInform:
+    return "PackInform";
+  case NetworkCommand::PackRequest:
+    return "PackRequest";
+  case NetworkCommand::PackRenounce:
+    return "PackRenounce";
+  case NetworkCommand::BlockSyncRequest:
+    return "BlockSyncRequest";
+  case NetworkCommand::SSRegistration:
+    return "SSRegistration";
+  case NetworkCommand::SSFirstRound:
+    return "SSFirstRound";
+  case NetworkCommand::SSRegistrationRefused:
+    return "SSRegistrationRefused";
+  case NetworkCommand::SSPingWhiteNode:
+    return "SSPingWhiteNode";
+  case NetworkCommand::SSLastBlock:
+    return "SSLastBlock";
+  case NetworkCommand::SSReRegistration:
+    return "SSReRegistration";
+  case NetworkCommand::SSSpecificBlock:
+    return "SSSpecificBlock";
+  }
+}
+
+class PacketFlags {
+public:
+  PacketFlags(const Packet& packet)
+    : packet_(packet) {
+  }
+
+  std::ostream& operator()(std::ostream& os) const {
+    uint8_t n = 0;
+    if (packet_.isNetwork()) {
+      os << "net";
+      ++n;
+    }
+    if (packet_.isFragmented()) {
+      os << (n ? "," : "") << "fragmented";
+      ++n;
+    }
+    if (packet_.isCompressed()) {
+      os << (n ? "," : "") << "compressed";
+      ++n;
+    }
+    if (packet_.isDirect()) {
+      os << (n ? "," : "") << "direct";
+      ++n;
+    }
+    return os;
+  }
+private:
+  const Packet& packet_;
+};
  
+std::ostream& operator<<(std::ostream& os, const PacketFlags& packetFlags) {
+  return packetFlags(os);
+}
+
 std::ostream& operator<<(std::ostream& os, const Packet& packet) {
+  if (!packet.isHeaderValid()) {
+    os << "Invalid packet header";
+    return os;
+  }
+  if (packet.isNetwork()) {
+    const uint8_t* data = packet.getMsgData();
+    size_t size = packet.getMsgSize();
+    os << "Type:\t" << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << ")" << std::endl;
+    os << "Flags:\t" << PacketFlags(packet) << std::endl;
+    os << cs::Utils::byteStreamToHex(++data, --size);
+    return os;
+  }
   os
     << "Type:\t\t" << getMsgTypesString(packet.getType()) << "(" << packet.getType() << ")" << std::endl
     << "Round:\t\t" << packet.getRoundNum() << std::endl
     << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size()) << std::endl
-    << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size())
-    << std::endl
+    << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size()) << std::endl
     << "Id:\t\t" << packet.getId() << std::endl
-    << "Flags:\t\t"
-      << (packet.isNetwork() ? "net " : "")
-      << (packet.isFragmented() ? "fragmented " : "")
-      << (packet.isBroadcast() ? "broadcast " : "")
-      << (packet.isCompressed() ? "compressed " : "")
-      << (packet.isDirect() ? "direct" : "") << std::endl
+    << "Flags:\t\t" << PacketFlags(packet) << std::endl
     << cs::Utils::byteStreamToHex(packet.getMsgData(), packet.getMsgSize());
   return os;
 }

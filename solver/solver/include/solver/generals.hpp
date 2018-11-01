@@ -16,14 +16,17 @@
 
 #include <csnode/node.hpp>
 #include <lib/system/keys.hpp>
+#include <solver/TransactionsValidator.h>
 
 namespace cs {
 
+class WalletsState;
+class TransactionsValidator;
 class Solver;
 
 class Generals {
- public:
-  Generals()  = default;
+public:
+  Generals(WalletsState& m_walletsState);
   ~Generals() = default;
 
   Generals(const Generals&) = delete;
@@ -41,23 +44,34 @@ class Generals {
 
   void addSenderToMatrix(uint8_t myConfNum);
 
-  const Characteristic& getCharacteristic() const;
   const PublicKey& getWriterPublicKey() const;
 
- private:
+private:
   struct HashWeigth {
-    char hash[HASH_LENGTH] = {};
+    cs::Hash hash;
     uint8_t weight = 0;
+
+    inline HashWeigth() {
+      hash.fill(0);
+    }
   };
 
-  HashMatrix m_hMatrix;
+  cs::HashMatrix m_hMatrix;
 
-  std::array<uint8_t, 10000> m_find_untrusted;
-  std::array<uint8_t, 100> m_new_trusted;
-  std::array<HashWeigth, 100> m_hw_total;
+  enum : unsigned int {
+    UntrustedSize = 10000,
+    TrustedSize = 100,
+    TotalSize = 100
+  };
 
-  Characteristic m_characteristic;
+  std::array<uint8_t, UntrustedSize> m_findUntrusted;
+  std::array<uint8_t, TrustedSize> m_newTrusted;
+  std::array<HashWeigth, TotalSize> m_hwTotal;
+
   PublicKey m_writerPublicKey;
+
+  WalletsState& m_walletsState;
+  std::unique_ptr<TransactionsValidator> m_transactionsValidator;
 };
 }  // namespace cs
 #endif

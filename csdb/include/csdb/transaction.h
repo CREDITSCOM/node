@@ -24,6 +24,7 @@ class ibstream;
 
 class Address;
 class Amount;
+class AmountCommission;
 class Currency;
 class PoolHash;
 class Pool;
@@ -93,9 +94,7 @@ class Transaction
 
 public:
   Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-	  Amount max_fee, Amount counted_fee, std::string signature);
-  Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-	  Amount max_fee, Amount counted_fee, std::string signature, Amount balance);
+	  AmountCommission max_fee, AmountCommission counted_fee, std::string signature);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -106,20 +105,19 @@ public:
   Address target() const noexcept;
   Currency currency() const noexcept;
   Amount amount() const noexcept;
-  Amount max_fee() const noexcept;
-  Amount counted_fee() const noexcept;
+  AmountCommission max_fee() const noexcept;
+  AmountCommission counted_fee() const noexcept;
   std::string signature() const noexcept;
-  Amount balance() const noexcept;
 
   void set_innerID(int64_t innerID);
   void set_source(Address source);
   void set_target(Address target);
   void set_currency(Currency currency);
   void set_amount(Amount amount);
-  void set_max_fee(Amount max_fee);
-  void set_counted_fee(Amount counted_fee);
+  void set_max_fee(AmountCommission max_fee);
+  void set_counted_fee(AmountCommission counted_fee);
+  void set_counted_fee_unsafe(AmountCommission counted_fee);
   void set_signature(std::string signature);
-  void set_balance(Amount balance);
 
   ::csdb::internal::byte_array to_binary();
   static Transaction from_binary(const ::csdb::internal::byte_array data);
@@ -127,6 +125,8 @@ public:
   static Transaction from_byte_stream(const char* data, size_t m_size);
   std::vector<uint8_t> to_byte_stream() const;
   std::vector<uint8_t> to_byte_stream_for_sig() const;
+
+  bool verify_signature(const internal::byte_array& public_key) const;
 
   /**
    * @brief Добавляет дополнительное произвольное поле к транзакции

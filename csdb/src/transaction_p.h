@@ -15,6 +15,7 @@
 
 #include "csdb/address.h"
 #include "csdb/amount.h"
+#include "csdb/amount_commission.h"
 #include "csdb/currency.h"
 #include "csdb/pool.h"
 
@@ -49,13 +50,11 @@ class Transaction::priv : public ::csdb::internal::shared_data
   inline priv() :
     read_only_(false),
     amount_(0_c),
-    max_fee_(0_c),
-	counted_fee_(0_c),
-    signature_(),
-    balance_(0_c)
+    signature_()
   {}
 
   inline priv(const priv& other) :
+    ::csdb::internal::shared_data(),
     read_only_(false),
     innerID_(other.innerID_),
     source_(other.source_),
@@ -63,14 +62,13 @@ class Transaction::priv : public ::csdb::internal::shared_data
     currency_(other.currency_),
     amount_(other.amount_),
     max_fee_(other.max_fee_),
-	counted_fee_(other.counted_fee_),
+    counted_fee_(other.counted_fee_),
     signature_(other.signature_),
-    balance_(other.balance_),
     user_fields_(other.user_fields_)
   {}
 
   inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-	  Amount max_fee, Amount counted_fee, std::string signature, Amount balance) :
+    AmountCommission max_fee, AmountCommission counted_fee, std::string signature) :
     read_only_(false),
     innerID_(innerID),
     source_(source),
@@ -78,9 +76,8 @@ class Transaction::priv : public ::csdb::internal::shared_data
     currency_(currency),
     amount_(amount),
     max_fee_(max_fee),
-	counted_fee_(counted_fee),
-    signature_(signature),
-    balance_(balance)
+    counted_fee_(counted_fee),
+    signature_(signature)
   {}
 
   inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index)
@@ -96,10 +93,9 @@ class Transaction::priv : public ::csdb::internal::shared_data
   Address target_;
   Currency currency_;
   Amount amount_;
-  Amount max_fee_;
-  Amount counted_fee_;
+  AmountCommission max_fee_;
+  AmountCommission counted_fee_;
   std::string signature_;
-  Amount balance_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
 
   friend class Transaction;

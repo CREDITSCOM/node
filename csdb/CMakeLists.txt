@@ -13,6 +13,7 @@ TEST_BIG_ENDIAN(CSDB_PLATFORM_IS_BIG_ENDIAN)
 add_library(${PROJECT_NAME} STATIC
   src/csdb.cpp
   src/amount.cpp
+  src/amount_commission.cpp
   src/transaction.cpp
   src/transaction_p.h
   src/pool.cpp
@@ -39,6 +40,7 @@ add_library(${PROJECT_NAME} STATIC
   include/csdb/internal/endian.h
   include/csdb/csdb.h
   include/csdb/amount.h
+  include/csdb/amount_commission.h
   include/csdb/transaction.h
   include/csdb/pool.h
   include/csdb/address.h
@@ -61,6 +63,8 @@ target_include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
 )
+
+include_directories(${Boost_INCLUDE_DIR})
 target_link_libraries(
   ${PROJECT_NAME}
   cscrypto
@@ -77,6 +81,7 @@ else()
   target_compile_definitions(${PROJECT_NAME} PUBLIC -DCSDB_PLATFORM_IS_LITTLE_ENDIAN)
 endif()
 
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 11)
 set_property(TARGET csdb PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
   
 if(CSDB_BUILD_UNITTESTS)

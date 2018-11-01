@@ -18,10 +18,11 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /MT")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 /MT")
+    set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /MT")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -no-pie")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unknown-pragmas -pedantic")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
 
 # Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
@@ -47,6 +48,54 @@ option(WITH_ZLIB "" OFF)
 option(WITH_STDTHREADS "" ON)
 option(WITH_LIBEVENT "" OFF)
 option(WITH_OPENSSL "" OFF)
+option(WITH_GPROF "" OFF)
+
+if(NOT MSVC AND WITH_GPROF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+endif()
+
+macro(configure_msvc_runtime)
+  if(MSVC)
+    # Default to statically-linked runtime.
+    if("${MSVC_RUNTIME}" STREQUAL "")
+      set(MSVC_RUNTIME "static")
+    endif()
+    # Set compiler options.
+    set(variables
+      CMAKE_C_FLAGS_DEBUG
+      CMAKE_C_FLAGS_MINSIZEREL
+      CMAKE_C_FLAGS_RELEASE
+      CMAKE_C_FLAGS_RELWITHDEBINFO
+      CMAKE_CXX_FLAGS_DEBUG
+      CMAKE_CXX_FLAGS_MINSIZEREL
+      CMAKE_CXX_FLAGS_RELEASE
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    )
+    if(${MSVC_RUNTIME} STREQUAL "static")
+      message(STATUS
+        "MSVC -> forcing use of statically-linked runtime."
+      )
+      foreach(variable ${variables})
+        if(${variable} MATCHES "/MD")
+          string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+        endif()
+      endforeach()
+    else()
+      message(STATUS
+        "MSVC -> forcing use of dynamically-linked runtime."
+      )
+      foreach(variable ${variables})
+        if(${variable} MATCHES "/MT")
+          string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
+        endif()
+      endforeach()
+    endif()
+  endif()
+endmacro()
+
+configure_msvc_runtime()
 
 add_subdirectory(third-party)
 add_subdirectory(api)
@@ -56,6 +105,8 @@ add_subdirectory(csnode)
 add_subdirectory(solver)
 add_subdirectory(crypto)
 add_subdirectory(csdb)
+add_subdirectory(solver2)
+
 add_subdirectory(client)
 
 enable_testing()

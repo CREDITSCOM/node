@@ -12,10 +12,21 @@ set(SOLVER_DOC_BUILD FALSE)
 add_library(solver
     include/solver/generals.hpp
     include/solver/solver.hpp
-        src/solver/solver.cpp
-        src/solver/generals.cpp
+    include/solver/WalletsState.h
+    include/solver/Fee.h
+    include/solver/TransactionsValidator.h
+    include/solver/spammer.h
+    src/solver.cpp
+    src/generals.cpp
+    src/WalletState.cpp
+    src/Fee.cpp
+    src/TransactionsValidator.cpp
+    src/spammer.cpp
     ${THRIFT_GENERATED_FILES}
 )
+
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 target_include_directories(csnode PUBLIC
   ../csnode/include

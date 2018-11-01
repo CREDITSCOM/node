@@ -68,9 +68,8 @@ BOOST_AUTO_TEST_SUITE(CsNodeTests)
         transaction.set_target(csdb::Address::from_public_key((char*)myPublicForSig.data()));
         transaction.set_source(start_address);
 
-        transaction.set_currency(csdb::Currency("CS"));
+        transaction.set_currency(1);
         transaction.set_amount(csdb::Amount(10000, 0));
-        transaction.set_balance(csdb::Amount(10000000, 0));
 
         for (int i = 0; i < 15; ++i)
         {

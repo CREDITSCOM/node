@@ -4,16 +4,46 @@
 #include <string>
 #include <vector>
 #include <array>
-#include <lib/system/keys.hpp>
 #include <csdb/pool.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
+
 #include <boost/smart_ptr/detail/spinlock.hpp>
-#include <libcuckoo/cuckoohash_map.hh>
+#include <boost/circular_buffer.hpp>
+
+#include <client/params.hpp>
 #include <csnode/transactionspacket.h>
 #include <lib/system/common.hpp>
+#include <lib/system/keys.hpp>
+
+#ifdef NO_DELAYS
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
+const std::size_t ROUND_DELAY = 0;
+#else
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
+const std::size_t ROUND_DELAY = 1000;                   //ms
+#endif
+
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 3000;        // ms
+
+namespace std
+{
+    // transactions packet hash specialization
+    template<>
+    struct hash<cs::TransactionsPacketHash>
+    {
+        std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+    };
+}
+
+enum NodeLevel {
+    Normal,
+    Confidant,
+    Main,
+    Writer
+};
 
 namespace cs
 {
@@ -30,7 +60,6 @@ namespace cs
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
-    using HashesSet = std::unordered_set<cs::TransactionsPacketHash>;
 
     // sync types
     using SharedMutex = std::shared_mutex;
@@ -47,7 +76,8 @@ namespace cs
         Black2HashLength = BLAKE2_HASH_LENGTH,
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
-        PrivateKeyLength = PRIVATE_KEY_LENGTH
+        PrivateKeyLength = PRIVATE_KEY_LENGTH,
+        PacketHashesRequestDelay = 100 // ms
     };
 
     enum SolverConsts : uint32_t
@@ -55,13 +85,12 @@ namespace cs
         TransactionsFlushRound = 2,
         TransactionsPacketInterval = 50,    // ms
         MaxPacketTransactions = 500,
-        RoundDelay = 1000                   // delay
     };
 
     // all info about round
     struct RoundTable
     {
-        RoundNumber round;
+        RoundNumber round = 0;
         PublicKey general;
         ConfidantsKeys confidants;
         Hashes hashes;
@@ -70,6 +99,23 @@ namespace cs
     struct Characteristic
     {
         cs::Bytes mask;
+    };
+
+    struct CharacteristicMeta
+    {
+        cs::Bytes bytes;
+        cs::PublicKey sender;
+        cs::RoundNumber round = 0;
+
+        bool operator==(const cs::CharacteristicMeta& meta) const
+        {
+            return round == meta.round;
+        }
+
+        bool operator !=(const cs::CharacteristicMeta& meta) const
+        {
+            return !((*this) == meta);
+        }
     };
 
     struct PoolMetaInfo
@@ -93,16 +139,14 @@ namespace cs
         HashVector hashVector[hashVectorCount];
         cs::Signature signature;
     };
-}
 
-namespace std
-{
-    // transactions packet hash specialization
-    template<>
-    struct hash<cs::TransactionsPacketHash>
+    struct StorageElement
     {
-        std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+        cs::RoundNumber round = 0;
+        cs::TransactionsPacketHashTable hashTable;
     };
+
+    using HashTablesStorage = boost::circular_buffer<StorageElement>;
 }
 
 #endif // NODE_CORE_H

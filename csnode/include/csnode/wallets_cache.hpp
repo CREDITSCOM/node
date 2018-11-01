@@ -35,7 +35,7 @@ namespace csdb
 
 class BlockChain;
 
-namespace Credits
+namespace cs
 {
 
     class WalletsCache
@@ -104,6 +104,6 @@ namespace Credits
         Data data_;
     };
 
-} // namespace Credits
+} // namespace cs
 
 #endif

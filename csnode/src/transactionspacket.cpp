@@ -15,7 +15,7 @@ namespace cs
 
     TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& str)
     {
-        if (str.size() == 0) {
+        if (str.empty()) {
             return TransactionsPacketHash();
         }
 
@@ -186,6 +186,11 @@ namespace cs
     }
 
     const std::vector<csdb::Transaction>& TransactionsPacket::transactions() const noexcept
+    {
+        return m_transactions;
+    }
+
+    std::vector<csdb::Transaction>& TransactionsPacket::transactions()
     {
         return m_transactions;
     }

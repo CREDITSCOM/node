@@ -7,6 +7,7 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+
 enum RegFlags : uint8_t { UsingIPv6 = 1, RedirectIP = 1 << 1, RedirectPort = 1 << 2 };
 
 enum Platform : uint8_t { Linux, MacOS, Windows };
@@ -93,37 +94,36 @@ void Transport::run() {
   }
 
   refillNeighbourhood();
-
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
   while (true) {
     ++ctr;
     bool askMissing    = true;
-    bool resendPacks   = ctr % 2 == 0;
+    bool resendPacks   = ctr % 4 == 0;
     bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending  = ctr % 100 == 0;
     bool checkSilent   = ctr % 150 == 0;
 
-    if (askMissing) {
+    if (askMissing)
       askForMissingPackages();
-    }
-    if (checkPending) {
-      nh_.checkPending();
-    }
-    if (checkSilent) {
+
+    if (checkPending)
+      nh_.checkPending(config_.getMaxNeighbours());
+
+    if (checkSilent)
       nh_.checkSilent();
-    }
-    if (resendPacks) {
+
+    if (resendPacks)
       nh_.resendPackets();
-    }
-    if (sendPing) {
+
+    if (sendPing)
       nh_.pingNeighbours();
-    }
-    if (refreshLimits) {
+
+    if (refreshLimits)
       nh_.refreshLimits();
-    }
+
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 }
@@ -160,11 +160,22 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
   return rn;
 }
 
-void Transport::sendDirect(const Packet* pack, const Connection& conn) {
-  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + cs::numeric_cast<uint32_t>(pack->size());
-  if (nextBytesCount <= conn.BytesLimit) {
-    conn.lastBytesCount.fetch_add(cs::numeric_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
+bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
+  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
+  if (nextBytesCount <= config_.getConnectionBandwidth()) {
+    conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
     net_->sendDirect(*pack, conn.getOut());
+    return true;
+  }
+
+  return false;
+}
+
+void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
+  const auto packEnd = pack + size;
+  for (auto ptr = pack; ptr != packEnd; ++ptr) {
+    nh_.registerDirect(ptr, conn);
+    sendDirect(ptr, **conn);
   }
 }
 
@@ -201,6 +212,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     case NetworkCommand::SSRegistration:
       gotSSRegistration(task, sender);
       break;
+    case NetworkCommand::SSReRegistration:
+      gotSSReRegistration();
+      break;
     case NetworkCommand::SSFirstRound:
       gotSSDispatch(task);
       break;
@@ -211,8 +225,22 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence());
+      try {
+        gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash());
+      }
+      catch (std::out_of_range) {}
       break;
+    case NetworkCommand::SSSpecificBlock: {
+      uint32_t round;
+      iPackStream_ >> round;
+      try {
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
+      }
+      catch (std::out_of_range) {
+        LOG_WARN("[WARNING] : [BIGBANG] : [VERY BIG HARD ROUND] : round: " + std::to_string(round));
+      }
+      break;
+    }
     case NetworkCommand::PackInform:
       gotPackInform(task, sender);
       break;
@@ -263,7 +291,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  RoundNum rNum;
+  RoundNum rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
@@ -285,6 +313,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
     return false;
   }
 
+  uint32_t ctr = nh_.size();
   if (config_.getBootstrapType() == BootstrapType::SignalServer) {
     for (uint8_t i = 0; i < numCirc; ++i) {
       EndpointData ep;
@@ -294,7 +323,8 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
       if (!iPackStream_.good())
         return false;
 
-      nh_.establishConnection(net_->resolve(ep));
+      if (++ctr <= config_.getMaxNeighbours())
+        nh_.establishConnection(net_->resolve(ep));
 
       iPackStream_.safeSkip<cs::PublicKey>();
       if (!iPackStream_.good()) {
@@ -474,6 +504,31 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     return;
   }
 
+  // если последний номер раунда в блоке у ноды отстаёт пришедшего номера раунда на N
+  // то начинается синхронизация
+  // в противом случае нода собирает блоки из транзакций по таблице раундов
+  constexpr size_t roundNumberLagLimit = 2;  // подобрано экспериментально
+  const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
+  const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
+  const bool isRoundNumberLagged = (rNum < lastSequenceNumber) && (lagBeetweenRounds > roundNumberLagLimit);
+
+  if (isRoundNumberLagged) {
+    csdebug() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+            << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
+    if (type == MsgTypes::RoundTableSS) {
+      csdebug() << "RoundTableSS";
+      return node_->getRoundTableSS(data, size, rNum);
+    }
+    else if (type == MsgTypes::BlockRequest) {
+      csdebug() << "BlockRequest";
+      return node_->getBlockRequest(data, size, firstPack.getSender());
+    }
+    else if (type == MsgTypes::RequestedBlock) {
+      csdebug() << "RequestedBlock";
+      return node_->getBlockReply(data, size);
+    }
+  }
+
   switch(type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
@@ -510,9 +565,9 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
-    return node_->getPacketHashesRequest(data, size, firstPack.getSender());
+    return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
-    return node_->getPacketHashesReply(data, size);
+    return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
   case MsgTypes::BigBang:
     return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
@@ -527,7 +582,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
 
 void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool incrementWhenResend) {
   auto end = pack + packNum;
-
+  
   for (auto ptr = pack; ptr != end; ++ptr) {
     SpinLock     l(sendPacksFlag_);
     PackSendTask pst;
@@ -552,6 +607,34 @@ void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhen
 void Transport::clearTasks() {
   SpinLock l(sendPacksFlag_);
   sendPacks_.clear();
+}
+
+uint32_t Transport::getMaxNeighbours() const {
+  return config_.getMaxNeighbours();
+}
+
+ConnectionPtr Transport::getSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
+  return nh_.getNextSyncRequestee(seq, alreadyRequested);
+}
+
+ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
+  return nh_.getNeighbourByKey(pk);
+}
+
+ConnectionPtr Transport::getRandomNeighbour()
+{
+  csdebug() << "Transport> Get random neighbour";
+  return nh_.getRandomSyncNeighbour();
+}
+
+void Transport::syncReplied(const uint32_t seq) {
+  return nh_.releaseSyncRequestee(seq);
+}
+
+void Transport::resetNeighbours()
+{
+  csdebug() << "Transport> Reset neighbours";
+  return nh_.resetSyncNeighbours();
 }
 
 /* Sending network tasks */
@@ -648,7 +731,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
 
   ConnectionId myCId;
   ConnectionId realCId;
-  cs::PublicKey key;
+  cs::PublicKey    key;
   iPackStream_ >> myCId >> realCId >> key;
 
   if (!iPackStream_.good()) {
@@ -698,6 +781,17 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
   return true;
 }
 
+bool Transport::gotSSReRegistration()
+{
+  LOG_WARN("ReRegistration on Signal Server");
+  {
+    SpinLock l(oLock_);
+    formSSConnectPack(config_, oPackStream_, myPublicKey_);
+    net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+  }
+  return true;
+}
+
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
     LOG_WARN("Unexpected Signal Server response");
@@ -728,14 +822,23 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash & lastHash) {
+#ifdef MONITOR_NODE
+  return true;
+#endif
+
   Connection conn;
   conn.in         = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
 
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
-  oPackStream_ << lastBlock << myPublicKey_;
+  cs::Hash lastHash_;
+  //std::copy(lastHash.to_binary().begin(), lastHash.to_binary().end(), lastHash_.data());
+  
+  memcpy(lastHash_.data(), ((const uint8_t*)lastHash.to_binary().data()), lastHash_.size());
+  oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
+  //oPackStream_ << lastBlock << myPublicKey_;
 
   sendDirect(oPackStream_.getPackets(), conn);
   return true;
@@ -749,19 +852,18 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
-  auto conn = sender->connection.load(std::memory_order_relaxed);
-  if (!conn){
-    return;
-  }
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return;
 
-  sendPackInform(pack, *conn);
+  sendPackInform(pack, **conn);
 
-  // FIXME: result of comparison of constant 100000 with expression of type 'const uint16_t' (aka 'const unsigned short') is always false
+  if (pack.isDirect()) return;  // Do not redirect direct packs
+
   if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
   }
   else {
-    nh_.neighbourHasPacket(sender, pack.getHash());
+    nh_.neighbourHasPacket(sender, pack.getHash(), false);
     sendBroadcast(&pack);
   }
 }
@@ -769,19 +871,18 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::PackInform << pack.getHash();
+  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isDirect() << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
   oPackStream_.clear();
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
+  uint8_t isDirect;
   cs::Hash hHash;
-  iPackStream_ >> hHash;
-  if (!iPackStream_.good() || !iPackStream_.end()) {
-    return false;
-  }
+  iPackStream_ >> isDirect >> hHash;
+  if (!iPackStream_.good() || !iPackStream_.end()) return false;
 
-  nh_.neighbourHasPacket(sender, hHash);
+  nh_.neighbourHasPacket(sender, hHash, isDirect);
   return true;
 }
 
@@ -889,10 +990,8 @@ void Transport::registerMessage(MessagePtr msg) {
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-  Connection* conn = sender->connection.load(std::memory_order_acquire);
-  if (!conn) {
-    return false;
-  }
+  ConnectionPtr conn = nh_.getConnection(sender);
+  if (!conn) return false;
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   cs::Hash hHash;
@@ -923,20 +1022,40 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 void Transport::sendPingPack(const Connection& conn) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id;
+  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence();
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  Connection::Id id;
+  Connection::Id id = 0u;
+  uint32_t lastSeq;
 
-  iPackStream_ >> id;
+  iPackStream_ >> id >> lastSeq;
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
   }
 
   nh_.validateConnectionId(sender, id, task->sender);
+
+  if (lastSeq > maxBlock_) {
+    maxBlock_ = lastSeq;
+    maxBlockCount_ = 1;
+  }
+  else if (lastSeq == maxBlock_) {
+    if (lastSeq > node_->getBlockChain().getLastWrittenSequence() && ++maxBlockCount_ > ((rand() % 5) + 5)) {
+      auto conn = sender->connection.load(std::memory_order_relaxed);
+      if (!conn) return false;
+
+      SpinLock l(oLock_);
+      oPackStream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
+      sendDirect(oPackStream_.getPackets(), *conn);
+      oPackStream_.clear();
+
+      maxBlockCount_ = 0;
+    }
+  }
 
   return true;
 }

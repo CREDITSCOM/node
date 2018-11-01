@@ -46,6 +46,7 @@ class Storage final
 {
 private:
   class priv;
+  bool write_queue_search(const PoolHash& hash, Pool& res_pool) const;
 
 public:
   using WeakPtr = ::std::weak_ptr<priv>;
@@ -241,6 +242,17 @@ public:
    */
   std::vector<Transaction> transactions(const Address &addr, size_t limit = 100, const TransactionID &offset = TransactionID()) const;
 
+  /**
+  * @brief get_from_blockchain возвращает true, если транзакция с addr и innerId есть в blockchain
+  * @param addr       адрес кошелька (input)
+  * @param InnerId    id транзакции (input)
+  * @Transaction trx  полученная транзакция (output)
+  * @return содержит ли blockchain транзакцию
+  *
+  * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
+  * \используется для входного параметра addr в виде id кошелька
+  */
+  bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
 
 private:
   ::std::shared_ptr<priv> d;

@@ -66,8 +66,7 @@ struct Dbt_safe : public Dbt
   {
     void* buf = get_data();
     if (buf != NULL) {
-      //free(buf);
-
+      free(buf);
     }
   }
 };
@@ -115,7 +114,30 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
 
-  uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_CDB | DB_THREAD;
+  DbEnv env(static_cast<uint32_t>(0));
+  uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
+  try {
+    env.open(path.c_str(), db_env_open_flags, 0);
+    env.close(0);
+  }
+  catch (DbException &e) {
+    std::cerr << "Error opening database environment: "
+      << path
+      << " and database "
+      << "blockchain.db" << std::endl;
+    std::cerr << e.what() << std::endl;
+    return false;
+  }
+  catch (std::exception &e) {
+    std::cerr << "Error opening database environment: "
+      << path
+      << " and database "
+      << "blockchain.db" << std::endl;
+    std::cerr << e.what() << std::endl;
+    return false;
+  }
+
+  db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_CDB | DB_THREAD;
   env_.open(path.c_str(), db_env_open_flags, 0);
 
   auto db_blocks = new Db(&env_, 0);

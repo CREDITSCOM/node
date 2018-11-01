@@ -15,20 +15,63 @@
 #include <limits>
 #include <thread>
 #include <functional>
+#include <ostream>
 #include <lib/system/structures.hpp>
 #include <lib/system/common.hpp>
 #include <sodium.h>
+#include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/bind.hpp>
 
-#define cswatch(x) std::cout << (#x) <<  " is " << (x) << '\n'
+#define cswatch(x) cslog() << (#x) <<  " is " << (x)
 #define csunused(x) (void)(x)
 
 namespace cs
 {
+    enum class Direction : uint8_t
+    {
+        PrevBlock,
+        NextBlock
+    };
+
+    inline std::ostream& operator<<(std::ostream& os, Direction dir)
+    {
+        switch (dir)
+        {
+        case Direction::PrevBlock:
+            return os << "Previous Block";
+
+        case Direction::NextBlock:
+            return os << "Next Block";
+
+        default:
+            return os << "Wrong dir=" << static_cast<int64_t>(dir);
+        }
+    }
+
+    inline std::ostream& printHex(std::ostream& os, const char* bytes, size_t num)
+    {
+        static char hex[] = { '0', '1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
+
+        for (size_t i = 0; i < num; i++)
+        {
+            os << hex[(bytes[i] >> 4) & 0x0F];
+            os << hex[bytes[i] & 0x0F];
+        }
+
+        return os;
+    }
+
+    template<typename T, size_t Size>
+    inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Size>& address)
+    {
+        printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
+        return os;
+    }
+
     ///
     /// Static utils helper class
     ///
@@ -42,7 +85,7 @@ namespace cs
         };
 
         ///
-        /// Generates random value from random generator
+        /// Generates random value from random generator [min, max]
         ///
         inline static int generateRandomValue(int min, int max)
         {
@@ -71,9 +114,14 @@ namespace cs
             auto now = std::chrono::system_clock::now();
             auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
+            struct tm result;
             std::stringstream ss;
-            ss << std::put_time(std::localtime(&in_time_t), "%H:%M:%S");
-
+#ifndef _WINDOWS
+            ss << std::put_time(localtime_r(&in_time_t, &result), "%H:%M:%S");
+#else
+            localtime_s(&result, &in_time_t);
+            ss << std::put_time(&result, "%H:%M:%S");
+#endif
             return ss.str();
         }
 
@@ -363,12 +411,12 @@ inline constexpr unsigned char operator "" _i8( unsigned long long arg ) noexcep
     return static_cast<signed char>( arg );
 }
 
-inline constexpr unsigned char operator "" _u16( unsigned long long arg ) noexcept
+inline constexpr unsigned short operator "" _u16( unsigned long long arg ) noexcept
 {
     return static_cast<unsigned short>( arg );
 }
 
-inline constexpr unsigned char operator "" _i16( unsigned long long arg ) noexcept
+inline constexpr short operator "" _i16( unsigned long long arg ) noexcept
 {
     return static_cast<short>( arg );
 }

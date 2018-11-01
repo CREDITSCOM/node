@@ -7,7 +7,7 @@
 
 #include "packet.hpp"
 
-using namespace boost::asio;
+namespace ip = boost::asio::ip;
 
 template <typename Pacman>
 class TaskPtr {
@@ -39,7 +39,7 @@ private:
 
 class IPacMan {
 public:
-  IPacMan(): allocator_(1 << 24) { }
+  IPacMan(): allocator_(1 << 20) { }
 
   struct Task {
     ip::udp::endpoint sender;

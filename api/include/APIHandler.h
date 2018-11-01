@@ -7,8 +7,8 @@
 #include <queue>
 
 #include <API.h>
-#include <solver/solver.hpp>
-//#include <csconnector/csconnector.h>
+#include <csnode/conveyer.h>
+#include <solver2/SolverCore.h>
 #include <csstats.h>
 
 #include <ContractExecutor.h>
@@ -29,6 +29,7 @@ class APIHandlerBase
         SUCCESS,
         FAILURE,
         NOT_IMPLEMENTED,
+        NOT_FOUND,
         MAX
     };
 
@@ -65,14 +66,16 @@ class APIFaker : public APINull
 class APIHandler : public APIHandlerInterface
 {
   public:
-    APIHandler(BlockChain& blockchain, cs::Solver& _solver);
+    APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
 
-    void BalanceGet(api::BalanceGetResult& _return,
-                    const api::Address& address,
-                    const api::Currency currency) override;
+    void WalletDataGet(api::WalletDataGetResult& _return,
+                       const api::Address& address) override;
+    void WalletIdGet(api::WalletIdGetResult& _return, const Address& address) override;
+    void WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const Address& address) override;
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const Address& address) override;
 
     void TransactionGet(api::TransactionGetResult& _return,
                         const api::TransactionId& transactionId) override;
@@ -122,14 +125,29 @@ class APIHandler : public APIHandlerInterface
 
     void WaitForBlock(PoolHash& _return, const PoolHash& obsolete) override;
 
+    void SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) override;
+
+    void TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) override;
+
+    void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
+
   private:
     BlockChain& s_blockchain;
+
+    std::vector<api::SealedTransaction>
+    extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
+
+    api::SealedTransaction
+    convertTransaction(const csdb::Transaction& transaction);
+
+    std::vector<api::SealedTransaction>
+    convertTransactions(const std::vector<csdb::Transaction>& transactions);
 
     api::Pool convertPool(const csdb::Pool& pool);
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    cs::Solver& solver;
+    slv2::SolverCore& solver;
     csstats::csstats stats;
 
     ::apache::thrift::stdcxx::shared_ptr<
@@ -138,25 +156,25 @@ class APIHandler : public APIHandlerInterface
 
     ::executor::ContractExecutorConcurrentClient executor;
 
-    Credits::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
+    cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
       smart_origin;
 
-    using smart_state_entry = Credits::worker_queue<std::string>;
+    using smart_state_entry = cs::worker_queue<std::string>;
 
-    Credits::SpinLockable<std::map<csdb::Address, smart_state_entry>>
+    cs::SpinLockable<std::map<csdb::Address, smart_state_entry>>
       smart_state;
 
     struct smart_trxns_queue
     {
-        Credits::spinlock lock;
+        cs::spinlock lock;
         std::condition_variable_any new_trxn_cv{};
         size_t awaiter_num{ 0 };
         std::deque<csdb::TransactionID> trid_queue{};
     };
-    Credits::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>
+    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>
       smart_last_trxn;
 
-    Credits::SpinLockable<
+    cs::SpinLockable<
       std::map<csdb::Address, std::vector<csdb::TransactionID>>>
       deployed_by_creator;
 
@@ -165,7 +183,7 @@ class APIHandler : public APIHandlerInterface
         std::queue<csdb::Transaction> queue;
         csdb::PoolHash last_pull_hash{};
     };
-    Credits::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+    cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
 
     template<typename Mapper>
     void get_mapped_deployer_smart(
@@ -188,7 +206,7 @@ class APIHandler : public APIHandlerInterface
     void smart_transaction_flow(api::TransactionFlowResult& _return,
                                             const ::api::Transaction&);
 
-    std::map<std::string, Credits::worker_queue<std::tuple<>>> work_queues;
+    std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
 };
 
 class SequentialProcessorFactory;
@@ -198,7 +216,7 @@ class APIProcessor : public api::APIProcessor
 {
   public:
     APIProcessor(::apache::thrift::stdcxx::shared_ptr<APIHandler> iface);
-    Credits::sweet_spot ss;
+    cs::sweet_spot ss;
 
   protected:
     bool dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
@@ -239,8 +257,6 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
 };
 }
 
-api::SealedTransaction
-convertTransaction(const csdb::Transaction& transaction);
 
 template<typename T>
 T
@@ -275,4 +291,4 @@ serialize(const T& sc)
 }
 
 bool
-is_smart_deploy(const api::SmartContractInvocation& smart);
+is_deploy_transaction(const csdb::Transaction& tr);
