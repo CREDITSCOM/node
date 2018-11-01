@@ -1547,7 +1547,7 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundN
   csdebug() << "NODE> Processing packets reply";
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  conveyer.addFoundPacket(std::move(packet));
+  conveyer.addFoundPacket(round, std::move(packet));
 
   if (conveyer.isSyncCompleted()) {
     csdebug() << "NODE> Packets sync completed";
@@ -1576,7 +1576,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
   else {
     csdebug() << "NODE> Sending packet hashes request";
-    sendPacketHashesRequest(conveyer.neededHashes(), roundNum_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
 
@@ -1714,7 +1714,7 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
-const char* getNodeLevelString(NodeLevel nodeLevel) {
+static const char* nodeLevelToString(NodeLevel nodeLevel) {
   switch (nodeLevel) {
   case NodeLevel::Normal:
     return "Normal";
@@ -1725,15 +1725,14 @@ const char* getNodeLevelString(NodeLevel nodeLevel) {
   case NodeLevel::Writer:
     return "Writer";
   }
+
   return "UNKNOWN";
 }
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
-  os << getNodeLevelString(nodeLevel);
+  os << nodeLevelToString(nodeLevel);
   return os;
 }
-
-
 
 template <class T, class... Args>
 void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args) {

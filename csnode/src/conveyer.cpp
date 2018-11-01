@@ -15,7 +15,7 @@ struct cs::Conveyer::Impl
     cs::TransactionsPacketHashTable hashTable;
 
     // sync fields
-    cs::Hashes neededHashes;
+    cs::NeededHashesMetaStorage neededHashesMeta;
 
     // writer notifications
     cs::Notifications notifications;
@@ -38,8 +38,6 @@ public signals:
 cs::Conveyer::Conveyer()
 {
     pimpl = std::make_unique<cs::Conveyer::Impl>();
-    pimpl->hashTablesStorage.resize(HashTablesStorageCapacity);
-    pimpl->characteristicMetas.resize(CharacteristicMetaCapacity);
 }
 
 cs::Conveyer& cs::Conveyer::instance()
@@ -117,7 +115,9 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     }
 
     // stoge needed hashes
-    pimpl->neededHashes = std::move(neededHashes);
+    if (!pimpl->neededHashesMeta.append(table.round, std::move(neededHashes))) {
+        csfatal() << "CONVEYER> Undefined behaviour of conveyer or node, can not add round needed hashes";
+    }
 
     {
         cs::Lock lock(m_sharedMutex);
@@ -139,35 +139,58 @@ cs::RoundNumber cs::Conveyer::currentRoundNumber() const
     return pimpl->roundTable.round;
 }
 
-const cs::RoundTable cs::Conveyer::roundTableSafe() const
+const cs::Hashes& cs::Conveyer::currentNeededHashes() const
 {
-    cs::SharedLock lock(m_sharedMutex);
-    return pimpl->roundTable;
+    auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
+
+    if (!pointer) {
+        throw std::exception("Bad needed hashes, fatal error");
+    }
+
+    return *pointer;
 }
 
-const cs::Hashes& cs::Conveyer::neededHashes() const
-{
-    return pimpl->neededHashes;
-}
-
-void cs::Conveyer::addFoundPacket(cs::TransactionsPacket&& packet)
+void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet)
 {
     cs::Lock lock(m_sharedMutex);
-    auto& hashes = pimpl->neededHashes;
 
-    if (auto iterator = std::find(hashes.begin(), hashes.end(), packet.hash()); iterator != hashes.end())
+    cs::TransactionsPacketHashTable* tablePointer = nullptr;
+    cs::Hashes* hashesPointer = nullptr;
+
+    if (round == pimpl->roundTable.round) {
+        tablePointer = &pimpl->hashTable;
+    }
+    else {
+        tablePointer = pimpl->hashTablesStorage.get(round);
+    }
+
+    hashesPointer = pimpl->neededHashesMeta.get(round);
+
+    if (tablePointer == nullptr || hashesPointer == nullptr) {
+        cserror() << "CONVEYER> Can not add sync packet because hash table or needed hashes do not exist";
+        return;
+    }
+
+    if (auto iterator = std::find(hashesPointer->begin(), hashesPointer->end(), packet.hash()); iterator != hashesPointer->end())
     {
         csdebug() << "CONVEYER> Adding synced packet";
-        hashes.erase(iterator);
+        hashesPointer->erase(iterator);
 
         // add to current table
-        pimpl->hashTable.emplace(packet.hash(), std::move(packet));
+        tablePointer->emplace(packet.hash(), std::move(packet));
     }
 }
 
 bool cs::Conveyer::isSyncCompleted() const
 {
-    return pimpl->neededHashes.empty();
+    auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
+
+    if (!pointer) {
+        cserror() << "CONVEYER> Needed hashes of current round if not found";
+        return false;
+    }
+
+    return pointer->empty();
 }
 
 const cs::Notifications& cs::Conveyer::notifications() const
@@ -276,13 +299,14 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
                     newPool.add_transaction(transaction);
                 }
             }
-            else
-            {
-                cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
-                return std::nullopt;
-            }
 
             ++maskIndex;
+        }
+
+        if (maskIndex >= mask.size())
+        {
+            cserror() << "CONVEYER: Apply characteristic hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
+            return std::nullopt;
         }
 
         // create storage hash table and remove from current hash table
@@ -291,13 +315,14 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     }
 
     cs::HashTablesMetaStorage::MetaElement element;
-    element.round = pimpl->roundTable.round;
+    element.round = pimpl->roundTable.round,
     element.meta = std::move(hashTable);
 
     // add current round hashes to storage
     pimpl->hashTablesStorage.append(element);
 
-    if (characteristic.mask.size() != newPool.transactions_count()) {
+    if (characteristic.mask.size() != newPool.transactions_count())
+    {
         cslog() << "CONVEYER> Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
         cswarning() << "CONVEYER> ApplyCharacteristic: Some of transactions is not valid";
     }
