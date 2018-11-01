@@ -14,6 +14,8 @@
 #include <iostream>
 #include <memory>
 
+#include "lib/system/utils.hpp"
+
 namespace ip = boost::asio::ip;
 
 enum BaseFlags: uint8_t {
@@ -143,7 +145,7 @@ public:
       size_t destSize = tempBuffer.size() - headerSize;
 
       auto compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
-      if (compressedSize > 0 && compressedSize < sourceSize) {
+      if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
         return std::move(boost::asio::buffer(dest, compressedSize + headerSize));
       } else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
@@ -172,7 +174,7 @@ public:
       size_t destSize = sizeof(dest) - headerSize;
 
       auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
-      if (uncompressedSize > 0 && uncompressedSize <= destSize) {
+      if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
         memcpy(source + headerSize, dest, uncompressedSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;

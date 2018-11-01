@@ -320,7 +320,7 @@ void Node::sendRoundTableRequest(size_t rNum) {
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
-  size_t rNum;
+  size_t rNum = 0u;
   istream_ >> rNum;
 
   if (rNum >= roundNum_) {
@@ -548,7 +548,7 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size) {
 
   istream_.init(data, size);
 
-  int num;
+  int num = 0;
   istream_ >> num;
 
   if (num == 1) {
@@ -1331,7 +1331,7 @@ void Node::resetNeighbours() {
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  uint32_t requested_seq;
+  uint32_t requested_seq = 0u;
 
   istream_.init(data, size);
   istream_ >> requested_seq;

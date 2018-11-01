@@ -291,7 +291,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  RoundNum rNum;
+  RoundNum rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
@@ -502,6 +502,31 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   if (size == 0) {
     LOG_ERROR("Bad packet size, why is it zero?");
     return;
+  }
+
+  // если последний номер раунда в блоке у ноды отстаёт пришедшего номера раунда на N
+  // то начинается синхронизация
+  // в противом случае нода собирает блоки из транзакций по таблице раундов
+  constexpr size_t roundNumberLagLimit = 2;  // подобрано экспериментально
+  const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
+  const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
+  const bool isRoundNumberLagged = (rNum < lastSequenceNumber) && (lagBeetweenRounds > roundNumberLagLimit);
+
+  if (isRoundNumberLagged) {
+    csdebug() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+            << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
+    if (type == MsgTypes::RoundTableSS) {
+      csdebug() << "RoundTableSS";
+      return node_->getRoundTableSS(data, size, rNum);
+    }
+    else if (type == MsgTypes::BlockRequest) {
+      csdebug() << "BlockRequest";
+      return node_->getBlockRequest(data, size, firstPack.getSender());
+    }
+    else if (type == MsgTypes::RequestedBlock) {
+      csdebug() << "RequestedBlock";
+      return node_->getBlockReply(data, size);
+    }
   }
 
   switch(type) {
@@ -1003,7 +1028,7 @@ void Transport::sendPingPack(const Connection& conn) {
 }
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  Connection::Id id;
+  Connection::Id id = 0u;
   uint32_t lastSeq;
 
   iPackStream_ >> id >> lastSeq;

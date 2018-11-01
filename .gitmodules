@@ -16,3 +16,9 @@
 [submodule "third-party/berkeleydb_prebuilt"]
 	path = third-party/berkeleydb_prebuilt
 	url = ../../credits_bc/third_party/berkeleydb_prebuilt.git
+[submodule "third-party/libcuckoo"]
+	path = third-party/libcuckoo
+	url = https://github.com/efficient/libcuckoo.git
+[submodule "third-party/googletest"]
+	path = third-party/googletest
+	url = https://github.com/google/googletest.git
