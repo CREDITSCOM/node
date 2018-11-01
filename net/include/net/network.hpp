@@ -18,6 +18,7 @@ public:
   bool isGood() const { return good_; }
   ip::udp::endpoint resolve(const EndpointData&);
 
+  void sendInit();
   void sendDirect(const Packet&, const ip::udp::endpoint&);
 
   bool resendFragment(const cs::Hash&, const uint16_t, const ip::udp::endpoint&);
@@ -58,6 +59,7 @@ private:
   // Only needed in a one-socket configuration
   __cacheline_aligned std::atomic<bool> singleSockOpened_ = { false };
   __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
+  std::atomic<bool> initFlag_ = { false };
 
   __cacheline_aligned std::atomic<ThreadStatus> readerStatus_ = { NonInit };
   __cacheline_aligned std::atomic<ThreadStatus> writerStatus_ = { NonInit };

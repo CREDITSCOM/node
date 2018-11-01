@@ -83,6 +83,7 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 }  // namespace
 
 void Transport::run() {
+  net_->sendInit();
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
   {
@@ -1022,7 +1023,7 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 void Transport::sendPingPack(const Connection& conn) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence();
+  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence() << myPublicKey_;
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
@@ -1030,13 +1031,14 @@ void Transport::sendPingPack(const Connection& conn) {
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
   uint32_t lastSeq;
+  cs::PublicKey pk;
 
-  iPackStream_ >> id >> lastSeq;
+  iPackStream_ >> id >> lastSeq >> pk;
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
   }
 
-  nh_.validateConnectionId(sender, id, task->sender);
+  nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
 
   if (lastSeq > maxBlock_) {
     maxBlock_ = lastSeq;
