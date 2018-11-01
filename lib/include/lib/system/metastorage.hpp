@@ -31,7 +31,7 @@ namespace cs
             T meta;
 
             MetaElement() = default;
-            MetaElement(RoundNumber r, T&& v) noexcept : round(r), v(std::move(v)) {}
+            MetaElement(RoundNumber number, T&& value) noexcept : round(number), meta(std::move(value)) {}
 
             bool operator ==(const MetaElement& element) const
             {
@@ -112,7 +112,7 @@ namespace cs
                 std::move(value)
             };
 
-            append(std::move(element));
+            return append(std::move(element));
         }
 
         ///
