@@ -5,6 +5,12 @@
 #include <lib/system/common.hpp>
 #include <boost/circular_buffer.hpp>
 
+/// nested namespace c++ 17
+namespace cs::values
+{
+    constexpr std::size_t defaultMetaStorageSize = 5;
+}
+
 namespace cs
 {
     ///
@@ -24,12 +30,12 @@ namespace cs
             RoundNumber round;
             T meta;
 
-            bool operator ==(const MetaElement& element)
+            bool operator ==(const MetaElement& element) const
             {
                 return round == element.round;
             }
 
-            bool operator !=(const MetaElement& element)
+            bool operator !=(const MetaElement& element) const
             {
                 return !((*this) == element);
             }
@@ -37,6 +43,12 @@ namespace cs
 
         /// element type
         using Element = MetaStorage<T>::MetaElement;
+
+        // default initialization
+        inline MetaStorage() noexcept
+        {
+            m_buffer.resize(cs::values::defaultMetaStorageSize);
+        }
 
         // storage interface
 
@@ -46,6 +58,14 @@ namespace cs
         void resize(std::size_t size)
         {
             m_buffer.resize(size);
+        }
+
+        ///
+        /// @brief Returns current circular buffer size
+        ///
+        std::size_t size() const
+        {
+            return m_buffer.size();
         }
 
         ///
@@ -69,6 +89,7 @@ namespace cs
         /// @brief Appends meta element to buffer.
         /// @param element Created from outside no needed lvalue, cuz it would be moved.
         /// @return Returns true if append is success, otherwise returns false.
+        /// @warning value would be moved.
         ///
         bool append(MetaElement& value)
         {
@@ -92,7 +113,7 @@ namespace cs
         /// @param round Round number to get element from storage.
         /// @return Returns optional parameter.
         ///
-        std::optional<MetaElement> value(RoundNumber round)
+        std::optional<MetaElement> value(RoundNumber round) const
         {
             const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
                 return value.round == round;
