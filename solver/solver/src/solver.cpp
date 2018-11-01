@@ -474,7 +474,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cs::Hashes hashes;
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::RoundNumber round = conveyer.roundNumber();
+    cs::RoundNumber round = conveyer.currentRoundNumber();
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());

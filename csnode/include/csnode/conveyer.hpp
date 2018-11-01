@@ -97,7 +97,7 @@ namespace cs
         /// @brief Returns current round number.
         /// Locks mutex and returns safe round number.
         ///
-         cs::RoundNumber roundNumber() const;
+        cs::RoundNumber currentRoundNumber() const;
 
         ///
         /// @brief Returns safe copy of round table.

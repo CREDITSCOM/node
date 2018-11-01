@@ -96,7 +96,7 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
-    if (table.round <= roundNumber())
+    if (table.round <= currentRoundNumber())
     {
         cserror() << "CONVEYER> Setting round in conveyer failed";
         return;
@@ -133,7 +133,7 @@ const cs::RoundTable& cs::Conveyer::roundTable() const
     return pimpl->roundTable;
 }
 
-cs::RoundNumber cs::Conveyer::roundNumber() const
+cs::RoundNumber cs::Conveyer::currentRoundNumber() const
 {
     cs::SharedLock lock(m_sharedMutex);
     return pimpl->roundTable.round;
@@ -219,7 +219,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
         return std::nullopt;
     }
 
-    return std::make_optional<cs::CharacteristicMeta>((std::move(result)).value().meta);
+    return std::make_optional<cs::CharacteristicMeta>((std::move(result)).value());
 }
 
 void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
@@ -290,12 +290,12 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         pimpl->hashTable.erase(hash);
     }
 
-    cs::StorageElement element;
+    cs::HashTablesStorage::MetaElement element;
     element.round = pimpl->roundTable.round;
-    element.hashTable = std::move(hashTable);
+    element.meta = std::move(hashTable);
 
     // add current round hashes to storage
-    pimpl->hashTablesStorage.push_back(element);
+    pimpl->hashTablesStorage.append(element);
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
         cslog() << "CONVEYER> Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
@@ -323,16 +323,14 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
         return pimpl->hashTable[hash];
     }
 
-    const auto& storage = pimpl->hashTablesStorage;
-    const auto iterator = std::find_if(storage.begin(), storage.end(), [&](const cs::StorageElement& element) {
-        return element.round == round;
-    });
+    const auto optional = pimpl->hashTablesStorage.value(round);
 
-    if (iterator != storage.end())
+    if (optional.has_value())
     {
+        const auto& value = optional.value();
         csdebug() << "CONVEYER> Found round hash table in storage, searching hash";
 
-        if (auto iter = iterator->hashTable.find(hash); iter != iterator->hashTable.end())
+        if (auto iter = value.find(hash); iter != value.end())
         {
             csdebug() << "CONVEYER> Found hash in hash table storage";
             return iter->second;

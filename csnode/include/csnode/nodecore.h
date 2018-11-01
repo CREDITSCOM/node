@@ -25,7 +25,7 @@ const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
 const std::size_t ROUND_DELAY = 0;
 #else
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
-const std::size_t ROUND_DELAY = 1000;                   //ms
+const std::size_t ROUND_DELAY = 1000;                   // ms
 #endif
 
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 3000;        // ms
@@ -123,7 +123,7 @@ namespace cs
         cs::Signature signature;
     };
 
-    const std::size_t hashVectorCount = 5;
+    constexpr std::size_t hashVectorCount = 5;
 
     struct HashMatrix
     {
@@ -132,13 +132,7 @@ namespace cs
         cs::Signature signature;
     };
 
-    struct StorageElement
-    {
-        cs::RoundNumber round = 0;
-        cs::TransactionsPacketHashTable hashTable;
-    };
-
-    using HashTablesStorage = boost::circular_buffer<StorageElement>;
+    using HashTablesStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
 }
 
 #endif // NODE_CORE_H

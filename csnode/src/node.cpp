@@ -962,7 +962,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::CharacteristicMetaStorage::MetaElement metaElement;
     metaElement.meta.bytes = std::move(characteristicBytes);
     metaElement.meta.sender = sender;
-    metaElement.round = conveyer.roundNumber();
+    metaElement.round = conveyer.currentRoundNumber();
 
     conveyer.addCharacteristicMeta(std::move(metaElement));
   }
@@ -1589,7 +1589,7 @@ uint8_t Node::getConfidantNumber() {
 }
 
 void Node::processTimer() {
-  const auto round = cs::Conveyer::instance().roundNumber();
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   if (myLevel_ != NodeLevel::Normal || round <= cs::TransactionsFlushRound) {
     return;
