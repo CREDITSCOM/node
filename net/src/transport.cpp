@@ -291,7 +291,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  RoundNum rNum;
+  RoundNum rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
@@ -1028,7 +1028,7 @@ void Transport::sendPingPack(const Connection& conn) {
 }
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  Connection::Id id;
+  Connection::Id id = 0u;
   uint32_t lastSeq;
 
   iPackStream_ >> id >> lastSeq;

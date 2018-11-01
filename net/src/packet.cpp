@@ -257,10 +257,9 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
   if (packet.isNetwork()) {
     const uint8_t* data = packet.getMsgData();
     size_t size = packet.getMsgSize();
-    os
-      << "Type:\t" << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << ")" << std::endl
-      << "Flags:\t" << PacketFlags(packet) << std::endl
-      << cs::Utils::byteStreamToHex(++data, --size);
+    os << "Type:\t" << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << ")" << std::endl;
+    os << "Flags:\t" << PacketFlags(packet) << std::endl;
+    os << cs::Utils::byteStreamToHex(++data, --size);
     return os;
   }
   os

@@ -268,7 +268,7 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 
 template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  uint32_t uncompressedSize;
+  uint32_t uncompressedSize = 0u;
   *this >> uncompressedSize;
   pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
   ptr_ = end_;

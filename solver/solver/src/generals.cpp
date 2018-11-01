@@ -90,7 +90,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
     cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
   }
 
-  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, NULL);
+  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
 
   m_findUntrusted.fill(0);
   m_newTrusted.fill(0);
