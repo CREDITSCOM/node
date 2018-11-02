@@ -832,7 +832,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 
   sendPackInform(pack, **conn);
 
-  if (pack.isDirect()) return;  // Do not redirect direct packs
+  if (pack.isNeighbors()) return;  // Do not redirect packs
 
   if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
     nh_.redirectByNeighbours(&pack);
@@ -846,7 +846,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isDirect() << pack.getHash();
+  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isNeighbors() << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
   oPackStream_.clear();
 }
@@ -1023,7 +1023,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
       if (!conn) return false;
 
       SpinLock l(oLock_);
-      oPackStream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      oPackStream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
       oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
       sendDirect(oPackStream_.getPackets(), *conn);
       oPackStream_.clear();

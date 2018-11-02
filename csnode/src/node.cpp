@@ -469,7 +469,7 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
 }
 
 void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round << bytes;
 
   csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
@@ -1384,7 +1384,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
       LOG_NOTICE("Sending request for block " << reqSeq << " from nbr " << requestee->id);
-      ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      ostream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
       if (lfReq == reqSeq && ++lfTimes >= 4)
@@ -1445,7 +1445,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
   if (!conn) return;
 
-  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
   transport_->deliverDirect(ostream_.getPackets(),
                             ostream_.getPacketsCount(),

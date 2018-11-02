@@ -42,7 +42,7 @@ uint32_t Packet::getHeadersLength() const {
 
     if (!isNetwork()) {
       headersLength_+= 40;  // Sender key + ID
-      if (!isBroadcast() && !isDirect())
+      if (!isBroadcast() && !isNeighbors())
         headersLength_+= 32; // Receiver key
     }
   }
@@ -235,8 +235,8 @@ public:
       os << (n ? "," : "") << "compressed";
       ++n;
     }
-    if (packet_.isDirect()) {
-      os << (n ? "," : "") << "direct";
+    if (packet_.isNeighbors()) {
+      os << (n ? "," : "") << "neighbors";
       ++n;
     }
     return os;
