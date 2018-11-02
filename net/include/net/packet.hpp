@@ -21,11 +21,11 @@ namespace ip = boost::asio::ip;
 enum BaseFlags: uint8_t {
   NetworkMsg = 1,
   Fragmented = 1 << 1,
-  Broadcast  = 1 << 2,
+  Broadcast  = 1 << 2,     // send packet to neighbors, neighbors can resend it to others
   Compressed = 1 << 3,
   Encrypted  = 1 << 4,
   Signed     = 1 << 5,
-  Direct     = 1 << 6
+  Neighbors  = 1 << 6,     // send packet to neighbors only, neighbors _cant_ resend it
 };
 
 enum Offsets: uint32_t {
@@ -82,7 +82,7 @@ public:
   bool isBroadcast() const { return checkFlag(BaseFlags::Broadcast); }
 
   bool isCompressed() const { return checkFlag(BaseFlags::Compressed); }
-  bool isDirect() const { return checkFlag(BaseFlags::Direct); }
+  bool isNeighbors() const { return checkFlag(BaseFlags::Neighbors); }
 
   const cs::Hash& getHash() const {
     if (!hashed_) {
@@ -94,7 +94,7 @@ public:
 
   bool addressedToMe(const cs::PublicKey& myKey) const {
     return
-      isNetwork() || isDirect() ||
+      isNetwork() || isNeighbors() ||
       (isBroadcast() && !(getSender() == myKey)) ||
       getAddressee() == myKey;
   }
