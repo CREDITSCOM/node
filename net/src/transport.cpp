@@ -501,7 +501,7 @@ void Transport::processPostponed(const RoundNum rNum) {
 void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, const Packet& firstPack,
                                     const uint8_t* data, size_t size) {
   if (size == 0) {
-    LOG_ERROR("Bad packet size, why is it zero?");
+    cserror() << "Bad packet size, why is it zero?";
     return;
   }
 
@@ -509,10 +509,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   constexpr size_t roundNumberLagLimit = 2;  // experimental
   const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
   const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
-  const bool isRoundNumberLagged = lastSequenceNumber < (rNum - roundNumberLagLimit);
+  const bool isNeedSync = lastSequenceNumber < ((rNum <= roundNumberLagLimit) ? 0 : rNum - roundNumberLagLimit);
 
-  if (isRoundNumberLagged) {
-    csdebug() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+  if (isNeedSync) {
+    csdebug() << "BLOCKCHAIN NEEDS SYNC. LAST BLOCK: " << lastSequenceNumber
             << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
     if (type == MsgTypes::RoundTableSS) {
       csdebug() << "RoundTableSS";
@@ -573,11 +573,11 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   case MsgTypes::BigBang:
     return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
-    return node_->getCharacteristic(data, size, firstPack.getSender());
+    return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::WriterNotification:
     return node_->getWriterNotification(data, size, firstPack.getSender());
   default:
-    LOG_ERROR("Unknown type");
+    cserror() << "Unknown type";
     break;
   }
 }

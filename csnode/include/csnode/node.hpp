@@ -52,7 +52,7 @@ public:
   void getPacketHashesReply(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey& sender);
 
   void getRoundTable(const uint8_t*, const size_t, const RoundNum);
-  void getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
 

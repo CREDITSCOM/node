@@ -962,11 +962,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   solver_->gotRound();
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cslog() << "NODE> Characteric has arrived";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!conveyer.isSyncCompleted()) {
+  if (!conveyer.isSyncCompleted(round)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
@@ -978,6 +978,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     metaElement.round = conveyer.currentRoundNumber();
 
     conveyer.addCharacteristicMeta(std::move(metaElement));
+    return;
   }
 
   cs::DataStream stream(data, size);
@@ -1470,7 +1471,7 @@ void Node::becomeWriter() {
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
-    solver_->sendTL();
+    solver_->sendTL();  // TODO: check this
   }
 
   cslog() << "======================================== ROUND " << roundTable.round
@@ -1565,7 +1566,7 @@ void Node::processPacketsReply(std::vector<cs::TransactionsPacket>&& packets, co
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value())
     {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
     }
   }
 }
