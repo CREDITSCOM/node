@@ -85,7 +85,7 @@ public:
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
   void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes, const cs::RoundNumber round);
-  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void sendPacketHashesReply(const std::vector<cs::TransactionsPacket>& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
 
   void sendBadBlock(const csdb::Pool& pool);
@@ -181,7 +181,7 @@ private:
 
   // conveyer
   void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-  void processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundNumber round);
+  void processPacketsReply(std::vector<cs::TransactionsPacket>&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);

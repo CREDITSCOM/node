@@ -875,30 +875,36 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 }
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
-  cs::DataStream stream(data, size);
-
-  cs::TransactionsPacket packet;
-  stream >> packet;
-
-  cslog() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-  cslog() << "NODE> Get transactions hashes answer amount got " << packet.transactionsCount();
-
-  if (!packet.transactionsCount()) {
-#ifdef DIRECT_TRANSACTIONS_REQUEST
-    const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-    if (!conveyer.isSyncCompleted()) {
-      sendPacketHashesRequest(conveyer.neededHashes(), round);
-    }
-#else
-    cserror() << "NODE> Received transaction hashes answer transactions count is 0";
-#endif
-
+  if (cs::Conveyer::instance().isSyncCompleted(round)) {
+    csdebug() << "NODE> Sync packets already synced";
     return;
   }
 
-  cslog() << "NODE> Get transactions packet hash " << packet.hash().toString();
-  processPacketsReply(std::move(packet), round);
+  cs::DataStream stream(data, size);
+
+  std::size_t packetsCount = 0;
+  stream >> packetsCount;
+
+  std::vector<cs::TransactionsPacket> packets;
+  packets.reserve(packetsCount);
+
+  for (std::size_t i = 0; i < packetsCount; ++i) {
+    cs::TransactionsPacket packet;
+    stream >> packet;
+
+    if (!packet.transactions().empty()) {
+      packets.push_back(packet);
+    }
+  }
+
+  if (packets.size() != packetsCount) {
+    cserror() << "NODE> Packet hashes reply, bad packets parsing";
+    return;
+  }
+
+  csdebug() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
+  processPacketsReply(std::move(packets), round);
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
@@ -1295,42 +1301,32 @@ void Node::sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>
     csdebug() << "NODE> Sending transaction packet request: need hash - " << hash.toString();
   }
 
-  const auto msgType = MsgTypes::TransactionsPacketRequest;
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_ << MsgTypes::TransactionsPacketRequest << round << bytes;
 
-#ifndef DIRECT_TRANSACTIONS_REQUEST
-  sendBroadcast(msgType, round, bytes);
-  return;
-#else
-
-  const bool success = sendToRandomNeighbour(msgType, round, bytes);
-
-  if (!success) {
-    sendBroadcast(msgType, round, bytes);
-    return;
-  }
-
-  cs::Timer::singleShot(cs::PacketHashesRequestDelay, [round, this] {
-                          const cs::Conveyer& conveyer = cs::Conveyer::instance();
-                          if (!conveyer.isSyncCompleted()) {
-                            sendPacketHashesRequest(conveyer.neededHashes(), round);
-                          };
-                       });
-#endif
+  flushCurrentTasks();
 }
 
-void Node::sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender) {
-  if (packet.hash().isEmpty()) {
-    cswarning() << "NODE> Send transaction packet reply with empty hash failed";
-#ifndef DIRECT_TRANSACTIONS_REQUEST
+void Node::sendPacketHashesReply(const std::vector<cs::TransactionsPacket>& packets, const cs::RoundNumber round, const cs::PublicKey& sender) {
+  if (packets.empty()) {
     return;
-#endif
   }
 
-  const bool success = sendDirect(sender, MsgTypes::TransactionsPacketReply, round, packet);
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
 
-  if (!success) {
-    cserror() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  stream << packets.size();
+
+  for (const auto& packet : packets) {
+    stream << packet;
   }
+
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_ << MsgTypes::TransactionsPacketReply << round << bytes;
+
+  cslog() << "Sending reply with " << packets.size() << " count of packs to " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
+  flushCurrentTasks();
 }
 
 void Node::resetNeighbours() {
@@ -1540,24 +1536,27 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
 void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
-  for (const auto& hash : hashes){
+  std::vector<cs::TransactionsPacket> packets;
+
+  for (const auto& hash : hashes) {
     std::optional<cs::TransactionsPacket> packet = cs::Conveyer::instance().searchPacket(hash, round);
 
-#ifndef DIRECT_TRANSACTIONS_REQUEST
-    if (!packet) {
-      continue;
+    if (packet) {
+      packets.push_back(std::move(packet).value());
     }
-#endif
-
-    sendPacketHashesReply(packet.value_or(cs::TransactionsPacket()), round, sender);
   }
+
+  sendPacketHashesReply(packets, round, sender);
 }
 
-void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundNumber round) {
+void Node::processPacketsReply(std::vector<cs::TransactionsPacket>&& packets, const cs::RoundNumber round) {
   csdebug() << "NODE> Processing packets reply";
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  conveyer.addFoundPacket(round, std::move(packet));
+
+  for (auto&& packet : packets) {
+    conveyer.addFoundPacket(round, std::move(packet));
+  }
 
   if (conveyer.isSyncCompleted(round)) {
     csdebug() << "NODE> Packets sync completed";

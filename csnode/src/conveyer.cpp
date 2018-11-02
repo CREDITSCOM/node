@@ -144,7 +144,7 @@ const cs::Hashes& cs::Conveyer::currentNeededHashes() const
     auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
 
     if (!pointer) {
-        throw std::exception("Bad needed hashes, fatal error");
+        throw std::out_of_range("Bad needed hashes, fatal error");
     }
 
     return *pointer;
@@ -249,7 +249,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
 {
     auto result = pimpl->characteristicMetas.extract(round);
 
-    if (result.has_value()) {
+    if (!result.has_value()) {
         cslog() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
@@ -427,8 +427,8 @@ void cs::Conveyer::flushTransactions()
 
     if (!pimpl->transactionsBlock.empty())
     {
-        csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << pimpl->transactionsBlock.size();
-        csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
+//        csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << pimpl->transactionsBlock.size();
+//        csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
 
         pimpl->transactionsBlock.clear();
     }
