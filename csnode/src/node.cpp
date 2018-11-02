@@ -1321,7 +1321,7 @@ void Node::sendPacketHashesReply(const std::vector<cs::TransactionsPacket>& pack
     stream << packet;
   }
 
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
   ostream_ << MsgTypes::TransactionsPacketReply << round << bytes;
 
   cslog() << "Sending reply with " << packets.size() << " count of packs to " << cs::Utils::byteStreamToHex(sender.data(), sender.size());

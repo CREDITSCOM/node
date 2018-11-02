@@ -428,8 +428,8 @@ void cs::Conveyer::flushTransactions()
 
     if (!pimpl->transactionsBlock.empty())
     {
-//        csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << pimpl->transactionsBlock.size();
-//        csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
+        csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << pimpl->transactionsBlock.size();
+        csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
 
         pimpl->transactionsBlock.clear();
     }
