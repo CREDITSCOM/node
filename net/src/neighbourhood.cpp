@@ -68,7 +68,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
   SpinLock l(nLockFlag_);
-  if (pack->isDirect()) {
+  if (pack->isNeighbors()) {
     for (auto& nb : neighbours_) {
       auto& bp = msgDirects_.tryStore(pack->getHash());
       bp.pack = *pack;

@@ -246,7 +246,7 @@ private:
   cs::Timer sendingTimer_;
 
   static const uint8_t broadcastFlag_ = BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
-  static const uint8_t directFlag_    = BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
+  static const uint8_t directFlag_    = BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

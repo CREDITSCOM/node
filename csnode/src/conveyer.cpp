@@ -4,6 +4,7 @@
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <exception>
 
 /// pointer implementation realization
 struct cs::Conveyer::Impl
