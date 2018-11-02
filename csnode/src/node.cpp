@@ -51,7 +51,7 @@ bool Node::init() {
   if (!solver_)
     return false;
 
-  LOG_EVENT("Everything init: " << myPublicForSig.size() << ", " << myPrivateForSig.size());
+  LOG_EVENT("Everything init");
 
   solver_->set_keys(myPublicForSig, myPrivateForSig);  // DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
 
