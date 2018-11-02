@@ -638,7 +638,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash & lastHash) {
-#ifdef MONITOR_NODE
+#if defined(MONITOR_NODE) || defined(NO_CONSENSUS)
   return true;
 #endif
 
