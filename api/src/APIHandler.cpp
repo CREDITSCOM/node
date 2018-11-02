@@ -558,12 +558,24 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
         auto res = state.locker_trx == 0;
         if (res) {
           TRACE("");
+#ifndef TETRIS_NODE
           state.locker_trx = inner_id;
+#else
+          state.locker_trx = (deploy ? 1 : 0);
+#endif
         }
         TRACE("");
 
         return res;
   });
+
+  if (deploy) {
+    work_queues["TransactionFlow"].get_position();
+    work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
+      contract_state_entry.get_position();
+      return true;
+    });
+  }
 
   bool trxn_sent = false;
   auto sg = scopeGuard([&contract_state_entry, &trxn_sent, amnesia]() {
@@ -634,6 +646,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
     });
   }
   else {
+#ifndef TETRIS_NODE
           using namespace std::chrono_literals;
           runAfter(10000ms, [&contract_state_entry, inner_id]() {
                   TRACE("");
@@ -646,6 +659,12 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
                           contract_state.locker_trx = 0;
                   });
           });
+#else
+    contract_state_entry.update_state([=](smart_state_record& contract_state) {
+                          contract_state.state = api_resp.contractState;
+                          contract_state.locker_trx = 0;
+          });
+#endif
   }
   TRACE("");
 }

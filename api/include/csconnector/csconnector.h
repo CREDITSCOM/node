@@ -26,9 +26,9 @@ namespace csconnector {
 
 struct Config
 {
-  int port = 8081;
+  int port = 9090;
 #ifdef AJAX_IFACE
-  int ajax_port = 9090;
+  int ajax_port = 8081;
 #endif
 };
 

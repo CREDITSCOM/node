@@ -3,6 +3,7 @@
 //#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
+//#define NO_CONSENSUS
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE

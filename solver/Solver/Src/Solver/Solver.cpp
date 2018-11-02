@@ -495,7 +495,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     return gotIncorrectBlock(std::move(block), sender);  // remove this line when the block candidate signing of all trusted will be implemented
 
   std::cout << "Solver -> getblock calls writeLastBlock" << std::endl;
-#ifndef MONITOR_NODE
+#if !defined(MONITOR_NODE) && !defined(NO_CONSENSUS)
   if (block.verify_signature()) {  // INCLUDE SIGNATURES!!!
     node_->getBlockChain().putBlock(block);
     if ((node_->getMyLevel() != NodeLevel::Writer) && (node_->getMyLevel() != NodeLevel::Main)) {
