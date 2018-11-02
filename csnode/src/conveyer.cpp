@@ -4,6 +4,7 @@
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <exception>
 
 /// pointer implementation realization
 struct cs::Conveyer::Impl
@@ -144,7 +145,7 @@ const cs::Hashes& cs::Conveyer::currentNeededHashes() const
     auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
 
     if (!pointer) {
-        throw std::exception("Bad needed hashes, fatal error");
+        throw std::out_of_range("Bad needed hashes, fatal error");
     }
 
     return *pointer;
