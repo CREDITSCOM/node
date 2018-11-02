@@ -505,6 +505,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return;
   }
 
+#ifdef CUT_PACKETS_ON_SYNCRO
   /// algorithm of slow node performance or lag detection
   constexpr size_t roundNumberLagLimit = 2;  // experimental
   const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
@@ -530,6 +531,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     csdebug() << "TRANSPORT> No command type choosen";
     return;
   }
+#endif
 
   switch(type) {
   case MsgTypes::RoundTableSS:

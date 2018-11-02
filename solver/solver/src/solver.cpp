@@ -452,7 +452,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
   cslog() << "Solver -> My Hash: " << myHash;
   cslog() << "Solver -> Received hash:" << hash;
 
-  cslog() << "Solver -> Received public key: " << sender.data();
+  cslog() << "Solver -> Received public key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (m_hashesReceivedKeys.size() <= min_nodes) {
     if (hash == myHash) {

@@ -6,6 +6,7 @@
 #define AJAX_IFACE
 #define SPAMMER
 #define SYNCRO
+//#define CUT_PACKETS_ON_SYNCRO
 #define TRANSACTION_VALIDATION
 
 #define NO_DELAYS
