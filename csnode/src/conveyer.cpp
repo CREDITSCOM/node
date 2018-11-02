@@ -348,7 +348,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const auto& writerPublicKey = sender;
     newPool.set_writer_public_key(csdb::internal::byte_array(writerPublicKey.begin(), writerPublicKey.end()));
 
-    return newPool;
+    return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
 std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
@@ -379,7 +379,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     return std::nullopt;
 }
 
-cs::SharedMutex &cs::Conveyer::sharedMutex() const
+cs::SharedMutex& cs::Conveyer::sharedMutex() const
 {
     return m_sharedMutex;
 }

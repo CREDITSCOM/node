@@ -505,13 +505,11 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
     return;
   }
 
-  // если последний номер раунда в блоке у ноды отстаёт пришедшего номера раунда на N
-  // то начинается синхронизация
-  // в противом случае нода собирает блоки из транзакций по таблице раундов
-  constexpr size_t roundNumberLagLimit = 2;  // подобрано экспериментально
+  /// algorithm of slow node performance or lag detection
+  constexpr size_t roundNumberLagLimit = 2;  // experimental
   const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
   const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
-  const bool isRoundNumberLagged = (rNum < lastSequenceNumber) && (lagBeetweenRounds > roundNumberLagLimit);
+  const bool isRoundNumberLagged = lastSequenceNumber < (rNum - roundNumberLagLimit);
 
   if (isRoundNumberLagged) {
     csdebug() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
@@ -528,6 +526,9 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
       csdebug() << "RequestedBlock";
       return node_->getBlockReply(data, size);
     }
+
+    csdebug() << "TRANSPORT> No command type choosen";
+    return;
   }
 
   switch(type) {
