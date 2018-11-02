@@ -402,15 +402,6 @@ void cs::Conveyer::flushTransactions()
         {
             packet.makeHash();
 
-            for (const auto& transaction : packet.transactions())
-            {
-                if (!transaction.is_valid())
-                {
-                    cswarning() << "CONVEYER > Can not send not valid transaction, sorry";
-                    continue;
-                }
-            }
-
             // try to send save in node
             pimpl->flushPacket(packet);
 
