@@ -33,7 +33,7 @@ public:
   MOCK_METHOD1(redirectPacket, void(const Packet&));
 
   MOCK_METHOD0(refillNeighbourhood, void());
-  MOCK_METHOD1(processPostponed, void(const RoundNum));
+  MOCK_METHOD1(processPostponed, void(const cs::RoundNumber));
 
   MOCK_METHOD1(sendRegistrationRequest, void(Connection&));
   MOCK_METHOD1(sendRegistrationConfirmation, void(const Connection&));
@@ -48,12 +48,12 @@ public:
 
   // private methods
 
-  MOCK_METHOD3(postponePacket, void(const RoundNum, const MsgTypes, const Packet&));
+  MOCK_METHOD3(postponePacket, void(const cs::RoundNumber, const MsgTypes, const Packet&));
 
   // Dealing with network connections
   MOCK_METHOD1(parseSSSignal, bool(const TaskPtr<IPacMan>&));
 
-  MOCK_METHOD5(dispatchNodeMessage, void(const MsgTypes, const RoundNum, const Packet&, const uint8_t* data, size_t));
+  MOCK_METHOD5(dispatchNodeMessage, void(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t));
 
   /* Network packages processing */
   MOCK_METHOD2(gotRegistrationRequest, bool(const TaskPtr<IPacMan>&, RemoteNodePtr&));

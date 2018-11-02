@@ -36,8 +36,8 @@ public:
   void run();
 
   /* Incoming requests processing */
-  void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
-  void getBigBang(const uint8_t*, const size_t, const RoundNum, uint8_t type);
+  void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
+  void getBigBang(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type);
   void getTransaction(const uint8_t*, const size_t);
   void getFirstTransaction(const uint8_t*, const size_t);
   void getTransactionsList(const uint8_t*, const size_t);
@@ -48,10 +48,10 @@ public:
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
   // transaction's pack syncro
-  void getPacketHashesRequest(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey&);
-  void getPacketHashesReply(const uint8_t*, const std::size_t, const RoundNum, const cs::PublicKey& sender);
+  void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
+  void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getRoundTable(const uint8_t*, const size_t, const RoundNum);
+  void getRoundTable(const uint8_t*, const size_t, const cs::RoundNumber);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
@@ -130,7 +130,7 @@ public:
     Drop
   };
 
-  MessageActions chooseMessageAction(const RoundNum, const MsgTypes);
+  MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes);
 
   const cs::PublicKey& getPublicKey() const {
     return myPublicKey_;
@@ -214,7 +214,7 @@ private:
   std::string sent_trx_fname = "sent.txt";
 
   // Current round state
-  RoundNum roundNum_ = 0;
+  cs::RoundNumber roundNum_ = 0;
   NodeLevel myLevel_;
 
   uint8_t myConfidantIndex_;

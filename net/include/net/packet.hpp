@@ -65,8 +65,6 @@ enum MsgTypes: uint8_t {
   WriterNotification
 };
 
-using RoundNum = uint32_t;
-
 class Packet {
 public:
   static const uint32_t MaxSize = 1 << 10;
@@ -111,7 +109,7 @@ public:
   const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); }
 
   MsgTypes getType() const { return getWithOffset<MsgTypes>(getHeadersLength()); }
-  RoundNum getRoundNum() const { return getWithOffset<RoundNum>(getHeadersLength() + 1); }
+  cs::RoundNumber getRoundNum() const { return getWithOffset<cs::RoundNumber>(getHeadersLength() + 1); }
 
   void* data() { return data_.get(); }
   const void* data() const { return data_.get(); }

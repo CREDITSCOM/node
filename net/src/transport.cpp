@@ -292,7 +292,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  RoundNum rNum = 0;
+  cs::RoundNumber rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
@@ -342,7 +342,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-constexpr const uint32_t StrippedDataSize = sizeof(RoundNum) + sizeof(MsgTypes);
+constexpr const uint32_t StrippedDataSize = sizeof(cs::RoundNumber) + sizeof(MsgTypes);
 void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
@@ -403,7 +403,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   if (pack.isNetwork()) {
     return false;
   }
-  const auto rLim = std::max(node_->getRoundNumber(), static_cast<RoundNum>(1)) - 1;
+  const auto rLim = std::max(node_->getRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
 
   if (!pack.isFragmented()) {
     return pack.getRoundNum() >= rLim;
@@ -474,11 +474,11 @@ void Transport::processNodeMessage(const Packet& pack) {
   }
 }
 
-inline void Transport::postponePacket(const RoundNum rNum, const MsgTypes type, const Packet& pack) {
+inline void Transport::postponePacket(const cs::RoundNumber rNum, const MsgTypes type, const Packet& pack) {
   (*postponed_)->emplace(rNum, type, pack);
 }
 
-void Transport::processPostponed(const RoundNum rNum) {
+void Transport::processPostponed(const cs::RoundNumber rNum) {
   auto& ppBuf = *postponed_[1];
   for (auto& pp : **postponed_) {
     if (pp.round > rNum) {
@@ -498,7 +498,7 @@ void Transport::processPostponed(const RoundNum rNum) {
   cslog() << "TRANSPORT> POSTPHONED finish";
 }
 
-void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, const Packet& firstPack,
+void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack,
                                     const uint8_t* data, size_t size) {
   if (size == 0) {
     cserror() << "Bad packet size, why is it zero?";
