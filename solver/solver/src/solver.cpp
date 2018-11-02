@@ -457,7 +457,12 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
   if (m_hashesReceivedKeys.size() <= min_nodes) {
     if (hash == myHash) {
       csdebug() << "Solver -> Hashes are good";
-      m_hashesReceivedKeys.push_back(sender);
+      auto iterator = std::find(m_hashesReceivedKeys.begin(), m_hashesReceivedKeys.end(), sender);
+
+      if (iterator == m_hashesReceivedKeys.end()) {
+        cslog() << "Solver - > Add sender to next confidant list";
+        m_hashesReceivedKeys.push_back(sender);
+      }
     } else {
       cslog() << "Hashes do not match!!!";
       return;
