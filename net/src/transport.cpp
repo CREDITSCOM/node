@@ -179,6 +179,13 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
   }
 }
 
+void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
+  const auto packEnd = pack + size;
+  for (auto ptr = pack; ptr != packEnd; ++ptr) {
+    sendBroadcast(ptr);
+  }
+}
+
 // Processing network packages
 
 void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
@@ -410,7 +417,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0) {
-    rn = pack.getRoundNum();
+    rn = pack.getRoundNum() + (pack.getType() != MsgTypes::Transactions ? 0 : 5);
   }
 
   return !rn || rn >= rLim;

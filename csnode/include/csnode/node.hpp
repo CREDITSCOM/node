@@ -84,8 +84,9 @@ public:
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes, const cs::RoundNumber round);
-  void sendPacketHashesReply(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
 
   void sendBadBlock(const csdb::Pool& pool);
@@ -104,7 +105,7 @@ public:
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes, const cs::PublicKey& sender = cs::PublicKey());
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
@@ -181,7 +182,7 @@ private:
 
   // conveyer
   void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-  void processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundNumber round);
+  void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);

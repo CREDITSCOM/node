@@ -60,6 +60,7 @@ namespace cs
     using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
+    using Packets = std::vector<cs::TransactionsPacket>;
 
     // sync types
     using SharedMutex = std::shared_mutex;
@@ -77,7 +78,7 @@ namespace cs
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
         PrivateKeyLength = PRIVATE_KEY_LENGTH,
-        PacketHashesRequestDelay = 100 // ms
+        PacketHashesRequestDelay = 200 // ms
     };
 
     enum SolverConsts : uint32_t

@@ -57,8 +57,8 @@ public:
 
   // transaction's pack syncro
   MOCK_METHOD1(sendTransactionsPacket, void(const cs::TransactionsPacket& packet));
-  MOCK_METHOD1(sendPacketHashesRequest, void(const std::vector<cs::TransactionsPacketHash>& hashes));
-  MOCK_METHOD2(sendPacketHashesReply, void(const cs::TransactionsPacket& packet, const cs::PublicKey& sender));
+  MOCK_METHOD1(sendPacketHashesRequest, void(const std::vector<cs::TransactionsPacketHash>& hashes, const cs::RoundNumber round));
+  MOCK_METHOD2(sendPacketHashesReply, void(const cs::TransactionsPacket& packet, const cs::RoundNumber round, const cs::PublicKey& receiver));
 
   MOCK_METHOD1(sendBadBlock, void(const csdb::Pool& pool));
   MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic));
