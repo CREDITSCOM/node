@@ -110,4 +110,4 @@ add_subdirectory(solver2)
 add_subdirectory(client)
 
 enable_testing()
-#add_subdirectory(tests)
+add_subdirectory(tests)

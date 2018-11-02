@@ -182,7 +182,7 @@ public:
     --end_;
   }
 
-  uint32_t size() const { return end() - elements_; }
+  uint32_t size() const { return static_cast<uint32_t>(end() - elements_); }
 
   bool contains(T* ptr) const {
     return begin() <= ptr && ptr < end();

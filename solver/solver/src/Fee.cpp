@@ -13,7 +13,7 @@
 #include <csdb/pool.h>
 #include <csdb/amount_commission.h>
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 namespace cs {
 namespace {
@@ -23,6 +23,7 @@ constexpr double kMarketRateCS = 0.18;
 constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
+constexpr double kMinFee = 0.0001428;
 }  // namespace
 
 Fee::Fee()
@@ -56,9 +57,15 @@ inline void Fee::Init(Node* node, csdb::Pool* pool) {
 void Fee::SetCountedFee() {
   std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
   size_t size_of_transaction;
+  double counted_fee;
   for (size_t i = 0; i < transactions.size(); ++i) {
     size_of_transaction = transactions[i].to_byte_stream().size();
-    transactions[i].set_counted_fee(one_byte_cost_ * size_of_transaction);
+    counted_fee = one_byte_cost_ * size_of_transaction;
+    if (counted_fee < kMinFee) {
+      transactions[i].set_counted_fee(kMinFee);
+    } else {
+      transactions[i].set_counted_fee(counted_fee);
+    }
   }
 }
 

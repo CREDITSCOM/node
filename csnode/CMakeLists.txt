@@ -38,7 +38,7 @@ add_library(csnode
   include/csnode/dynamicbuffer.h
   include/csnode/threading.hpp
   include/csnode/nodecore.h
-  include/csnode/conveyer.h
+  include/csnode/conveyer.hpp
   include/csnode/transactionspacket.h
   include/csnode/TransactionsTail.h
   include/csnode/WalletsCache.h

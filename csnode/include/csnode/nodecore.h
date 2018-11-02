@@ -15,15 +15,17 @@
 
 #include <client/params.hpp>
 #include <csnode/transactionspacket.h>
+
 #include <lib/system/common.hpp>
 #include <lib/system/keys.hpp>
+#include <lib/system/metastorage.hpp>
 
 #ifdef NO_DELAYS
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
 const std::size_t ROUND_DELAY = 0;
 #else
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
-const std::size_t ROUND_DELAY = 1000;                   //ms
+const std::size_t ROUND_DELAY = 1000;                   // ms
 #endif
 
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 3000;        // ms
@@ -57,7 +59,6 @@ namespace cs
     using Notifications = std::vector<cs::Bytes>;
 
     // round data
-    using RoundNumber = uint32_t;
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
 
@@ -105,17 +106,6 @@ namespace cs
     {
         cs::Bytes bytes;
         cs::PublicKey sender;
-        cs::RoundNumber round = 0;
-
-        bool operator==(const cs::CharacteristicMeta& meta) const
-        {
-            return round == meta.round;
-        }
-
-        bool operator !=(const cs::CharacteristicMeta& meta) const
-        {
-            return !((*this) == meta);
-        }
     };
 
     struct PoolMetaInfo
@@ -131,7 +121,7 @@ namespace cs
         cs::Signature signature;
     };
 
-    const std::size_t hashVectorCount = 5;
+    constexpr std::size_t hashVectorCount = 5;
 
     struct HashMatrix
     {
@@ -140,13 +130,11 @@ namespace cs
         cs::Signature signature;
     };
 
-    struct StorageElement
-    {
-        cs::RoundNumber round = 0;
-        cs::TransactionsPacketHashTable hashTable;
-    };
-
-    using HashTablesStorage = boost::circular_buffer<StorageElement>;
+    // metas
+    using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
+    using HashTablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
+    using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
+    using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
 }
 
 #endif // NODE_CORE_H

@@ -76,9 +76,8 @@ void Network::readerRoutine(const Config& config) {
   ip::udp::socket* sock =
       getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
 
-  if (!sock) {
-    return;
-  }
+  if (!sock) return;
+  while (!initFlag_.load());
 
   boost::system::error_code lastError;
 
@@ -274,6 +273,10 @@ bool Network::resendFragment(const cs::Hash& hash,
   }
 
   return false;
+}
+
+void Network::sendInit() {
+  initFlag_.store(true);
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {

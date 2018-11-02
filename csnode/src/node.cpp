@@ -4,7 +4,7 @@
 
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -208,6 +208,12 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+#ifdef MONITOR_NODE
+bool monitorNode = true;
+#else
+bool monitorNode = false;
+#endif
+
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
   istream_.init(data, size);
 
@@ -215,7 +221,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
 
   if (roundNum_ < rNum || type == MsgTypes::BigBang) {
     roundNum_ = rNum;
-  } else {
+  }
+  else {
     cswarning() << "Bad round number, ignoring";
     return;
   }
@@ -320,7 +327,7 @@ void Node::sendRoundTableRequest(size_t rNum) {
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
-  size_t rNum;
+  size_t rNum = 0u;
   istream_ >> rNum;
 
   if (rNum >= roundNum_) {
@@ -548,7 +555,7 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size) {
 
   istream_.init(data, size);
 
-  int num;
+  int num = 0;
   istream_ >> num;
 
   if (num == 1) {
@@ -959,12 +966,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     cs::Bytes characteristicBytes;
     characteristicBytes.assign(data, data + size);
 
-    cs::CharacteristicMeta meta;
-    meta.bytes = std::move(characteristicBytes);
-    meta.round = conveyer.roundTable().round;
-    meta.sender = sender;
+    cs::CharacteristicMetaStorage::MetaElement metaElement;
+    metaElement.meta.bytes = std::move(characteristicBytes);
+    metaElement.meta.sender = sender;
+    metaElement.round = conveyer.currentRoundNumber();
 
-    conveyer.addCharacteristicMeta(meta);
+    conveyer.addCharacteristicMeta(std::move(metaElement));
   }
 
   cs::DataStream stream(data, size);
@@ -1331,7 +1338,7 @@ void Node::resetNeighbours() {
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  uint32_t requested_seq;
+  uint32_t requested_seq = 0u;
 
   istream_.init(data, size);
   istream_ >> requested_seq;
@@ -1443,7 +1450,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
-  if (!conn) return;
+  if (!conn) {
+    LOG_WARN("Cannot get a connection with a specified public key");
+    return;
+  }
 
   ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
@@ -1547,21 +1557,16 @@ void Node::processPacketsReply(cs::TransactionsPacket&& packet, const cs::RoundN
   csdebug() << "NODE> Processing packets reply";
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  conveyer.addFoundPacket(std::move(packet));
+  conveyer.addFoundPacket(round, std::move(packet));
 
-  if (conveyer.isSyncCompleted()) {
+  if (conveyer.isSyncCompleted(round)) {
     csdebug() << "NODE> Packets sync completed";
     solver_->gotRound();
 
-    if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
+    if (auto meta = conveyer.characteristicMeta(round); meta.has_value())
+    {
       csdebug() << "NODE> Run characteristic meta";
-
-      if (meta->round != 0) {
-        getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
-      }
-      else {
-        csfatal() << "NODE> Can not call node get characteristic method";
-      }
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
     }
   }
 }
@@ -1581,7 +1586,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
   else {
     csdebug() << "NODE> Sending packet hashes request";
-    sendPacketHashesRequest(conveyer.neededHashes(), roundNum_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
 
@@ -1594,7 +1599,7 @@ uint8_t Node::getConfidantNumber() {
 }
 
 void Node::processTimer() {
-  const auto round = cs::Conveyer::instance().roundNumber();
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   if (myLevel_ != NodeLevel::Normal || round <= cs::TransactionsFlushRound) {
     return;
@@ -1719,7 +1724,7 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
-const char* getNodeLevelString(NodeLevel nodeLevel) {
+static const char* nodeLevelToString(NodeLevel nodeLevel) {
   switch (nodeLevel) {
   case NodeLevel::Normal:
     return "Normal";
@@ -1730,15 +1735,14 @@ const char* getNodeLevelString(NodeLevel nodeLevel) {
   case NodeLevel::Writer:
     return "Writer";
   }
+
   return "UNKNOWN";
 }
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
-  os << getNodeLevelString(nodeLevel);
+  os << nodeLevelToString(nodeLevel);
   return os;
 }
-
-
 
 template <class T, class... Args>
 void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args) {

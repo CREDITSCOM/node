@@ -16,7 +16,7 @@
 #include <csdb/wallet.h>
 
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 #include <sys/timeb.h>
 
 #include <algorithm>
@@ -192,7 +192,7 @@ void Solver::runConsensus() {
   const auto& transactionsWithFees = pool.transactions();
 
   // TODO: transaction can be without fee?
-  for (int i = 0; i < transactionsWithFees.size(); ++i) {
+  for (size_t i = 0; i < transactionsWithFees.size(); ++i) {
     packet.addTransaction(transactionsWithFees[i]);
   }
 
@@ -474,7 +474,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     cs::Hashes hashes;
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::RoundNumber round = conveyer.roundNumber();
+    cs::RoundNumber round = conveyer.currentRoundNumber();
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());
@@ -597,7 +597,7 @@ cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::Tra
   cs::TransactionsPacket good_pool;
   std::vector<csdb::Transaction> transactions = packet.transactions();
   BlockChain::WalletData data_to_fetch_pulic_key;
-  for (int i = 0; i < transactions.size(); ++i) {
+  for (size_t i = 0; i < transactions.size(); ++i) {
     if (transactions[i].source().is_wallet_id()) {
       m_node->getBlockChain().findWalletData(transactions[i].source().wallet_id(), data_to_fetch_pulic_key);
       if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),

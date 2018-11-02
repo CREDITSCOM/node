@@ -83,6 +83,7 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 }  // namespace
 
 void Transport::run() {
+  net_->sendInit();
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
   {
@@ -291,7 +292,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  RoundNum rNum;
+  RoundNum rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrPtr();
@@ -502,6 +503,31 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const RoundNum rNum, co
   if (size == 0) {
     LOG_ERROR("Bad packet size, why is it zero?");
     return;
+  }
+
+  // если последний номер раунда в блоке у ноды отстаёт пришедшего номера раунда на N
+  // то начинается синхронизация
+  // в противом случае нода собирает блоки из транзакций по таблице раундов
+  constexpr size_t roundNumberLagLimit = 2;  // подобрано экспериментально
+  const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
+  const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
+  const bool isRoundNumberLagged = (rNum < lastSequenceNumber) && (lagBeetweenRounds > roundNumberLagLimit);
+
+  if (isRoundNumberLagged) {
+    csdebug() << "ROUND NUMBER LAGGED. LAST BLOCK: " << lastSequenceNumber
+            << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
+    if (type == MsgTypes::RoundTableSS) {
+      csdebug() << "RoundTableSS";
+      return node_->getRoundTableSS(data, size, rNum);
+    }
+    else if (type == MsgTypes::BlockRequest) {
+      csdebug() << "BlockRequest";
+      return node_->getBlockRequest(data, size, firstPack.getSender());
+    }
+    else if (type == MsgTypes::RequestedBlock) {
+      csdebug() << "RequestedBlock";
+      return node_->getBlockReply(data, size);
+    }
   }
 
   switch(type) {
@@ -997,21 +1023,22 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 void Transport::sendPingPack(const Connection& conn) {
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence();
+  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence() << myPublicKey_;
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  Connection::Id id;
+  Connection::Id id = 0u;
   uint32_t lastSeq;
+  cs::PublicKey pk;
 
-  iPackStream_ >> id >> lastSeq;
+  iPackStream_ >> id >> lastSeq >> pk;
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
   }
 
-  nh_.validateConnectionId(sender, id, task->sender);
+  nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
 
   if (lastSeq > maxBlock_) {
     maxBlock_ = lastSeq;
