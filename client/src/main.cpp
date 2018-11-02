@@ -22,7 +22,9 @@ int main(int argc, char* argv[]) {
   desc.add_options()
     ("help", "produce this message")
     ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
-    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")");
+    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
+    ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
+    ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")");
 
   po::variables_map vm;
 

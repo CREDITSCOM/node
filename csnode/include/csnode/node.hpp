@@ -116,11 +116,6 @@ class Node {
  private:
   bool init();
 
-  // signature verification
-  bool checkKeysFile();
-  void generateKeys();
-  bool checkKeysForSig();
-
   inline bool readRoundData(bool);
   void        onRoundStart();
 
@@ -140,9 +135,6 @@ class Node {
   // signature variables
   std::vector<uint8_t> myPublicForSig;
   std::vector<uint8_t> myPrivateForSig;
-
-  std::string rcvd_trx_fname = "rcvd.txt";
-  std::string sent_trx_fname = "sent.txt";
 
   // Current round state
   RoundNum  roundNum_ = 0;

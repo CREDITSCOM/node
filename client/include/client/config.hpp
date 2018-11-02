@@ -16,7 +16,9 @@ const NodeVersion NODE_VERSION = 88;
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
+
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
+const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
 const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
@@ -59,6 +61,7 @@ public:
   const std::vector<EndpointData>& getIpList() const { return bList_; }
 
   const PublicKey& getMyPublicKey() const { return publicKey_; }
+  const PrivateKey& getMyPrivateKey() const { return privateKey_; }
   const std::string& getPathToDB() const { return pathToDb_; }
 
   bool isGood() const { return good_; }
@@ -75,6 +78,8 @@ public:
 private:
   Config() { }
   static Config readFromFile(const std::string& fileName);
+
+  bool readKeys(const std::string& pathToPk, const std::string& pathToSk);
 
   bool good_ = false;
 
@@ -99,7 +104,9 @@ private:
   bool server_;
 
   std::string pathToDb_;
+
   PublicKey publicKey_;
+  PrivateKey privateKey_;
 };
 
 #endif // __CONFIG_HPP__

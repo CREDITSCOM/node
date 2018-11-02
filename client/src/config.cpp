@@ -5,8 +5,10 @@
 #include <boost/asio.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
-#include <lib/system/logger.hpp>
 #include <base58.h>
+#include <sodium.h>
+
+#include <lib/system/logger.hpp>
 #include "config.hpp"
 
 const std::string BLOCK_NAME_PARAMS = "params";
@@ -21,9 +23,13 @@ const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
-
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
+
+const std::string ARG_NAME_CONFIG_FILE = "config-file";
+const std::string ARG_NAME_DB_PATH = "db-path";
+const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
+const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = { { "client", NodeType::Client }, { "router", NodeType::Router } };
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = { { "signal_server", BootstrapType::SignalServer }, { "list", BootstrapType::IpList } };
@@ -73,40 +79,107 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
 
+static inline std::string getArgFromCmdLine(const po::variables_map& vm,
+                                            const std::string& name,
+                                            const std::string& defVal) {
+  return vm.count(name) ? vm[name].as<std::string>() : defVal;
+}
+
+static inline void writeFile(const std::string name, const std::string data) {
+  std::ofstream file(name);
+  file << data;
+  file.close();
+}
+
 Config Config::read(po::variables_map& vm) {
-  Config result = readFromFile(vm.count("config-file") ?
-                               vm["config-file"].as<std::string>() :
-                               DEFAULT_PATH_TO_CONFIG);
+  Config result = readFromFile(getArgFromCmdLine(vm,
+                                                 ARG_NAME_CONFIG_FILE,
+                                                 DEFAULT_PATH_TO_CONFIG));
 
-  result.pathToDb_ = vm.count("db-path") ?
-    vm["db-path"].as<std::string>() :
-    DEFAULT_PATH_TO_DB;
+  result.pathToDb_ = getArgFromCmdLine(vm,
+                                       ARG_NAME_DB_PATH,
+                                       DEFAULT_PATH_TO_DB);
 
-  const auto keyFile = vm.count("key-file") ?
-    vm["key-file"].as<std::string>() :
-    DEFAULT_PATH_TO_PUBLIC_KEY;
-  std::ifstream pub(keyFile);
-  
-  if (pub.is_open()) {
-    std::string pub58;
-    std::vector<uint8_t> myPublic;
-    std::getline(pub, pub58);
-    pub.close();
-    DecodeBase58(pub58, myPublic);
-    if (myPublic.size() != 32) {
-      result.good_ = false;
-      LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
-    }
-
-    result.publicKey_ = PublicKey((const char*)myPublic.data());
-  }
-  else {
-    srand(time(NULL));
-    for (int i = 0; i < 32; ++i)
-      *(result.publicKey_.str + i) = (char)(rand() % 255);
-  }
+  if (result.good_)
+    result.good_ =
+      result.readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
+                      getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY));
 
   return result;
+}
+
+bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk) {
+  // First read private
+  std::ifstream skFile(pathToSk);
+  std::string pk58;
+
+  if (skFile.is_open()) {
+    std::string sk58;
+    std::vector<uint8_t> sk;
+
+    std::getline(skFile, sk58);
+    skFile.close();
+    DecodeBase58(sk58, sk);
+
+    if (sk.size() != PRIVATE_KEY_LENGTH) {
+      LOG_ERROR("Bad Base-58 Private Key in " << pathToSk);
+      return false;
+    }
+
+    privateKey_ = PrivateKey((const char*)sk.data());
+    crypto_sign_ed25519_sk_to_pk((unsigned char*)publicKey_.str, (unsigned char*)privateKey_.str);
+    pk58 = EncodeBase58((unsigned char*)publicKey_.str,
+                        (unsigned char*)(publicKey_.str + PUBLIC_KEY_LENGTH));
+  }
+  else {
+    // No private key detected
+    for (;;) {
+      std::cout << "No suitable keys were found. Type \"g\" to generate or \"q\" to quit." << std::endl;
+      char flag;
+      std::cin >> flag;
+
+      if (flag == 'g') {
+        // Key generation
+        crypto_sign_ed25519_keypair((unsigned char*)publicKey_.str,
+                                    (unsigned char*)privateKey_.str);
+        pk58 = EncodeBase58((unsigned char*)publicKey_.str,
+                            (unsigned char*)(publicKey_.str + PUBLIC_KEY_LENGTH));
+
+        writeFile(pathToPk, pk58);
+        writeFile(pathToSk, EncodeBase58((unsigned char*)privateKey_.str,
+                                         (unsigned char*)(privateKey_.str + PRIVATE_KEY_LENGTH)));
+
+        LOG_EVENT("Keys generated");
+        break;
+      }
+      else if (flag == 'q')
+        return false;
+    }
+  }
+
+  // Okay so by now we have both public and private key fields filled up
+  std::ifstream pkFile(pathToPk);
+  bool pkGood = false;
+
+  if (pkFile.is_open()) {
+    std::string pkFileCont;
+    std::getline(pkFile, pkFileCont);
+    pkFile.close();
+
+    pkGood = (pkFileCont == pk58);
+  }
+
+  if (!pkGood) {
+    std::cout << "The PUBLIC key file not found or doesn't contain a valid key (matching the provided private key). Type \"f\" to rewrite the PUBLIC key file." << std::endl;
+    char flag;
+    std::cin >> flag;
+    if (flag == 'f')
+      writeFile(pathToPk, pk58);
+    else
+      return false;
+  }
+
+  return true;
 }
 
 Config Config::readFromFile(const std::string& fileName) {
