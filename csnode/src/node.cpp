@@ -24,6 +24,13 @@ Node::Node(const Config& config)
 , allocator_(1 << 26, 3)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, myPublicKey_) {
+
+  myPublicForSig.resize(PUBLIC_KEY_LENGTH);
+  myPrivateForSig.resize(PRIVATE_KEY_LENGTH);
+
+  memcpy(myPublicForSig.data(), config.getMyPublicKey().str, PUBLIC_KEY_LENGTH);
+  memcpy(myPrivateForSig.data(), config.getMyPrivateKey().str, PRIVATE_KEY_LENGTH);
+
   good_ = init();
 }
 
@@ -44,95 +51,13 @@ bool Node::init() {
   if (!solver_)
     return false;
 
-  LOG_EVENT("Everything init");
+  LOG_EVENT("Everything init: " << myPublicForSig.size() << ", " << myPrivateForSig.size());
 
-  // check file with keys
-  if (!checkKeysFile())
-    return false;
   solver_->set_keys(myPublicForSig, myPrivateForSig);  // DECOMMENT WHEN SOLVER STRUCTURE WILL BE CHANGED!!!!
 
   solver_->addInitialBalance();
 
   return true;
-}
-
-bool Node::checkKeysFile() {
-  std::ifstream pub("NodePublic.txt");    // 44
-  std::ifstream priv("NodePrivate.txt");  // 88
-                                          // std::cout <<
-                                          // "//////////////////////////////////////////////////////////////////////////////////////////////////"
-                                          // << std::endl;
-
-  if (!pub.is_open() || !priv.is_open()) {
-    std::cout << "\n\nNo suitable keys were found. Type \"g\" to generate or \"q\" to quit." << std::endl;
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
-    if (gen_flag == 'g') {
-      generateKeys();
-      return true;
-    } else
-      return false;
-  } else {
-    std::string pub58, priv58;
-    std::getline(pub, pub58);
-    std::getline(priv, priv58);
-    pub.close();
-    priv.close();
-    DecodeBase58(pub58, myPublicForSig);
-    DecodeBase58(priv58, myPrivateForSig);
-    if (myPublicForSig.size() != 32 || myPrivateForSig.size() != 64) {
-      std::cout << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit." << std::endl;
-      char gen_flag = 'a';
-      std::cin >> gen_flag;
-      if (gen_flag == 'g') {
-        generateKeys();
-        return true;
-      } else
-        return false;
-    }
-    if (checkKeysForSig())
-      return true;
-    else
-      return false;
-  }
-}
-
-void Node::generateKeys() {
-  myPublicForSig.resize(32);
-  myPrivateForSig.resize(64);
-
-  crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
-
-  std::ofstream f_pub("NodePublic.txt");
-  f_pub << EncodeBase58(myPublicForSig);
-  f_pub.close();
-
-  std::ofstream f_priv("NodePrivate.txt");
-  f_priv << EncodeBase58(myPrivateForSig);
-  f_priv.close();
-}
-
-bool Node::checkKeysForSig() {
-  const uint8_t msg[] = {255, 0, 0, 0, 255};
-  uint8_t       signature[64], public_key[32], private_key[64];
-
-  memcpy(public_key, myPublicForSig.data(), 32);
-  memcpy(private_key, myPrivateForSig.data(), 64);
-
-  uint64_t sig_size;
-  crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long*>(&sig_size), msg, 5, private_key);
-  if (!crypto_sign_ed25519_verify_detached(signature, msg, 5, public_key)) {
-    return true;
-  } else {
-    std::cout << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit." << std::endl;
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
-    if (gen_flag == 'g') {
-      generateKeys();
-      return true;
-    } else
-      return false;
-  }
 }
 
 void Node::run(const Config&) {

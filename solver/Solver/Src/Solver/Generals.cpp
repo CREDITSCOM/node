@@ -50,12 +50,24 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_
   const csdb::Amount zero_balance = 0.0_c;
   csdb::Amount       delta;
   Hash_              hash_;
+
+  std::map<csdb::Address, csdb::Amount> localBalances;
+
   if (transactionsCount > 0) {
     std::vector<csdb::Transaction> t_pool(
         _pool.transactions());  // warning: returns copy, csdb classes optimizations nedded
     for (auto& it : t_pool) {
+
+      decltype(localBalances)::iterator srcIter = localBalances.find(it.source());
+      if (srcIter == localBalances.end()) {
+        /* Supporting incomes are not supported (ironically) in this version.
+           Thus one must have all the money he (or she) spends in this
+           block by the end of the previous round */
+        srcIter = localBalances.insert(srcIter, std::make_pair(it.source(), it.balance()));
+      }
+
       countFee(it, num_of_trusted, transactionsCount);
-      delta = it.balance() - it.amount() - it.counted_fee();
+      delta = srcIter->second - it.amount() - it.counted_fee();
 
 #ifdef _MSC_VER
       int8_t bitcnt = __popcnt(delta.integral()) + __popcnt64(delta.fraction());
@@ -66,6 +78,7 @@ Hash_ Generals::buildvector(csdb::Pool& _pool, csdb::Pool& new_pool, size_t num_
         *(del1 + i) = bitcnt;
         it.set_balance(delta);
         new_pool.add_transaction(it);
+        srcIter->second-= (it.amount() + it.counted_fee());
       } else {
         *(del1 + i) = -bitcnt;
         new_bpool.add_transaction(it);
@@ -298,6 +311,11 @@ csdb::Amount Generals::countFee(csdb::Transaction& transaction, size_t numOfTrus
     lengthCoef        = lengthCoef * lengthCoef * lengthCoef;
     fee *= lengthCoef;
   }
+
+  /* The Business wanted this... */
+  static const double MagicFee = 0.0001428;
+  fee = std::max(fee, MagicFee);
+  /* End of what the Business wanted */
 
   csdb::Amount countedFee(fee);
   transaction.set_counted_fee(countedFee);
