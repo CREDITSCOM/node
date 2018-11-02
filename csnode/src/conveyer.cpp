@@ -54,6 +54,11 @@ cs::PacketFlushSignal& cs::Conveyer::flushSignal()
 
 void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
 {
+    if (!transaction.is_valid()) {
+        cswarning() << "CONVEYER> Can not add no valid transaction to conveyer";
+        return;
+    }
+
     cs::Lock lock(m_sharedMutex);
 
     if (pimpl->transactionsBlock.empty() || (pimpl->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
