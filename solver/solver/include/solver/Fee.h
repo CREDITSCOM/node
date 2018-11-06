@@ -15,6 +15,8 @@ class Pool;
 }  // namespace csdb
 
 namespace cs {
+class TransactionsPacket;
+
 /** @brief This class was designed to count round fee.
 *
 *  The amount of counted fee in round depends on:
@@ -33,6 +35,7 @@ class Fee {
   *                in this pool.
   */
   void CountFeesInPool(Node* node, csdb::Pool* pool);
+  void CountFeesInPool(Node* node, TransactionsPacket* packet);
 
   Fee();
   Fee(const Fee&) = delete;
@@ -67,6 +70,7 @@ class Fee {
   double CountBlockTimeStampDifference(size_t num_block_from);
   inline void CountTotalTransactionsLength();
   inline void Init(Node* node, csdb::Pool* pool);
+  inline void Init(Node* node, TransactionsPacket* packet);
 
   size_t num_of_nodes_;
   size_t num_of_last_block_;
@@ -75,6 +79,7 @@ class Fee {
   double one_round_cost_;
   double rounds_frequency_;
   csdb::Pool* current_pool_;
+  TransactionsPacket* transactions_packet_;
   Node* node_;
 };
 }  // namespace Credits

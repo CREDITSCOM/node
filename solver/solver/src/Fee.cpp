@@ -14,6 +14,7 @@
 #include <csdb/amount_commission.h>
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
+#include <transactionspacket.h>
 
 namespace cs {
 namespace {
@@ -34,6 +35,7 @@ Fee::Fee()
     one_round_cost_(0),
     rounds_frequency_(0),
     current_pool_(nullptr),
+    transactions_packet_(nullptr),
     node_(nullptr) {}
 
 void Fee::CountFeesInPool(Node* node, csdb::Pool* pool) {
@@ -45,8 +47,28 @@ void Fee::CountFeesInPool(Node* node, csdb::Pool* pool) {
   SetCountedFee();
 }
 
+void Fee::CountFeesInPool(Node* node, TransactionsPacket* packet) {
+  if (packet->transactionsCount() < 1) {
+    return;
+  }
+  Init(node, packet);
+  CountOneByteCost();
+  SetCountedFee();
+}
+
 inline void Fee::Init(Node* node, csdb::Pool* pool) {
   current_pool_ = pool;
+  transactions_packet_ = nullptr;
+  num_of_last_block_ = node->getBlockChain().getLastWrittenSequence() + 1;
+  // Now we don't have tools to estimate number of all nodes in the network.
+  // So we use number of trusted. In fact it is a constant. Will be fixed soon.
+  num_of_nodes_ = cs::Conveyer::instance().roundTable().confidants.size();
+  node_ = node;
+}
+
+inline void Fee::Init(Node* node, TransactionsPacket* packet) {
+  transactions_packet_ = packet;
+  current_pool_ = nullptr;
   num_of_last_block_ = node->getBlockChain().getLastWrittenSequence() + 1;
   // Now we don't have tools to estimate number of all nodes in the network.
   // So we use number of trusted. In fact it is a constant. Will be fixed soon.
@@ -55,16 +77,32 @@ inline void Fee::Init(Node* node, csdb::Pool* pool) {
 }
 
 void Fee::SetCountedFee() {
-  std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
-  size_t size_of_transaction;
-  double counted_fee;
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    size_of_transaction = transactions[i].to_byte_stream().size();
-    counted_fee = one_byte_cost_ * size_of_transaction;
-    if (counted_fee < kMinFee) {
-      transactions[i].set_counted_fee(kMinFee);
-    } else {
-      transactions[i].set_counted_fee(counted_fee);
+  if (current_pool_ != nullptr) {
+    std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
+    size_t size_of_transaction;
+    double counted_fee;
+    for (size_t i = 0; i < transactions.size(); ++i) {
+      size_of_transaction = transactions[i].to_byte_stream().size();
+      counted_fee = one_byte_cost_ * size_of_transaction;
+      if (counted_fee < kMinFee) {
+        transactions[i].set_counted_fee(kMinFee);
+      } else {
+        transactions[i].set_counted_fee(counted_fee);
+      }
+    }
+  } else {
+    std::vector<csdb::Transaction>& transactions = transactions_packet_->transactions();
+    size_t size_of_transaction;
+    double counted_fee;
+    for (size_t i = 0; i < transactions.size(); ++i) {
+      size_of_transaction = transactions[i].to_byte_stream().size();
+      counted_fee = one_byte_cost_ * size_of_transaction;
+      if (counted_fee < kMinFee) {
+        transactions[i].set_counted_fee(kMinFee);
+      }
+      else {
+        transactions[i].set_counted_fee(counted_fee);
+      }
     }
   }
 }
@@ -87,7 +125,12 @@ void Fee::CountOneByteCost() {
 
 inline void Fee::CountTotalTransactionsLength() {
   total_transactions_length_ = 0;
-  auto transactions = current_pool_->transactions();
+  std::vector<csdb::Transaction> transactions;
+  if (current_pool_ != nullptr) {
+    transactions = current_pool_->transactions();
+  } else {
+    transactions = transactions_packet_->transactions();
+  }
   for (size_t i = 0; i < transactions.size(); ++i) {
     total_transactions_length_ += transactions[i].to_byte_stream().size();
   }
