@@ -175,6 +175,8 @@ private:
   void generateKeys();
   bool checkKeysForSig();
 
+  bool blockchainSync();
+
   bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
   void onRoundStartConveyer(cs::RoundTable&& roundTable);
@@ -198,7 +200,7 @@ private:
   static const csdb::Address startAddress_;
   static const csdb::Address spammerAddress_;
   const cs::PublicKey myPublicKey_;
-  bool            good_ = true;
+  bool good_ = true;
 
   // syncro variables
   bool syncro_started = false;

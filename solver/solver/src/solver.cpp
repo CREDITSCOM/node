@@ -358,23 +358,25 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
 
 void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender) {
   cslog() << __func__;
+
   if (m_temporaryStorage.count(block.sequence()) == 0) {
     m_temporaryStorage.emplace(block.sequence(), block);
-    cslog() << "GOTINCORRECTBLOCK> block saved to temporary storage: " << block.sequence();
+    cslog() << "GOT INCORRECT BLOCK> block saved to temporary storage: " << block.sequence();
   }
 }
 
 void Solver::gotFreeSyncroBlock(csdb::Pool&& block) {
   cslog() << __func__;
+
   if (m_randomStorage.count(block.sequence()) == 0) {
     m_randomStorage.emplace(block.sequence(), block);
-    cslog() << "GOTFREESYNCROBLOCK> block saved to temporary storage: " << block.sequence();
+    cslog() << "GOT FREE SYNCRO BLOCK> block saved to temporary storage: " << block.sequence();
   }
 }
 
 void Solver::rndStorageProcessing() {
   cslog() << __func__;
-  bool   loop = true;
+  bool loop = true;
   size_t newSeq;
 
   while (loop) {

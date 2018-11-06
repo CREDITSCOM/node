@@ -198,6 +198,18 @@ bool Node::checkKeysForSig() {
   return false;
 }
 
+bool Node::blockchainSync() {
+  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || (getBlockChain().getBlockRequestNeed())) {
+    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
+    syncro_started = true;
+  }
+
+  if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
+    syncro_started = false;
+    awaitingSyncroBlock = false;
+  }
+}
+
 void Node::run() {
   transport_->run();
 }
@@ -1512,15 +1524,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
 #ifdef SYNCRO
-  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || (getBlockChain().getBlockRequestNeed())) {
-    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
-    syncro_started = true;
-  }
-
-  if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
-    syncro_started = false;
-    awaitingSyncroBlock = false;
-  }
+  blockchainSync();
 #endif
 
   if (!sendingTimer_.isRunning()) {
@@ -1578,6 +1582,10 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet)
 }
 
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
+  if (syncro_started) {
+    return;
+  }
+
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
 
