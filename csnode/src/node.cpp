@@ -220,7 +220,7 @@ void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequ
 }
 
 void Node::processMetaMap() {
-  cslog() << "NODE> Processing pool meta map";
+  cslog() << "NODE> Processing pool meta map, map size: " << poolMetaMap_.size();
 
   for (auto& [sequence, meta] : poolMetaMap_) {
     solver_->countFeesInPool(&meta.pool);
@@ -229,7 +229,7 @@ void Node::processMetaMap() {
     getBlockChain().finishNewBlock(meta.pool);
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
-      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+      csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(meta.pool, sequence, meta.sender);
     }
     else {
@@ -1415,23 +1415,26 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 void Node::sendBlockRequest(uint32_t seq) {
   static uint32_t lfReq, lfTimes;
 
-  solver_->rndStorageProcessing();
   seq = getBlockChain().getLastWrittenSequence() + 1;
 
   csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
   csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
+
   if (gs == 0) {
     gs = roundNum_;
   }
+
   csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
   const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
   std::stringstream progress;
+
   if (syncStatus <= 100) {
     progress << "SYNC: [";
     for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
     for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
     progress << "] " << syncStatus << "%";
   }
+
   cslog() << progress.str();
 
   uint32_t reqSeq = seq;
@@ -1479,10 +1482,6 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
 
-  if (pool.sequence() == sendBlockRequestSequence_) {
-    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
-  }
-
   transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
 
   if (getBlockChain().getGlobalSequence() < pool.sequence()) {
@@ -1506,6 +1505,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
     isSyncroStarted_ = false;
+    roundToSync_ = 0;
+
     processMetaMap();
     cslog() << "SYNCRO FINISHED!!!";
   }
