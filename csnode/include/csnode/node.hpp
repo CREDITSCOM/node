@@ -177,6 +177,7 @@ private:
 
   void blockchainSync();
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
+  void processMetaMap();
 
   bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
@@ -253,6 +254,7 @@ private:
 
   // sync meta
   cs::PoolMetaMap poolMetaMap_;
+  cs::RoundNumber roundToSync_ = 0;
 
   static const uint8_t broadcastFlag_ = BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
   static const uint8_t directFlag_ = BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;

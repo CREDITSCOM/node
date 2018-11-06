@@ -199,14 +199,13 @@ bool Node::checkKeysForSig() {
 }
 
 void Node::blockchainSync() {
-  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || (getBlockChain().getBlockRequestNeed())) {
-    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
-    isSyncroStarted_ = true;
-  }
+  if (!isSyncroStarted_) {
+    if (roundNum_ != getBlockChain().getLastWrittenSequence() + 1) {
+      isSyncroStarted_ = true;
+      roundToSync_ = roundNum_;
 
-  if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
-    isSyncroStarted_ = false;
-    isAwaitingSyncroBlock_ = false;
+      sendBlockRequest(bc_.getLastWrittenSequence() + 1);
+    }
   }
 }
 
@@ -218,6 +217,30 @@ void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequ
   else {
     cswarning() << "NODE> Can not add same pool meta sequence";
   }
+}
+
+void Node::processMetaMap() {
+  cslog() << "NODE> Processing pool meta map";
+
+  for (auto& [sequence, meta] : poolMetaMap_) {
+    solver_->countFeesInPool(&meta.pool);
+    meta.pool.set_previous_hash(bc_.getLastWrittenHash());
+
+    getBlockChain().finishNewBlock(meta.pool);
+
+    if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
+      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+      writeBlock(meta.pool, sequence, meta.sender);
+    }
+    else {
+      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> remove wallets from wallets cache";
+
+      getBlockChain().removeWalletsInPoolFromCache(meta.pool);
+    }
+  }
+
+  poolMetaMap_.clear();
 }
 
 void Node::run() {
@@ -263,6 +286,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   transport_->clearTasks();
+
+  if (getBlockChain().getLastWrittenSequence() < roundNum_ - 1) {
+    return;
+  }
 
   // start round on node
   onRoundStart(roundTable);
@@ -930,7 +957,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
-  cslog() << "NODE> RoundTableUpdated";
+  cslog() << "NODE> RoundTable";
 
   cs::DataStream stream(data, size);
 
@@ -1450,10 +1477,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   istream_.init(data, size);
   istream_ >> pool;
 
-  cslog() << "GETBLOCKREPLY> Getting block " << pool.sequence();
+  cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
 
   if (pool.sequence() == sendBlockRequestSequence_) {
-    cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
+    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
   }
 
   transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
@@ -1463,19 +1490,23 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
 
   if (pool.sequence() == sendBlockRequestSequence_) {
-    cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
-    solver_->gotBlockReply(std::move(pool));
+    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
+
+    if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
+      bc_.onBlockReceived(pool);
+    }
+
     isAwaitingSyncroBlock_ = false;
-    solver_->rndStorageProcessing();
   }
   else {
     solver_->gotFreeSyncroBlock(std::move(pool));
   }
 
-  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  if (roundToSync_ != bc_.getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
     isSyncroStarted_ = false;
+    processMetaMap();
     cslog() << "SYNCRO FINISHED!!!";
   }
 }
