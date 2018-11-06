@@ -65,14 +65,10 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* sol
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte = 0;
+      cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
 
-      if (solver) {
+      if (byte) {
         byte = static_cast<cs::Byte>(solver->checkTransactionSignature(transaction));
-
-        if (byte) {
-          byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
-        }
       }
 
       characteristicMask.push_back(byte);
