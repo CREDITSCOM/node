@@ -19,7 +19,7 @@ struct cs::Conveyer::Impl
     cs::NeededHashesMetaStorage neededHashesMeta;
 
     // writer notifications
-    cs::Notifications notifications;
+    cs::NotificationsMetaStorage notificationsMeta;
 
     // storage of received characteristic for slow motion nodes
     cs::CharacteristicMetaStorage characteristicMetas;
@@ -131,7 +131,9 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     }
 
     // clean data
-    pimpl->notifications.clear();
+    if (!pimpl->notificationsMeta.contains(currentRoundNumber())) {
+        pimpl->notificationsMeta.append(currentRoundNumber(), cs::Notifications());
+    }
 }
 
 const cs::RoundTable& cs::Conveyer::roundTable() const
@@ -213,13 +215,25 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
 
 const cs::Notifications& cs::Conveyer::notifications() const
 {
-    return pimpl->notifications;
+    auto notifications = pimpl->notificationsMeta.get(currentRoundNumber());
+
+    if (notifications) {
+        return *notifications;
+    }
+    else {
+        throw std::out_of_range("There is no notifications at current round");
+    }
 }
 
 void cs::Conveyer::addNotification(const cs::Bytes& bytes)
 {
-    csdebug() << "CONVEYER> Writer notification added";
-    pimpl->notifications.push_back(bytes);
+    auto notifications = pimpl->notificationsMeta.get(currentRoundNumber());
+
+    if (notifications)
+    {
+        csdebug() << "CONVEYER> Writer notification added";
+        notifications->push_back(bytes);
+    }
 }
 
 std::size_t cs::Conveyer::neededNotificationsCount() const
@@ -232,7 +246,7 @@ std::size_t cs::Conveyer::neededNotificationsCount() const
 bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) const
 {
     const std::size_t neededConfidantsCount = neededNotificationsCount();
-    const std::size_t notificationsCount = pimpl->notifications.size();
+    const std::size_t notificationsCount = notifications().size();
 
     cslog() << "CONVEYER> Current notifications count - " << notificationsCount;
     cslog() << "CONVEYER> Needed confidans count - " << neededConfidantsCount;
