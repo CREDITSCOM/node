@@ -34,11 +34,12 @@ public:
     Success
   };
 
+  void stop();
+
 private:
   void readerRoutine(const Config&);
   void writerRoutine(const Config&);
   void processorRoutine();
-
 
   ip::udp::socket* getSocketInThread(const bool,
                                      const EndpointData&,
@@ -46,6 +47,10 @@ private:
                                      const bool useIPv6);
 
   bool good_;
+  bool stopReaderRoutine = false;
+  bool stopWriterRoutine = false;
+  bool stopProcessorRoutine = false;
+
 
   io_context context_;
   ip::udp::resolver resolver_;

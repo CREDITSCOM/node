@@ -37,6 +37,9 @@ public:
   }
 
   void run();
+  void stop();
+
+  //static void stop();
 
   /* Incoming requests processing */
   void getRoundTableSS(const uint8_t*, const size_t, const RoundNum, uint8_t type = 0);
@@ -145,7 +148,6 @@ public:
     return solver_;
   }
 
-
 #ifdef NODE_API
   csconnector::connector& getConnector() {
     return api_;
@@ -197,6 +199,7 @@ private:
 
   slv2::SolverCore* solver_;
   Transport* transport_;
+  std::thread runThr;
 
 #ifdef MONITOR_NODE
   csstats::csstats       stats_;

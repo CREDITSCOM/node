@@ -2,6 +2,7 @@
 #ifndef __TRANSPORT_HPP__
 #define __TRANSPORT_HPP__
 #include <boost/asio.hpp>
+#include <csignal>
 
 #include <client/config.hpp>
 #include <csnode/node.hpp>
@@ -69,7 +70,8 @@ class Transport {
   , oPackStream_(&netPacksAllocator_, node->getMyPublicKey())
   , net_(new Network(config, this))
   , node_(node)
-  , nh_(this) {
+  , nh_(this)
+  {
     good_ = net_->isGood();
   }
 
@@ -77,7 +79,13 @@ class Transport {
     delete net_;
   }
 
-  [[noreturn]] void run();
+//  [[noreturn]] void run();
+
+  void run();
+
+  static volatile std::sig_atomic_t gSignalStatus;
+
+  static void stop() { Transport::gSignalStatus = 1; }
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 

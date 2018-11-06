@@ -296,7 +296,12 @@ void Neighbourhood::gotRegistration(Connection&& conn,
   }
 
   connectNode(node, connPtr);
-  transport_->sendRegistrationConfirmation(**connPtr, conn.id);
+  if (transport_->isGood()) { // check if transport available
+    transport_->sendRegistrationConfirmation(**connPtr, conn.id);
+  }
+  else {
+    LOG_ERROR("Transport is not available!!!");
+  }
 }
 
 void Neighbourhood::gotConfirmation(const Connection::Id& my,

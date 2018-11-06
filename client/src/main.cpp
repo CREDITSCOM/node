@@ -2,11 +2,20 @@
 
 #include <iomanip>
 #include <iostream>
+#include <csignal>
+#include  <condition_variable>
+#include <mutex>
 
 #include <lib/system/logger.hpp>
 #include <csnode/node.hpp>
+#include <net/transport.hpp>
 
 #include "config.hpp"
+
+
+volatile std::sig_atomic_t gSignalStatus = 0;
+bool whileNotFlag = true;
+static void stopNode() noexcept(false);
 
 #ifdef BUILD_WITH_GPROF
 #include <dlfcn.h>
@@ -41,7 +50,126 @@ inline void mouseSelectionDisable() {
 #endif
 }
 
+extern "C" void sig_handler(int sig) {
+  gSignalStatus = 1;
+  switch (sig)
+  {
+  case 2:
+    std::cout << "Signal SIGINT received, exiting" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    exit(EXIT_FAILURE);
+  case 4:
+    std::cout << "Signal WM_CLOSE received, exiting" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    exit(EXIT_FAILURE);
+  default:
+    std::cout << "Uncknown signal received, exiting" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    exit(EXIT_FAILURE);
+  }
+}
+
+#ifndef WIN32
+void installSignalHandler() {
+  if (SIG_ERR == std::signal(SIGTERM, sig_handler)) {
+    // Handle error
+    LOG_ERROR("Error to set SIGTERM!");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+  else if (SIG_ERR == std::signal(SIGBREAK, sig_handler)) {
+    LOG_ERROR("Error to set SIGBREAK!");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+  else if (SIG_ERR == std::signal(SIGINT, sig_handler)) {
+    LOG_ERROR("Error to set SIGINT!");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+  else if (SIG_ERR == std::signal(SIGHUP, sig_handler)) {
+    LOG_ERROR("Error to set SIGHUP!");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+}
+#else
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
+{
+  gSignalStatus = 1;
+  std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
+  switch (fdwCtrlType)
+  {
+    // Handle the CTRL-C signal. 
+  case CTRL_C_EVENT:
+    printf("Ctrl-C event\n\n");
+    Beep(750, 300);
+    //std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+    //std::raise(SIGTERM);
+    return TRUE;
+
+  // CTRL-CLOSE: confirm that the user wants to exit. 
+  case CTRL_CLOSE_EVENT:
+    Beep(600, 200);
+    printf("Ctrl-Close event\n\n");
+    return TRUE;
+
+      // Pass other signals to the next handler. 
+  case CTRL_BREAK_EVENT:
+    Beep(900, 200);
+    printf("Ctrl-Break event\n\n");
+    return TRUE;
+
+  case CTRL_LOGOFF_EVENT:
+    Beep(1000, 200);
+    printf("Ctrl-Logoff event\n\n");
+    return FALSE;
+
+  case CTRL_SHUTDOWN_EVENT:
+    Beep(750, 500);
+    printf("Ctrl-Shutdown event\n\n");
+    return FALSE;
+
+  default:
+    return FALSE;
+  }
+}
+#endif // !WIN32
+
+static void stopNode() noexcept(false) {
+  Transport::stop();
+  //std::this_thread::sleep_for(std::chrono::seconds(60));
+}
+
+// Called periodically to poll the signal flag.
+void poll_signal_flag() {
+  if (gSignalStatus == 1) {
+    gSignalStatus = 0;
+    try {
+      stopNode();
+      whileNotFlag = false;
+    }
+    catch (...) {
+      // Handle error
+      LOG_ERROR("Poll signal error!");
+      std::raise(SIGTERM);
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
+#ifdef WIN32
+  if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
+  {
+    std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
+    std::cout << "\n\t -- Now try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
+    std::cout << "\n\t    try logging off or closing the console...\n" << std::flush;
+    Sleep(2000);
+  }
+  else
+  {
+    std::cout << "\nERROR: Could not set control handler" << std::flush;
+    return 1;
+  }
+#else
+  installSignalHandler();
+#endif // WIN32
   mouseSelectionDisable();
 #if BUILD_WITH_GPROF
   signal(SIGUSR1, sigUsr1Handler);
@@ -84,9 +212,20 @@ int main(int argc, char* argv[]) {
   if (!node.isGood()) {
     panic();
   }
-
+    
   node.run();
+  LOG_WARN("+++++++++++++>>> NODE RUNNING! <<<++++++++++++++++++++++");
+  while (whileNotFlag) {
+    poll_signal_flag();
+  }
+
+  LOG_WARN("+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++");
+  node.stop();
+
+  LOG_WARN("Exiting Main Function");
 
   logger::cleanup();
-  return 0;
+
+  std::cout << "Logger cleaned" << std::endl;
+
 }
