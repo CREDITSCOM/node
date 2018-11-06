@@ -152,13 +152,13 @@ public:
   const BlockChain& getBlockChain() const {
     return bc_;
   }
+
   slv2::SolverCore* getSolver() {
     return solver_;
   }
   const slv2::SolverCore* getSolver() const {
     return solver_;
   }
-
 
 #ifdef NODE_API
   csconnector::connector& getConnector() {
@@ -176,6 +176,10 @@ private:
   bool checkKeysFile();
   void generateKeys();
   bool checkKeysForSig();
+
+  void blockchainSync();
+  void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
+  void processMetaMap();
 
   bool readRoundData(cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
@@ -198,24 +202,27 @@ private:
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   // Info
+
+  // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
   static const csdb::Address spammerAddress_;
+
   const cs::PublicKey myPublicKey_;
-  bool            good_ = true;
+  bool good_ = true;
 
   // syncro variables
-  bool syncro_started = false;
-  uint32_t sendBlockRequestSequence;
-  bool awaitingSyncroBlock = false;
-  uint32_t awaitingRecBlockCount = 0;
+  bool isSyncroStarted_ = false;
+  uint32_t sendBlockRequestSequence_;
+  bool isAwaitingSyncroBlock_ = false;
+  uint32_t awaitingRecBlockCount_ = 0;
 
   // signature variables
-  std::vector<uint8_t> myPublicForSig;
-  std::vector<uint8_t> myPrivateForSig;
+  std::vector<uint8_t> myPublicKeyForSignature_;
+  std::vector<uint8_t> myPrivateKeyForSignature_;
 
-  std::string rcvd_trx_fname = "rcvd.txt";
-  std::string sent_trx_fname = "sent.txt";
+  std::string receviedTrxFileName_ = "rcvd.txt";
+  std::string sentTrxFileName_ = "sent.txt";
 
   // Current round state
   cs::RoundNumber roundNum_ = 0;
@@ -230,7 +237,7 @@ private:
   Transport* transport_;
 
 #ifdef MONITOR_NODE
-  csstats::csstats       stats_;
+  csstats::csstats stats_;
 #endif
 
 #ifdef NODE_API
@@ -246,8 +253,13 @@ private:
   IPackStream istream_;
   OPackStream ostream_;
 
-  /// sends transactions blocks to network
+  // sends transactions blocks to network
   cs::Timer sendingTimer_;
+
+  // sync meta
+  cs::PoolMetaMap poolMetaMap_;
+  cs::RoundNumber roundToSync_ = 0;
+
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

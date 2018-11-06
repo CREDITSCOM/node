@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
+#include <map>
 
 #include <boost/smart_ptr/detail/spinlock.hpp>
 #include <boost/circular_buffer.hpp>
@@ -28,7 +29,7 @@ const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
 const std::size_t ROUND_DELAY = 1000;                   // ms
 #endif
 
-const std::size_t TIME_TO_AWAIT_SS_ROUND = 10000;        // ms
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 5000;        // ms
 
 namespace std
 {
@@ -131,11 +132,21 @@ namespace cs
         cs::Signature signature;
     };
 
+    struct PoolSyncMeta
+    {
+        csdb::Pool pool;
+        cs::Signature signature;
+        cs::PublicKey sender;
+    };
+
+    using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
+
     // metas
     using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
     using HashTablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
     using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
     using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
+    using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;
 }
 
 #endif // NODE_CORE_H

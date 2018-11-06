@@ -523,15 +523,19 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     csdebug() << "BLOCKCHAIN NEEDS SYNC. LAST BLOCK: " << lastSequenceNumber
             << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
     if (type == MsgTypes::RoundTableSS) {
-      csdebug() << "RoundTableSS";
+      csdebug() << "TRANSPORT> No cut, RoundTableSS";
       return node_->getRoundTableSS(data, size, rNum);
     }
+    else if (type == MsgTypes::RoundTable) {
+      csdebug() << "TRANSPORT> No cut, Round table";
+      return node_->getRoundTable(data, size, rNum);
+    }
     else if (type == MsgTypes::BlockRequest) {
-      csdebug() << "BlockRequest";
+      csdebug() << "TRANSPORT> No cut, BlockRequest";
       return node_->getBlockRequest(data, size, firstPack.getSender());
     }
     else if (type == MsgTypes::RequestedBlock) {
-      csdebug() << "RequestedBlock";
+      csdebug() << "TRANSPORT> No cut, RequestedBlock";
       return node_->getBlockReply(data, size);
     }
 

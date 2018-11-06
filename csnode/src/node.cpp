@@ -76,10 +76,10 @@ bool Node::init() {
   }
 
   cs::PublicKey publicKey;
-  std::copy(myPublicForSig.begin(), myPublicForSig.end(), publicKey.begin());
+  std::copy(myPublicKeyForSignature_.begin(), myPublicKeyForSignature_.end(), publicKey.begin());
 
   cs::PrivateKey privateKey;
-  std::copy(myPrivateForSig.begin(), myPrivateForSig.end(), privateKey.begin());
+  std::copy(myPrivateKeyForSignature_.begin(), myPrivateKeyForSignature_.end(), privateKey.begin());
 
   solver_->setKeysPair(publicKey, privateKey);
   solver_->runSpammer();
@@ -120,10 +120,10 @@ bool Node::checkKeysFile() {
     pub.close();
     priv.close();
 
-    DecodeBase58(pub58, myPublicForSig);
-    DecodeBase58(priv58, myPrivateForSig);
+    DecodeBase58(pub58, myPublicKeyForSignature_);
+    DecodeBase58(priv58, myPrivateKeyForSignature_);
 
-    if (myPublicForSig.size() != 32 || myPrivateForSig.size() != 64) {
+    if (myPublicKeyForSignature_.size() != 32 || myPrivateKeyForSignature_.size() != 64) {
       cslog() << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit.";
 
       char gen_flag = 'a';
@@ -143,24 +143,24 @@ bool Node::checkKeysFile() {
 }
 
 void Node::generateKeys() {
-  myPublicForSig.clear();
-  myPrivateForSig.clear();
+  myPublicKeyForSignature_.clear();
+  myPrivateKeyForSignature_.clear();
 
   std::string pub58, priv58;
-  pub58  = EncodeBase58(myPublicForSig);
-  priv58 = EncodeBase58(myPrivateForSig);
+  pub58  = EncodeBase58(myPublicKeyForSignature_);
+  priv58 = EncodeBase58(myPrivateKeyForSignature_);
 
-  myPublicForSig.resize(32);
-  myPrivateForSig.resize(64);
+  myPublicKeyForSignature_.resize(32);
+  myPrivateKeyForSignature_.resize(64);
 
-  crypto_sign_keypair(myPublicForSig.data(), myPrivateForSig.data());
+  crypto_sign_keypair(myPublicKeyForSignature_.data(), myPrivateKeyForSignature_.data());
 
   std::ofstream f_pub("NodePublic.txt");
-  f_pub << EncodeBase58(myPublicForSig);
+  f_pub << EncodeBase58(myPublicKeyForSignature_);
   f_pub.close();
 
   std::ofstream f_priv("NodePrivate.txt");
-  f_priv << EncodeBase58(myPrivateForSig);
+  f_priv << EncodeBase58(myPrivateKeyForSignature_);
   f_priv.close();
 }
 
@@ -169,11 +169,11 @@ bool Node::checkKeysForSig() {
   uint8_t signature[64], public_key[32], private_key[64];
 
   for (size_t i = 0; i < 32; i++) {
-    public_key[i] = myPublicForSig[i];
+    public_key[i] = myPublicKeyForSignature_[i];
   }
 
   for (size_t i = 0; i < 64; i++) {
-    private_key[i] = myPrivateForSig[i];
+    private_key[i] = myPrivateKeyForSignature_[i];
   }
 
   unsigned long long sig_size;
@@ -196,6 +196,51 @@ bool Node::checkKeysForSig() {
   }
 
   return false;
+}
+
+void Node::blockchainSync() {
+  if (!isSyncroStarted_) {
+    if (roundNum_ != getBlockChain().getLastWrittenSequence() + 1) {
+      isSyncroStarted_ = true;
+      roundToSync_ = roundNum_;
+
+      sendBlockRequest(bc_.getLastWrittenSequence() + 1);
+    }
+  }
+}
+
+void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence) {
+  if (poolMetaMap_.count(sequence) == 0ul) {
+    poolMetaMap_.emplace(sequence, std::move(meta));
+    cslog() << "NODE> Put pool meta to temporary storage, await sync complection";
+  }
+  else {
+    cswarning() << "NODE> Can not add same pool meta sequence";
+  }
+}
+
+void Node::processMetaMap() {
+  cslog() << "NODE> Processing pool meta map";
+
+  for (auto& [sequence, meta] : poolMetaMap_) {
+    solver_->countFeesInPool(&meta.pool);
+    meta.pool.set_previous_hash(bc_.getLastWrittenHash());
+
+    getBlockChain().finishNewBlock(meta.pool);
+
+    if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
+      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+      writeBlock(meta.pool, sequence, meta.sender);
+    }
+    else {
+      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> remove wallets from wallets cache";
+
+      getBlockChain().removeWalletsInPoolFromCache(meta.pool);
+    }
+  }
+
+  poolMetaMap_.clear();
 }
 
 void Node::run() {
@@ -241,6 +286,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   transport_->clearTasks();
+
+  if (getBlockChain().getLastWrittenSequence() < roundNum_ - 1) {
+    return;
+  }
 
   // start round on node
   onRoundStart(roundTable);
@@ -899,7 +948,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
-  cslog() << "NODE> RoundTableUpdated";
+  cslog() << "NODE> RoundTable";
 
   cs::DataStream stream(data, size);
 
@@ -1038,6 +1087,19 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   conveyer.setCharacteristic(characteristic);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
+  if (isSyncroStarted_) {
+    if (pool) {
+      cs::PoolSyncMeta meta;
+      meta.sender = sender;
+      meta.signature = signature;
+      meta.pool = std::move(pool).value();
+
+      addPoolMetaToMap(std::move(meta), sequence);
+    }
+
+    return;
+  }
+
   if (pool) {
     solver_->countFeesInPool(&pool.value());
     pool.value().set_previous_hash(bc_.getLastWrittenHash());
@@ -1133,7 +1195,7 @@ void Node::applyNotifications() {
   cs::Solver::addTimestampToPool(pool.value()));
   #endif
 
-  pool.value().sign(myPrivateForSig);
+  pool.value().sign(myPrivateKeyForSignature_);
 
   // array
   cs::Signature poolSignature;
@@ -1455,9 +1517,9 @@ void Node::sendBlockRequest(uint32_t seq) {
   }
 
   //#endif
-  sendBlockRequestSequence = seq;
-  awaitingSyncroBlock = true;
-  awaitingRecBlockCount = 0;
+  sendBlockRequestSequence_ = seq;
+  isAwaitingSyncroBlock_ = true;
+  awaitingRecBlockCount_ = 0;
 
   csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
 }
@@ -1470,10 +1532,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   istream_.init(data, size);
   istream_ >> pool;
 
-  cslog() << "GETBLOCKREPLY> Getting block " << pool.sequence();
+  cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
 
-  if (pool.sequence() == sendBlockRequestSequence) {
-    cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
+  if (pool.sequence() == sendBlockRequestSequence_) {
+    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
   }
 
   transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
@@ -1482,20 +1544,24 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  if (pool.sequence() == sendBlockRequestSequence) {
-    cslog() << "GETBLOCKREPLY> Block Sequence is Ok";
-    solver_->gotBlockReply(std::move(pool));
-    awaitingSyncroBlock = false;
-    solver_->rndStorageProcessing();
+  if (pool.sequence() == sendBlockRequestSequence_) {
+    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
+
+    if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
+      bc_.onBlockReceived(pool);
+    }
+
+    isAwaitingSyncroBlock_ = false;
   }
   else {
     solver_->gotFreeSyncroBlock(std::move(pool));
   }
 
-  if (getBlockChain().getGlobalSequence() > getBlockChain().getLastWrittenSequence()) {  //&&(getBlockChain().getGlobalSequence()<=roundNum_))
+  if (roundToSync_ != bc_.getLastWrittenSequence()) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
-    syncro_started = false;
+    isSyncroStarted_ = false;
+    processMetaMap();
     cslog() << "SYNCRO FINISHED!!!";
   }
 }
@@ -1567,15 +1633,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
 #ifdef SYNCRO
-  if ((roundNum_ > getBlockChain().getLastWrittenSequence() + 1) || (getBlockChain().getBlockRequestNeed())) {
-    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
-    syncro_started = true;
-  }
-
-  if (roundNum_ == getBlockChain().getLastWrittenSequence() + 1) {
-    syncro_started = false;
-    awaitingSyncroBlock = false;
-  }
+  blockchainSync();
 #endif
 
   if (!sendingTimer_.isRunning()) {
@@ -1649,11 +1707,11 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
 }
 
 bool Node::getSyncroStarted() {
-  return syncro_started;
+  return isSyncroStarted_;
 }
 
 uint8_t Node::getConfidantNumber() {
-    return myConfidantIndex_;
+  return myConfidantIndex_;
 }
 
 void Node::processTimer() {
