@@ -445,26 +445,26 @@ void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& t
 }
 
 template <class... Args>
-bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
+bool Node::sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
   writeDefaultStream(stream, args...);
 
-  return sendDirect(sender, msgType, round, bytes);
+  return sendNeighbours(sender, msgType, round, bytes);
 }
 
-bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
+bool Node::sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ConnectionPtr connection = transport_->getConnectionByKey(sender);
 
   if (connection) {
-    sendDirect(connection, msgType, round, bytes);
+    sendNeighbours(connection, msgType, round, bytes);
   }
 
   return connection;
 }
 
-void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
+void Node::sendNeighbours(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round << bytes;
 
@@ -492,7 +492,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, c
   sendBroadcastImpl(msgType, round, bytes);
 }
 
-void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes, const cs::PublicKey& sender) {
+void Node::sendBroadcast(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
   csdebug() << "NODE> Sending data Broadcast to: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
@@ -513,7 +513,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber 
   ConnectionPtr connection = transport_->getRandomNeighbour();
 
   if (connection) {
-    sendDirect(connection, msgType, round, bytes);
+    sendNeighbours(connection, msgType, round, bytes);
   }
 
   return connection;
@@ -1295,7 +1295,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   const auto msgType = MsgTypes::TransactionsPacketRequest;
 
   const auto & general = cs::Conveyer::instance().roundTable().general;
-  const bool sendToGeneral = sendDirect(general, msgType, round, bytes);
+  const bool sendToGeneral = sendNeighbours(general, msgType, round, bytes);
 
   if (!sendToGeneral) {
     csdebug() << "NODE> Sending transaction packet request: Cannot get a connection with a general ";
@@ -1376,7 +1376,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   }
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
-  const bool success = sendDirect(sender, msgType, round, bytes);
+  const bool success = sendNeighbours(sender, msgType, round, bytes);
 
   if (!success) {
     csdebug() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
