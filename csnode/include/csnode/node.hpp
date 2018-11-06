@@ -248,9 +248,6 @@ private:
 
   /// sends transactions blocks to network
   cs::Timer sendingTimer_;
-
-  static const uint8_t broadcastFlag_ = BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
-  static const uint8_t directFlag_    = BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
