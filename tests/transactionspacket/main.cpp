@@ -8,56 +8,32 @@
 #include <csdb/currency.h>
 #include <sodium.h>
 
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+
 /*
-    Tests server
+    Tests cs node
 */
 BOOST_AUTO_TEST_SUITE(CsNodeTests)
 
     /*
-        Tests server
+        Tests transactions packet
     */
-    BOOST_AUTO_TEST_CASE(MainServerTests)
+    BOOST_AUTO_TEST_CASE(TransactionsPacketTests)
     {
-        std::cout << "\nLet the magic begin!\n\n";
-
-        cs::TransactionsPacket tp;
+        cs::TransactionsPacket packet;
 
         // test hash
-        std::cout << "create packet. is hash empty: " << std::boolalpha << tp.isHashEmpty() << "\n\n";
-        BOOST_CHECK(tp.isHashEmpty());
-
-        std::cout << "make hash: " << "\n";
-        tp.makeHash();
-        std::cout << "hash not empty: " << std::boolalpha << !tp.isHashEmpty() << "\n";
-        BOOST_CHECK(!tp.isHashEmpty());
-
-        // hash to String
-        auto & hash = tp.hash();
-        std::string hashStr = hash.toString();
-        std::cout << "hash.toString() representation \n";
-        std::cout << "hash size    : " << hash.size() << "\n";
-        std::cout << "hash         : " << hashStr << "\n\n";
-
-        // make hash from String
-        cs::TransactionsPacketHash tph;
-        BOOST_CHECK(tph.isEmpty());
-        tph = cs::TransactionsPacketHash::fromString(hashStr);
-        std::cout << "make new hash from old hash.toString() representation \n";
-        std::cout << "NewHash size : " << tph.size() << "\n";
-        std::cout << "NewHash      : " << tph.toString() << "\n\n";
-        BOOST_CHECK(hash == tph);
-
-        // make hash from Binary
-        cs::TransactionsPacketHash binHash = cs::TransactionsPacketHash::fromBinary(hash.toBinary());
-        std::cout << "make new hash from old fromBinary(hash.toBinary()) representation \n";
-        std::cout << "binHash size : " << binHash.size() << "\n";
-        std::cout << "binHash      : " << binHash.toString() << "\n\n";
-        BOOST_CHECK(hash.toBinary() == binHash.toBinary());
+        cslog() << "Create packet. Is hash empty: " << packet.isHashEmpty();
+        BOOST_CHECK(packet.isHashEmpty());
 
         // test transactions
-        std::cout << "old transactionsCount: " << tp.transactionsCount() << "\n";
+        const auto startMainHash = packet.hash();
+        const auto startMainTransactionsCount = packet.transactionsCount();
+        cslog() << "Main transactions count: " << startMainTransactionsCount;
+        cslog() << "Start hash     : " << startMainHash.toString();
 
-        auto start_address = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
+        auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
         std::vector<uint8_t> myPublicForSig;
         std::vector<uint8_t> myPrivateForSig;
         myPublicForSig.resize(32);
@@ -66,53 +42,86 @@ BOOST_AUTO_TEST_SUITE(CsNodeTests)
 
         csdb::Transaction transaction;
         transaction.set_target(csdb::Address::from_public_key((char*)myPublicForSig.data()));
-        transaction.set_source(start_address);
-
+        transaction.set_source(startAddress);
         transaction.set_currency(1);
         transaction.set_amount(csdb::Amount(10000, 0));
 
-        for (int i = 0; i < 15; ++i)
+        const std::size_t randomTransactionsCount = cs::Utils::generateRandomValue(3, 30);
+        const std::size_t startInnerID = cs::Utils::generateRandomValue(1, 2789);
+        cslog() << "Generate transactions count: " << randomTransactionsCount;
+
+        for (std::size_t i = 0; i < randomTransactionsCount; ++i)
         {
-            transaction.set_innerID(i + 2789);
-            tp.addTransaction(transaction);
+            transaction.set_innerID(i + startInnerID);
+            BOOST_CHECK(packet.addTransaction(transaction));
         }
 
         // test make hash
-        {
-            auto oldhash = tp.hash();
-            std::cout << "old hash     : " << oldhash.toString() << "\n";
-            tp.makeHash();
-            auto & newhash = tp.hash();
-            std::cout << "new transactionsCount: " << tp.transactionsCount() << "\n";
-            std::cout << "new hash     : " << newhash.toString() << "\n\n";
-            BOOST_CHECK(oldhash == newhash);
-        }
+        packet.makeHash();
+        cslog() << "Make hash: " << !packet.isHashEmpty();
+        BOOST_CHECK(!packet.isHashEmpty());
+        const auto mainHash = packet.hash();
+        const auto& maintransactionsCount = packet.transactionsCount();
+        cslog() << "New transactions count: " << maintransactionsCount;
+        cslog() << "New hash size : " << mainHash.size();
+        cslog() << "New hash : " << mainHash.toString();
+        BOOST_CHECK(startMainHash != mainHash);
+        BOOST_CHECK(startMainTransactionsCount != maintransactionsCount);
+
+        packet.makeHash();
+        BOOST_CHECK(mainHash == packet.hash());
+
+        // hash to String
+        const std::string mainHashStr = mainHash.toString();
+        cslog() << "Main hash string representation: " << mainHashStr;
+
+        const auto& mainHashBin = mainHash.toBinary();
+
+        // make hash from String
+        cs::TransactionsPacketHash hashFromString;
+        BOOST_CHECK(hashFromString.isEmpty());
+        hashFromString = cs::TransactionsPacketHash::fromString(mainHashStr);
+        cslog() << "Make new hash from string representation: " << hashFromString.toString();
+        cslog() << "Hash from string size : " << hashFromString.size();
+        BOOST_CHECK(mainHash == hashFromString);
+        BOOST_CHECK(mainHashBin == hashFromString.toBinary());
+
+        // make hash from Binary
+        cs::TransactionsPacketHash hashFromBinary = cs::TransactionsPacketHash::fromBinary(mainHashBin);
+        cslog() << "Make new hash from binary representation: " << hashFromBinary.toString();
+        cslog() << "Hash from binary size : " << hashFromBinary.size();
+        BOOST_CHECK(mainHash == hashFromBinary);
+        BOOST_CHECK(mainHashBin == hashFromBinary.toBinary());
+
+        const auto& mainPacketBin = packet.toBinary();
 
         // create TransactionsPacket from binary
-        cs::TransactionsPacket tpBin     = cs::TransactionsPacket::fromBinary(tp.toBinary());
-        auto &                 tpBinHash = tpBin.hash();
-        std::cout << "tpBin trans  : " << tpBin.transactionsCount() << "\n";
-        std::cout << "tpBin hash s : " << tpBinHash.size() << "\n";
-        std::cout << "tpBin hash   : " << tpBinHash.toString() << "\n\n";
-        BOOST_CHECK(tp.transactionsCount() == tpBin.transactionsCount());
-        BOOST_CHECK(tp.hash()              != tpBin.hash());
+        cs::TransactionsPacket packetFromBinary = cs::TransactionsPacket::fromBinary(packet.toBinary());
+        const auto& packetFromBinaryHash = packetFromBinary.hash();
+        cslog() << "Packet from binary transactions count: " << packetFromBinary.transactionsCount();
+        cslog() << "Packet from binary hash size: " << packetFromBinaryHash.size();
+        cslog() << "Packet from binary hash string: " << packetFromBinaryHash.toString();
+        BOOST_CHECK(packet.transactionsCount() == packetFromBinary.transactionsCount());
+        BOOST_CHECK(mainHash == packetFromBinaryHash);
+        BOOST_CHECK(mainHashBin == packetFromBinaryHash.toBinary());
+        BOOST_CHECK(mainPacketBin == packetFromBinary.toBinary());
 
         // test binary stream
-        cs::Bytes buffer  = tp.toBinary();
-        const size_t        rawSize = buffer.size();
-        void*               rawData = buffer.data();
-        std::cout << "tp    rawData Size : " << rawSize << "\n";
-        std::cout << "tpBin rawData Size : " << tpBin.toBinary().size() << "\n\n";
+        const size_t rawSize = mainPacketBin.size();
+        const void* rawData = mainPacketBin.data();
+        cslog() << "Main packet binary size : " << rawSize;
 
         // create TransactionsPacket from Byte Stream
-        cs::TransactionsPacket tpBinStream    = cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
-        auto&                  tpBinStremHash = tpBinStream.hash();
-        std::cout << "tpBinStream trans  : " << tpBinStream.transactionsCount() << "\n";
-        std::cout << "tpBinStream hash s : " << tpBinStremHash.size() << "\n";
-        std::cout << "tpBinStream hash   : " << tpBinStremHash.toString() << "\n\n";
-        BOOST_CHECK(tp.transactionsCount() == tpBinStream.transactionsCount());
-        BOOST_CHECK(tpBin.hash()           == tpBinStremHash);
-        BOOST_CHECK(tp.hash()              != tpBinStremHash);
+        cs::TransactionsPacket hashFromStream = cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
+        const auto& hashFromStreamHash = hashFromStream.hash();
+        cslog() << "Packet from stream transactions count: " << hashFromStream.transactionsCount();
+        cslog() << "Packet from stream hash size: " << hashFromStreamHash.size();
+        cslog() << "Packet from stream hash string: " << hashFromStreamHash.toString();
+        BOOST_CHECK(packet.transactionsCount() == hashFromStream.transactionsCount());
+        BOOST_CHECK(mainHash == hashFromStreamHash);
+        BOOST_CHECK(packetFromBinaryHash == hashFromStreamHash);
+        BOOST_CHECK(mainHashBin == hashFromStreamHash.toBinary());
+        BOOST_CHECK(mainPacketBin == hashFromStream.toBinary());
 
     }
 
