@@ -719,8 +719,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
 
-void
-APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction)
+void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction)
 {
   if (!transaction.__isset.smartContract)
     dumb_transaction_flow(_return, transaction);
