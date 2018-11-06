@@ -455,7 +455,6 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
 }
 
 bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
-#ifdef DIRECT_TRANSACTIONS_REQUEST
   ConnectionPtr connection = transport_->getConnectionByKey(sender);
 
   if (connection) {
@@ -463,16 +462,6 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
   }
 
   return connection;
-#else
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
-  ostream_ << msgType << round << bytes;
-
-  csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
-  csdebug() << "NODE> Sending data Direct: to " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  flushCurrentTasks();
-  return true;
-#endif
 }
 
 void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
@@ -1305,11 +1294,6 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
 
   const auto msgType = MsgTypes::TransactionsPacketRequest;
 
-#ifndef DIRECT_TRANSACTIONS_REQUEST
-  sendBroadcast(msgType, round, bytes);
-  return;
-#else
-
   const auto & general = cs::Conveyer::instance().roundTable().general;
   const bool sendToGeneral = sendDirect(general, msgType, round, bytes);
 
@@ -1317,8 +1301,6 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
     csdebug() << "NODE> Sending transaction packet request: Cannot get a connection with a general ";
     sendPacketHashesRequestToRandomNeighbour(hashes, round);
   }
-
-#endif
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
@@ -1332,8 +1314,6 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   const bool isHashesLess = hashesCount < neighboursCount;
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
   const std::size_t amountHashesOfRequest = isHashesLess ? hashesCount : (hashesCount / neighboursCount);
-
-  csdebug() << "NODE> Sending transaction packet request to Random Neighbour: needed hashes Count: " << hashesCount;
 
   auto getRequestBytes = [hashes](const std::size_t startHashNumber, const std::size_t hashesCount) -> cs::Bytes {
     cs::Bytes bytes;
@@ -1836,10 +1816,6 @@ void Node::writeDefaultStream(cs::DataStream& stream, const T& value) {
 void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_ << msgType << round << bytes;
 
-#ifdef DIRECT_TRANSACTIONS_REQUEST
   transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();
-#else
-  flushCurrentTasks();
-#endif
 }
