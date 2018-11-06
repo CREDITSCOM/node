@@ -12,11 +12,12 @@ add_executable(client
   src/main.cpp
 )
 
-target_link_libraries (client net csnode csconnector blake2 lib solver2)
+target_link_libraries (client csnode lib)
 
 target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../net/include)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/base58/include)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,33 +27,16 @@ set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 
 find_package (Threads)
-if (MSVC)
-  find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex log)
-  target_link_libraries (client
-                         Boost::system
-                         Boost::filesystem
-                         Boost::program_options
-                         Boost::date_time
-                         Boost::regex
-                         Boost::log
-                         Boost::disable_autolinking
-                         ${CMAKE_THREAD_LIBS_INIT}
-                         )
-else (MSVC)
-  # gcc doesnt resolve cycle dependencies automatically, so need to declare log_setup prior log
-  find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex log_setup log)
-  target_link_libraries (client
-                         Boost::system
-                         Boost::filesystem
-                         Boost::program_options
-                         Boost::date_time
-                         Boost::regex
-                         Boost::log_setup
-                         Boost::log
-                         Boost::disable_autolinking
-                         ${CMAKE_THREAD_LIBS_INIT}
-                         )
-endif (MSVC)
+find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex)
+target_link_libraries (client
+                       Boost::system
+                       Boost::filesystem
+                       Boost::program_options
+                       Boost::date_time
+                       Boost::regex
+                       Boost::disable_autolinking
+                       ${CMAKE_THREAD_LIBS_INIT}
+                       )
 
 if (NOT MSVC AND WITH_GPROF)
 add_definitions(-DBUILD_WITH_GPROF)

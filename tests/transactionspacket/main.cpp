@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <boost/test/unit_test.hpp>
-#include <csnode/transactionsPacket.h>
+#include <csnode/transactionspacket.h>
 #include <csdb/transaction.h>
 #include <csdb/address.h>
 #include <csdb/currency.h>
@@ -106,13 +106,13 @@ BOOST_AUTO_TEST_SUITE(CsNodeTests)
 
         // create TransactionsPacket from Byte Stream
         cs::TransactionsPacket tpBinStream    = cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
-        auto &                 tpBinStremHash = tpBinStream.hash();
+        auto&                  tpBinStremHash = tpBinStream.hash();
         std::cout << "tpBinStream trans  : " << tpBinStream.transactionsCount() << "\n";
         std::cout << "tpBinStream hash s : " << tpBinStremHash.size() << "\n";
         std::cout << "tpBinStream hash   : " << tpBinStremHash.toString() << "\n\n";
         BOOST_CHECK(tp.transactionsCount() == tpBinStream.transactionsCount());
-        BOOST_CHECK(tpBin.hash()           == tpBinStream.hash());
-        BOOST_CHECK(tp.hash()              != tpBinStream.hash());
+        BOOST_CHECK(tpBin.hash()           == tpBinStremHash);
+        BOOST_CHECK(tp.hash()              != tpBinStremHash);
 
     }
 

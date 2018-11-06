@@ -4,7 +4,7 @@
 
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -208,14 +208,21 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
+#ifdef MONITOR_NODE
+bool monitorNode = true;
+#else
+bool monitorNode = false;
+#endif
+
+void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
 
   cslog() << "NODE> Get Round Table";
 
   if (roundNum_ < rNum || type == MsgTypes::BigBang) {
     roundNum_ = rNum;
-  } else {
+  }
+  else {
     cswarning() << "Bad round number, ignoring";
     return;
   }
@@ -245,7 +252,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   });
 }
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
 
   if (rNum > lastBlock && rNum >= roundNum_) {
@@ -320,7 +327,7 @@ void Node::sendRoundTableRequest(size_t rNum) {
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
-  size_t rNum;
+  size_t rNum = 0u;
   istream_ >> rNum;
 
   if (rNum >= roundNum_) {
@@ -469,7 +476,7 @@ bool Node::sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, cons
 }
 
 void Node::sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
-  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round << bytes;
 
   csdebug() << "NODE> Sending data Direct: data size " << bytes.size();
@@ -489,26 +496,18 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, c
   sendBroadcast(msgType, round, bytes);
 }
 
+void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  csdebug() << "NODE> Sending data Broadcast";
+
+  sendBroadcastImpl(msgType, round, bytes);
+}
+
 void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes, const cs::PublicKey& sender) {
-  const uint8_t initFlags = BaseFlags::Fragmented | BaseFlags::Compressed;
+  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
+  csdebug() << "NODE> Sending data Broadcast to: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  if (sender.empty()) {
-    ostream_.init(initFlags, sender);
-    csdebug() << "NODE> Sending data Broadcast to: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-  }
-  else {
-    ostream_.init(BaseFlags::Broadcast | initFlags);
-    csdebug() << "NODE> Sending data Broadcast";
-  }
-
-  ostream_ << msgType << round << bytes;
-
-#ifdef DIRECT_TRANSACTIONS_REQUEST
-  transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
-  ostream_.clear();
-#else
-  flushCurrentTasks();
-#endif
+  sendBroadcastImpl(msgType, round, bytes);
 }
 
 template <class... Args>
@@ -556,7 +555,7 @@ void Node::getVectorRequest(const uint8_t* data, const size_t size) {
 
   istream_.init(data, size);
 
-  int num;
+  int num = 0;
   istream_ >> num;
 
   if (num == 1) {
@@ -849,7 +848,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   processTransactionsPacket(std::move(packet));
 }
 
-void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cs::DataStream stream(data, size);
 
   std::size_t hashesCount = 0;
@@ -877,40 +876,40 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
-  if (cs::Conveyer::instance().isSyncCompleted()) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+  if (cs::Conveyer::instance().isSyncCompleted(round)) {
+    csdebug() << "NODE> Sync packets already synced";
     return;
   }
 
   cs::DataStream stream(data, size);
 
-  cslog() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
   std::size_t packetsCount = 0;
-
   stream >> packetsCount;
 
   cs::Packets packets;
   packets.reserve(packetsCount);
 
-  for (auto i = 0; i < packetsCount; ++i) {
+  for (std::size_t i = 0; i < packetsCount; ++i) {
     cs::TransactionsPacket packet;
     stream >> packet;
 
-    packets.push_back(std::move(packet));
+    if (!packet.transactions().empty()) {
+      packets.push_back(std::move(packet));
+    }
   }
 
-  cslog() << "NODE> Hashes reply got packet hashes count: " << packetsCount;
-
-  if (packetsCount != packets.size()) {
-    cserror() << "Bad packets created";
+  if (packets.size() != packetsCount) {
+    cserror() << "NODE> Packet hashes reply, bad packets parsing";
     return;
   }
+
+  csdebug() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   processPacketsReply(std::move(packets), round);
 }
 
-void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
+void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
   cslog() << "NODE> RoundTableUpdated";
 
   cs::DataStream stream(data, size);
@@ -965,22 +964,23 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   solver_->gotRound();
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cslog() << "NODE> Characteric has arrived";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!conveyer.isSyncCompleted()) {
+  if (!conveyer.isSyncCompleted(round)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
     characteristicBytes.assign(data, data + size);
 
-    cs::CharacteristicMeta meta;
-    meta.bytes = std::move(characteristicBytes);
-    meta.round = conveyer.roundTable().round;
-    meta.sender = sender;
+    cs::CharacteristicMetaStorage::MetaElement metaElement;
+    metaElement.meta.bytes = std::move(characteristicBytes);
+    metaElement.meta.sender = sender;
+    metaElement.round = conveyer.currentRoundNumber();
 
-    conveyer.addCharacteristicMeta(meta);
+    conveyer.addCharacteristicMeta(std::move(metaElement));
+    return;
   }
 
   cs::DataStream stream(data, size);
@@ -1060,6 +1060,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> remove wallets from wallets cache";
+      getBlockChain().removeWalletsInPoolFromCache(pool.value());
     }
   }
 }
@@ -1373,14 +1375,13 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   cs::Timer::singleShot(cs::PacketHashesRequestDelay, [round, this] {
                           const cs::Conveyer& conveyer = cs::Conveyer::instance();
                           if (!conveyer.isSyncCompleted()) {
-                            sendPacketHashesRequestToRandomNeighbour(conveyer.neededHashes(), round);
+                            sendPacketHashesRequestToRandomNeighbour(conveyer.currentNeededHashes(), round);
                           };
                        });
 }
 
 void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (packets.empty()) {
-    cswarning() << "NODE> Send transaction packet reply with empty packets failed";
     return;
   }
 
@@ -1409,7 +1410,7 @@ void Node::resetNeighbours() {
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  uint32_t requested_seq;
+  uint32_t requested_seq = 0u;
 
   istream_.init(data, size);
   istream_ >> requested_seq;
@@ -1462,7 +1463,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
       csdebug() << "Sending request for block " << reqSeq << " from nbr " << requestee->id;
-      ostream_.init(BaseFlags::Direct | BaseFlags::Signed);
+      ostream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
       if (lfReq == reqSeq && ++lfTimes >= 4)
@@ -1521,9 +1522,12 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& sender) {
   ConnectionPtr conn = transport_->getConnectionByKey(sender);
-  if (!conn) return;
+  if (!conn) {
+    LOG_WARN("Cannot get a connection with a specified public key");
+    return;
+  }
 
-  ostream_.init(BaseFlags::Direct | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
   transport_->deliverDirect(ostream_.getPackets(),
                             ostream_.getPacketsCount(),
@@ -1542,7 +1546,7 @@ void Node::becomeWriter() {
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
-    solver_->sendTL();
+    solver_->sendTL();  // TODO: check this
   }
 
   cslog() << "======================================== ROUND " << roundTable.round
@@ -1610,15 +1614,14 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   csdebug() << "NODE> Processing packets sync request";
 
   cs::Packets packets;
-  packets.reserve(hashes.size());
 
   const auto& conveyer = cs::Conveyer::instance();
 
-  for (const auto& hash : hashes){
+  for (const auto& hash : hashes) {
     std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
 
     if (packet) {
-      packets.push_back(std::move(packet.value()));
+      packets.push_back(std::move(packet).value());
     }
   }
 
@@ -1630,24 +1633,18 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  for (auto& packet : packets) {
-    conveyer.addFoundPacket(std::move(packet));
+  for (auto&& packet : packets) {
+    conveyer.addFoundPacket(round, std::move(packet));
   }
 
-  if (conveyer.isSyncCompleted()) {
+  if (conveyer.isSyncCompleted(round)) {
     csdebug() << "NODE> Packets sync completed";
     resetNeighbours();
     solver_->gotRound();
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-
-      if (meta->round != 0) {
-        getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
-      }
-      else {
-        csfatal() << "NODE> Can not call node get characteristic method";
-      }
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
     }
   }
 }
@@ -1667,7 +1664,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
   else {
     csdebug() << "NODE> Sending packet hashes request";
-    sendPacketHashesRequest(conveyer.neededHashes(), roundNum_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
 
@@ -1680,7 +1677,7 @@ uint8_t Node::getConfidantNumber() {
 }
 
 void Node::processTimer() {
-  const auto round = cs::Conveyer::instance().roundNumber();
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   if (myLevel_ != NodeLevel::Normal || round <= cs::TransactionsFlushRound) {
     return;
@@ -1699,7 +1696,7 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
   onRoundStart(roundTable);
 }
 
-Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
+Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
   if (type == MsgTypes::NewCharacteristic && rNum <= roundNum_) {
     return MessageActions::Process;
   }
@@ -1805,7 +1802,7 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
-const char* getNodeLevelString(NodeLevel nodeLevel) {
+static const char* nodeLevelToString(NodeLevel nodeLevel) {
   switch (nodeLevel) {
   case NodeLevel::Normal:
     return "Normal";
@@ -1816,15 +1813,14 @@ const char* getNodeLevelString(NodeLevel nodeLevel) {
   case NodeLevel::Writer:
     return "Writer";
   }
+
   return "UNKNOWN";
 }
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel) {
-  os << getNodeLevelString(nodeLevel);
+  os << nodeLevelToString(nodeLevel);
   return os;
 }
-
-
 
 template <class T, class... Args>
 void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args) {
@@ -1835,4 +1831,15 @@ void Node::writeDefaultStream(cs::DataStream& stream, const T& value, const Args
 template<class T>
 void Node::writeDefaultStream(cs::DataStream& stream, const T& value) {
   stream << value;
+}
+
+void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
+  ostream_ << msgType << round << bytes;
+
+#ifdef DIRECT_TRANSACTIONS_REQUEST
+  transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
+  ostream_.clear();
+#else
+  flushCurrentTasks();
+#endif
 }

@@ -10,7 +10,7 @@ set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem thread)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -38,7 +38,7 @@ add_library(csnode
   include/csnode/dynamicbuffer.h
   include/csnode/threading.hpp
   include/csnode/nodecore.h
-  include/csnode/conveyer.h
+  include/csnode/conveyer.hpp
   include/csnode/transactionspacket.h
   include/csnode/TransactionsTail.h
   include/csnode/WalletsCache.h
@@ -58,7 +58,7 @@ add_library(csnode
   src/BlockHashes.cpp
 )
 
-target_link_libraries (csnode net csdb solver2 base58 lz4 Boost::thread)
+target_link_libraries (csnode net csdb solver2 lib base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include

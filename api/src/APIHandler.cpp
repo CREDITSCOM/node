@@ -470,6 +470,15 @@ APIHandler::TransactionsGet(TransactionsGetResult& _return,
 
   _return.transactions = convertTransactions(transactions);
 
+
+  //for test
+  /*MembersSmartContractGetResult ret;
+  api::TransactionId api_id;
+  api_id.index = transactions.back().id().index();
+  api_id.poolHash = fromByteArray(transactions.back().id().pool_hash().to_binary());
+  MembersSmartContractGet(ret, api_id);*/
+   //
+
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -592,26 +601,60 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
-/*void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction)
+void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) {
+  auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
+  auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+  auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
+  auto smart = fetch_smart_body(transaction);
+  auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
+  auto api_addr = transaction.source().to_api_addr();
+
+  executor::APIResponse api_resp;
+  //name
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
+  _return.name = api_resp.ret_val.v_string;
+  //decimal
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
+  _return.decimal = api_resp.ret_val.v_string;
+  //total coins
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
+  _return.totalCoins = api_resp.ret_val.v_string;
+  //symbol
+  api_resp.ret_val.v_string.clear();
+  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
+  _return.symbol = api_resp.ret_val.v_string;
+  //owner
+  _return.owner = api_resp.contractVariables["owner"].v_string;
+}
+
+api::TransactionId api_id;
+void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction)
 {
   auto input_smart = transaction.smartContract;
-  auto send_transaction = make_transaction(transaction);
+  csdb::Transaction send_transaction = make_transaction(transaction);
   const auto smart_addr = send_transaction.target();
-
   bool deploy = is_smart_deploy(input_smart);
   if (!deploy) {
-    input_smart.byteCode.clear();
-    input_smart.sourceCode.clear();
+    input_smart.byteCode = std::string();
+    input_smart.sourceCode = std::string();
   }
 
   bool present = false;
   std::string origin_bytecode;
   {
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
+    if (smart_addr.is_wallet_id()) {
+      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(smart_addr).to_api_addr().data());
+      if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(smart_addr)))
+        return;
+    }
+
     auto it = smart_origin->find(smart_addr);
-    if (it != smart_origin->end()) {
-      present = true;
-      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+    if ((present = (it != smart_origin->end()))) {
+      origin_bytecode =
+        fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
     }
   }
 
@@ -621,6 +664,7 @@ operator<<(std::ostream& s, const T& t)
   }
 
   const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
+  bool amnesia = input_smart.forgetNewState;
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
     auto smart_state(locked_ref(this->smart_state));
@@ -628,6 +672,7 @@ operator<<(std::ostream& s, const T& t)
   }();
 
   std::string contract_state;
+
   work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
     contract_state_entry.get_position();
     return true;
@@ -637,17 +682,21 @@ operator<<(std::ostream& s, const T& t)
     contract_state_entry.wait_till_front([&](std::string& state) {
       auto res = !state.empty();
       if (res)
-      contract_state = state;
+        contract_state = state;
       return res;
     });
   }
 
+  bool trxn_sent = false;
   auto sg = scopeGuard([&]() {
-    auto fun = [&]() -> decltype(auto) { return std::move(contract_state); };
-    contract_state_entry.update_state(fun);
+    if (!trxn_sent) {
+      auto fun = [&]() -> decltype(auto) { return std::move(contract_state); };
+      contract_state_entry.update_state(fun);
+    }
   });
 
   executor::APIResponse api_resp;
+
   while (!executor_transport->isOpen()) {
     executor_transport->open();
   }
@@ -674,163 +723,10 @@ operator<<(std::ostream& s, const T& t)
   if ((_return.__isset.smart_contract_result = api_resp.__isset.ret_val)) // non-bug = instead of ==
     _return.smart_contract_result = api_resp.ret_val;
 
-  if (input_smart.forgetNewState) {
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
-    return;
-  }
-
-  send_transaction.add_user_field(0, serialize(transaction.smartContract));
-  send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
-  solver.send_wallet_transaction(send_transaction);
-
-  if (deploy)
-    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
-
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
-}*/
-
-void
-APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
-                                   const Transaction& transaction)
-{
-  auto input_smart = transaction.smartContract;
-  //TRACE('\n', '\t', "transaction =", transaction);
-
-  csdb::Transaction send_transaction = make_transaction(transaction);
-
-  const auto smart_addr = send_transaction.target();
-
-  bool deploy = is_smart_deploy(input_smart);
-  if (!deploy) {
-    input_smart.byteCode = std::string();
-    input_smart.sourceCode = std::string();
-  }
-
-  //TRACE("");
-
-  bool present = false;
-  std::string origin_bytecode;
-  {
-    //TRACE("");
-    decltype(auto) smart_origin = locked_ref(this->smart_origin);
-    //TRACE("");
-    auto it = smart_origin->find(smart_addr);
-    if ((present = (it != smart_origin->end()))) {
-      origin_bytecode =
-        fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
-    }
-  }
-
-  if (present == deploy) {
-    //TRACE("");
-    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    return;
-  }
-
-  const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
-
-  bool amnesia = input_smart.forgetNewState;
-
-  auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
-    //TRACE("");
-    auto smart_state(locked_ref(this->smart_state));
-    //TRACE("");
-    return (*smart_state)[smart_addr];
-  }();
-
-  std::string contract_state;
-
-  //TRACE("");
-
-  work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
-    //TRACE("");
-    contract_state_entry.get_position();
-    //TRACE("");
-    return true;
-  });
-
-  //TRACE("");
-  if (!deploy) {
-    //TRACE("");
-    contract_state_entry.wait_till_front([&](std::string& state) {
-      //TRACE("");
-      auto res = !state.empty();
-      if (res) {
-        //TRACE
-        contract_state = state;
-        //contract_state = std::move(state);
-        //state.clear();
-      }
-      //TRACE("");
-      return res;
-    });
-  }
-
-  bool trxn_sent = false;
-  auto sg = scopeGuard([&]() {
-    if (!trxn_sent) {
-      //TRACE("");
-      auto fun = [&]() -> decltype(auto) {
-        //TRACE("");
-        return std::move(contract_state);
-      };
-      contract_state_entry.update_state(fun);
-    }
-  });
-
-  executor::APIResponse api_resp;
-
-  //TRACE("");
-
-  while (!executor_transport->isOpen()) {
-    executor_transport->open();
-  }
-
-  Address pk_source;
-  csdb::Address res_addr;
-  WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
-  if (transaction.source.size() == PUBLIC_KEY_LENGTH)
-    pk_source = transaction.source;
-  else if (s_blockchain.findAddrByWalletId(id, res_addr))
-    pk_source = res_addr.to_api_addr();
-  else {
-    LOG_ERROR("Public key of wallet not found by walletId");
-    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-  }
-  executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
-
-  //TRACE("");
-  //executor.executeByteCode(api_resp,
-  //                         transaction.source,
-  //                         bytecode,
-  //                         contract_state,
-  //                         input_smart.method,
-  //                         input_smart.params);
-
-  //TRACE("");
-
-  if (api_resp.code) {
-    //TRACE("");
-    _return.status.code = api_resp.code;
-    _return.status.message = api_resp.message;
-    return;
-  }
-
-  if ((_return.__isset.smart_contract_result =
-         api_resp.__isset.ret_val)) { // non-bug = instead of ==
-    //TRACE("");
-    _return.smart_contract_result = api_resp.ret_val;
-  }
-
-  //TRACE("");
-
   if (amnesia) {
-    //TRACE("");
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
   }
-
-  //TRACE("");
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
@@ -838,19 +734,11 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
 
   trxn_sent = true;
 
-  //TRACE("");
-
   if (deploy) {
-    //TRACE("");
-    contract_state_entry.wait_till_front([&](std::string& state) {
-      //TRACE("");
-      return !state.empty();
-    });
+    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
   }
-  //TRACE("");
-  SetResponseStatus(_return.status,
-                    APIRequestStatusType::SUCCESS,
-                    get_delimited_transaction_sighex(send_transaction));
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
 
 void
@@ -1065,6 +953,14 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     auto smart = fetch_smart(tr);
     auto address = tr.target();
 
+    //convert to public key
+    if (address.is_wallet_id()) {
+      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(address.to_api_addr().data());
+      if (!s_blockchain.findAddrByWalletId(id, address))
+        return false;
+    }
+    //
+
     if (!init) {
       auto& e = [&]() -> decltype(auto) {
         auto smart_last_trxn = locked_ref(this->smart_last_trxn);
@@ -1092,8 +988,19 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         (*smart_origin)[address] = tr.id();
       }
       {
+        csdb::Address pk_addr;
+        if (tr.source().is_public_key())
+          pk_addr = tr.source();
+        else {
+          WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(tr.source().to_api_addr().data());
+          if (!s_blockchain.findAddrByWalletId(id, pk_addr))
+            return false;
+        }
         auto deployed_by_creator = locked_ref(this->deployed_by_creator);
-        (*deployed_by_creator)[tr.source()].push_back(tr.id());
+        (*deployed_by_creator)[pk_addr].push_back(tr.id());
+
+        //auto deployed_by_creator = locked_ref(this->deployed_by_creator);
+        //(*deployed_by_creator)[tr.source()].push_back(tr.id());
       }
     }
     return true;

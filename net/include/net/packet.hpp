@@ -14,16 +14,18 @@
 #include <iostream>
 #include <memory>
 
+#include "lib/system/utils.hpp"
+
 namespace ip = boost::asio::ip;
 
 enum BaseFlags: uint8_t {
   NetworkMsg = 1,
   Fragmented = 1 << 1,
-  Broadcast  = 1 << 2,
+  Broadcast  = 1 << 2,     // send packet to neighbors, neighbors can resend it to others
   Compressed = 1 << 3,
   Encrypted  = 1 << 4,
   Signed     = 1 << 5,
-  Direct     = 1 << 6
+  Neighbors  = 1 << 6,     // send packet to neighbors only, neighbors _cant_ resend it
 };
 
 enum Offsets: uint32_t {
@@ -63,8 +65,6 @@ enum MsgTypes: uint8_t {
   WriterNotification
 };
 
-using RoundNum = uint32_t;
-
 class Packet {
 public:
   static const uint32_t MaxSize = 1 << 10;
@@ -80,7 +80,7 @@ public:
   bool isBroadcast() const { return checkFlag(BaseFlags::Broadcast); }
 
   bool isCompressed() const { return checkFlag(BaseFlags::Compressed); }
-  bool isDirect() const { return checkFlag(BaseFlags::Direct); }
+  bool isNeighbors() const { return checkFlag(BaseFlags::Neighbors); }
 
   const cs::Hash& getHash() const {
     if (!hashed_) {
@@ -92,7 +92,7 @@ public:
 
   bool addressedToMe(const cs::PublicKey& myKey) const {
     return
-      isNetwork() || isDirect() ||
+      isNetwork() || isNeighbors() ||
       (isBroadcast() && !(getSender() == myKey)) ||
       getAddressee() == myKey;
   }
@@ -109,7 +109,7 @@ public:
   const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); }
 
   MsgTypes getType() const { return getWithOffset<MsgTypes>(getHeadersLength()); }
-  RoundNum getRoundNum() const { return getWithOffset<RoundNum>(getHeadersLength() + 1); }
+  cs::RoundNumber getRoundNum() const { return getWithOffset<cs::RoundNumber>(getHeadersLength() + 1); }
 
   void* data() { return data_.get(); }
   const void* data() const { return data_.get(); }
@@ -143,7 +143,7 @@ public:
       size_t destSize = tempBuffer.size() - headerSize;
 
       auto compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
-      if (compressedSize > 0 && compressedSize < sourceSize) {
+      if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
         return std::move(boost::asio::buffer(dest, compressedSize + headerSize));
       } else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
@@ -172,7 +172,7 @@ public:
       size_t destSize = sizeof(dest) - headerSize;
 
       auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
-      if (uncompressedSize > 0 && uncompressedSize <= destSize) {
+      if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
         memcpy(source + headerSize, dest, uncompressedSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;

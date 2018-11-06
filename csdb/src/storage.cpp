@@ -525,14 +525,15 @@ Wallet Storage::wallet(const Address &addr) const
 bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const {
   Pool curPool;
   TransactionID::sequence_t curIdx = -1;
-  TransactionID last_trx_id = get_last_by_source(addr).id();
+  //TransactionID last_trx_id = get_last_by_source(addr).id();
+  curIdx = InnerId;
   bool is_in_blockchain = false;
 
-  if (last_trx_id.is_valid()) {
+  /*if (last_trx_id.is_valid()) {
     curPool = pool_load(last_trx_id.pool_hash());
     if (curPool.is_valid() && last_trx_id.index() < curPool.transactions_count())
       curIdx = last_trx_id.index();
-  }
+  }*/
 
   auto nextIt = [this, &curPool, &curIdx]() -> bool {
     if (curPool.is_valid()) {

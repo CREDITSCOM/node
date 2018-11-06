@@ -34,8 +34,8 @@ namespace cs
         };
 
         enum : unsigned int {
-            HashTablesStorageCapacity = 10,
-            CharacteristicMetaCapacity = HashTablesStorageCapacity
+            HashTablesStorageCapacity = 5,
+            CharacteristicMetaCapacity = HashTablesStorageCapacity,
         };
 
         ///
@@ -97,29 +97,28 @@ namespace cs
         /// @brief Returns current round number.
         /// Locks mutex and returns safe round number.
         ///
-         cs::RoundNumber roundNumber() const;
-
-        ///
-        /// @brief Returns safe copy of round table.
-        /// Locks mutex and returns deep copy of round table.
-        ///
-        const cs::RoundTable roundTableSafe() const;
+        cs::RoundNumber currentRoundNumber() const;
 
         ///
         /// @brief Returns current round needed hashes.
         ///
-        const cs::Hashes& neededHashes() const;
+        const cs::Hashes& currentNeededHashes() const;
 
         ///
         /// @brief Adds synced packet to conveyer.
         ///
-        void addFoundPacket(cs::TransactionsPacket&& packet);
+        void addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet);
 
         ///
-        /// @brief Returns state of current round hashes.
+        /// @brief Returns state of current round hashes sync.
         /// Checks conveyer needed round hashes on empty state.
         ///
         bool isSyncCompleted() const;
+
+        ///
+        /// @brief Returns state of arg round hashes sync.
+        ///
+        bool isSyncCompleted(cs::RoundNumber round) const;
 
         // writer notifications
 
@@ -151,7 +150,7 @@ namespace cs
         /// @brief Adds characteristic meta if early characteristic recevied from network.
         /// @param meta Created on network characteristic meta information.
         ///
-        void addCharacteristicMeta(const cs::CharacteristicMeta& meta);
+        void addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta);
 
         ///
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.

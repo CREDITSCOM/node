@@ -7,7 +7,7 @@
 #include <queue>
 
 #include <API.h>
-#include <csnode/conveyer.h>
+#include <csnode/conveyer.hpp>
 #include <solver2/SolverCore.h>
 #include <csstats.h>
 
@@ -130,6 +130,8 @@ class APIHandler : public APIHandlerInterface
     void TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) override;
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
+
+    void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) override;
 
   private:
     BlockChain& s_blockchain;

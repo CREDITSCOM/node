@@ -70,7 +70,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
   SpinLock l(nLockFlag_);
-  if (pack->isDirect()) {
+  if (pack->isNeighbors()) {
     for (auto& nb : neighbours_) {
       auto& bp = msgDirects_.tryStore(pack->getHash());
       bp.pack = *pack;
@@ -329,7 +329,9 @@ void Neighbourhood::gotConfirmation(const Connection::Id& my,
 
 void Neighbourhood::validateConnectionId(RemoteNodePtr node,
                                          const Connection::Id id,
-                                         const ip::udp::endpoint& ep) {
+                                         const ip::udp::endpoint& ep,
+                                         const cs::PublicKey& pk,
+                                         const uint32_t lastSeq) {
   SpinLock l1(mLockFlag_);
   SpinLock l2(nLockFlag_);
 
@@ -343,6 +345,8 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
         nConn->specialOut = true;
         nConn->out = nConn->in;
         nConn->in = ep;
+        nConn->key = pk;
+        nConn->lastSeq = lastSeq;
       }
     }
     else {
@@ -359,7 +363,12 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
       (*realPtr)->out = (*realPtr)->in;
     }
     (*realPtr)->in = ep;
+    (*realPtr)->key = pk;
+    (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
+  }
+  else {
+    (*realPtr)->lastSeq = lastSeq;
   }
 }
 
@@ -567,7 +576,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   alreadyRequested = false;
   ConnectionPtr candidate;
   for (auto& nb : neighbours_) {
-    if (nb->isSignal) continue;
+    if (nb->isSignal || nb->lastSeq < seq) continue;
     if (nb->syncSeq == seq) {
       if (nb->syncSeqRetries < MaxSyncAttempts) {
         alreadyRequested = true;
@@ -601,7 +610,7 @@ ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
   ConnectionPtr& candidate = *(neighbours_.begin() + candidateNumber);
 
   if (!candidate->syncNeighbourRetries) {
-    candidate->syncNeighbourRetries = cs::Utils::generateRandomValue(1, (MaxSyncAttempts * 3) + 1);
+    candidate->syncNeighbourRetries = cs::Utils::generateRandomValue(1, MaxSyncAttempts * 3);
   }
 
   --(candidate->syncNeighbourRetries);
