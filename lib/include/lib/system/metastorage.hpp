@@ -148,7 +148,7 @@ namespace cs
         ///
         /// @brief Returns and removes meta element if it's exists at round parameter.
         /// @param round Round number to get element from storage.
-        /// @return Returns meta element of storage if found, otherwise default constructed meta element.
+        /// @return Returns meta element of storage if found, otherwise returns nothing.
         ///.
         std::optional<T> extract(RoundNumber round)
         {
@@ -170,7 +170,7 @@ namespace cs
         /// @brief Returns reference to existing element, otherwise returns nullptr.
         /// @param round Round of searching element.
         /// @return Reference to element.
-        /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr
+        /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
         ///
         T* get(RoundNumber round)
         {

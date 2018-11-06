@@ -32,7 +32,7 @@ public:
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  cs::Hash buildVector(const cs::TransactionsPacket& packet);
+  cs::Hash buildVector(const cs::TransactionsPacket& packet, cs::Solver* solver);
 
   void addVector(const HashVector& vector);
   void addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes);

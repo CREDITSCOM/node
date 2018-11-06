@@ -214,7 +214,7 @@ bool monitorNode = true;
 bool monitorNode = false;
 #endif
 
-void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
+void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
 
   cslog() << "NODE> Get Round Table";
@@ -252,7 +252,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const RoundNu
   });
 }
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const RoundNum rNum, uint8_t type) {
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
 
   if (rNum > lastBlock && rNum >= roundNum_) {
@@ -848,7 +848,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   processTransactionsPacket(std::move(packet));
 }
 
-void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cs::DataStream stream(data, size);
 
   std::size_t hashesCount = 0;
@@ -874,7 +874,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const RoundNum round, const cs::PublicKey& sender) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     csdebug() << "NODE> Sync packets already synced";
     return;
@@ -907,7 +907,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   processPacketsReply(std::move(packets), round);
 }
 
-void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum round) {
+void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
   cslog() << "NODE> RoundTableUpdated";
 
   cs::DataStream stream(data, size);
@@ -962,11 +962,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const RoundNum 
   solver_->gotRound();
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cslog() << "NODE> Characteric has arrived";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!conveyer.isSyncCompleted()) {
+  if (!conveyer.isSyncCompleted(round)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
@@ -978,6 +978,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::P
     metaElement.round = conveyer.currentRoundNumber();
 
     conveyer.addCharacteristicMeta(std::move(metaElement));
+    return;
   }
 
   cs::DataStream stream(data, size);
@@ -1470,7 +1471,7 @@ void Node::becomeWriter() {
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
-    solver_->sendTL();
+    solver_->sendTL();  // TODO: check this
   }
 
   cslog() << "======================================== ROUND " << roundTable.round
@@ -1565,7 +1566,7 @@ void Node::processPacketsReply(std::vector<cs::TransactionsPacket>&& packets, co
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value())
     {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), meta->sender);
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
     }
   }
 }
@@ -1617,7 +1618,7 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
   onRoundStart(roundTable);
 }
 
-Node::MessageActions Node::chooseMessageAction(const RoundNum rNum, const MsgTypes type) {
+Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
   if (type == MsgTypes::NewCharacteristic && rNum <= roundNum_) {
     return MessageActions::Process;
   }

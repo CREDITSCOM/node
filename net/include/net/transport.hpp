@@ -107,7 +107,7 @@ class Transport {
   bool shouldSendPacket(const Packet&);
 
   void refillNeighbourhood();
-  void processPostponed(const RoundNum);
+  void processPostponed(const cs::RoundNumber);
 
   void sendRegistrationRequest(Connection&);
   void sendRegistrationConfirmation(const Connection&, const Connection::Id);
@@ -128,12 +128,12 @@ class Transport {
   void resetNeighbours();
 
  private:
-  void postponePacket(const RoundNum, const MsgTypes, const Packet&);
+  void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
   // Dealing with network connections
   bool parseSSSignal(const TaskPtr<IPacMan>&);
 
-  void dispatchNodeMessage(const MsgTypes, const RoundNum, const Packet&, const uint8_t* data, size_t);
+  void dispatchNodeMessage(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t);
 
   /* Network packages processing */
   bool gotRegistrationRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
@@ -195,11 +195,11 @@ class Transport {
   bool      acceptRegistrations_ = false;
 
   struct PostponedPacket {
-    RoundNum round;
+    cs::RoundNumber round;
     MsgTypes type;
     Packet   pack;
 
-    PostponedPacket(const RoundNum r, const MsgTypes t, const Packet& p)
+    PostponedPacket(const cs::RoundNumber r, const MsgTypes t, const Packet& p)
     : round(r)
     , type(t)
     , pack(p) {
@@ -220,7 +220,7 @@ class Transport {
   Node*    node_;
 
   Neighbourhood nh_;
-  FixedHashMap<cs::Hash, RoundNum, uint16_t, 10000> fragOnRound_;
+  FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, 10000> fragOnRound_;
 };
 
 #endif  // __TRANSPORT_HPP__

@@ -54,6 +54,11 @@ cs::PacketFlushSignal& cs::Conveyer::flushSignal()
 
 void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
 {
+    if (!transaction.is_valid()) {
+        cswarning() << "CONVEYER> Can not add no valid transaction to conveyer";
+        return;
+    }
+
     cs::Lock lock(m_sharedMutex);
 
     if (pimpl->transactionsBlock.empty() || (pimpl->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
@@ -199,7 +204,7 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
     auto pointer = pimpl->neededHashesMeta.get(round);
 
     if (!pointer) {
-        cserror() << "CONVEYER> Needed hashes of" + std::to_string(round) + " round not found";
+        cserror() << "CONVEYER> Needed hashes of" << round << " round not found";
         return false;
     }
 
@@ -348,7 +353,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const auto& writerPublicKey = sender;
     newPool.set_writer_public_key(csdb::internal::byte_array(writerPublicKey.begin(), writerPublicKey.end()));
 
-    return newPool;
+    return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
 std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
@@ -379,7 +384,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     return std::nullopt;
 }
 
-cs::SharedMutex &cs::Conveyer::sharedMutex() const
+cs::SharedMutex& cs::Conveyer::sharedMutex() const
 {
     return m_sharedMutex;
 }
@@ -396,15 +401,6 @@ void cs::Conveyer::flushTransactions()
         if ((transactionsCount != 0u) && packet.isHashEmpty())
         {
             packet.makeHash();
-
-            for (const auto& transaction : packet.transactions())
-            {
-                if (!transaction.is_valid())
-                {
-                    cswarning() << "CONVEYER > Can not send not valid transaction, sorry";
-                    continue;
-                }
-            }
 
             // try to send save in node
             pimpl->flushPacket(packet);

@@ -90,7 +90,3 @@ int main(int argc, char* argv[]) {
   logger::cleanup();
   return 0;
 }
-
-void sendInit() {
-
-}
