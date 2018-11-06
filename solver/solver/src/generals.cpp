@@ -40,7 +40,7 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
+cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* solver) {
   cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
@@ -60,24 +60,25 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet) {
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);
 
-#ifdef TRANSACTION_VALIDATION
     uint8_t del1;
-    csdb::Pool new_bpool;
-#endif
+    csdb::Pool newPool;
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = transactions[i];
-#ifdef TRANSACTION_VALIDATION
-      cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
-#else
-      cs::Byte byte = static_cast<cs::Byte>(transaction.is_valid());
-#endif
+      cs::Byte byte = 0;
+
+      if (solver) {
+        byte = static_cast<cs::Byte>(solver->checkTransactionSignature(transaction));
+
+        if (byte) {
+          byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
+        }
+      }
+
       characteristicMask.push_back(byte);
     }
 
-#ifdef TRANSACTION_VALIDATION
-    m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), new_bpool);
-#endif
+    m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), newPool);
 
     characteristic.mask = std::move(characteristicMask);
     conveyer.setCharacteristic(characteristic);
