@@ -1060,7 +1060,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
       if (!conn) return false;
 
       SpinLock l(oLock_);
-      oPackStream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
+      oPackStream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
       oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
       sendDirect(oPackStream_.getPackets(), *conn);
       oPackStream_.clear();
