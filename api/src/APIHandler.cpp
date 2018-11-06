@@ -601,6 +601,17 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
+using transport_type = ::apache::thrift::transport::TTransport;
+void execute_by_code(::executor::ContractExecutorConcurrentClient& executor, std::shared_ptr<transport_type> _transport,
+	executor::APIResponse& resp, const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
+{
+  const auto deleter = [](transport_type* transport) {if (transport != nullptr) transport->close(); };
+  const auto transport = std::unique_ptr<transport_type, decltype(deleter)>(_transport.get(), deleter);
+  while (!transport->isOpen()) {
+    transport->open();
+  }
+  executor.executeByteCode(resp, address, code, state, method, params);
+}
 void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) {
   auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
   auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
@@ -611,19 +622,19 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
 
   executor::APIResponse api_resp;
   //name
-  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
+  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
   _return.name = api_resp.ret_val.v_string;
   //decimal
   api_resp.ret_val.v_string.clear();
-  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
+  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
   _return.decimal = api_resp.ret_val.v_string;
   //total coins
   api_resp.ret_val.v_string.clear();
-  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
+  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
   _return.totalCoins = api_resp.ret_val.v_string;
   //symbol
   api_resp.ret_val.v_string.clear();
-  executor.executeByteCode(api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
+  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
   _return.symbol = api_resp.ret_val.v_string;
   //owner
   _return.owner = api_resp.contractVariables["owner"].v_string;
@@ -646,17 +657,17 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   {
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
     if (smart_addr.is_wallet_id()) {
-      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(smart_addr).to_api_addr().data());
+    WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(smart_addr).to_api_addr().data());
       if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(smart_addr)))
-        return;
+      return;
     }
 
     auto it = smart_origin->find(smart_addr);
     if ((present = (it != smart_origin->end()))) {
       origin_bytecode =
         fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+      }
     }
-  }
 
   if (present == deploy) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
@@ -695,12 +706,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
   });
 
-  executor::APIResponse api_resp;
-
-  while (!executor_transport->isOpen()) {
-    executor_transport->open();
-  }
-
   Address pk_source;
   csdb::Address res_addr;
   WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
@@ -712,7 +717,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
-  executor.executeByteCode(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+
+  executor::APIResponse api_resp;
+  execute_by_code(executor, executor_transport, api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.code) {
     _return.status.code = api_resp.code;
