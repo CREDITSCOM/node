@@ -103,9 +103,9 @@ public:
 
   static void addTimestampToPool(csdb::Pool& pool);
 
-private:
-  cs::TransactionsPacket removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet);
+  bool checkTransactionSignature(const csdb::Transaction& transaction);
 
+private:
   cs::PublicKey m_publicKey;
   cs::PrivateKey m_privateKey;
 

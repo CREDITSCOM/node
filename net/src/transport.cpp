@@ -356,37 +356,37 @@ void Transport::processNodeMessage(const Message& msg) {
 
   switch (type) {
     case MsgTypes::BlockHash:
-      cslog() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
       break;
     case MsgTypes::BlockRequest:
-      cslog() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
       break;
     case MsgTypes::FirstTransaction:
-      cslog() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
       break;
     case MsgTypes::RequestedBlock:
-      cslog() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
       break;
     case MsgTypes::RoundTableSS:
-      cslog() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
       break;
     case MsgTypes::TransactionList:
-      cslog() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
       break;
     case MsgTypes::NewCharacteristic:
-      cslog() << "TRANSPORT> Process Node Message MSG: Characteristic received";
+      csdebug() << "TRANSPORT> Process Node Message MSG: Characteristic received";
       break;
     case MsgTypes::WriterNotification:
-      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+      csdebug() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
       break;
     case MsgTypes::BigBang:
-      cslog() << "TRANSPORT> Process Node Message MSG: BigBang ";
+      csdebug() << "TRANSPORT> Process Node Message MSG: BigBang ";
       break;
     case MsgTypes::TransactionsPacketRequest:
-      cslog() << "TRANSPORT> Process Node Message MSG: Transactions packet request";
+      csdebug() << "TRANSPORT> Process Node Message MSG: Transactions packet request";
       break;
     case MsgTypes::TransactionsPacketReply:
-      cslog() << "TRANSPORT> Process Node Message MSG: Transactions packet reply";
+      csdebug() << "TRANSPORT> Process Node Message MSG: Transactions packet reply";
       break;
   default:
       break;
@@ -430,37 +430,37 @@ void Transport::processNodeMessage(const Packet& pack) {
 
   switch (type) {
     case MsgTypes::BlockHash:
-      cslog() << "TRANSPORT> Process Node Message PKG: BlockHash ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: BlockHash ";
       break;
     case MsgTypes::BlockRequest:
-      cslog() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
       break;
     case MsgTypes::FirstTransaction:
-      cslog() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
       break;
     case MsgTypes::RequestedBlock:
-      cslog() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
       break;
     case MsgTypes::RoundTableSS:
-      cslog() << "TRANSPORT> Process Node Message PKG: RoundTable ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: RoundTable ";
       break;
     case MsgTypes::TransactionList:
-      cslog() << "TRANSPORT> Process Node Message PKG: TransactionList ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: TransactionList ";
       break;
     case MsgTypes::NewCharacteristic:
-      cslog() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
+      csdebug() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
       break;
     case MsgTypes::WriterNotification:
-      cslog() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+      csdebug() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
       break;
     case MsgTypes::BigBang:
-      cslog() << "TRANSPORT> Process Node Message PKG: BigBang ";
+      csdebug() << "TRANSPORT> Process Node Message PKG: BigBang ";
       break;
     case MsgTypes::TransactionsPacketRequest:
-      cslog() << "TRANSPORT> Process Node Message PKG: Transactions packet request";
+      csdebug() << "TRANSPORT> Process Node Message PKG: Transactions packet request";
       break;
     case MsgTypes::TransactionsPacketReply:
-      cslog() << "TRANSPORT> Process Node Message PKG: Transactions packet reply";
+      csdebug() << "TRANSPORT> Process Node Message PKG: Transactions packet reply";
       break;
     default:
       break;
@@ -502,7 +502,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
   postponed_[1] = *postponed_;
   postponed_[0] = &ppBuf;
 
-  cslog() << "TRANSPORT> POSTPHONED finish";
+  csdebug() << "TRANSPORT> POSTPHONED finish";
 }
 
 void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack,
@@ -512,6 +512,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return;
   }
 
+#ifdef CUT_PACKETS_ON_SYNCRO
   /// algorithm of slow node performance or lag detection
   constexpr size_t roundNumberLagLimit = 2;  // experimental
   const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
@@ -537,6 +538,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     csdebug() << "TRANSPORT> No command type choosen";
     return;
   }
+#endif
 
   switch(type) {
   case MsgTypes::RoundTableSS:

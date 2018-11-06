@@ -145,6 +145,7 @@ void Solver::gotRound() {
 
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
     cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
+      cs::SharedLock lock(cs::Conveyer::instance().sharedMutex());
       runConsensus();
     });
   }
@@ -180,23 +181,9 @@ void Solver::runConsensus() {
 
   cslog() << "SOLVER> Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
-  packet = removeTransactionsWithBadSignatures(packet);
+  m_feeCounter.CountFeesInPool(m_node, &packet);
 
-  // TODO: fix that
-  csdb::Pool pool;
-  pool.transactions() = packet.transactions();
-
-  m_feeCounter.CountFeesInPool(m_node, &pool);
-  packet.clear();
-
-  const auto& transactionsWithFees = pool.transactions();
-
-  // TODO: transaction can be without fee?
-  for (size_t i = 0; i < transactionsWithFees.size(); ++i) {
-    packet.addTransaction(transactionsWithFees[i]);
-  }
-
-  cs::Hash result = m_generals->buildVector(packet);
+  cs::Hash result = m_generals->buildVector(packet, this);
 
   m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
 
@@ -597,25 +584,19 @@ void Solver::addTimestampToPool(csdb::Pool& pool) {
   pool.add_user_field(0, std::to_string(count));
 }
 
-cs::TransactionsPacket Solver::removeTransactionsWithBadSignatures(const cs::TransactionsPacket& packet)
+bool Solver::checkTransactionSignature(const csdb::Transaction& transaction)
 {
-  cs::TransactionsPacket good_pool;
-  std::vector<csdb::Transaction> transactions = packet.transactions();
   BlockChain::WalletData data_to_fetch_pulic_key;
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    if (transactions[i].source().is_wallet_id()) {
-      m_node->getBlockChain().findWalletData(transactions[i].source().wallet_id(), data_to_fetch_pulic_key);
-      if (transactions[i].verify_signature(csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(),
-        data_to_fetch_pulic_key.address_.end()))) {
-        good_pool.addTransaction(transactions[i]);
-      }
-      continue;
-    }
-    if (transactions[i].verify_signature(transactions[i].source().public_key())) {
-      good_pool.addTransaction(transactions[i]);
-    }
+
+  if (transaction.source().is_wallet_id()) {
+    m_node->getBlockChain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+
+    csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
+                                          data_to_fetch_pulic_key.address_.end());
+    return transaction.verify_signature(byte_array);
   }
-  return good_pool;
+
+  return transaction.verify_signature(transaction.source().public_key());
 }
 
 }  // namespace cs
