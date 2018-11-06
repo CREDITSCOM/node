@@ -1381,7 +1381,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   if (!success) {
     csdebug() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-    sendBroadcast(msgType, round, bytes, sender);
+    sendBroadcast(sender, msgType, round, bytes);
   }
 }
 
