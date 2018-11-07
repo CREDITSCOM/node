@@ -82,6 +82,10 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 }
 }  // namespace
 
+Transport::~Transport() {
+  delete net_;
+}
+
 void Transport::run() {
   net_->sendInit();
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
@@ -561,14 +565,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
     return node_->getBlockReply(data, size);
-  case MsgTypes::ConsVectorRequest:
-    return node_->getVectorRequest(data, size);
-  case MsgTypes::ConsMatrixRequest:
-    return node_->getMatrixRequest(data, size);
-  case MsgTypes::RoundTableRequest:
-    return node_->getRoundTableRequest(data, size, firstPack.getSender());
-  case MsgTypes::NewBadBlock:
-    return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:

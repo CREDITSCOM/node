@@ -66,7 +66,7 @@ namespace cs
         ///
         /// @brief Returns current round transactions packet hash table.
         ///
-        const cs::TransactionsPacketHashTable& transactionsPacketTable() const;
+        const cs::TransactionsPacketTable& transactionsPacketTable() const;
 
         ///
         /// @brief Returns transactions block, first stage of conveyer.

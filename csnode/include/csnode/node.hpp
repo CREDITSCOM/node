@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -20,13 +21,14 @@
 #include "packstream.hpp"
 
 class Transport;
-namespace slv2 { class SolverCore; }
+
+namespace slv2 {
+  class SolverCore;
+}
 
 class Node {
 public:
-  static const std::string start_address_;
-public:
-  Node(const Config&);
+  explicit Node(const Config&);
   ~Node();
 
   bool isGood() const {
@@ -66,9 +68,6 @@ public:
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-
-  void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   // outcoming requests forming
   void sendVector(const cs::HashVector&);
@@ -83,12 +82,9 @@ public:
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
 
-  void sendBadBlock(const csdb::Pool& pool);
-
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
-  void sendWritingConfirmation(const cs::PublicKey& node);
   void sendRoundTable(const cs::RoundTable& round);
 
   template<class... Args>
@@ -104,12 +100,6 @@ public:
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-
-  void sendVectorRequest(const cs::PublicKey&);
-  void sendMatrixRequest(const cs::PublicKey&);
-
-  void getVectorRequest(const uint8_t* data, const size_t size);
-  void getMatrixRequest(const uint8_t* data, const size_t size);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -147,6 +137,7 @@ public:
   slv2::SolverCore* getSolver() {
     return solver_;
   }
+
   const slv2::SolverCore* getSolver() const {
     return solver_;
   }
@@ -168,6 +159,7 @@ private:
   void generateKeys();
   bool checkKeysForSig();
 
+  // pool sync helpers
   void blockchainSync();
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
@@ -181,6 +173,7 @@ private:
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
+  // pool compression helpers
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
@@ -215,7 +208,7 @@ private:
   std::string receviedTrxFileName_ = "rcvd.txt";
   std::string sentTrxFileName_ = "sent.txt";
 
-  // Current round state
+  // current round state
   cs::RoundNumber roundNum_ = 0;
   NodeLevel myLevel_;
 
@@ -224,6 +217,7 @@ private:
   // Resources
   BlockChain bc_;
 
+  // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
 

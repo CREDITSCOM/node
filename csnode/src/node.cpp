@@ -46,12 +46,12 @@ Node::Node(const Config& config):
   allocator_(1 << 24, 5),
   packStreamAllocator_(1 << 26, 5),
   ostream_(&packStreamAllocator_, myPublicKey_) {
-  good_ = init();
+    good_ = init();
 }
 
 Node::~Node() {
-  delete transport_;
   delete solver_;
+  delete transport_;
 }
 
 bool Node::init() {
@@ -345,26 +345,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
-void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  istream_.init(data, size);
-
-  size_t rNum = 0u;
-  istream_ >> rNum;
-
-  if (rNum >= roundNum_) {
-    return;
-  }
-
-  cslog() << "NODE> Get RT request from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
-  if (!istream_.good()) {
-    cswarning() << "Bad RoundTableRequest format";
-    return;
-  }
-
-  sendRoundTable(cs::Conveyer::instance().roundTable());
-}
-
 template <class... Args>
 bool Node::sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
   cs::Bytes bytes;
@@ -438,92 +418,6 @@ bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber 
   }
 
   return connection;
-}
-
-void Node::sendVectorRequest(const cs::PublicKey& node) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can send vectors";
-    return;
-  }
-
-  cslog() << "NODE> Sending vector request to  " << cs::Utils::byteStreamToHex(node.data(), node.size());
-
-  ostream_.init(BaseFlags::Signed, node);
-  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << 1;
-
-  flushCurrentTasks();
-}
-
-void Node::getVectorRequest(const uint8_t* data, const size_t size) {
-  cslog() << __func__;
-
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  cslog() << "NODE> Getting vector Request from ";  // byteStreamToHex(sender.str, 32) <<
-
-  istream_.init(data, size);
-
-  int num = 0;
-  istream_ >> num;
-
-  if (num == 1) {
-    sendVector(solver_->getMyVector());
-  }
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad vector packet format";
-    return;
-  }
-}
-
-void Node::sendWritingConfirmation(const cs::PublicKey& node) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cserror() << "Only confidant nodes can send confirmation of the Writer";
-    return;
-  }
-
-  cslog() << "NODE> Sending writing confirmation to  " << cs::Utils::byteStreamToHex(node.data(), node.size());
-
-  ostream_.init(BaseFlags::Signed, node);
-  ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getConfidantNumber();
-
-  flushCurrentTasks();
-}
-
-void Node::sendMatrixRequest(const cs::PublicKey& node) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cserror() << "Only confidant nodes can send vectors";
-    return;
-  }
-
-  cslog() << "NODE> Sending vector request to  " << cs::Utils::byteStreamToHex(node.data(), node.size());
-
-  ostream_.init(BaseFlags::Signed, node);
-  ostream_ << MsgTypes::ConsMatrixRequest << roundNum_ << 1;
-  flushCurrentTasks();
-}
-
-void Node::getMatrixRequest(const uint8_t* data, const size_t size) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  cslog() << "NODE> Getting matrix Request";
-
-  istream_.init(data, size);
-
-  int num;
-  istream_ >> num;
-
-  if (!istream_.good() || !istream_.end()) {
-    LOG_ERROR("Bad vector packet format");
-    return;
-  }
-
-  if (num == 1) {
-    sendMatrix(solver_->getMyMatrix());
-  }
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -651,37 +545,6 @@ void Node::sendBlock(const csdb::Pool& pool) {
   flushCurrentTasks();
 }
 
-void Node::getBadBlock(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ == NodeLevel::Writer) {
-    cswarning() << "Writer cannot get bad blocks";
-    return;
-  }
-
-  istream_.init(data, size);
-
-  csdb::Pool pool;
-  istream_ >> pool;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad block packet format";
-    return;
-  }
-
-  cslog() << "Got block of " << pool.transactions_count() << " transactions";
-
-  solver_->gotBadBlockHandler(std::move(pool), sender);
-}
-
-void Node::sendBadBlock(const csdb::Pool& pool) {
-  if (myLevel_ != NodeLevel::Writer) {
-    cserror() << "Only writer nodes can send bad blocks";
-    return;
-  }
-
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  composeMessageWithBlock(pool, MsgTypes::NewBadBlock);
-}
-
 void Node::getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   if (myLevel_ != NodeLevel::Writer) {
     return;
@@ -709,8 +572,6 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   istream_ >> bytes;
 
   cs::TransactionsPacket packet = cs::TransactionsPacket::fromBinary(bytes);
-
-  csdebug() << "NODE> Transactions amount got " << packet.transactionsCount();
 
   if (packet.hash().isEmpty()) {
     cswarning() << "Received transaction packet hash is empty";
@@ -1534,9 +1395,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
   }
 }
 
-void Node::processTransactionsPacket(cs::TransactionsPacket&& packet)
-{
-  csdebug() << "NODE> Process transaction packet";
+void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
   cs::Conveyer::instance().addTransactionsPacket(packet);
 }
 
