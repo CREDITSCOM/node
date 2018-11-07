@@ -137,7 +137,6 @@ namespace slv2
         cs::PublicKey getWriterPublicKey() const;
         bool getBigBangStatus();
         bool isPoolClosed() const;
-        void sendTL();
         NodeLevel nodeLevel() const;
         const cs::PublicKey& nodePublicKey() const;
         void countFeesInPool(csdb::Pool* pool);

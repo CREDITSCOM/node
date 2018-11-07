@@ -220,7 +220,7 @@ void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequ
 }
 
 void Node::processMetaMap() {
-  cslog() << "NODE> Processing pool meta map";
+  cslog() << "NODE> Processing pool meta map, map size: " << poolMetaMap_.size();
 
   for (auto& [sequence, meta] : poolMetaMap_) {
     solver_->countFeesInPool(&meta.pool);
@@ -229,7 +229,7 @@ void Node::processMetaMap() {
     getBlockChain().finishNewBlock(meta.pool);
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
-      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+      csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(meta.pool, sequence, meta.sender);
     }
     else {
@@ -301,17 +301,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   });
 }
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
-  uint32_t lastBlock = getBlockChain().getLastWrittenSequence();
-
-  if (rNum > lastBlock && rNum >= roundNum_) {
-    getRoundTableSS(data, size, rNum, type);
-    solver_->setBigBangStatus(true);
-  } else {
-    cslog() << "BigBang else";
-  }
-}
-
 void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << MsgTypes::RoundTable;
@@ -358,21 +347,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
-void Node::sendRoundTableRequest(size_t rNum) {
-  if (rNum < roundNum_) {
-    return;
-  }
-
-  cslog() << "rNum = " << rNum << ", real RoundNumber = " << roundNum_;
-
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::RoundTableRequest << roundNum_;
-
-  cslog() << "Sending RoundTable request";
-
-  flushCurrentTasks();
-}
-
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
@@ -391,106 +365,6 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
   }
 
   sendRoundTable(cs::Conveyer::instance().roundTable());
-}
-
-void Node::getTransaction(const uint8_t* data, const size_t size) {
-  if (solver_->getIPoolClosed()) {
-    return;
-  }
-
-  if (myLevel_ != NodeLevel::Main && myLevel_ != NodeLevel::Writer) {
-    return;
-  }
-
-  istream_.init(data, size);
-
-  csdb::Pool pool;
-  istream_ >> pool;
-
-  cslog() << "NODE> Transactions amount got " << pool.transactions_count();
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad transactions packet format";
-    return;
-  }
-
-  auto& trx = pool.transactions();
-  uint16_t i   = 0;
-
-  for (auto& tr : trx) {
-    cslog() << "NODE> Get transaction #:" << i << " from " << tr.source().to_string() << " ID= " << tr.innerID();
-
-    solver_->gotTransaction(std::move(tr));
-    i++;
-  }
-}
-
-void Node::getFirstTransaction(const uint8_t* data, const size_t size) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  istream_.init(data, size);
-
-  csdb::Transaction trans;
-  istream_ >> trans;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad transaction packet format";
-    return;
-  }
-
-  csdb::Pool pool_;
-  pool_.add_transaction(trans);
-
-  cslog() << "Got first transaction, initializing consensus...";
-}
-
-void Node::sendFirstTransaction(const csdb::Transaction& trans) {
-  if (myLevel_ != NodeLevel::Main) {
-    cserror() << "Only main nodes can initialize the consensus procedure";
-    return;
-  }
-
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::FirstTransaction << roundNum_ << trans;
-
-  flushCurrentTasks();
-}
-
-void Node::getTransactionsList(const uint8_t* data, const size_t size) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  csdb::Pool pool;
-  pool = csdb::Pool{};
-
-  cslog() << "Getting List: list size: " << size;
-
-  if (!((size == 0) || (size > 2000000000))) {
-    istream_.init(data, size);
-    istream_ >> pool;
-
-    if (!istream_.good() || !istream_.end()) {
-      cswarning() << "Bad transactions list packet format";
-      pool = csdb::Pool{};
-    }
-
-    cslog() << "Got full transactions list of " << pool.transactions_count();
-  }
-}
-
-void Node::sendTransactionList(const csdb::Pool& pool) {  //, const PublicKey& target) {
-  if ((myLevel_ == NodeLevel::Confidant) || (myLevel_ == NodeLevel::Normal)) {
-    LOG_WARN("Only main nodes can send transaction lists");
-    return;
-  }
-
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed | BaseFlags::Broadcast);
-  composeMessageWithBlock(pool, MsgTypes::TransactionList);
-
-  flushCurrentTasks();
 }
 
 template <class... Args>
@@ -617,44 +491,6 @@ void Node::sendWritingConfirmation(const cs::PublicKey& node) {
   ostream_ << MsgTypes::ConsVectorRequest << roundNum_ << getConfidantNumber();
 
   flushCurrentTasks();
-}
-
-void Node::sendTLRequest() {
-  if ((myLevel_ != NodeLevel::Confidant) || (roundNum_ < 2)) {
-    cserror() << "Only confidant nodes need TransactionList";
-    return;
-  }
-
-  const auto& mainNode = cs::Conveyer::instance().roundTable().general;
-
-  cslog() << "NODE> Sending TransactionList request to  " << cs::Utils::byteStreamToHex(mainNode.data(), mainNode.size());
-
-  ostream_.init(BaseFlags::Signed, mainNode);
-  ostream_ << MsgTypes::ConsTLRequest << getConfidantNumber();
-
-  flushCurrentTasks();
-}
-
-void Node::getTlRequest(const uint8_t* data, const size_t size) {
-  if (myLevel_ != NodeLevel::Main) {
-    cserror() << "Only main nodes can send TransactionList";
-    return;
-  }
-
-  cslog() << "NODE> Getting TransactionList request";
-
-  istream_.init(data, size);
-
-  uint8_t num;
-  istream_ >> num;
-
-  if (!istream_.good() || !istream_.end()) {
-    return;
-  }
-
-  if (num < cs::Conveyer::instance().roundTable().confidants.size()) {
-    sendMatrix(solver_->getMyMatrix());
-  }
 }
 
 void Node::sendMatrixRequest(const cs::PublicKey& node) {
@@ -1356,7 +1192,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
 
   const auto msgType = MsgTypes::TransactionsPacketRequest;
 
-  const auto & general = cs::Conveyer::instance().roundTable().general;
+  const auto& general = cs::Conveyer::instance().roundTable().general;
   const bool sendToGeneral = sendNeighbours(general, msgType, round, bytes);
 
   if (!sendToGeneral) {
@@ -1470,23 +1306,26 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 void Node::sendBlockRequest(uint32_t seq) {
   static uint32_t lfReq, lfTimes;
 
-  solver_->rndStorageProcessing();
   seq = getBlockChain().getLastWrittenSequence() + 1;
 
   csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
   csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
+
   if (gs == 0) {
     gs = roundNum_;
   }
+
   csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
   const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
   std::stringstream progress;
+
   if (syncStatus <= 100) {
     progress << "SYNC: [";
     for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
     for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
     progress << "] " << syncStatus << "%";
   }
+
   cslog() << progress.str();
 
   uint32_t reqSeq = seq;
@@ -1504,12 +1343,17 @@ void Node::sendBlockRequest(uint32_t seq) {
     }
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
-      csdebug() << "Sending request for block " << reqSeq << " from nbr " << requestee->id;
+      cslog() << "Sending request for block " << reqSeq << " from nbr " << requestee->id;
+
       ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
+
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
-      if (lfReq == reqSeq && ++lfTimes >= 4)
+
+      if (lfReq == reqSeq && ++lfTimes >= 4) {
         transport_->sendBroadcast(ostream_.getPackets());
+      }
+
       ostream_.clear();
     }
 
@@ -1521,7 +1365,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   isAwaitingSyncroBlock_ = true;
   awaitingRecBlockCount_ = 0;
 
-  csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
+  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << seq;
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
@@ -1533,10 +1377,6 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   istream_ >> pool;
 
   cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
-
-  if (pool.sequence() == sendBlockRequestSequence_) {
-    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
-  }
 
   transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
 
@@ -1561,6 +1401,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
     isSyncroStarted_ = false;
+    roundToSync_ = 0;
+
     processMetaMap();
     cslog() << "SYNCRO FINISHED!!!";
   }
@@ -1591,10 +1433,6 @@ void Node::becomeWriter() {
 }
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
-  if ((!solver_->isPoolClosed()) && (!solver_->getBigBangStatus())) {
-    solver_->sendTL();  // TODO: check this
-  }
-
   cslog() << "======================================== ROUND " << roundTable.round
           << " ========================================";
   cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());

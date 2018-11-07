@@ -419,7 +419,7 @@ void cs::Conveyer::flushTransactions()
             }
 
             if (pimpl->hashTable.count(hash) == 0u) {
-                pimpl->hashTable.emplace(hash, packet);
+                pimpl->hashTable.emplace(std::move(hash), std::move(packet));
             }
             else {
                 cserror() << "CONVEYER > Logical error, adding transactions packet more than one time";

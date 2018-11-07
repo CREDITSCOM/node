@@ -17,7 +17,6 @@ public:
 
   /* Incoming requests processing */
   MOCK_METHOD4(getRoundTable, void(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type));
-  MOCK_METHOD4(getBigBang, void(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type));
   MOCK_METHOD2(getTransaction, void(const uint8_t*, const size_t));
   MOCK_METHOD2(getFirstTransaction, void(const uint8_t*, const size_t));
   MOCK_METHOD2(getTransactionsList, void(const uint8_t*, const size_t));
@@ -69,13 +68,10 @@ public:
   MOCK_METHOD1(sendBlockRequest, void(uint32_t seq));
   MOCK_METHOD2(sendBlockReply, void(const csdb::Pool&, const cs::PublicKey&));
   MOCK_METHOD1(sendWritingConfirmation, void(const cs::PublicKey& node));
-  MOCK_METHOD1(sendRoundTableRequest, void(size_t rNum));
-//  MOCK_METHOD1(sendRoundTableUpdated, void(const cs::RoundInfo& round));
 
   MOCK_METHOD1(sendVectorRequest, void(const cs::PublicKey&));
   MOCK_METHOD1(sendMatrixRequest, void(const cs::PublicKey&));
 
-  MOCK_METHOD0(sendTLRequest, void());
   MOCK_METHOD2(getTlRequest, void(const uint8_t* data, const size_t size));
 
   MOCK_METHOD2(getVectorRequest, void(const uint8_t* data, const size_t size));
