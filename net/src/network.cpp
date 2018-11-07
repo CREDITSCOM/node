@@ -76,38 +76,6 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn,
   return result;
 } //resolve
 
-void Network::stop()
-{
-  transport_->clearTasks();
-  stopProcessorRoutine = true;
-  LOG_WARN("[WARNING] : [processorThread_ attempt to STOP]");
-  if (processorThread_.joinable()) {
-    std::cout << "processorThread join...\n" << std::flush;
-    processorThread_.join();
-  }
-
-  transport_->clearTasks();
-  stopReaderRoutine = true;
-  LOG_WARN("[WARNING] : [readerThread attempt to STOP]");
-  if (readerThread_.joinable()) {
-    std::cout << "readerThread join...\n" << std::flush;
-    readerThread_.join();
-  }
-  std::cout << "readerThread joined.\n" << std::flush;
-
-  transport_->clearTasks();
-  stopWriterRoutine = true;
-  LOG_WARN("[WARNING] : [writerThread_ attempt to STOP]");
-  if (writerThread_.joinable()) {
-    std::cout << "writerThread join...\n" << std::flush;
-    writerThread_.join();
-  }
-  std::cout << "writerThread joined.\n" << std::flush;
-  
-  std::cout << "processorThread joined.\n" << std::flush;
-  context_.stop();
-} // stop
-
 void Network::readerRoutine(const Config& config) {
   ip::udp::socket* sock =
       getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
@@ -141,9 +109,7 @@ void Network::readerRoutine(const Config& config) {
       LOG_ERROR("Cannot receive packet. Error " << lastError);
     }
   }
-  std::cout << "readerRoutine STOPPED!!!\n" << std::flush;
-  //sock->shutdown(boost::asio::ip::udp::socket::shutdown_receive);
-  sock->close();
+  LOG_WARN("readerRoutine STOPPED!!!\n");
 }
 
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
@@ -196,9 +162,7 @@ void Network::writerRoutine(const Config& config) {
       LOG_ERROR("Cannot send packet. Error " << lastError);
     }
   }
-  std::cout << "writerRoutine STOPPED!!!\n" << std::flush;
-  //sock->shutdown(boost::asio::ip::udp::socket::shutdown_send);
-  sock->close();
+  LOG_WARN("writerRoutine STOPPED!!!\n");
 }
 
 // Processors
@@ -255,7 +219,7 @@ void Network::processorRoutine() {
     transport_->redirectPacket(task->pack, remoteSender);
     ++recCounter;
   }
-  std::cout << "processorRoutine STOPPED!!!\n" << std::flush;
+  LOG_WARN("processorRoutine STOPPED!!!\n");
 }
 
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
@@ -358,6 +322,5 @@ Network::~Network() {
   if (processorThread_.joinable()) {
     processorThread_.join();
   }
-  //auto sockPtr = singleSock_.load();
-  //delete sockPtr;
+  delete singleSock_.load();
 }

@@ -7,7 +7,11 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+// Variable to store Class signal status.
 volatile std::sig_atomic_t Transport::gSignalStatus = 0;
+
+// Extern function dfined in main.cpp to poll and handle signal status.
+extern void poll_signal_flag();
 
 enum RegFlags : uint8_t { UsingIPv6 = 1, RedirectIP = 1 << 1, RedirectPort = 1 << 2 };
 
@@ -98,7 +102,7 @@ void Transport::run() {
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
-  std::cout << "++++++++++++++++++++++++++++++++>>> Transport Run Task Start <<<+++++++++++++++++++++++++++++++++++++++++" << std::endl;
+  LOG_WARN("+++++++>>> Transport Run Task Start <<<+++++++++++++++");
 
   // Check if thread is requested to stop ?
   while (Transport::gSignalStatus == 0)
@@ -129,19 +133,10 @@ void Transport::run() {
     if (refreshLimits)
       nh_.refreshLimits();
 
+    poll_signal_flag();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
-  LOG_WARN("[WARNING] : [EXITED FROM WHILE]");
-  BlockChain& refBc = node_->getBlockChain();
-  auto bcStorage = refBc.getStorage();
-  bcStorage.close();
-  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
-  auto nodeSlv = node_->getSolver();
-  nodeSlv->finish();
-  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
-  net_->stop();
-  LOG_WARN("[WARNING] : [NETWORK STOPPED]");
-  LOG_WARN("[WARNING] : [EXITED Transport::run]");
+  LOG_WARN("[WARNING] : [Transport::run STOPED!]");
 }
 
 template <>

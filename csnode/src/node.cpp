@@ -193,15 +193,15 @@ bool Node::checkKeysForSig() {
 }
 
 void Node::run() {
-  runThr = std::thread([this]() {
-    transport_->run();
-  });
+  transport_->run();
 }
 
 void Node::stop() {
-  if (runThr.joinable()) {
-    runThr.join();
-  }
+  solver_->finish();
+  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
+  auto bcStorage = bc_.getStorage();
+  bcStorage.close();
+  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
 }
 
 /* Requests */

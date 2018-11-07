@@ -34,8 +34,6 @@ public:
     Success
   };
 
-  void stop();
-
 private:
   void readerRoutine(const Config&);
   void writerRoutine(const Config&);

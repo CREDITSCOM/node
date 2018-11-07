@@ -14,7 +14,6 @@
 
 
 volatile std::sig_atomic_t gSignalStatus = 0;
-bool whileNotFlag = true;
 static void stopNode() noexcept(false);
 
 #ifdef BUILD_WITH_GPROF
@@ -50,6 +49,7 @@ inline void mouseSelectionDisable() {
 #endif
 }
 
+#ifndef WIN32
 extern "C" void sig_handler(int sig) {
   gSignalStatus = 1;
   switch (sig)
@@ -69,7 +69,6 @@ extern "C" void sig_handler(int sig) {
   }
 }
 
-#ifndef WIN32
 void installSignalHandler() {
   if (SIG_ERR == std::signal(SIGTERM, sig_handler)) {
     // Handle error
@@ -100,8 +99,6 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
   case CTRL_C_EVENT:
     printf("Ctrl-C event\n\n");
     Beep(750, 300);
-    //std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-    //std::raise(SIGTERM);
     return TRUE;
 
   // CTRL-CLOSE: confirm that the user wants to exit. 
@@ -132,9 +129,9 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 }
 #endif // !WIN32
 
+// Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
   Transport::stop();
-  //std::this_thread::sleep_for(std::chrono::seconds(60));
 }
 
 // Called periodically to poll the signal flag.
@@ -143,12 +140,11 @@ void poll_signal_flag() {
     gSignalStatus = 0;
     try {
       stopNode();
-      whileNotFlag = false;
     }
     catch (...) {
       // Handle error
       LOG_ERROR("Poll signal error!");
-      std::raise(SIGTERM);
+      std::raise(SIGABRT);
     }
   }
 }
@@ -214,10 +210,6 @@ int main(int argc, char* argv[]) {
   }
     
   node.run();
-  LOG_WARN("+++++++++++++>>> NODE RUNNING! <<<++++++++++++++++++++++");
-  while (whileNotFlag) {
-    poll_signal_flag();
-  }
 
   LOG_WARN("+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++");
   node.stop();
@@ -227,5 +219,5 @@ int main(int argc, char* argv[]) {
   logger::cleanup();
 
   std::cout << "Logger cleaned" << std::endl;
-
+  std::_Exit(EXIT_SUCCESS);
 }
