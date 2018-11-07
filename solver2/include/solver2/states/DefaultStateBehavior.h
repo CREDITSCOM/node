@@ -2,10 +2,6 @@
 
 #include "../INodeState.h"
 
-#include <lib/system/keys.hpp>
-
-#include <vector>
-
 namespace slv2
 {
     /**
@@ -38,11 +34,22 @@ namespace slv2
         void expired(SolverContext& /*context*/) override
         {}
 
-        void onRoundEnd(SolverContext& /*context*/) override
-        {}
+        /**
+         * @fn  void DefaultStateBehavior::onRoundEnd(SolverContext& context, bool is_bigbang) override;
+         *
+         * @brief   Executes the round end action: stores block if write was deferred
+         *
+         * @author  Alexander Avramenko
+         * @date    24.10.2018
+         *
+         * @param [in,out]  context     The context.
+         * @param           is_bigbang  True if is bigbang, false if not.
+         */
+
+        void onRoundEnd(SolverContext& context, bool is_bigbang) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onRoundTable(SolverContext& context, const uint32_t round) override;
+         * @fn  Result DefaultStateBehavior::onRoundTable(SolverContext& context, const uint32_t round, bool is_bigbang) override;
          *
          * @brief   Executes the round table action. Signals for core to make transition on
          *          Event::RoundTable
@@ -50,24 +57,22 @@ namespace slv2
          * @author  aae
          * @date    01.10.2018
          *
-         * @param [in,out]  context The context.
-         * @param           round   The new round number.
+         * @param [in,out]  context     The context.
+         * @param           round       The new round number.
+         * @param           is_bigbang  True if is bigbang, false if not.
          *
          * @return  A Result::Finished value.
-         *
-         * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onRoundTable(SolverContext& context, const uint32_t round) override;
+        Result onRoundTable(SolverContext& context, const size_t round) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
          *
          * @brief   Do test of block received.
          *          
-         *          If OK stores block in chain storage. Must be overridden to send hash back to sender. Has to be invoked in overrides.
-         *          If overrides send hash of last block back to sender they MUST use last_block_sender protected data member instead of
-         *          method argument. It is caused by possible restoring of cached blocks
+         *          If OK stores block in chain storage. Has to be invoked in overrides.
+         *          Performs deferred block write. May be overridden to flush block immediately.
          *
          * @author  aae
          * @date    01.10.2018
@@ -81,48 +86,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
-         *
-         * @brief   Ignores vector received
-         *
-         * @author  aae
-         * @date    01.10.2018
-         *
-         * @param [in,out]  context The context.
-         * @param           vect    The vect.
-         * @param           sender  The sender.
-         *
-         * @return  A Result::Ignore value.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) override;
-
-        /**
-         * @fn  Result DefaultStateBehavior::onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
-         *
-         * @brief   Ignores the matrix received
-         *
-         * @author  aae
-         * @date    01.10.2018
-         *
-         * @param [in,out]  context The context.
-         * @param           matr    The matr.
-         * @param           sender  The sender.
-         *
-         * @return  A Result::Ignore value.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) override;
-
-        /**
-         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
          *
          * @brief   Ignores the hash received
          *
@@ -138,7 +105,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
+        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
 
         /**
          * @fn  Result DefaultStateBehavior::onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
@@ -174,12 +141,16 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
+        Result onTransactionList(SolverContext& context, csdb::Pool& pool) override;
+
+        Result onStage1(SolverContext& context, const Credits::StageOne& stage) override;
+        Result onStage2(SolverContext& context, const Credits::StageTwo& stage) override;
+        Result onStage3(SolverContext& context, const Credits::StageThree& stage) override;
 
     protected:
 
         /**
-         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& sender);
+         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& sender);
          *
          * @brief   Sends a last written hash to 
          *
@@ -190,7 +161,7 @@ namespace slv2
          * @param           target  The target receiver of hash sent.
          */
 
-        void sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target);
+        void sendLastWrittenHash(SolverContext& context, const PublicKey& target);
     };
 
 } // slv2

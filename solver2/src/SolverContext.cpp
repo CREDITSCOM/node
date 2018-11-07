@@ -1,6 +1,11 @@
 #include "SolverContext.h"
 #include "SolverCore.h"
-#include "Node.h"
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <csnode/node.hpp>
+#pragma warning(pop)
+
 #include <lib/system/logger.hpp>
 
 namespace slv2
@@ -10,21 +15,55 @@ namespace slv2
 		return core.pnode->getBlockChain();
 	}
 
+    void SolverContext::add_stage1(Credits::StageOne & stage, bool send)
+    {
+        //core.stageOneStorage.push_back(stage);
+        if(send) {
+            core.pnode->sendStageOne(stage);
+        }
+        /*the order is important! the signature is created in node 
+        before sending stage and then is inserted in the field .sig
+        now we can add it to stages storage*/
+        core.gotStageOne(stage);
+    }
+
+    void SolverContext::add_stage2(Credits::StageTwo& stage, bool send)
+    {
+        //core.stageTwoStorage.push_back(stage);
+
+        if(send) {
+            core.pnode->sendStageTwo(stage);
+        }
+        /*the order is important! the signature is created in node
+        before sending stage and then is inserted in the field .sig
+        now we can add it to stages storage*/
+        core.gotStageTwo(stage);
+    }
+
+    void SolverContext::add_stage3(Credits::StageThree& stage)
+    {
+        //core.stageThreeStorage.push_back(stage);
+
+        core.pnode->sendStageThree(stage);
+        /*the order is important! the signature is created in node
+        before sending stage and then is inserted in the field .sig
+        now we can add it to stages storage*/
+        core.gotStageThree(stage);
+    }
+
     size_t SolverContext::own_conf_number() const
     {
-        return (size_t) core.pnode->getConfidantNumber();
+        return (size_t) core.pnode->getMyConfNumber();
     }
 
     size_t SolverContext::cnt_trusted() const
     {
-        return 4;//core.pnode->getConfidants().size(); // vshilkin
+        return core.pnode->getConfidants().size();
     }
 
-    const std::vector<cs::PublicKey>& SolverContext::trusted() const
+    const std::vector<PublicKey>& SolverContext::trusted() const
     {
-//        return core.pnode->getConfidants(); // vshilkin
-      static std::vector<cs::PublicKey> tmp{};
-      return tmp;
+        return core.pnode->getConfidants();
     }
 
     void SolverContext::request_round_table() const
@@ -34,16 +73,14 @@ namespace slv2
 
     Role SolverContext::role() const
     {
-        auto v = core.pnode->getNodeLevel();
+        auto v = core.pnode->getMyLevel();
         switch(v) {
         case NodeLevel::Normal:
+        case NodeLevel::Main:
             return Role::Normal;
         case NodeLevel::Confidant:
-            return Role::Trusted;
-        case NodeLevel::Main:
-            return Role::Collect;
         case NodeLevel::Writer:
-            return Role::Write;
+            return Role::Trusted;
         default:
             break;
         }
@@ -54,10 +91,26 @@ namespace slv2
 
     void SolverContext::spawn_next_round()
     {
-        //core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash)); //vshilkin
+        if(Consensus::Log) {
+            if(core.trusted_candidates.empty()) {
+                LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
+            }
+        }
+        core.spawn_next_round(core.trusted_candidates);
     }
 
-	csdb::Address SolverContext::optimize(const csdb::Address& address) const
+    void SolverContext::spawn_first_round()
+    {
+        if(core.trusted_candidates.empty()) {
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: trusted candidates must be " << Consensus::MinTrustedNodes << " or greater to spawn first round");
+            }
+            return;
+        }
+        core.pnode->initNextRound(*core.trusted_candidates.cbegin(), std::move(core.trusted_candidates));
+    }
+
+    csdb::Address SolverContext::optimize(const csdb::Address& address) const
 	{
 		csdb::internal::WalletId id;
 		if (core.pnode->getBlockChain().findWalletId(address, id)) {
@@ -66,24 +119,46 @@ namespace slv2
 		return address;
 	}
 
-    void SolverContext::send_hash(const cs::Hash & hash, const cs::PublicKey & target)
+    void SolverContext::send_hash(const Hash & hash, const PublicKey & target)
     {
-//        core.pnode->sendHash(hash, target); // vshilkin
+        core.pnode->sendHash(hash, target);
     }
 
-    void SolverContext::send_own_vector()
+    bool SolverContext::test_trusted_idx(uint8_t idx, const PublicKey & sender)
     {
-        core.pnode->sendVector(core.getMyVector());
+        // vector<Hash> confidantNodes_ in Node actually stores PublicKey items :-)
+        const auto& trusted = core.pnode->getConfidants();
+        if(idx < trusted.size()) {
+            const auto& pk = *(trusted.cbegin() + idx);
+            return 0 == memcmp(pk.str, sender.str, sizeof(PublicKey));
+        }
+        return false;
     }
 
-    void SolverContext::send_own_matrix()
+    const uint8_t* SolverContext::last_block_hash()
     {
-        core.pnode->sendMatrix(core.getMyMatrix());
+        //if(!core.is_block_deferred()) {
+            return core.pnode->getBlockChain().getLastWrittenHash().to_binary().data();
+        //}
+        //return core.deferred_block.hash().to_binary().data();
     }
 
-    void SolverContext::send_transaction_list(csdb::Pool & pool)
+    void SolverContext::request_stage1(uint8_t from, uint8_t required)
     {
-        core.pnode->sendTransactionList(pool);
+        LOG_NOTICE("SolverCore: ask [" << (int) from << "] for stage-1 of [" << (int) required << "]");
+        core.pnode->requestStageOne(from, required);
+    }
+
+    void SolverContext::request_stage2(uint8_t from, uint8_t required)
+    {
+        LOG_NOTICE("SolverCore: ask [" << (int) from << "] for stage-2 of [" << (int) required << "]");
+        core.pnode->requestStageTwo(from, required);
+    }
+
+    void SolverContext::request_stage3(uint8_t from, uint8_t required)
+    {
+      LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]");
+      core.pnode->requestStageThree(from, required);
     }
 
 } // slv2

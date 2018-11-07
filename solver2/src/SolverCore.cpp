@@ -1,12 +1,26 @@
-#include "SolverCore.h"
-#include "SolverContext.h"
-#include "CallsQueueScheduler.h"
-#include "Consensus.h"
-#include "Node.h"
-#include "SolverCompat.h"
-#include <solver/WalletsState.h>
-#include <solver/Fee.h>
-#include "Generals.h"
+#include <SolverCore.h>
+#include <SolverContext.h>
+#include <CallsQueueScheduler.h>
+#include <Consensus.h>
+#include <states/NoState.h>
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <csnode/node.hpp>
+#pragma warning(pop)
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <Solver/Solver.hpp>
+#pragma warning(pop)
+
+#include <Solver/WalletsState.h>
+#include <Solver/Fee.h>
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <Solver/Generals.hpp>
+#pragma warning(pop)
 
 #pragma warning(push)
 #pragma warning(disable: 4324)
@@ -32,9 +46,9 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = true;
-    // Special mode: main node serve as collector and writer through all the rounds, other nodes works as normal
-    constexpr const bool PermanentNodeRole = false;
+    constexpr const bool ProxyToOldSolver = false;
+    // Special mode: uses debug transition table
+    constexpr const bool DebugModeOn = false;
 
     // default (test intended) constructor
     SolverCore::SolverCore()
@@ -43,18 +57,20 @@ namespace slv2
         , opt_repeat_state_enabled(RepeatStateEnabled)
         , opt_spammer_on(SpammerOn)
         , opt_is_proxy_v1(ProxyToOldSolver)
-        , opt_is_permanent_roles(PermanentNodeRole)
+        , opt_debug_mode(DebugModeOn)
         // inner data
         , pcontext(std::make_unique<SolverContext>(*this))
         , tag_state_expired(CallsQueueScheduler::no_tag)
         , req_stop(true)
         , cnt_trusted_desired(Consensus::MinTrustedNodes)
+        , total_recv_trans(0)
+        , total_accepted_trans(0)
+        , cnt_deferred_trans(0)
+        , total_duration_ms(0)
         // consensus data
         , addr_spam(std::nullopt)
         , cur_round(0)
-        , pown_hvec(std::make_unique<cs::HashVector>())
-        , pfee(std::make_unique<cs::Fee>())
-        , last_trans_list_recv(std::numeric_limits<uint64_t>::max())
+        , pfee(std::make_unique<Credits::Fee>())
         , is_bigbang(false)
         // previous solver version instance
         , pslv_v1(nullptr)
@@ -64,7 +80,7 @@ namespace slv2
         , pgen_inst(nullptr)
         , pgen(nullptr)
     {
-        if(!opt_is_permanent_roles) {
+        if(!opt_debug_mode) {
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: use default transition table");
             }
@@ -72,9 +88,15 @@ namespace slv2
         }
         else {
             if(Consensus::Log) {
-                LOG_WARN("SolverCore: opt_permanent_roles is on, so use special transition table");
+                LOG_WARN("SolverCore: opt_debug_mode is on, so use special transition table");
             }
-            InitPermanentTransitions();
+            InitDebugModeTransitions();
+        }
+        if(opt_is_proxy_v1) {
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: serve as proxy to Solver-1");
+            }
+            InitTransitions();
         }
     }
 
@@ -91,20 +113,20 @@ namespace slv2
 
 #if !defined(SPAMMER) // see: client\include\client\params.hpp
             // thanks to Solver constructor :-), it has 3 args in this case
-            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start);
+            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start);
 #else
             // thanks to Solver constructor :-), it has 4 args in this case
-            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
+            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
 #endif
 
-            pgen = pslv_v1->m_generals.get();
-            pws = pslv_v1->m_walletsState.get();
+            pgen = pslv_v1->generals.get();
+            pws = pslv_v1->walletsState.get();
         }
         else {
-            pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
+            pws_inst = std::make_unique<Credits::WalletsState>(pNode->getBlockChain());
             // temp decision until solver-1 may be instantiated:
             pws = pws_inst.get();
-            pgen_inst = std::make_unique<cs::Generals>(*pws_inst);
+            pgen_inst = std::make_unique<Credits::Generals>(*pws_inst);
             // temp decision until solver-1 may be instantiated:
             pgen = pgen_inst.get();
         }
@@ -116,21 +138,29 @@ namespace slv2
         transitions.clear();
     }
 
-    void SolverCore::start()
+    void SolverCore::ExecuteStart(Event start_event)
     {
+        if(!is_finished()) {
+            if(Consensus::Log) {
+                LOG_NOTICE("SolverCore: cannot start again, already started");
+            }
+            return;
+        }
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: starting in " << (opt_is_proxy_v1 ? "proxy" : "standalone") << " mode");
         }
         req_stop = false;
-        handleTransitions(Event::Start);
+        handleTransitions(start_event);
     }
 
     void SolverCore::finish()
     {
-        pstate->off(*pcontext);
+        if(pstate) {
+            pstate->off(*pcontext);
+        }
         scheduler.RemoveAll();
         tag_state_expired = CallsQueueScheduler::no_tag;
-        pstate = nullptr;
+        pstate = std::make_shared<NoState>();
         req_stop = true;
     }
 
@@ -150,11 +180,19 @@ namespace slv2
             // state changed due timeout from within expired state        
         }
         
-        pstate->off(*pcontext);
+        if(pstate) {
+            pstate->off(*pcontext);
+        }
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: switch state " << pstate->name() << " -> " << pState->name());
+            LOG_NOTICE("SolverCore: switch "
+                << (pstate ? pstate->name() : "null")
+                << " -> "
+                << (pState ? pState->name() : "null"));
         }
         pstate = pState;
+        if(!pstate) {
+            return;
+        }
         pstate->on(*pcontext);
         
         // timeout handling
@@ -175,12 +213,16 @@ namespace slv2
                     }
                     //setNormalState();
                 }
-            }, true);
+            }, true /*replace if exists*/);
         }
     }
 
     void SolverCore::handleTransitions(Event evt)
     {
+        if(!pstate) {
+            // unable to work until initTransitions() called
+            return;
+        }
         if(Event::BigBang == evt) {
             if(Consensus::Log) {
                 LOG_WARN("SolverCore: BigBang on");
@@ -206,135 +248,119 @@ namespace slv2
 
     bool SolverCore::stateCompleted(Result res)
     {
-        if(Consensus::Log && Result::Failure == res) {
-            LOG_ERROR("SolverCore: error in state " << pstate->name());
+        if(Consensus::Log) {
+            if(Result::Failure == res) {
+                LOG_ERROR("SolverCore: error in state " << ( pstate ? pstate->name() : "null"));
+            }
         }
         return (Result::Finish == res);
     }
 
-    void SolverCore::repeatLastBlock()
-    {
-        if(cur_round == block_pool.sequence()) {
-            // still actual, send it again
-            if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: current block is ready to repeat, do it");
-                LOG_NOTICE("SolverCore: sending block #" << block_pool.sequence() << " of " << block_pool.transactions_count() << " transactions");
-            }
-            pnode->sendBlock(block_pool);
-        }
-        else {
-            // load block and send it
-            if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: current block is out of date, so load stored block to repeat");
-            }
-            auto& bch = pnode->getBlockChain();
-            csdb::Pool p = bch.loadBlock(bch.getLastWrittenHash());
-            if(p.is_valid()) {
-                if(Consensus::Log) {
-                    LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
-                }
-                pnode->sendBlock(p);
-            }
-        }
-    }
-
     // Copied methods from solver.v1
-    
-    void SolverCore::createAndSendNewBlockFrom(csdb::Pool & p)
-    {
-        pnode->becomeWriter();
 
+    void SolverCore::spawn_next_round(const std::vector<PublicKey>& nodes)
+    {
+        if(accepted_pool.to_binary().size() > 0) {
+            LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
+        }
+        pnode->becomeWriter();
+        LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
         // see Solver-1, writeNewBlock() method
-        p.set_writer_public_key(public_key);
+        accepted_pool.set_writer_public_key(public_key);
         auto& bc = pnode->getBlockChain();
-        bc.finishNewBlock(p);
+        bc.finishNewBlock(accepted_pool);
         // see: Solver-1, addTimestampToPool() method
-        p.add_user_field(0, std::to_string(
+        accepted_pool.add_user_field(0, std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
         ));
         // finalize
         // see Solver-1, prepareBlockForSend() method
-        p.set_sequence((bc.getLastWrittenSequence()) + 1);
-        p.sign(private_key);
+        accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
+        accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
+        accepted_pool.sign(private_key);
 
         if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
+            LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "
+                << accepted_pool.transactions_count() << " trans.");
+            LOG_NOTICE("SolverCore: block previous hash " << accepted_pool.previous_hash().to_string());
+            LOG_DEBUG("SolverCore: signed with secret which public is "
+                << byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
         }
-        pnode->sendBlock(p);
-        bc.writeNewBlock(p);
-        bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
+
+        bc.putBlock(accepted_pool, true); // defer_write
+        cnt_deferred_trans += accepted_pool.transactions_count();
+
+        csdb::Pool tmp;
+        {
+            // at this section adding new transactions unavailable
+            std::lock_guard<std::mutex> lock(trans_mtx);
+            trans_pool.set_sequence(pnode->getRoundNumber() + 1);
+            trans_pool.compose();
+            tmp = trans_pool;
+            trans_pool = csdb::Pool {};
+        }
+        if(Consensus::Log) {
+            LOG_NOTICE("SolverCore: send pool [" << tmp.sequence() << "] of "
+                << tmp.transactions_count() << " trans.");
+        }
+        pnode->sendRoundInfo(nodes, tmp, accepted_pool, stageThreeStorage);
+
+        //TODO: store transactions sent until they found in future accepted blocks
     }
 
-    void SolverCore::storeReceivedBlock(csdb::Pool& p)
+    void SolverCore::store_received_block(csdb::Pool& p, bool defer_write)
     {
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store received block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
         }
+
+        auto& bc = pnode->getBlockChain();
+
         // see: Solver-1, method Solver::gotBlock()
-        if(!pnode->getBlockChain().onBlockReceived(p)) {
+        if(!bc.onBlockReceived(p, defer_write)) {
             if(Consensus::Log) {
-                LOG_ERROR("SolverCore: BlockChain::onBlockReceived() reports an itnernal error");
+                LOG_ERROR("SolverCore: block sync required");
             }
+            return;
         }
+
+        total_accepted_trans += p.transactions_count();
     }
 
-    size_t SolverCore::flushTransactions()
+    bool SolverCore::is_block_deferred() const
     {
-        // thread-safe with send_wallet_transaction(), suppose to sync with calls from network-related threads
-        std::lock_guard<std::mutex> l(trans_mtx);
-        //TODO: force  update counter due to possible adding transactions by direct call to push_back(), not to add_transaction() method
-        trans_pool.recount();
-        size_t tr_cnt = trans_pool.transactions_count();
-        if(tr_cnt > 0) {
-            //pnode->sendTransaction(std::move(trans_pool)); //vshilkin
-            if(Consensus::Log) {
-				std::ostringstream os;
-				for (const auto& t : trans_pool.transactions()) {
-					os << " " << t.innerID();
-				}
-				LOG_DEBUG("SolverCore: flush" << os.str());
-                LOG_DEBUG("SolverCore: " << tr_cnt << " are sent, clear buffer");
-            }
-            trans_pool = csdb::Pool {};
-        }
-        else if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: no transactions collected, nothing to send");
-        }
-        return tr_cnt;
+        return pnode->getBlockChain().isLastBlockDeferred();
     }
 
-    csdb::Pool SolverCore::removeTransactionsWithBadSignatures(const csdb::Pool& p)
+    void SolverCore::flush_deferred_block()
     {
-        csdb::Pool good;
-        BlockChain::WalletData data_to_fetch_pulic_key;
-        BlockChain& bc = pnode->getBlockChain();
-        for( const auto& tr: p.transactions()) {
-            const auto& src = tr.source();
-            csdb::internal::byte_array pk;
-            if(src.is_wallet_id()) {
-                bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-                pk.assign(data_to_fetch_pulic_key.address_.cbegin(), data_to_fetch_pulic_key.address_.cend());
-            }
-            else {
-                const auto& tmpref = src.public_key();
-                pk.assign(tmpref.cbegin(), tmpref.cend());
-            }
-            bool force_permit = (opt_spammer_on && addr_spam.has_value() && pk == addr_spam.value().public_key());
-            if(force_permit || tr.verify_signature(pk)) {
-                if(Consensus::Log && force_permit) {
-                    LOG_WARN("SolverCore: permit drain " << static_cast<int>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
-                }
-                good.add_transaction(tr);
+        // if nothing to save deferred_block has zero sequence number
+        if(!is_block_deferred()) {
+            return;
+        }
+        pnode->getBlockChain().writeDeferredBlock();
+        total_accepted_trans += cnt_deferred_trans;
+        cnt_deferred_trans = 0;
+    }
+
+    void SolverCore::drop_deferred_block()
+    {
+        if(!is_block_deferred()) {
+            return;
+        }
+        if(pnode->getBlockChain().revertLastBlock()) {
+            //TODO: bc.revertWalletsInPool(deferred_block);
+            if(Consensus::Log) {
+                LOG_WARN("SolverCore: deferred block dropped, wallets are reverted");
             }
         }
-        if(Consensus::Log) {
-            auto cnt_before = p.transactions_count();
-            auto cnt_after = good.transactions_count();
-            if(cnt_before != cnt_after) {
-                LOG_WARN("SolverCore: " << cnt_before << " transactions filtered to " << cnt_after << " while test signatures");
+        else {
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: cannot drop deferred block");
             }
+            total_accepted_trans += cnt_deferred_trans;
         }
-        return good;
+        cnt_deferred_trans = 0;
     }
 
     void SolverCore::test_outrunning_blocks()
@@ -350,17 +376,18 @@ namespace slv2
             if(oldest->first < desired_seq) {
                 // clear outdated block if it is and select next one:
                 if(Consensus::Log) {
-                    LOG_NOTICE("SolverCore: remove outdated block #" << desired_seq << " from cache");
+                    LOG_NOTICE("SolverCore: remove outdated block #" << oldest->first << " from cache");
                 }
                 outrunning_blocks.erase(oldest);
             }
             else if(oldest->first == desired_seq) {
                 if(Consensus::Log) {
-                    LOG_NOTICE("SolverCore: retrieve and use required block #" << desired_seq << " from cache");
+                    LOG_NOTICE("SolverCore: retrieve required block #" << desired_seq << " from cache");
                 }
                 // retrieve and use block if it is exactly what we need:
                 auto& data = outrunning_blocks.at(desired_seq);
-                if(desired_seq == cur_round) {
+                // if state is not set store block also:
+                if(desired_seq == cur_round && pstate) {
                     if(stateCompleted(pstate->onBlock(*pcontext, data.first, data.second))) {
                         // do not forget make proper transitions if they are set in our table
                         handleTransitions(Event::Block);
@@ -368,55 +395,24 @@ namespace slv2
                 }
                 else {
                     // store block and remove it from cache
-                    storeReceivedBlock(data.first);
+                    store_received_block(data.first, false);
                 }
                 outrunning_blocks.erase(desired_seq);
             }
             else {
                 // stop processing, we have not got required block yet
                 if(Consensus::Log) {
-                    LOG_DEBUG("SolverCore: nothing to retreive yet");
+                    LOG_DEBUG("SolverCore: nothing to retrieve yet");
                 }
                 break;
             }
         }
     }
 
-    void SolverCore::cache_vector(uint8_t sender, const cs::HashVector& vect)
+    void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)
     {
-        //if(vect.is_empty()) {
-        //    return;
-        //}
-        std::vector<VectorVariant>& variants = vector_cache[sender];
-        bool update_existsing = false;
-        for(auto& v : variants) {
-            if(memcmp(&v.first.hash, &vect.hash, sizeof(cs::HashVector)) == 0) {
-                v.second++;
-                update_existsing = true;
-                break;
-            }
-        }
-        if(!update_existsing) {
-            variants.push_back(std::make_pair(vect, 1));
-        }
-    }
 
-    const cs::HashVector * SolverCore::lookup_vector(uint8_t sender) const
-    {
-        const auto it = vector_cache.find(sender);
-        if(it == vector_cache.cend()) {
-            return nullptr;
-        }
-        const auto& variants = it->second;
-        const cs::HashVector * ptr = nullptr;
-        size_t max_cnt = 0;
-        for(const auto& v : variants) {
-            if(v.second > max_cnt) {
-                ptr = &v.first;
-                max_cnt = v.second;
-            }
-        }
-        return ptr;
+
     }
 
 } // slv2

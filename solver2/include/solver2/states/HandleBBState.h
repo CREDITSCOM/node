@@ -1,5 +1,5 @@
 #pragma once
-#include "WriteState.h"
+#include "DefaultStateBehavior.h"
 
 namespace slv2
 {
@@ -15,7 +15,7 @@ namespace slv2
      * @sa  T:WriteState  
      */
 
-    class HandleBBState final : public WriteState
+    class HandleBBState final : public DefaultStateBehavior
     {
     public:
 

@@ -1,8 +1,6 @@
 #pragma once
 #include "INodeState.h"
 
-#include <lib/system/keys.hpp>
-
 namespace slv2
 {
     /**
@@ -32,7 +30,7 @@ namespace slv2
         void expired(SolverContext& /*context*/) override
         {}
 
-        void onRoundEnd(SolverContext& /*context*/) override
+        void onRoundEnd(SolverContext& /*context*/, bool /*is_bingbang*/) override
         {}
 
         /**
@@ -49,27 +47,17 @@ namespace slv2
          * @return  A Result::Finish to allow/initiate transition to proper state.
          */
 
-        Result onRoundTable(SolverContext& /*context*/, const uint32_t /*round*/) override
+        Result onRoundTable(SolverContext& /*context*/, const size_t /*round*/) override
         {
             return Result::Finish;
         }
 
-        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const cs::PublicKey& /*sender*/) override
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
 
-        Result onVector(SolverContext& /*context*/, const cs::HashVector& /*vect*/, const cs::PublicKey& /*sender*/) override
-        {
-            return Result::Failure;
-        }
-
-        Result onMatrix(SolverContext& /*context*/, const cs::HashMatrix& /*matr*/, const cs::PublicKey& /*sender*/) override
-        {
-            return Result::Failure;
-        }
-
-        Result onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/) override
+        Result onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
@@ -79,7 +67,22 @@ namespace slv2
             return Result::Failure;
         }
 
-        Result onTransactionList(SolverContext& /*context*/, const csdb::Pool& /*pool*/) override
+        Result onTransactionList(SolverContext& /*context*/, csdb::Pool& /*pool*/) override
+        {
+            return Result::Failure;
+        }
+
+        Result onStage1(SolverContext& /*context*/, const Credits::StageOne& /*stage*/) override
+        {
+            return Result::Failure;
+        }
+
+        Result onStage2(SolverContext& /*context*/, const Credits::StageTwo& /*stage*/) override
+        {
+            return Result::Failure;
+        }
+
+        Result onStage3(SolverContext& /*context*/, const Credits::StageThree& /*stage*/) override
         {
             return Result::Failure;
         }

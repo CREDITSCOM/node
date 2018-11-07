@@ -2,56 +2,57 @@ cmake_minimum_required(VERSION 3.4)
 
 project(solver2)
 
-#set(SOLVER2_TEST_BUILD FALSE)
-#set(SOLVER2_DOC_BUILD FALSE)
+# turn off optimization for this project in RelWithDebInfo only
+if (MSVC)
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
+endif()
 
-add_library(solver2
+# set next option to ON to create solver2_tests project (also install googletest, not tested outside Windows platform yet)
+option(SLV2_BUILD_TESTS "Build unit tests" OFF)
+option(SLV2_AUTORUN_TESTS "Automatically run unit tests after build" OFF)
+	
+add_library(${PROJECT_NAME} STATIC
 	include/solver2/Consensus.h
 	include/solver2/INodeState.h
 	include/solver2/Result.h
 	include/solver2/SolverCore.h
 	include/solver2/SolverContext.h
-	include/solver2/Node.h
-	include/solver2/Blockchain.h
-	include/solver2/Generals.h
-	include/solver2/SolverCompat.h
 	include/solver2/CallsQueueScheduler.h
-	include/solver2/states/CollectState.h
+	include/solver2/TimeoutTracking.h
+
 	include/solver2/states/DefaultStateBehavior.h
 	include/solver2/states/HandleBBState.h
 	include/solver2/states/HandleRTState.h
 	include/solver2/states/NormalState.h
 	include/solver2/states/NoState.h
-	include/solver2/states/StartState.h
-	include/solver2/states/StartNormalState.h
-	include/solver2/states/StartTrustedState.h
-	include/solver2/states/StartCollectState.h
 	include/solver2/states/SyncState.h
-	include/solver2/states/TrustedMState.h
-	include/solver2/states/TrustedState.h
-	include/solver2/states/TrustedVMState.h
-	include/solver2/states/TrustedVState.h
-	include/solver2/states/WriteState.h
-	include/solver2/states/PermanentCollectWriteState.h
+	include/solver2/states/TrustedStage1State.h
+	include/solver2/states/TrustedStage2State.h
+	include/solver2/states/TrustedStage3State.h
+	include/solver2/states/TrustedPostStageState.h
+	include/solver2/states/PrimitiveWriteState.h
+	include/solver2/states/WritingState.h
+	include/solver2/states/WaitingState.h
+
 	src/SolverCore.cpp
 	src/SolverContext.cpp
 	src/SolverInterface.cpp
 	src/SolverTransitions.cpp
 	src/CallsQueueScheduler.cpp
-	src/states/CollectState.cpp
+	src/TimeoutTracking.cpp
+
 	src/states/DefaultStateBehavior.cpp
 	src/states/HandleBBState.cpp
 	src/states/HandleRTState.cpp
 	src/states/NormalState.cpp
-	src/states/StartNormalState.cpp
-	src/states/StartCollectState.cpp
 	src/states/SyncState.cpp
-	src/states/TrustedMState.cpp
-	src/states/TrustedState.cpp
-	src/states/TrustedVMState.cpp
-	src/states/TrustedVState.cpp
-	src/states/WriteState.cpp
-	src/states/PermanentCollectWriteState.cpp
+	src/states/TrustedStage1State.cpp
+	src/states/TrustedStage2State.cpp
+	src/states/TrustedStage3State.cpp
+	src/states/TrustedPostStageState.cpp
+	src/states/PrimitiveWriteState.cpp
+	src/states/WritingState.cpp
+	src/states/WaitingState.cpp
 )
 
 target_include_directories(solver2 PUBLIC
@@ -61,22 +62,14 @@ target_include_directories(solver2 PUBLIC
 
 target_link_libraries (
 	solver2
-	solver
-#	csconnector
-#	csdb
+#	solver
 	csnode
-#	base58
 	libsodium
-	lib
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(SOLVER2_TEST_BUILD)
+if(SLV2_BUILD_TESTS)
     add_subdirectory(tests)
-endif()
-
-if(SOLVER2_DOC_BUILD)
-    add_subdirectory(doc)
 endif()

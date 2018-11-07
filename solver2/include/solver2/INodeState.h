@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Result.h"
-#include <csnode/nodecore.h>
 #include <lib/system/keys.hpp> // PublicKey, Hash
 #include <cstdint>
 
@@ -14,6 +13,9 @@ namespace Credits
 {
     struct HashVector;
     struct HashMatrix;
+    struct StageOne;
+    struct StageTwo;
+    struct StageThree;
 }
 
 namespace slv2
@@ -49,7 +51,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual void on(SolverContext& /*context*/) = 0;
+        virtual void on(SolverContext& context) = 0;
 
         /**
          * @fn  virtual void INodeState::off(SolverContext& ) = 0;
@@ -64,7 +66,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual void off(SolverContext& /*context*/) = 0;
+        virtual void off(SolverContext& context) = 0;
 
         /**
          * @fn  virtual void INodeState::expired(SolverContext& ) = 0;
@@ -79,20 +81,21 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual void expired(SolverContext& /*context*/) = 0;
+        virtual void expired(SolverContext& context) = 0;
 
         /**
-         * @fn  virtual void INodeState::onRoundEnd(SolverContext& context) = 0;
+         * @fn  virtual void INodeState::onRoundEnd(SolverContext& context, bool is_bigbang) = 0;
          *
          * @brief   Called on the current round end
          *
          * @author  aae
          * @date    01.10.2018
          *
-         * @param [in,out]  context The context.
+         * @param [in,out]  context     The context.
+         * @param           is_bigbang  True if round finished by bigbang, false if not (normal finish).
          */
 
-        virtual void onRoundEnd(SolverContext& /*context*/) = 0;
+        virtual void onRoundEnd(SolverContext& context, bool is_bigbang) = 0;
 
         /**
          * @fn  virtual Result INodeState::onRoundTable(SolverContext& context, const uint32_t round) = 0;
@@ -111,10 +114,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onRoundTable(SolverContext& context, const uint32_t round) = 0;
+        virtual Result onRoundTable(SolverContext& context, const size_t round) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
          *
          * @brief   Is called when new block is received.
          *
@@ -131,49 +134,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
+        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) = 0;
-         *
-         * @brief   Is called when new vector is received.
-         *
-         * @author  aae
-         * @date    01.10.2018
-         *
-         * @param [in]  context The core context.
-         * @param       vect    The vector received.
-         * @param       sender  The sender of vector.
-         *
-         * @return  A Result of event: Finish - core has to make a transition, Ignore - continue to work
-         *          in current state, Failed - error occurs.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        virtual Result onVector(SolverContext& context, const cs::HashVector& vect, const cs::PublicKey& sender) = 0;
-
-        /**
-         * @fn  virtual Result INodeState::onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) = 0;
-         *
-         * @brief   Is called when new matrix is received.
-         *
-         * @author  aae
-         * @date    01.10.2018
-         *
-         * @param [in]  context The core context.
-         * @param       matr    The matrix received.
-         * @param       sender  The sender of matrix.
-         *
-         * @return  A Result.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        virtual Result onMatrix(SolverContext& context, const cs::HashMatrix& matr, const cs::PublicKey& sender) = 0;
-
-        /**
-         * @fn  virtual Result INodeState::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
          *
          * @brief   Is called when new hash is received.
          *
@@ -190,7 +154,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
+        virtual Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
 
         /**
          * @fn  virtual Result INodeState::onTransaction(SolverContext& context, const csdb::Transaction& trans) = 0;
@@ -227,7 +191,13 @@ namespace slv2
          *          in current state, Failed - error occurs.
          */
 
-        virtual Result onTransactionList(SolverContext& context, const csdb::Pool& pool) = 0;
+        virtual Result onTransactionList(SolverContext& context, csdb::Pool& pool) = 0;
+
+        // Solver3 new methods
+        
+        virtual Result onStage1(SolverContext& context, const Credits::StageOne& stage) = 0;
+        virtual Result onStage2(SolverContext& context, const Credits::StageTwo& stage) = 0;
+        virtual Result onStage3(SolverContext& context, const Credits::StageThree& stage) = 0;
 
         /**
          * @fn  virtual const char * INodeState::name() const = 0;

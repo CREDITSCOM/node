@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.10)
 
 project(csnode)
 
+# it is useful not to optimize code in RelWithDebInfo config for debug ability
+if (MSVC)
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

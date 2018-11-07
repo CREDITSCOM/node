@@ -1,5 +1,5 @@
-#include "SyncState.h"
-#include "../SolverContext.h"
+#include <states/SyncState.h>
+#include <SolverContext.h>
 
 namespace slv2
 {

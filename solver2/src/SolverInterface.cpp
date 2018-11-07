@@ -1,134 +1,58 @@
 #include "SolverCore.h"
 #include "Consensus.h"
-#include "Node.h"
-#include "SolverCompat.h"
-#include "Generals.h"
-#include <solver/Fee.h>
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <csnode/node.hpp>
+#pragma warning(pop)
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <Solver/Solver.hpp>
+#pragma warning(pop)
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <Solver/Generals.hpp>
+#pragma warning(pop)
+
+#include <Solver/Fee.h>
 #include <csdb/currency.h>
 #include <lib/system/logger.hpp>
+
+#include <chrono>
 
 namespace slv2
 {
 
-    void SolverCore::setKeysPair(const cs::PublicKey& publicKey,
-      const cs::PrivateKey& privateKey)
+    const Credits::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->setKeysPair(publicKey, privateKey);
+            return pslv_v1->getMyVector();
         }
+
+        // empty one is for test purpose
+        static Credits::HashVector stub {};
+        return stub;
     }
 
-    void SolverCore::runSpammer() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->runSpammer();
-        }
-    }
-
-    void SolverCore::gotRound() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotRound();
-        }
-    }
-
-    bool SolverCore::getIPoolClosed() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->isPoolClosed();
-        }
-    }
-
-    void SolverCore::gotHash(std::string&& hash, const cs::PublicKey& pub) {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotHash(std::move(hash), pub);
-        }
-    }
-
-    const cs::PrivateKey& SolverCore::getPrivateKey() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->privateKey();
-        }
-    }
-
-    const cs::PublicKey& SolverCore::getPublicKey() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->publicKey();
-        }
-    }
-
-    cs::PublicKey SolverCore::getWriterPublicKey() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->writerPublicKey();
-        }
-    }
-
-    bool SolverCore::getBigBangStatus() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->bigBangStatus();
-        }
-    }
-
-    bool SolverCore::isPoolClosed() const {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->isPoolClosed();
-        }
-    }
-
-    void SolverCore::sendTL() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->sendTL();
-        }
-    }
-
-    const cs::HashVector& SolverCore::getMyVector() const
+    const Credits::HashMatrix& SolverCore::getMyMatrix() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->hashVector();
-        }
-        if(!pown_hvec) {
-            // empty one is for test purpose
-            static cs::HashVector stub {};
-            return stub;
-        }
-        return *pown_hvec;
-    }
-
-    const cs::HashMatrix& SolverCore::getMyMatrix() const
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->hashMatrix();
+            return pslv_v1->getMyMatrix();
         }
         if(!pgen) {
             // empty one is for test purpose
-            static cs::HashMatrix stub {};
+            static Credits::HashMatrix stub {};
             return stub;
         }
         return pgen->getMatrix();
     }
 
-    NodeLevel SolverCore::nodeLevel() const
-    {
-        if (opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->nodeLevel();
-        }
-    }
-
-    const cs::PublicKey& SolverCore::nodePublicKey() const
-    {
-        if (opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->nodePublicKey();
-        }
-    }
-
-    void SolverCore::countFeesInPool(csdb::Pool* pool)
-    {
-        if (opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->countFeesInPool(pool);
-        }
-    }
-
     void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            //pslv_v1->set_keys(pub, priv); //vshilkin
+            pslv_v1->set_keys(pub, priv);
         }
         public_key = pub;
         private_key = priv;
@@ -150,6 +74,7 @@ namespace slv2
         }
 
         is_bigbang = status;
+
         if(!pstate) {
             return;
         }
@@ -180,45 +105,11 @@ namespace slv2
 
     void SolverCore::gotTransactionList(csdb::Pool& p)
     {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            csdb::Pool tmp = p;
-            //pslv_v1->gotTransactionList(std::move(tmp)); //vshilkin
-            return;
-        }
+        // any way processed transactions
+        total_recv_trans += p.transactions_count();
 
-        auto tl_seq = p.sequence();
-        if(!is_bigbang) {
-            if(tl_seq == last_trans_list_recv) {
-                // already received
-                if(Consensus::Log) {
-                    LOG_WARN("SolverCore: transaction list (#" << tl_seq << ") already received, ignore");
-                }
-                return;
-            }
-            last_trans_list_recv = tl_seq;
-        }
-
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: transaction list (#" << tl_seq << ", " << p.transactions_count() <<" transactions) received, updating own hashvector");
-			std::ostringstream os;
-			for (const auto& t : p.transactions()) {
-				os << " " << t.innerID();
-			}
-			LOG_DEBUG("SolverCore:" << os.str());
-        }
-        // bad tansactions storage:
-        csdb::Pool b_pool {};
-        // update own hash vector
-        if(pnode != nullptr && pgen != nullptr) {
-            p = removeTransactionsWithBadSignatures(p);
-            pfee->CountFeesInPool(pnode, &p);
-            //auto result = pgen->buildVector(p, block_pool, b_pool); //vshilkin
-            if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
-            }
-            pown_hvec->sender = pnode->getConfidantNumber();
-            //pown_hvec->hash = result; //vshilkin
-        }
+        // clear data
+        markUntrusted.fill(0);
 
         if(!pstate) {
             return;
@@ -228,59 +119,39 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotVector(const cs::HashVector& vect)
+    void SolverCore::gotVector(const Credits::HashVector& vect)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            cs::HashVector tmp = vect;
+            Credits::HashVector tmp = vect;
             pslv_v1->gotVector(std::move(tmp));
             return;
         }
-
-        if(!pstate) {
-            return;
-        }
-        //TODO: how to get real public key from vect.Sender?
-        if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotVector()");
-        }
-        if(stateCompleted(pstate->onVector(*pcontext, vect, cs::PublicKey {}))) {
-            handleTransitions(Event::Vectors);
-        }
     }
 
-    void SolverCore::gotMatrix(const cs::HashMatrix& matr)
+    void SolverCore::gotMatrix(const Credits::HashMatrix& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            cs::HashMatrix tmp = matr;  //TODO: what is this?
+            Credits::HashMatrix tmp = matr;
             pslv_v1->gotMatrix(std::move(tmp));
             return;
         }
-
-        if(!pstate) {
-            return;
-        }
-        //TODO: how to get real public key from vect.Sender?
-        if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotMatrix()");
-        }
-        if(stateCompleted(pstate->onMatrix(*pcontext, matr, cs::PublicKey {}))) {
-            handleTransitions(Event::Matrices);
-        }
     }
 
-    void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool& p, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotBlock(std::move(p), sender);
+            csdb::Pool tmp = p;
+            pslv_v1->gotBlock_V3(std::move(tmp), sender);
             return;
         }
 
         // solver-1 logic: clear bigbang status upon block receive
         is_bigbang = false;
 
-        // solver-1: caching, actually duplicates before done caching in Node::getBlock()
-        if(p.sequence() > cur_round) {
-            gotIncorrectBlock(std::move(p), sender); // remove this line when the block candidate signing of all trusted will be implemented
+        // solver-1: caching, actually duplicates caching implemented in Node::getBlock()
+        csdb::Pool::sequence_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
+        if(p.sequence() != desired_seq) {
+            gotIncorrectBlock(std::move(p), sender);
             return;
         }
 
@@ -297,7 +168,7 @@ namespace slv2
         test_outrunning_blocks();
     }
 
-    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender)
+    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::PoolHash tmp = p_hash;
@@ -305,20 +176,28 @@ namespace slv2
             return;
         }
 
-        if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotBlockRequest()");
-        }
+        std::ostringstream os;
+        os << "SolverCore: got request for block, ";
         // state does not take part
         if(pnode != nullptr) {
             csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
             if(p.is_valid()) {
-                p.set_previous_hash(csdb::PoolHash::from_string(""));
+                os << "[" << p.sequence() << "] found, sending";
                 pnode->sendBlockReply(p, sender);
             }
+            else {
+                os << "not found";
+            }
+        }
+        else {
+            os << "cannot handle";
+        }
+        if(Consensus::Log) {
+            LOG_EVENT(os.str());
         }
     }
 
-    void SolverCore::gotBlockReply(csdb::Pool&& p)
+    void SolverCore::gotBlockReply(csdb::Pool& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotBlockReply(std::move(p));
@@ -326,22 +205,22 @@ namespace slv2
         }
 
         if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotBlockReply()");
-            LOG_DEBUG("SolverCore: got block on my request: " << p.sequence());
+            //LOG_NOTICE("SolverCore: gotBlockReply()");
+            LOG_EVENT("SolverCore: got block [" << p.sequence() << "] on my request");
         }
         if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
-            storeReceivedBlock(p);
+            store_received_block(p, false);
         }
         else {
-            gotIncorrectBlock(std::move(p), cs::PublicKey {});
+            gotIncorrectBlock(std::move(p), PublicKey {});
         }
     }
 
-    void SolverCore::gotHash(const cs::Hash& hash, const cs::PublicKey& sender)
+    void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            cs::Hash modifiable = hash;
-            //pslv_v1->gotHash(modifiable, sender); //vshilkin
+            Hash tmp(hash);
+            pslv_v1->gotHash_V3(tmp, sender);
             return;
         }
 
@@ -356,7 +235,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender)
+    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotIncorrectBlock(std::move(p), sender);
@@ -365,15 +244,24 @@ namespace slv2
 
         // store outrunning block for future using
         const auto seq = p.sequence();
+
+        // test proper sequence
+        if(pnode->getBlockChain().getLastWrittenSequence() >= seq) {
+            if(Consensus::Log) {
+                LOG_DEBUG("SolverCore: <-- block [" << seq << "] of " << p.transactions_count() << ", outdated ignored");
+            }
+            return;
+        }
+
         if(outrunning_blocks.count(seq) == 0) {
             outrunning_blocks [seq] = std::make_pair(p, sender);
             if(Consensus::Log) {
-                LOG_NOTICE("SolverCore: got outrunning block #" << seq << ", cache it for future using");
+                LOG_NOTICE("SolverCore: <-- block [" << seq << "] of " << p.transactions_count() << ", outrunning cached");
             }
         }
         else {
             if(Consensus::Log) {
-                LOG_DEBUG("SolverCore: gotIncorrectBlock(" << seq << "), ignored duplicated");
+                LOG_DEBUG("SolverCore: <-- block [" << seq << "] of " << p.transactions_count() << ", duplicated ignored");
             }
         }
     }
@@ -398,7 +286,7 @@ namespace slv2
             return;
         }
 
-        gotIncorrectBlock(std::move(p), cs::PublicKey {});
+        gotIncorrectBlock(std::move(p), PublicKey {});
     }
 
     void SolverCore::rndStorageProcessing()
@@ -418,7 +306,7 @@ namespace slv2
     void SolverCore::addConfirmation(uint8_t own_conf_number)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            //pslv_v1->addConfirmation(own_conf_number); vshilkin
+            pslv_v1->addConfirmation(own_conf_number);
             return;
         }
 
@@ -433,14 +321,14 @@ namespace slv2
     void SolverCore::beforeNextRound()
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            //pslv_v1->beforeNextRound();
+            pslv_v1->beforeNextRound();
             return;
         }
-        
+
         if(!pstate) {
             return;
         }
-        pstate->onRoundEnd(*pcontext);
+        pstate->onRoundEnd(*pcontext, is_bigbang);
     }
 
     void SolverCore::nextRound()
@@ -450,43 +338,204 @@ namespace slv2
             return;
         }
 
-        // as store result of current round:
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: clear all stored senders (vectors, matrices, hashes)");
+        // minimal statistics, skip 0 & 1 rounds because of possibility extra timeouts
+        if(cur_round < 2) {
+            t_start_ms = std::chrono::steady_clock::now();
+            total_duration_ms = 0;
+        }
+        else {
+            using namespace std::chrono;
+            auto new_duration_ms = duration_cast<milliseconds>(steady_clock::now() - t_start_ms).count();
+            auto last_round_ms = new_duration_ms - total_duration_ms;
+            total_duration_ms = new_duration_ms;
+            auto ave_round_ms = total_duration_ms / cur_round;
+
+            //TODO: use more intelligent output formatting
+            std::ostringstream os;
+            constexpr size_t in_minutes = 5 * 60 * 1000;
+            constexpr size_t in_seconds = 10 * 1000;
+            os << "SolverCore: last round ";
+            if(last_round_ms > in_minutes) {
+                os << "> " << last_round_ms / 60000 << "min";
+            }
+            else if(last_round_ms > in_seconds) {
+                os << "> " << last_round_ms / 1000 << "sec";
+            }
+            else {
+                os << last_round_ms << "ms";
+            }
+            os << ", average round ";
+            if(ave_round_ms > in_seconds) {
+                os << "> " << ave_round_ms / 1000 << "sec";
+            }
+            else {
+                os << ave_round_ms << "ms";
+            }
+            os << ", " << total_recv_trans << " viewed trans., " << total_accepted_trans << " stored trans.";
+            LOG_NOTICE(os.str());
         }
 
-        // Ñ‡Ð¸ÑÑ‚Ð¸Ð¼ Ð´Ð»Ñ Ð½Ð¾Ð²Ð¾Ð³Ð¾ ÑÐ¿Ð¸ÑÐºÐ°
-        block_pool = csdb::Pool {};
+        if(pnode != nullptr) {
+            auto tmp = pnode->getRoundNumber();
+            if(cur_round == tmp) {
+                return;
+            }
+            cur_round = tmp;
+        }
+        else {
+            cur_round = 1;
+        }
 
-        recv_vect.clear();
-        recv_matr.clear();
+        // as store result of current round:
+        if(Consensus::Log) {
+            LOG_DEBUG("SolverCore: clear all stored senders (vectors, matrices, hashes)");
+        }
+
         recv_hash.clear();
+        stageOneStorage.clear();
+        stageTwoStorage.clear();
+        stageThreeStorage.clear();
 
         if(!pstate) {
             return;
         }
-        if(pnode != nullptr) {
-            cur_round = pnode->getRoundNumber();
-        }
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: nextRound()");
-        }
 
         // update desired count of trusted nodes
-        size_t cnt_trusted = 4;//pnode->getConfidants().size(); //vshilkin
+        size_t cnt_trusted = pnode->getConfidants().size();
         if(cnt_trusted > cnt_trusted_desired) {
             cnt_trusted_desired = cnt_trusted;
         }
 
-        if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
+        auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
+        if(desired_seq < cur_round) {
+            pnode->sendBlockRequest(static_cast<uint32_t>(desired_seq));
+        }
+
+        if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {
             handleTransitions(Event::RoundTable);
         }
 
-        //TODO: not good solution, to reproduce solver-1 logic only:
-        if(is_bigbang) {
-            csdb::Pool tmp {};
-            gotTransactionList(tmp);
+        if(1 == cur_round) {
+            scheduler.InsertOnce(Consensus::T_round, [this]() {
+                pnode->sendHash_V3();
+                gotTransactionList_V3(std::move(csdb::Pool{}));
+            });
         }
+        //TODO: not good solution, to reproduce solver-1 logic only:
+        else if(is_bigbang) {
+            scheduler.InsertOnce(Consensus::T_coll_trans, [this]() {
+                csdb::Pool tmp {};
+                tmp.set_sequence(cur_round - 1);
+                gotTransactionList_V3(std::move(tmp));
+            });
+        }
+    }
+
+    void SolverCore::gotStageOne(const Credits::StageOne & stage)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotStageOne(stage);
+            return;
+        }
+
+        if(find_stage1(stage.sender) != nullptr) {
+            // duplicated
+            return;
+        }
+
+        stageOneStorage.push_back(stage);
+        LOG_NOTICE("SolverCore: <-- stage-1 [" << (int) stage.sender << "] = " << stageOneStorage.size());
+
+        if(!pstate) {
+            return;
+        }
+        if(stateCompleted(pstate->onStage1(*pcontext, stage))) {
+            handleTransitions(Event::Stage1Enough);
+        }
+    }
+
+    void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required)
+    {
+        LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]");
+        const auto ptr = find_stage1(required);
+        if(ptr != nullptr) {
+            pnode->sendStageOneReply(*ptr, requester);
+        }
+    }
+    
+    void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required)
+    {
+        LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]");
+        const auto ptr = find_stage2(required);
+        if(ptr != nullptr) {
+            pnode->sendStageTwoReply(*ptr, requester);
+        }
+    }
+    
+    void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required)
+    {
+        LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]");
+        const auto ptr = find_stage3(required);
+        if(ptr != nullptr) {
+            pnode->sendStageThreeReply(*ptr, requester);
+        }
+    }
+
+    void SolverCore::gotStageTwo(const Credits::StageTwo & stage)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotStageTwo(stage);
+            return;
+        }
+
+        if(find_stage2(stage.sender) != nullptr) {
+            // duplicated
+            return;
+        }
+
+        stageTwoStorage.push_back(stage);
+        LOG_NOTICE("SolverCore: <-- stage-2 [" << (int) stage.sender << "] = " << stageTwoStorage.size());
+
+        if(!pstate) {
+            return;
+        }
+        if(stateCompleted(pstate->onStage2(*pcontext, stage))) {
+            handleTransitions(Event::Stage2Enough);
+        }
+    }
+
+    void SolverCore::gotStageThree(const Credits::StageThree & stage)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotStageThree(stage);
+            return;
+        }
+
+        if(find_stage3(stage.sender) != nullptr) {
+            // duplicated
+            return;
+        }
+
+        stageThreeStorage.push_back(stage);
+        LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size());
+
+        if(!pstate) {
+            return;
+        }
+        if(stateCompleted(pstate->onStage3(*pcontext, stage))) {
+            handleTransitions(Event::Stage3Enough);
+        }
+    }
+
+    void SolverCore::gotTransactionList_V3(csdb::Pool &&tl)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotTransactionList_V3(std::move(tl));
+            return;
+        }
+
+        csdb::Pool tmp(tl);
+        gotTransactionList(tmp);
     }
 
     void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
@@ -522,7 +571,7 @@ namespace slv2
         if(outrunning_blocks.empty()) {
             return 0;
         }
-        // it - "ÑÐºÐ²Ð¾Ð·Ð½Ð¾Ð¹" Ð¸Ñ‚ÐµÑ€Ð°Ñ‚Ð¾Ñ€ Ð´Ð»Ñ Ð´Ð²ÑƒÑ… Ð±Ð»Ð¾ÐºÐ¾Ð² while()
+        // it - "ñêâîçíîé" èòåðàòîð äëÿ äâóõ áëîêîâ while()
         auto it = outrunning_blocks.cbegin();
         // skip outdated blocks if any
         while(it->first <= starting_after) {

@@ -4,7 +4,6 @@
 #include "SolverCore.h"
 
 #include <csdb/pool.h>
-#include <lib/system/keys.hpp>
 
 class CallsQueueScheduler;
 class Node;
@@ -32,8 +31,7 @@ namespace slv2
     {
         Normal,
         Trusted,
-        Collect,
-        Write
+        Writer
     };
 
     /**
@@ -80,13 +78,25 @@ namespace slv2
             case Role::Trusted:
                 core.handleTransitions(SolverCore::Event::SetTrusted);
                 break;
-            case Role::Collect:
-                core.handleTransitions(SolverCore::Event::SetCollector);
-                break;
-            case Role::Write:
+            case Role::Writer:
                 core.handleTransitions(SolverCore::Event::SetWriter);
                 break;
             }
+        }
+
+        void complete_stage2()
+        {
+            core.handleTransitions(SolverCore::Event::Stage1Enough);
+        }
+
+        void complete_stage3()
+        {
+            core.handleTransitions(SolverCore::Event::Stage2Enough);
+        }
+
+        void complete_post_stage()
+        {
+            core.handleTransitions(SolverCore::Event::Stage3Enough);
         }
 
         /**
@@ -103,49 +113,25 @@ namespace slv2
         Role role() const;
 
         /**
-         * @fn  void SolverContext::vectors_completed();
-         *
-         * @brief   Inform core that enough vectors are received.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void vectors_completed()
-        {
-            core.handleTransitions(SolverCore::Event::Vectors);
-        }
-
-        /**
-         * @fn  void SolverContext::matrices_completed();
-         *
-         * @brief   Inform core that enough matrices are received.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void matrices_completed()
-        {
-            core.handleTransitions(SolverCore::Event::Matrices);
-        }
-
-        /**
-         * @fn  void SolverContext::spawn_next_round();
+         * @fn  void SolverContext::spawn_next_round(const std::vector<PublicKey>& nodes);
          *
          * @brief   Spawn request to next round.
          *
          * @author  aae
          * @date    03.10.2018
          *
-         * ### remarks  Aae, 30.09.2018.
+         * @param   nodes   The nodes.
          */
 
         void spawn_next_round();
+
+        void spawn_first_round();
+
+        void next_trusted_candidates(const std::vector<PublicKey>& nodes)
+        {
+            std::vector<PublicKey> tmp(nodes);
+            std::swap(core.trusted_candidates, tmp);
+        }
 
         // Fast access methods, may be removed at the end
 
@@ -163,19 +149,19 @@ namespace slv2
 		BlockChain& blockchain() const;
 
         /**
-         * @fn  cs::Generals& SolverContext::generals() const;
+         * @fn  Credits::Generals& SolverContext::generals() const;
          *
          * @brief   Gets the generals instance.
          *
          * @author  aae
          * @date    03.10.2018
          *
-         * @return  A reference to the cs::Generals.
+         * @return  A reference to the Credits::Generals.
          *
          * ### remarks  Aae, 30.09.2018.
          */
 
-        cs::Generals& generals() const
+        Credits::Generals& generals() const
         {
             return *core.pgen;
         }
@@ -236,39 +222,97 @@ namespace slv2
             return core.private_key;
         }
 
-        /**
-         * @fn  const cs::HashVector& SolverContext::hash_vector() const;
-         *
-         * @brief   Current hash vector.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  A reference to a const cs::HashVector.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
+        void add_stage1(Credits::StageOne& stage, bool send);
 
-        const cs::HashVector& hash_vector() const
+        void add_stage2(Credits::StageTwo& stage, bool send);
+
+        void add_stage3(Credits::StageThree& stage);
+
+        const std::vector<Credits::StageOne>& stage1_data() const
         {
-            return core.getMyVector();
+            return core.stageOneStorage;
         }
 
-        /**
-         * @fn  const cs::HashMatrix& SolverContext::hash_matrix() const;
-         *
-         * @brief   Hash matrix
-         *          
-         *
-         * @author  Alexander Avramenko
-         * @date    15.10.2018
-         *
-         * @return  A reference to a const cs::HashMatrix.
-         */
-
-        const cs::HashMatrix& hash_matrix() const
+        const std::vector<Credits::StageTwo>& stage2_data() const
         {
-            return core.getMyMatrix();
+            return core.stageTwoStorage;
+        }
+
+        const std::vector<Credits::StageThree>& stage3_data() const
+        {
+            return core.stageThreeStorage;
+        }
+
+        const Credits::StageOne* stage1(uint8_t sender) const
+        {
+            return core.find_stage1(sender);
+        }
+
+        const Credits::StageTwo* stage2(uint8_t sender) const
+        {
+            return core.find_stage2(sender);
+        }
+
+        const Credits::StageThree* stage3(uint8_t sender) const
+        {
+            return core.find_stage3(sender);
+        }
+
+        bool enough_stage1() const
+        {
+            return (core.stageOneStorage.size() == cnt_trusted());
+        }
+
+        bool enough_stage2() const
+        {
+            return (core.stageTwoStorage.size() == cnt_trusted());
+        }
+
+        bool enough_stage3() const
+        {
+            return (core.stageThreeStorage.size() >= cnt_trusted()/2 + 1);
+        }
+
+        void request_stage1(uint8_t from, uint8_t required);
+
+        void request_stage2(uint8_t from, uint8_t required);
+
+        void request_stage3(uint8_t from, uint8_t required);
+
+        void mark_untrusted(uint8_t sender)
+        {
+            if(sender < Consensus::MaxTrustedNodes) {
+                ++(core.markUntrusted[sender]);
+            }
+        }
+
+        //bool is_untrusted(uint8_t sender) const
+        //{
+        //    return untrusted_value(sender) > 0;
+        //}
+
+        uint8_t untrusted_value(uint8_t sender) const
+        {
+            if(sender < Consensus::MaxTrustedNodes) {
+                return (core.markUntrusted[sender]);
+            }
+            return 0;
+        }
+
+        //size_t cnt_untrusted() const
+        //{
+        //    size_t cnt = 0;
+        //    for(size_t i = 0; i < Consensus::MaxTrustedNodes; ++i) {
+        //        if(core.markUntrusted[i] > 0) {
+        //            ++cnt;
+        //        }
+        //    }
+        //    return cnt;
+        //}
+
+        void accept_transactions(const csdb::Pool& pool)
+        {
+            core.accepted_pool = pool;
         }
 
         /**
@@ -284,7 +328,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        uint32_t round() const
+        size_t round() const
         {
             return core.cur_round;
         }
@@ -349,7 +393,7 @@ namespace slv2
          *          
          */
 
-        const std::vector<cs::PublicKey>& trusted() const;
+        const std::vector<PublicKey>& trusted() const;
 
         /**
          * @fn  bool SolverContext::is_spammer() const;
@@ -369,69 +413,86 @@ namespace slv2
             return core.opt_spammer_on;
         }
 
+        void update_fees(csdb::Pool& p)
+        {
+            core.pfee->CountFeesInPool(core.pnode, &p);
+        }
+
         /**
-         * @fn  void SolverContext::store_received_block(csdb::Pool & block);
+         * @fn  void SolverContext::store_received_block(csdb::Pool & block, bool defer_write = false)
          *
          * @brief   Stores received block
          *
          * @author  Alexander Avramenko
          * @date    10.10.2018
          *
-         * @param [in,out]  block   The block.
+         * @param [in,out]  block       The block.
+         * @param           defer_write (Optional) True to defer write.
          */
 
-        void store_received_block(csdb::Pool & block)
+        void store_received_block(csdb::Pool & block, bool defer_write = false)
         {
-            core.storeReceivedBlock(block);
+            core.store_received_block(block, defer_write);
         }
 
         // Common operations, candidates for refactoring:
 
         /**
-         * @fn  void SolverContext::create_and_send_new_block();
+         * @fn  void SolverContext::flush_deferred_block()
          *
-         * @brief   Makes a block from inner pool of collected and validated transactions and send it
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void create_and_send_new_block()
-        {
-            core.createAndSendNewBlock();
-        }
-
-        /**
-         * @fn  void SolverContext::create_and_send_new_block_from(csdb::Pool& p)
-         *
-         * @brief   Creates and send new block from passed pool of transactions
+         * @brief   Flus deferred block
          *
          * @author  Alexander Avramenko
-         * @date    11.10.2018
-         *
-         * @param [in,out]  p   A csdb::Pool to process.
+         * @date    24.10.2018
          */
 
-        void create_and_send_new_block_from(csdb::Pool& p)
+        void flush_deferred_block()
         {
-            core.createAndSendNewBlockFrom(p);
+            core.flush_deferred_block();
         }
 
         /**
-         * @fn  void SolverContext::repeat_last_block()
+         * @fn  void SolverContext::drop_deferred_block()
          *
-         * @brief   Resend last block
+         * @brief   Drop deferred block
          *
-         * @author  aae
-         * @date    02.10.2018
+         * @author  Alexander Avramenko
+         * @date    24.10.2018
          */
 
-        void repeat_last_block()
+        void drop_deferred_block()
         {
-            core.repeatLastBlock();
+            core.drop_deferred_block();
         }
+
+        /**
+         * @fn  bool SolverContext::is_block_deferred() const
+         *
+         * @brief   Query if this object is block deferred
+         *
+         * @author  Alexander Avramenko
+         * @date    24.10.2018
+         *
+         * @return  True if block deferred, false if not.
+         */
+
+        bool is_block_deferred() const
+        {
+            return core.is_block_deferred();
+        }
+
+        /**
+         * @fn  const uint8_t* SolverContext::last_block_hash();
+         *
+         * @brief   Last block hash
+         *
+         * @author  Alexander Avramenko
+         * @date    24.10.2018
+         *
+         * @return  Null if it fails, else a pointer to a const uint8_t.
+         */
+
+        const uint8_t* last_block_hash();
 
         /**
          * @fn  void SolverContext::request_round_table() const;
@@ -464,137 +525,7 @@ namespace slv2
         }
 
         /**
-         * @fn  void SolverContext::flush_transactions();
-         *
-         * @brief   Sends the transactions in inner list
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return count of flushed transactions
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        size_t flush_transactions()
-        {
-            return core.flushTransactions();
-        }
-
-        /**
-         * @fn  bool SolverContext::is_vect_recv_from(uint8_t sender) const;
-         *
-         * @brief   Query if is vector received from passed sender
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * @return  True if vect receive from, false if not.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        bool is_vect_recv_from(uint8_t sender) const
-        {
-            return core.recv_vect.find(sender) != core.recv_vect.cend();
-        }
-
-        /**
-         * @fn  void SolverContext::recv_vect_from(uint8_t sender);
-         *
-         * @brief   Inform core to remember that vector from passed sender is received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void recv_vect_from(uint8_t sender)
-        {
-            core.recv_vect.insert(sender);
-        }
-
-        /**
-         * @fn  size_t SolverContext::cnt_vect_recv() const;
-         *
-         * @brief   Count of vectors received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  The total number of vect receive.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        size_t cnt_vect_recv() const
-        {
-            return core.recv_vect.size();
-        }
-
-        /**
-         * @fn  bool SolverContext::is_matr_recv_from(uint8_t sender) const;
-         *
-         * @brief   Query if is matrix received from passed sender
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * @return  True if matr receive from, false if not.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        bool is_matr_recv_from(uint8_t sender) const
-        {
-            return core.recv_matr.find(sender) != core.recv_matr.cend();
-        }
-
-        /**
-         * @fn  void SolverContext::recv_matr_from(uint8_t sender);
-         *
-         * @brief   Inform core to remember that matrix from passed sender is received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void recv_matr_from(uint8_t sender)
-        {
-            core.recv_matr.insert(sender);
-        }
-
-        /**
-         * @fn  size_t SolverContext::cnt_matr_recv() const;
-         *
-         * @brief   Count of matrices received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  The total number of matr receive.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        size_t cnt_matr_recv() const
-        {
-            return core.recv_matr.size();
-        }
-
-        /**
-         * @fn  bool SolverContext::is_hash_recv_from(const cs::PublicKey& sender) const;
+         * @fn  bool SolverContext::is_hash_recv_from(const PublicKey& sender) const;
          *
          * @brief   Query if is hash received from passed sender
          *
@@ -608,13 +539,13 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        bool is_hash_recv_from(const cs::PublicKey& sender) const
+        bool is_hash_recv_from(const PublicKey& sender) const
         {
             return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
         }
 
         /**
-         * @fn  void SolverContext::recv_hash_from(const cs::PublicKey& sender);
+         * @fn  void SolverContext::recv_hash_from(const PublicKey& sender);
          *
          * @brief   Inform core to remember that hash from passed sender is received
          *
@@ -626,7 +557,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        void recv_hash_from(const cs::PublicKey& sender)
+        void recv_hash_from(const PublicKey& sender)
         {
             core.recv_hash.push_back(sender);
         }
@@ -697,7 +628,6 @@ namespace slv2
             return core.addr_start;
         }
 
-
 		/**
 		 * @fn	csdb::Address SolverContext::optimize(const csdb::Address& address) const;
 		 *
@@ -725,62 +655,52 @@ namespace slv2
          * @param   target  Target for the.
          */
 
-        void send_hash(const cs::Hash& hash, const cs::PublicKey& target);
+        void send_hash(const Hash& hash, const PublicKey& target);
 
         /**
-         * @fn  void SolverContext::send_own_vector();
+         * @fn  bool SolverContext::test_trusted_idx(uint8_t idx, const PublicKey& sender);
          *
-         * @brief   Sends the own vector
+         * @brief   test conformance of node index to public key.
          *
          * @author  Alexander Avramenko
-         * @date    15.10.2018
+         * @date    31.10.2018
+         *
+         * @param   idx     Zero-based index of the.
+         * @param   sender  The sender.
+         *
+         * @return  True if the test passes, false if the test fails.
          */
 
-        void send_own_vector();
+        bool test_trusted_idx(uint8_t idx, const PublicKey& sender);
 
         /**
-         * @fn  void SolverContext::send_own_matrix();
+         * @fn  bool SolverContext::transaction_still_in_pool(int64_t inner_id) const
          *
-         * @brief   Sends the own matrix
-         *
-         * @author  Alexander Avramenko
-         * @date    15.10.2018
-         */
-
-        void send_own_matrix();
-
-        /**
-         * @fn  void SolverContext::send_transaction_list(csdb::Pool& pool);
-         *
-         * @brief   Sends a transaction list
+         * @brief   Tests if transaction with inner_id passed still in pool (not sent yet)
          *
          * @author  Alexander Avramenko
-         * @date    15.10.2018
+         * @date    31.10.2018
          *
-         * @param [in,out]  pool    The pool.
+         * @param   inner_id    Identifier for the inner.
+         *
+         * @return  True if it succeeds, false if it fails.
          */
 
-        void send_transaction_list(csdb::Pool& pool);
-
-        // methods to operate with vectors cache
-
-        void cache_vector(uint8_t sender, const cs::HashVector& vect)
+        bool transaction_still_in_pool(int64_t inner_id) const
         {
-            core.cache_vector(sender, vect);
-        }
-
-        // looks for vector in matrices already received, returns nullptr if vector not found:
-        const cs::HashVector* lookup_vector(uint8_t sender) const
-        {
-            return core.lookup_vector(sender);
-        }
-
-        void clear_vectors_cache()
-        {
-            core.clear_vectors_cache();
+            if(core.trans_pool.transactions_count() == 0) {
+                return false;
+            }
+            for(const auto& t : core.trans_pool.transactions()) {
+                if(t.innerID() == inner_id) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     private:
+
         SolverCore& core;
     };
 
