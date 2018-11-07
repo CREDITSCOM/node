@@ -72,7 +72,7 @@ namespace slv2
         void gotTransaction(const csdb::Transaction& trans);
         void gotTransactionList(csdb::Pool& p);
         void gotVector(const cs::HashVector& vect);
-        void gotMatrix(const cs::HashMatrix& matr);
+        void gotMatrix(cs::HashMatrix&& matr);
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
         void gotBlockReply(csdb::Pool&& p);
