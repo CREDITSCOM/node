@@ -1228,7 +1228,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
-    showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+
+    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
@@ -1526,14 +1527,9 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
-  if (globalSequence == 0) {
-    globalSequence = roundNum_;
-  }
-
   auto last = float(lastWrittenSequence);
   auto global = float(globalSequence);
-  auto cached = float(solver_->getCountCahchedBlock(lastWrittenSequence, globalSequence));
-  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last - cached) / global) * 100.0f);
+  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last) / global) * 100.0f);
 
   if (syncStatus <= 100) {
     std::stringstream progress;

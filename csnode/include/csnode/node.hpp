@@ -183,7 +183,7 @@ private:
   template<class T>
   void writeDefaultStream(cs::DataStream& stream, const T& value);
 
-  void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
+  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   // TODO: C++ 17 static inline?
@@ -243,7 +243,6 @@ private:
   // sync meta
   cs::PoolMetaMap poolMetaMap_;
   cs::RoundNumber roundToSync_ = 0;
-
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
