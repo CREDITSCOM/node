@@ -57,14 +57,14 @@ namespace slv2
         //core.pnode->initNextRound(core.pnode->getMyPublicKey(), std::move(core.recv_hash)); //vshilkin
     }
 
-	csdb::Address SolverContext::optimize(const csdb::Address& address) const
-	{
-		csdb::internal::WalletId id;
-		if (core.pnode->getBlockChain().findWalletId(address, id)) {
-			return csdb::Address::from_wallet_id(id);
-		}
-		return address;
-	}
+    csdb::Address SolverContext::optimize(const csdb::Address& address) const
+    {
+        csdb::internal::WalletId id;
+        if (core.pnode->getBlockChain().findWalletId(address, id)) {
+            return csdb::Address::from_wallet_id(id);
+        }
+        return address;
+    }
 
     void SolverContext::send_hash(const cs::Hash & hash, const cs::PublicKey & target)
     {
@@ -83,7 +83,6 @@ namespace slv2
 
     void SolverContext::send_transaction_list(csdb::Pool & pool)
     {
-        core.pnode->sendTransactionList(pool);
     }
 
 } // slv2

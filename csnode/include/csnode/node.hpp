@@ -35,12 +35,8 @@ public:
 
   void run();
 
-  /* Incoming requests processing */
+  // incoming requests processing
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
-  void getBigBang(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type);
-  void getTransaction(const uint8_t*, const size_t);
-  void getFirstTransaction(const uint8_t*, const size_t);
-  void getTransactionsList(const uint8_t*, const size_t);
   void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -67,16 +63,14 @@ public:
   cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                                         const cs::Signature& signature, const cs::Notifications& notifications);
 
-  /*syncro get functions*/
+  // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
   void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
   void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
-  /* Outcoming requests forming */
-  void sendFirstTransaction(const csdb::Transaction&);
-  void sendTransactionList(const csdb::Pool&);
+  // outcoming requests forming
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
   void sendBlock(const csdb::Pool&);
@@ -113,15 +107,13 @@ public:
   void sendVectorRequest(const cs::PublicKey&);
   void sendMatrixRequest(const cs::PublicKey&);
 
-  void sendTLRequest();
-  void getTlRequest(const uint8_t* data, const size_t size);
-
   void getVectorRequest(const uint8_t* data, const size_t size);
   void getMatrixRequest(const uint8_t* data, const size_t size);
 
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const cs::RoundTable& roundTable);
+
   bool getSyncroStarted();
 
   enum MessageActions {

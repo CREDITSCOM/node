@@ -69,29 +69,6 @@ void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& p
   m_privateKey = privateKey;
 }
 
-void Solver::sendTL() {
-  if (m_gotBigBang) {
-    return;
-  }
-
-  uint32_t tNum = static_cast<uint32_t>(m_vPool.transactions_count());
-
-  cslog() << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-  csdebug() << "                          Total received " << tNum << " transactions";
-  cslog() << "========================================================================================";
-
-  m_isPoolClosed = true;
-
-  cslog() << "Solver -> Sending " << tNum << " transactions ";
-
-  m_vPool.set_sequence(m_node->getRoundNumber());
-  m_node->sendTransactionList(m_vPool);  // Correct sending, better when to all one time
-}
-
-uint32_t Solver::getTLsize() {
-  return static_cast<uint32_t>(m_vPool.transactions_count());
-}
-
 cs::PublicKey Solver::writerPublicKey() const {
   PublicKey result;
   const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().roundTable().confidants;

@@ -542,12 +542,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum);
-  case MsgTypes::Transactions:
-    return node_->getTransaction(data, size);
-  case MsgTypes::FirstTransaction:
-    return node_->getFirstTransaction(data, size);
-  case MsgTypes::TransactionList:
-    return node_->getTransactionsList(data, size);
   case MsgTypes::ConsVector:
     return node_->getVector(data, size, firstPack.getSender());
   case MsgTypes::ConsMatrix:
@@ -566,8 +560,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getMatrixRequest(data, size);
   case MsgTypes::RoundTableRequest:
     return node_->getRoundTableRequest(data, size, firstPack.getSender());
-  case MsgTypes::ConsTLRequest:
-    return node_->getTlRequest(data, size);
   case MsgTypes::NewBadBlock:
     return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
@@ -576,8 +568,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
-  case MsgTypes::BigBang:
-    return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
     return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::WriterNotification:
