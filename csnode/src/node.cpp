@@ -1452,12 +1452,17 @@ void Node::sendBlockRequest(uint32_t seq) {
     }
 
     if (!alreadyRequested) {  // Already requested this block from this guy?
-      LOG_NOTICE("Sending request for block " << reqSeq << " from nbr " << requestee->id);
+      cslog() << "Sending request for block " << reqSeq << " from nbr " << requestee->id;
+
       ostream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
       ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
+
       transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
-      if (lfReq == reqSeq && ++lfTimes >= 4)
+
+      if (lfReq == reqSeq && ++lfTimes >= 4) {
         transport_->sendBroadcast(ostream_.getPackets());
+      }
+
       ostream_.clear();
     }
 
@@ -1469,7 +1474,7 @@ void Node::sendBlockRequest(uint32_t seq) {
   isAwaitingSyncroBlock_ = true;
   awaitingRecBlockCount_ = 0;
 
-  csdebug() << "SENDBLOCKREQUEST> Sending request for block: " << seq;
+  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << seq;
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {

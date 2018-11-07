@@ -144,10 +144,8 @@ void Solver::gotRound() {
   cslog() << "SOLVER> Got round";
 
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-      cs::SharedLock lock(cs::Conveyer::instance().sharedMutex());
-      runConsensus();
-    });
+    cs::SharedLock lock(cs::Conveyer::instance().sharedMutex());
+    runConsensus();
   }
 }
 
@@ -245,10 +243,7 @@ void Solver::runFinalConsensus() {
         m_node->becomeWriter();
       }
       else {
-        // TODO: make next stage without delay
-        cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-          m_node->sendWriterNotification();
-        });
+        m_node->sendWriterNotification();
       }
     }
   }
@@ -452,11 +447,13 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
         cslog() << "Solver - > Add sender to next confidant list";
         m_hashesReceivedKeys.push_back(sender);
       }
-    } else {
+    }
+    else {
       cslog() << "Hashes do not match!!!";
       return;
     }
-  } else {
+  }
+  else {
     cslog() << "Solver -> We have enough hashes!";
     return;
   }
@@ -472,6 +469,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());
+
       for (const auto& element : conveyer.transactionsPacketTable()) {
         hashes.push_back(element.first);
       }
@@ -490,10 +488,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cslog() << "Solver -> NEW ROUND initialization done";
 
     if (!m_roundTableSent) {
-      cs::Timer::singleShot(ROUND_DELAY, [=]() {
-        m_node->initNextRound(cs::Conveyer::instance().roundTable());
-      });
-
+      m_node->initNextRound(cs::Conveyer::instance().roundTable());
       m_roundTableSent = true;
     }
   }

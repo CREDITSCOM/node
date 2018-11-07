@@ -7,8 +7,6 @@
 #define SPAMMER
 #define SYNCRO
 //#define CUT_PACKETS_ON_SYNCRO
-
-#define NO_DELAYS
 #define FLUSH_PACKETS_TO_NETWORK
 
 #define BOTTLENECKED_SMARTS
