@@ -582,12 +582,12 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
-using transport_type = ::apache::thrift::transport::TTransport;
-void execute_by_code(::executor::ContractExecutorConcurrentClient& executor, std::shared_ptr<transport_type> _transport,
-	executor::APIResponse& resp, const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
+void APIHandler::execute_byte_code(executor::APIResponse& resp, 
+	const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
 {
+  using transport_type = decltype(executor_transport)::element_type;
   const auto deleter = [](transport_type* transport) {if (transport != nullptr) transport->close(); };
-  const auto transport = std::unique_ptr<transport_type, decltype(deleter)>(_transport.get(), deleter);
+  const auto transport = std::unique_ptr<transport_type, decltype(deleter)>(executor_transport.get(), deleter);
   while (!transport->isOpen()) {
     transport->open();
   }
@@ -603,19 +603,19 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
 
   executor::APIResponse api_resp;
   //name
-  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
   _return.name = api_resp.ret_val.v_string;
   //decimal
   api_resp.ret_val.v_string.clear();
-  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
   _return.decimal = api_resp.ret_val.v_string;
   //total coins
   api_resp.ret_val.v_string.clear();
-  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
   _return.totalCoins = api_resp.ret_val.v_string;
   //symbol
   api_resp.ret_val.v_string.clear();
-  execute_by_code(executor, executor_transport, api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
   _return.symbol = api_resp.ret_val.v_string;
   //owner
   _return.owner = api_resp.contractVariables["owner"].v_string;
@@ -698,7 +698,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   }
 
   executor::APIResponse api_resp;
-  execute_by_code(executor, executor_transport, api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+  execute_byte_code(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.code) {
     _return.status.code = api_resp.code;
