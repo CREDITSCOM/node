@@ -74,7 +74,7 @@ namespace slv2
 
     void SolverContext::request_round_table() const
     {
-        core.pnode->sendRoundTableRequest(core.cur_round);
+//        core.pnode->sendRoundTableRequest(core.cur_round);
     }
 
     Role SolverContext::role() const

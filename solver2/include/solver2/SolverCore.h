@@ -72,8 +72,8 @@ namespace slv2
         void gotTransaction(const csdb::Transaction& trans);
         void gotTransactionList(csdb::Pool& p);
         void gotVector(const cs::HashVector& vect);
-        void gotMatrix(const cs::HashMatrix& matr);
-        void gotBlock(csdb::Pool& p, const cs::PublicKey& sender);
+        void gotMatrix(cs::HashMatrix&& matr);
+        void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
         void gotBlockReply(csdb::Pool& p);
         void gotHash(const cs::Hash& hash, const cs::PublicKey& sender);
@@ -137,7 +137,21 @@ namespace slv2
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const
         {}
-
+#if 0 // added with conveyer
+        void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
+        void runSpammer();
+        void gotRound();
+        bool getIPoolClosed();
+        void gotHash(std::string&&, const cs::PublicKey&);
+        const cs::PrivateKey& getPrivateKey() const;
+        const cs::PublicKey& getPublicKey() const;
+        cs::PublicKey getWriterPublicKey() const;
+        bool getBigBangStatus();
+        bool isPoolClosed() const;
+        NodeLevel nodeLevel() const;
+        const cs::PublicKey& nodePublicKey() const;
+        void countFeesInPool(csdb::Pool* pool);
+#endif // 0
     private:
 
         // to use private data while serve for states as SolverCore context:

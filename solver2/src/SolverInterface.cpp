@@ -104,7 +104,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotMatrix(const cs::HashMatrix& matr)
+    void SolverCore::gotMatrix(cs::HashMatrix&& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             cs::HashMatrix tmp = matr;

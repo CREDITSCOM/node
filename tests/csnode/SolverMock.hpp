@@ -14,7 +14,6 @@ public:
   MOCK_CONST_METHOD0(getMyPublicKey, cs::PublicKey());
   MOCK_CONST_METHOD0(getPathToDB, std::string());
   MOCK_METHOD2(set_keys, void(const std::vector<uint8_t>& pub, const std::vector<uint8_t>& priv));
-  MOCK_METHOD1(gotTransaction, void(csdb::Transaction&&));
   MOCK_METHOD1(gotTransactionsPacket, void(cs::TransactionsPacket&& packet));
   MOCK_METHOD2(gotPacketHashesRequest, void(std::vector<cs::TransactionsPacketHash>&& hashes, const cs::PublicKey& sender));
   MOCK_METHOD1(gotPacketHashesReply, void(cs::TransactionsPacket&& packet));
@@ -26,7 +25,6 @@ public:
   MOCK_METHOD2(gotBlockRequest, void(csdb::PoolHash&&, const cs::PublicKey&));
   MOCK_METHOD1(gotBlockReply, void(csdb::Pool&&));
   MOCK_METHOD2(gotBadBlockHandler, void(csdb::Pool&&, const cs::PublicKey&));
-  MOCK_METHOD0(sendTL, void());
   MOCK_METHOD4(applyCharacteristic, void(const std::vector<uint8_t>& characteristic, const uint32_t bitsCount,
                        const csdb::Pool& metaInfoPool, const cs::PublicKey& sender));
   MOCK_CONST_METHOD0(getCharacteristicHash, cs::Hash());
@@ -38,7 +36,6 @@ public:
 
   // API methods
   MOCK_METHOD0(initApi, void());
-  MOCK_METHOD0(getTLsize, uint32_t());
   MOCK_METHOD0(addInitialBalance, void());
 
   MOCK_METHOD0(currentRoundNumber, cs::RoundNumber());

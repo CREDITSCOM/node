@@ -82,6 +82,10 @@ void formSSConnectPack(const Config& config, OPackStream& stream, const cs::Publ
 }
 }  // namespace
 
+Transport::~Transport() {
+  delete net_;
+}
+
 void Transport::run() {
   net_->sendInit();
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
@@ -177,6 +181,13 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
   for (auto ptr = pack; ptr != packEnd; ++ptr) {
     nh_.registerDirect(ptr, conn);
     sendDirect(ptr, **conn);
+  }
+}
+
+void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
+  const auto packEnd = pack + size;
+  for (auto ptr = pack; ptr != packEnd; ++ptr) {
+    sendBroadcast(ptr);
   }
 }
 
@@ -411,7 +422,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0) {
-    rn = pack.getRoundNum();
+    rn = pack.getRoundNum() + (pack.getType() != MsgTypes::Transactions ? 0 : 5);
   }
 
   return !rn || rn >= rLim;
@@ -542,12 +553,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum);
-  case MsgTypes::Transactions:
-    return node_->getTransaction(data, size);
-  case MsgTypes::FirstTransaction:
-    return node_->getFirstTransaction(data, size);
-  case MsgTypes::TransactionList:
-    return node_->getTransactionsList(data, size);
   case MsgTypes::ConsVector:
     return node_->getVector(data, size, firstPack.getSender());
   case MsgTypes::ConsMatrix:
@@ -560,24 +565,12 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
     return node_->getBlockReply(data, size);
-  case MsgTypes::ConsVectorRequest:
-    return node_->getVectorRequest(data, size);
-  case MsgTypes::ConsMatrixRequest:
-    return node_->getMatrixRequest(data, size);
-  case MsgTypes::RoundTableRequest:
-    return node_->getRoundTableRequest(data, size, firstPack.getSender());
-  case MsgTypes::ConsTLRequest:
-    return node_->getTlRequest(data, size);
-  case MsgTypes::NewBadBlock:
-    return node_->getBadBlock(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
     return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
-  case MsgTypes::BigBang:
-    return node_->getBigBang(data, size, rNum, type);
   case MsgTypes::NewCharacteristic:
     return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::WriterNotification:
@@ -1057,7 +1050,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
       if (!conn) return false;
 
       SpinLock l(oLock_);
-      oPackStream_.init(BaseFlags::Neighbors | BaseFlags::Signed);
+      oPackStream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
       oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
       sendDirect(oPackStream_.getPackets(), *conn);
       oPackStream_.clear();
