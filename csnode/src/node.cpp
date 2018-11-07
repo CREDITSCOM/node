@@ -86,9 +86,7 @@ bool Node::init() {
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
 
-#ifdef FLUSH_PACKETS_TO_NETWORK
   cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
-#endif
 
   return true;
 }
