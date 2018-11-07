@@ -64,7 +64,6 @@ public:
   void gotBadBlockHandler(csdb::Pool&&, const cs::PublicKey&);
   void gotIncorrectBlock(csdb::Pool&&, const cs::PublicKey&);
   void gotFreeSyncroBlock(csdb::Pool&&);
-  void sendTL();
   void rndStorageProcessing();
   void tmpStorageProcessing();
 

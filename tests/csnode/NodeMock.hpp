@@ -6,6 +6,7 @@
 #define PROJECT_NODEMOCK_HPP
 
 #include <gmock/gmock.h>
+#include "csnode/nodecore.h"
 #include "csnode/node.hpp"
 
 class NodeMock : public Node
@@ -16,7 +17,6 @@ public:
 
   /* Incoming requests processing */
   MOCK_METHOD4(getRoundTable, void(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type));
-  MOCK_METHOD4(getBigBang, void(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type));
   MOCK_METHOD2(getTransaction, void(const uint8_t*, const size_t));
   MOCK_METHOD2(getFirstTransaction, void(const uint8_t*, const size_t));
   MOCK_METHOD2(getTransactionsList, void(const uint8_t*, const size_t));
@@ -40,9 +40,6 @@ public:
   MOCK_METHOD3(getBlockRequest, void(const uint8_t*, const size_t, const cs::PublicKey& sender));
   MOCK_METHOD2(getBlockReply, void(const uint8_t*, const size_t));
   MOCK_METHOD3(getWritingConfirmation, void(const uint8_t* data, const size_t size, const cs::PublicKey& sender));
-  MOCK_METHOD3(getRoundTableRequest, void(const uint8_t* data, const size_t size, const cs::PublicKey& sender));
-
-  MOCK_METHOD3(getBadBlock, void(const uint8_t*, const size_t, const cs::PublicKey& sender));
 
   /* Outcoming requests forming */
   MOCK_METHOD0(sendRoundTable, void());
@@ -57,27 +54,15 @@ public:
 
   // transaction's pack syncro
   MOCK_METHOD1(sendTransactionsPacket, void(const cs::TransactionsPacket& packet));
-  MOCK_METHOD1(sendPacketHashesRequest, void(const std::vector<cs::TransactionsPacketHash>& hashes));
-  MOCK_METHOD2(sendPacketHashesReply, void(const cs::TransactionsPacket& packet, const cs::PublicKey& sender));
+  MOCK_METHOD2(sendPacketHashesRequest, void(const cs::Hashes& hashes, const cs::RoundNumber round));
+  MOCK_METHOD2(sendPacketHashesRequestToRandomNeighbour, void(const cs::Hashes& hashes, const cs::RoundNumber round));
+  MOCK_METHOD3(sendPacketHashesReply, void(const cs::Packets& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
 
-  MOCK_METHOD1(sendBadBlock, void(const csdb::Pool& pool));
   MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic));
 
   /*syncro send functions*/
   MOCK_METHOD1(sendBlockRequest, void(uint32_t seq));
   MOCK_METHOD2(sendBlockReply, void(const csdb::Pool&, const cs::PublicKey&));
-  MOCK_METHOD1(sendWritingConfirmation, void(const cs::PublicKey& node));
-  MOCK_METHOD1(sendRoundTableRequest, void(size_t rNum));
-//  MOCK_METHOD1(sendRoundTableUpdated, void(const cs::RoundInfo& round));
-
-  MOCK_METHOD1(sendVectorRequest, void(const cs::PublicKey&));
-  MOCK_METHOD1(sendMatrixRequest, void(const cs::PublicKey&));
-
-  MOCK_METHOD0(sendTLRequest, void());
-  MOCK_METHOD2(getTlRequest, void(const uint8_t* data, const size_t size));
-
-  MOCK_METHOD2(getVectorRequest, void(const uint8_t* data, const size_t size));
-  MOCK_METHOD2(getMatrixRequest, void(const uint8_t* data, const size_t size));
 
   MOCK_METHOD0(flushCurrentTasks, void());
   MOCK_METHOD0(becomeWriter, void());

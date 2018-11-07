@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -20,13 +21,14 @@
 #include "packstream.hpp"
 
 class Transport;
-namespace slv2 { class SolverCore; }
+
+namespace slv2 {
+  class SolverCore;
+}
 
 class Node {
 public:
-  static const std::string start_address_;
-public:
-  Node(const Config&);
+  explicit Node(const Config&);
   ~Node();
 
   bool isGood() const {
@@ -35,12 +37,8 @@ public:
 
   void run();
 
-  /* Incoming requests processing */
+  // incoming requests processing
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
-  void getBigBang(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type);
-  void getTransaction(const uint8_t*, const size_t);
-  void getFirstTransaction(const uint8_t*, const size_t);
-  void getTransactionsList(const uint8_t*, const size_t);
   void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -67,16 +65,11 @@ public:
   cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                                         const cs::Signature& signature, const cs::Notifications& notifications);
 
-  /*syncro get functions*/
+  // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
-  void getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
-  void getBadBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
-
-  /* Outcoming requests forming */
-  void sendFirstTransaction(const csdb::Transaction&);
-  void sendTransactionList(const csdb::Pool&);
+  // outcoming requests forming
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
   void sendBlock(const csdb::Pool&);
@@ -84,44 +77,34 @@ public:
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const std::vector<cs::TransactionsPacketHash>& hashes, const cs::RoundNumber round);
-  void sendPacketHashesReply(const std::vector<cs::TransactionsPacket>& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
   void resetNeighbours();
-
-  void sendBadBlock(const csdb::Pool& pool);
 
   /*syncro send functions*/
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
-  void sendWritingConfirmation(const cs::PublicKey& node);
-  void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
 
   template<class... Args>
-  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendDirect(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendDirect(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  bool sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  bool sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  void sendNeighbours(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  void sendBroadcast(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
-  void sendVectorRequest(const cs::PublicKey&);
-  void sendMatrixRequest(const cs::PublicKey&);
-
-  void sendTLRequest();
-  void getTlRequest(const uint8_t* data, const size_t size);
-
-  void getVectorRequest(const uint8_t* data, const size_t size);
-  void getMatrixRequest(const uint8_t* data, const size_t size);
-
   void flushCurrentTasks();
   void becomeWriter();
   void initNextRound(const cs::RoundTable& roundTable);
+
   bool getSyncroStarted();
 
   enum MessageActions {
@@ -154,6 +137,7 @@ public:
   slv2::SolverCore* getSolver() {
     return solver_;
   }
+
   const slv2::SolverCore* getSolver() const {
     return solver_;
   }
@@ -175,6 +159,7 @@ private:
   void generateKeys();
   bool checkKeysForSig();
 
+  // pool sync helpers
   void blockchainSync();
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
@@ -185,9 +170,10 @@ private:
 
   // conveyer
   void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-  void processPacketsReply(std::vector<cs::TransactionsPacket>&& packets, const cs::RoundNumber round);
+  void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
+  // pool compression helpers
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
@@ -197,7 +183,9 @@ private:
   template<class T>
   void writeDefaultStream(cs::DataStream& stream, const T& value);
 
-  // info
+  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+
+  // Info
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
@@ -220,7 +208,7 @@ private:
   std::string receviedTrxFileName_ = "rcvd.txt";
   std::string sentTrxFileName_ = "sent.txt";
 
-  // Current round state
+  // current round state
   cs::RoundNumber roundNum_ = 0;
   NodeLevel myLevel_;
 
@@ -229,6 +217,7 @@ private:
   // Resources
   BlockChain bc_;
 
+  // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
 
@@ -256,8 +245,6 @@ private:
   cs::PoolMetaMap poolMetaMap_;
   cs::RoundNumber roundToSync_ = 0;
 
-  static const uint8_t broadcastFlag_ = BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
-  static const uint8_t directFlag_ = BaseFlags::Neighbors | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

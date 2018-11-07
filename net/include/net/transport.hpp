@@ -73,9 +73,7 @@ class Transport {
     good_ = net_->isGood();
   }
 
-  ~Transport() {
-    delete net_;
-  }
+  ~Transport();
 
   [[noreturn]] void run();
 
@@ -101,6 +99,7 @@ class Transport {
 
   bool sendDirect(const Packet*, const Connection&);
   void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
+  void deliverBroadcast(const Packet*, const uint32_t);
 
   void gotPacket(const Packet&, RemoteNodePtr&);
   void redirectPacket(const Packet&, RemoteNodePtr&);

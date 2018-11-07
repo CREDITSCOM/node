@@ -69,29 +69,6 @@ void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& p
   m_privateKey = privateKey;
 }
 
-void Solver::sendTL() {
-  if (m_gotBigBang) {
-    return;
-  }
-
-  uint32_t tNum = static_cast<uint32_t>(m_vPool.transactions_count());
-
-  cslog() << "AAAAAAAAAAAAAAAAAAAAAAAA -= TRANSACTION RECEIVING IS OFF =- AAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-  csdebug() << "                          Total received " << tNum << " transactions";
-  cslog() << "========================================================================================";
-
-  m_isPoolClosed = true;
-
-  cslog() << "Solver -> Sending " << tNum << " transactions ";
-
-  m_vPool.set_sequence(m_node->getRoundNumber());
-  m_node->sendTransactionList(m_vPool);  // Correct sending, better when to all one time
-}
-
-uint32_t Solver::getTLsize() {
-  return static_cast<uint32_t>(m_vPool.transactions_count());
-}
-
 cs::PublicKey Solver::writerPublicKey() const {
   PublicKey result;
   const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().roundTable().confidants;
@@ -144,10 +121,8 @@ void Solver::gotRound() {
   cslog() << "SOLVER> Got round";
 
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-      cs::SharedLock lock(cs::Conveyer::instance().sharedMutex());
-      runConsensus();
-    });
+    cs::SharedLock lock(cs::Conveyer::instance().sharedMutex());
+    runConsensus();
   }
 }
 
@@ -245,10 +220,7 @@ void Solver::runFinalConsensus() {
         m_node->becomeWriter();
       }
       else {
-        // TODO: make next stage without delay
-        cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY, [this] {
-          m_node->sendWriterNotification();
-        });
+        m_node->sendWriterNotification();
       }
     }
   }
@@ -452,11 +424,13 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
         cslog() << "Solver - > Add sender to next confidant list";
         m_hashesReceivedKeys.push_back(sender);
       }
-    } else {
+    }
+    else {
       cslog() << "Hashes do not match!!!";
       return;
     }
-  } else {
+  }
+  else {
     cslog() << "Solver -> We have enough hashes!";
     return;
   }
@@ -472,6 +446,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
 
     {
       cs::SharedLock lock(conveyer.sharedMutex());
+
       for (const auto& element : conveyer.transactionsPacketTable()) {
         hashes.push_back(element.first);
       }
@@ -490,10 +465,7 @@ void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
     cslog() << "Solver -> NEW ROUND initialization done";
 
     if (!m_roundTableSent) {
-      cs::Timer::singleShot(ROUND_DELAY, [=]() {
-        m_node->initNextRound(cs::Conveyer::instance().roundTable());
-      });
-
+      m_node->initNextRound(cs::Conveyer::instance().roundTable());
       m_roundTableSent = true;
     }
   }

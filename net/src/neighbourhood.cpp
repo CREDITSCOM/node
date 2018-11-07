@@ -6,6 +6,8 @@
 
 #include <csnode/blockchain.hpp>
 
+#include <lib/system/utils.hpp>
+
 Neighbourhood::Neighbourhood(Transport* net):
     transport_(net),
     connectionsAllocator_(MaxConnections + 1) {
@@ -388,10 +390,7 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node,
 
   if (isDirect) {
     auto& dp = msgDirects_.tryStore(hash);
-    //if (dp.receiver && conn->id == dp.receiver->id)
-      dp.received = true;
-    //else
-    //  LOG_WARN("Got confirmation from a different connection");
+    dp.received = true;
   }
   else {
     auto& bp = msgBroads_.tryStore(hash);
@@ -602,25 +601,22 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
 ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
   SpinLock l(nLockFlag_);
 
-  ConnectionPtr candidate;
+  const int candidateNumber = getRandomSyncNeighbourNumber();
 
-  for (auto& nb : neighbours_) {
-    if (nb->isSignal ||
-        nb->isRequested) {
-      continue;
-    }
-    if (!nb->syncNeighbourRetries) {
-      nb->syncNeighbourRetries = (rand() % (MaxSyncAttempts / 2)) + 1; // min == 1
-    }
-    candidate = nb;
-    break;
+  if (candidateNumber < 0) {
+    return ConnectionPtr();
   }
 
-  if (candidate) {
-    --(candidate->syncNeighbourRetries);
-    if (candidate->syncNeighbourRetries == 0) {
-      candidate->isRequested = true;
-    }
+  ConnectionPtr& candidate = *(neighbours_.begin() + candidateNumber);
+
+  if (!candidate->syncNeighbourRetries) {
+    candidate->syncNeighbourRetries = cs::Utils::generateRandomValue(1, MaxSyncAttempts * 3);
+  }
+
+  --(candidate->syncNeighbourRetries);
+
+  if (candidate->syncNeighbourRetries == 0) {
+    candidate->isRequested = true;
   }
 
   return candidate;
@@ -662,4 +658,34 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
       nb->syncSeqRetries = 0;
     }
   }
+}
+
+int Neighbourhood::getRandomSyncNeighbourNumber(const int attemptCount) {
+  const std::size_t neighbourCount = neighbours_.size() - 1;
+
+  if (attemptCount > (neighbourCount * 3)) {
+    int index = 0;
+    for (const auto& nb : neighbours_) {
+      if (nb->isSignal || nb->isRequested) {
+        ++index;
+      }
+      else {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  const int randomNumber = cs::Utils::generateRandomValue(0, neighbourCount);
+  const ConnectionPtr& nb = *(neighbours_.begin() + randomNumber);
+
+  if (!nb) {
+    return -1;
+  }
+
+  if (nb->isSignal || nb->isRequested) {
+    return getRandomSyncNeighbourNumber(attemptCount + 1);
+  }
+
+  return randomNumber;
 }

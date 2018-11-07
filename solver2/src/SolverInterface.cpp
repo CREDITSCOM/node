@@ -72,12 +72,6 @@ namespace slv2
         }
     }
 
-    void SolverCore::sendTL() {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->sendTL();
-        }
-    }
-
     const cs::HashVector& SolverCore::getMyVector() const
     {
         if(opt_is_proxy_v1 && pslv_v1) {
@@ -248,7 +242,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotMatrix(const cs::HashMatrix& matr)
+    void SolverCore::gotMatrix(cs::HashMatrix&& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             cs::HashMatrix tmp = matr;  //TODO: what is this?
