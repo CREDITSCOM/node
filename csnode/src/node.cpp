@@ -916,7 +916,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
-    csdebug() << "NODE> Sync packets already synced";
+    csdebug() << "NODE> Sync packets already synced in round: " << round;
     return;
   }
 
@@ -1661,6 +1661,13 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
     if (packet) {
       packets.push_back(std::move(packet).value());
     }
+  }
+
+  if (packets.size()) {
+    csdebug() << "NODE> Found hashes count in hash table storage: " << packets.size();
+  }
+  else {
+    csdebug() << "NODE> Can not find round in storage, hash not found";
   }
 
   sendPacketHashesReply(packets, round, sender);

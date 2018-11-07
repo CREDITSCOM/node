@@ -374,27 +374,20 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 {
     cs::SharedLock lock(m_sharedMutex);
 
-    if (pimpl->hashTable.count(hash) != 0u)
-    {
-        csdebug() << "CONVEYER> Found hash at current table in request - " << hash.toString();
+    if (pimpl->hashTable.count(hash) != 0u) {
         return pimpl->hashTable[hash];
     }
 
     const auto optional = pimpl->hashTablesStorage.value(round);
 
-    if (optional.has_value())
-    {
+    if (optional.has_value()) {
         const auto& value = optional.value();
-        csdebug() << "CONVEYER> Found round hash table in storage, searching hash";
 
-        if (auto iter = value.find(hash); iter != value.end())
-        {
-            csdebug() << "CONVEYER> Found hash in hash table storage";
+        if (auto iter = value.find(hash); iter != value.end()) {
             return iter->second;
         }
     }
 
-    csdebug() << "CONVEYER> Can not find round in storage, hash not found";
     return std::nullopt;
 }
 
@@ -436,11 +429,7 @@ void cs::Conveyer::flushTransactions()
         }
     }
 
-    if (!pimpl->transactionsBlock.empty())
-    {
-        csdebug() << "CONVEYER> All transaction packets flushed, packets count: " << pimpl->transactionsBlock.size();
-        csdebug() << "CONVEYER> Common flushed transactions count: " << allTransactionsCount;
-
+    if (!pimpl->transactionsBlock.empty()) {
         pimpl->transactionsBlock.clear();
     }
 }
