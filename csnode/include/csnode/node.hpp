@@ -198,6 +198,7 @@ private:
   void writeDefaultStream(cs::DataStream& stream, const T& value);
 
   // info
+  void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
