@@ -134,6 +134,9 @@ class APIHandler : public APIHandlerInterface
     void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) override;
 
   private:
+    void execute_byte_code(executor::APIResponse& resp, const std::string& address, const std::string& code,
+        const std::string& state, const std::string& method, const std::vector<::variant::Variant>& params);
+
     BlockChain& s_blockchain;
 
     std::vector<api::SealedTransaction>

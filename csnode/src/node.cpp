@@ -1173,23 +1173,7 @@ void Node::sendBlockRequest(uint32_t seq) {
 
   csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
   csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
-
-  if (gs == 0) {
-    gs = roundNum_;
-  }
-
-  csdb::Pool::sequence_t cached = solver_->getCountCahchedBlock(lws, gs);
-  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (gs * 1.0f - lws * 1.0f - cached * 1.0f) / gs) * 100.0f);
-  std::stringstream progress;
-
-  if (syncStatus <= 100) {
-    progress << "SYNC: [";
-    for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
-    for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
-    progress << "] " << syncStatus << "%";
-  }
-
-  cslog() << progress.str();
+  showSyncronizationProgress(lws, gs);
 
   uint32_t reqSeq = seq;
 
@@ -1543,6 +1527,27 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
   allocator_.shrinkLast(cs::numeric_cast<uint32_t>(realSize));
   ostream_ << type << roundNum_ << bSize;
   ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
+}
+
+void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
+    if (globalSequence == 0) {
+      globalSequence = roundNum_;
+    }
+
+    auto last = float(lastWrittenSequence);
+    auto global = float(globalSequence);
+    auto cached = float(solver_->getCountCahchedBlock(lastWrittenSequence, globalSequence));
+    const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last - cached) / global) * 100.0f);
+    std::stringstream progress;
+
+    if (syncStatus <= 100) {
+      progress << "SYNC: [";
+      for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
+      for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
+      progress << "] " << syncStatus << "%";
+    }
+
+    cslog() << progress.str();
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {
