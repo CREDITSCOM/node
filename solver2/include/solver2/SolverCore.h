@@ -3,8 +3,8 @@
 #include "CallsQueueScheduler.h"
 #include "INodeState.h"
 #include "Consensus.h"
-
-// temporary, while Credits::HashVector defined there
+#include "Stage.h"
+// temporary, while cs::HashVector defined there
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
 #include <Solver/Solver.hpp>
@@ -23,7 +23,7 @@
 
 // forward declarations
 class Node;
-namespace Credits
+namespace cs
 {
     class WalletsState;
     class Solver;
@@ -35,12 +35,6 @@ namespace Credits
 
 namespace slv2
 {
-
-    class SolverCore;
-
-    using KeyType = csdb::internal::byte_array;
-
-
 
     class SolverCore
     {
@@ -72,20 +66,18 @@ namespace slv2
         // Solver "public" interface,
         // below are the "required" methods to be implemented by Solver-compatibility issue:
         
-        const Credits::HashVector& getMyVector() const;
-        const Credits::HashMatrix& getMyMatrix() const;
-        void set_keys(const KeyType& pub, const KeyType& priv);
+        void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
         void gotTransactionList(csdb::Pool& p);
-        void gotVector(const Credits::HashVector& vect);
-        void gotMatrix(const Credits::HashMatrix& matr);
-        void gotBlock(csdb::Pool& p, const PublicKey& sender);
-        void gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender);
+        void gotVector(const cs::HashVector& vect);
+        void gotMatrix(const cs::HashMatrix& matr);
+        void gotBlock(csdb::Pool& p, const cs::PublicKey& sender);
+        void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
         void gotBlockReply(csdb::Pool& p);
-        void gotHash(const Hash& hash, const PublicKey& sender);
-        void gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender);
+        void gotHash(const cs::Hash& hash, const cs::PublicKey& sender);
+        void gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         // store outrunning syncro blocks
         void gotFreeSyncroBlock(csdb::Pool&& p);
         // retrieve outrunning syncro blocks and store them
@@ -97,9 +89,9 @@ namespace slv2
         void gotRoundInfoRequest(uint8_t requesterNumber);
 
         // Solver3 "public" extension
-        void gotStageOne(const Credits::StageOne& stage);
-        void gotStageTwo(const Credits::StageTwo& stage);
-        void gotStageThree(const Credits::StageThree& stage);
+        void gotStageOne(const cs::StageOne& stage);
+        void gotStageTwo(const cs::StageTwo& stage);
+        void gotStageThree(const cs::StageThree& stage);
         void gotTransactionList_V3(csdb::Pool&&);
 
         void gotStageOneRequest(uint8_t requester, uint8_t required);
@@ -143,7 +135,7 @@ namespace slv2
         csdb::Pool::sequence_t getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end ) const;
 
         // empty in Solver
-        void gotBadBlockHandler(const csdb::Pool& /*p*/, const PublicKey& /*sender*/) const
+        void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const
         {}
 
     private:
@@ -213,11 +205,11 @@ namespace slv2
         csdb::Address addr_start;
         std::optional<csdb::Address> addr_spam;
         size_t cur_round;
-        KeyType public_key;
-        KeyType private_key;
-        std::unique_ptr<Credits::Fee> pfee;
+        cs::PublicKey public_key;
+        cs::PrivateKey private_key;
+        std::unique_ptr<cs::Fee> pfee;
         // senders of hashes received this round
-        std::vector<PublicKey> recv_hash;
+        std::vector<cs::PublicKey> recv_hash;
         std::mutex trans_mtx;
         // pool for storing individual transactions from wallets and candidates for transaction list,
         // accumulates transactions until sent in write state
@@ -226,18 +218,18 @@ namespace slv2
         csdb::Pool accepted_pool {};
         // to store outrunning blocks until the time to insert them comes
         // stores pairs of <block, sender> sorted by sequence number
-        std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool,PublicKey>> outrunning_blocks;
+        std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool, cs::PublicKey>> outrunning_blocks;
         // store BB status to reproduce solver-1 logic
         bool is_bigbang;
 
         // previous solver version instance
 
-        std::unique_ptr<Credits::Solver> pslv_v1;
+        std::unique_ptr<cs::Solver> pslv_v1;
         Node * pnode;
-        std::unique_ptr<Credits::WalletsState> pws_inst;
-        Credits::WalletsState * pws;
-        std::unique_ptr<Credits::Generals> pgen_inst;
-        Credits::Generals * pgen;
+        std::unique_ptr<cs::WalletsState> pws_inst;
+        cs::WalletsState * pws;
+        std::unique_ptr<cs::Generals> pgen_inst;
+        cs::Generals * pgen;
 
         void ExecuteStart(Event start_event);
 
@@ -250,52 +242,66 @@ namespace slv2
         // scans cached before blocks and retrieve them for processing if good sequence number
         void test_outrunning_blocks();
 
-        void spawn_next_round(const std::vector<PublicKey>& nodes);
+        void spawn_next_round(const std::vector<cs::PublicKey>& nodes);
         void store_received_block(csdb::Pool& p, bool defer_write);
         bool is_block_deferred() const;
         void flush_deferred_block();
         void drop_deferred_block();
 
+        /**
+         * @fn  cs::StageOne* SolverCore::find_stage1(uint8_t sender);
+         *
+         * @brief   Searches for the stage 1 of given sender
+         *
+         * @author  Alexander Avramenko
+         * @date    07.11.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  Null if it fails, else the found stage 1.
+         */
 
-        Credits::StageOne* find_stage1(uint8_t sender)
-        {
-            for(auto it = stageOneStorage.begin(); it != stageOneStorage.end(); ++it) {
-                if(it->sender == sender) {
-                    return &(*it);
-                }
-            }
-            return nullptr;
-        }
+        cs::StageOne* find_stage1(uint8_t sender);
 
-        Credits::StageTwo* find_stage2(uint8_t sender)
-        {
-            for(auto it = stageTwoStorage.begin(); it != stageTwoStorage.end(); ++it) {
-                if(it->sender == sender) {
-                    return &(*it);
-                }
-            }
-            return nullptr;
-        }
+        /**
+         * @fn  cs::StageTwo* SolverCore::find_stage2(uint8_t sender);
+         *
+         * @brief   Searches for the stage 2 of given sender
+         *
+         * @author  Alexander Avramenko
+         * @date    07.11.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  Null if it fails, else the found stage 2.
+         */
 
-        Credits::StageThree* find_stage3(uint8_t sender)
-        {
-            for(auto it = stageThreeStorage.begin(); it != stageThreeStorage.end(); ++it) {
-                if(it->sender == sender) {
-                    return &(*it);
-                }
-            }
-            return nullptr;
-        }
+        cs::StageTwo* find_stage2(uint8_t sender);
+
+        /**
+         * @fn  cs::StageThree* SolverCore::find_stage3(uint8_t sender);
+         *
+         * @brief   Searches for the stage 3 of given sender
+         *
+         * @author  Alexander Avramenko
+         * @date    07.11.2018
+         *
+         * @param   sender  The sender.
+         *
+         * @return  Null if it fails, else the found stage 3.
+         */
+
+        cs::StageThree* find_stage3(uint8_t sender);
 
         //// -= THIRD SOLVER CLASS DATA FIELDS =-
         std::array<uint8_t, Consensus::MaxTrustedNodes> markUntrusted;
 
-        std::vector <Credits::StageOne> stageOneStorage;
-        std::vector <Credits::StageTwo> stageTwoStorage;
-        std::vector <Credits::StageThree> stageThreeStorage;
+        std::vector <cs::StageOne> stageOneStorage;
+        std::vector <cs::StageTwo> stageTwoStorage;
+        std::vector <cs::StageThree> stageThreeStorage;
 
         // stores candidates for next round
-        std::vector <PublicKey> trusted_candidates;
+        std::vector <cs::PublicKey> trusted_candidates;
     };
 
 } // slv2

@@ -18,6 +18,11 @@
 #include <lib/system/keys.hpp>
 #include <solver/TransactionsValidator.h>
 
+namespace slv2
+{
+    class SolverCore;
+}
+
 namespace cs {
 
 class WalletsState;
@@ -32,7 +37,7 @@ public:
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
-  cs::Hash buildVector(const cs::TransactionsPacket& packet, cs::Solver* solver);
+  cs::Hash buildVector(const cs::TransactionsPacket& packet, slv2::SolverCore* solver);
 
   void addVector(const HashVector& vector);
   void addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& confidantNodes);

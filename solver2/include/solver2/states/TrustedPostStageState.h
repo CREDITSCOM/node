@@ -28,7 +28,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onStage3(SolverContext& context, const Credits::StageThree& stage) override;
+        Result onStage3(SolverContext& context, const cs::StageThree& stage) override;
 
         const char * name() const override
         {

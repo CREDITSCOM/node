@@ -2,7 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include <TimeoutTracking.h>
 
-// Credits::StageTwo requires:
+// cs::StageTwo requires:
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
 #include <Solver/Solver.hpp>
@@ -45,7 +45,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onStage1(SolverContext& context, const Credits::StageOne& stage) override;
+        Result onStage1(SolverContext& context, const cs::StageOne& stage) override;
 
         const char * name() const override
         {
@@ -54,7 +54,7 @@ namespace slv2
 
     private:
 
-        Credits::StageTwo stage;
+        cs::StageTwo stage;
 
         // timeout tracking
 

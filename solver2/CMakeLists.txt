@@ -15,6 +15,7 @@ add_library(${PROJECT_NAME} STATIC
 	include/solver2/Consensus.h
 	include/solver2/INodeState.h
 	include/solver2/Result.h
+	include/solver2/Stage.h
 	include/solver2/SolverCore.h
 	include/solver2/SolverContext.h
 	include/solver2/CallsQueueScheduler.h

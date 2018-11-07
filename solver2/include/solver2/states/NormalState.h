@@ -35,7 +35,7 @@ namespace slv2
         Result onRoundTable(SolverContext& context, const size_t round) override;
 
         /**
-         * @fn  Result NormalState::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+         * @fn  Result NormalState::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
          *
          * @brief   Overrides base implementation to flush block immediately
          *
@@ -49,7 +49,7 @@ namespace slv2
          * @return  A Result.
          */
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {

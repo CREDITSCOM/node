@@ -102,7 +102,7 @@ namespace slv2
       }
     }
 
-    Result TrustedPostStageState::onStage3(SolverContext & context, const Credits::StageThree & /*stage*/)
+    Result TrustedPostStageState::onStage3(SolverContext & context, const cs::StageThree & /*stage*/)
     {
         if(context.enough_stage3()) {
             LOG_NOTICE(name() << ": enough stage-3 received");

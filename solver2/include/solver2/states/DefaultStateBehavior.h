@@ -67,7 +67,7 @@ namespace slv2
         Result onRoundTable(SolverContext& context, const size_t round) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
          *
          * @brief   Do test of block received.
          *          
@@ -86,10 +86,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& sender) override;
+        Result onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+         * @fn  Result DefaultStateBehavior::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
          *
          * @brief   Ignores the hash received
          *
@@ -105,7 +105,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         /**
          * @fn  Result DefaultStateBehavior::onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
@@ -143,14 +143,14 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, csdb::Pool& pool) override;
 
-        Result onStage1(SolverContext& context, const Credits::StageOne& stage) override;
-        Result onStage2(SolverContext& context, const Credits::StageTwo& stage) override;
-        Result onStage3(SolverContext& context, const Credits::StageThree& stage) override;
+        Result onStage1(SolverContext& context, const cs::StageOne& stage) override;
+        Result onStage2(SolverContext& context, const cs::StageTwo& stage) override;
+        Result onStage3(SolverContext& context, const cs::StageThree& stage) override;
 
     protected:
 
         /**
-         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& sender);
+         * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& sender);
          *
          * @brief   Sends a last written hash to 
          *
@@ -161,7 +161,7 @@ namespace slv2
          * @param           target  The target receiver of hash sent.
          */
 
-        void sendLastWrittenHash(SolverContext& context, const PublicKey& target);
+        void sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target);
     };
 
 } // slv2

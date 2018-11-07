@@ -20,7 +20,7 @@ namespace slv2
                     LOG_NOTICE(name() << ": it is time to spawn first round");
                 }
                 trusted_candidates.assign(Consensus::MinTrustedNodes, (const char*)pctx->public_key().data());
-                pctx->next_trusted_candidates(trusted_candidates);
+                    pctx->next_trusted_candidates(trusted_candidates);
                 trusted_candidates.clear();
                 pctx->spawn_first_round();
             }, true);

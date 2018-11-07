@@ -26,7 +26,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         Result onTransactionList(SolverContext& context, csdb::Pool& pool) override;
 
@@ -39,7 +39,7 @@ namespace slv2
 
         CallsQueueScheduler::CallTag tag_timeout { CallsQueueScheduler::no_tag };
 
-        std::vector<PublicKey> trusted_candidates;
+        std::vector<cs::PublicKey> trusted_candidates;
     };
 
 } // slv2

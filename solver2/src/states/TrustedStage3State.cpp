@@ -105,17 +105,18 @@ namespace slv2
       }
     }
 
-    Result TrustedStage3State::onStage2(SolverContext & context, const Credits::StageTwo & st)
+    Result TrustedStage3State::onStage2(SolverContext & context, const cs::StageTwo & st)
     {
         LOG_DEBUG(__func__);
         const auto ptr = context.stage2((uint8_t)context.own_conf_number());
         if(ptr != nullptr && context.enough_stage2()) {
             LOG_NOTICE(name() << ": enough stage-2 received");
             const auto cnt = context.cnt_trusted();
-            constexpr size_t sig_len = sizeof(st.signatures[0].val);
+            constexpr size_t sig_len = sizeof(st.signatures[0].size());
             for(int i = 0; i < cnt; i++) {
                 // check amount of trusted node's signatures nonconformity
-                if(memcmp(ptr->signatures[i].val, st.signatures[i].val, sig_len) != 0) {
+                // TODO: redesign required:
+                if(memcmp(ptr->signatures[i].data(), st.signatures[i].data(), sig_len) != 0) {
                     LOG_WARN(name() << ": [" << (int)st.sender << "] marked as untrusted");
                     context.mark_untrusted(st.sender);
                 }
@@ -179,7 +180,7 @@ namespace slv2
             }
         }
         size_t maxWeight = 0;
-        Credits::Hash_ mostFrequentHash;
+        cs::Hash_ mostFrequentHash;
         memset(&mostFrequentHash, 0, sizeof(mostFrequentHash));
 
         ////searching for most frequent hash 

@@ -9,10 +9,13 @@ namespace csdb
     class Pool;
     class Transaction;
 }
-namespace Credits
+namespace cs
 {
     struct HashVector;
     struct HashMatrix;
+}
+namespace cs
+{
     struct StageOne;
     struct StageTwo;
     struct StageThree;
@@ -117,7 +120,7 @@ namespace slv2
         virtual Result onRoundTable(SolverContext& context, const size_t round) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new block is received.
          *
@@ -134,10 +137,10 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const PublicKey& sender) = 0;
+        virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new hash is received.
          *
@@ -154,7 +157,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) = 0;
+        virtual Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
 
         /**
          * @fn  virtual Result INodeState::onTransaction(SolverContext& context, const csdb::Transaction& trans) = 0;
@@ -195,9 +198,9 @@ namespace slv2
 
         // Solver3 new methods
         
-        virtual Result onStage1(SolverContext& context, const Credits::StageOne& stage) = 0;
-        virtual Result onStage2(SolverContext& context, const Credits::StageTwo& stage) = 0;
-        virtual Result onStage3(SolverContext& context, const Credits::StageThree& stage) = 0;
+        virtual Result onStage1(SolverContext& context, const cs::StageOne& stage) = 0;
+        virtual Result onStage2(SolverContext& context, const cs::StageTwo& stage) = 0;
+        virtual Result onStage3(SolverContext& context, const cs::StageThree& stage) = 0;
 
         /**
          * @fn  virtual const char * INodeState::name() const = 0;

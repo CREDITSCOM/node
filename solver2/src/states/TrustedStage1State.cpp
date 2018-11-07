@@ -7,13 +7,10 @@
 #include <Solver/Solver.hpp>
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Generals.hpp>
-#pragma warning(pop)
-
 #include <csnode/blockchain.hpp>
+#include <csnode/conveyer.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 #if LOG_LEVEL & FLAG_LOG_DEBUG
 #include <sstream>
@@ -84,15 +81,32 @@ namespace slv2
         // TODO: update own hash vector?
         
         pool = removeTransactionsWithBadSignatures(context, pool);
-        context.update_fees(pool);
-        auto result = context.generals().buildvector(pool, accepted_pool, rejected_pool);
+
+        // see Solver::runCinsensus()
+        cs::TransactionsPacket packet;
+        cs::Conveyer& conveyer = cs::Conveyer::instance();
+        for(const auto& hash : conveyer.roundTable().hashes) {
+            const auto& hashTable = conveyer.transactionsPacketTable();
+            if(!hashTable.count(hash)) {
+                cserror() << name() << ": consensus build vector: HASH NOT FOUND";
+                return Result::Failure;
+            }
+            const auto& transactions = conveyer.packet(hash).transactions();
+            for(const auto& transaction : transactions) {
+                if(!packet.addTransaction(transaction)) {
+                    cserror() << name() << ": cannot add transaction to packet in consensus";
+                }
+            }
+        }
+        cslog() << name() << ": consensus transaction packet of " << packet.transactionsCount() << " transactions";
+        context.update_fees(packet);
+        auto result = context.build_vector(packet);
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": accepted " << accepted_pool.transactions_count()
                 << " trans, rejected " << rejected_pool.transactions_count());
         }
 
-        constexpr size_t hash_len = sizeof(stage.hash.val) / sizeof(stage.hash.val[0]);
-        memcpy(stage.hash.val, result.val, hash_len);
+        std::copy(result.cbegin(), result.cend(), stage.hash.begin());
 
         context.accept_transactions(accepted_pool);
         transactions_checked = true;
@@ -100,10 +114,13 @@ namespace slv2
         return (enough_hashes ? Result::Finish : Result::Ignore);
     }
 
-    Result TrustedStage1State::onHash(SolverContext & context, const Hash & hash, const PublicKey & sender)
+    Result TrustedStage1State::onHash(SolverContext & context, const cs::Hash & hash, const cs::PublicKey & sender)
     {
-        LOG_NOTICE(name() << ": <-- hash " << byteStreamToHex(hash.str, 32) << " from " << byteStreamToHex(sender.str, 32));
-        Hash myHash((char*) (context.blockchain().getLastWrittenHash().to_binary().data()));
+        LOG_NOTICE(name() << ": <-- hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
+            << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()));
+        cs::Hash myHash;
+        const auto& lwh = context.blockchain().getLastWrittenHash().to_binary();
+        std::copy(lwh.cbegin(), lwh.cend(), myHash.begin());
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
             if(hash == myHash) {
                 bool keyFound = false;

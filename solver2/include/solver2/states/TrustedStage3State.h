@@ -2,7 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include <TimeoutTracking.h>
 #include <lib/system/keys.hpp>
-// Credits::StageThree requires:
+// cs::StageThree requires:
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
 #include <Solver/Solver.hpp>
@@ -36,7 +36,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        virtual Result onStage2(SolverContext& context, const Credits::StageTwo& stage) override;
+        virtual Result onStage2(SolverContext& context, const cs::StageTwo& stage) override;
 
         const char * name() const override
         {
@@ -52,8 +52,8 @@ namespace slv2
         TimeoutTracking timeout_request_stage;
         TimeoutTracking timeout_request_neighbors;
 
-        Credits::StageThree stage;
-        std::vector<PublicKey> next_round_trust;
+        cs::StageThree stage;
+        std::vector<cs::PublicKey> next_round_trust;
 
         void trusted_election(SolverContext& context);
         bool pool_solution_analysis(SolverContext& context);

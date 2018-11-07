@@ -1,5 +1,5 @@
-#include "SolverCore.h"
-#include "Consensus.h"
+#include <SolverCore.h>
+#include <Consensus.h>
 
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
@@ -25,34 +25,10 @@
 namespace slv2
 {
 
-    const Credits::HashVector& SolverCore::getMyVector() const
+    void SolverCore::setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getMyVector();
-        }
-
-        // empty one is for test purpose
-        static Credits::HashVector stub {};
-        return stub;
-    }
-
-    const Credits::HashMatrix& SolverCore::getMyMatrix() const
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            return pslv_v1->getMyMatrix();
-        }
-        if(!pgen) {
-            // empty one is for test purpose
-            static Credits::HashMatrix stub {};
-            return stub;
-        }
-        return pgen->getMatrix();
-    }
-
-    void SolverCore::set_keys(const KeyType& pub, const KeyType& priv)
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->set_keys(pub, priv);
+            pslv_v1->setKeysPair(pub, priv);
         }
         public_key = pub;
         private_key = priv;
@@ -119,29 +95,30 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotVector(const Credits::HashVector& vect)
+    void SolverCore::gotVector(const cs::HashVector& vect)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Credits::HashVector tmp = vect;
+            cs::HashVector tmp = vect;
             pslv_v1->gotVector(std::move(tmp));
             return;
         }
     }
 
-    void SolverCore::gotMatrix(const Credits::HashMatrix& matr)
+    void SolverCore::gotMatrix(const cs::HashMatrix& matr)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Credits::HashMatrix tmp = matr;
+            cs::HashMatrix tmp = matr;
             pslv_v1->gotMatrix(std::move(tmp));
             return;
         }
     }
 
-    void SolverCore::gotBlock(csdb::Pool& p, const PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = p;
-            pslv_v1->gotBlock_V3(std::move(tmp), sender);
+            //TODO: gotBlock_V3() required
+            pslv_v1->gotBlock(std::move(tmp), sender);
             return;
         }
 
@@ -168,7 +145,7 @@ namespace slv2
         test_outrunning_blocks();
     }
 
-    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const PublicKey& sender)
+    void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::PoolHash tmp = p_hash;
@@ -212,15 +189,14 @@ namespace slv2
             store_received_block(p, false);
         }
         else {
-            gotIncorrectBlock(std::move(p), PublicKey {});
+            gotIncorrectBlock(std::move(p), cs::PublicKey {});
         }
     }
 
-    void SolverCore::gotHash(const Hash& hash, const PublicKey& sender)
+    void SolverCore::gotHash(const cs::Hash& hash, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            Hash tmp(hash);
-            pslv_v1->gotHash_V3(tmp, sender);
+            pslv_v1->gotHash(cs::Utils::byteStreamToHex(hash.data(), hash.size()), sender);
             return;
         }
 
@@ -235,7 +211,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const PublicKey& sender)
+    void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotIncorrectBlock(std::move(p), sender);
@@ -286,7 +262,7 @@ namespace slv2
             return;
         }
 
-        gotIncorrectBlock(std::move(p), PublicKey {});
+        gotIncorrectBlock(std::move(p), cs::PublicKey {});
     }
 
     void SolverCore::rndStorageProcessing()
@@ -303,25 +279,12 @@ namespace slv2
         test_outrunning_blocks();
     }
 
-    void SolverCore::addConfirmation(uint8_t own_conf_number)
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->addConfirmation(own_conf_number);
-            return;
-        }
-
-        if(Consensus::Log) {
-            LOG_ERROR("SolverCore: addConfirmation(): not implemented yet");
-        }
-        if(!pstate) {
-            return;
-        }
-    }
-
     void SolverCore::beforeNextRound()
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->beforeNextRound();
+            if((!pslv_v1->isPoolClosed()) && (!pslv_v1->bigBangStatus())) {
+                pslv_v1->sendTL();  // TODO: check this
+            }
             return;
         }
 
@@ -401,7 +364,7 @@ namespace slv2
         }
 
         // update desired count of trusted nodes
-        size_t cnt_trusted = pnode->getConfidants().size();
+        size_t cnt_trusted = cs::Conveyer::instance().roundTable().confidants.size();
         if(cnt_trusted > cnt_trusted_desired) {
             cnt_trusted_desired = cnt_trusted;
         }
@@ -431,10 +394,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotStageOne(const Credits::StageOne & stage)
+    void SolverCore::gotStageOne(const cs::StageOne & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotStageOne(stage);
+            assert(false); // not implemented
             return;
         }
 
@@ -481,10 +444,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotStageTwo(const Credits::StageTwo & stage)
+    void SolverCore::gotStageTwo(const cs::StageTwo & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotStageTwo(stage);
+            assert(false); // not implemented
             return;
         }
 
@@ -504,10 +467,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotStageThree(const Credits::StageThree & stage)
+    void SolverCore::gotStageThree(const cs::StageThree & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotStageThree(stage);
+            assert(false); // not implemented
             return;
         }
 
@@ -530,7 +493,7 @@ namespace slv2
     void SolverCore::gotTransactionList_V3(csdb::Pool &&tl)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotTransactionList_V3(std::move(tl));
+            assert(false); // not implemented
             return;
         }
 

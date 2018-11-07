@@ -9,13 +9,14 @@
 
 #include <csdb/pool.h>
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 #include <algorithm>
 
 // provide find by sequence() capability
 namespace std
 {
-    bool operator==(const std::pair<csdb::Pool, PublicKey>& lhs, uint64_t rhs)
+    bool operator==(const std::pair<csdb::Pool, cs::PublicKey>& lhs, uint64_t rhs)
     {
         return lhs.first.sequence() == rhs;
     }
@@ -48,7 +49,7 @@ namespace slv2
         return Result::Finish;
     }
 
-    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& /*sender*/)
     {
 //#ifdef MONITOR_NODE
 //        addTimestampToPool(block);
@@ -70,7 +71,7 @@ namespace slv2
                 if(pk.empty()) {
                     LOG_ERROR(name() << ": block omits writer public key");
                 }
-                LOG_NOTICE(name() << ": verify block with public key " << byteStreamToHex((const char *)pk.data(), pk.size()) );
+                LOG_NOTICE(name() << ": verify block with public key " << cs::Utils::byteStreamToHex(pk.data(), pk.size()) );
             }
             if(block.verify_signature()) {
                 bool defer_write = (context.round() == g_seq); // outdated block need not to defer writing
@@ -98,7 +99,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": hash ignored in this state");
@@ -122,7 +123,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onStage1(SolverContext & /*context*/, const Credits::StageOne & /*stage*/)
+    Result DefaultStateBehavior::onStage1(SolverContext & /*context*/, const cs::StageOne & /*stage*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": consensus stage 1 ignored in this state");
@@ -130,7 +131,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onStage2(SolverContext & /*context*/, const Credits::StageTwo & /*stage*/)
+    Result DefaultStateBehavior::onStage2(SolverContext & /*context*/, const cs::StageTwo & /*stage*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": consensus stage 2 ignored in this state");
@@ -138,7 +139,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onStage3(SolverContext & /*context*/, const Credits::StageThree & /*stage*/)
+    Result DefaultStateBehavior::onStage3(SolverContext & /*context*/, const cs::StageThree & /*stage*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": consensus stage 3 ignored in this state");
@@ -146,12 +147,13 @@ namespace slv2
         return Result::Ignore;
     }
 
-    void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const PublicKey& target)
+    void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target)
     {
-        Hash hash_val((char*) context.last_block_hash());
+        const auto& tmp = context.last_block_hash();
+        cs::Hash hash_val;
+        std::copy(tmp.cbegin(), tmp.cend(), hash_val.begin());
         if(Consensus::Log) {
-            constexpr const size_t hash_len = sizeof(hash_val.str) / sizeof(hash_val.str[0]);
-            LOG_NOTICE(name() << ": --> hash = " << byteStreamToHex(hash_val.str, hash_len));
+            LOG_NOTICE(name() << ": --> hash = " << cs::Utils::byteStreamToHex(hash_val.data(), hash_val.size()));
         }
         context.send_hash(hash_val, target);
     }

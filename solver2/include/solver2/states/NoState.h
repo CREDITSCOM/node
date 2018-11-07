@@ -52,12 +52,12 @@ namespace slv2
             return Result::Finish;
         }
 
-        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const PublicKey& /*sender*/) override
+        Result onBlock(SolverContext& /*context*/, csdb::Pool& /*pool*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
 
-        Result onHash(SolverContext& /*context*/, const Hash& /*hash*/, const PublicKey& /*sender*/) override
+        Result onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/) override
         {
             return Result::Failure;
         }
@@ -72,17 +72,17 @@ namespace slv2
             return Result::Failure;
         }
 
-        Result onStage1(SolverContext& /*context*/, const Credits::StageOne& /*stage*/) override
+        Result onStage1(SolverContext& /*context*/, const cs::StageOne& /*stage*/) override
         {
             return Result::Failure;
         }
 
-        Result onStage2(SolverContext& /*context*/, const Credits::StageTwo& /*stage*/) override
+        Result onStage2(SolverContext& /*context*/, const cs::StageTwo& /*stage*/) override
         {
             return Result::Failure;
         }
 
-        Result onStage3(SolverContext& /*context*/, const Credits::StageThree& /*stage*/) override
+        Result onStage3(SolverContext& /*context*/, const cs::StageThree& /*stage*/) override
         {
             return Result::Failure;
         }

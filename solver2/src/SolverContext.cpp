@@ -4,6 +4,12 @@
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
 #include <csnode/node.hpp>
+#include <csnode/conveyer.hpp>
+#pragma warning(pop)
+
+#pragma warning(push)
+#pragma warning(disable: 4267 4244 4100 4245)
+#include <Solver/Generals.hpp>
 #pragma warning(pop)
 
 #include <lib/system/logger.hpp>
@@ -15,7 +21,7 @@ namespace slv2
 		return core.pnode->getBlockChain();
 	}
 
-    void SolverContext::add_stage1(Credits::StageOne & stage, bool send)
+    void SolverContext::add_stage1(cs::StageOne & stage, bool send)
     {
         //core.stageOneStorage.push_back(stage);
         if(send) {
@@ -27,7 +33,7 @@ namespace slv2
         core.gotStageOne(stage);
     }
 
-    void SolverContext::add_stage2(Credits::StageTwo& stage, bool send)
+    void SolverContext::add_stage2(cs::StageTwo& stage, bool send)
     {
         //core.stageTwoStorage.push_back(stage);
 
@@ -40,7 +46,7 @@ namespace slv2
         core.gotStageTwo(stage);
     }
 
-    void SolverContext::add_stage3(Credits::StageThree& stage)
+    void SolverContext::add_stage3(cs::StageThree& stage)
     {
         //core.stageThreeStorage.push_back(stage);
 
@@ -53,17 +59,17 @@ namespace slv2
 
     size_t SolverContext::own_conf_number() const
     {
-        return (size_t) core.pnode->getMyConfNumber();
+        return (size_t) core.pnode->getConfidantNumber();
     }
 
     size_t SolverContext::cnt_trusted() const
     {
-        return core.pnode->getConfidants().size();
+        return cs::Conveyer::instance().roundTable().confidants.size(); //core.pnode->getConfidants().size();
     }
 
-    const std::vector<PublicKey>& SolverContext::trusted() const
+    const std::vector<cs::PublicKey>& SolverContext::trusted() const
     {
-        return core.pnode->getConfidants();
+        return cs::Conveyer::instance().roundTable().confidants;
     }
 
     void SolverContext::request_round_table() const
@@ -73,7 +79,7 @@ namespace slv2
 
     Role SolverContext::role() const
     {
-        auto v = core.pnode->getMyLevel();
+        auto v = core.pnode->getNodeLevel();
         switch(v) {
         case NodeLevel::Normal:
         case NodeLevel::Main:
@@ -119,26 +125,26 @@ namespace slv2
 		return address;
 	}
 
-    void SolverContext::send_hash(const Hash & hash, const PublicKey & target)
+    void SolverContext::send_hash(const cs::Hash & hash, const cs::PublicKey & target)
     {
-        core.pnode->sendHash(hash, target);
+        core.pnode->sendHash(cs::Utils::byteStreamToHex((const uint8_t*) hash.data(), hash.size()), target);
     }
 
-    bool SolverContext::test_trusted_idx(uint8_t idx, const PublicKey & sender)
+    bool SolverContext::test_trusted_idx(uint8_t idx, const cs::PublicKey & sender)
     {
         // vector<Hash> confidantNodes_ in Node actually stores PublicKey items :-)
-        const auto& trusted = core.pnode->getConfidants();
+        const auto& trusted = this->trusted();
         if(idx < trusted.size()) {
             const auto& pk = *(trusted.cbegin() + idx);
-            return 0 == memcmp(pk.str, sender.str, sizeof(PublicKey));
+            return 0 == memcmp(pk.data(), sender.data(), pk.size());
         }
         return false;
     }
 
-    const uint8_t* SolverContext::last_block_hash()
+    const csdb::internal::byte_array& SolverContext::last_block_hash() const
     {
         //if(!core.is_block_deferred()) {
-            return core.pnode->getBlockChain().getLastWrittenHash().to_binary().data();
+            return core.pnode->getBlockChain().getLastWrittenHash().to_binary();
         //}
         //return core.deferred_block.hash().to_binary().data();
     }
@@ -159,6 +165,11 @@ namespace slv2
     {
       LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]");
       core.pnode->requestStageThree(from, required);
+    }
+
+    cs::Hash SolverContext::build_vector(const cs::TransactionsPacket& trans_pack)
+    {
+        return core.pgen->buildVector(trans_pack, &core);
     }
 
 } // slv2

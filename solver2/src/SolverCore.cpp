@@ -2,6 +2,7 @@
 #include <SolverContext.h>
 #include <CallsQueueScheduler.h>
 #include <Consensus.h>
+#include <Stage.h>
 #include <states/NoState.h>
 
 #pragma warning(push)
@@ -70,7 +71,7 @@ namespace slv2
         // consensus data
         , addr_spam(std::nullopt)
         , cur_round(0)
-        , pfee(std::make_unique<Credits::Fee>())
+        , pfee(std::make_unique<cs::Fee>())
         , is_bigbang(false)
         // previous solver version instance
         , pslv_v1(nullptr)
@@ -113,20 +114,20 @@ namespace slv2
 
 #if !defined(SPAMMER) // see: client\include\client\params.hpp
             // thanks to Solver constructor :-), it has 3 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start);
+            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start);
 #else
             // thanks to Solver constructor :-), it has 4 args in this case
-            pslv_v1 = std::make_unique<Credits::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
+            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
 #endif
 
-            pgen = pslv_v1->generals.get();
-            pws = pslv_v1->walletsState.get();
+            pgen = pslv_v1->m_generals.get();
+            pws = pslv_v1->m_walletsState.get();
         }
         else {
-            pws_inst = std::make_unique<Credits::WalletsState>(pNode->getBlockChain());
+            pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
             // temp decision until solver-1 may be instantiated:
             pws = pws_inst.get();
-            pgen_inst = std::make_unique<Credits::Generals>(*pws_inst);
+            pgen_inst = std::make_unique<cs::Generals>(*pws_inst);
             // temp decision until solver-1 may be instantiated:
             pgen = pgen_inst.get();
         }
@@ -258,7 +259,7 @@ namespace slv2
 
     // Copied methods from solver.v1
 
-    void SolverCore::spawn_next_round(const std::vector<PublicKey>& nodes)
+    void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes)
     {
         if(accepted_pool.to_binary().size() > 0) {
             LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
@@ -266,7 +267,7 @@ namespace slv2
         pnode->becomeWriter();
         LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
         // see Solver-1, writeNewBlock() method
-        accepted_pool.set_writer_public_key(public_key);
+        accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
         auto& bc = pnode->getBlockChain();
         bc.finishNewBlock(accepted_pool);
         // see: Solver-1, addTimestampToPool() method
@@ -277,17 +278,17 @@ namespace slv2
         // see Solver-1, prepareBlockForSend() method
         accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
         accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
-        accepted_pool.sign(private_key);
+        accepted_pool.sign(csdb::internal::byte_array(private_key.cbegin(), private_key.cend()));
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "
                 << accepted_pool.transactions_count() << " trans.");
             LOG_NOTICE("SolverCore: block previous hash " << accepted_pool.previous_hash().to_string());
             LOG_DEBUG("SolverCore: signed with secret which public is "
-                << byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
+                << cs::Utils::byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
         }
 
-        bc.putBlock(accepted_pool, true); // defer_write
+        bc.putBlock(accepted_pool/*, true*/); // defer_write
         cnt_deferred_trans += accepted_pool.transactions_count();
 
         csdb::Pool tmp;
@@ -317,7 +318,7 @@ namespace slv2
         auto& bc = pnode->getBlockChain();
 
         // see: Solver-1, method Solver::gotBlock()
-        if(!bc.onBlockReceived(p, defer_write)) {
+        if(!bc.onBlockReceived(p/*, defer_write*/)) {
             if(Consensus::Log) {
                 LOG_ERROR("SolverCore: block sync required");
             }
@@ -329,7 +330,7 @@ namespace slv2
 
     bool SolverCore::is_block_deferred() const
     {
-        return pnode->getBlockChain().isLastBlockDeferred();
+        return false; // pnode->getBlockChain().isLastBlockDeferred();
     }
 
     void SolverCore::flush_deferred_block()
@@ -338,7 +339,7 @@ namespace slv2
         if(!is_block_deferred()) {
             return;
         }
-        pnode->getBlockChain().writeDeferredBlock();
+        //pnode->getBlockChain().writeDeferredBlock();
         total_accepted_trans += cnt_deferred_trans;
         cnt_deferred_trans = 0;
     }
@@ -348,7 +349,7 @@ namespace slv2
         if(!is_block_deferred()) {
             return;
         }
-        if(pnode->getBlockChain().revertLastBlock()) {
+        if(false /*pnode->getBlockChain().revertLastBlock()*/) {
             //TODO: bc.revertWalletsInPool(deferred_block);
             if(Consensus::Log) {
                 LOG_WARN("SolverCore: deferred block dropped, wallets are reverted");
@@ -407,6 +408,36 @@ namespace slv2
                 break;
             }
         }
+    }
+
+    cs::StageOne* SolverCore::find_stage1(uint8_t sender)
+    {
+        for(auto it = stageOneStorage.begin(); it != stageOneStorage.end(); ++it) {
+            if(it->sender == sender) {
+                return &(*it);
+            }
+        }
+        return nullptr;
+    }
+
+    cs::StageTwo* SolverCore::find_stage2(uint8_t sender)
+    {
+        for(auto it = stageTwoStorage.begin(); it != stageTwoStorage.end(); ++it) {
+            if(it->sender == sender) {
+                return &(*it);
+            }
+        }
+        return nullptr;
+    }
+
+    cs::StageThree* SolverCore::find_stage3(uint8_t sender)
+    {
+        for(auto it = stageThreeStorage.begin(); it != stageThreeStorage.end(); ++it) {
+            if(it->sender == sender) {
+                return &(*it);
+            }
+        }
+        return nullptr;
     }
 
     void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)

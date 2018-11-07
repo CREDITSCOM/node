@@ -25,6 +25,7 @@
 #include <solver/generals.hpp>
 #include <solver/WalletsState.h>
 #include <csnode/conveyer.hpp>
+#include <solver2/SolverCore.h>
 
 namespace cs {
 Generals::Generals(WalletsState& _walletsState)
@@ -40,7 +41,7 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* solver) {
+cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, slv2::SolverCore* solver) {
   cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
   std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));

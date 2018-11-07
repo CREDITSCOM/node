@@ -1,8 +1,9 @@
 #pragma once
 #include "DefaultStateBehavior.h"
+#include <Stage.h>
 #include <csdb/pool.h>
 
-// Credits::StageOne requires:
+// cs::StageOne requires:
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
 #include <Solver/Solver.hpp>
@@ -50,7 +51,7 @@ namespace slv2
 
         Result onTransactionList(SolverContext& context, csdb::Pool& pool) override;
 
-        Result onHash(SolverContext& context, const Hash& hash, const PublicKey& sender) override;
+        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {
@@ -62,7 +63,7 @@ namespace slv2
         bool enough_hashes { false };
         bool transactions_checked { false };
 
-        Credits::StageOne stage;
+        cs::StageOne stage;
 
         csdb::Pool removeTransactionsWithBadSignatures(SolverContext& context, const csdb::Pool& p);
 

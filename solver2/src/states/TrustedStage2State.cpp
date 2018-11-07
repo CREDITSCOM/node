@@ -77,7 +77,7 @@ namespace slv2
         }
     }
 
-    Result TrustedStage2State::onStage1(SolverContext & context, const Credits::StageOne & st)
+    Result TrustedStage2State::onStage1(SolverContext & context, const cs::StageOne & st)
     {
         stage.signatures[st.sender] = st.sig;
         if(context.enough_stage1()) {

@@ -144,7 +144,7 @@ namespace slv2
         tr.set_signature(std::string(&sig[0], &sig[0] + sig_size));
     }
 
-    Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const PublicKey & sender)
+    Result NormalState::onBlock(SolverContext & context, csdb::Pool & block, const cs::PublicKey & sender)
     {
         auto r = DefaultStateBehavior::onBlock(context, block, sender);
         if(context.is_block_deferred()) {

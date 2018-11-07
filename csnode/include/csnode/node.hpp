@@ -47,6 +47,45 @@ public:
   void getHash(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
+  //SOLVER3 methods
+  void getStageOne(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+  //SOLVER3 methods
+  void sendStageOne(cs::StageOne&);
+  // sends StageOne request to respondent about required
+  void requestStageOne(uint8_t respondent, uint8_t required);
+  void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
+
+  void sendStageTwo(const cs::StageTwo&);
+  void requestStageTwo(uint8_t respondent, uint8_t required);
+  void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester);
+
+  void sendStageThree(const cs::StageThree&);
+  void requestStageThree(uint8_t respondent, uint8_t required);
+  void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
+
+  void sendHash_V3();
+
+  void onRoundStart_V3();
+
+  void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
+  void addCompressedPoolToPack(const csdb::Pool& pool);
+  void composeMessageWithBlock1(const csdb::Pool& pool);
+
+  void sendRoundInfo(const std::vector<cs::PublicKey>& confidantNodes,
+      const csdb::Pool& poolToVerify,
+      const csdb::Pool& newPool,
+      const std::vector <cs::StageThree>& stageThreeStorage);
+  void sendRoundInfoRequest(uint8_t respondent);
+  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
+  void sendRoundInfoReply(uint8_t, uint8_t);
+  void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
+
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
@@ -121,6 +160,7 @@ public:
 
   void flushCurrentTasks();
   void becomeWriter();
+  void initNextRound(const cs::PublicKey& mainNode, std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
   bool getSyncroStarted();
 
