@@ -1170,11 +1170,6 @@ void Node::sendBlockRequest(uint32_t seq) {
   static uint32_t lfReq, lfTimes;
 
   seq = getBlockChain().getLastWrittenSequence() + 1;
-
-  csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
-  csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
-  showSyncronizationProgress(lws, gs);
-
   uint32_t reqSeq = seq;
 
   if (lfReq != seq) {
@@ -1233,6 +1228,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
+    showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
@@ -1530,24 +1526,34 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
-    if (globalSequence == 0) {
-      globalSequence = roundNum_;
-    }
+  if (globalSequence == 0) {
+    globalSequence = roundNum_;
+  }
 
-    auto last = float(lastWrittenSequence);
-    auto global = float(globalSequence);
-    auto cached = float(solver_->getCountCahchedBlock(lastWrittenSequence, globalSequence));
-    const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last - cached) / global) * 100.0f);
+  auto last = float(lastWrittenSequence);
+  auto global = float(globalSequence);
+  auto cached = float(solver_->getCountCahchedBlock(lastWrittenSequence, globalSequence));
+  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last - cached) / global) * 100.0f);
+
+  if (syncStatus <= 100) {
     std::stringstream progress;
+    progress << "SYNC: [";
 
-    if (syncStatus <= 100) {
-      progress << "SYNC: [";
-      for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
-      for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
-      progress << "] " << syncStatus << "%";
+    for (uint32_t i = 0; i < syncStatus; ++i) {
+      if (i % 2) {
+        progress << "#";
+      }
     }
 
+    for (uint32_t i = syncStatus; i < 100; ++i) {
+      if (i % 2) {
+        progress << "-";
+      }
+    }
+
+    progress << "] " << syncStatus << "%";
     cslog() << progress.str();
+  }
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {
