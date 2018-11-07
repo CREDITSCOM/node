@@ -388,14 +388,14 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, c
 
 void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  csdebug() << "NODE> Sending data Broadcast";
+  csdebug() << "NODE> Sending broadcast";
 
   sendBroadcastImpl(msgType, round, bytes);
 }
 
 void Node::sendBroadcast(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, sender);
-  csdebug() << "NODE> Sending data Broadcast to: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Sending broadcast to: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   sendBroadcastImpl(msgType, round, bytes);
 }
@@ -817,7 +817,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {
+void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -1076,7 +1076,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
   const std::size_t amountHashesOfRequest = isHashesLess ? hashesCount : (hashesCount / neighboursCount);
 
-  auto getRequestBytes = [hashes](const std::size_t startHashNumber, const std::size_t hashesCount) -> cs::Bytes {
+  auto getRequestBytesClosure = [hashes](const std::size_t startHashNumber, const std::size_t hashesCount) {
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
 
@@ -1088,7 +1088,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
       stream << hashes.at(startHashNumber + i);
     }
 
-    return std::move(bytes);
+    return bytes;
   };
 
   bool successRequest = false;
@@ -1096,7 +1096,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   for (std::size_t i = 0; i < neighboursCount; ++i) {
     const std::size_t count = i == (neighboursCount - 1) ? amountHashesOfRequest + remainderHashes : amountHashesOfRequest;
 
-    successRequest = sendToRandomNeighbour(msgType, round, getRequestBytes(i * amountHashesOfRequest, count));
+    successRequest = sendToRandomNeighbour(msgType, round, getRequestBytesClosure(i * amountHashesOfRequest, count));
 
     if (!successRequest) {
       cswarning() << "NODE> Sending transaction packet request: Cannot get a connection with a random neighbour";
@@ -1109,7 +1109,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   }
 
   if (!successRequest) {
-    sendBroadcast(msgType, round, getRequestBytes(0, hashesCount));
+    sendBroadcast(msgType, round, getRequestBytesClosure(0, hashesCount));
     return;
   }
 

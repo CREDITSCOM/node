@@ -101,7 +101,7 @@ namespace cs
 
         TransactionsPacket() = default;
 
-        TransactionsPacket(const TransactionsPacket& packet);
+        TransactionsPacket(const TransactionsPacket& packet) = default;
         TransactionsPacket(TransactionsPacket&& packet);
 
         TransactionsPacket& operator=(const TransactionsPacket& packet);

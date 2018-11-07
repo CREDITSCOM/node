@@ -210,7 +210,7 @@ void Solver::runFinalConsensus() {
                                               m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
 
     if (m_writerIndex == 100) {
-      cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
+      cserror() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
     }
     else {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
