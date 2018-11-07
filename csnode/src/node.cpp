@@ -776,7 +776,8 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
     return;
   }
 
-  csdebug() << "NODE> Get transactions sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Get packet hashes reply: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  cslog() << "NODE> Hashes reply got packets count: " << packetsCount;
 
   processPacketsReply(std::move(packets), round);
 }
@@ -1182,7 +1183,10 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
-  stream << hashes.size();
+  const std::size_t hashesSize = hashes.size();
+
+  stream << hashesSize;
+  csdebug() << "NODE> Sending packet hashes request: " << hashesSize;
 
   for (const auto& hash : hashes) {
     stream << hash;
@@ -1544,7 +1548,6 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
     cslog() << "NODE> All hashes in conveyer";
   }
   else {
-    csdebug() << "NODE> Sending packet hashes request";
     sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
