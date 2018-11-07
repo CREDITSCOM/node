@@ -50,8 +50,8 @@ enum NodeLevel {
 
 namespace cs
 {
-    // hash table for fast transactions storage
-    using TransactionsPacketHashTable = std::unordered_map<TransactionsPacketHash, TransactionsPacket>;
+    // table for fast transactions storage
+    using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // TODO: chechk performance of map/unordered_map
 
     // array of packets
     using TransactionsBlock = std::vector<cs::TransactionsPacket>;
@@ -142,7 +142,7 @@ namespace cs
 
     // metas
     using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
-    using HashTablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketHashTable>;
+    using TablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketTable>;
     using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
     using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
     using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;

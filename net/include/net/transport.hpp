@@ -73,9 +73,7 @@ class Transport {
     good_ = net_->isGood();
   }
 
-  ~Transport() {
-    delete net_;
-  }
+  ~Transport();
 
   [[noreturn]] void run();
 

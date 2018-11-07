@@ -13,7 +13,7 @@ struct cs::Conveyer::Impl
     cs::TransactionsBlock transactionsBlock;
 
     // current round transactions packets storage
-    cs::TransactionsPacketHashTable hashTable;
+    cs::TransactionsPacketTable hashTable;
 
     // sync fields
     cs::NeededHashesMetaStorage neededHashesMeta;
@@ -26,7 +26,7 @@ struct cs::Conveyer::Impl
     cs::Characteristic characteristic;
 
     // hash tables storage
-    cs::HashTablesMetaStorage hashTablesStorage;
+    cs::TablesMetaStorage hashTablesStorage;
 
     // round table
     cs::RoundTable roundTable;
@@ -70,8 +70,6 @@ void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
 
 void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
 {
-    csdebug() << "CONVEYER> Add transactions packet";
-
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(m_sharedMutex);
 
@@ -83,7 +81,7 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     }
 }
 
-const cs::TransactionsPacketHashTable& cs::Conveyer::transactionsPacketTable() const
+const cs::TransactionsPacketTable& cs::Conveyer::transactionsPacketTable() const
 {
     return pimpl->hashTable;
 }
@@ -162,7 +160,7 @@ void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&
 {
     cs::Lock lock(m_sharedMutex);
 
-    cs::TransactionsPacketHashTable* tablePointer = nullptr;
+    cs::TransactionsPacketTable* tablePointer = nullptr;
     cs::Hashes* hashesPointer = nullptr;
 
     if (round == pimpl->roundTable.round) {
@@ -301,10 +299,10 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     cs::Lock lock(m_sharedMutex);
 
     const cs::Hashes& localHashes = pimpl->roundTable.hashes;
-    cs::TransactionsPacketHashTable hashTable;
+    cs::TransactionsPacketTable hashTable;
 
     const cs::Characteristic& characteristic = pimpl->characteristic;
-    cs::TransactionsPacketHashTable& currentHashTable = pimpl->hashTable;
+    cs::TransactionsPacketTable& currentHashTable = pimpl->hashTable;
 
     cslog() << "CONVEYER> Characteristic bytes size " << characteristic.mask.size();
 
@@ -346,7 +344,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         pimpl->hashTable.erase(hash);
     }
 
-    cs::HashTablesMetaStorage::MetaElement element;
+    cs::TablesMetaStorage::MetaElement element;
     element.round = pimpl->roundTable.round,
     element.meta = std::move(hashTable);
 
@@ -374,9 +372,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 {
     cs::SharedLock lock(m_sharedMutex);
 
-    if (pimpl->hashTable.count(hash) != 0u)
-    {
-        csdebug() << "CONVEYER> Found hash at current table in request - " << hash.toString();
+    if (pimpl->hashTable.count(hash) != 0u) {
         return pimpl->hashTable[hash];
     }
 
@@ -385,16 +381,12 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     if (optional.has_value())
     {
         const auto& value = optional.value();
-        csdebug() << "CONVEYER> Found round hash table in storage, searching hash";
 
-        if (auto iter = value.find(hash); iter != value.end())
-        {
-            csdebug() << "CONVEYER> Found hash in hash table storage";
+        if (auto iter = value.find(hash); iter != value.end()) {
             return iter->second;
         }
     }
 
-    csdebug() << "CONVEYER> Can not find round in storage, hash not found";
     return std::nullopt;
 }
 

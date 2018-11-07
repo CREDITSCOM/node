@@ -39,9 +39,6 @@ public:
   MOCK_METHOD3(getBlockRequest, void(const uint8_t*, const size_t, const cs::PublicKey& sender));
   MOCK_METHOD2(getBlockReply, void(const uint8_t*, const size_t));
   MOCK_METHOD3(getWritingConfirmation, void(const uint8_t* data, const size_t size, const cs::PublicKey& sender));
-  MOCK_METHOD3(getRoundTableRequest, void(const uint8_t* data, const size_t size, const cs::PublicKey& sender));
-
-  MOCK_METHOD3(getBadBlock, void(const uint8_t*, const size_t, const cs::PublicKey& sender));
 
   /* Outcoming requests forming */
   MOCK_METHOD0(sendRoundTable, void());
@@ -59,21 +56,11 @@ public:
   MOCK_METHOD1(sendPacketHashesRequest, void(const std::vector<cs::TransactionsPacketHash>& hashes));
   MOCK_METHOD2(sendPacketHashesReply, void(const cs::TransactionsPacket& packet, const cs::PublicKey& sender));
 
-  MOCK_METHOD1(sendBadBlock, void(const csdb::Pool& pool));
   MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic));
 
   /*syncro send functions*/
   MOCK_METHOD1(sendBlockRequest, void(uint32_t seq));
   MOCK_METHOD2(sendBlockReply, void(const csdb::Pool&, const cs::PublicKey&));
-  MOCK_METHOD1(sendWritingConfirmation, void(const cs::PublicKey& node));
-
-  MOCK_METHOD1(sendVectorRequest, void(const cs::PublicKey&));
-  MOCK_METHOD1(sendMatrixRequest, void(const cs::PublicKey&));
-
-  MOCK_METHOD2(getTlRequest, void(const uint8_t* data, const size_t size));
-
-  MOCK_METHOD2(getVectorRequest, void(const uint8_t* data, const size_t size));
-  MOCK_METHOD2(getMatrixRequest, void(const uint8_t* data, const size_t size));
 
   MOCK_METHOD0(flushCurrentTasks, void());
   MOCK_METHOD0(becomeWriter, void());
