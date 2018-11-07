@@ -66,8 +66,6 @@ public:
   MOCK_METHOD1(sendBlockRequest, void(uint32_t seq));
   MOCK_METHOD2(sendBlockReply, void(const csdb::Pool&, const cs::PublicKey&));
   MOCK_METHOD1(sendWritingConfirmation, void(const cs::PublicKey& node));
-  MOCK_METHOD1(sendRoundTableRequest, void(size_t rNum));
-//  MOCK_METHOD1(sendRoundTableUpdated, void(const cs::RoundInfo& round));
 
   MOCK_METHOD1(sendVectorRequest, void(const cs::PublicKey&));
   MOCK_METHOD1(sendMatrixRequest, void(const cs::PublicKey&));

@@ -88,7 +88,6 @@ public:
   void sendBlockRequest(uint32_t seq);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
   void sendWritingConfirmation(const cs::PublicKey& node);
-  void sendRoundTableRequest(size_t rNum);
   void sendRoundTable(const cs::RoundTable& round);
 
   template<class... Args>

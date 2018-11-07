@@ -347,21 +347,6 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
   flushCurrentTasks();
 }
 
-void Node::sendRoundTableRequest(size_t rNum) {
-  if (rNum < roundNum_) {
-    return;
-  }
-
-  cslog() << "rNum = " << rNum << ", real RoundNumber = " << roundNum_;
-
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::RoundTableRequest << roundNum_;
-
-  cslog() << "Sending RoundTable request";
-
-  flushCurrentTasks();
-}
-
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
