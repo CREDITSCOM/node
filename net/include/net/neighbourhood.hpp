@@ -193,6 +193,8 @@ private:
   void connectNode(RemoteNodePtr, ConnectionPtr);
   void disconnectNode(ConnectionPtr*);
 
+  int getRandomSyncNeighbourNumber(const int attemptCount = 0);
+
   Transport* transport_;
 
   TypedAllocator<Connection> connectionsAllocator_;
