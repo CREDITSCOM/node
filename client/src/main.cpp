@@ -2,9 +2,11 @@
 
 #include <iomanip>
 #include <iostream>
+#ifndef WIN32
+#define <signal.h>
+#else
 #include <csignal>
-#include  <condition_variable>
-#include <mutex>
+#endif
 
 #include <lib/system/logger.hpp>
 #include <csnode/node.hpp>
@@ -73,19 +75,19 @@ void installSignalHandler() {
   if (SIG_ERR == std::signal(SIGTERM, sig_handler)) {
     // Handle error
     LOG_ERROR("Error to set SIGTERM!");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    exit(EXIT_FAILURE);
   }
   else if (SIG_ERR == std::signal(SIGBREAK, sig_handler)) {
     LOG_ERROR("Error to set SIGBREAK!");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    exit(EXIT_FAILURE);
   }
   else if (SIG_ERR == std::signal(SIGINT, sig_handler)) {
     LOG_ERROR("Error to set SIGINT!");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    exit(EXIT_FAILURE);
   }
   else if (SIG_ERR == std::signal(SIGHUP, sig_handler)) {
     LOG_ERROR("Error to set SIGHUP!");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    exit(EXIT_FAILURE);
   }
 }
 #else
