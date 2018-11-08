@@ -1,4 +1,6 @@
 #include <sstream>
+#include <numeric>
+#include <algorithm>
 
 #include <solver2/SolverCore.h>
 
@@ -63,7 +65,6 @@ bool Node::init() {
     return false;
   }
 
-  // Create solver
   if (!solver_) {
     return false;
   }
@@ -75,25 +76,17 @@ bool Node::init() {
     return false;
   }
 
-  cs::PublicKey publicKey;
-  std::copy(myPublicKeyForSignature_.begin(), myPublicKeyForSignature_.end(), publicKey.begin());
-
-  cs::PrivateKey privateKey;
-  std::copy(myPrivateKeyForSignature_.begin(), myPrivateKeyForSignature_.end(), privateKey.begin());
-
-  solver_->setKeysPair(publicKey, privateKey);
   solver_->runSpammer();
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
-
-  cs::Connector::connect(cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+  cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
 
 bool Node::checkKeysFile() {
-  std::ifstream pub("NodePublic.txt");    // 44
-  std::ifstream priv("NodePrivate.txt");  // 88
+  std::ifstream pub(publicKeyFileName_);
+  std::ifstream priv(privateKeyFileName_);
 
   if (!pub.is_open() || !priv.is_open()) {
     cslog() << "\n\nNo suitable keys were found. Type \"g\" to generate or \"q\" to quit.";
@@ -102,13 +95,13 @@ bool Node::checkKeysFile() {
     std::cin >> gen_flag;
 
     if (gen_flag == 'g') {
-      generateKeys();
+      auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
+      solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
       return true;
     }
     else {
       return false;
     }
-
   }
   else {
     std::string pub58, priv58;
@@ -118,10 +111,13 @@ bool Node::checkKeysFile() {
     pub.close();
     priv.close();
 
-    DecodeBase58(pub58, myPublicKeyForSignature_);
-    DecodeBase58(priv58, myPrivateKeyForSignature_);
+    cs::Bytes privateKey;
+    cs::Bytes publicKey;
 
-    if (myPublicKeyForSignature_.size() != 32 || myPrivateKeyForSignature_.size() != 64) {
+    DecodeBase58(pub58, publicKey);
+    DecodeBase58(priv58, privateKey);
+
+    if (publicKey.size() != PUBLIC_KEY_LENGTH || privateKey.size() != PRIVATE_KEY_LENGTH) {
       cslog() << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit.";
 
       char gen_flag = 'a';
@@ -130,56 +126,60 @@ bool Node::checkKeysFile() {
       bool needGenerateKeys = gen_flag == 'g';
 
       if (gen_flag == 'g') {
-        generateKeys();
+        auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
+        solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
       }
 
       return needGenerateKeys;
     }
 
-    return checkKeysForSig();
+    cs::PublicKey fixedPublicKey;
+    cs::PrivateKey fixedPrivatekey;
+
+    std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
+    std::copy(privateKey.begin(), privateKey.end(), fixedPrivatekey.begin());
+
+    return checkKeysForSignature(fixedPublicKey, fixedPrivatekey);
   }
 }
 
-void Node::generateKeys() {
-  myPublicKeyForSignature_.clear();
-  myPrivateKeyForSignature_.clear();
+std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
+  cs::Bytes publicKey;
+  cs::Bytes privateKey;
 
-  std::string pub58, priv58;
-  pub58  = EncodeBase58(myPublicKeyForSignature_);
-  priv58 = EncodeBase58(myPrivateKeyForSignature_);
+  publicKey.resize(PUBLIC_KEY_LENGTH);
+  privateKey.resize(PRIVATE_KEY_LENGTH);
 
-  myPublicKeyForSignature_.resize(32);
-  myPrivateKeyForSignature_.resize(64);
+  crypto_sign_keypair(publicKey.data(), privateKey.data());
 
-  crypto_sign_keypair(myPublicKeyForSignature_.data(), myPrivateKeyForSignature_.data());
-
-  std::ofstream f_pub("NodePublic.txt");
-  f_pub << EncodeBase58(myPublicKeyForSignature_);
+  std::ofstream f_pub(publicKeyFileName_);
+  f_pub << EncodeBase58(publicKey);
   f_pub.close();
 
-  std::ofstream f_priv("NodePrivate.txt");
-  f_priv << EncodeBase58(myPrivateKeyForSignature_);
+  std::ofstream f_priv(privateKeyFileName_);
+  f_priv << EncodeBase58(privateKey);
   f_priv.close();
+
+  cs::PublicKey fixedPublicKey;
+  cs::PrivateKey fixedPrivateKey;
+
+  std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
+  std::copy(privateKey.begin(), privateKey.end(), fixedPrivateKey.begin());
+
+  return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
 }
 
-bool Node::checkKeysForSig() {
+bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
   const uint8_t msg[] = {255, 0, 0, 0, 255};
-  uint8_t signature[64], public_key[32], private_key[64];
-
-  for (size_t i = 0; i < 32; i++) {
-    public_key[i] = myPublicKeyForSignature_[i];
-  }
-
-  for (size_t i = 0; i < 64; i++) {
-    private_key[i] = myPrivateKeyForSignature_[i];
-  }
+  cs::Signature signature;
 
   unsigned long long sig_size;
-  crypto_sign_detached(signature, &sig_size, msg, 5, private_key);
+  crypto_sign_detached(signature.data(), &sig_size, msg, 5, privateKey.data());
 
-  int ver_ok = crypto_sign_verify_detached(signature, msg, 5, public_key);
+  int ver_ok = crypto_sign_verify_detached(signature.data(), msg, 5, publicKey.data());
 
   if (ver_ok == 0) {
+    solver_->setKeysPair(publicKey, privateKey);
     return true;
   }
 
@@ -189,7 +189,8 @@ bool Node::checkKeysForSig() {
   std::cin >> gen_flag;
 
   if (gen_flag == 'g') {
-    generateKeys();
+    auto [generatedPublickey, generatedPrivateKey] = generateKeys();
+    solver_->setKeysPair(generatedPublickey, generatedPrivateKey);
     return true;
   }
 
@@ -202,7 +203,34 @@ void Node::blockchainSync() {
       isSyncroStarted_ = true;
       roundToSync_ = roundNum_;
 
-      sendBlockRequest(bc_.getLastWrittenSequence() + 1);
+      processPoolSync();
+    }
+  }
+}
+
+void Node::processPoolSync() {
+  cslog() << "NODE> Processing pool syncronization algorithm";
+
+  const auto currentSequence = bc_.getLastWrittenSequence();
+  const auto needSequence = roundToSync_;
+  const std::size_t mainCount = 1;
+  const auto nodeSyncCount = mainCount + cs::Conveyer::instance().roundTable().confidants.size();
+  const auto neededPoolCounts = needSequence - currentSequence;
+
+  std::vector<csdb::Pool::sequence_t> sequences(neededPoolCounts, 0);
+  std::iota(sequences.begin(), sequences.end(), currentSequence + 1);
+
+  // choose strategy
+  if (neededPoolCounts <= maxPoolCountToSync_) {
+    sendBlockRequest(sequences);
+  }
+  else {
+    auto splited = cs::Utils::splitVector(sequences, nodeSyncCount);
+
+    for (const auto& part : splited) {
+      std::size_t size = (part.size() < maxPoolCountToSync_) ? part.size() : maxPoolCountToSync_;
+
+      sendBlockRequest(std::vector<csdb::Pool::sequence_t>(part.data(), part.data() + size));
     }
   }
 }
@@ -487,49 +515,6 @@ uint32_t Node::getRoundNumber() {
   return roundNum_;
 }
 
-void Node::getBlock(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ == NodeLevel::Writer) {
-    cswarning() << "Writer cannot get blocks";
-    return;
-  }
-
-  csunused(sender);
-
-  istream_.init(data, size);
-
-  csdb::Pool pool;
-  istream_ >> pool;
-
-  if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad block packet format";
-    return;
-  }
-
-  size_t localSeq = getBlockChain().getLastWrittenSequence();
-  size_t blockSeq = pool.sequence();
-
-  if (roundNum_ == blockSeq) {
-    getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(blockSeq));
-  }
-
-  if (localSeq >= blockSeq) {
-    return;
-  }
-
-  if (!blocksReceivingStarted_) {
-    blocksReceivingStarted_ = true;
-    lastStartSequence_      = pool.sequence();
-    csdebug() << "GETBLOCK> Setting first got block: " << lastStartSequence_;
-  }
-
-  if (pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) {
-    solver_->gotBlock(std::move(pool), sender);
-  }
-  else {
-    solver_->gotIncorrectBlock(std::move(pool), sender);
-  }
-}
-
 void Node::sendBlock(const csdb::Pool& pool) {
   if (myLevel_ != NodeLevel::Writer) {
     cserror() << "Only writer nodes can send blocks";
@@ -552,17 +537,17 @@ void Node::getHash(const uint8_t* data, const size_t size, const cs::PublicKey& 
 
   cslog() << "Get hash size: " << size;
 
-  istream_.init(data, size);
+  cs::DataStream stream(data, size);
 
-  std::string hash;
-  istream_ >> hash;
+  csdb::PoolHash poolHash;
+  stream >> poolHash;
 
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "Bad hash packet format";
     return;
   }
 
-  solver_->gotHash(std::move(hash), sender);
+  solver_->gotHash(std::move(poolHash), sender);
 }
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
@@ -831,17 +816,17 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
     this->getBlockChain().putBlock(newPool);
 
     if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
-      auto hash = this->getBlockChain().getLastWrittenHash().to_string();
+      auto poolHash = this->getBlockChain().getLastWrittenHash();
+      sendHash(poolHash, sender);
 
-      this->sendHash(hash, sender);
-
-      cslog() << "SENDING HASH to writer: " << hash;
-    } else {
+      cslog() << "SENDING HASH to writer: " << poolHash.to_string();
+    }
+    else {
       cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
     }
   }
   else {
-    solver_->gotIncorrectBlock(std::move(newPool), sender);
+    cswarning() << "NODE> Can not write block with sequence " << sequence;
   }
 #else
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
@@ -891,7 +876,7 @@ void Node::applyNotifications() {
   cs::Solver::addTimestampToPool(pool.value()));
   #endif
 
-  pool.value().sign(myPrivateKeyForSignature_);
+  pool.value().sign(solver_->getPrivateKey());
 
   // array
   cs::Signature poolSignature;
@@ -1008,17 +993,22 @@ cs::Bytes Node::createNotification() {
   return bytes;
 }
 
-void Node::sendHash(const std::string& hash, const cs::PublicKey& target) {
+void Node::sendHash(const csdb::PoolHash& hash, const cs::PublicKey& target) {
   if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
     cserror() << "Writer and Main node shouldn't send hashes";
     return;
   }
 
-  cswarning() << "Sending hash of " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.data(), target.size());
-  cslog() << "Hash is " << hash;
+  cslog() << "NODE> Sending hash of " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  cslog() << "NODE> Hash is " << hash.to_string();
+
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  stream << hash;
 
   ostream_.init(BaseFlags::Fragmented, target);
-  ostream_ << MsgTypes::BlockHash << roundNum_ << hash;
+  ostream_ << MsgTypes::BlockHash << roundNum_ << bytes;
 
   flushCurrentTasks();
 }
@@ -1166,48 +1156,43 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   solver_->gotBlockRequest(getBlockChain().getHashBySequence(requested_seq), sender);
 }
 
-void Node::sendBlockRequest(uint32_t seq) {
-  static uint32_t lfReq, lfTimes;
+void Node::sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences) {
+  const auto& roundTable = cs::Conveyer::instance().roundTable();
 
-  seq = getBlockChain().getLastWrittenSequence() + 1;
-  uint32_t reqSeq = seq;
+  // create destinations
+  std::vector<cs::PublicKey> keys;
+  keys.push_back(roundTable.general);
+  keys.insert(keys.end(), roundTable.confidants.begin(), roundTable.confidants.end());
 
-  if (lfReq != seq) {
-    lfReq = seq;
-    lfTimes = 0;
+  const auto maxTries = 10;
+  const auto msgType = MsgTypes::BlockRequest;
+
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  stream << sequences.size();
+
+  for (auto& seq : sequences) {
+    stream << seq;
   }
 
-  while (reqSeq) {
-    bool alreadyRequested = false;
-    ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
-    if (!requestee) {
-      break;  // No more free requestees
+  // random confidant search
+  for (std::size_t i = 0; i < maxTries; ++i) {
+    std::size_t randomIndex = static_cast<std::size_t>(cs::Utils::generateRandomValue(0, static_cast<int>(keys.size() - 1)));
+    ConnectionPtr connection = transport_->getConnectionByKey(keys[randomIndex]);
+
+    if (connection) {
+      sendNeighbours(connection, msgType, roundNum_, bytes);
+      csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequences.size();
+      return;
     }
-
-    if (!alreadyRequested) {  // Already requested this block from this guy?
-      cslog() << "Sending request for block " << reqSeq << " from nbr " << requestee->id;
-
-      ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
-      ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
-
-      transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
-
-      if (lfReq == reqSeq && ++lfTimes >= 4) {
-        transport_->sendBroadcast(ostream_.getPackets());
-      }
-
-      ostream_.clear();
-    }
-
-    reqSeq = cs::numeric_cast<uint32_t>(solver_->getNextMissingBlock(reqSeq));
   }
 
-  //#endif
-  sendBlockRequestSequence_ = seq;
-  isAwaitingSyncroBlock_ = true;
-  awaitingRecBlockCount_ = 0;
+  std::size_t randomIndex = static_cast<std::size_t>(cs::Utils::generateRandomValue(0, static_cast<int>(keys.size() - 1)));
 
-  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << seq;
+  sendBroadcast(keys[randomIndex], msgType, roundNum_, bytes);
+
+  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequences.size();
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
@@ -1226,7 +1211,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  if (pool.sequence() == sendBlockRequestSequence_) {
+  if (pool.sequence()) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
 
     Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
@@ -1242,7 +1227,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
 
   if (roundToSync_ != bc_.getLastWrittenSequence()) {
-    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
+//    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
   } else {
     isSyncroStarted_ = false;
     roundToSync_ = 0;
@@ -1527,11 +1512,16 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
+  if (!globalSequence) {
+    return;
+  }
+
   auto last = float(lastWrittenSequence);
   auto global = float(globalSequence);
-  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last) / global) * 100.0f);
+  const float maxValue = 100.0f;
+  const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
 
-  if (syncStatus <= 100) {
+  if (syncStatus <= maxValue) {
     std::stringstream progress;
     progress << "SYNC: [";
 
@@ -1541,7 +1531,7 @@ void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence
       }
     }
 
-    for (uint32_t i = syncStatus; i < 100; ++i) {
+    for (uint32_t i = syncStatus; i < maxValue; ++i) {
       if (i % 2) {
         progress << "-";
       }

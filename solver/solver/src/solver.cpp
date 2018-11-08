@@ -318,10 +318,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
       m_node->getBlockChain().onBlockReceived(block);
 #ifndef MONITOR_NODE
       if ((m_node->getNodeLevel() != NodeLevel::Writer) && (m_node->getNodeLevel() != NodeLevel::Main)) {
-        std::string test_hash = m_node->getBlockChain().getLastWrittenHash().to_string();
-        // HASH!!!
-        m_node->sendHash(test_hash, sender);
-        csdebug() << "SENDING HASH: " << cs::Utils::debugByteStreamToHex(test_hash.data(), 32);
+        auto hash = m_node->getBlockChain().getLastWrittenHash();
+        m_node->sendHash(hash, sender);
+        csdebug() << "SENDING HASH: " << hash.to_string();
       }
 #endif
     }
@@ -403,15 +402,15 @@ void Solver::gotBlockCandidate(csdb::Pool&& block) {
   m_blockCandidateArrived = true;
 }
 
-void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
+void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
   if (m_roundTableSent) {
     return;
   }
 
-  std::string myHash = m_node->getBlockChain().getLastWrittenHash().to_string();
+  csdb::PoolHash myHash = m_node->getBlockChain().getLastWrittenHash();
 
-  cslog() << "Solver -> My Hash: " << myHash;
-  cslog() << "Solver -> Received hash:" << hash;
+  cslog() << "Solver -> My Hash: " << myHash.to_string();
+  cslog() << "Solver -> Received hash:" << hash.to_string();
 
   cslog() << "Solver -> Received public key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 

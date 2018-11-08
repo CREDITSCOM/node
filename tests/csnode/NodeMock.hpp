@@ -94,7 +94,7 @@ public:
   // signature verification
   MOCK_METHOD0(checkKeysFile, bool());
   MOCK_METHOD0(generateKeys, void());
-  MOCK_METHOD0(checkKeysForSig, bool());
+  MOCK_METHOD0(checkKeysForSignature, bool());
 
   MOCK_METHOD1(readRoundData, bool(bool));
   MOCK_METHOD0(onRoundStart, void());

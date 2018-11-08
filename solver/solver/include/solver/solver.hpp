@@ -58,7 +58,7 @@ public:
   void gotVector(HashVector&&);
   void gotMatrix(HashMatrix&&);
   void gotBlock(csdb::Pool&&, const cs::PublicKey&);
-  void gotHash(std::string&&, const cs::PublicKey&);
+  void gotHash(csdb::PoolHash&&, const cs::PublicKey&);
   void gotBlockRequest(csdb::PoolHash&&, const cs::PublicKey&);
   void gotBlockReply(csdb::Pool&&);
   void gotBadBlockHandler(csdb::Pool&&, const cs::PublicKey&);

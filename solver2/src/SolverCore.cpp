@@ -255,7 +255,7 @@ namespace slv2
         // finalize
         // see Solver-1, prepareBlockForSend() method
         p.set_sequence((bc.getLastWrittenSequence()) + 1);
-        p.sign(private_key);
+//        p.sign(private_key);
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
