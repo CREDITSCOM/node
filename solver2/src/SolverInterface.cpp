@@ -205,7 +205,7 @@ namespace slv2
         // update own hash vector
         if(pnode != nullptr && pgen != nullptr) {
             p = removeTransactionsWithBadSignatures(p);
-            pfee->CountFeesInPool(pnode, &p);
+            pfee->CountFeesInPool(pnode->getBlockChain(), &p);
             //auto result = pgen->buildVector(p, block_pool, b_pool); //vshilkin
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
