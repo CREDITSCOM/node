@@ -4,11 +4,6 @@
 #include "INodeState.h"
 #include "Consensus.h"
 #include "Stage.h"
-// temporary, while cs::HashVector defined there
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
-#pragma warning(pop)
 
 #include <csdb/pool.h>
 
@@ -27,7 +22,6 @@ namespace cs
 {
     class WalletsState;
     class Solver;
-    class Generals;
     class Fee;
 }
 
@@ -67,10 +61,7 @@ namespace slv2
         // below are the "required" methods to be implemented by Solver-compatibility issue:
         
         void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
-        void runSpammer()
-        {
-            opt_spammer_on = true;
-        }
+        void runSpammer();
         void countFeesInPool(csdb::Pool* pool);
         void gotRound();
         void gotHash(std::string&&, const cs::PublicKey&);
@@ -84,7 +75,6 @@ namespace slv2
         }
         //TODO: requires revision a.s.a.p.
         const cs::PublicKey& getWriterPublicKey() const;
-        bool checkTransactionSignature(const csdb::Transaction& transaction);
 
         void addInitialBalance();
         void setBigBangStatus(bool status);
@@ -259,8 +249,6 @@ namespace slv2
         Node * pnode;
         std::unique_ptr<cs::WalletsState> pws_inst;
         cs::WalletsState * pws;
-        std::unique_ptr<cs::Generals> pgen_inst;
-        cs::Generals * pgen;
 
         void ExecuteStart(Event start_event);
 
@@ -292,7 +280,10 @@ namespace slv2
          * @return  Null if it fails, else the found stage 1.
          */
 
-        cs::StageOne* find_stage1(uint8_t sender);
+        cs::StageOne* find_stage1(uint8_t sender)
+        {
+            return find_stage<>(stageOneStorage, sender);
+        }
 
         /**
          * @fn  cs::StageTwo* SolverCore::find_stage2(uint8_t sender);
@@ -307,7 +298,10 @@ namespace slv2
          * @return  Null if it fails, else the found stage 2.
          */
 
-        cs::StageTwo* find_stage2(uint8_t sender);
+        cs::StageTwo* find_stage2(uint8_t sender)
+        {
+            return find_stage<>(stageTwoStorage, sender);
+        }
 
         /**
          * @fn  cs::StageThree* SolverCore::find_stage3(uint8_t sender);
@@ -322,11 +316,25 @@ namespace slv2
          * @return  Null if it fails, else the found stage 3.
          */
 
-        cs::StageThree* find_stage3(uint8_t sender);
+        cs::StageThree* find_stage3(uint8_t sender)
+        {
+            return find_stage<>(stageThreeStorage, sender);
+        }
 
         const cs::StageThree* find_stage3(uint8_t sender) const
         {
-            return find_stage3(sender);
+            return find_stage<>(stageThreeStorage, sender);
+        }
+
+        template<typename StageT>
+        StageT* find_stage(const std::vector<StageT>& vec, uint8_t sender) const
+        {
+            for(auto it = vec.begin(); it != vec.end(); ++it) {
+                if(it->sender == sender) {
+                    return (StageT*) &(*it);
+                }
+            }
+            return nullptr;
         }
 
         //// -= THIRD SOLVER CLASS DATA FIELDS =-

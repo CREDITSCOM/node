@@ -18,7 +18,14 @@
 #include <ostream>
 #include <lib/system/structures.hpp>
 #include <lib/system/common.hpp>
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
+#endif
 #include <sodium.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 #include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -348,7 +355,7 @@ namespace cs
         static cs::Signature sign(const cs::Bytes& data, const cs::PrivateKey& securityKey)
         {
             cs::Signature signature;
-            std::fill(signature.begin(), signature.end(), 0);
+            std::fill(signature.begin(), signature.end(), (cs::Byte)0);
 
             unsigned long long signLength = 0;
 

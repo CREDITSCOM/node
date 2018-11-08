@@ -7,6 +7,8 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
 endif()
 
+add_definitions(-D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
+
 # set next option to ON to create solver2_tests project (also install googletest, not tested outside Windows platform yet)
 option(SLV2_BUILD_TESTS "Build unit tests" OFF)
 option(SLV2_AUTORUN_TESTS "Automatically run unit tests after build" OFF)

@@ -2,28 +2,25 @@
 #include <SolverContext.h>
 #include <Consensus.h>
 
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
-#pragma warning(pop)
-
+#include <csnode/transactionspacket.h>
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
+#include <blake2.h>
 #if LOG_LEVEL & FLAG_LOG_DEBUG
 #include <sstream>
 #endif
-#pragma warning(push)
-#pragma warning(disable: 4324)
-#include <sodium.h>
-#pragma warning(pop)
 
 namespace slv2
 {
     void TrustedStage1State::on(SolverContext& context)
     {
+        if(!ptransval) {
+            ptransval = std::make_unique<cs::TransactionsValidator>(context.wallets(), cs::TransactionsValidator::Config {});
+        }
+
         DefaultStateBehavior::on(context);
 
         // if we were Writer un the previous round, we have a deferred block, flush it:
@@ -80,7 +77,7 @@ namespace slv2
 
         // TODO: update own hash vector?
         
-        pool = removeTransactionsWithBadSignatures(context, pool);
+        pool = filter_test_signatures(context, pool);
 
         // see Solver::runCinsensus()
         cs::TransactionsPacket packet;
@@ -100,7 +97,7 @@ namespace slv2
         }
         cslog() << name() << ": consensus transaction packet of " << packet.transactionsCount() << " transactions";
         context.update_fees(packet);
-        auto result = context.build_vector(packet);
+        auto result = build_vector(context, packet);
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": accepted " << accepted_pool.transactions_count()
                 << " trans, rejected " << rejected_pool.transactions_count());
@@ -152,7 +149,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    csdb::Pool TrustedStage1State::removeTransactionsWithBadSignatures(SolverContext& context, const csdb::Pool& p)
+    csdb::Pool TrustedStage1State::filter_test_signatures(SolverContext& context, const csdb::Pool& p)
     {
         csdb::Pool good;
         BlockChain::WalletData data_to_fetch_pulic_key;
@@ -188,6 +185,80 @@ namespace slv2
             }
         }
         return good;
+    }
+
+    cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::TransactionsPacket& packet)
+    {
+        cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
+
+        //std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+
+        cs::Hash hash;
+
+        const std::size_t transactionsCount = packet.transactionsCount();
+        const auto& transactions = packet.transactions();
+
+        cs::Conveyer& conveyer = cs::Conveyer::instance();
+        cs::Characteristic characteristic;
+
+        if(transactionsCount > 0) {
+            context.wallets().updateFromSource();
+            ptransval->reset(transactionsCount);
+
+            cs::Bytes characteristicMask;
+            characteristicMask.reserve(transactionsCount);
+
+            uint8_t del1;
+            csdb::Pool newPool;
+
+            for(std::size_t i = 0; i < transactionsCount; ++i) {
+                const csdb::Transaction& transaction = transactions[i];
+                cs::Byte byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+
+                if(byte) {
+                    byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+                }
+
+                characteristicMask.push_back(byte);
+            }
+
+            ptransval->validateByGraph(characteristicMask, packet.transactions(), newPool);
+
+            characteristic.mask = std::move(characteristicMask);
+            conveyer.setCharacteristic(characteristic);
+        }
+        else {
+            conveyer.setCharacteristic(characteristic);
+        }
+
+        if(characteristic.mask.size() != transactionsCount) {
+            cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
+        }
+
+        blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
+
+        //m_findUntrusted.fill(0);
+        //m_newTrusted.fill(0);
+        //m_hwTotal.fill(HashWeigth {});
+
+        csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+
+        return hash;
+    }
+
+    bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction)
+    {
+        BlockChain::WalletData data_to_fetch_pulic_key;
+
+        if(transaction.source().is_wallet_id()) {
+            context.blockchain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+
+            csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
+                data_to_fetch_pulic_key.address_.end());
+            return transaction.verify_signature(byte_array);
+        }
+
+        return transaction.verify_signature(transaction.source().public_key());
     }
 
 } // slv2

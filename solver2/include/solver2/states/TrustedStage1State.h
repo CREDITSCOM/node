@@ -1,13 +1,17 @@
 #pragma once
 #include "DefaultStateBehavior.h"
 #include <Stage.h>
+
+#include <solver/TransactionsValidator.h>
 #include <csdb/pool.h>
 
-// cs::StageOne requires:
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
-#pragma warning(pop)
+#include <memory>
+
+namespace cs
+{
+    class TransactionsPacket;
+    class TransactionsValidator;
+}
 
 namespace slv2
 {
@@ -64,8 +68,11 @@ namespace slv2
         bool transactions_checked { false };
 
         cs::StageOne stage;
+        std::unique_ptr<cs::TransactionsValidator> ptransval;
 
-        csdb::Pool removeTransactionsWithBadSignatures(SolverContext& context, const csdb::Pool& p);
+        csdb::Pool filter_test_signatures(SolverContext& context, const csdb::Pool& p);
+        bool check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction);
+        cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
 
     };
 
