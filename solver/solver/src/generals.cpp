@@ -40,10 +40,12 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
+void Generals::resetHashMatrix() {
+  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+}
+
 cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* solver) {
   cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
-
-  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
   cs::Hash hash;
 

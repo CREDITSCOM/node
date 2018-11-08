@@ -105,6 +105,9 @@ public:
   bool checkTransactionSignature(const csdb::Transaction& transaction);
 
 private:
+  bool addVector(const HashVector& hashVector);
+
+private:
   cs::PublicKey m_publicKey;
   cs::PrivateKey m_privateKey;
 
@@ -126,11 +129,8 @@ private:
   Fee m_feeCounter;
   HashVector m_hashVector;
 
-  bool m_receivedVectorFrom[100];
-  std::atomic<uint8_t> trustedCounterVector = 0;
-
-  bool m_receivedMatrixFrom[100];
-  std::atomic<uint8_t> trustedCounterMatrix = 0;
+  std::vector<uint8_t> m_receivedVectorFrom;
+  std::vector<uint8_t> m_receivedMatrixFrom;
 
   uint8_t m_writerIndex; // index at confidants
 
