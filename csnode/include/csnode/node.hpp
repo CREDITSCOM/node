@@ -81,6 +81,7 @@ public:
   void resetNeighbours();
 
   // syncro send functions
+  void sendBlockRequest();
   void sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
 
@@ -241,6 +242,7 @@ private:
   cs::Timer sendingTimer_;
 
   // sync meta
+  csdb::Pool::sequence_t sendBlockRequestSequence_;
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
   std::map<csdb::Pool::sequence_t, csdb::Pool> poolSyncRequestMap_;   // meta information of pool sync from nodes
   cs::RoundNumber roundToSync_ = 0;

@@ -203,7 +203,8 @@ void Node::blockchainSync() {
       isSyncroStarted_ = true;
       roundToSync_ = roundNum_;
 
-      processPoolSync();
+      cslog() << "Processing pools sync....";
+      sendBlockRequest();
     }
   }
 }
@@ -1136,20 +1137,71 @@ void Node::resetNeighbours() {
   transport_->resetNeighbours();
 }
 
+void Node::sendBlockRequest() {
+  static uint32_t lfReq, lfTimes;
+
+  csdb::Pool::sequence_t sequence = getBlockChain().getLastWrittenSequence() + 1;
+  uint32_t reqSeq = sequence;
+
+  if (lfReq != sequence) {
+    lfReq = sequence;
+    lfTimes = 0;
+  }
+
+  while (reqSeq) {
+    bool alreadyRequested = false;
+    ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
+
+    if (!requestee) {
+      break;  // No more free requestees
+    }
+
+    if (!alreadyRequested) {  // Already requested this block from this guy?
+      cslog() << "NODE> Sending request for block " << reqSeq << " from nbr " << requestee->id;
+
+      ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
+      ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
+
+      transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
+
+      if (lfReq == reqSeq && ++lfTimes >= 4) {
+        transport_->sendBroadcast(ostream_.getPackets());
+      }
+
+      ostream_.clear();
+    }
+
+    reqSeq = cs::numeric_cast<uint32_t>(solver_->getNextMissingBlock(reqSeq));
+  }
+
+  sendBlockRequestSequence_ = sequence;
+  isAwaitingSyncroBlock_ = true;
+  awaitingRecBlockCount_ = 0;
+
+  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequence;
+}
+
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   uint32_t requested_seq = 0u;
 
   istream_.init(data, size);
   istream_ >> requested_seq;
 
-  cslog() << "GETBLOCKREQUEST> Getting the request for block: " << requested_seq;
+  cslog() << "GET BLOCK REQUEST> Getting the request for block: " << requested_seq;
 
   if (requested_seq > getBlockChain().getLastWrittenSequence()) {
-    cslog() << "GETBLOCKREQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN";
+    cslog() << "GET BLOCK REQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN";
     return;
   }
 
-  solver_->gotBlockRequest(getBlockChain().getHashBySequence(requested_seq), sender);
+  csdb::Pool pool = bc_.loadBlock(bc_.getHashBySequence(requested_seq));
+
+  if (pool.is_valid()) {
+    auto prev_hash = csdb::PoolHash::from_string("");
+    pool.set_previous_hash(prev_hash);
+
+    sendBlockReply(pool, sender);
+  }
 }
 
 void Node::sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences) {
@@ -1207,7 +1259,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  if (pool.sequence()) {
+  if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
 
     Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
@@ -1219,11 +1271,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     isAwaitingSyncroBlock_ = false;
   }
   else {
-    solver_->gotFreeSyncroBlock(std::move(pool));
+    cswarning() << "GET STRANGE SYNC POOL";
   }
 
   if (roundToSync_ != bc_.getLastWrittenSequence()) {
-//    sendBlockRequest(getBlockChain().getLastWrittenSequence() + 1);
+    sendBlockRequest();
   } else {
     isSyncroStarted_ = false;
     roundToSync_ = 0;
@@ -1236,12 +1288,12 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& target) {
   ConnectionPtr conn = transport_->getConnectionByKey(target);
   if (!conn) {
-    LOG_WARN("Cannot get a connection with a specified public key");
+    cswarning() << "Cannot get a connection with a specified public key";
     return;
   }
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  ostream_ << MsgTypes::RequestedBlock << pool;
+  ostream_ << MsgTypes::RequestedBlock << roundNum_ << pool;
 
   transport_->deliverDirect(ostream_.getPackets(),
                             ostream_.getPacketsCount(),
