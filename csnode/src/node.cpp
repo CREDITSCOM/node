@@ -388,7 +388,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, c
 
 void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  csdebug() << "NODE> Sending data Broadcast";
+  csdebug() << "NODE> Sending broadcast";
 
   sendBroadcastImpl(msgType, round, bytes);
 }
@@ -828,7 +828,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey& sender) {
+void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -1087,7 +1087,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
   const std::size_t amountHashesOfRequest = isHashesLess ? hashesCount : (hashesCount / neighboursCount);
 
-  auto getRequestBytes = [hashes](const std::size_t startHashNumber, const std::size_t hashesCount) -> cs::Bytes {
+  auto getRequestBytesClosure = [hashes](const std::size_t startHashNumber, const std::size_t hashesCount) {
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
 
@@ -1099,7 +1099,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
       stream << hashes.at(startHashNumber + i);
     }
 
-    return std::move(bytes);
+    return bytes;
   };
 
   bool successRequest = false;
@@ -1107,7 +1107,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   for (std::size_t i = 0; i < neighboursCount; ++i) {
     const std::size_t count = i == (neighboursCount - 1) ? amountHashesOfRequest + remainderHashes : amountHashesOfRequest;
 
-    successRequest = sendToRandomNeighbour(msgType, round, getRequestBytes(i * amountHashesOfRequest, count));
+    successRequest = sendToRandomNeighbour(msgType, round, getRequestBytesClosure(i * amountHashesOfRequest, count));
 
     if (!successRequest) {
       cswarning() << "NODE> Sending transaction packet request: Cannot get a connection with a random neighbour";
@@ -1120,7 +1120,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   }
 
   if (!successRequest) {
-    sendBroadcast(msgType, round, getRequestBytes(0, hashesCount));
+    sendBroadcast(msgType, round, getRequestBytesClosure(0, hashesCount));
     return;
   }
 
@@ -1181,11 +1181,6 @@ void Node::sendBlockRequest(uint32_t seq) {
   static uint32_t lfReq, lfTimes;
 
   seq = getBlockChain().getLastWrittenSequence() + 1;
-
-  csdb::Pool::sequence_t lws = getBlockChain().getLastWrittenSequence();
-  csdb::Pool::sequence_t gs = getBlockChain().getGlobalSequence();
-  showSyncronizationProgress(lws, gs);
-
   uint32_t reqSeq = seq;
 
   if (lfReq != seq) {
@@ -1244,6 +1239,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
+
+    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
@@ -1541,24 +1538,29 @@ void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTy
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
-    if (globalSequence == 0) {
-      globalSequence = roundNum_;
-    }
+  auto last = float(lastWrittenSequence);
+  auto global = float(globalSequence);
+  const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last) / global) * 100.0f);
 
-    auto last = float(lastWrittenSequence);
-    auto global = float(globalSequence);
-    auto cached = float(solver_->getCountCahchedBlock(lastWrittenSequence, globalSequence));
-    const uint32_t syncStatus = cs::numeric_cast<int>((1.0f - (global - last - cached) / global) * 100.0f);
+  if (syncStatus <= 100) {
     std::stringstream progress;
+    progress << "SYNC: [";
 
-    if (syncStatus <= 100) {
-      progress << "SYNC: [";
-      for (uint32_t i = 0; i < syncStatus; ++i) if (i % 2) progress << "#";
-      for (uint32_t i = syncStatus; i < 100; ++i) if (i % 2) progress << "-";
-      progress << "] " << syncStatus << "%";
+    for (uint32_t i = 0; i < syncStatus; ++i) {
+      if (i % 2) {
+        progress << "#";
+      }
     }
 
+    for (uint32_t i = syncStatus; i < 100; ++i) {
+      if (i % 2) {
+        progress << "-";
+      }
+    }
+
+    progress << "] " << syncStatus << "%";
     cslog() << progress.str();
+  }
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {

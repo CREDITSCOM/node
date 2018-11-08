@@ -93,7 +93,7 @@ namespace cs
 
     TransactionsPacket TransactionsPacket::fromBinary(const cs::Bytes& data)
     {
-        return fromByteStream((const char*)(data.data()), data.size());
+        return fromByteStream(reinterpret_cast<const char*>(data.data()), data.size());
     }
 
     TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t size)
@@ -111,15 +111,9 @@ namespace cs
         return res;
     }
 
-    TransactionsPacket::TransactionsPacket(const TransactionsPacket& packet):
-        m_hash(packet.m_hash),
-        m_transactions(packet.m_transactions)
-    {
-    }
-
     TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet):
         m_hash(std::move(packet.m_hash)),
-        m_transactions(packet.m_transactions)
+        m_transactions(std::move(packet.m_transactions))
     {
         packet.m_hash = TransactionsPacketHash();
         packet.m_transactions.clear();

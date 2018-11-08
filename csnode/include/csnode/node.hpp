@@ -56,7 +56,7 @@ public:
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
-  void writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey &sender);
+  void writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
@@ -180,7 +180,7 @@ private:
   void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
   void composeCompressed(const void*, const uint32_t, const MsgTypes);
 
-  void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
+  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
   template <class T, class... Args>
   void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);
@@ -248,7 +248,6 @@ private:
   // sync meta
   cs::PoolMetaMap poolMetaMap_;
   cs::RoundNumber roundToSync_ = 0;
-
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
