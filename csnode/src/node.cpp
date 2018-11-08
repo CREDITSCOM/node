@@ -27,7 +27,6 @@ const csdb::Address Node::startAddress_   = csdb::Address::from_string("00000000
 const csdb::Address Node::spammerAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003");
 
 Node::Node(const Config& config):
-  runThr{},
   myPublicKey_(config.getMyPublicKey()),
   bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_, spammerAddress_),
   solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_

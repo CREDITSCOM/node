@@ -56,18 +56,16 @@ extern "C" void sig_handler(int sig) {
   gSignalStatus = 1;
   switch (sig)
   {
-  case 2:
-    std::cout << "Signal SIGINT received, exiting" << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    exit(EXIT_FAILURE);
-  case 4:
-    std::cout << "Signal WM_CLOSE received, exiting" << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    exit(EXIT_FAILURE);
+  case SIGINT:
+    LOG_WARN("Signal SIGINT received, exiting");
+  case SIGTERM:
+    LOG_WARN("Signal SIGTERM received, exiting");
+  case SIGBREAK:
+    LOG_WARN("Signal SIGBREAK received, exiting");
+  case SIGHUP:
+    LOG_WARN("Signal SIGHUP received, exiting");
   default:
-    std::cout << "Uncknown signal received, exiting" << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    exit(EXIT_FAILURE);
+    LOG_WARN("Uncknown signal received, exiting");
   }
 }
 
@@ -99,30 +97,25 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
   {
     // Handle the CTRL-C signal. 
   case CTRL_C_EVENT:
-    printf("Ctrl-C event\n\n");
-    Beep(750, 300);
+    LOG_WARN("Ctrl-C event\n\n");
     return TRUE;
 
   // CTRL-CLOSE: confirm that the user wants to exit. 
   case CTRL_CLOSE_EVENT:
-    Beep(600, 200);
-    printf("Ctrl-Close event\n\n");
+    LOG_WARN("Ctrl-Close event\n\n");
     return TRUE;
 
       // Pass other signals to the next handler. 
   case CTRL_BREAK_EVENT:
-    Beep(900, 200);
-    printf("Ctrl-Break event\n\n");
+    LOG_WARN("Ctrl-Break event\n\n");
     return TRUE;
 
   case CTRL_LOGOFF_EVENT:
-    Beep(1000, 200);
-    printf("Ctrl-Logoff event\n\n");
+    LOG_WARN("Ctrl-Logoff event\n\n");
     return FALSE;
 
   case CTRL_SHUTDOWN_EVENT:
-    Beep(750, 500);
-    printf("Ctrl-Shutdown event\n\n");
+    LOG_WARN("Ctrl-Shutdown event\n\n");
     return FALSE;
 
   default:
