@@ -60,7 +60,7 @@ extern "C" void sig_handler(int sig) {
     LOG_WARN("Signal SIGINT received, exiting");
   case SIGTERM:
     LOG_WARN("Signal SIGTERM received, exiting");
-  case SIGBREAK:
+  case SIGQUIT:
     LOG_WARN("Signal SIGBREAK received, exiting");
   case SIGHUP:
     LOG_WARN("Signal SIGHUP received, exiting");
@@ -75,8 +75,8 @@ void installSignalHandler() {
     LOG_ERROR("Error to set SIGTERM!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == std::signal(SIGBREAK, sig_handler)) {
-    LOG_ERROR("Error to set SIGBREAK!");
+  else if (SIG_ERR == std::signal(SIGQUIT, sig_handler)) {
+    LOG_ERROR("Error to set SIGQUIT!");
     exit(EXIT_FAILURE);
   }
   else if (SIG_ERR == std::signal(SIGINT, sig_handler)) {
@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
   std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
   std::cout << "\n\t -- Now try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
   std::cout << "\n\t    try logging off or closing the console...\n" << std::flush;
-  Sleep(2000);
+  sleep(2000);
 #endif // WIN32
   mouseSelectionDisable();
 #if BUILD_WITH_GPROF
