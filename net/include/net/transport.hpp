@@ -81,9 +81,7 @@ class Transport {
 
 
 
-//  [[noreturn]] void run();
-
-  
+// [[noreturn]] void run();
   void run();
 
   static volatile std::sig_atomic_t gSignalStatus;

@@ -10,8 +10,6 @@
 
 using boost::asio::buffer;
 
-extern volatile std::sig_atomic_t gSignalStatus;
-
 const ip::udp::socket::message_flags NO_FLAGS = 0;
 
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {

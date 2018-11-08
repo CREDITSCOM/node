@@ -199,7 +199,6 @@ private:
 
   slv2::SolverCore* solver_;
   Transport* transport_;
-  std::thread runThr;
 
 #ifdef MONITOR_NODE
   csstats::csstats       stats_;

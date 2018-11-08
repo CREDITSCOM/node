@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <iostream>
 #ifndef WIN32
-#define <signal.h>
+#include <signal.h>
 #else
 #include <csignal>
 #endif
