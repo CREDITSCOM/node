@@ -6,7 +6,7 @@
 class BlockChain
 {
 public:
-    using WalletData = Credits::WalletsCache::WalletData;
+    using WalletData = cs::WalletsCache::WalletData;
 
     BlockChain()
     {}
