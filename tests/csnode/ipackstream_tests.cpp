@@ -1,128 +1,174 @@
-#define TESTING
 
 #include <gtest/gtest.h>
 #include "packstream.hpp"
 
-void displayStreamData(IPackStream& stream, const size_t& size)
-{
+TEST(IPackStream, IsNotGoodWithoutInitialization) {
+  IPackStream stream;
+  ASSERT_FALSE(stream.good());
+}
+
+TEST(IPackStream, IsGoodAfterProperInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  ASSERT_TRUE(stream.good());
+}
+
+TEST(IPackStream, OperatorBoolReturnsFalseWithoutInitialization) {
+  IPackStream stream;
+  ASSERT_FALSE(static_cast<bool>(stream));
+}
+
+TEST(IPackStream, OperatorBoolReturnsTrueAfterInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  ASSERT_TRUE(static_cast<bool>(stream));
+}
+
+TEST(IPackStream, IsAtEndWithoutInitialization) {
+  IPackStream stream;
+  ASSERT_TRUE(stream.end());
+}
+
+TEST(IPackStream, IsNotAtEndAfterProperInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  ASSERT_FALSE(stream.end());
+}
+
+TEST(IPackStream, CanNotPeekWithoutInitialization) {
+  IPackStream stream;
+  ASSERT_FALSE(stream.canPeek<int>());
+}
+
+TEST(IPackStream, CanPeekAfterInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3};
+  stream.init(data, sizeof data);
+  ASSERT_TRUE(stream.canPeek<uint32_t>());
+  ASSERT_FALSE(stream.canPeek<uint64_t>());
+}
+
+TEST(IPackStream, CurrentPointerIsNullWithoutInitialization) {
+  IPackStream stream;
+  ASSERT_EQ(nullptr, stream.getCurrPtr());
+}
+
+TEST(IPackStream, CurrentPointerIsEqualToThatPassedDuringInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  ASSERT_EQ(data, stream.getCurrPtr());
+}
+
+// TODO: must correct IPackStream to satisfy these obvious conditions
+#if 0
+TEST(IPackStream, CanNotExtractByteArrayWithoutInitialization) {
+  IPackStream stream;
+  cs::ByteArray<3> string;
+  stream >> string;
+  ASSERT_EQ(string[0], 0);
+  ASSERT_EQ(string[1], 0);
+  ASSERT_EQ(string[2], 0);
+}
+#endif
+
+TEST(IPackStream, CanExtractByteArrayAfterInitialization) {
+  IPackStream stream;
+  uint8_t data[] = {1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  cs::ByteArray<3> string;
+  stream >> string;
+  ASSERT_EQ(string[0], 1);
+  ASSERT_EQ(string[1], 2);
+  ASSERT_EQ(string[2], 3);
+}
+
+TEST(IPackStream, UnsafeSkipCorrectlyWorks) {
+  IPackStream stream;
+  uint8_t data[] = {1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  cs::ByteArray<3> string;
+  stream.skip<uint32_t>();
+  stream >> string;
+  ASSERT_EQ(string[0], 5);
+  ASSERT_EQ(string[1], 6);
+  ASSERT_EQ(string[2], 7);
+}
+
+TEST(IPackStream, SafeSkipCorrectlySkips) {
+  IPackStream stream;
+  uint8_t data[] = {1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  cs::ByteArray<3> string;
+  stream.safeSkip<uint32_t>(1);
+  stream >> string;
+  ASSERT_EQ(string[0], 5);
+  ASSERT_EQ(string[1], 6);
+  ASSERT_EQ(string[2], 7);
+}
+
+TEST(IPackStream, SafeSkipCorrectlyDeclinesTooBigShift) {
+  IPackStream stream;
+  uint8_t data[] = {1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  stream.safeSkip<uint32_t>(2);
+  ASSERT_FALSE(stream.good());
+}
+
+TEST(IPackStream, IsAtEndAfterSkipToTheEnd) {
+  IPackStream stream;
+  uint8_t data[] = {1, 2, 3, 4, 5, 6, 7};
+  stream.init(data, sizeof data);
+  stream.safeSkip<uint8_t>(7);
+  ASSERT_TRUE(stream.end());
+}
+
+TEST(IPackStream, IsAtEndAfterReadTheWholeBlob) {
+  IPackStream stream;
+  uint8_t data[] = {0, 1, 2, 3};
+  stream.init(data, sizeof data);
+  uint32_t discarded_value;
+  stream >> discarded_value;
+  ASSERT_TRUE(stream.end());
+}
+
+TEST(IPackStream, SuccessfulReadOfIntegralType) {
+  IPackStream stream;
+  uint8_t data[] = {0x12, 0x34, 0x56, 0x78, 0xEE, 0xEE,
+                    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE};
+  stream.init(data, sizeof data);
+  uint32_t value;
+  stream >> value;
+  EXPECT_TRUE(stream.good());
+  ASSERT_EQ(value, 0x78563412);
+}
+
+TEST(IPackStream, IsNotGoodAfterRequestForReadingTooMany) {
+  IPackStream stream;
+  uint8_t data[] = {0x12, 0x34, 0x56, 0x78};
+  stream.init(data, sizeof data);
+  uint64_t value = 0;
+  stream >> value;
+  EXPECT_FALSE(stream.good());
+  ASSERT_EQ(value, 0);
+}
+
+TEST(IPackStream, PeekIntegerValue) {
+  IPackStream stream;
+  uint8_t data[] = {0x12, 0x34, 0x56, 0x78};
+  stream.init(data, sizeof data);
+  uint32_t value;
+  value = stream.peek<decltype(value)>();
+  ASSERT_EQ(value, 0x78563412);
+}
+
+void displayStreamData(IPackStream& stream, const size_t& size) {
   auto ptr = stream.getCurrPtr();
 
-  for(int i = 0; i < size; i++){
+  for (int i = 0; i < size; i++) {
     std::cout << "item " << i << ": " << (int)(*(ptr + i)) << std::endl;
   }
-}
-
-TEST(IPackStream, init)
-{
-  IPackStream iPackStream;
-
-  ASSERT_FALSE(iPackStream.good());
-
-  uint8_t data[] = {1, 2, 3, 4};
-  iPackStream.init(data, 4);
-
-  ASSERT_TRUE(iPackStream.good());
-}
-
-TEST(IPackStream, canPeek)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {1, 2, 3, 4};
-  iPackStream.init(data, 4);
-
-  ASSERT_TRUE(iPackStream.canPeek<uint8_t>());
-  ASSERT_FALSE(iPackStream.canPeek<uint64_t>());
-}
-
-TEST(IPackStream, peek)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12, 13, 14};
-  iPackStream.init(data, 4);
-
-  ASSERT_EQ(11, (int)iPackStream.peek<uint8_t>());
-}
-
-TEST(IPackStream, skip)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12, 13, 14};
-  iPackStream.init(data, 4);
-  iPackStream.skip<uint8_t>();
-
-  ASSERT_EQ(12, (int)iPackStream.peek<uint8_t>());
-}
-
-TEST(IPackStream, saveSkip)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12, 13};
-  iPackStream.init(data, 3);
-  iPackStream.safeSkip<uint32_t>();
-
-  ASSERT_FALSE(iPackStream.good());
-
-  iPackStream.safeSkip<uint8_t>(2);
-
-  ASSERT_EQ(13, (int)iPackStream.peek<uint8_t>());
-}
-
-TEST(IPackStream, input)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12, 13, 14, 15, 16, 17};
-  iPackStream.init(data, 7);
-
-  uint8_t val;
-  iPackStream >> val;
-
-  ASSERT_EQ(11, (int)val);
-
-  FixedString<2> str;
-  iPackStream >> str;
-
-  ASSERT_EQ(12, (int)str.data()[0]);
-
-  cs::ByteArray<2> array;
-  iPackStream >> array;
-
-  ASSERT_EQ(14, (int)array.data()[0]);
-
-  cs::Bytes bytes;
-  iPackStream >> bytes;
-
-  ASSERT_EQ(16, (int)bytes[0]);
-
-  uint8_t addrArray[] = {0, 127, 0, 0, 1};
-  iPackStream.init(addrArray, 5);
-
-  boost::asio::ip::address address;
-  iPackStream >> address;
-
-  ASSERT_TRUE(address.is_v4());
-
-  // TODO add v6
-}
-
-TEST(IPackStream, end)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12};
-  iPackStream.init(data, 2);
-
-  ASSERT_FALSE(iPackStream.end());
-
-  iPackStream.skip<uint8_t>();
-  iPackStream.skip<uint8_t>();
-
-  ASSERT_TRUE(iPackStream.end());
-}
-
-TEST(IPackStream, getCurrPtr)
-{
-  IPackStream iPackStream;
-  uint8_t data[] = {11, 12};
-  iPackStream.init(data, 2);
-
-  ASSERT_EQ(11, (int)*iPackStream.getCurrPtr());
 }

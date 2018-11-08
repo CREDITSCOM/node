@@ -156,7 +156,7 @@ void Solver::runConsensus() {
 
   cslog() << "SOLVER> Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
-  m_feeCounter.CountFeesInPool(m_node, &packet);
+  m_feeCounter.CountFeesInPool(m_node->getBlockChain(), &packet);
 
   cs::Hash result = m_generals->buildVector(packet, this);
 
@@ -547,7 +547,7 @@ const cs::PublicKey& Solver::publicKey() const {
 }
 
 void Solver::countFeesInPool(csdb::Pool* pool) {
-  m_feeCounter.CountFeesInPool(m_node, pool);
+  m_feeCounter.CountFeesInPool(m_node->getBlockChain(), pool);
 }
 
 void Solver::addTimestampToPool(csdb::Pool& pool) {
