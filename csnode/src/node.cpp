@@ -526,21 +526,6 @@ uint32_t Node::getRoundNumber() {
   return roundNum_;
 }
 
-void Node::sendBlock(const csdb::Pool& pool) {
-  if (myLevel_ != NodeLevel::Writer) {
-    cserror() << "Only writer nodes can send blocks";
-    return;
-  }
-
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  composeMessageWithBlock(pool, MsgTypes::NewBlock);
-
-  csdebug() << "Sending block of " << pool.transactions_count() << " transactions of seq " << pool.sequence()
-            << " and hash " << pool.hash().to_string() << " and ts " << pool.user_field(0).value<std::string>();
-
-  flushCurrentTasks();
-}
-
 void Node::getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   if (myLevel_ != NodeLevel::Writer) {
     return;
@@ -1256,7 +1241,8 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& target) {
   }
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  composeMessageWithBlock(pool, MsgTypes::RequestedBlock);
+  ostream_ << MsgTypes::RequestedBlock << pool;
+
   transport_->deliverDirect(ostream_.getPackets(),
                             ostream_.getPacketsCount(),
                             conn);
@@ -1503,23 +1489,6 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
   roundTable.hashes.clear();
 
   return true;
-}
-
-void Node::composeMessageWithBlock(const csdb::Pool& pool, const MsgTypes type) {
-  uint32_t bSize;
-  const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-  composeCompressed(data, bSize, type);
-}
-
-void Node::composeCompressed(const void* data, const uint32_t bSize, const MsgTypes type) {
-  auto max    = LZ4_compressBound(cs::numeric_cast<int>(bSize));
-  auto memPtr = allocator_.allocateNext(cs::numeric_cast<uint32_t>(max));
-
-  auto realSize = LZ4_compress_default((const char*)data, (char*)memPtr.get(), cs::numeric_cast<int>(bSize), cs::numeric_cast<int>(memPtr.size()));
-
-  allocator_.shrinkLast(cs::numeric_cast<uint32_t>(realSize));
-  ostream_ << type << roundNum_ << bSize;
-  ostream_ << std::string(cs::numeric_cast<char*>(memPtr.get()), memPtr.size());
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {

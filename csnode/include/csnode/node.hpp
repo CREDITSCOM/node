@@ -71,7 +71,6 @@ public:
   // outcoming requests forming
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
-  void sendBlock(const csdb::Pool&);
   void sendHash(const csdb::PoolHash&, const cs::PublicKey&);
 
   // transaction's pack syncro
@@ -179,10 +178,7 @@ private:
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
-  // pool compression helpers
-  void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
-  void composeCompressed(const void*, const uint32_t, const MsgTypes);
-
+  // pool sync progress
   static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
   template <class T, class... Args>
