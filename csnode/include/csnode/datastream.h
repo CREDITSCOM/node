@@ -494,6 +494,19 @@ namespace cs
     }
 
     ///
+    /// Gets pool from stream.
+    ///
+    inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool)
+    {
+        cs::Bytes bytes;
+        stream >> bytes;
+
+        pool = csdb::Pool::from_binary(bytes);
+
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -603,6 +616,15 @@ namespace cs
     inline DataStream& operator<<(DataStream& stream, const csdb::PoolHash& hash)
     {
         stream << hash.to_binary();
+        return stream;
+    }
+
+    ///
+    /// Writes pool structure to stream as byte representation
+    ///
+    inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool)
+    {
+        stream << pool.to_binary();
         return stream;
     }
 }
