@@ -32,6 +32,8 @@ public:
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
+  void resetHashMatrix();
+
   cs::Hash buildVector(const cs::TransactionsPacket& packet, cs::Solver* solver);
 
   void addVector(const HashVector& vector);
