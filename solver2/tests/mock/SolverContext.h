@@ -7,7 +7,6 @@
 #include <csnode/blockchain.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
-#include <Solver/generals.hpp>
 #include <Solver/Solver.hpp>
 #include <Solver/WalletsState.h>
 #include <csnode/conveyer.hpp>

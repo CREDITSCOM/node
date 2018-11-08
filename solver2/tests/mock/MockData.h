@@ -11,7 +11,6 @@ struct MockData
 {
     slv2::CallsQueueScheduler sched;
     BlockChain bc;
-    cs::Generals gen;
     cs::Hash hash;
     cs::Hash hash1;
     cs::Hash hash2;

@@ -36,12 +36,16 @@ add_executable(${PROJECT_NAME}
   mock/TimeoutTracking.h
   mock/SolverContext.h
   mock/sodium.h
+  mock/blake2.h
   mock/csdb/pool.h
   mock/csnode/blockchain.hpp
   mock/csnode/csnode.h
+  mock/csnode/conveyer.hpp
   mock/csnode/WalletsCache.h
-  mock/Solver/generals.hpp
+  mock/csnode/transactionspacket.h
   mock/Solver/Solver.hpp
+  mock/Solver/WalletsState.h
+  mock/Solver/TransactionsValidator.h
   ${SLV2_STATES_HEADERS_DIR}/DefaultStateBehavior.h
   ${SLV2_STATES_HEADERS_DIR}/TrustedStage1State.h
   ${SLV2_STATES_HEADERS_DIR}/TrustedStage2State.h
