@@ -67,6 +67,25 @@ namespace slv2
         // below are the "required" methods to be implemented by Solver-compatibility issue:
         
         void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
+        void runSpammer()
+        {
+            opt_spammer_on = true;
+        }
+        void countFeesInPool(csdb::Pool* pool);
+        void gotRound();
+        void gotHash(std::string&&, const cs::PublicKey&);
+        const cs::PublicKey& getPublicKey() const
+        {
+            return public_key;
+        }
+        const cs::PrivateKey& getPrivateKey() const
+        {
+            return private_key;
+        }
+        //TODO: requires revision a.s.a.p.
+        const cs::PublicKey& getWriterPublicKey() const;
+        bool checkTransactionSignature(const csdb::Transaction& transaction);
+
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
@@ -76,14 +95,12 @@ namespace slv2
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
         void gotBlockReply(csdb::Pool& p);
-        void gotHash(const cs::Hash& hash, const cs::PublicKey& sender);
         void gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender);
         // store outrunning syncro blocks
         void gotFreeSyncroBlock(csdb::Pool&& p);
         // retrieve outrunning syncro blocks and store them
         void rndStorageProcessing();
         void tmpStorageProcessing();
-        void addConfirmation(uint8_t own_conf_number);
         void beforeNextRound();
         void nextRound();
         void gotRoundInfoRequest(uint8_t requesterNumber);
@@ -306,6 +323,11 @@ namespace slv2
          */
 
         cs::StageThree* find_stage3(uint8_t sender);
+
+        const cs::StageThree* find_stage3(uint8_t sender) const
+        {
+            return find_stage3(sender);
+        }
 
         //// -= THIRD SOLVER CLASS DATA FIELDS =-
         std::array<uint8_t, Consensus::MaxTrustedNodes> markUntrusted;

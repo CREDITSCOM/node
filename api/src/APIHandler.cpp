@@ -36,7 +36,7 @@ constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
 using namespace api;
 using namespace ::apache;
-using namespace Credits;
+//using namespace Credits;
 
 api::custom::APIProcessor::APIProcessor(
   ::apache::thrift::stdcxx::shared_ptr<APIHandler> iface)

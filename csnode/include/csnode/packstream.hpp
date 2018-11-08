@@ -270,7 +270,9 @@ template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
   uint32_t uncompressedSize = 0u;
   *this >> uncompressedSize;
-  pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
+  std::string raw_bytes;
+  *this >> raw_bytes;
+  pool = csdb::Pool::from_lz4_byte_stream(raw_bytes.data(), raw_bytes.size(), uncompressedSize);
   ptr_ = end_;
   return *this;
 }

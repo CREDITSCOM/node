@@ -34,6 +34,40 @@ namespace slv2
         private_key = priv;
     }
 
+    void SolverCore::countFeesInPool(csdb::Pool * pool)
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->countFeesInPool(pool);
+            return;
+        }
+        this->pfee->CountFeesInPool(pnode, pool);
+    }
+
+    void SolverCore::gotRound()
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->gotRound();
+            return;
+        }
+        //TODO: strange method
+    }
+
+
+
+    const cs::PublicKey& SolverCore::getWriterPublicKey() const
+    {
+        auto ptr = find_stage3(pnode->getConfidantNumber());
+        if(ptr != nullptr) {
+            const auto& trusted = cs::Conveyer::instance().roundTable().confidants;
+            if(trusted.size() >= ptr->writer) {
+                return *(trusted.cbegin() + ptr->writer);
+            }
+        }
+        // must not ignore the problem
+        assert(false);
+        return getPublicKey();//TODO: what we should return if do not know writer?
+    }
+
     void SolverCore::addInitialBalance()
     {
         if(opt_is_proxy_v1 && pslv_v1) {
@@ -113,7 +147,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotBlock(csdb::Pool& p, const cs::PublicKey& sender)
+    void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             csdb::Pool tmp = p;
@@ -193,10 +227,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotHash(const cs::Hash& hash, const cs::PublicKey& sender)
+    void SolverCore::gotHash(std::string&& hash_string, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotHash(cs::Utils::byteStreamToHex(hash.data(), hash.size()), sender);
+            pslv_v1->gotHash(std::move(hash_string), sender);
             return;
         }
 
@@ -206,6 +240,10 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: gotHash()");
         }
+
+        const auto& tmp = csdb::PoolHash::from_string(hash_string).to_binary();
+        cs::Hash hash;
+        std::copy(tmp.cbegin(), tmp.cend(), hash.begin());
         if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
             handleTransitions(Event::Hashes);
         }
@@ -281,13 +319,6 @@ namespace slv2
 
     void SolverCore::beforeNextRound()
     {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            if((!pslv_v1->isPoolClosed()) && (!pslv_v1->bigBangStatus())) {
-                pslv_v1->sendTL();  // TODO: check this
-            }
-            return;
-        }
-
         if(!pstate) {
             return;
         }

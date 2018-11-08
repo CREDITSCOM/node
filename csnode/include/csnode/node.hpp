@@ -69,6 +69,11 @@ public:
 
   void sendHash_V3();
 
+  const cs::ConfidantsKeys confidants() const
+  {
+      return cs::Conveyer::instance().roundTable().confidants;
+  }
+
   void onRoundStart_V3();
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);

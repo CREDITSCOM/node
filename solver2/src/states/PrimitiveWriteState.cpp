@@ -19,7 +19,7 @@ namespace slv2
                 if(Consensus::Log) {
                     LOG_NOTICE(name() << ": it is time to spawn first round");
                 }
-                trusted_candidates.assign(Consensus::MinTrustedNodes, (const char*)pctx->public_key().data());
+                trusted_candidates.assign(Consensus::MinTrustedNodes, pctx->public_key());
                     pctx->next_trusted_candidates(trusted_candidates);
                 trusted_candidates.clear();
                 pctx->spawn_first_round();
@@ -38,7 +38,7 @@ namespace slv2
             if(Consensus::MinTrustedNodes > trusted_candidates.size()) {
                 size_t cnt = Consensus::MinTrustedNodes - trusted_candidates.size();
                 for(size_t i = 0; i < cnt; i++) {
-                    trusted_candidates.push_back((const char *)pctx->public_key().data());
+                    trusted_candidates.emplace_back(pctx->public_key());
                 }
             }
             pctx->next_trusted_candidates(trusted_candidates);
@@ -56,10 +56,10 @@ namespace slv2
         DefaultStateBehavior::off(context);
     }
 
-    Result PrimitiveWriteState::onHash(SolverContext & /*context*/, const Hash & /*hash*/, const PublicKey & sender)
+    Result PrimitiveWriteState::onHash(SolverContext & /*context*/, const cs::Hash & /*hash*/, const cs::PublicKey & sender)
     {
         // form "trusted candidates"
-        trusted_candidates.push_back(sender);
+        trusted_candidates.emplace_back(sender);
         return Result::Ignore;
     }
 

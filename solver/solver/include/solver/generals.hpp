@@ -37,6 +37,8 @@ public:
   Generals(const Generals&) = delete;
   Generals& operator=(const Generals&) = delete;
 
+  // obsolete:
+  cs::Hash buildVector(const cs::TransactionsPacket& packet, cs::Solver* solver);
   cs::Hash buildVector(const cs::TransactionsPacket& packet, slv2::SolverCore* solver);
 
   void addVector(const HashVector& vector);
@@ -44,6 +46,7 @@ public:
 
   // take desision
   uint8_t takeDecision(const cs::ConfidantsKeys& confidantNodes, const csdb::PoolHash& lasthash);
+  uint8_t takeUrgentDecision(const size_t confNumber, const csdb::PoolHash &lasthash);
   static int8_t extractRaisedBitsCount(const csdb::Amount& amount);
   const HashMatrix& getMatrix() const;
 

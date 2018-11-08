@@ -440,6 +440,21 @@ namespace slv2
         return nullptr;
     }
 
+    bool SolverCore::checkTransactionSignature(const csdb::Transaction& transaction)
+    {
+        BlockChain::WalletData data_to_fetch_pulic_key;
+
+        if(transaction.source().is_wallet_id()) {
+            pnode->getBlockChain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+
+            csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
+                data_to_fetch_pulic_key.address_.end());
+            return transaction.verify_signature(byte_array);
+        }
+
+        return transaction.verify_signature(transaction.source().public_key());
+    }
+
     void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)
     {
 

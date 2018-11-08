@@ -150,7 +150,7 @@ namespace slv2
     {
         struct HashWeight
         {
-            uint8_t hash[32];
+            cs::Hash hash;
             uint8_t weight { 0 };
         };
 
@@ -159,35 +159,35 @@ namespace slv2
         //creating hash frequency table
         for(const auto& it : context.stage1_data()) {
             if(hWeight.size() == 0) {
-                memcpy(everyHashWeight.hash, it.hash.val, 32);
+                std::copy(it.hash.cbegin(), it.hash.cend(), everyHashWeight.hash.begin());
                 everyHashWeight.weight = 1;
                 hWeight.push_back(everyHashWeight);
             }
             else {
                 bool found = false;
                 for(auto& itt : hWeight) {
-                    if(memcmp(itt.hash, it.hash.val, 32) == 0) {
+                    if(itt.hash == it.hash) {
                         ++(itt.weight);
                         found = true;
                         break;
                     }
                 }
                 if(!found) {
-                    memcpy(everyHashWeight.hash, it.hash.val, 32);
+                    std::copy(it.hash.cbegin(), it.hash.cend(), everyHashWeight.hash.begin());
                     everyHashWeight.weight = 1;
                     hWeight.push_back(everyHashWeight);
                 }
             }
         }
         size_t maxWeight = 0;
-        cs::Hash_ mostFrequentHash;
-        memset(&mostFrequentHash, 0, sizeof(mostFrequentHash));
+        cs::Hash mostFrequentHash;
+        std::fill(mostFrequentHash.begin(), mostFrequentHash.end(), 0);
 
         ////searching for most frequent hash 
         for(auto& it : hWeight) {
             if(it.weight > maxWeight) {
                 maxWeight = it.weight;
-                memcpy(mostFrequentHash.val, it.hash, 32);
+                std::copy(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.begin());
             }
         }
         std::cout << "================================= SUMMARY ======================================= " << std::endl;
@@ -195,14 +195,14 @@ namespace slv2
         /* std::cout <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32) << std::endl;*/
         for(const auto& it : context.stage1_data()) {
 
-            if(memcmp(it.hash.val, mostFrequentHash.val, 32) == 0) {
-                std::cout << "\t[" << (int) it.sender << "] is not liar " << byteStreamToHex((const char*) it.hash.val, 32)
-                    << std::endl;
+            if(std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
+                std::cout << "\t[" << (int) it.sender << "] is not liar "
+                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size()) << std::endl;
             }
             else {
                 ++liarNumber;
-                std::cout << "\t[" << (int) it.sender << "] IS LIAR " << byteStreamToHex((const char*) it.hash.val, 32)
-                    << std::endl;
+                std::cout << "\t[" << (int) it.sender << "] IS LIAR "
+                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size()) << std::endl;
             }
         }
 
@@ -223,11 +223,11 @@ namespace slv2
         }
         std::array<uint8_t,Consensus::MaxTrustedNodes> trustedMask;
         trustedMask.fill(0);
-        std::map <PublicKey, uint8_t> candidatesElection;
+        std::map <cs::PublicKey, uint8_t> candidatesElection;
         const uint8_t cnt_trusted = std::min((uint8_t) context.cnt_trusted(), (uint8_t) Consensus::MaxTrustedNodes);
         uint8_t cr = cnt_trusted / 2;
-        std::vector <PublicKey> aboveThreshold;
-        std::vector <PublicKey> belowThreshold;
+        std::vector <cs::PublicKey> aboveThreshold;
+        std::vector <cs::PublicKey> belowThreshold;
 
         LOG_NOTICE(name() << ": number of generals / 2 = " << (int) cr);
 
@@ -269,31 +269,36 @@ namespace slv2
         LOG_NOTICE(name() << ": candidates divided: above = " << aboveThreshold.size() << ", below = " << belowThreshold.size());
         LOG_DEBUG("======================================================");
         for(int i = 0; i < aboveThreshold.size(); i++) {
-            LOG_DEBUG(i << ". " << byteStreamToHex(aboveThreshold.at(i).str, 32)
-                << " - " << (int) candidatesElection.at(aboveThreshold.at(i)));
+            const auto& tmp = aboveThreshold.at(i);
+            LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+                << " - " << (int) candidatesElection.at(tmp));
         }
         LOG_DEBUG("------------------------------------------------------");
         for(int i = 0; i < belowThreshold.size(); i++) {
-            LOG_DEBUG(i << ". " << byteStreamToHex(belowThreshold.at(i).str, 32)
-                << " - " << (int) candidatesElection.at(belowThreshold.at(i)));
+            const auto& tmp = belowThreshold.at(i);
+            LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+                << " - " << (int) candidatesElection.at(tmp));
         }
         LOG_NOTICE(name() << ": final list of next round trusted:");
 
         if(aboveThreshold.size() >= max_conf) { // Consensus::MinTrustedNodes) {
             for(unsigned int i = 0; i < max_conf; ++i) {
-                next_round_trust.push_back(aboveThreshold.at(i));
-                LOG_NOTICE(byteStreamToHex(next_round_trust.back().str, 32));
+                const auto& tmp = aboveThreshold.at(i);
+                next_round_trust.push_back(tmp);
+                LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
             }
         }
         else {
             if(belowThreshold.size() >= max_conf - aboveThreshold.size()) {
                 for(int i = 0; i < aboveThreshold.size(); i++) {
-                    next_round_trust.push_back(aboveThreshold.at(i));
-                    LOG_NOTICE(byteStreamToHex(next_round_trust.back().str, 32));
+                    const auto& tmp = aboveThreshold.at(i);
+                    next_round_trust.push_back(tmp);
+                    LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
                 }
                 for(int i = 0; i < max_conf - next_round_trust.size(); i++) {
-                    next_round_trust.push_back(belowThreshold.at(i));
-                    LOG_NOTICE(byteStreamToHex(next_round_trust.back().str, 32));
+                    const auto& tmp = belowThreshold.at(i);
+                    next_round_trust.push_back(tmp);
+                    LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
                 }
             }
             else {
