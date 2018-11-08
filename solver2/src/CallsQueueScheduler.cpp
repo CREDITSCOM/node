@@ -2,86 +2,90 @@
 #include <lib/system/structures.hpp> // CallsQueue
 #include <algorithm>
 
-void CallsQueueScheduler::Run()
+void CallsQueueScheduler::SchedulerProc()
 {
-    _stop = false;
-    _worker = std::thread([this]() {
-        bool signaled { false };
-        constexpr long long min_wait_for = 5;
-        while(!_stop)
+    bool signaled { false };
+    constexpr long long min_wait_for = 5;
+    while(!_stop) {
+        // get earliest action time
+        auto earliest = ClockType::now() + std::chrono::seconds(60);
         {
-            // get earliest action time
-            auto earliest = ClockType::now() + std::chrono::seconds(60);
-            {
-                std::lock_guard<std::mutex> lque(_mtx_queue);
-                if(!_queue.empty()) {
-                    earliest = _queue.cbegin()->tp;
-                }
+            std::lock_guard<std::mutex> lque(_mtx_queue);
+            if(!_queue.empty()) {
+                earliest = _queue.cbegin()->tp;
             }
-            // sleep until scheduled event and get ready to awake at any time
-            std::unique_lock<std::mutex> lsig(_mtx_signal);
-            signaled = _signal.wait_until(lsig, earliest, [this]() { return _flag; }); // std::system_error!
-            // test stop condition before reaction
-            if(_stop) {
-                break;
-            }
-            // event occurs
-            if(signaled) {
-                // reset _flag for the next signal
-                _flag = false;
-                // awake by direct notification: re-schedule next timeout
-                std::lock_guard<std::mutex> lque(_mtx_queue);
-                if(!_queue.empty()) {
-                    // test whether to call immediately
-                    if((_queue.cbegin()->tp - ClockType::now()).count() >= min_wait_for) {
-                        // schedule next wait period
-                        continue;
-                    }
-                    // fall through to execute proc now (either timeout almost coincided with the signal, or proc is scheduled with tiny wait_for)
-                }
-                else {
-                    // queue is empty, schedule next wait period
+        }
+        // sleep until scheduled event and get ready to awake at any time
+        std::unique_lock<std::mutex> lsig(_mtx_signal);
+        signaled = _signal.wait_until(lsig, earliest, [this]() { return _flag; }); // std::system_error!
+        // test stop condition before reaction
+        if(_stop) {
+            break;
+        }
+        // event occurs
+        if(signaled) {
+            // reset _flag for the next signal
+            _flag = false;
+            // awake by direct notification: re-schedule next timeout
+            std::lock_guard<std::mutex> lque(_mtx_queue);
+            if(!_queue.empty()) {
+                // test whether to call immediately
+                if((_queue.cbegin()->tp - ClockType::now()).count() >= min_wait_for) {
+                    // schedule next wait period
                     continue;
                 }
+                // fall through to execute proc now (either timeout almost coincided with the signal, or proc is scheduled with tiny wait_for)
             }
-            // awake due timeout: the most probable its time to execute earliest proc
-            // test scheduled time (if it was at all)
-            Context run;
-            run.id = no_tag;
-            {
-                std::lock_guard<std::mutex> lque(_mtx_queue);
-                // execute calls until wait time >= min_wait_for
-                while(!_queue.empty()) {
-                    if((_queue.cbegin()->tp - ClockType::now()).count() >= min_wait_for) {
-                        break;
-                    }
-                    run = *_queue.cbegin();
-                    _queue.erase(_queue.cbegin());
-                    ProcType proc = run.proc;
-                    // push to CallsQueue only if there are no any previous calls
-                    if(CanExe(run.id)) {
-                        OnExeQueued(run.id);
-                        CallsQueue::instance().insert([this, run]() {
-                            run.proc();
-                            std::lock_guard<std::mutex> lque(_mtx_queue);
-                            OnExeDone(run.id);
-                        });
-                        _cnt_total += 1;
-                    }
-                    else {
-                        _cnt_block_exe += 1;
-                    }
-                    // Launch::periodic -> schedule next item
-                    if(run.dt > 0) {
-                        run.tp = ClockType::now() + std::chrono::milliseconds(run.dt);
-                        auto pos = _queue.insert(run);
-                        if(pos == _queue.end()) {
-                            // periodic calls aborted due to unexpected problem!
-                        }
+            else {
+                // queue is empty, schedule next wait period
+                continue;
+            }
+        }
+        // awake due timeout: the most probable its time to execute earliest proc
+        // test scheduled time (if it was at all)
+        Context run;
+        run.id = no_tag;
+        {
+            std::lock_guard<std::mutex> lque(_mtx_queue);
+            // execute calls until wait time >= min_wait_for
+            while(!_queue.empty()) {
+                if((_queue.cbegin()->tp - ClockType::now()).count() >= min_wait_for) {
+                    break;
+                }
+                run = *_queue.cbegin();
+                _queue.erase(_queue.cbegin());
+                ProcType proc = run.proc;
+                // push to CallsQueue only if there are no any previous calls
+                if(CanExe(run.id)) {
+                    OnExeQueued(run.id);
+                    CallsQueue::instance().insert([this, run]() {
+                        run.proc();
+                        std::lock_guard<std::mutex> lque(_mtx_queue);
+                        OnExeDone(run.id);
+                    });
+                    _cnt_total += 1;
+                }
+                else {
+                    _cnt_block_exe += 1;
+                }
+                // Launch::periodic -> schedule next item
+                if(run.dt > 0) {
+                    run.tp = ClockType::now() + std::chrono::milliseconds(run.dt);
+                    auto pos = _queue.insert(run);
+                    if(pos == _queue.end()) {
+                        // periodic calls aborted due to unexpected problem!
                     }
                 }
             }
         }
+    }
+}
+
+void CallsQueueScheduler::Run()
+{
+    _stop = false;
+    _worker = std::thread([this]() {
+        SchedulerProc();
     });
 }
 

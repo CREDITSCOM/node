@@ -11,11 +11,6 @@
 #include <Solver/Solver.hpp>
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Generals.hpp>
-#pragma warning(pop)
-
 #include <Solver/Fee.h>
 #include <csdb/currency.h>
 #include <lib/system/logger.hpp>

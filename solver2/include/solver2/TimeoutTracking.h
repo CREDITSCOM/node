@@ -1,6 +1,5 @@
 #pragma once
 #include <CallsQueueScheduler.h>
-#include <SolverContext.h>
 
 namespace slv2
 {

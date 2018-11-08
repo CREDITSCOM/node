@@ -286,6 +286,9 @@ private:
     };
     std::map<CallTag, ExeSync> _exe_sync;
 
+    // thread procedure
+    void SchedulerProc();
+
     // methods below are NOT thread-safe, they must be synced at point of call!
 
     // must be called when the lambda put in CallsQueue for execution

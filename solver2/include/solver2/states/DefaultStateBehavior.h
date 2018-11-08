@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../INodeState.h"
+#include <INodeState.h>
 
 namespace slv2
 {

@@ -1,12 +1,8 @@
 #pragma once
 #include "DefaultStateBehavior.h"
+#include <Stage.h>
 #include <TimeoutTracking.h>
 #include <lib/system/keys.hpp>
-// cs::StageThree requires:
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
-#pragma warning(pop)
 
 #include <vector>
 
