@@ -575,6 +575,24 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::WriterNotification:
     return node_->getWriterNotification(data, size, firstPack.getSender());
+    case MsgTypes::FirstStage:
+      return node_->getStageOne(data, size, firstPack.getSender());
+    case MsgTypes::FirstStageRequest:
+      return node_->getStageOneRequest(data, size, firstPack.getSender());
+    case MsgTypes::SecondStage:
+      return node_->getStageTwo(data, size, firstPack.getSender());
+    case MsgTypes::SecondStageRequest:
+      return node_->getStageTwoRequest(data, size, firstPack.getSender());
+    case MsgTypes::ThirdStage:
+      return node_->getStageThree(data, size, firstPack.getSender());
+    case MsgTypes::ThirdStageRequest:
+      return node_->getStageTwoRequest(data, size, firstPack.getSender());
+    case MsgTypes::RoundInfo:
+      return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
+    case MsgTypes::RoundInfoRequest:
+      return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
+    case MsgTypes::RoundInfoReply:
+      return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
   default:
     cserror() << "Unknown type";
     break;
