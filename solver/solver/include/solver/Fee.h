@@ -8,7 +8,7 @@
 
 #include <cstddef>
 
-class Node;
+class BlockChain;
 
 namespace csdb {
 class Pool;
@@ -34,8 +34,8 @@ class Fee {
   *  @param pool - counted fee will be set for each transaction
   *                in this pool.
   */
-  void CountFeesInPool(Node* node, csdb::Pool* pool);
-  void CountFeesInPool(Node* node, TransactionsPacket* packet);
+  void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
+  void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
 
   Fee();
   Fee(const Fee&) = delete;
@@ -48,7 +48,7 @@ class Fee {
   *  one_byte_cost_ member) should be multiplied by number of bytes
   *  in transaction.
   */
-  void CountOneByteCost();
+  void CountOneByteCost(const BlockChain& blockchain);
   /** @brief Set "counted_fee_" field for each transaction in current_pool_.
   *
   *  To find counted fee it multiplies size of transaction by one_byte_cost_.
@@ -60,17 +60,17 @@ class Fee {
   *  the network and rental cost of one node per day.
   *  Sets one_round_cost_.
   */
-  void CountOneRoundCost();
+  void CountOneRoundCost(const BlockChain& blockchain);
   /** @brief Counts rounds frequency and save it in member rounds_frequency_.
   *
   *  Round frequency depends on time stamp difference between previous pool
   *  and pool of current round - 100.
   */
-  void CountRoundsFrequency();
-  double CountBlockTimeStampDifference(size_t num_block_from);
+  void CountRoundsFrequency(const BlockChain& blockchain);
+  double CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain);
   inline void CountTotalTransactionsLength();
-  inline void Init(Node* node, csdb::Pool* pool);
-  inline void Init(Node* node, TransactionsPacket* packet);
+  inline void Init(const BlockChain& blockchain, csdb::Pool* pool);
+  inline void Init(const BlockChain&, TransactionsPacket* packet);
 
   size_t num_of_nodes_;
   size_t num_of_last_block_;
@@ -80,7 +80,6 @@ class Fee {
   double rounds_frequency_;
   csdb::Pool* current_pool_;
   TransactionsPacket* transactions_packet_;
-  Node* node_;
 };
 }  // namespace Credits
 
