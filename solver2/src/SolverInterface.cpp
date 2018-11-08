@@ -34,6 +34,15 @@ namespace slv2
         private_key = priv;
     }
 
+    void SolverCore::runSpammer()
+    {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            pslv_v1->runSpammer();
+            return;
+        }
+        opt_spammer_on = true;
+    }
+
     void SolverCore::countFeesInPool(csdb::Pool * pool)
     {
         if(opt_is_proxy_v1 && pslv_v1) {

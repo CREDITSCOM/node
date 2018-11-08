@@ -47,7 +47,7 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = false;
+    constexpr const bool ProxyToOldSolver = true;
     // Special mode: uses debug transition table
     constexpr const bool DebugModeOn = false;
 
@@ -78,8 +78,6 @@ namespace slv2
         , pnode(nullptr)
         , pws_inst(nullptr)
         , pws(nullptr)
-        , pgen_inst(nullptr)
-        , pgen(nullptr)
     {
         if(!opt_debug_mode) {
             if(Consensus::Log) {
@@ -120,16 +118,12 @@ namespace slv2
             pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
 #endif
 
-            pgen = pslv_v1->m_generals.get();
             pws = pslv_v1->m_walletsState.get();
         }
         else {
             pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
             // temp decision until solver-1 may be instantiated:
             pws = pws_inst.get();
-            pgen_inst = std::make_unique<cs::Generals>(*pws_inst);
-            // temp decision until solver-1 may be instantiated:
-            pgen = pgen_inst.get();
         }
 }
 
@@ -309,7 +303,7 @@ namespace slv2
         //TODO: store transactions sent until they found in future accepted blocks
     }
 
-    void SolverCore::store_received_block(csdb::Pool& p, bool defer_write)
+    void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)
     {
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store received block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
@@ -408,51 +402,6 @@ namespace slv2
                 break;
             }
         }
-    }
-
-    cs::StageOne* SolverCore::find_stage1(uint8_t sender)
-    {
-        for(auto it = stageOneStorage.begin(); it != stageOneStorage.end(); ++it) {
-            if(it->sender == sender) {
-                return &(*it);
-            }
-        }
-        return nullptr;
-    }
-
-    cs::StageTwo* SolverCore::find_stage2(uint8_t sender)
-    {
-        for(auto it = stageTwoStorage.begin(); it != stageTwoStorage.end(); ++it) {
-            if(it->sender == sender) {
-                return &(*it);
-            }
-        }
-        return nullptr;
-    }
-
-    cs::StageThree* SolverCore::find_stage3(uint8_t sender)
-    {
-        for(auto it = stageThreeStorage.begin(); it != stageThreeStorage.end(); ++it) {
-            if(it->sender == sender) {
-                return &(*it);
-            }
-        }
-        return nullptr;
-    }
-
-    bool SolverCore::checkTransactionSignature(const csdb::Transaction& transaction)
-    {
-        BlockChain::WalletData data_to_fetch_pulic_key;
-
-        if(transaction.source().is_wallet_id()) {
-            pnode->getBlockChain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
-
-            csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
-                data_to_fetch_pulic_key.address_.end());
-            return transaction.verify_signature(byte_array);
-        }
-
-        return transaction.verify_signature(transaction.source().public_key());
     }
 
     void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)

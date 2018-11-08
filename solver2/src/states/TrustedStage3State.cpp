@@ -1,11 +1,8 @@
 #include <states/TrustedStage3State.h>
 #include <SolverContext.h>
 
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Generals.hpp>
-#pragma warning(pop)
-
+#include <csnode/blockchain.hpp>
+#include <lib/system/utils.hpp>
 #include <math.h>
 
 namespace slv2
@@ -124,8 +121,7 @@ namespace slv2
 
             trusted_election(context);
             if(pool_solution_analysis(context)) {
-                stage.writer = context.generals().takeUrgentDecision(
-                    context.cnt_trusted(), context.blockchain().getHashBySequence(static_cast<uint32_t>(context.round()) - 1));
+                stage.writer = take_urgent_decision(context);
                 LOG_NOTICE(name() << ": consensus -> [" << (int)stage.writer << "]");
             }
             else {
@@ -181,7 +177,7 @@ namespace slv2
         }
         size_t maxWeight = 0;
         cs::Hash mostFrequentHash;
-        std::fill(mostFrequentHash.begin(), mostFrequentHash.end(), 0);
+        std::fill(mostFrequentHash.begin(), mostFrequentHash.end(), (cs::Byte)0);
 
         ////searching for most frequent hash 
         for(auto& it : hWeight) {
@@ -307,5 +303,20 @@ namespace slv2
         }
         LOG_NOTICE(name() << ": end of trusted election");
     }
+
+    uint8_t TrustedStage3State::take_urgent_decision(SolverContext& context)
+    {
+        auto hash_t = context.blockchain().getHashBySequence(static_cast<uint32_t>(context.round()) - 1).to_binary();
+        if(hash_t.empty()) {
+            return 0; //TODO: decide what to return
+        }
+        int k = *(hash_t.begin());
+        //std::cout << "K : " << k << std::endl;
+        int result0 = (int) context.cnt_trusted();
+        int result = 0;
+        result = k % result0;
+        return (uint8_t) result;
+    }
+
 
 } // slv2

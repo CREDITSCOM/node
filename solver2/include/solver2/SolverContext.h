@@ -11,8 +11,7 @@ class BlockChain;
 
 namespace cs
 {
-    class Solver;
-    class Generals;
+    class TransactionsPacket;
 }
 
 namespace slv2
@@ -148,24 +147,10 @@ namespace slv2
 
 		BlockChain& blockchain() const;
 
-        /**
-         * @fn  cs::Generals& SolverContext::generals() const;
-         *
-         * @brief   Gets the generals instance.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  A reference to the cs::Generals.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        cs::Generals& generals() const
+        cs::WalletsState& wallets() const
         {
-            return *core.pgen;
+            return *core.pws;
         }
-
         /**
          * @fn  CallsQueueScheduler& SolverContext::scheduler() const;
          *
@@ -413,12 +398,7 @@ namespace slv2
             return core.opt_spammer_on;
         }
 
-        void update_fees(cs::TransactionsPacket& p)
-        {
-            core.pfee->CountFeesInPool(core.pnode, &p);
-        }
-
-        cs::Hash build_vector(const cs::TransactionsPacket& trans_pack);
+        void update_fees(cs::TransactionsPacket& p);
 
         /**
          * @fn  void SolverContext::store_received_block(csdb::Pool & block, bool defer_write = false)
@@ -494,7 +474,7 @@ namespace slv2
          * @return  Null if it fails, else a pointer to a const uint8_t.
          */
 
-        const csdb::internal::byte_array& last_block_hash() const;
+        csdb::internal::byte_array last_block_hash() const;
 
         /**
          * @fn  void SolverContext::request_round_table() const;

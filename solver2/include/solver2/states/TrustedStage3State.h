@@ -57,6 +57,7 @@ namespace slv2
 
         void trusted_election(SolverContext& context);
         bool pool_solution_analysis(SolverContext& context);
+        uint8_t take_urgent_decision(SolverContext& context);
     };
 
 } // slv2

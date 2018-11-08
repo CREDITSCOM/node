@@ -7,11 +7,6 @@
 #include <csnode/conveyer.hpp>
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Generals.hpp>
-#pragma warning(pop)
-
 #include <lib/system/logger.hpp>
 
 namespace slv2
@@ -141,7 +136,7 @@ namespace slv2
         return false;
     }
 
-    const csdb::internal::byte_array& SolverContext::last_block_hash() const
+    csdb::internal::byte_array SolverContext::last_block_hash() const
     {
         //if(!core.is_block_deferred()) {
             return core.pnode->getBlockChain().getLastWrittenHash().to_binary();
@@ -167,9 +162,9 @@ namespace slv2
       core.pnode->requestStageThree(from, required);
     }
 
-    cs::Hash SolverContext::build_vector(const cs::TransactionsPacket& trans_pack)
+    void SolverContext::update_fees(cs::TransactionsPacket& p)
     {
-        return core.pgen->buildVector(trans_pack, &core);
+        core.pfee->CountFeesInPool(core.pnode, &p);
     }
 
 } // slv2
