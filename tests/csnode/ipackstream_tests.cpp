@@ -40,7 +40,7 @@ TEST(IPackStream, IsNotAtEndAfterProperInitialization) {
 
 TEST(IPackStream, CanNotPeekWithoutInitialization) {
   IPackStream stream;
-  ASSERT_FALSE(stream.canPeek<void>());
+  ASSERT_FALSE(stream.canPeek<int>());
 }
 
 TEST(IPackStream, CanPeekAfterInitialization) {
