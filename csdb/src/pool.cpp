@@ -125,8 +125,8 @@ class Pool::priv : public ::csdb::internal::shared_data
         os.put(wall);
     }
 
-	  os.put(writer_public_key_);
-	  os.put(signature_);
+      os.put(writer_public_key_);
+      os.put(signature_);
   }
 
   void put_for_sig(::csdb::priv::obstream& os)
@@ -146,29 +146,29 @@ class Pool::priv : public ::csdb::internal::shared_data
         os.put(wall);
     }
 
-	  os.put(writer_public_key_);
+      os.put(writer_public_key_);
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
-	  if (!is.get(previous_hash_)) {
-		  return false;
+      if (!is.get(previous_hash_)) {
+          return false;
       }
 
-	  if (!is.get(sequence_))
-		  return false;
+      if (!is.get(sequence_))
+          return false;
 
           if(!is.get(user_fields_)) {
             return false;
           }
 
-	  if (!is.get(cnt)) {
-		  return false;
-	  }
+      if (!is.get(cnt)) {
+          return false;
+      }
 
       transactionsCount_ = cnt;
       is_valid_ = true;
 
-	  return true;
+      return true;
   }
 
   bool getTransactions(::csdb::priv::ibstream& is, size_t cnt)
@@ -204,9 +204,9 @@ class Pool::priv : public ::csdb::internal::shared_data
   }
   bool get(::csdb::priv::ibstream& is)
   {
-	size_t cnt;
-	if (!get_meta(is, cnt))
-		return false;
+    size_t cnt;
+    if (!get_meta(is, cnt))
+        return false;
 
     if (!getTransactions(is, cnt))
         return false;
@@ -453,13 +453,13 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept
 
 void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept
 {
-	if (d.constData()->read_only_) {
-		return;
-	}
+    if (d.constData()->read_only_) {
+        return;
+    }
 
-	priv* data = d.data();
-	data->is_valid_ = true;
-	data->writer_public_key_ = writer_public_key;
+    priv* data = d.data();
+    data->is_valid_ = true;
+    data->writer_public_key_ = writer_public_key;
 }
 
 void Pool::set_signature(const std::string& signature) noexcept
@@ -483,7 +483,7 @@ void Pool::set_storage(Storage storage) noexcept
 
 Pool::Transactions& Pool::transactions()
 {
-	return d->transactions_;
+    return d->transactions_;
 }
 
 const Pool::Transactions& Pool::transactions() const
@@ -554,29 +554,29 @@ bool Pool::compose()
 
 Pool Pool::from_binary(const ::csdb::internal::byte_array& data)
 {
-	priv *p = new priv();
-	::csdb::priv::ibstream is(data.data(), data.size());
-	if (!p->get(is)) {
-		delete p;
-		return Pool();
-	}
-	p->binary_representation_ = data;
-	p->update_transactions();
-	return Pool(p);
+    priv *p = new priv();
+    ::csdb::priv::ibstream is(data.data(), data.size());
+    if (!p->get(is)) {
+        delete p;
+        return Pool();
+    }
+    p->binary_representation_ = data;
+    p->update_transactions();
+    return Pool(p);
 }
 
 Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt)
 {
-	priv *p = new priv();
-	::csdb::priv::ibstream is(data.data(), data.size());
+    priv *p = new priv();
+    ::csdb::priv::ibstream is(data.data(), data.size());
 
-	if (!p->get_meta(is, cnt)) {
-		delete p;
-		return Pool();
-	}
+    if (!p->get_meta(is, cnt)) {
+        delete p;
+        return Pool();
+    }
 
-	p->binary_representation_ = data;
-	return Pool(p);
+    p->binary_representation_ = data;
+    return Pool(p);
 }
 
 Pool Pool::meta_from_byte_stream(const char* data, size_t size) {
@@ -618,14 +618,14 @@ Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompress
 }
 
   char* Pool::to_byte_stream(uint32_t& size) {
-	  if (d->binary_representation_.empty()) {
-		  ::csdb::priv::obstream os;
-		  d->put(os);
-		  d->binary_representation_ = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
-	  }
+      if (d->binary_representation_.empty()) {
+          ::csdb::priv::obstream os;
+          d->put(os);
+          d->binary_representation_ = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+      }
 
-	  size = d->binary_representation_.size();
-	  return (char*)(d->binary_representation_.data());
+      size = d->binary_representation_.size();
+      return (char*)(d->binary_representation_.data());
   }
 
   bool Pool::save(Storage storage)
@@ -656,32 +656,32 @@ Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompress
 
   ::csdb::internal::byte_array Pool::to_byte_stream_for_sig()
   {
-	  ::csdb::priv::obstream os;
-	  d->put_for_sig(os);
-	  ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
-	  return result;
+      ::csdb::priv::obstream os;
+      d->put_for_sig(os);
+      ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+      return result;
   }
 
-void Pool::sign(std::vector<uint8_t> private_key)
+void Pool::sign(const cs::PrivateKey& private_key)
 {
-	uint8_t signature[internal::kSignatureLength];
-	auto pool_bytes = this->to_byte_stream_for_sig();
-	uint64_t sig_len;
-	crypto_sign_ed25519_detached(signature, reinterpret_cast<unsigned long long *>(&sig_len),
-	  pool_bytes.data(), pool_bytes.size(), private_key.data());
-	d->signature_.assign((char *)signature, sizeof(signature));
+    cs::Signature signature;
+    auto pool_bytes = this->to_byte_stream_for_sig();
+    uint64_t sig_len;
+    crypto_sign_ed25519_detached(signature.data(), reinterpret_cast<unsigned long long *>(&sig_len),
+      pool_bytes.data(), pool_bytes.size(), private_key.data());
+    d->signature_ = std::string(signature.begin(), signature.end());
 }
 
 bool Pool::verify_signature()
 {
-	if (this->writer_public_key().size() != internal::kPublicKeySize || d->signature_.size() != internal::kSignatureLength)
-		return false;
-	const auto& pool_bytes = this->to_byte_stream_for_sig();
-	if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
-		pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
-		return true;
-	}
-	return false;
+    if (this->writer_public_key().size() != internal::kPublicKeySize || d->signature_.size() != internal::kSignatureLength)
+        return false;
+    const auto& pool_bytes = this->to_byte_stream_for_sig();
+    if (crypto_sign_ed25519_verify_detached((const uint8_t *)d->signature_.c_str(),
+        pool_bytes.data(), pool_bytes.size(), this->writer_public_key().data()) == 0) {
+        return true;
+    }
+    return false;
 }
 
 bool Pool::verify_signature(const std::string& signature)
