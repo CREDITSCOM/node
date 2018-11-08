@@ -58,14 +58,19 @@ extern "C" void sig_handler(int sig) {
   {
   case SIGINT:
     LOG_WARN("Signal SIGINT received, exiting");
+    break;
   case SIGTERM:
     LOG_WARN("Signal SIGTERM received, exiting");
+    break;
   case SIGQUIT:
     LOG_WARN("Signal SIGBREAK received, exiting");
+    break;
   case SIGHUP:
     LOG_WARN("Signal SIGHUP received, exiting");
+    break;
   default:
     LOG_WARN("Uncknown signal received, exiting");
+    break;
   }
 }
 
