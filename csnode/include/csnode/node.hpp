@@ -10,7 +10,6 @@
 #include <csconnector/csconnector.h>
 #include <client/config.hpp>
 
-#include <csnode/datastream.h>
 #include <csnode/dynamicbuffer.h>
 
 #include <lib/system/keys.hpp>
@@ -61,8 +60,8 @@ public:
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
 
-  cs::Bytes createNotification();
-  cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+  void createNotification();
+  void createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                                         const cs::Signature& signature, const cs::Notifications& notifications);
 
   // syncro get functions
@@ -89,22 +88,20 @@ public:
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
 
-  template<class... Args>
+  template<typename... Args>
   bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+
+  template<typename... Args>
+  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -183,14 +180,17 @@ private:
   // pool sync progress
   static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
-  template <class T, class... Args>
-  void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);
+  template <typename T, typename... Args>
+  void writeDefaultStream(const T& value, const Args&... args);
 
-  template<class T>
-  void writeDefaultStream(cs::DataStream& stream, const T& value);
+  template<typename T>
+  void writeDefaultStream(const T& value);
 
-  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  template<typename... Args>
+  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+
+  template<typename... Args>
+  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;

@@ -90,6 +90,25 @@ public:
     return *this;
   }
 
+  template<typename T, typename A>
+  IPackStream& operator>>(std::vector<T,A>& vector) {
+    std::size_t size;
+    (*this) >> size;
+
+    std::vector<T, A> entity;
+
+    for (std::size_t i = 0; i < size; ++i) {
+      T element;
+      (*this) >> element;
+
+      entity.push_back(element);
+    }
+
+    vector = std::move(entity);
+
+    return *this;
+  }
+
   bool good() const {
     return good_;
   }
@@ -182,6 +201,17 @@ public:
   template <size_t Length>
   OPackStream& operator<<(const cs::ByteArray<Length>& byteArray) {
     insertBytes(byteArray.data(), Length);
+    return *this;
+  }
+
+  template<typename T, typename A>
+  cs::OPackStream& operator<<(const std::vector<T,A> & vector) {
+    (*this) << vector.size();
+
+    for (const auto& element : vector) {
+      (*this) << element;
+    }
+
     return *this;
   }
 

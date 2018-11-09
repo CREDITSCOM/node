@@ -21,14 +21,8 @@
 #include <lib/system/keys.hpp>
 #include <lib/system/metastorage.hpp>
 
-#ifdef NO_DELAYS
-const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
-const std::size_t ROUND_DELAY = 0;
-#else
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
 const std::size_t ROUND_DELAY = 1000;                   // ms
-#endif
-
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 5000;        // ms
 
 namespace std
