@@ -528,7 +528,7 @@ uint32_t Node::getRoundNumber() {
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Confidant) {
+  if (myLevel_ != NodeLevel::Confidant && myLevel_ != NodeLevel::Writer) {
     return;
   }
 
