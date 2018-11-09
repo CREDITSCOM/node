@@ -44,7 +44,7 @@ namespace slv2
             pslv_v1->countFeesInPool(pool);
             return;
         }
-        this->pfee->CountFeesInPool(pnode, pool);
+        this->pfee->CountFeesInPool(pnode->getBlockChain(), pool);
     }
 
     void SolverCore::gotRound()
@@ -279,10 +279,10 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotHash(std::string&& hash_string, const cs::PublicKey& sender)
+    void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotHash(std::move(hash_string), sender);
+            pslv_v1->gotHash(std::move(hash), sender);
             return;
         }
 
@@ -293,10 +293,11 @@ namespace slv2
             LOG_DEBUG("SolverCore: gotHash()");
         }
 
-        const auto& tmp = csdb::PoolHash::from_string(hash_string).to_binary();
-        cs::Hash hash;
-        std::copy(tmp.cbegin(), tmp.cend(), hash.begin());
-        if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
+        //TODO: replace cs::Hash with csdb::PoolHash in INodeState::onHash(.., hash, ..) interface
+        const auto& bytes = hash.to_binary();
+        cs::Hash h;
+        std::copy(bytes.cbegin(), bytes.cend(), h.begin());
+        if(stateCompleted(pstate->onHash(*pcontext, h, sender))) {
             handleTransitions(Event::Hashes);
         }
     }
@@ -454,7 +455,8 @@ namespace slv2
 
         auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
         if(desired_seq < cur_round) {
-            pnode->sendBlockRequest(static_cast<uint32_t>(desired_seq));
+            // empty args requests exactly what we need:
+            pnode->sendBlockRequest();
         }
 
         if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {

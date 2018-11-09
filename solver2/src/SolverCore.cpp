@@ -267,7 +267,7 @@ namespace slv2
         // see Solver-1, prepareBlockForSend() method
         accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
         accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
-        accepted_pool.sign(csdb::internal::byte_array(private_key.cbegin(), private_key.cend()));
+        accepted_pool.sign(private_key);
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "

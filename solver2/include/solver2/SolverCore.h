@@ -64,7 +64,7 @@ namespace slv2
         void runSpammer();
         void countFeesInPool(csdb::Pool* pool);
         void gotRound();
-        void gotHash(std::string&&, const cs::PublicKey&);
+        void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
         const cs::PublicKey& getPublicKey() const
         {
             return public_key;

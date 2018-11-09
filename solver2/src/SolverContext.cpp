@@ -122,7 +122,8 @@ namespace slv2
 
     void SolverContext::send_hash(const cs::Hash & hash, const cs::PublicKey & target)
     {
-        core.pnode->sendHash(cs::Utils::byteStreamToHex((const uint8_t*) hash.data(), hash.size()), target);
+        csdb::internal::byte_array bytes(hash.cbegin(), hash.cend());
+        core.pnode->sendHash(csdb::PoolHash::from_binary(bytes), target);
     }
 
     bool SolverContext::test_trusted_idx(uint8_t idx, const cs::PublicKey & sender)
@@ -164,7 +165,7 @@ namespace slv2
 
     void SolverContext::update_fees(cs::TransactionsPacket& p)
     {
-        core.pfee->CountFeesInPool(core.pnode, &p);
+        core.pfee->CountFeesInPool(blockchain(), &p);
     }
 
 } // slv2
