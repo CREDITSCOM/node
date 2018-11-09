@@ -1677,7 +1677,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   //std::cout << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize) << std::endl;
   
   unsigned long long sig_size;
-  crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, msgSize, myPrivateKeyForSignature_.data());
+  crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
   //std::cout << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64) << std::endl;
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::FirstStage
@@ -1857,7 +1857,7 @@ void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo)
   //std::cout << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize) << std::endl;
 
   unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageTwoInfo.sig.data(), &sig_size, rawData, msgSize, myPrivateKeyForSignature_.data());
+  crypto_sign_ed25519_detached((unsigned char*)stageTwoInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::SecondStage
@@ -2031,7 +2031,7 @@ void Node::sendStageThree(const cs::StageThree& stageThreeInfo)
   memcpy(rawData + 34, stageThreeInfo.hashCandidatesList.data(), 32);
 
   unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageThreeInfo.sig.data(), &sig_size, rawData, msgSize, myPrivateKeyForSignature_.data());
+  crypto_sign_ed25519_detached((unsigned char*)stageThreeInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::ThirdStage
@@ -2189,7 +2189,7 @@ void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
   cs::Solver::addTimestampToPool(pool.value()));
 #endif
 
-  pool.value().sign(myPrivateKeyForSignature_);
+  pool.value().sign(solver_->getPrivateKey());
 
   // array
   cs::Signature poolSignature;

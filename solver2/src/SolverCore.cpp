@@ -42,7 +42,7 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = false;
+    constexpr const bool ProxyToOldSolver = true;
     // Special mode: uses debug transition table
     constexpr const bool DebugModeOn = false;
 
@@ -248,7 +248,7 @@ namespace slv2
 
     // Copied methods from solver.v1
 
-    void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes)
+    void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& /*nodes*/)
     {
         //if(accepted_pool.to_binary().size() > 0) {
         //    LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
