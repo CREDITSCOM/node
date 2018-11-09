@@ -253,6 +253,14 @@ class OPackStream {
 };
 
 template <>
+inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes)
+{
+    bytes = std::vector<uint8_t>(ptr_, end_);
+    ptr_ = end_;
+    return *this;
+}
+
+template <>
 inline IPackStream& IPackStream::operator>>(std::string& str) {
   str  = std::string(ptr_, end_);
   ptr_ = end_;
@@ -267,22 +275,37 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  uint32_t uncompressedSize = 0u;
-  *this >> uncompressedSize;
-  std::string raw_bytes;
-  *this >> raw_bytes;
-  pool = csdb::Pool::from_lz4_byte_stream(raw_bytes.data(), raw_bytes.size(), uncompressedSize);
-  ptr_ = end_;
-  return *this;
+inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
+{
+    cs::Bytes bytes;
+    (*this) >> bytes;
+    pool = csdb::Pool::from_binary(bytes);
+    return *this;
 }
 
+#if 0 // compressed pool (opposite to Node::addCompressedPoolToPack() method) deserialization
 template <>
-inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes) {
-  bytes = std::vector<uint8_t>(ptr_, end_);
-  ptr_ = end_;
-  return *this;
+inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
+{
+    uint32_t uncompressedSize;
+    uint32_t compressedSize;
+    *this >> uncompressedSize >> compressedSize;
+
+    //TODO: review that condition (2) is legal
+    constexpr size_t abnormal_len = 1 << 20;
+    if(end_ - ptr_ < compressedSize || uncompressedSize >= abnormal_len) {
+        // data is corrupted
+        pool = csdb::Pool {};
+        ptr_ = end_;
+        good_ = false;
+        return *this;
+    }
+
+    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), compressedSize, uncompressedSize);
+    ptr_ += compressedSize;
+    return *this;
 }
+#endif // 0
 
 template <>
 inline IPackStream& IPackStream::operator>>(ip::address& addr) {
@@ -340,11 +363,12 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 }
 
 template <>
-inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
-  uint32_t bSize;
-  auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-  insertBytes((char*)dataPtr, bSize);
-  return *this;
+inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool)
+{
+    uint32_t bSize;
+    auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+    insertBytes((char*) dataPtr, bSize);
+    return *this;
 }
 
 template <>

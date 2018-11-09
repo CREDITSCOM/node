@@ -600,6 +600,10 @@ namespace slv2
 
     csdb::Pool::sequence_t SolverCore::getNextMissingBlock(const uint32_t starting_after) const
     {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            return pslv_v1->getNextMissingBlock(starting_after);
+        }
+
         for(csdb::Pool::sequence_t b = starting_after + 1; b < cur_round; ++b) {
             if(outrunning_blocks.count(b) > 0) {
                 continue;
@@ -609,7 +613,7 @@ namespace slv2
         return 0;
     }
 
-    csdb::Pool::sequence_t SolverCore::getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end) const
+    csdb::Pool::sequence_t SolverCore::getCountCahchedBlocks(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end) const
     {
         if(outrunning_blocks.empty()) {
             return 0;

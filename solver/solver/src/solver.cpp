@@ -334,6 +334,17 @@ void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender) {
   csunused(sender);
 }
 
+// restored from cs_dev:
+uint32_t Solver::getNextMissingBlock(const uint32_t fromSeq)
+{
+    for(uint32_t b = fromSeq + 1; b < m_node->getRoundNumber(); ++b) {
+        if(m_temporaryStorage.count(b) || m_randomStorage.count(b)) continue;
+        return b;
+    }
+
+    return 0;
+}
+
 void Solver::gotBlockCandidate(csdb::Pool&& block) {
   csdebug() << "Solver -> getBlockCanditate";
   csunused(block);

@@ -66,6 +66,8 @@ public:
   void gotFreeSyncroBlock(csdb::Pool&&);
   void rndStorageProcessing();
   void tmpStorageProcessing();
+  // restored from cs_dev:
+  uint32_t getNextMissingBlock(const uint32_t fromSeq);
 
   cs::PublicKey writerPublicKey() const;
 

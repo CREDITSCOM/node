@@ -79,6 +79,7 @@ public:
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
   void addCompressedPoolToPack(const csdb::Pool& pool);
+  csdb::Pool getCompressedPoolFromPack();
   void composeMessageWithBlock1(const csdb::Pool& pool);
 
   void sendRoundInfo(const std::vector<cs::PublicKey>& confidantNodes,

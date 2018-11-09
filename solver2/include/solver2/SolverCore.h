@@ -144,7 +144,7 @@ namespace slv2
         ///     Count of cached blocks in passed range.
         /// </returns>
 
-        csdb::Pool::sequence_t getCountCahchedBlock(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end ) const;
+        csdb::Pool::sequence_t getCountCahchedBlocks(csdb::Pool::sequence_t starting_after, csdb::Pool::sequence_t end ) const;
 
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const

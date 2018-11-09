@@ -2957,6 +2957,32 @@ void Node::addCompressedPoolToPack(const csdb::Pool& pool)
     ostream_ << std::string(cs::numeric_cast<const char *>(memPtr.get()), realSize);
 }
 
+csdb::Pool Node::getCompressedPoolFromPack()
+{
+    csdb::Pool pool{};
+
+    uint32_t uncompressedSize;
+    uint32_t compressedSize;
+    istream_ >> uncompressedSize >> compressedSize;
+
+    //TODO: review that condition (2) is legal
+    constexpr size_t abnormal_len = 1 << 20;
+    //TODO: how to get avail bytes from istream?
+    if(uncompressedSize >= abnormal_len) {
+        // data is corrupted
+        //ptr_ = end_;
+        //good_ = false;
+        //return *this;
+        return pool;
+    }
+
+    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(istream_.getCurrPtr()),
+        compressedSize, uncompressedSize);
+    //ptr_ += compressedSize;
+    istream_.safeSkip<uint8_t>(compressedSize);
+    return pool;
+}
+
 void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
 {
     solver_->rndStorageProcessing();
