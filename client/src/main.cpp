@@ -4,6 +4,7 @@
 #include <iostream>
 #ifndef WIN32
 #include <signal.h>
+#include <unistd.h>
 #else
 #include <csignal>
 #endif
@@ -75,20 +76,20 @@ extern "C" void sig_handler(int sig) {
 }
 
 void installSignalHandler() {
-  if (SIG_ERR == std::signal(SIGTERM, sig_handler)) {
+  if (SIG_ERR == signal(SIGTERM, sig_handler)) {
     // Handle error
     LOG_ERROR("Error to set SIGTERM!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == std::signal(SIGQUIT, sig_handler)) {
+  else if (SIG_ERR == signal(SIGQUIT, sig_handler)) {
     LOG_ERROR("Error to set SIGQUIT!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == std::signal(SIGINT, sig_handler)) {
+  else if (SIG_ERR == signal(SIGINT, sig_handler)) {
     LOG_ERROR("Error to set SIGINT!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == std::signal(SIGHUP, sig_handler)) {
+  else if (SIG_ERR == signal(SIGHUP, sig_handler)) {
     LOG_ERROR("Error to set SIGHUP!");
     exit(EXIT_FAILURE);
   }
