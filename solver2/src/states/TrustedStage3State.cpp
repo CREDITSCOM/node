@@ -186,24 +186,24 @@ namespace slv2
                 std::copy(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.begin());
             }
         }
-        std::cout << "================================= SUMMARY ======================================= " << std::endl;
+        cslog() << "================================= SUMMARY ======================================= ";
         uint8_t liarNumber = 0;
-        /* std::cout <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32) << std::endl;*/
+        /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32);*/
         for(const auto& it : context.stage1_data()) {
 
             if(std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
-                std::cout << "\t[" << (int) it.sender << "] is not liar "
-                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size()) << std::endl;
+                cslog() << "\t[" << (int) it.sender << "] is not liar "
+                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
             else {
                 ++liarNumber;
-                std::cout << "\t[" << (int) it.sender << "] IS LIAR "
-                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size()) << std::endl;
+                cslog() << "\t[" << (int) it.sender << "] IS LIAR "
+                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
         }
 
-        std::cout << "\tLiars amount: " << (int) liarNumber << std::endl;
-        std::cout << "================================================================================= " << std::endl;
+        cslog() << "\tLiars amount: " << (int) liarNumber;
+        cslog() << "================================================================================= ";
         if(liarNumber > context.cnt_trusted() / 2) {
             return false;
         }
@@ -233,7 +233,7 @@ namespace slv2
                 const auto& stage_i = *(context.stage1_data().cbegin() + i);
                 uint8_t candidates_amount = stage_i.candidatesAmount;
                 for(uint8_t j = 0; j < candidates_amount; j++) {
-                    //std::cout << (int) i << "." << (int) j << " " << byteStreamToHex(stageOneStorage.at(i).candiates[j].str, 32) << std::endl;
+                    //cslog() << (int) i << "." << (int) j << " " << byteStreamToHex(stageOneStorage.at(i).candiates[j].str, 32);
                     if(candidatesElection.count(stage_i.candiates[j]) > 0) {
                         candidatesElection.at(stage_i.candiates[j]) += 1;
                     }
@@ -253,7 +253,7 @@ namespace slv2
 
 
         for(auto& it : candidatesElection) {
-            //std::cout << byteStreamToHex(it.first.str, 32) << " - " << (int) it.second << std::endl;
+            //cslog() << byteStreamToHex(it.first.str, 32) << " - " << (int) it.second;
             if(it.second > cr) {
                 aboveThreshold.push_back(it.first);
             }
@@ -311,7 +311,7 @@ namespace slv2
             return 0; //TODO: decide what to return
         }
         int k = *(hash_t.begin());
-        //std::cout << "K : " << k << std::endl;
+        //cslog() << "K : " << k;
         int result0 = (int) context.cnt_trusted();
         int result = 0;
         result = k % result0;
