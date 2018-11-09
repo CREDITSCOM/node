@@ -29,6 +29,8 @@
 #include <iomanip>
 #include <scope_guard.h>
 
+#include <csnode/wallets_cache.hpp>
+
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
 using namespace api;
@@ -1164,5 +1166,24 @@ void
 APIHandler::WalletsGet(WalletsGetResult& _return,
                        int64_t _offset,
                        int64_t _limit) {
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
+  s_blockchain.iterateOverWallets([&_return, &_offset, &_limit](const Credits::WalletsCache::WalletData::Address& addr, const Credits::WalletsCache::WalletData& wd) {
+                                    if (_offset > 0) {
+                                      --_offset;
+                                      return true;
+                                    }
+                                    if (!(--_limit)) return false;
+
+                                    api::WalletInfo wi;
+                                    wi.address = fromByteArray(addr);
+                                    wi.balance.integral = wd.balance_.integral();
+                                    wi.balance.fraction = wd.balance_.fraction();
+#ifdef MONITOR_NODE
+                                    wi.transactionsNumber = wd.transNum_;
+                                    wi.firstTransactionTime = wd.createTime_;
+#endif
+
+                                    _return.wallets.push_back(wi);
+                                  });
 }

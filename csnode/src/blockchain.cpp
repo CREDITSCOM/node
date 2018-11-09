@@ -379,6 +379,11 @@ BlockChain::updateCache(csdb::Pool& pool)
     return true;
 }
 
+void BlockChain::iterateOverWallets(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WalletData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  walletsCache_->iterateOverWallets(func);
+}
+
 csdb::PoolHash
 BlockChain::getLastHash() const
 {

@@ -14,6 +14,8 @@
 
 #include <csnode/cyclic_buffer.hpp>
 
+#include <client/params.hpp>
+
 namespace std
 {
     template<typename T>
@@ -66,6 +68,11 @@ namespace Credits
 
             PoolsHashes poolsHashes_;
             csdb::Amount balance_;
+
+#ifdef MONITOR_NODE
+            uint64_t createTime_ = 0;
+            uint64_t transNum_ = 0;
+#endif
         };
 
     public:
@@ -79,6 +86,7 @@ namespace Credits
         void updateFrom(csdb::Pool& curr);
 
         const WalletData* findWallet(const csdb::internal::byte_array&& dbAddress) const;
+        void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
 
     private:
         enum class Mode : uint8_t
@@ -89,10 +97,10 @@ namespace Credits
         friend std::ostream& operator<<(std::ostream& os, Mode mode);
 
         void load(csdb::Pool& curr, Mode mode);
-        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
-        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
-        void loadTrxForTarget(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash);
-        WalletData* getWalletData(const WalletData::Address&& address);
+        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter, const uint64_t timeStamp);
+        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter, const uint64_t timeStamp);
+        void loadTrxForTarget(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, const uint64_t timeStamp);
+        WalletData* getWalletData(const WalletData::Address&& address, const uint64_t timeStamp);
 
         void addPoolHash(WalletData& walData, Mode mode, const PoolHash& poolHash);
         void addPoolHashAsLoad(WalletData& walData, Mode mode, const PoolHash& poolHash);
