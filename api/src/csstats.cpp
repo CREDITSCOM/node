@@ -1,11 +1,5 @@
-//#define TRACE_ENABLER
+#include "stdafx.h"
 
-#include <csdb/currency.h>
-#include <csstats.h>
-#include <algorithm>
-#include <cassert>
-#include <client/params.hpp>
-#include <csdb/currency.h>
 #include <csstats.h>
 
 #include <APIHandler.h>

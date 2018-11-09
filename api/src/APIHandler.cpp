@@ -1,36 +1,14 @@
-//#define TRACE_ENABLER
-
+#include "stdafx.h"
 #include <APIHandler.h>
 
 #include "csconnector/csconnector.h"
-
-// csdb
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/csdb.h>
-#include <csdb/currency.h>
-#include <csdb/pool.h>
-#include <csdb/storage.h>
-#include <csdb/transaction.h>
-#include <csdb/wallet.h>
-
-#include <stack>
-
-#include <cinttypes>
-#include <algorithm>
-#include <cassert>
-#include <type_traits>
-#include <functional>
 
 #include <API.h>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
-
-#include <boost/io/ios_state.hpp>
-#include <iomanip>
-#include <scope_guard.h>
+#include <csnode/conveyer.hpp>
+//#include <thrift/transport/TServerSocket.h>
 
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
@@ -374,7 +352,6 @@ api::Pool
 APIHandler::convertPool(const csdb::Pool& pool)
 {
   api::Pool result;
-  pool.is_valid();
   if (pool.is_valid()) {
     result.hash = fromByteArray(pool.hash().to_binary());
     result.poolNumber = pool.sequence();
@@ -519,7 +496,7 @@ is_deploy_transaction(const csdb::Transaction& tr)
 }
 
 template<typename T>
-auto
+auto 
 set_max_fee(T& trx, const csdb::Amount& am, int)
   -> decltype(trx.set_max_fee(am), void())
 {
@@ -535,7 +512,6 @@ csdb::Transaction
 APIHandler::make_transaction(const Transaction& transaction)
 {
   csdb::Transaction send_transaction;
-  cs::PublicKey from, to;
 
   auto source = BlockChain::getAddressFromKey(transaction.source);
 
@@ -633,7 +609,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     input_smart.sourceCode = std::string();
   }
 
-  bool present = false;
+  bool present;
   std::string origin_bytecode;
   {
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
@@ -714,8 +690,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return;
   }
 
-  send_transaction.add_user_field(0, serialize(transaction.smartContract));
-  send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+  send_transaction.add_user_field(0, serialize(transaction.smartContract).c_str());
+  send_transaction.add_user_field(smart_state_idx, api_resp.contractState.c_str());
   solver.send_wallet_transaction(send_transaction);
 
   trxn_sent = true;
@@ -756,7 +732,6 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
 
   csdb::PoolHash hash = s_blockchain.getLastHash();
 
-  size_t lastCount = 0;
   csdb::Pool pool; // = s_blockchain->loadBlock(hash/*, lastCount*/);
 
   uint64_t sequence = s_blockchain.getSize();
@@ -774,7 +749,6 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
         // apiPool.transactionsCount = lastCount;
         _return.pools.push_back(apiPool);
       }
-      lastCount = 0;
 
       poolCache.insert(cch, std::make_pair(hash, apiPool));
       hash = pool.previous_hash();
@@ -889,7 +863,6 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   pending_smart_transactions->last_pull_hash = start;
 
   while (!new_blocks.empty()) {
-    auto trace = false;
     auto p = s_blockchain.loadBlock(new_blocks.back());
     new_blocks.pop_back();
     auto& trs = p.transactions();
@@ -1087,7 +1060,6 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
 
   _return.pools.reserve(limit);
 
-  size_t lastCount = 0;
   csdb::Pool pool;
 
   for (size_t pools_left = limit; pools_left && !cur_hash.is_empty();
@@ -1098,7 +1070,6 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
       pool = s_blockchain.loadBlock(cur_hash);
       api::Pool apiPool = convertPool(pool);
       _return.pools.push_back(apiPool);
-      lastCount = 0;
 
       poolCache.insert(cch, std::make_pair(cur_hash, apiPool));
       cur_hash = pool.previous_hash();
@@ -1178,7 +1149,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   for (auto inner_id : v) {
-    csdb::Transaction transaction;
+    csdb::Transaction transactionTmp;
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
     inner_id &= 0x3fffffffffff;
@@ -1188,12 +1159,11 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
       return;
     }
     auto addr_id = csdb::Address::from_wallet_id(wallId);
-    if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transaction)) // find in blockchain
+    if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transactionTmp)) // find in blockchain
       _return.states[inner_id] = VALID;
     else {
       cs::Conveyer& conveyer = cs::Conveyer::instance();
       cs::SharedLock sharedLock(conveyer.sharedMutex());
-      decltype(auto) trx_block = conveyer.transactionsBlock();  // find in transaction block
       for (decltype(auto) it : conveyer.transactionsBlock()) {
         const auto &transactions = it.transactions();
         for (decltype(auto) transaction : transactions) {
@@ -1242,7 +1212,7 @@ void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, con
   executor.getContractMethods(executor_ret, bytecode);
   _return.code = executor_ret.code;
   _return.message = executor_ret.message;
-  for (int Count = 0; Count < executor_ret.methods.size(); Count++) {
+  for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
     _return.methods[Count].name = executor_ret.methods[Count].name;
     _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
     _return.methods[Count].returnType = executor_ret.methods[Count].returnType;

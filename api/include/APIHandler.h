@@ -1,23 +1,18 @@
 #pragma once
 
+
 #include <csnode/blockchain.hpp>
 
-#include <deque>
-#include <mutex>
-#include <queue>
-
 #include <API.h>
-#include <csnode/conveyer.hpp>
-#include <solver2/SolverCore.h>
 #include <csstats.h>
+#include <deque>
+#include <queue>
 
 #include <ContractExecutor.h>
 
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TBufferTransports.h>
-#include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TSocket.h>
 
 #include <csnode/threading.hpp>
 
@@ -44,12 +39,22 @@ struct APIHandlerInterface
   : public api::APINull
   , public APIHandlerBase
 {};
-
+namespace cs {
+	class Solver;
+}
+namespace slv2
+{
+	class SolverCore;
+}
+namespace executor
+{
+	class APIResponse;
+	class ContractExecutorConcurrentClient;
+}
 namespace api {
 namespace custom {
 class APIProcessor;
 }
-
 class APIFaker : public APINull
 {
   public:
@@ -159,7 +164,7 @@ class APIHandler : public APIHandlerInterface
       ::apache::thrift::transport::TTransport>
       executor_transport;
 
-    ::executor::ContractExecutorConcurrentClient executor;
+    executor::ContractExecutorConcurrentClient executor;
 
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
       smart_origin;
