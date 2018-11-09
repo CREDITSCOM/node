@@ -91,6 +91,8 @@ namespace slv2
             return persist_obj;
         }
 
+        // Previous solver returns confidant key with index equal result of takeDecision() method.
+        // As analogue, found writer's index in stage3 if exists, otherwise return empty object as prev. solver does
         auto ptr = find_stage3(pnode->getConfidantNumber());
         if(ptr != nullptr) {
             const auto& trusted = cs::Conveyer::instance().roundTable().confidants;
@@ -98,9 +100,9 @@ namespace slv2
                 return *(trusted.cbegin() + ptr->writer);
             }
         }
-        // must not ignore the problem
-        assert(false);
-        return getPublicKey();//TODO: what we should return if do not know writer?
+        // TODO: redesign getting ref to persistent object
+        static cs::PublicKey empty {};
+        return empty;
     }
 
     void SolverCore::addInitialBalance()
@@ -610,7 +612,7 @@ namespace slv2
         if(outrunning_blocks.empty()) {
             return 0;
         }
-        // it - "сквозной" итератор для двух блоков while()
+        // it: a pass-through iterator for both while() blocks
         auto it = outrunning_blocks.cbegin();
         // skip outdated blocks if any
         while(it->first <= starting_after) {
