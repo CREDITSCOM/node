@@ -53,13 +53,44 @@ namespace slv2
             pslv_v1->gotRound();
             return;
         }
-        //TODO: strange method
+        
+        // previous solver implementation calls to runConsensus method() here
+        // perform similar actions, but use csdb::Pool instead of cs::TransactionsPacket
+        
+        cslog() << "SolverCore: got round, start consensus";
+        csdb::Pool pool {};
+        cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+        for(const auto& hash : conveyer.roundTable().hashes) {
+            const auto& hashTable = conveyer.transactionsPacketTable();
+
+            if(hashTable.count(hash) == 0) {
+                cserror() << "SolverCore: HASH NOT FOUND while prepare consensus to build vector";
+                return;
+            }
+
+            const auto& transactions = conveyer.packet(hash).transactions();
+
+            for(const auto& transaction : transactions) {
+                if(!pool.add_transaction(transaction)) {
+                    cserror() << "SolverCore: cannot add transaction to packet while prepare consensus to build vector";
+                }
+            }
+        }
+
+        cslog() << "SolverCore: prepare transaction packet of " << pool.transactions_count() << " transactions or consensus to build vector";
+        gotTransactionList(pool);
     }
-
-
 
     const cs::PublicKey& SolverCore::getWriterPublicKey() const
     {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            // temporary workaround of return reference to rvalue
+            static cs::PublicKey persist_obj = cs::PublicKey {};
+            persist_obj = pslv_v1->writerPublicKey();
+            return persist_obj;
+        }
+
         auto ptr = find_stage3(pnode->getConfidantNumber());
         if(ptr != nullptr) {
             const auto& trusted = cs::Conveyer::instance().roundTable().confidants;
@@ -119,6 +150,13 @@ namespace slv2
 
     void SolverCore::gotTransactionList(csdb::Pool& p)
     {
+        if(opt_is_proxy_v1 && pslv_v1) {
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: method gotTransactionList() is not implemented in proxied solver object");
+            }
+            return;
+        }
+
         // any way processed transactions
         total_recv_trans += p.transactions_count();
 
@@ -140,6 +178,10 @@ namespace slv2
             pslv_v1->gotVector(std::move(tmp));
             return;
         }
+
+        if(Consensus::Log) {
+            LOG_ERROR("SolverCore: method gotVector() is obsolete in current version");
+        }
     }
 
     void SolverCore::gotMatrix(cs::HashMatrix&& matr)
@@ -148,6 +190,10 @@ namespace slv2
             cs::HashMatrix tmp = matr;
             pslv_v1->gotMatrix(std::move(tmp));
             return;
+        }
+
+        if(Consensus::Log) {
+            LOG_ERROR("SolverCore: method gotMatrix() is obsolete in current version");
         }
     }
 
@@ -432,7 +478,9 @@ namespace slv2
     void SolverCore::gotStageOne(const cs::StageOne & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            assert(false); // not implemented
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: method gotStageOne() is not implemented in proxied solver object");
+            }
             return;
         }
 
@@ -482,7 +530,9 @@ namespace slv2
     void SolverCore::gotStageTwo(const cs::StageTwo & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            assert(false); // not implemented
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: method gotStageTwo() is not implemented in proxied solver object");
+            }
             return;
         }
 
@@ -505,7 +555,9 @@ namespace slv2
     void SolverCore::gotStageThree(const cs::StageThree & stage)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            assert(false); // not implemented
+            if(Consensus::Log) {
+                LOG_ERROR("SolverCore: method gotStageThree() is not implemented in proxied solver object");
+            }
             return;
         }
 
@@ -523,17 +575,6 @@ namespace slv2
         if(stateCompleted(pstate->onStage3(*pcontext, stage))) {
             handleTransitions(Event::Stage3Enough);
         }
-    }
-
-    void SolverCore::gotTransactionList_V3(csdb::Pool &&tl)
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            assert(false); // not implemented
-            return;
-        }
-
-        csdb::Pool tmp(tl);
-        gotTransactionList(tmp);
     }
 
     void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
