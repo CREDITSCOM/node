@@ -290,7 +290,7 @@ namespace slv2
             return;
         }
         if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: gotHash()");
+            LOG_EVENT("SolverCore: gotHash()");
         }
 
         //TODO: replace cs::Hash with csdb::PoolHash in INodeState::onHash(.., hash, ..) interface

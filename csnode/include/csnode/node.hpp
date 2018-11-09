@@ -49,6 +49,8 @@ public:
   void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+  void getRoundInfo_(const uint8_t *, const size_t , const cs::RoundNumber, const cs::PublicKey&);
+
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
   // sends StageOne request to respondent about required
@@ -83,6 +85,9 @@ public:
       const csdb::Pool& poolToVerify,
       const csdb::Pool& newPool,
       const std::vector <cs::StageThree>& stageThreeStorage);
+
+  void sendRoundInfo_(const cs::RoundTable& roundTable);
+
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
   void sendRoundInfoReply(uint8_t, uint8_t);
@@ -151,7 +156,7 @@ public:
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound(const cs::PublicKey& mainNode, std::vector<cs::PublicKey>&& confidantNodes);
+  void initNextRound( std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
 
   bool getSyncroStarted();

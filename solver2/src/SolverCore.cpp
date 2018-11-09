@@ -42,7 +42,7 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = true;
+    constexpr const bool ProxyToOldSolver = false;
     // Special mode: uses debug transition table
     constexpr const bool DebugModeOn = false;
 
@@ -250,50 +250,50 @@ namespace slv2
 
     void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes)
     {
-        if(accepted_pool.to_binary().size() > 0) {
-            LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
-        }
+        //if(accepted_pool.to_binary().size() > 0) {
+        //    LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
+        //}
         pnode->becomeWriter();
         LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
         // see Solver-1, writeNewBlock() method
-        accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
-        auto& bc = pnode->getBlockChain();
-        bc.finishNewBlock(accepted_pool);
-        // see: Solver-1, addTimestampToPool() method
-        accepted_pool.add_user_field(0, std::to_string(
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
-        ));
-        // finalize
-        // see Solver-1, prepareBlockForSend() method
-        accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
-        accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
-        accepted_pool.sign(private_key);
+        //accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
+        //auto& bc = pnode->getBlockChain();
+        //bc.finishNewBlock(accepted_pool);
+        //// see: Solver-1, addTimestampToPool() method
+        //accepted_pool.add_user_field(0, std::to_string(
+        //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
+        //));
+        //// finalize
+        //// see Solver-1, prepareBlockForSend() method
+        //accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
+        //accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
+        //accepted_pool.sign(private_key);
 
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "
-                << accepted_pool.transactions_count() << " trans.");
-            LOG_NOTICE("SolverCore: block previous hash " << accepted_pool.previous_hash().to_string());
-            LOG_DEBUG("SolverCore: signed with secret which public is "
-                << cs::Utils::byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
-        }
+        //if(Consensus::Log) {
+        //    LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "
+        //        << accepted_pool.transactions_count() << " trans.");
+        //    LOG_NOTICE("SolverCore: block previous hash " << accepted_pool.previous_hash().to_string());
+        //    LOG_DEBUG("SolverCore: signed with secret which public is "
+        //        << cs::Utils::byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
+        //}
 
-        bc.putBlock(accepted_pool/*, true*/); // defer_write
-        cnt_deferred_trans += accepted_pool.transactions_count();
+        //bc.putBlock(accepted_pool/*, true*/); // defer_write
+        //cnt_deferred_trans += accepted_pool.transactions_count();
 
-        csdb::Pool tmp;
-        {
-            // at this section adding new transactions unavailable
-            std::lock_guard<std::mutex> lock(trans_mtx);
-            trans_pool.set_sequence(pnode->getRoundNumber() + 1);
-            trans_pool.compose();
-            tmp = trans_pool;
-            trans_pool = csdb::Pool {};
-        }
-        if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: send pool [" << tmp.sequence() << "] of "
-                << tmp.transactions_count() << " trans.");
-        }
-        pnode->sendRoundInfo(nodes, tmp, accepted_pool, stageThreeStorage);
+        //csdb::Pool tmp;
+        //{
+        //    // at this section adding new transactions unavailable
+        //    std::lock_guard<std::mutex> lock(trans_mtx);
+        //    trans_pool.set_sequence(pnode->getRoundNumber() + 1);
+        //    trans_pool.compose();
+        //    tmp = trans_pool;
+        //    trans_pool = csdb::Pool {};
+        //}
+        //if(Consensus::Log) {
+        //    LOG_NOTICE("SolverCore: send pool [" << tmp.sequence() << "] of "
+        //        << tmp.transactions_count() << " trans.");
+        //}
+        pnode->initNextRound(std::move(trusted_candidates));
 
         //TODO: store transactions sent until they found in future accepted blocks
     }
