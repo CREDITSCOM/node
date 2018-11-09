@@ -60,8 +60,8 @@ APIHandler::APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver)
   , executor_transport(new ::apache::thrift::transport::TBufferedTransport(
       ::apache::thrift::stdcxx::make_shared<
         ::apache::thrift::transport::TSocket>("localhost", 9080)))
-  , executor(::apache::thrift::stdcxx::make_shared<
-             ::apache::thrift::protocol::TBinaryProtocol>(executor_transport))
+  , executor(std::make_unique<client_type>(apache::thrift::stdcxx::make_shared<
+             apache::thrift::protocol::TBinaryProtocol>(executor_transport)))
 {
   //TRACE("");
   std::cerr << (s_blockchain.isGood() ? "Storage is opened normal"
@@ -560,7 +560,7 @@ void APIHandler::execute_byte_code(executor::APIResponse& resp,
   while (!transport->isOpen()) {
     transport->open();
   }
-  executor.executeByteCode(resp, address, code, state, method, params);
+  executor->executeByteCode(resp, address, code, state, method, params);
 }
 void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) {
   auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
@@ -1199,7 +1199,7 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) {
   executor::GetContractMethodsResult executor_ret;
-  executor.getContractMethods(executor_ret, bytecode);
+  executor->getContractMethods(executor_ret, bytecode);
   _return.code = executor_ret.code;
   _return.message = executor_ret.message;
   for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {

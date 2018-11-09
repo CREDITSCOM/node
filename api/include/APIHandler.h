@@ -8,11 +8,6 @@
 #include <deque>
 #include <queue>
 
-#include <ContractExecutor.h>
-
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TBufferTransports.h>
 
 #include <csnode/threading.hpp>
 
@@ -138,12 +133,42 @@ class APIHandler : public APIHandlerInterface
 
     void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) override;
 
-  private:
+private:
+	struct smart_trxns_queue
+	{
+		cs::spinlock lock;
+		std::condition_variable_any new_trxn_cv{};
+		size_t awaiter_num{ 0 };
+		std::deque<csdb::TransactionID> trid_queue{};
+	};
+	struct PendingSmartTransactions
+	{
+		std::queue<csdb::Transaction> queue;
+		csdb::PoolHash last_pull_hash{};
+	};
+	using smart_state_entry = cs::worker_queue<std::string>;
+	using client_type = executor::ContractExecutorConcurrentClient;
+
+	BlockChain& s_blockchain;
+	slv2::SolverCore& solver;
+	csstats::csstats stats; ::
+	apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executor_transport;
+	std::unique_ptr<client_type> executor;
+	
+	cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin; 
+	cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
+	cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+	cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
+	cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+	std::map<csdb::PoolHash, api::Pool> poolCache;
+	std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
+	std::thread state_updater;
+	std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
+private:
     void execute_byte_code(executor::APIResponse& resp, const std::string& address, const std::string& code,
         const std::string& state, const std::string& method, const std::vector<::variant::Variant>& params);
 
-    BlockChain& s_blockchain;
-
+    
     std::vector<api::SealedTransaction>
     extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 
@@ -157,45 +182,7 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    bool convertAddrToPublicKey(const csdb::Address &address);
-
-    slv2::SolverCore& solver;
-    csstats::csstats stats;
-
-    ::apache::thrift::stdcxx::shared_ptr<
-      ::apache::thrift::transport::TTransport>
-      executor_transport;
-
-    executor::ContractExecutorConcurrentClient executor;
-
-    cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>
-      smart_origin;
-
-    using smart_state_entry = cs::worker_queue<std::string>;
-
-    cs::SpinLockable<std::map<csdb::Address, smart_state_entry>>
-      smart_state;
-
-    struct smart_trxns_queue
-    {
-        cs::spinlock lock;
-        std::condition_variable_any new_trxn_cv{};
-        size_t awaiter_num{ 0 };
-        std::deque<csdb::TransactionID> trid_queue{};
-    };
-    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>
-      smart_last_trxn;
-
-    cs::SpinLockable<
-      std::map<csdb::Address, std::vector<csdb::TransactionID>>>
-      deployed_by_creator;
-
-    struct PendingSmartTransactions
-    {
-        std::queue<csdb::Transaction> queue;
-        csdb::PoolHash last_pull_hash{};
-    };
-    cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+    bool convertAddrToPublicKey(const csdb::Address &address); 
 
     template<typename Mapper>
     void get_mapped_deployer_smart(
@@ -205,11 +192,6 @@ class APIHandler : public APIHandlerInterface
 
     bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
 
-    std::map<csdb::PoolHash, api::Pool> poolCache;
-
-    std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
-    std::thread state_updater;
-
     friend class api::custom::APIProcessor;
 
     ::csdb::Transaction make_transaction(const ::api::Transaction&);
@@ -218,7 +200,6 @@ class APIHandler : public APIHandlerInterface
     void smart_transaction_flow(api::TransactionFlowResult& _return,
                                             const ::api::Transaction&);
 
-    std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
 };
 
 class SequentialProcessorFactory;

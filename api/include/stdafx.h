@@ -19,9 +19,12 @@
 #include <csdb/storage.h>
 #include <csdb/transaction.h>
 
-#include <thrift/transport/TSocket.h>
 #include <thrift/protocol/TJSONProtocol.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TSocket.h>
 #include <thrift/transport/THttpServer.h>
+#include <thrift/transport/TBufferTransports.h>
 
 #include <iomanip>
 #include <scope_guard.h>
