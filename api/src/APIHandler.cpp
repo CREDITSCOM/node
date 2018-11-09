@@ -1173,7 +1173,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
                                       --_offset;
                                       return true;
                                     }
-                                    if (!(--_limit)) return false;
+                                    if (!(_limit--)) return false;
 
                                     api::WalletInfo wi;
                                     wi.address = fromByteArray(addr);
@@ -1185,5 +1185,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 #endif
 
                                     _return.wallets.push_back(wi);
+
+                                    return true;
                                   });
 }

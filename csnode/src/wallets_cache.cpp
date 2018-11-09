@@ -150,7 +150,7 @@ WalletsCache::WalletData* WalletsCache::getWalletData(const WalletData::Address&
 
         auto res = data_.emplace(make_pair(move(address), WalletData()));
 #ifdef MONITOR_NODE
-        itWalData->second.createTime_ = timeStamp;
+        res.first->second.createTime_ = timeStamp;
 #endif
         itWalData = res.first;
     }
