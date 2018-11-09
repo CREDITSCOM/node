@@ -152,6 +152,8 @@ class APIHandler : public APIHandlerInterface
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
+    bool convertAddrToPublicKey(const csdb::Address &address);
+
     slv2::SolverCore& solver;
     csstats::csstats stats;
 
