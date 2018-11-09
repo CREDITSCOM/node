@@ -42,7 +42,7 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = true;
+    constexpr const bool ProxyToOldSolver = false;
     // Special mode: uses debug transition table
     constexpr const bool DebugModeOn = false;
 

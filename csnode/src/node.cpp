@@ -528,7 +528,7 @@ uint32_t Node::getRoundNumber() {
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (myLevel_ != NodeLevel::Writer) {
+  if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
 
@@ -2775,16 +2775,16 @@ void Node::sendHash_V3() {
      return;
    }*/
 
-  const auto& tmp = getBlockChain().getLastWrittenHash().to_binary();
-  cs::Hash testHash;
-  std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
-  LOG_NOTICE("NODE: Sending hash of " << cs::Utils::byteStreamToHex(testHash.data(), testHash.size()) << " to ALL");
-  LOG_WARN("Sending hash of " << cs::Utils::byteStreamToHex(testHash.data(), testHash.size()) << " to ALL");
+  const auto& tmp = getBlockChain().getLastWrittenHash();
+  //cs::Hash testHash;
+  //std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
+ 
+  LOG_WARN("Sending hash of " << tmp.to_string() << " to ALL");
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::BlockHash
     << roundNum_
-    << testHash;
+    << tmp;
   flushCurrentTasks();
 }
 

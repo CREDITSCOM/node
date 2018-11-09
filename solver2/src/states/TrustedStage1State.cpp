@@ -120,6 +120,8 @@ namespace slv2
         std::copy(lwh.cbegin(), lwh.cend(), myHash.begin());
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
             if(hash == myHash) {
+              LOG_NOTICE(name() << ": Hashes are good"); 
+
                 bool keyFound = false;
                 for(uint8_t i = 0; i < stage.candidatesAmount; i++) {
                     if(stage.candiates[i] == sender) {
@@ -134,6 +136,7 @@ namespace slv2
             }
             else {
                 // hash does not match to own hash
+                LOG_NOTICE(name() << ": Hashes DOESN'T match");
                 return Result::Ignore;
             }
         }
