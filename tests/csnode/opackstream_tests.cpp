@@ -22,8 +22,8 @@ protected:
 
 void displayStreamData(cs::OPackStream& stream)
 {
-  auto ptr = stream.getCurrPtr();
-  auto offset = stream.getCurrSize();
+  auto ptr = stream.getCurrentPtr();
+  auto offset = stream.getCurrentSize();
 
   for(int i = 0; i < offset; i++){
     std::cout << "item: " << (int)(*(ptr - offset + i)) << std::endl;
@@ -36,12 +36,12 @@ TEST_F(TestOPackStream, init)
   cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
-  auto ptr = oPackStream.getCurrPtr();
+  auto ptr = oPackStream.getCurrentPtr();
 
   ASSERT_EQ(1, (int)(*(ptr - 2)));
 
   oPackStream.init(BaseFlags::Fragmented);
-  ptr = oPackStream.getCurrPtr();
+  ptr = oPackStream.getCurrentPtr();
 
   ASSERT_EQ((int)key_[key_.size() - 1], (int)(*(ptr - 1)));
 }
@@ -66,27 +66,27 @@ TEST_F(TestOPackStream, output) // TODO add transaction
   uint8_t val = 13;
   oPackStream << val;
 
-  ASSERT_EQ(13, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(13, (int)(*(oPackStream.getCurrentPtr() - 1)));
 
   FixedString<3> str("str");
   oPackStream << str;
 
-  ASSERT_EQ(114, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(114, (int)(*(oPackStream.getCurrentPtr() - 1)));
 
   cs::ByteArray<2> array {{10, 11}};
   oPackStream << array;
 
-  ASSERT_EQ(11, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(11, (int)(*(oPackStream.getCurrentPtr() - 1)));
 
   auto adderss = boost::asio::ip::address_v4::from_string("127.0.0.1");
   oPackStream << adderss;
 
-  ASSERT_EQ(1, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(1, (int)(*(oPackStream.getCurrentPtr() - 1)));
 
   std::string abc("abc");
   oPackStream << abc;
 
-  ASSERT_EQ(99, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(99, (int)(*(oPackStream.getCurrentPtr() - 1)));
 
   csdb::internal::byte_array byteArray {{11, 12, 13}};
   auto poolHash = csdb::PoolHash::calc_from_data(byteArray);
@@ -98,7 +98,7 @@ TEST_F(TestOPackStream, output) // TODO add transaction
   cs::Bytes bytes {{14, 15}};
   oPackStream << bytes;
 
-  ASSERT_EQ(15, (int)(*(oPackStream.getCurrPtr() - 1)));
+  ASSERT_EQ(15, (int)(*(oPackStream.getCurrentPtr() - 1)));
 }
 
 TEST_F(TestOPackStream, getPacketsCount)
@@ -118,7 +118,7 @@ TEST_F(TestOPackStream, getCurrPtr)
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
-  ASSERT_EQ(1, (int)(*(oPackStream.getCurrPtr() - 2)));
+  ASSERT_EQ(1, (int)(*(oPackStream.getCurrentPtr() - 2)));
 }
 
 TEST_F(TestOPackStream, getCurrSize)
@@ -128,5 +128,5 @@ TEST_F(TestOPackStream, getCurrSize)
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
-  ASSERT_EQ(5, oPackStream.getCurrSize());
+  ASSERT_EQ(5, oPackStream.getCurrentSize());
 }

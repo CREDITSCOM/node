@@ -18,7 +18,7 @@
 namespace cs {
 class IPackStream {
 public:
-  void init(const uint8_t* ptr, const size_t size) {
+  void init(const cs::Byte* ptr, const size_t size) {
     ptr_ = ptr;
     end_ = ptr_ + size;
     good_ = true;
@@ -102,13 +102,13 @@ public:
     return good() && !end();
   }
 
-  const uint8_t* getCurrPtr() const {
+  const cs::Byte* getCurrentPtr() const {
     return ptr_;
   }
 
 private:
-  const uint8_t* ptr_;
-  const uint8_t* end_;
+  const cs::Byte* ptr_ = nullptr;
+  const cs::Byte* end_ = nullptr;
   bool good_ = false;
 };
 
@@ -121,12 +121,12 @@ public:
   , senderKey_(myKey) {
   }
 
-  void init(uint8_t flags) {
+  void init(cs::Byte flags) {
     clear();
     ++id_;
 
     newPack();
-    *static_cast<uint8_t*>(ptr_) = flags;
+    *static_cast<cs::Byte*>(ptr_) = flags;
     ++ptr_;
 
     if (flags & BaseFlags::Fragmented) {
@@ -211,11 +211,11 @@ public:
     return packetsCount_;
   }
 
-  cs::Byte* getCurrPtr() {
+  cs::Byte* getCurrentPtr() {
     return ptr_;
   }
 
-  uint32_t getCurrSize() const {
+  uint32_t getCurrentSize() const {
     return static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data()));
   }
 
@@ -257,8 +257,8 @@ private:
     insertBytes(reinterpret_cast<const char*>(bytes), size);
   }
 
-  uint8_t* ptr_;
-  uint8_t* end_;
+  cs::Byte* ptr_ = nullptr;
+  cs::Byte* end_ = nullptr;
 
   RegionAllocator* allocator_;
 
@@ -274,22 +274,34 @@ private:
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
-  str = std::string(ptr_, end_);
-  ptr_ = end_;
-  return *this;
-}
+  std::size_t size;
+  (*this) >> size;
 
-template <>
-inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Transaction& cont) {
-  cont = csdb::Transaction::from_byte_stream(reinterpret_cast<const char*>(ptr_), static_cast<size_t>(end_ - ptr_));
-  ptr_ = end_;
+  auto nextPtr = ptr_ + size;
+  str = std::string(ptr_, nextPtr);
+
+  ptr_ = nextPtr;
   return *this;
 }
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
-  bytes = std::vector<uint8_t>(ptr_, end_);
-  ptr_ = end_;
+  std::size_t size;
+  (*this) >> size;
+
+  auto nextPtr = ptr_ + size;
+  bytes = std::vector<uint8_t>(ptr_, nextPtr);
+
+  ptr_ = nextPtr;
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Transaction& transaction) {
+  cs::Bytes bytes;
+  (*this) >> bytes;
+
+  transaction = csdb::Transaction::from_binary(bytes);
   return *this;
 }
 
@@ -297,6 +309,7 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool) {
   cs::Bytes bytes;
   (*this) >> bytes;
+
   pool = csdb::Pool::from_binary(bytes);
   return *this;
 }
@@ -315,7 +328,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
         ip::address_v6::bytes_type bt;
 
         for (auto& b : bt) {
-          *this >> b;
+          (*this) >> b;
         }
 
         addr = ip::make_address_v6(bt);
@@ -325,7 +338,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
       uint32_t ipnum;
 
       for (auto ptr = reinterpret_cast<cs::Byte*>(&ipnum) + 3; ptr >= reinterpret_cast<cs::Byte*>(&ipnum); --ptr) {
-        *this >> *ptr;
+        (*this) >> *ptr;
       }
 
       addr = ip::make_address_v4(ipnum);
@@ -336,21 +349,68 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
 }
 
 template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(cs::TransactionsPacketHash& hash) {
+  cs::Bytes bytes;
+  (*this) >> bytes;
+
+  hash = cs::TransactionsPacketHash::fromBinary(bytes);
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(cs::TransactionsPacket& packet) {
+  cs::Bytes bytes;
+  (*this) >> bytes;
+
+  packet = cs::TransactionsPacket::fromBinary(bytes);
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashVector& hashVector) {
+  (*this) >> hashVector.sender >> hashVector.hash >> hashVector.signature;
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashMatrix& hashMatrix) {
+  (*this) >> hashMatrix.sender;
+
+  for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    (*this) >> hashMatrix.hashVector[i];
+  }
+
+  (*this) >> hashMatrix.signature;
+
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
+  cs::Bytes bytes;
+  (*this) >> bytes;
+  hash = csdb::PoolHash::from_binary(bytes);
+  return *this;
+}
+
+// writable entities
+
+template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
-  *this << static_cast<cs::Byte>(ip.is_v6());
+  (*this) << static_cast<cs::Byte>(ip.is_v6());
 
   if (ip.is_v6()) {
     auto bts = ip.to_v6().to_bytes();
 
     for (auto& b : bts) {
-      *this << b;
+      (*this) << b;
     }
   }
   else {
     uint32_t ipnum = ip.to_v4().to_uint();
 
     for (auto ptr = reinterpret_cast<cs::Byte*>(&ipnum) + 3; ptr >= reinterpret_cast<cs::Byte*>(&ipnum); --ptr) {
-      *this << *ptr;
+      (*this) << *ptr;
     }
   }
 
@@ -359,14 +419,21 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const std::string& str) {
+  (*this) << str.size();
   insertBytes(str.data(), static_cast<uint32_t>(str.size()));
   return *this;
 }
 
 template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const cs::Bytes& bytes) {
+  (*this) << bytes.size();
+  insertBytes(reinterpret_cast<const char*>(bytes.data()), static_cast<uint32_t>(bytes.size()));
+  return *this;
+}
+
+template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::Transaction& trans) {
-  auto byteArray = trans.to_byte_stream();
-  insertBytes(reinterpret_cast<char*>(byteArray.data()), static_cast<uint32_t>(byteArray.size()));
+  (*this) << trans.to_byte_stream();
   return *this;
 }
 
@@ -374,13 +441,45 @@ template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
   auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+
+  (*this) << static_cast<std::size_t>(bSize);
   insertBytes(static_cast<char*>(dataPtr), bSize);
   return *this;
 }
 
 template <>
-inline cs::OPackStream& cs::OPackStream::operator<<(const cs::Bytes& bytes) {
-  insertBytes(reinterpret_cast<const char*>(bytes.data()), static_cast<uint32_t>(bytes.size()));
+inline cs::OPackStream& cs::OPackStream::operator<<(const cs::TransactionsPacketHash& hash) {
+  (*this) << hash.toBinary();
+  return *this;
+}
+
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const cs::TransactionsPacket& packet) {
+  (*this) << packet.toBinary();
+  return *this;
+}
+
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashVector& hashVector) {
+  (*this) << hashVector.sender << hashVector.hash << hashVector.signature;
+  return *this;
+}
+
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashMatrix& hashMatrix) {
+  (*this) << hashMatrix.sender;
+
+  for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    (*this) << hashMatrix.hashVector[i];
+  }
+
+  (*this) << hashMatrix.signature;
+  return *this;
+}
+
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) {
+  (*this) << hash.to_binary();
   return *this;
 }
 

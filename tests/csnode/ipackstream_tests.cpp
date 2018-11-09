@@ -53,14 +53,14 @@ TEST(IPackStream, CanPeekAfterInitialization) {
 
 TEST(IPackStream, CurrentPointerIsNullWithoutInitialization) {
   cs::IPackStream stream;
-  ASSERT_EQ(nullptr, stream.getCurrPtr());
+  ASSERT_EQ(nullptr, stream.getCurrentPtr());
 }
 
 TEST(IPackStream, CurrentPointerIsEqualToThatPassedDuringInitialization) {
   cs::IPackStream stream;
   uint8_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
   stream.init(data, sizeof data);
-  ASSERT_EQ(data, stream.getCurrPtr());
+  ASSERT_EQ(data, stream.getCurrentPtr());
 }
 
 // TODO: must correct IPackStream to satisfy these obvious conditions
@@ -166,7 +166,7 @@ TEST(IPackStream, PeekIntegerValue) {
 }
 
 void displayStreamData(cs::IPackStream& stream, const size_t& size) {
-  auto ptr = stream.getCurrPtr();
+  auto ptr = stream.getCurrentPtr();
 
   for (int i = 0; i < size; i++) {
     std::cout << "item " << i << ": " << (int)(*(ptr + i)) << std::endl;

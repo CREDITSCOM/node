@@ -30,7 +30,7 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
     regFlag |= RegFlags::RedirectPort;
   }
 
-  uint8_t* flagChar = stream.getCurrPtr();
+  uint8_t* flagChar = stream.getCurrentPtr();
 
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -58,7 +58,7 @@ void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPa
   stream << NetworkCommand::Registration << NODE_VERSION;
 
   addMyOut(config, stream);
-  *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrPtr());
+  *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
 
   stream << static_cast<ConnectionId>(0) << pk;
 }
@@ -306,7 +306,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   cs::RoundNumber rNum = 0;
   iPackStream_ >> rNum;
 
-  auto trStart = iPackStream_.getCurrPtr();
+  auto trStart = iPackStream_.getCurrentPtr();
 
   uint8_t numConf;
   iPackStream_ >> numConf;
@@ -316,7 +316,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
-  auto trFinish = iPackStream_.getCurrPtr();
+  auto trFinish = iPackStream_.getCurrentPtr();
   node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
   uint8_t numCirc;
