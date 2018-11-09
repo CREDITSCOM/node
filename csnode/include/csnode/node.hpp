@@ -236,8 +236,8 @@ private:
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
 
-  IPackStream istream_;
-  OPackStream ostream_;
+  cs::IPackStream istream_;
+  cs::OPackStream ostream_;
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;

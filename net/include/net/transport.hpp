@@ -179,10 +179,10 @@ class Transport {
   RegionAllocator netPacksAllocator_;
   cs::PublicKey myPublicKey_;
 
-  IPackStream iPackStream_;
+  cs::IPackStream iPackStream_;
 
   std::atomic_flag oLock_ = ATOMIC_FLAG_INIT;
-  OPackStream      oPackStream_;
+  cs::OPackStream oPackStream_;
 
   // SS Data
   SSBootstrapStatus ssStatus_ = SSBootstrapStatus::Empty;

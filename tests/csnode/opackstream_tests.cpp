@@ -20,7 +20,7 @@ protected:
   cs::PublicKey key_;
 };
 
-void displayStreamData(OPackStream& stream)
+void displayStreamData(cs::OPackStream& stream)
 {
   auto ptr = stream.getCurrPtr();
   auto offset = stream.getCurrSize();
@@ -33,7 +33,7 @@ void displayStreamData(OPackStream& stream)
 TEST_F(TestOPackStream, init)
 {
   RegionAllocator allocator(100, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
   auto ptr = oPackStream.getCurrPtr();
@@ -49,7 +49,7 @@ TEST_F(TestOPackStream, init)
 TEST_F(TestOPackStream, clear)
 {
   RegionAllocator allocator(100, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented);
   oPackStream.clear();
@@ -60,7 +60,7 @@ TEST_F(TestOPackStream, clear)
 TEST_F(TestOPackStream, output) // TODO add transaction
 {
   RegionAllocator allocator(200, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
   uint8_t val = 13;
@@ -104,7 +104,7 @@ TEST_F(TestOPackStream, output) // TODO add transaction
 TEST_F(TestOPackStream, getPacketsCount)
 {
   RegionAllocator allocator(100, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
@@ -114,7 +114,7 @@ TEST_F(TestOPackStream, getPacketsCount)
 TEST_F(TestOPackStream, getCurrPtr)
 {
   RegionAllocator allocator(100, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
@@ -124,7 +124,7 @@ TEST_F(TestOPackStream, getCurrPtr)
 TEST_F(TestOPackStream, getCurrSize)
 {
   RegionAllocator allocator(100, 1);
-  OPackStream oPackStream(&allocator, key_);
+  cs::OPackStream oPackStream(&allocator, key_);
 
   oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 

@@ -15,7 +15,7 @@ enum Platform : uint8_t { Linux, MacOS, Windows };
 namespace {
 // Packets formation
 
-void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagValue = 0) {
+void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initFlagValue = 0) {
   uint8_t regFlag = 0;
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -52,7 +52,7 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
   *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
+void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
 
   stream << NetworkCommand::Registration << NODE_VERSION;
@@ -63,7 +63,7 @@ void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackCo
   stream << static_cast<ConnectionId>(0) << pk;
 }
 
-void formSSConnectPack(const Config& config, OPackStream& stream, const cs::PublicKey& pk) {
+void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
