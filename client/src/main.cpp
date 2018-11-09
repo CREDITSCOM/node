@@ -154,8 +154,8 @@ int main(int argc, char* argv[]) {
   if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
   {
     std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-    std::cout << "\n\t -- Now try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
-    std::cout << "\n\t    try logging off or closing the console...\n" << std::flush;
+    std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
+    std::cout << "\n\t !!! try logging off or closing the console...\n" << std::flush;
     Sleep(2000);
   }
   else
@@ -166,8 +166,8 @@ int main(int argc, char* argv[]) {
 #else
   installSignalHandler();
   std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-  std::cout << "\n\t -- Now try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
-  std::cout << "\n\t    try logging off or closing the console...\n" << std::flush;
+  std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
+  std::cout << "\n\t !!! try logging off or closing the console...\n" << std::flush;
   sleep(2);
 #endif // WIN32
   mouseSelectionDisable();
