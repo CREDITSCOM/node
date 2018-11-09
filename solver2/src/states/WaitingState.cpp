@@ -1,5 +1,6 @@
 #include "WaitingState.h"
 #include <Consensus.h>
+#include <SolverContext.h>
 #include <sstream>
 
 namespace slv2

@@ -91,17 +91,18 @@ namespace cs
     };
 
     // all info about round
+    struct Characteristic
+    {
+      cs::Bytes mask;
+    };
+
     struct RoundTable
     {
         RoundNumber round = 0;
         PublicKey general;
         ConfidantsKeys confidants;
         Hashes hashes;
-    };
-
-    struct Characteristic
-    {
-        cs::Bytes mask;
+        Characteristic charBytes;
     };
 
     struct CharacteristicMeta

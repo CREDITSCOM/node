@@ -593,7 +593,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundInfoReply:
     return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
-
   default:
     cserror() << "Unknown type";
     break;

@@ -1,6 +1,6 @@
 #pragma once
 #include "DefaultStateBehavior.h"
-#include "../CallsQueueScheduler.h"
+#include <CallsQueueScheduler.h>
 #include <csdb/address.h>
 #include <vector>
 
