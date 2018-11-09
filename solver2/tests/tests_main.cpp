@@ -24,9 +24,4 @@ TEST(Init, Done)
 {
   EXPECT_FALSE(false);
   EXPECT_TRUE(true);
-
-  char array[] = "0123456789ABCDEF";
-  std::string s(array, sizeof(array));
-  array[10] = 'a';
-  const char *p = s.c_str();
 }
