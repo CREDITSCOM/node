@@ -3,6 +3,7 @@
 #define PACKSTREAM_HPP
 
 #include <algorithm>
+#include <type_traits>
 #include <cstring>
 
 #include <csdb/pool.h>
@@ -25,7 +26,7 @@ public:
 
   template <typename T>
   bool canPeek() const {
-    return (uint32_t)(end_ - ptr_) >= sizeof(T);
+    return static_cast<uint32_t>(end_ - ptr_) >= sizeof(T);
   }
 
   template <typename T>
@@ -65,11 +66,11 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(FixedString<Length>& str) {
-    if ((uint32_t)(end_ - ptr_) < Length) {
+    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
       good_ = false;
     }
     else {
-      std::memcpy(str.data(), ptr_, Length);
+      std::copy(ptr_, ptr_ + Length, str.data());
       ptr_ += Length;
     }
 
@@ -78,11 +79,11 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(cs::ByteArray<Length>& byteArray) {
-    if ((uint32_t)(end_ - ptr_) < Length) {
+    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
       good_ = false;
     }
     else {
-      std::memcpy(byteArray.data(), ptr_, Length);
+      std::copy(ptr_, ptr_ + Length, byteArray.data());
       ptr_ += Length;
     }
 
@@ -129,7 +130,7 @@ public:
     ++ptr_;
 
     if (flags & BaseFlags::Fragmented) {
-      *this << (uint16_t)0 << packetsCount_;
+      *this << static_cast<uint16_t>(0) << packetsCount_;
     }
 
     if (!(flags & BaseFlags::NetworkMsg)) {
@@ -153,18 +154,19 @@ public:
   }
 
   template <typename T>
-  OPackStream& operator<<(const T& d) {
+  OPackStream& operator<<(const T& value) {
     static_assert(sizeof(T) <= Packet::MaxSize, "Type too long");
-    const uint32_t left = end_ - ptr_;
+
+    const uint32_t left = static_cast<uint32_t>(end_ - ptr_);
 
     if (left >= sizeof(T)) {
-      *((T*)ptr_) = d;
+      *((T*)ptr_) = value;
       ptr_ += sizeof(T);
     }
-    else {  // On border
-      std::memcpy(ptr_, &d, left);
+    else {
+      std::copy(reinterpret_cast<const cs::Byte*>(&value), (reinterpret_cast<const cs::Byte*>(&value) + left), ptr_);
       newPack();
-      std::memcpy(ptr_, ((uint8_t*)&d) + left, sizeof(T) - left);
+      std::copy((reinterpret_cast<const cs::Byte*>(&value)) + left, (reinterpret_cast<const cs::Byte*>(&value)) + sizeof(T), ptr_);
       ptr_ += sizeof(T) - left;
     }
 
@@ -185,11 +187,11 @@ public:
 
   Packet* getPackets() {
     if (!finished_) {
-      allocator_->shrinkLast(ptr_ - static_cast<uint8_t*>((packetsEnd_ - 1)->data()));
+      allocator_->shrinkLast(static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data())));
 
       if (packetsCount_ > 1) {
         for (auto p = packets_; p != packetsEnd_; ++p) {
-          uint8_t* data = static_cast<uint8_t*>(p->data());
+          cs::Byte* data = static_cast<cs::Byte*>(p->data());
 
           if (!p->isFragmented()) {
             cswarning() << "No Fragmented flag for packets";
@@ -209,24 +211,24 @@ public:
     return packetsCount_;
   }
 
-  uint8_t* getCurrPtr() {
+  cs::Byte* getCurrPtr() {
     return ptr_;
   }
+
   uint32_t getCurrSize() const {
-    return ptr_ - (uint8_t*)((packetsEnd_ - 1)->data());
+    return static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data()));
   }
 
 private:
   void newPack() {
     new (packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
 
-    ptr_ = static_cast<uint8_t*>(packetsEnd_->data());
+    ptr_ = static_cast<cs::Byte*>(packetsEnd_->data());
     end_ = ptr_ + packetsEnd_->size();
 
-    if (packetsEnd_ != packets_) {  // Not the first one
-      std::memcpy(ptr_, packets_->data(), packets_->getHeadersLength());
-
-      *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(packetsEnd_->data()) +
+    if (packetsEnd_ != packets_) {
+      std::copy(static_cast<cs::Byte*>(packets_->data()), static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
+      *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) +
                                    static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
 
       ptr_ += packets_->getHeadersLength();
@@ -242,15 +244,16 @@ private:
         newPack();
       }
 
-      const auto toPut = std::min((uint32_t)(end_ - ptr_), size);
-      std::memcpy(ptr_, bytes, toPut);
+      const auto toPut = std::min(static_cast<uint32_t>(end_ - ptr_), size);
+      std::copy(bytes, bytes + toPut, ptr_);
+
       size -= toPut;
       ptr_ += toPut;
       bytes += toPut;
     }
   }
 
-  void insertBytes(const unsigned char* bytes, uint32_t size) {
+  void insertBytes(const cs::Byte* bytes, uint32_t size) {
     insertBytes(reinterpret_cast<const char*>(bytes), size);
   }
 
@@ -278,7 +281,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Transaction& cont) {
-  cont = csdb::Transaction::from_byte_stream((char*)ptr_, (size_t)(end_ - ptr_));
+  cont = csdb::Transaction::from_byte_stream(reinterpret_cast<const char*>(ptr_), static_cast<size_t>(end_ - ptr_));
   ptr_ = end_;
   return *this;
 }
@@ -305,7 +308,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
   }
   else {
     if (*(ptr_++) & 1) {
-      if ((uint32_t)(end_ - ptr_) < 16) {
+      if (static_cast<uint32_t>(end_ - ptr_) < 16) {
         good_ = false;
       }
       else {
@@ -321,7 +324,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
     else {
       uint32_t ipnum;
 
-      for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr) {
+      for (auto ptr = reinterpret_cast<cs::Byte*>(&ipnum) + 3; ptr >= reinterpret_cast<cs::Byte*>(&ipnum); --ptr) {
         *this >> *ptr;
       }
 
@@ -334,7 +337,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
-  *this << (uint8_t)(ip.is_v6());
+  *this << static_cast<cs::Byte>(ip.is_v6());
 
   if (ip.is_v6()) {
     auto bts = ip.to_v6().to_bytes();
@@ -346,7 +349,7 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
   else {
     uint32_t ipnum = ip.to_v4().to_uint();
 
-    for (auto ptr = reinterpret_cast<uint8_t*>(&ipnum) + 3; ptr >= reinterpret_cast<uint8_t*>(&ipnum); --ptr) {
+    for (auto ptr = reinterpret_cast<cs::Byte*>(&ipnum) + 3; ptr >= reinterpret_cast<cs::Byte*>(&ipnum); --ptr) {
       *this << *ptr;
     }
   }
@@ -356,14 +359,14 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const std::string& str) {
-  insertBytes(str.data(), str.size());
+  insertBytes(str.data(), static_cast<uint32_t>(str.size()));
   return *this;
 }
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::Transaction& trans) {
   auto byteArray = trans.to_byte_stream();
-  insertBytes((char*)byteArray.data(), byteArray.size());
+  insertBytes(reinterpret_cast<char*>(byteArray.data()), static_cast<uint32_t>(byteArray.size()));
   return *this;
 }
 
@@ -371,13 +374,13 @@ template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
   auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-  insertBytes((char*)dataPtr, bSize);
+  insertBytes(static_cast<char*>(dataPtr), bSize);
   return *this;
 }
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const cs::Bytes& bytes) {
-  insertBytes((const char*)bytes.data(), bytes.size());
+  insertBytes(reinterpret_cast<const char*>(bytes.data()), static_cast<uint32_t>(bytes.size()));
   return *this;
 }
 
