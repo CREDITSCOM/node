@@ -71,7 +71,8 @@ enum MsgTypes: uint8_t {
   TransactionsPacketReply,
   NewCharacteristic,
   RoundTable,
-  WriterNotification
+  WriterNotification,
+  BlockHashV3
 };
 
 class Packet {

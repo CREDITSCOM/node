@@ -2775,17 +2775,43 @@ void Node::sendHash_V3() {
      return;
    }*/
 
-  const auto& tmp = getBlockChain().getLastWrittenHash();
+  const auto& tmp = getBlockChain().getLastWrittenHash().to_binary();
   //cs::Hash testHash;
   //std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
  
-  LOG_WARN("Sending hash of " << tmp.to_string() << " to ALL");
+  LOG_WARN("Sending hash of " << cs::Utils::byteStreamToHex(tmp.data(),tmp.size()) << " to ALL");
+  cs::Hash tmpHash;
+  std::copy(tmp.cbegin(),tmp.cend(),tmpHash.begin());
 
   ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::BlockHash
+  ostream_ << MsgTypes::BlockHashV3
     << roundNum_
-    << tmp;
+    << tmpHash;
   flushCurrentTasks();
+}
+
+void Node::getHash_V3(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+  if (myLevel_ != NodeLevel::Confidant) {
+    return;
+  }
+
+  cslog() << "Get hash size: " << size;
+
+  istream_.init(data, size);
+
+
+  cs::Hash tmpHash;
+  istream_ >> tmpHash;
+
+  csdb::internal::byte_array tmp(tmpHash.cbegin(),tmpHash.cend());
+ 
+
+  if (!istream_.good() || !istream_.end()) {
+    cswarning() << "Bad hash packet format";
+    return;
+  }
+
+  solver_->gotHash(csdb::PoolHash::from_binary(tmp), sender);
 }
 
 void Node::sendRoundInfoRequest(uint8_t respondent)

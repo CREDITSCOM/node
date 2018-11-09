@@ -54,6 +54,7 @@ public:
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
   // sends StageOne request to respondent about required
+  void getHash_V3(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void requestStageOne(uint8_t respondent, uint8_t required);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
@@ -66,7 +67,7 @@ public:
   void sendStageThree(const cs::StageThree&);
   void requestStageThree(uint8_t respondent, uint8_t required);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
+  void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
   void sendHash_V3();
 
