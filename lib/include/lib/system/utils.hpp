@@ -391,6 +391,32 @@ namespace cs
         {
             return cs::Utils::verifySignature(signature, publicKey, bytes.data(), bytes.size());
         }
+
+        ///
+        /// Splits vector on equals parts
+        ///
+        template<typename T>
+        static std::vector<std::vector<T>> splitVector(const std::vector<T>& vector, std::size_t parts)
+        {
+            std::vector<std::vector<T>> result;
+
+            std::size_t length = vector.size() / parts;
+            std::size_t remain = vector.size() % parts;
+
+            std::size_t begin = 0;
+            std::size_t end = 0;
+
+            for (std::size_t i = 0; i < std::min(parts, vector.size()); ++i)
+            {
+                end += (remain > 0) ? (length + !!(remain--)) : length;
+
+                result.push_back(std::vector<T>(vector.begin() + begin, vector.begin() + end));
+
+                begin = end;
+            }
+
+            return result;
+        }
     };
 
     ///

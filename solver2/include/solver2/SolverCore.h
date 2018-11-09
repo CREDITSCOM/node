@@ -154,7 +154,7 @@ namespace slv2
         void runSpammer();
         void gotRound();
         bool getIPoolClosed();
-        void gotHash(std::string&&, const cs::PublicKey&);
+        void gotHash(csdb::PoolHash&&, const cs::PublicKey&);
         const cs::PrivateKey& getPrivateKey() const;
         const cs::PublicKey& getPublicKey() const;
         cs::PublicKey getWriterPublicKey() const;

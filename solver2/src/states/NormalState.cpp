@@ -191,8 +191,8 @@ namespace slv2
             constexpr const int32_t deposit = 1'000'000;
             constexpr const double max_fee = 0.1;
             // deposit required
-            // в генезис-блоке на start (innerID 0) и на спамер (innerID 1) размещено по 100 000 000 в валюте (1)
-            // пробуем взять оттуда
+            // РІ РіРµРЅРµР·РёСЃ-Р±Р»РѕРєРµ РЅР° start (innerID 0) Рё РЅР° СЃРїР°РјРµСЂ (innerID 1) СЂР°Р·РјРµС‰РµРЅРѕ РїРѕ 100 000 000 РІ РІР°Р»СЋС‚Рµ (1)
+            // РїСЂРѕР±СѓРµРј РІР·СЏС‚СЊ РѕС‚С‚СѓРґР°
             csdb::Transaction tr;
             tr.set_source(context.optimize(context.address_spammer()));
             tr.set_target(context.optimize(own_wallet));

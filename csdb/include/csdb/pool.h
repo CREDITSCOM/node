@@ -20,6 +20,8 @@
 #include "csdb/internal/shared_data.h"
 #include "csdb/internal/types.h"
 
+#include <lib/system/common.hpp>
+
 namespace csdb {
 
 class Transaction;
@@ -269,7 +271,7 @@ public:
   */
   Transaction get_last_by_target(Address target) const noexcept;
 
-  void sign(std::vector<uint8_t> private_key);
+  void sign(const cs::PrivateKey& private_key);
   bool verify_signature();
   bool verify_signature(const std::string& signature);
 

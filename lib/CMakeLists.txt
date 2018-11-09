@@ -31,7 +31,7 @@ endif(MSVC)
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
     )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/rang)
+target_link_libraries(lib rang)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)

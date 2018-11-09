@@ -31,6 +31,8 @@
 #include <boost/io/ios_state.hpp>
 #include <iomanip>
 #include <scope_guard.h>
+#include <thread>
+#include <mutex>
 
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
@@ -585,8 +587,10 @@ operator<<(std::ostream& s, const T& t)
 void APIHandler::execute_byte_code(executor::APIResponse& resp, 
 	const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
 {
+  static std::mutex m;
+  std::lock_guard<std::mutex> lk(m);
   using transport_type = decltype(executor_transport)::element_type;
-  const auto deleter = [](transport_type* transport) {if (transport != nullptr) transport->close(); };
+  const auto deleter = [](transport_type* transport) { if (transport != nullptr) transport->close(); };
   const auto transport = std::unique_ptr<transport_type, decltype(deleter)>(executor_transport.get(), deleter);
   while (!transport->isOpen()) {
     transport->open();

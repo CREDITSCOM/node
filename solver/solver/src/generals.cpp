@@ -40,63 +40,64 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
-cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, cs::Solver* solver)
-{
-    cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
+void Generals::resetHashMatrix() {
+  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+}
 
-    std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* solver) {
+  cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
 
-    cs::Hash hash;
+  cs::Hash hash;
 
-    const std::size_t transactionsCount = packet.transactionsCount();
-    const auto& transactions = packet.transactions();
+  const std::size_t transactionsCount = packet.transactionsCount();
+  const auto& transactions = packet.transactions();
 
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::Characteristic characteristic;
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::Characteristic characteristic;
 
-    if(transactionsCount > 0) {
-        m_walletsState.updateFromSource();
-        m_transactionsValidator->reset(transactionsCount);
+  if (transactionsCount > 0) {
+    m_walletsState.updateFromSource();
+    m_transactionsValidator->reset(transactionsCount);
 
-        cs::Bytes characteristicMask;
-        characteristicMask.reserve(transactionsCount);
+    cs::Bytes characteristicMask;
+    characteristicMask.reserve(transactionsCount);
 
-        uint8_t del1;
-        csdb::Pool newPool;
+    uint8_t del1;
+    csdb::Pool newPool;
 
-        for(std::size_t i = 0; i < transactionsCount; ++i) {
-            const csdb::Transaction& transaction = transactions[i];
-            cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
+    for (std::size_t i = 0; i < transactionsCount; ++i) {
+      const csdb::Transaction& transaction = transactions[i];
+      cs::Byte byte = static_cast<cs::Byte>(m_transactionsValidator->validateTransaction(transaction, i, del1));
 
-            if(byte) {
-                byte = static_cast<cs::Byte>(solver->checkTransactionSignature(transaction));
-            }
+      if (byte) {
+        byte = static_cast<cs::Byte>(solver->checkTransactionSignature(transaction));
+      }
 
-            characteristicMask.push_back(byte);
-        }
-
-        m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), newPool);
-
-        characteristic.mask = std::move(characteristicMask);
-        conveyer.setCharacteristic(characteristic);
-    }
-    else {
-        conveyer.setCharacteristic(characteristic);
+      characteristicMask.push_back(byte);
     }
 
-    if(characteristic.mask.size() != transactionsCount) {
-        cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
-    }
+    m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), newPool);
 
-    blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
+    characteristic.mask = std::move(characteristicMask);
+    conveyer.setCharacteristic(characteristic);
+  }
+  else {
+    conveyer.setCharacteristic(characteristic);
+  }
 
-    m_findUntrusted.fill(0);
-    m_newTrusted.fill(0);
-    m_hwTotal.fill(HashWeigth {});
+  if (characteristic.mask.size() != transactionsCount) {
+    cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
+  }
 
-    csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
 
-    return hash;
+  m_findUntrusted.fill(0);
+  m_newTrusted.fill(0);
+  m_hwTotal.fill(HashWeigth{});
+
+  csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+
+  return hash;
 }
 
 void Generals::addVector(const HashVector& vector) {
@@ -249,10 +250,10 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   return cs::numeric_cast<uint8_t>(result);
 }
 
-const HashMatrix& Generals::getMatrix() const
-{
-    return m_hMatrix;
+const HashMatrix& Generals::getMatrix() const {
+  return m_hMatrix;
 }
+
 const PublicKey& Generals::getWriterPublicKey() const {
   return m_writerPublicKey;
 }
