@@ -199,7 +199,7 @@ NodeLevel Solver::nodeLevel() const {
 }
 
 const PublicKey& Solver::nodePublicKey() const {
-  return m_node->getPublicKey();
+  return m_node->getNodeIdKey();
 }
 
 void Solver::gotVector(HashVector&& vector) {
@@ -397,7 +397,7 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
     cs::RoundTable table;
     table.round = ++round;
     table.confidants = std::move(m_hashesReceivedKeys);
-    table.general = m_node->getPublicKey();
+    table.general = m_node->getNodeIdKey();
     table.hashes = std::move(hashes);
 
     conveyer.setRound(std::move(table));

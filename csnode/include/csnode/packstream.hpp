@@ -1,6 +1,6 @@
-/* Send blaming letters to @yrtimd */
-#ifndef __PACKSTREAM_HPP__
-#define __PACKSTREAM_HPP__
+#ifndef PACKSTREAM_HPP
+#define PACKSTREAM_HPP
+
 #include <algorithm>
 #include <cstring>
 
@@ -98,7 +98,7 @@ class IPackStream {
  private:
   const uint8_t* ptr_;
   const uint8_t* end_;
-  bool           good_ = false;
+  bool good_ = false;
 };
 
 class OPackStream {
@@ -165,8 +165,8 @@ class OPackStream {
 
   template <size_t Length>
   OPackStream& operator<<(const cs::ByteArray<Length>& byteArray) {
-      insertBytes(byteArray.data(), Length);
-      return *this;
+    insertBytes(byteArray.data(), Length);
+    return *this;
   }
 
   Packet* getPackets() {
@@ -350,4 +350,4 @@ inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
   return *this;
 }
 
-#endif  // __PACKSTREAM_HPP__
+#endif  // PACKSTREAM_HPP

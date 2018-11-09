@@ -12,6 +12,7 @@
 
 #include <csnode/datastream.h>
 #include <csnode/dynamicbuffer.h>
+
 #include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
@@ -119,8 +120,8 @@ public:
 
   MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes);
 
-  const cs::PublicKey& getPublicKey() const {
-    return myPublicKey_;
+  const cs::PublicKey& getNodeIdKey() const {
+    return nodeIdKey_;
   }
 
   NodeLevel getNodeLevel() const {
@@ -196,7 +197,7 @@ private:
   static const csdb::Address startAddress_;
   static const csdb::Address spammerAddress_;
 
-  const cs::PublicKey myPublicKey_;
+  const cs::PublicKey nodeIdKey_;
   bool good_ = true;
 
   // syncro variables

@@ -31,7 +31,7 @@ const csdb::Address Node::startAddress_   = csdb::Address::from_string("00000000
 const csdb::Address Node::spammerAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003");
 
 Node::Node(const Config& config):
-  myPublicKey_(config.getMyPublicKey()),
+  nodeIdKey_(config.getMyPublicKey()),
   bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_, spammerAddress_),
   solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_
 #ifdef SPAMMER
@@ -47,8 +47,8 @@ Node::Node(const Config& config):
 #endif
   allocator_(1 << 24, 5),
   packStreamAllocator_(1 << 26, 5),
-  ostream_(&packStreamAllocator_, myPublicKey_) {
-    good_ = init();
+  ostream_(&packStreamAllocator_, nodeIdKey_) {
+  good_ = init();
 }
 
 Node::~Node() {
@@ -465,7 +465,7 @@ void Node::getVector(const uint8_t* data, const size_t size, const cs::PublicKey
     return;
   }
 
-  if (myPublicKey_ == sender) {
+  if (nodeIdKey_ == sender) {
     return;
   }
 
@@ -497,7 +497,7 @@ void Node::getMatrix(const uint8_t* data, const size_t size, const cs::PublicKey
     return;
   }
 
-  if (myPublicKey_ == sender) {
+  if (nodeIdKey_ == sender) {
     return;
   }
 
@@ -841,6 +841,7 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
   }
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
+
   cs::Bytes notification(data, data + size);
   conveyer.addNotification(notification);
 
@@ -914,7 +915,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   cs::PublicKey writerPublicKey;
   stream >> writerPublicKey;
 
-  if (writerPublicKey != myPublicKey_) {
+  if (writerPublicKey != nodeIdKey_) {
     csdebug() << "NODE> Writer public key equals failed";
     return false;
   }
@@ -1248,8 +1249,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   csdb::Pool pool;
 
-  istream_.init(data, size);
-  istream_ >> pool;
+  cs::DataStream stream(data, size);
+  stream >> pool;
 
   cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
 
@@ -1281,7 +1282,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     roundToSync_ = 0;
 
     processMetaMap();
-    cslog() << "SYNCRO FINISHED!!!";
+    cslog() << "POOL SYNCRO FINISHED";
   }
 }
 
@@ -1292,13 +1293,7 @@ void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& target) {
     return;
   }
 
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  ostream_ << MsgTypes::RequestedBlock << roundNum_ << pool;
-
-  transport_->deliverDirect(ostream_.getPackets(),
-                            ostream_.getPacketsCount(),
-                            conn);
-  ostream_.clear();
+  tryToSendDirect(target, MsgTypes::RequestedBlock, roundNum_, pool);
 }
 
 void Node::becomeWriter() {
@@ -1313,15 +1308,15 @@ void Node::becomeWriter() {
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
   cslog() << "======================================== ROUND " << roundTable.round
           << " ========================================";
-  cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());
+  cslog() << "Node PK = " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
 
   const cs::ConfidantsKeys& confidants = roundTable.confidants;
 
-  if (roundTable.general == myPublicKey_) {
+  if (roundTable.general == nodeIdKey_) {
     myLevel_ = NodeLevel::Main;
   }
   else {
-    const auto iter = std::find(confidants.begin(), confidants.end(), myPublicKey_);
+    const auto iter = std::find(confidants.begin(), confidants.end(), nodeIdKey_);
 
     if (iter != confidants.end()) {
       myLevel_ = NodeLevel::Confidant;

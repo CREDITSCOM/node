@@ -624,7 +624,9 @@ namespace cs
     ///
     inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool)
     {
-        stream << pool.to_binary();
+        uint32_t bSize;
+        auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+        stream << cs::Bytes(dataPtr, dataPtr + bSize);
         return stream;
     }
 }
