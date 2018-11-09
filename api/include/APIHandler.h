@@ -124,6 +124,10 @@ class APIHandler : public APIHandlerInterface
 
     void SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) override;
 
+    void WalletsGet(api::WalletsGetResult& _return,
+                    int64_t offset,
+                    int64_t limit) override;
+
   private:
     BlockChain& s_blockchain;
 

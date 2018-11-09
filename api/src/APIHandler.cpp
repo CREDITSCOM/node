@@ -315,6 +315,19 @@ APIHandler::convertPool(const csdb::Pool& pool)
       (int32_t)pool.transactions_count(); // DO NOT EVER CREATE POOLS WITH
                                           // MORE THAN 2 BILLION
                                           // TRANSACTIONS, EVEN AT NIGHT
+
+    auto wpk = pool.writer_public_key();
+    result.writer = fromByteArray(wpk);
+
+    double totalFee = 0;
+    const auto& transs = const_cast<csdb::Pool&>(pool).transactions();
+    for (auto& t : transs)
+      totalFee+= t.counted_fee().to_double();
+
+
+    const auto tf = csdb::Amount(totalFee);
+    result.totalFee.integral = tf.integral();
+    result.totalFee.fraction = tf.fraction();
   }
   return result;
 }
@@ -1145,4 +1158,11 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
   _return.method = convertTransaction(trx).trxn.smartContract.method;
   _return.params = convertTransaction(trx).trxn.smartContract.params;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void
+APIHandler::WalletsGet(WalletsGetResult& _return,
+                       int64_t _offset,
+                       int64_t _limit) {
+
 }
