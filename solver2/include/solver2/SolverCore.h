@@ -99,7 +99,12 @@ namespace slv2
         void gotStageOne(const cs::StageOne& stage);
         void gotStageTwo(const cs::StageTwo& stage);
         void gotStageThree(const cs::StageThree& stage);
-        void gotTransactionList_V3(csdb::Pool&&);
+        // TODO: remove when obsolete
+        void gotTransactionList_V3(csdb::Pool&& tl)
+        {
+            csdb::Pool tmp(tl);
+            gotTransactionList(tmp);
+        }
 
         void gotStageOneRequest(uint8_t requester, uint8_t required);
         void gotStageTwoRequest(uint8_t requester, uint8_t required);

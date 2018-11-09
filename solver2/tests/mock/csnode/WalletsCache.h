@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace Credits
+namespace cs
 {
     class WalletsCache
     {

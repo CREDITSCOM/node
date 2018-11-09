@@ -10,42 +10,8 @@ namespace csdb
     class Pool;
 }
 
-namespace Credits
+namespace cs
 {
-    struct Hash_
-    {
-        uint8_t val[32];
-    };
-    
-    struct Signature
-    {};
-
-    struct StageOne
-    {
-        uint8_t sender { 0 };
-        Hash_ hash;
-        uint8_t candidatesAmount { 0 };
-        PublicKey candiates[MAX_CONF_NUMBER];
-        Signature sig;
-    };
-
-    struct StageTwo
-    {
-        uint8_t sender { 0 };
-        uint8_t trustedAmount { 0 };
-        Signature signatures[MAX_CONF_NUMBER];
-        Signature sig;
-    };
-
-    struct StageThree
-    {
-        uint8_t sender { 0 };
-        uint8_t writer { 0 };
-        Hash_ hashBlock;
-        Hash_ hashCandidatesList;
-        Signature sig;
-    };
-
     class Fee
     {
     public:
