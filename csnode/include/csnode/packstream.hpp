@@ -267,18 +267,17 @@ inline IPackStream& IPackStream::operator>>(csdb::Transaction& cont) {
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
-  uint32_t uncompressedSize = 0u;
-  *this >> uncompressedSize;
-  pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), end_ - ptr_, uncompressedSize);
+inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes) {
+  bytes = std::vector<uint8_t>(ptr_, end_);
   ptr_ = end_;
   return *this;
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(cs::Bytes& bytes) {
-  bytes = std::vector<uint8_t>(ptr_, end_);
-  ptr_ = end_;
+inline IPackStream& IPackStream::operator>>(csdb::Pool& pool) {
+  cs::Bytes bytes;
+  (*this) >> bytes;
+  pool = csdb::Pool::from_binary(bytes);
   return *this;
 }
 
@@ -340,7 +339,7 @@ inline OPackStream& OPackStream::operator<<(const csdb::Transaction& trans) {
 template <>
 inline OPackStream& OPackStream::operator<<(const csdb::Pool& pool) {
   uint32_t bSize;
-  auto     dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+  auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
   insertBytes((char*)dataPtr, bSize);
   return *this;
 }
@@ -351,135 +350,4 @@ inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
   return *this;
 }
 
-#if 0
-// "has data" flag
-constexpr const uint8_t ContainsData = 1;
-// "has no data" flag
-constexpr const uint8_t EmptyData = 0;
-
-template <>
-inline OPackStream& OPackStream::operator<<(const Credits::Signature& sig)
-{
-    if(sig.is_empty()) {
-        *this << EmptyData;
-        return *this;
-    }
-    *this << ContainsData;
-    insertBytes((const char*) sig.val, sizeof(sig.val));
-    return *this;
-}
-
-template <>
-inline IPackStream& IPackStream::operator>>(Credits::Signature& sig)
-{
-    uint8_t flag;
-    *this >> flag;
-    if(EmptyData == flag) {
-        memset(&sig, 0, sizeof(sig));
-    }
-    else if(canPeek<Credits::Signature>()) {
-        memcpy(&sig, ptr_, sizeof(Credits::Signature));
-        safeSkip<Credits::Signature>();
-    }
-    return *this;
-}
-
-template <>
-inline OPackStream& OPackStream::operator<<(const Credits::Hash_& h)
-{
-    if(h.is_empty()) {
-        *this << EmptyData;
-        return *this;
-    }
-    *this << ContainsData;
-    insertBytes((const char*) h.val, sizeof(h.val));
-    return *this;
-}
-
-template <>
-inline IPackStream& IPackStream::operator>>(Credits::Hash_& h)
-{
-    uint8_t flag;
-    *this >> flag;
-    if(EmptyData == flag) {
-        memset(&h.val, 0, sizeof(h));
-    }
-    else if(canPeek<Credits::Hash_>()) {
-        memcpy(&h.val, ptr_, sizeof(Credits::Hash_));
-        safeSkip<Credits::Hash_>();
-    }
-    return *this;
-}
-
-template <>
-inline OPackStream& OPackStream::operator<<(const Credits::HashVector& vec) {
-    if(vec.is_empty()) {
-        *this << EmptyData;
-        return *this;
-    }
-    *this << ContainsData;
-    *this << vec.Sender;
-    *this << vec.hash;
-    *this << vec.sig;
-    return *this;
-}
-
-template <>
-inline IPackStream& IPackStream::operator>>(Credits::HashVector& vec)
-{
-    uint8_t flag;
-    *this >> flag;
-    if(EmptyData == flag) {
-        memset(&vec, 0, sizeof(vec));
-    }
-    else {
-        *this >> vec.Sender;
-        *this >> vec.hash;
-        *this >> vec.sig;
-    }
-    return *this;
-}
-
-template <>
-inline OPackStream& OPackStream::operator<<(const Credits::HashMatrix& mat) {
-    if(mat.is_empty()) {
-        *this << EmptyData;
-        return *this;
-    }
-    *this << ContainsData;
-    *this << mat.Sender;
-    *this << mat.sig;
-    auto cnt = mat.count_vectors();
-    *this << cnt;
-    for(size_t i = 0; i < cnt; ++i) {
-        *this << mat.hmatr[i];
-    }
-    return *this;
-}
-
-template <>
-inline IPackStream& IPackStream::operator>>(Credits::HashMatrix& mat)
-{
-    uint8_t flag;
-    *this >> flag;
-    if(EmptyData == flag) {
-        memset(&mat, 0, sizeof(Credits::HashMatrix));
-        return *this;
-    }
-    *this >> mat.Sender;
-    *this >> mat.sig;
-    // read actual vectors
-    uint8_t actual_cnt_vect = 0;
-    *this >> actual_cnt_vect;
-    for(size_t i = 0; i < actual_cnt_vect; ++i) {
-        *this >> mat.hmatr[i];
-    }
-    // nullify others
-    constexpr const size_t max_cnt_vect = sizeof(mat.hmatr) / sizeof(mat.hmatr[0]);
-    if(max_cnt_vect > actual_cnt_vect) {
-        memset(&mat.hmatr[actual_cnt_vect], 0, sizeof(mat.hmatr[0]) * (max_cnt_vect - actual_cnt_vect));
-    }
-    return *this;
-}
-#endif
 #endif  // __PACKSTREAM_HPP__

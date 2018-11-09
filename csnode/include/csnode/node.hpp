@@ -41,7 +41,6 @@ public:
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
   void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getBlock(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getHash(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
@@ -54,9 +53,9 @@ public:
 
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
 
-  void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& senderPublicKey);
+  void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
-  void writeBlock(csdb::Pool newPool, size_t sequence, const cs::PublicKey &sender);
+  void writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
@@ -72,30 +71,35 @@ public:
   // outcoming requests forming
   void sendVector(const cs::HashVector&);
   void sendMatrix(const cs::HashMatrix&);
-  void sendBlock(const csdb::Pool&);
-  void sendHash(const std::string&, const cs::PublicKey&);
+  void sendHash(const csdb::PoolHash&, const cs::PublicKey&);
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
   void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round);
   void sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round);
-  void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
   void resetNeighbours();
 
-  /*syncro send functions*/
-  void sendBlockRequest(uint32_t seq);
-  void sendBlockReply(const csdb::Pool&, const cs::PublicKey&);
+  // syncro send functions
+  void sendBlockRequest();
+  void sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences);
+  void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
+
+  // start new round
   void sendRoundTable(const cs::RoundTable& round);
 
   template<class... Args>
-  bool sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendNeighbours(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendNeighbours(const ConnectionPtr& connection, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendBroadcast(const cs::PublicKey& sender, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+
+  template <class... Args>
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
@@ -156,11 +160,13 @@ private:
 
   // signature verification
   bool checkKeysFile();
-  void generateKeys();
-  bool checkKeysForSig();
+  std::pair<cs::PublicKey, cs::PrivateKey> generateKeys();
+  bool checkKeysForSignature(const cs::PublicKey&, const cs::PrivateKey&);
 
   // pool sync helpers
   void blockchainSync();
+  void processPoolSync();
+
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
 
@@ -173,9 +179,8 @@ private:
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
-  // pool compression helpers
-  void composeMessageWithBlock(const csdb::Pool&, const MsgTypes);
-  void composeCompressed(const void*, const uint32_t, const MsgTypes);
+  // pool sync progress
+  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
   template <class T, class... Args>
   void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);
@@ -183,9 +188,8 @@ private:
   template<class T>
   void writeDefaultStream(cs::DataStream& stream, const T& value);
 
+  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-
-  // Info
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
@@ -197,24 +201,20 @@ private:
 
   // syncro variables
   bool isSyncroStarted_ = false;
-  uint32_t sendBlockRequestSequence_;
   bool isAwaitingSyncroBlock_ = false;
   uint32_t awaitingRecBlockCount_ = 0;
 
-  // signature variables
-  std::vector<uint8_t> myPublicKeyForSignature_;
-  std::vector<uint8_t> myPrivateKeyForSignature_;
-
-  std::string receviedTrxFileName_ = "rcvd.txt";
-  std::string sentTrxFileName_ = "sent.txt";
+  // file names for crypto public/private keys
+  inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
+  inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
   // current round state
   cs::RoundNumber roundNum_ = 0;
   NodeLevel myLevel_;
 
-  uint8_t myConfidantIndex_;
+  cs::Byte myConfidantIndex_;
 
-  // Resources
+  // main cs storage
   BlockChain bc_;
 
   // appidional dependencies
@@ -242,9 +242,12 @@ private:
   cs::Timer sendingTimer_;
 
   // sync meta
-  cs::PoolMetaMap poolMetaMap_;
+  csdb::Pool::sequence_t sendBlockRequestSequence_;
+  cs::PoolMetaMap poolMetaMap_;   // active pool meta information
+  std::map<csdb::Pool::sequence_t, csdb::Pool> poolSyncRequestMap_;   // meta information of pool sync from nodes
   cs::RoundNumber roundToSync_ = 0;
 
+  inline static const std::size_t maxPoolCountToSync_ = 10;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

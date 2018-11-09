@@ -36,7 +36,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotHash(std::string&& hash, const cs::PublicKey& pub) {
+    void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& pub) {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotHash(std::move(hash), pub);
         }
@@ -205,7 +205,7 @@ namespace slv2
         // update own hash vector
         if(pnode != nullptr && pgen != nullptr) {
             p = removeTransactionsWithBadSignatures(p);
-            pfee->CountFeesInPool(pnode, &p);
+            pfee->CountFeesInPool(pnode->getBlockChain(), &p);
             //auto result = pgen->buildVector(p, block_pool, b_pool); //vshilkin
             if(Consensus::Log) {
                 LOG_NOTICE("SolverCore: " << block_pool.transactions_count() << " trans stored to block, " << b_pool.transactions_count() << " to bad pool");
@@ -265,7 +265,7 @@ namespace slv2
     void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
-            pslv_v1->gotBlock(std::move(p), sender);
+//            pslv_v1->gotBlock(std::move(p), sender);
             return;
         }
 

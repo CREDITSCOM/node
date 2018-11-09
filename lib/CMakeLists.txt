@@ -5,6 +5,7 @@ project(lib)
 add_library(lib
   src/lib/system/logger.cpp
   src/lib/system/timer.cpp
+  src/lib/system/progressbar.cpp
   include/lib/system/hash.hpp
   include/lib/system/queues.hpp
   include/lib/system/structures.hpp
@@ -17,7 +18,9 @@ add_library(lib
   include/lib/system/cache.hpp
   include/lib/system/signals.hpp
   include/lib/system/metastorage.hpp
+  include/lib/system/progressbar.hpp
 )
+
 
 if (MSVC)
   # Boost.Log uses some functions on windows
@@ -25,7 +28,10 @@ if (MSVC)
   target_link_libraries(lib Psapi)
 endif(MSVC)
 
-target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
+target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+    )
+
+target_link_libraries(lib rang)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
@@ -39,7 +45,6 @@ target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
                        libsodium
                        Boost::log
-                       Boost::disable_autolinking
-                       )
+                       Boost::disable_autolinking)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -59,6 +59,8 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 #endif
 , m_feeCounter()
 , m_writerIndex(0) {
+  m_receivedVectorFrom.reserve(cs::hashVectorCount); // TODO Maybe = 100. Is max trusted count
+  m_receivedMatrixFrom.reserve(cs::hashVectorCount); // TODO Maybe = 100. Is max trusted count
 }
 
 Solver::~Solver() {
@@ -156,61 +158,27 @@ void Solver::runConsensus() {
 
   cslog() << "SOLVER> Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
-  m_feeCounter.CountFeesInPool(m_node, &packet);
+  m_feeCounter.CountFeesInPool(m_node->getBlockChain(), &packet);
 
   cs::Hash result = m_generals->buildVector(packet, this);
-
-  m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
 
   m_hashVector.sender = m_node->getConfidantNumber();
   m_hashVector.hash = result;
 
-  m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
-
-  m_generals->addVector(m_hashVector);
   m_node->sendVector(m_hashVector);
 
-  trustedCounterVector++;
-
-  csdebug() << "SOLVER> Trusted counter vector: " << (int)trustedCounterVector;
-
-  auto size = conveyer.roundTable().confidants.size();
-  csdebug() << "SOVLER>: confidants size: " << size;
-
-  if (trustedCounterVector == size) {
-    std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
-
-    // all vectors received
-    trustedCounterVector = 0;
-
-    // compose and send matrix!!!
-    m_generals->addSenderToMatrix(m_node->getConfidantNumber());
-
-    m_receivedMatrixFrom[m_node->getConfidantNumber()] = true;
-    ++trustedCounterMatrix;
-
-    m_node->sendMatrix(m_generals->getMatrix());
-    m_generals->addMatrix(m_generals->getMatrix(), conveyer.roundTable().confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
-
-    cslog() << "SOLVER> Matrix added";
-  }
+  addVector(m_hashVector);
 }
 
 void Solver::runFinalConsensus() {
-  const cs::RoundTable& table = cs::Conveyer::instance().roundTable();
-  const uint8_t numGen = static_cast<uint8_t>(table.confidants.size());
+  const auto& confidants = cs::Conveyer::instance().roundTable().confidants;
 
-  if (trustedCounterMatrix == numGen) {
-    std::memset(m_receivedMatrixFrom, 0, sizeof(m_receivedMatrixFrom));
-
-    // all matrix received
-    trustedCounterMatrix = 0;
-
-    m_writerIndex = (m_generals->takeDecision(table.confidants,
-                                              m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1)));
+  if (m_receivedMatrixFrom.size() == confidants.size()) {
+    const auto& hash = m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1);
+    m_writerIndex = m_generals->takeDecision(confidants, hash);
 
     if (m_writerIndex == 100) {
-      cslog() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
+      cserror() << "SOLVER> CONSENSUS WASN'T ACHIEVED!!!";
     }
     else {
       cslog() << "SOLVER> CONSENSUS ACHIEVED!!!";
@@ -237,40 +205,14 @@ const PublicKey& Solver::nodePublicKey() const {
 void Solver::gotVector(HashVector&& vector) {
   cslog() << "SOLVER> GotVector";
 
-  if (m_receivedVectorFrom[vector.sender]) {
+  const auto alreadyGot = std::find(m_receivedVectorFrom.begin(), m_receivedVectorFrom.end(), vector.sender);
+
+  if (alreadyGot != m_receivedVectorFrom.end()) {
     cslog() << "SOLVER> I've already got the vector from this Node";
     return;
   }
 
-  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().roundTable().confidants;
-  uint8_t numGen = static_cast<uint8_t>(confidants.size());
-
-  m_receivedVectorFrom[vector.sender] = true;
-
-  m_generals->addVector(vector);  // building matrix
-  trustedCounterVector++;
-
-  csdebug() << "SOVLER> Got vector num gen: " << (int)numGen;
-  csdebug() << "SOVLER> Trusted conuter vector: " << (int)trustedCounterVector;
-
-  if (trustedCounterVector == numGen) {
-    std::memset(m_receivedVectorFrom, 0, sizeof(m_receivedVectorFrom));
-
-    // all vectors received
-    trustedCounterVector = 0;
-
-    // compose and send matrix!!!
-    uint8_t confNumber = m_node->getConfidantNumber();
-    m_generals->addSenderToMatrix(confNumber);
-    m_receivedMatrixFrom[confNumber] = true;
-
-    trustedCounterMatrix++;
-
-    HashMatrix matrix = m_generals->getMatrix();
-
-    m_node->sendMatrix(matrix);
-    m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
-
+  if (addVector(vector)) {
     runFinalConsensus();
   }
 
@@ -282,13 +224,14 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
     return;
   }
 
-  if (m_receivedMatrixFrom[matrix.sender]) {
+  const auto alreadyGot = std::find(m_receivedMatrixFrom.begin(), m_receivedMatrixFrom.end(), matrix.sender);
+
+  if (alreadyGot != m_receivedMatrixFrom.end()) {
     cslog() << "SOLVER> I've already got the matrix from this Node";
     return;
   }
 
-  m_receivedMatrixFrom[matrix.sender] = true;
-  trustedCounterMatrix++;
+  m_receivedMatrixFrom.push_back(matrix.sender);
   m_generals->addMatrix(matrix, cs::Conveyer::instance().roundTable().confidants);
 
   runFinalConsensus();
@@ -318,10 +261,9 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
       m_node->getBlockChain().onBlockReceived(block);
 #ifndef MONITOR_NODE
       if ((m_node->getNodeLevel() != NodeLevel::Writer) && (m_node->getNodeLevel() != NodeLevel::Main)) {
-        std::string test_hash = m_node->getBlockChain().getLastWrittenHash().to_string();
-        // HASH!!!
-        m_node->sendHash(test_hash, sender);
-        csdebug() << "SENDING HASH: " << cs::Utils::debugByteStreamToHex(test_hash.data(), 32);
+        auto hash = m_node->getBlockChain().getLastWrittenHash();
+        m_node->sendHash(hash, sender);
+        csdebug() << "SENDING HASH: " << hash.to_string();
       }
 #endif
     }
@@ -403,15 +345,15 @@ void Solver::gotBlockCandidate(csdb::Pool&& block) {
   m_blockCandidateArrived = true;
 }
 
-void Solver::gotHash(std::string&& hash, const PublicKey& sender) {
+void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
   if (m_roundTableSent) {
     return;
   }
 
-  std::string myHash = m_node->getBlockChain().getLastWrittenHash().to_string();
+  csdb::PoolHash myHash = m_node->getBlockChain().getLastWrittenHash();
 
-  cslog() << "Solver -> My Hash: " << myHash;
-  cslog() << "Solver -> Received hash:" << hash;
+  cslog() << "Solver -> My Hash: " << myHash.to_string();
+  cslog() << "Solver -> Received hash:" << hash.to_string();
 
   cslog() << "Solver -> Received public key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
@@ -529,8 +471,9 @@ void Solver::nextRound() {
   }
 
   if (m_node->getNodeLevel() == NodeLevel::Confidant) {
-    cs::Utils::clearMemory(m_receivedVectorFrom);
-    cs::Utils::clearMemory(m_receivedMatrixFrom);
+    m_receivedVectorFrom.clear();
+    m_receivedMatrixFrom.clear();
+    m_generals->resetHashMatrix();
 
     cslog() << "SOLVER> next Round : the variables initialized";
   }
@@ -548,7 +491,7 @@ const cs::PublicKey& Solver::publicKey() const {
 }
 
 void Solver::countFeesInPool(csdb::Pool* pool) {
-  m_feeCounter.CountFeesInPool(m_node, pool);
+  m_feeCounter.CountFeesInPool(m_node->getBlockChain(), pool);
 }
 
 void Solver::addTimestampToPool(csdb::Pool& pool) {
@@ -571,6 +514,35 @@ bool Solver::checkTransactionSignature(const csdb::Transaction& transaction)
   }
 
   return transaction.verify_signature(transaction.source().public_key());
+}
+
+bool Solver::addVector(const HashVector& hashVector) {
+  m_receivedVectorFrom.push_back(hashVector.sender);
+  m_generals->addVector(hashVector);
+
+  const auto& confidants = cs::Conveyer::instance().roundTable().confidants;
+  const auto confidantsSize = confidants.size();
+  const auto receivedVectorsSize = m_receivedVectorFrom.size();
+
+  csdebug() << "SOLVER> Trusted counter vector: " << receivedVectorsSize;
+  csdebug() << "SOVLER> Confidants size: " << confidantsSize;
+
+  if (receivedVectorsSize != confidantsSize) {
+    return false;
+  }
+
+  // compose and send matrix!!!
+  const uint8_t confNumber = m_node->getConfidantNumber();
+  m_generals->addSenderToMatrix(confNumber);
+  m_receivedMatrixFrom.push_back(confNumber);
+
+  const HashMatrix& matrix = hashMatrix();
+  m_node->sendMatrix(matrix);
+  m_generals->addMatrix(matrix, confidants);  // MATRIX SHOULD BE DECOMPOSED HERE!!!
+
+  cslog() << "SOLVER> Matrix added";
+
+  return true;
 }
 
 }  // namespace cs

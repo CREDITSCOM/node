@@ -40,8 +40,9 @@ cs::DynamicBuffer& cs::DynamicBuffer::operator=(const cs::DynamicBuffer& buffer)
 {
     if (this != &buffer)
     {
-        if (m_array)
+        if (m_array) {
             delete[] m_array;
+        }
 
         m_size = buffer.m_size;
         m_array = new char[m_size];
@@ -56,8 +57,9 @@ cs::DynamicBuffer& cs::DynamicBuffer::operator=(cs::DynamicBuffer&& buffer)
 {
     if (this != &buffer)
     {
-        if (m_array)
+        if (m_array) {
             delete[] m_array;
+        }
 
         m_size = buffer.m_size;
         m_array = buffer.m_array;
@@ -127,13 +129,15 @@ const char* cs::DynamicBuffer::end() const
 
 bool cs::operator==(const cs::DynamicBuffer& lhs, const cs::DynamicBuffer& rhs)
 {
-    if (lhs.size() != rhs.size())
+    if (lhs.size() != rhs.size()) {
         return  false;
+    }
 
     for (std::size_t i = 0; i < lhs.size(); ++i)
     {
-        if (lhs[i] != rhs[i])
+        if (lhs[i] != rhs[i]) {
             return  false;
+        }
     }
 
     return true;

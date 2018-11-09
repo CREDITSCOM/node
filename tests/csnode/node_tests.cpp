@@ -1,4 +1,5 @@
 #define TESTING
+
 #include <algorithm>
 #include <array>
 #include <cstring>

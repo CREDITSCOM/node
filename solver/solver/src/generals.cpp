@@ -40,10 +40,12 @@ int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #endif
 }
 
+void Generals::resetHashMatrix() {
+  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
+}
+
 cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* solver) {
   cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
-
-  std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
   cs::Hash hash;
 
@@ -178,7 +180,7 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
 
   for (size_t i = 0; i < nodes_amount; i++) {
     if (*(m_findUntrusted.data() + i + j * TrustedSize) == max_frec_position) {
-      *(m_newTrusted.data() + i) += 1;
+      ++(*(m_newTrusted.data() + i));
     }
   }
 }
@@ -187,13 +189,10 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   csdebug() << "GENERALS> Take decision: starting ";
 
   const uint8_t nodes_amount = static_cast<uint8_t>(confidantNodes.size());
-  auto hash_weights = new HashWeigth[nodes_amount];
-  auto mtr = new unsigned char[nodes_amount * 97];      // what is 97 magic value?
+  std::vector<HashWeigth> hash_weights(nodes_amount, HashWeigth());
 
   uint8_t j_max, jj;
   j_max = 0;
-
-  std::memset(mtr, 0, nodes_amount * 97);
 
   for (uint8_t j = 0; j < nodes_amount; j++) {
     // matrix init
@@ -247,9 +246,6 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   m_writerPublicKey = confidantNodes.at(result);
 
   cslog() << "Writing node : " << cs::Utils::byteStreamToHex(m_writerPublicKey.data(), m_writerPublicKey.size());
-
-  delete[] hash_weights;
-  delete[] mtr;
 
   return cs::numeric_cast<uint8_t>(result);
 }

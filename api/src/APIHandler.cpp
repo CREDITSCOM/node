@@ -7,8 +7,8 @@
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+
 #include <csnode/conveyer.hpp>
-//#include <thrift/transport/TServerSocket.h>
 
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
@@ -437,15 +437,6 @@ APIHandler::TransactionsGet(TransactionsGetResult& _return,
 
   _return.transactions = convertTransactions(transactions);
 
-
-  //for test
-  /*MembersSmartContractGetResult ret;
-  api::TransactionId api_id;
-  api_id.index = transactions.back().id().index();
-  api_id.poolHash = fromByteArray(transactions.back().id().pool_hash().to_binary());
-  MembersSmartContractGet(ret, api_id);*/
-   //
-
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -561,8 +552,10 @@ operator<<(std::ostream& s, const T& t)
 void APIHandler::execute_byte_code(executor::APIResponse& resp, 
 	const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
 {
+  static std::mutex m;
+  std::lock_guard<std::mutex> lk(m);
   using transport_type = decltype(executor_transport)::element_type;
-  const auto deleter = [](transport_type* transport) {if (transport != nullptr) transport->close(); };
+  const auto deleter = [](transport_type* transport) { if (transport != nullptr) transport->close(); };
   const auto transport = std::unique_ptr<transport_type, decltype(deleter)>(executor_transport.get(), deleter);
   while (!transport->isOpen()) {
     transport->open();
@@ -597,104 +590,82 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
   _return.owner = api_resp.contractVariables["owner"].v_string;
 }
 
-//api::TransactionId api_id;
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction)
 {
-  auto input_smart = transaction.smartContract;
-  csdb::Transaction send_transaction = make_transaction(transaction);
+  auto input_smart      = transaction.smartContract;
+  auto send_transaction = make_transaction(transaction);
   const auto smart_addr = send_transaction.target();
-  bool deploy = is_smart_deploy(input_smart);
-  if (!deploy) {
-    input_smart.byteCode = std::string();
-    input_smart.sourceCode = std::string();
-  }
+  const bool deploy     = is_smart_deploy(input_smart);
 
-  bool present;
-  std::string origin_bytecode;
-  {
-    decltype(auto) smart_origin = locked_ref(this->smart_origin);
-    if (smart_addr.is_wallet_id()) {
-      WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(smart_addr).to_api_addr().data());
-      if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(smart_addr)))
-        return;
-    }
-
-    auto it = smart_origin->find(smart_addr);
-    if ((present = (it != smart_origin->end())))
-      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
-  }
-
-  if (present == deploy) {
+  if (!convertAddrToPublicKey(smart_addr)) {
+    LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    return;
   }
 
-  const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
-  bool amnesia = input_smart.forgetNewState;
+  std::string origin_bytecode;
+  if (!deploy) {
+    input_smart.byteCode.clear();
+    input_smart.sourceCode.clear();
+
+    decltype(auto) smart_origin = locked_ref(this->smart_origin);
+    auto it = smart_origin->find(smart_addr);
+    if (it != smart_origin->end())
+      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+    else {
+      SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+      return;
+    }
+  }
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
     auto smart_state(locked_ref(this->smart_state));
     return (*smart_state)[smart_addr];
   }();
 
-  std::string contract_state;
-
   work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
     contract_state_entry.get_position();
     return true;
   });
 
+  std::string contract_state;
   if (!deploy) {
     contract_state_entry.wait_till_front([&](std::string& state) {
-      auto res = !state.empty();
-      if (res)
+      auto ret = !state.empty();
+      if (ret)
         contract_state = state;
-      return res;
+      return ret;
     });
   }
 
-  bool trxn_sent = false;
-  auto sg = scopeGuard([&]() {
-    if (!trxn_sent) {
-      auto fun = [&]() -> decltype(auto) { return std::move(contract_state); };
-      contract_state_entry.update_state(fun);
-    }
-  });
-
-  Address pk_source;
-  csdb::Address res_addr;
-  WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(transaction.source.data());
-  if (transaction.source.size() == PUBLIC_KEY_LENGTH)
-    pk_source = transaction.source;
-  else if (s_blockchain.findAddrByWalletId(id, res_addr))
-    pk_source = res_addr.to_api_addr();
-  else {
+  auto pk_source = send_transaction.source();
+  if (!convertAddrToPublicKey(pk_source)) {
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
 
   executor::APIResponse api_resp;
-  execute_byte_code(api_resp, pk_source, bytecode, contract_state, input_smart.method, input_smart.params);
+  const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
+  execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.code) {
-    _return.status.code = api_resp.code;
-    _return.status.message = api_resp.message;
+    _return.status.code     = api_resp.code;
+    _return.status.message  = api_resp.message;
+    contract_state_entry.update_state([&]()->decltype(auto) { return std::move(contract_state); });
     return;
   }
 
-  if ((_return.__isset.smart_contract_result = api_resp.__isset.ret_val)) // non-bug = instead of ==
+  if (_return.__isset.smart_contract_result = api_resp.__isset.ret_val)
     _return.smart_contract_result = api_resp.ret_val;
 
-  if (amnesia) {
+  /*if (input_smart.forgetNewState) {
+    contract_state_entry.update_state([&]()->decltype(auto) { return std::move(contract_state); });
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
-  }
+  }*/
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract).c_str());
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState.c_str());
   solver.send_wallet_transaction(send_transaction);
-
-  trxn_sent = true;
 
   if (deploy)
     contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
@@ -880,12 +851,16 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     auto address = tr.target();
 
     //convert to public key
-    if (address.is_wallet_id()) {
+    /*if (address.is_wallet_id()) {
       WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(address.to_api_addr().data());
       if (!s_blockchain.findAddrByWalletId(id, address))
         return false;
-    }
+    }*/
     //
+    if (!convertAddrToPublicKey(address)) {
+      LOG_ERROR("Public key of wallet not found by walletId");
+      return false;
+    }
 
     if (!init) {
       auto& e = [&]() -> decltype(auto) {
@@ -913,14 +888,20 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         (*smart_origin)[address] = tr.id();
       }
       {
-        csdb::Address pk_addr;
+        /*csdb::Address pk_addr;
         if (tr.source().is_public_key())
           pk_addr = tr.source();
         else {
           WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(tr.source().to_api_addr().data());
           if (!s_blockchain.findAddrByWalletId(id, pk_addr))
             return false;
+        }*/
+        csdb::Address pk_addr = tr.source();
+        if (!convertAddrToPublicKey(pk_addr)) {
+          LOG_ERROR("Public key of wallet not found by walletId");
+          return false;
         }
+
         auto deployed_by_creator = locked_ref(this->deployed_by_creator);
         (*deployed_by_creator)[pk_addr].push_back(tr.id());
 
@@ -1144,6 +1125,15 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
     s_blockchain
       .wait_for_block(csdb::PoolHash::from_binary(toByteArray(obsolete)))
       .to_binary());
+}
+
+bool APIHandler::convertAddrToPublicKey(const csdb::Address &addr) {
+  if (addr.is_wallet_id()) {
+    WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(addr).to_api_addr().data());
+    if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(addr)))
+      return false;
+  }
+  return true;
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t> & v) {

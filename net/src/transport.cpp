@@ -557,8 +557,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getVector(data, size, firstPack.getSender());
   case MsgTypes::ConsMatrix:
     return node_->getMatrix(data, size, firstPack.getSender());
-  case MsgTypes::NewBlock:
-    return node_->getBlock(data, size, firstPack.getSender());
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockRequest:

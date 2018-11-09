@@ -220,7 +220,7 @@ namespace slv2
                 LOG_NOTICE("SolverCore: current block is ready to repeat, do it");
                 LOG_NOTICE("SolverCore: sending block #" << block_pool.sequence() << " of " << block_pool.transactions_count() << " transactions");
             }
-            pnode->sendBlock(block_pool);
+//            pnode->sendBlock(block_pool);
         }
         else {
             // load block and send it
@@ -233,7 +233,7 @@ namespace slv2
                 if(Consensus::Log) {
                     LOG_NOTICE("SolverCore: sending block #" << p.sequence() << " of " << p.transactions_count() << " transactions");
                 }
-                pnode->sendBlock(p);
+//                pnode->sendBlock(p);
             }
         }
     }
@@ -255,12 +255,12 @@ namespace slv2
         // finalize
         // see Solver-1, prepareBlockForSend() method
         p.set_sequence((bc.getLastWrittenSequence()) + 1);
-        p.sign(private_key);
+//        p.sign(private_key);
 
         if(Consensus::Log) {
             LOG_NOTICE("SolverCore: store & send block #" << p.sequence() << ", " << p.transactions_count() << " transactions");
         }
-        pnode->sendBlock(p);
+//        pnode->sendBlock(p);
         bc.writeNewBlock(p);
         bc.setGlobalSequence(static_cast<uint32_t>(p.sequence()));
     }
