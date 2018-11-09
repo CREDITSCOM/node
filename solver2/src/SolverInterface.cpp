@@ -292,7 +292,7 @@ namespace slv2
         if(Consensus::Log) {
             LOG_DEBUG("SolverCore: gotHash()");
         }
-
+        LOG_EVENT("SolverCore: got hash");
         const auto& tmp = csdb::PoolHash::from_string(hash_string).to_binary();
         cs::Hash hash;
         std::copy(tmp.cbegin(), tmp.cend(), hash.begin());

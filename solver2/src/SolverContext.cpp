@@ -108,7 +108,7 @@ namespace slv2
             }
             return;
         }
-        core.pnode->initNextRound(*core.trusted_candidates.cbegin(), std::move(core.trusted_candidates));
+        core.pnode->initNextRound(std::move(core.trusted_candidates));
     }
 
     csdb::Address SolverContext::optimize(const csdb::Address& address) const

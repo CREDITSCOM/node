@@ -1410,7 +1410,7 @@ void Node::processTimer() {
   cs::Conveyer::instance().flushTransactions();
 }
 
-void Node::initNextRound(const cs::PublicKey& mainNode, std::vector<cs::PublicKey>&& confidantNodes)
+void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
 {
     // copied from Solver::gotHash():
     cs::Hashes hashes;
@@ -1427,7 +1427,7 @@ void Node::initNextRound(const cs::PublicKey& mainNode, std::vector<cs::PublicKe
     cs::RoundTable table;
     table.round = ++round;
     table.confidants = std::move(confidantNodes);
-    table.general = mainNode;
+    //table.general = mainNode;
     table.hashes = std::move(hashes);
 
     conveyer.setRound(std::move(table));
@@ -2407,10 +2407,12 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
     hashes.push_back(hash);
   }
 
-  roundTable.general = std::move(general);
+//  roundTable.general = std::move(general);
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
 
+
+  ///////////////////////////////////// Round table received , parcing char func
   cs::PublicKey writerPublicKey;
   istream_ >> writerPublicKey;  
 
@@ -2421,7 +2423,7 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
   std::size_t charFuncSize = 0;
   istream_ >> charFuncSize;
 
-  if (!conveyer.isSyncCompleted(round)) {
+  if (!conveyer.isSyncCompleted(rNum)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
@@ -2436,7 +2438,7 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
     return;
   }
 
-  cs::DataStream stream(istream_.getCurrPtr(), istream_.getCurrPtr() + charFuncSize);
+  cs::DataStream stream((char*)istream_.getCurrPtr(), charFuncSize);
 
   std::string time;
   cs::Bytes characteristicMask;
@@ -2495,10 +2497,10 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
   characteristic.mask = std::move(characteristicMask);
 
   assert(sequence <= this->getRoundNumber());
-
-  onRoundStart(roundTable);
-  onRoundStartConveyer(std::move(roundTable));
-  solver_->gotRound();
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+  //onRoundStart(roundTable);
+  //onRoundStartConveyer(std::move(roundTable));
+  //solver_->gotRound();
 
   conveyer.setCharacteristic(characteristic);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
@@ -2512,8 +2514,6 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
 
       addPoolMetaToMap(std::move(meta), sequence);
     }
-
-    return;
   }
 
   if (pool) {
@@ -2530,39 +2530,14 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
       cswarning() << "NODE> remove wallets from wallets cache";
       getBlockChain().removeWalletsInPoolFromCache(pool.value());
     }
+   }
 
 
 
-
-
-  uint8_t confSize = 0;
-  int tempVar = 0;
-  csdb::Pool poolToVerify;
-  csdb::Pool newPool;
-  std::vector <cs::StageThree> stageThreeStorage;
-
-
-
-  istream_ >> confSize;
-
-  LOG_DEBUG("Conf size = " << (int)confSize);
-  if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
-    LOG_WARN("Bad confidants number");
-    return;
+  for (int i = 0; i < roundTable.confidants.size(); i++) {
+    std::cout << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size()) << std::endl;
   }
-  roundNum_ = roundNum;
-  std::vector<cs::PublicKey> confidants;
-  confidants.reserve(confSize);
-
-  for (int i = 0; i < confSize; i++) {
-    confidants.push_back(cs::PublicKey());
-    istream_ >> confidants.back();
-  }
-
-  for (int i = 0; i < confSize; i++) {
-    std::cout << i << ". " << cs::Utils::byteStreamToHex(confidants.at(i).data(), confidants.at(i).size()) << std::endl;
-  }
-  uint8_t stageThreeNumber = 0;
+ /* uint8_t stageThreeNumber = 0;
   istream_ >> stageThreeNumber;
   std::vector<cs::StageThree> stageThreeIncoming;
   stageThreeIncoming.reserve(stageThreeNumber);
@@ -2571,41 +2546,41 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
   for (int i = 0; i < stageThreeNumber; i++) {
     istream_ >> tempStage;
     stageThreeIncoming.push_back(tempStage);
-  }
-#ifdef MYLOG
-  std::cout << "--------------------------------------------------------------------------------------" << std::endl;
-  std::cout << (int)stageThreeNumber << " : ";
-  for (int i = 0; i < stageThreeNumber; i++) {
-    std::cout << (int)stageThreeIncoming.at(i).sender;
-  }
-  std::cout << std::endl << "--------------------------------------------------------------------------------------" << std::endl;
-#endif
-
-  istream_ >> newPool >> poolToVerify;
-
-  if (!istream_.good()) {
-    LOG_ERROR("Node: packet with round info is corrupted");
-    //TODO: decide what to do
-  }
-#ifdef MYLOG
-  uint32_t bSize;
-  const char* bl = poolToVerify.to_byte_stream(bSize);
-  std::cout << "GET> PoolToVerify: " << poolToVerify.sequence() << ", tr_amount =" << poolToVerify.transactions_count() << ", " << ", " << byteStreamToHex(bl, bSize) << std::endl;
-  const char* b2 = newPool.to_byte_stream(bSize);
-  std::cout << "newPool: " << newPool.sequence() << ", " << byteStreamToHex(b2, bSize) << std::endl << std::endl;
-#endif
-  passBlockToSolver(newPool, sender);
-
-  getBlockChain().setGlobalSequence(newPool.sequence());
-  transport_->clearTasks();
+  }*/
+//#ifdef MYLOG
+//  std::cout << "--------------------------------------------------------------------------------------" << std::endl;
+//  std::cout << (int)stageThreeNumber << " : ";
+//  for (int i = 0; i < stageThreeNumber; i++) {
+//    std::cout << (int)stageThreeIncoming.at(i).sender;
+//  }
+//  std::cout << std::endl << "--------------------------------------------------------------------------------------" << std::endl;
+//#endif
+//
+//  istream_ >> newPool >> poolToVerify;
+//
+//  if (!istream_.good()) {
+//    LOG_ERROR("Node: packet with round info is corrupted");
+//    //TODO: decide what to do
+//  }
+//#ifdef MYLOG
+//  uint32_t bSize;
+//  const char* bl = poolToVerify.to_byte_stream(bSize);
+//  std::cout << "GET> PoolToVerify: " << poolToVerify.sequence() << ", tr_amount =" << poolToVerify.transactions_count() << ", " << ", " << byteStreamToHex(bl, bSize) << std::endl;
+//  const char* b2 = newPool.to_byte_stream(bSize);
+//  std::cout << "newPool: " << newPool.sequence() << ", " << byteStreamToHex(b2, bSize) << std::endl << std::endl;
+//#endif
+//  passBlockToSolver(newPool, sender);
+//
+//  getBlockChain().setGlobalSequence(newPool.sequence());
+//  transport_->clearTasks();
 
   //TODO: обновить таблицу раунда в cs::Conveyer::instance()
   // std::swap(confidants, cs::Conveyer::instance().roundTable().confidants);
-  assert(false);
+  /*assert(false);*/
 
-  onRoundStart_V3();
+ /* onRoundStart_V3();*/
   // let solver to decide what to do: if (getMyLevel() == NodeLevel::Confidant) {
-  solver_->gotTransactionList_V3(std::move(poolToVerify));
+  //solver_->gotTransactionList_V3(std::move(poolToVerify));
   //}
 }
 
@@ -2770,9 +2745,11 @@ void Node::sendHash_V3() {
      LOG_ERROR("Writer and Main node shouldn't send hashes");
      return;
    }*/
+
   const auto& tmp = getBlockChain().getLastWrittenHash().to_binary();
   cs::Hash testHash;
   std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
+  LOG_NOTICE("NODE: Sending hash of " << cs::Utils::byteStreamToHex(testHash.data(), testHash.size()) << " to ALL");
   LOG_WARN("Sending hash of " << cs::Utils::byteStreamToHex(testHash.data(), testHash.size()) << " to ALL");
 
   ostream_.init(BaseFlags::Broadcast);

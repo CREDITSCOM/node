@@ -168,7 +168,7 @@ void Solver::runConsensus() {
   m_receivedVectorFrom[m_node->getConfidantNumber()] = true;
 
   m_generals->addVector(m_hashVector);
-  m_node->sendVector(m_hashVector);
+  m_node->sendVector(m_hashVector);//send stage one
 
   trustedCounterVector++;
 
