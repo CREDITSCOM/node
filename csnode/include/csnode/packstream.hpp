@@ -104,6 +104,11 @@ public:
       entity.push_back(element);
     }
 
+    if (entity.size() != size) {
+      cserror() << "Pack stream -> vector parsing failed";
+      return *this;
+    }
+
     vector = std::move(entity);
 
     return *this;

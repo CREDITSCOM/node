@@ -677,26 +677,18 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Signature signature;
   istream_ >> signature;
 
-  std::size_t notificationsSize;
-  istream_ >> notificationsSize;
+  cs::Notifications notifications;
+  istream_ >> notifications;
 
-  if (notificationsSize == 0) {
-    cserror() << "NODE> Get characteristic: notifications count is zero";
-  }
-
-  for (std::size_t i = 0; i < notificationsSize; ++i) {
-    cs::Bytes notification;
-    istream_ >> notification;
-
-    conveyer.addNotification(notification);
+  for (std::size_t i = 0; i < notifications.size(); ++i) {
+    conveyer.addNotification(notifications[i]);
   }
 
   std::vector<cs::Hash> confidantsHashes;
 
   for (const auto& notification : conveyer.notifications()) {
     cs::Hash hash;
-    cs::IPackStream notificationStream;
-    notificationStream.init(notification.data(), notification.size());
+    cs::DataStream notificationStream(notification.data(), notification.size());
 
     notificationStream >> hash;
 
@@ -796,14 +788,17 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
-  if (!isCorrectNotification(data, size)) {
+  istream_.init(data, size);
+
+  cs::Bytes notification;
+  istream_ >> notification;
+
+  if (!isCorrectNotification(notification.data(), notification.size())) {
     cswarning() << "NODE> Notification failed " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     return;
   }
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  cs::Bytes notification(data, data + size);
   conveyer.addNotification(notification);
 
   if (conveyer.isEnoughNotifications(cs::Conveyer::NotificationState::Equal) && myLevel_ == NodeLevel::Writer) {
@@ -855,10 +850,10 @@ void Node::applyNotifications() {
 }
 
 bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
-  istream_.init(data, size);
+  cs::DataStream stream(data, size);
 
   cs::Hash characteristicHash;
-  istream_ >> characteristicHash;
+  stream >> characteristicHash;
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::Hash currentCharacteristicHash = conveyer.characteristicHash();
@@ -871,7 +866,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   }
 
   cs::PublicKey writerPublicKey;
-  istream_ >> writerPublicKey;
+  stream >> writerPublicKey;
 
   if (writerPublicKey != nodeIdKey_) {
     csdebug() << "NODE> Writer public key equals failed";
@@ -879,10 +874,10 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   }
 
   cs::Signature signature;
-  istream_ >> signature;
+  stream >> signature;
 
   cs::PublicKey publicKey;
-  istream_ >> publicKey;
+  stream >> publicKey;
 
   std::size_t messageSize = size - signature.size() - publicKey.size();
 
@@ -908,11 +903,8 @@ void Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo,
   ostream_ << characteristic.mask;
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
-  ostream_ << notifications.size();
 
-  for (const auto& notification : notifications) {
-    ostream_ << notification;
-  }
+  ostream_ << notifications;
 
   ostream_ << solver_->getPublicKey();
 }
@@ -939,10 +931,6 @@ cs::Bytes Node::createNotification(const cs::PublicKey& writerPublicKey) {
   stream << characteristicHash << writerPublicKey;
 
   cs::Signature signature = cs::Utils::sign(bytes.data(), bytes.size(), solver_->getPrivateKey());
-
-  if (cs::Utils::verifySignature(signature, solver_->getPublicKey(), bytes.data(), bytes.size())) {
-    cslog() << "NODE: Verfication is OKAY";
-  }
 
   stream << signature;
   stream << solver_->getPublicKey();
