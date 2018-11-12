@@ -111,7 +111,7 @@ void APIHandler::state_updater_work_function()
 	{
 		std::stringstream ss;
 		ss << "error [" << ex.what() <<"] in file'" << __FILE__ << "' line'" << __LINE__ << "'";
-		cserror() << ex.what();
+		cserror() << ss.str().c_str();
 	}
 	catch(...)
 	{
