@@ -85,20 +85,20 @@ namespace slv2
         default:
             break;
         }
-        LOG_ERROR("SolverCore: unknown NodelLevel value " << static_cast<int>(v) << " was returned by Node");
+        LOG_ERROR("SolverCore: unknown NodeLevel value " << static_cast<int>(v) << " was returned by Node");
         //TODO: how to handle "unknown" node level value?
         return Role::Normal;
     }
 
     void SolverContext::spawn_next_round()
     {
-        LOG_NOTICE("SolverCore: spawn nex round 0");
+        LOG_NOTICE("SolverCore: spawn next round 0");
         if(Consensus::Log) {
             if(core.trusted_candidates.empty()) {
                 LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
             }
         }
-        LOG_NOTICE("New confidantNodes: ");
+        LOG_NOTICE("New confidant nodes: ");
         int i = 0;
         for (auto& it : core.trusted_candidates) {
           cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
