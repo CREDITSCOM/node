@@ -7,6 +7,7 @@
 #include <csnode/nodecore.h>
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
+#include <csnode/datastream.h>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -917,26 +918,33 @@ void Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo,
 }
 
 void Node::sendWriterNotification() {
-  createNotification();
+  cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
+
+  ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented, writerPublicKey);
+  ostream_ << MsgTypes::WriterNotification;
+  ostream_ << roundNum_;
+
+  ostream_ << createNotification(writerPublicKey);
 
   cslog() << "NODE> Notification sent to writer";
 
   flushCurrentTasks();
 }
 
-void Node::createNotification() {
+cs::Bytes Node::createNotification(const cs::PublicKey& writerPublicKey) {
   cs::Hash characteristicHash = cs::Conveyer::instance().characteristicHash();
-  cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
 
-  ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented, writerPublicKey);
-  ostream_ << MsgTypes::WriterNotification;
-  ostream_ << roundNum_;
-  ostream_  << characteristicHash << writerPublicKey;
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
 
-  cs::Signature signature = cs::Utils::sign(ostream_.getCurrentPtr(), ostream_.getCurrentSize(), solver_->getPrivateKey());
+  stream << characteristicHash << writerPublicKey;
 
-  ostream_ << signature;
-  ostream_ << solver_->getPublicKey();
+  cs::Signature signature = cs::Utils::sign(bytes.data(), bytes.size(), solver_->getPrivateKey());
+
+  stream << signature;
+  stream << solver_->getPublicKey();
+
+  return bytes;
 }
 
 void Node::sendHash(const csdb::PoolHash& hash, const cs::PublicKey& target) {

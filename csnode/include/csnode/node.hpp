@@ -60,7 +60,7 @@ public:
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
 
-  void createNotification();
+  cs::Bytes createNotification(const cs::PublicKey& writerPublicKey);
   void createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                                         const cs::Signature& signature, const cs::Notifications& notifications);
 
