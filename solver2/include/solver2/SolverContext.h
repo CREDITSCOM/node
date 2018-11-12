@@ -668,18 +668,7 @@ namespace slv2
          * @return  True if it succeeds, false if it fails.
          */
 
-        bool transaction_still_in_pool(int64_t inner_id) const
-        {
-            if(core.trans_pool.transactions_count() == 0) {
-                return false;
-            }
-            for(const auto& t : core.trans_pool.transactions()) {
-                if(t.innerID() == inner_id) {
-                    return true;
-                }
-            }
-            return false;
-        }
+        bool transaction_still_in_pool(int64_t inner_id) const;
 
     private:
 

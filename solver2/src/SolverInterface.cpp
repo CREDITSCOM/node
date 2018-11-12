@@ -587,15 +587,7 @@ namespace slv2
             pslv_v1->send_wallet_transaction(tr);
             return;
         }
-
-        // thread-safe with flushTransactions(), suppose to receive calls from network-related threads
-        std::lock_guard<std::mutex> l(trans_mtx);
-        //TODO: such a way transactions added in solver-1, ask author about it
-        trans_pool.transactions().push_back(tr);
-        trans_pool.recount();
-        if(Consensus::Log) {
-            LOG_DEBUG("SolverCore: transaction " << tr.innerID() << " added, total " << trans_pool.transactions_count());
-        }
+        cs::Conveyer::instance().addTransaction(tr);
     }
 
     csdb::Pool::sequence_t SolverCore::getNextMissingBlock(const uint32_t starting_after) const

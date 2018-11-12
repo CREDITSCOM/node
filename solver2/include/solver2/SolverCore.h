@@ -73,7 +73,7 @@ namespace slv2
         {
             return private_key;
         }
-        //TODO: requires revision a.s.a.p.
+        //TODO: requires revision
         const cs::PublicKey& getWriterPublicKey() const;
 
         void addInitialBalance();
@@ -150,19 +150,11 @@ namespace slv2
         void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const
         {}
 #if 0 // added with conveyer
-        void setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey);
-        void runSpammer();
-        void gotRound();
         bool getIPoolClosed();
-        void gotHash(csdb::PoolHash&&, const cs::PublicKey&);
-        const cs::PrivateKey& getPrivateKey() const;
-        const cs::PublicKey& getPublicKey() const;
-        cs::PublicKey getWriterPublicKey() const;
         bool getBigBangStatus();
         bool isPoolClosed() const;
         NodeLevel nodeLevel() const;
         const cs::PublicKey& nodePublicKey() const;
-        void countFeesInPool(csdb::Pool* pool);
 #endif // 0
     private:
 
@@ -236,12 +228,9 @@ namespace slv2
         std::unique_ptr<cs::Fee> pfee;
         // senders of hashes received this round
         std::vector<cs::PublicKey> recv_hash;
-        std::mutex trans_mtx;
         // pool for storing individual transactions from wallets and candidates for transaction list,
-        // accumulates transactions until sent in write state
-        csdb::Pool trans_pool {};
         // good transactions storage, serve as source for new block
-        csdb::Pool accepted_pool {};
+        csdb::Pool  accepted_pool {};
         // to store outrunning blocks until the time to insert them comes
         // stores pairs of <block, sender> sorted by sequence number
         std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool, cs::PublicKey>> outrunning_blocks;

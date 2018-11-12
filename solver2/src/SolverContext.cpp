@@ -168,4 +168,19 @@ namespace slv2
         core.pfee->CountFeesInPool(blockchain(), &p);
     }
 
+    bool SolverContext::transaction_still_in_pool(int64_t inner_id) const
+    {
+        cs::Lock lock(cs::Conveyer::instance().sharedMutex());
+
+        const auto& block = cs::Conveyer::instance().transactionsBlock();
+        for(const auto& packet: block) {
+            for(const auto& tr : packet.transactions()) {
+                if(tr.innerID() == inner_id) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 } // slv2
