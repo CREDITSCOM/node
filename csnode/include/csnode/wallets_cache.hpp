@@ -75,12 +75,10 @@ namespace Credits
 #endif
         };
 
-#ifdef MONITOR_NODE
         struct WriterData {
           uint64_t times = 0;
           csdb::Amount totalFee;
         };
-#endif
 
     public:
         static void convert(const csdb::PoolHash& poolHashDb, PoolHash& poolHashCache);
@@ -94,7 +92,10 @@ namespace Credits
 
         const WalletData* findWallet(const csdb::internal::byte_array&& dbAddress) const;
         void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
+
+#ifdef MONITOR_NODE
         void iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)>);
+#endif
 
     private:
         enum class Mode : uint8_t

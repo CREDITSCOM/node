@@ -384,10 +384,12 @@ void BlockChain::iterateOverWallets(const std::function<bool(const Credits::Wall
   walletsCache_->iterateOverWallets(func);
 }
 
+#ifdef MONITOR_NODE
 void BlockChain::iterateOverWriters(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WriterData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   walletsCache_->iterateOverWriters(func);
 }
+#endif
 
 csdb::PoolHash
 BlockChain::getLastHash() const

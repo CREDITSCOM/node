@@ -236,12 +236,14 @@ void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData:
   }
 }
 
+#ifdef MONITOR_NODE
 void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)> func) {
   for (const auto& wrd : writers_) {
     if (!func(wrd.first, wrd.second))
       break;
   }
 }
+#endif
 
 namespace
 {

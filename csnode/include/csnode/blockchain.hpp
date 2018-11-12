@@ -76,7 +76,9 @@ public:
   const csdb::Storage & getStorage() const;
 
   void iterateOverWallets(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WalletData&)>);
+#ifdef MONITOR_NODE
   void iterateOverWriters(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WriterData&)>);
+#endif
 
 private:
   Headtag ht;
