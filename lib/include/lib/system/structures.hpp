@@ -3,7 +3,6 @@
 #define __STRUCTURES_HPP__
 #include <cstdint>
 #include <cstring>
-#include <cstdlib>
 #include <cstring>
 #include <functional>
 

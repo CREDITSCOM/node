@@ -7,7 +7,6 @@
 #ifndef _CREDITS_CSDB_AMOUNT_COMMISSION_H_INCLUDED_
 #define _CREDITS_CSDB_AMOUNT_COMMISSION_H_INCLUDED_
 
-#include <cinttypes>
 #include <type_traits>
 #include <cmath>
 

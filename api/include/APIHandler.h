@@ -237,7 +237,7 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
         // TRACE("");
         processor_.ss.occupy();
         // TRACE("");
-        auto deleter = [](api::custom::APIProcessor* p) {
+        const auto deleter = [](api::custom::APIProcessor* p) {
             // TRACE("");
             p->ss.leave();
             // TRACE("");
@@ -264,8 +264,8 @@ deserialize(std::string&& s)
     CHAR_BIT == 8 && std::is_same<std::uint8_t, unsigned char>::value,
     "This code requires std::uint8_t to be implemented as unsigned char.");
 
-  auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>(
-    reinterpret_cast<uint8_t*>(&(s[0])), (uint32_t)s.size());
+  const auto buffer = thrift::stdcxx::make_shared<thrift::transport::TMemoryBuffer>(
+    reinterpret_cast<uint8_t*>(&(s[0])), static_cast<uint32_t>(s.size()));
   thrift::protocol::TBinaryProtocol proto(buffer);
   T sc;
   sc.read(&proto);

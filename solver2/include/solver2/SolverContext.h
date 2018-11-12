@@ -1,10 +1,8 @@
 #pragma once
 
-#include "INodeState.h"
 #include "SolverCore.h"
 
 #include <csdb/pool.h>
-#include <lib/system/keys.hpp>
 
 class CallsQueueScheduler;
 class Node;

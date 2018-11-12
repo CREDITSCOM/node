@@ -1,10 +1,8 @@
 #include "SolverCore.h"
 #include "Consensus.h"
-#include "Node.h"
 #include "SolverCompat.h"
 #include "Generals.h"
 #include <solver/Fee.h>
-#include <csdb/currency.h>
 #include <lib/system/logger.hpp>
 
 namespace slv2

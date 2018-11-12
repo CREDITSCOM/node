@@ -9,6 +9,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <map>
 
 #define NO_STATS_TEST
 #define NO_FAST_UPDATE

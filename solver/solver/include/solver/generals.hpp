@@ -4,18 +4,9 @@
 #ifndef GENERALS_HPP
 #define GENERALS_HPP
 
-#include <blake2-impl.h>
-#include <blake2.h>
-#include <map>
-
-#include <string>
 #include <vector>
 
-#include <csdb/csdb.h>
-#include <csdb/pool.h>
-
 #include <csnode/node.hpp>
-#include <lib/system/keys.hpp>
 #include <solver/TransactionsValidator.h>
 
 namespace cs {

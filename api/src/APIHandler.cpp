@@ -159,8 +159,7 @@ APIHandlerBase::SetResponseStatus(APIResponse& response, bool commandWasHandled)
 void
 APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
 {
-  csdb::Address addr;
-  addr = BlockChain::getAddressFromKey(address);
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
   BlockChain::WalletData wallData{};
   BlockChain::WalletId wallId{};
@@ -181,7 +180,7 @@ APIHandler::WalletDataGet(WalletDataGetResult& _return, const Address& address)
 
 void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const Address& address)
 {
-    csdb::Address addr = BlockChain::getAddressFromKey(address);
+    const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
@@ -198,7 +197,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const Address& add
 
 void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const Address& address)
 {
-    csdb::Address addr = BlockChain::getAddressFromKey(address);
+	const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
@@ -216,7 +215,7 @@ void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResul
 
 void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const Address& address)
 {
-    csdb::Address addr = BlockChain::getAddressFromKey(address);
+	const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
@@ -289,7 +288,7 @@ api::SealedTransaction
 APIHandler::convertTransaction(const csdb::Transaction& transaction)
 {
   api::SealedTransaction result;
-  csdb::Amount amount = transaction.amount();
+  const csdb::Amount amount = transaction.amount();
   csdb::Currency currency = transaction.currency();
 
   csdb::Address address = transaction.source();
@@ -336,7 +335,7 @@ APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactio
   std::vector<api::SealedTransaction> result;
   // reserve vs resize
   result.resize(transactions.size());
-  auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
+  const auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
   std::transform(transactions.begin(),
                  transactions.end(),
                  result.begin(),
@@ -409,8 +408,8 @@ void
 APIHandler::TransactionGet(TransactionGetResult& _return,
                            const TransactionId& transactionId)
 {
-  csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
-  csdb::TransactionID tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+  const csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
+  const csdb::TransactionID tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
   csdb::Transaction transaction = s_blockchain.loadTransaction(tmpTransactionId);
 
   _return.found = transaction.is_valid();
@@ -426,14 +425,13 @@ APIHandler::TransactionsGet(TransactionsGetResult& _return,
                             const int64_t _offset,
                             const int64_t limit)
 {
-  csdb::Address addr;
-  addr = BlockChain::getAddressFromKey(address);
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
   BlockChain::Transactions transactions;
 
   if (limit > 0)
   {
-      int64_t offset = (_offset < 0) ? 0 : _offset;
+	  const int64_t offset = (_offset < 0) ? 0 : _offset;
       s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
   }
 
@@ -454,7 +452,7 @@ fetch_smart_body(const csdb::Transaction& tr)
   if (!tr.is_valid()) {
     return res;
   }
-  auto sci = deserialize<api::SmartContractInvocation>(
+  const auto sci = deserialize<api::SmartContractInvocation>(
     tr.user_field(0).value<std::string>());
   res.byteCode = sci.byteCode;
   res.sourceCode = sci.sourceCode;
@@ -506,9 +504,9 @@ APIHandler::make_transaction(const Transaction& transaction)
 {
   csdb::Transaction send_transaction;
 
-  auto source = BlockChain::getAddressFromKey(transaction.source);
+  const auto source = BlockChain::getAddressFromKey(transaction.source);
 
-  const uint64_t WALLET_DENOM = 1'000'000'000'000'000'000ull;
+  const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;// 1'000'000'000'000'000'000ull;
 
   send_transaction.set_amount(csdb::Amount(
     transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
@@ -565,12 +563,12 @@ void APIHandler::execute_byte_code(executor::APIResponse& resp,
   executor->executeByteCode(resp, address, code, state, method, params);
 }
 void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId &transactionId) {
-  auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
-  auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+  const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
+  const auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
   auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
-  auto smart = fetch_smart_body(transaction);
-  auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
-  auto api_addr = transaction.source().to_api_addr();
+  const auto smart = fetch_smart_body(transaction);
+  const auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
+  const auto api_addr = transaction.source().to_api_addr();
 
   executor::APIResponse api_resp;
   //name
@@ -707,7 +705,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
 
   csdb::Pool pool; // = s_blockchain->loadBlock(hash/*, lastCount*/);
 
-  uint64_t sequence = s_blockchain.getSize();
+  const uint64_t sequence = s_blockchain.getSize();
 
   const uint64_t lower =
     sequence - std::min(sequence, (uint64_t)(offset + const_limit));
@@ -734,7 +732,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t limit)
 {
-  csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
+  const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
   csdb::Pool pool = s_blockchain.loadBlock(poolHash);
 
   if (pool.is_valid())
@@ -745,7 +743,7 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
 
 void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, const int64_t index)
 {
-  csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
+  const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
   csdb::Pool pool = s_blockchain.loadBlock(poolHash);
   _return.isFound = pool.is_valid();
 
@@ -795,7 +793,7 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Ad
   }
   _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
 
-  csdb::Address adrs = BlockChain::getAddressFromKey(address);
+  const csdb::Address adrs = BlockChain::getAddressFromKey(address);
   auto smart_state(locked_ref(this->smart_state));
   _return.smartContract.objectState = (*smart_state)[adrs].get_state();
 
@@ -806,7 +804,7 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Ad
 bool
 APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 {
-  auto trace = !init;
+  const auto trace = !init;
   auto pending_smart_transactions = locked_ref(this->pending_smart_transactions);
 
   std::vector<csdb::PoolHash> new_blocks;
@@ -849,7 +847,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   if (!pending_smart_transactions->queue.empty()) {
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
-    auto smart = fetch_smart(tr);
+	const auto smart = fetch_smart(tr);
     auto address = tr.target();
 
     //convert to public key
@@ -898,7 +896,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
           if (!s_blockchain.findAddrByWalletId(id, pk_addr))
             return false;
         }*/
-        csdb::Address pk_addr = tr.source();
+        const csdb::Address pk_addr = tr.source();
         if (!convertAddrToPublicKey(pk_addr)) {
           LOG_ERROR("Public key of wallet not found by walletId");
           return false;
@@ -1017,14 +1015,14 @@ void APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper
 void
 APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const api::Address& deployer)
 {
-  csdb::Address addr = BlockChain::getAddressFromKey(deployer);
+  const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
   get_mapped_deployer_smart(addr, [](const api::SmartContract& smart) { return smart; }, _return.smartContractsList);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const api::Address& deployer)
 {
-  csdb::Address addr = BlockChain::getAddressFromKey(deployer);
+  const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
   get_mapped_deployer_smart(addr,[](const SmartContract& sc) { return sc.address; }, _return.addressesList);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -1082,7 +1080,7 @@ APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const api::Addr
 
     ++entry.awaiter_num;
 
-    auto checker = [&]() {
+	const auto checker = [&]() {
       if (!entry.trid_queue.empty()) {
         _return = convert_transaction_id(entry.trid_queue.front());
         if (--entry.awaiter_num == 0) {
@@ -1131,7 +1129,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 
 bool APIHandler::convertAddrToPublicKey(const csdb::Address &addr) {
   if (addr.is_wallet_id()) {
-    WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(addr).to_api_addr().data());
+    const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address &>(addr).to_api_addr().data());
     if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address &>(addr)))
       return false;
   }
