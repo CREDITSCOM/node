@@ -192,7 +192,7 @@ namespace slv2
 
     cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::TransactionsPacket& packet)
     {
-        cslog() << "GENERALS> buildVector: " << packet.transactionsCount() << " transactions";
+        cslog() << "Trusted-1: buildVector: " << packet.transactionsCount() << " transactions";
 
         //std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
 
@@ -235,7 +235,7 @@ namespace slv2
         }
 
         if(characteristic.mask.size() != transactionsCount) {
-            cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";
+            cserror() << "Trusted-1: Build vector, characteristic mask size not equals transactions count";
         }
 
         blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
@@ -244,7 +244,7 @@ namespace slv2
         //m_newTrusted.fill(0);
         //m_hwTotal.fill(HashWeigth {});
 
-        csdebug() << "GENERALS> Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+        csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
         return hash;
     }

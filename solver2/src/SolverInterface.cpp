@@ -47,7 +47,7 @@ namespace slv2
         this->pfee->CountFeesInPool(pnode->getBlockChain(), pool);
     }
 
-    void SolverCore::gotRound()
+    void SolverCore::gotRound(const cs::RoundNumber rNum)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotRound();
@@ -57,7 +57,7 @@ namespace slv2
         // previous solver implementation calls to runConsensus method() here
         // perform similar actions, but use csdb::Pool instead of cs::TransactionsPacket
         
-        cslog() << "SolverCore: got round, start consensus";
+        cslog() << "SolverCore: got round, start consensus = " << rNum;
         csdb::Pool pool {};
         cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -453,7 +453,7 @@ namespace slv2
             cnt_trusted_desired = cnt_trusted;
         }
 
-        auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
+        auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 2;
         if(desired_seq < cur_round) {
             // empty args requests exactly what we need:
             pnode->sendBlockRequest();
@@ -466,7 +466,7 @@ namespace slv2
         if(1 == cur_round) {
             scheduler.InsertOnce(Consensus::T_round, [this]() {
                 pnode->sendHash_V3();
-                gotTransactionList_V3(std::move(csdb::Pool{}));
+                //gotTransactionList_V3(std::move(csdb::Pool{}));
             });
         }
         //TODO: not good solution, to reproduce solver-1 logic only:
@@ -474,7 +474,7 @@ namespace slv2
             scheduler.InsertOnce(Consensus::T_coll_trans, [this]() {
                 csdb::Pool tmp {};
                 tmp.set_sequence(cur_round - 1);
-                gotTransactionList_V3(std::move(tmp));
+                //gotTransactionList_V3(std::move(tmp));
             });
         }
     }

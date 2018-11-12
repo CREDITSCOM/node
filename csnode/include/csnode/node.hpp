@@ -70,6 +70,7 @@ public:
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
   void sendHash_V3();
+  void writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   const cs::ConfidantsKeys confidants() const
   {
@@ -160,7 +161,7 @@ public:
   void becomeWriter();
   void initNextRound( std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
-
+  void onRoundStart(const cs::RoundTable& roundTable);
   bool getSyncroStarted();
 
   enum MessageActions {
@@ -206,7 +207,7 @@ public:
 
 public slots:
   void processTimer();
-  void onRoundStart(const cs::RoundTable& roundTable);
+
 private:
   bool init();
 

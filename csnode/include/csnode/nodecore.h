@@ -29,7 +29,7 @@ const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
 const std::size_t ROUND_DELAY = 1000;                   // ms
 #endif
 
-const std::size_t TIME_TO_AWAIT_SS_ROUND = 5000;        // ms
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 50;        // ms
 
 namespace std
 {
