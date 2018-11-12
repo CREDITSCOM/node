@@ -64,7 +64,7 @@ namespace slv2
         void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
         void runSpammer();
         void countFeesInPool(csdb::Pool* pool);
-        void gotRound();
+        void gotRound(const cs::RoundNumber rNum);
         void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
         const cs::PublicKey& getPublicKey() const
         {

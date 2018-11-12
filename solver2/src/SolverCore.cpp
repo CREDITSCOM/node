@@ -279,7 +279,7 @@ namespace slv2
           table.hashes = std::move(hashes);
           conveyer.setRound(std::move(table));
           pnode->sendRoundInfo_(conveyer.roundTable());
-          pnode->onRoundStart(conveyer.roundTable());
+          //pnode->onRoundStart(conveyer.roundTable());
 
         // see Solver-1, writeNewBlock() method
         //accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
