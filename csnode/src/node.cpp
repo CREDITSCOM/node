@@ -812,15 +812,15 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
     this->getBlockChain().putBlock(newPool);
 
-    //if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
-    //  auto poolHash = this->getBlockChain().getLastWrittenHash();
-    //  sendHash(poolHash, sender);
+    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
+      auto poolHash = this->getBlockChain().getLastWrittenHash();
+      sendHash(poolHash, sender);
 
-    //  cslog() << "SENDING HASH to writer: " << poolHash.to_string();
-    //}
-    //else {
-    //  cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
-    //}
+      cslog() << "SENDING HASH to writer: " << poolHash.to_string();
+    }
+    else {
+      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
+    }
   }
   else {
     cswarning() << "NODE> Can not write block with sequence " << sequence;
