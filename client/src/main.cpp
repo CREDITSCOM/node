@@ -53,7 +53,7 @@ inline void mouseSelectionDisable() {
 }
 
 #ifndef WIN32
-extern "C" static void sigHandler(int sig) {
+extern "C" void sigHandler(int sig) {
   gSignalStatus = 1;
   std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
   switch (sig)
@@ -80,23 +80,23 @@ void installSignalHandler() {
   if (SIG_ERR == signal(SIGTERM, sigHandler)) {
     // Handle error
     LOG_ERROR("Error to set SIGTERM!");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGQUIT, sigHandler)) {
     LOG_ERROR("Error to set SIGQUIT!");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGINT, sigHandler)) {
     LOG_ERROR("Error to set SIGINT!");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGHUP, sigHandler)) {
     LOG_ERROR("Error to set SIGHUP!");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGBUS, sigHandler)) {
     LOG_ERROR("Error to set SIGHUP!");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
 }
 #else
