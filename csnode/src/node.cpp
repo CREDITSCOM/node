@@ -15,13 +15,9 @@
 
 #include <base58.h>
 
-#include <boost/optional.hpp>
-
-#include <lz4.h>
 #include <sodium.h>
 
 #include <snappy.h>
-#include <sodium.h>
 
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 100;

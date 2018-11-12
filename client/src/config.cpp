@@ -1,15 +1,8 @@
-#include <iostream>
+#include "stdafx.h"
 /* Send blaming letters to @yrtimd */
+#include <string>
 #include <regex>
 #include <stdexcept>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/asio.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/log/utility/setup/settings_parser.hpp>
-#include <boost/property_tree/ini_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/xml_parser.hpp>
 
 #include <lib/system/logger.hpp>
 #include <base58.h>
@@ -55,7 +48,7 @@ EndpointData EndpointData::fromString(const std::string& str) {
   static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
 
   std::smatch match;
-  EndpointData result;
+  EndpointData result { 0 };
 
   if (std::regex_match(str, match, ipv4Regex))
     result.ip = ip::make_address_v4(match[1]);
@@ -79,7 +72,7 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
 
-Config Config::read(po::variables_map& vm) {
+Config Config::read(variables_map& vm) {
   Config result = readFromFile(vm.count("config-file") ?
                                vm["config-file"].as<std::string>() :
                                DEFAULT_PATH_TO_CONFIG);
@@ -107,7 +100,7 @@ Config Config::read(po::variables_map& vm) {
     std::copy(myPublic.begin(), myPublic.end(), result.publicKey_.begin());
   }
   else {
-    srand(time(NULL));
+    srand(time(nullptr));
     for (int i = 0; i < 32; ++i) {
       *(result.publicKey_.data() + i) = (char)(rand() % 255);
     }
@@ -228,11 +221,11 @@ Config Config::readFromFile(const std::string& fileName) {
 
 void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   boost::property_tree::ptree settings;
-  auto core = config.get_child_optional("Core");
+  const auto core = config.get_child_optional("Core");
   if (core) {
     settings.add_child("Core", *core);
   }
-  auto sinks = config.get_child_optional("Sinks");
+  const auto sinks = config.get_child_optional("Sinks");
   if (sinks) {
     for (const auto& val: *sinks) {
       settings.add_child(boost::property_tree::ptree::path_type("Sinks." + val.first, '/'), val.second);

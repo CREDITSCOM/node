@@ -1,20 +1,12 @@
 #pragma once
 
-#include <list>
-#include <map>
 #include <memory>
-#include <mutex>
 #include <vector>
-
-#include <fstream>
-#include <iostream>
 #include <string>
 
 #include <boost/dynamic_bitset.hpp>
 
 #include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
 #include <csdb/pool.h>
 #include <csdb/storage.h>
 
@@ -25,7 +17,6 @@
 #include <csnode/WalletsPools.h>
 
 #include <condition_variable>
-#include <mutex>
 
 namespace cs
 {

@@ -2,8 +2,6 @@
 #ifndef __NODE_HPP__
 #define __NODE_HPP__
 
-#include <iostream>
-#include <memory>
 #include <string>
 
 #include <csstats.h>
@@ -11,8 +9,6 @@
 #include <client/config.hpp>
 
 #include <csnode/datastream.h>
-#include <csnode/dynamicbuffer.h>
-#include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>

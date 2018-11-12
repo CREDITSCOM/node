@@ -3,10 +3,7 @@
 
 #include <array>
 #include <limits>
-#include <memory>
-#include <vector>
 #include <csdb/address.h>
-#include <csdb/amount.h>
 #include <csdb/internal/types.h>
 #include <csdb/pool.h>
 #include <csnode/CyclicBuffer.hpp>

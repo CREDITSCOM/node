@@ -1,15 +1,13 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __CONFIG_HPP__
 #define __CONFIG_HPP__
-#include <string>
+
 #include <boost/asio.hpp>
-#include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
 
 #include <lib/system/keys.hpp>
 #include <lib/system/common.hpp>
 
-namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
@@ -24,6 +22,13 @@ const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 
 typedef short unsigned Port;
+namespace boost
+{
+	namespace program_options
+	{
+		class variables_map;
+	}
+}
 
 struct EndpointData {
   bool ipSpecified;
@@ -48,8 +53,9 @@ public:
   Config() {} // necessary for testing
   Config(const Config&) = default;
   Config(Config&&) = default;
+  using variables_map = boost::program_options::variables_map;
 
-  static Config read(po::variables_map&);
+  static Config read(variables_map&);
 
   const EndpointData& getInputEndpoint() const { return inputEp_; }
   const EndpointData& getOutputEndpoint() const { return outputEp_; }
