@@ -26,7 +26,9 @@ constexpr auto kPrivateKeySize = 64;
 constexpr auto kSignatureLength = 64;
 // number of wallets, which will be generated to send transactions to
 constexpr auto kTargetWalletsNum = 10;
+// spamming starts after this timeout
 constexpr auto kTimeStartSleepSec = 5;
+// increase this value to make spammer slower, otherwise decrease
 constexpr auto kSpammerSleepTimeMicrosec = 70000;
 // from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
@@ -109,6 +111,7 @@ void Spammer::FundMyWallet(Node& node) {
 
 csdb::Address Spammer::OptimizeAddress(const csdb::Address& address, Node& node) {
   csdb::internal::WalletId id;
+  // thread safety is provided by findWalletId method
   if (node.getBlockChain().findWalletId(address, id)) {
     return csdb::Address::from_wallet_id(id);
   }

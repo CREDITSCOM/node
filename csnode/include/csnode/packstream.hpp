@@ -283,6 +283,17 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
     return *this;
 }
 
+template <>
+inline IPackStream& IPackStream::operator>>(csdb::PoolHash& pool_hash)
+{
+    uint8_t len;
+    *this >> len;
+    csdb::internal::byte_array raw_bytes(ptr_, ptr_ + len);
+    pool_hash = csdb::PoolHash::from_binary(raw_bytes);
+    safeSkip<uint8_t>(len);
+    return *this;
+}
+
 #if 0 // compressed pool (opposite to Node::addCompressedPoolToPack() method) deserialization
 template <>
 inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
@@ -375,6 +386,15 @@ template <>
 inline OPackStream& OPackStream::operator<<(const cs::Bytes& bytes) {
   insertBytes((const char*)bytes.data(), bytes.size());
   return *this;
+}
+
+template <>
+inline OPackStream& OPackStream::operator<<(const csdb::PoolHash& pool_hash)
+{
+    const auto& raw_bytes = pool_hash.to_binary();
+    *this << (uint8_t) raw_bytes.size();
+    insertBytes((const char*) raw_bytes.data(), raw_bytes.size());
+    return *this;
 }
 
 #endif  // __PACKSTREAM_HPP__
