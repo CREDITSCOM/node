@@ -92,10 +92,17 @@ namespace slv2
 
     void SolverContext::spawn_next_round()
     {
+        LOG_NOTICE("SolverCore: spawn nex round 0");
         if(Consensus::Log) {
             if(core.trusted_candidates.empty()) {
                 LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
             }
+        }
+        LOG_NOTICE("New confidantNodes: ");
+        int i = 0;
+        for (auto& it : core.trusted_candidates) {
+          cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
+          ++i;
         }
         core.spawn_next_round(core.trusted_candidates);
     }
@@ -108,6 +115,12 @@ namespace slv2
             }
             return;
         }
+        int i = 0;
+        for (auto& it : core.trusted_candidates) {
+          std::cout << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size()) << std::endl;
+          ++i;
+        }
+
         core.pnode->initNextRound(std::move(core.trusted_candidates));
     }
 

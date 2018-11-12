@@ -248,13 +248,37 @@ namespace slv2
 
     // Copied methods from solver.v1
 
-    void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& /*nodes*/)
+    void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& trusted_nodes)
     {
         //if(accepted_pool.to_binary().size() > 0) {
         //    LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
         //}
-        pnode->becomeWriter();
+ 
         LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
+
+          LOG_NOTICE("Node: init next round1");
+          // copied from Solver::gotHash():
+          cs::Hashes hashes;
+          cs::Conveyer& conveyer = cs::Conveyer::instance();
+          cs::RoundNumber round = conveyer.currentRoundNumber();
+
+          {
+            cs::SharedLock lock(conveyer.sharedMutex());
+            for (const auto& element : conveyer.transactionsPacketTable()) {
+              hashes.push_back(element.first);
+            }
+          }
+
+          cs::RoundTable table;
+          table.round = ++round;
+          table.confidants = trusted_nodes;
+          //table.general = mainNode;
+
+          table.hashes = std::move(hashes);
+          conveyer.setRound(std::move(table));
+          pnode->sendRoundInfo_(conveyer.roundTable());
+          pnode->onRoundStart(conveyer.roundTable());
+
         // see Solver-1, writeNewBlock() method
         //accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
         //auto& bc = pnode->getBlockChain();
@@ -293,7 +317,7 @@ namespace slv2
         //    LOG_NOTICE("SolverCore: send pool [" << tmp.sequence() << "] of "
         //        << tmp.transactions_count() << " trans.");
         //}
-        pnode->initNextRound(std::move(trusted_candidates));
+        
 
         //TODO: store transactions sent until they found in future accepted blocks
     }
