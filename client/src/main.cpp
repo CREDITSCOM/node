@@ -55,6 +55,7 @@ inline void mouseSelectionDisable() {
 #ifndef WIN32
 extern "C" void sig_handler(int sig) {
   gSignalStatus = 1;
+  std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
   switch (sig)
   {
   case SIGINT:
@@ -169,7 +170,27 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 #else
-  installSignalHandler();
+  if (SIG_ERR == signal(SIGTERM, sig_handler)) {
+    // Handle error
+    LOG_ERROR("Error to set SIGTERM!");
+    exit(EXIT_FAILURE);
+  }
+  if (SIG_ERR == signal(SIGQUIT, sig_handler)) {
+    LOG_ERROR("Error to set SIGQUIT!");
+    exit(EXIT_FAILURE);
+  }
+  if (SIG_ERR == signal(SIGINT, sig_handler)) {
+    LOG_ERROR("Error to set SIGINT!");
+    exit(EXIT_FAILURE);
+  }
+  if (SIG_ERR == signal(SIGHUP, sig_handler)) {
+    LOG_ERROR("Error to set SIGHUP!");
+    exit(EXIT_FAILURE);
+  }
+  if (SIG_ERR == signal(SIGBUS, sig_handler)) {
+    LOG_ERROR("Error to set SIGHUP!");
+    exit(EXIT_FAILURE);
+  }
   std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
   std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
   std::cout << "\n\t !!! try logging off or closing the console...\n" << std::flush;
