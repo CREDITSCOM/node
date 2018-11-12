@@ -80,7 +80,7 @@ bool Node::init() {
   solver_->runSpammer();
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
-//  cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+  cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
