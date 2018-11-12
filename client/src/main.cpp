@@ -82,22 +82,22 @@ void installSignalHandler() {
     LOG_ERROR("Error to set SIGTERM!");
     _exit(EXIT_FAILURE);
   }
-  if (SIG_ERR == signal(SIGQUIT, sigHandler)) {
-    LOG_ERROR("Error to set SIGQUIT!");
-    _exit(EXIT_FAILURE);
-  }
-  if (SIG_ERR == signal(SIGINT, sigHandler)) {
-    LOG_ERROR("Error to set SIGINT!");
-    _exit(EXIT_FAILURE);
-  }
-  if (SIG_ERR == signal(SIGHUP, sigHandler)) {
-    LOG_ERROR("Error to set SIGHUP!");
-    _exit(EXIT_FAILURE);
-  }
-  if (SIG_ERR == signal(SIGBUS, sigHandler)) {
-    LOG_ERROR("Error to set SIGHUP!");
-    _exit(EXIT_FAILURE);
-  }
+  //if (SIG_ERR == signal(SIGQUIT, sigHandler)) {
+  //  LOG_ERROR("Error to set SIGQUIT!");
+  //  _exit(EXIT_FAILURE);
+  //}
+  //if (SIG_ERR == signal(SIGINT, sigHandler)) {
+  //  LOG_ERROR("Error to set SIGINT!");
+  //  _exit(EXIT_FAILURE);
+  //}
+  //if (SIG_ERR == signal(SIGHUP, sigHandler)) {
+  //  LOG_ERROR("Error to set SIGHUP!");
+  //  _exit(EXIT_FAILURE);
+  //}
+  //if (SIG_ERR == signal(SIGBUS, sigHandler)) {
+  //  LOG_ERROR("Error to set SIGHUP!");
+  //  _exit(EXIT_FAILURE);
+  //}
 }
 #else
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
