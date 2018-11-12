@@ -98,6 +98,7 @@ const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketH
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
 {
+    cslog() << "CONVEYER> SetRound";
     if (table.round <= currentRoundNumber())
     {
         cserror() << "CONVEYER> Setting round in conveyer failed";

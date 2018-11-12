@@ -76,7 +76,7 @@ public:
       return cs::Conveyer::instance().roundTable().confidants;
   }
 
-  void onRoundStart_V3();
+  void onRoundStart_V3(const cs::RoundTable& roundTable);
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
   void addCompressedPoolToPack(const csdb::Pool& pool);
@@ -206,7 +206,7 @@ public:
 
 public slots:
   void processTimer();
-
+  void onRoundStart(const cs::RoundTable& roundTable);
 private:
   bool init();
 
@@ -223,7 +223,7 @@ private:
   void processMetaMap();
 
   bool readRoundData(cs::RoundTable& roundTable);
-  void onRoundStart(const cs::RoundTable& roundTable);
+
   void onRoundStartConveyer(cs::RoundTable&& roundTable);
 
   // conveyer

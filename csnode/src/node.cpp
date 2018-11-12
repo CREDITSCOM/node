@@ -812,15 +812,15 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
     this->getBlockChain().putBlock(newPool);
 
-    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
-      auto poolHash = this->getBlockChain().getLastWrittenHash();
-      sendHash(poolHash, sender);
+    //if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
+    //  auto poolHash = this->getBlockChain().getLastWrittenHash();
+    //  sendHash(poolHash, sender);
 
-      cslog() << "SENDING HASH to writer: " << poolHash.to_string();
-    }
-    else {
-      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
-    }
+    //  cslog() << "SENDING HASH to writer: " << poolHash.to_string();
+    //}
+    //else {
+    //  cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
+    //}
   }
   else {
     cswarning() << "NODE> Can not write block with sequence " << sequence;
@@ -1444,8 +1444,10 @@ void Node::processTimer() {
   cs::Conveyer::instance().flushTransactions();
 }
 
+
 void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
 {
+  LOG_NOTICE("Node: init next round1");
     // copied from Solver::gotHash():
     cs::Hashes hashes;
     cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1462,20 +1464,17 @@ void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
     table.round = ++round;
     table.confidants = std::move(confidantNodes);
     //table.general = mainNode;
+   
     table.hashes = std::move(hashes);
-
     conveyer.setRound(std::move(table));
 
-    initNextRound(table);
+    initNextRound(conveyer.roundTable());
 }
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {
   roundNum_ = roundTable.round;
-
-  sendRoundTable(roundTable);
-
+  sendRoundInfo_(roundTable);
   cslog() << "NODE> RoundNumber :" << roundNum_;
-
   onRoundStart(roundTable);
 }
 
@@ -2167,7 +2166,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
 
   csdebug() << "NODE> Apply notifications";
-
+  roundNum_ = roundTable.round; // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1; // change for roundNumber
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
@@ -2208,6 +2207,7 @@ void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
   ostream_ << MsgTypes::RoundInfo << roundTable.round;
   ostream_ << roundTable.confidants.size();
   ostream_ << roundTable.hashes.size();
+  cslog() << "NODE> CONFIDANTS::";
   for (const auto& confidant : roundTable.confidants) {
     ostream_ << confidant;
     cslog() << __FUNCTION__ << " confidant: " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
@@ -2264,7 +2264,7 @@ void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
   //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
   assert(false);
 
-  onRoundStart_V3();
+  onRoundStart_V3(roundTable);
 
   //if (getNodeLevel() == NodeLevel::Confidant) {
   //  solver_->gotTransactionList_V3(std::move(tmpPool));
@@ -2392,6 +2392,7 @@ void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
 
 void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   LOG_DEBUG(__func__);
+  cslog() << "NODE> Get ROUND INFO ... start processing";
   if (myLevel_ == NodeLevel::Writer) {
     LOG_WARN("NODE> Writers don't need ROUNDINFO");
     return;
@@ -2527,9 +2528,9 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
 
   assert(sequence <= this->getRoundNumber());
   ////////////////////////////////////////////////////////////////////////////////////////////////////
-  //onRoundStart(roundTable);
-  //onRoundStartConveyer(std::move(roundTable));
-  //solver_->gotRound();
+  onRoundStart_V3(roundTable);
+  onRoundStartConveyer(std::move(roundTable));
+  solver_->gotRound();
 
   conveyer.setCharacteristic(characteristic);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
@@ -2681,7 +2682,7 @@ void Node::sendRoundInfo( const std::vector<cs::PublicKey>& confidantNodes,
   //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
   assert(false);
 
-  onRoundStart_V3();
+  //onRoundStart_V3(RoundTable);
 
   if (getNodeLevel() == NodeLevel::Confidant) {
     solver_->gotTransactionList_V3(std::move(tmpPool));
@@ -2764,11 +2765,12 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   // std::swap(confidants, cs::Conveyer::instance().roundTable().confidants);
   assert(false);
 
-  onRoundStart_V3();
+  //onRoundStart_V3(RoundTable);
   // let solver to decide what to do: if (getMyLevel() == NodeLevel::Confidant) {
   solver_->gotTransactionList_V3(std::move(poolToVerify));
   //}
 }
+
 void Node::sendHash_V3() {
   /* if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
      LOG_ERROR("Writer and Main node shouldn't send hashes");
@@ -2907,7 +2909,7 @@ void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::R
   solver_->gotRoundInfoRequest(requesterNumber);
 }
 
-void Node::onRoundStart_V3()
+void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 {
     //if (!solver_->mPoolClosed())
     //{
@@ -2923,7 +2925,7 @@ void Node::onRoundStart_V3()
 
     const auto& conf_nodes = confidants();
 
-    for(auto& conf : conf_nodes) {
+    for(auto& conf : roundTable.confidants) {
         if(conf == myPublicKey_) {
             myLevel_ = NodeLevel::Confidant;
             myConfidantIndex_ = conf_no;
@@ -2947,7 +2949,7 @@ void Node::onRoundStart_V3()
     std::cout << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
         << std::endl << "Confidants: " << std::endl;
     int i = 0;
-    for(auto& e : conf_nodes) {
+    for(auto& e : roundTable.confidants) {
         std::cout << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size()) << std::endl;
         i++;
     }

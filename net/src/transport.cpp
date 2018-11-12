@@ -588,7 +588,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::ThirdStageRequest:
     return node_->getStageTwoRequest(data, size, firstPack.getSender());
   case MsgTypes::RoundInfo:
-    return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
+    return node_->getRoundInfo_(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundInfoRequest:
     return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundInfoReply:
