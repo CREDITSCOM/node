@@ -84,17 +84,7 @@ APIHandler::APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver)
   //TRACE = true;
   //TRACE("");
   state_updater_running.test_and_set(std::memory_order_acquire);
-  state_updater = std::thread([this]() {
-    // //TRACE = false;
-    //TRACE("");
-    auto lapooh = s_blockchain.getLastHash();
-    //TRACE("");
-    while (state_updater_running.test_and_set(std::memory_order_acquire)) {
-      if (!update_smart_caches_once(lapooh)) {
-        lapooh = s_blockchain.wait_for_block(lapooh);
-      }
-    }
-  });
+  state_updater = std::thread([this]() {state_updater_work_function(); });
   //TRACE("");
 }
 
@@ -106,18 +96,30 @@ APIHandler::~APIHandler()
   }
 }
 
-// void
-// APIHandler::smart_rescan(bool init)
-//{
-//    if (!init) {
-//        return;
-//    }
-//    //TRACE("");
-//    auto lapooh = s_blockchain.getLastHash();
-//    while (update_smart_caches_once(lapooh, init)) {
-//        //TRACE("");
-//    }
-//}
+void APIHandler::state_updater_work_function()
+{
+	try
+	{
+		auto ррр = s_blockchain.getLastHash();
+		while (state_updater_running.test_and_set(std::memory_order_acquire)) {
+			if (!update_smart_caches_once(ррр)) {
+				ррр = s_blockchain.wait_for_block(ррр);
+			}
+		}
+	}
+	catch(std::exception& ex)
+	{
+		std::stringstream ss;
+		ss << "error [" << ex.what() <<"] in file'" << __FILE__ << "' line'" << __LINE__ << "'";
+		cserror() << ex.what();
+	}
+	catch(...)
+	{
+		std::stringstream ss;
+		ss << "unknown error in file'" << __FILE__ << "' line'"<< __LINE__ << "'";
+		cslog() << ss.str().c_str();
+	}
+}
 
 void
 APIHandlerBase::SetResponseStatus(APIResponse& response,

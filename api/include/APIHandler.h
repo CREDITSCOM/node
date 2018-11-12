@@ -165,6 +165,7 @@ private:
 	std::thread state_updater;
 	std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
 private:
+	void state_updater_work_function();
     void execute_byte_code(executor::APIResponse& resp, const std::string& address, const std::string& code,
         const std::string& state, const std::string& method, const std::vector<::variant::Variant>& params);
 

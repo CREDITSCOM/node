@@ -2,11 +2,7 @@
 #ifndef __STDAFX_H__
 #define __STDAFX_H__
 
-#include <stack>
-#include <algorithm>
 #include <cassert>
-#include <type_traits>
-#include <functional>
 #include <mutex>
 
 #include <boost/io/ios_state.hpp>
