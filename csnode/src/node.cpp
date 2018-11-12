@@ -1473,7 +1473,7 @@ void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {
   roundNum_ = roundTable.round;
-  sendRoundInfo_(roundTable);
+  sendRoundTable(roundTable);
   cslog() << "NODE> RoundNumber :" << roundNum_;
   onRoundStart(roundTable);
 }
