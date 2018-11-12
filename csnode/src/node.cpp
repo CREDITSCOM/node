@@ -80,7 +80,7 @@ bool Node::init() {
   solver_->runSpammer();
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
-  cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+//  cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
 
   return true;
 }
@@ -958,7 +958,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
-  if (cs::Conveyer::instance().isSyncCompleted()) {
+  if (cs::Conveyer::instance().isSyncCompleted(round)) {
     return;
   }
 
@@ -969,20 +969,16 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
   const std::size_t amountHashesOfRequest = isHashesLess ? hashesCount : (hashesCount / neighboursCount);
 
-  auto getRequestBytesClosure = [hashes](const std::size_t startHashNumber, std::size_t hashesCount) {
-    cs::Bytes bytes;
-    auto begin = reinterpret_cast<cs::Byte*>(&hashesCount);
-    auto end = begin + sizeof(hashesCount);
-    std::copy(begin, end, std::back_inserter(bytes));
+  auto getRequestHashesClosure = [hashes](const std::size_t startHashNumber, std::size_t hashesCount) {
+    cs::Hashes hashesToSend;
 
     csdebug() << "NODE> Sending transaction packet request to Random Neighbour: hashes Count: " << hashesCount;
 
     for (auto i = 0; i < hashesCount; ++i) {
-      auto& binary = hashes.at(startHashNumber + i).toBinary();
-      std::copy(binary.begin(), binary.end(), std::back_inserter(bytes));
+      hashesToSend.push_back(hashes[startHashNumber + i]);
     }
 
-    return bytes;
+    return hashesToSend;
   };
 
   bool successRequest = false;
@@ -990,7 +986,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   for (std::size_t i = 0; i < neighboursCount; ++i) {
     const std::size_t count = i == (neighboursCount - 1) ? amountHashesOfRequest + remainderHashes : amountHashesOfRequest;
 
-    successRequest = sendToRandomNeighbour(msgType, round, getRequestBytesClosure(i * amountHashesOfRequest, count));
+    successRequest = sendToRandomNeighbour(msgType, round, getRequestHashesClosure(i * amountHashesOfRequest, count));
 
     if (!successRequest) {
       cswarning() << "NODE> Sending transaction packet request: Cannot get a connection with a random neighbour";
@@ -1003,14 +999,15 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   }
 
   if (!successRequest) {
-    sendBroadcast(msgType, round, getRequestBytesClosure(0, hashesCount));
+    sendBroadcast(msgType, round, getRequestHashesClosure(0, hashesCount));
     return;
   }
 
   cs::Timer::singleShot(cs::PacketHashesRequestDelay, [round, this] {
                           const cs::Conveyer& conveyer = cs::Conveyer::instance();
-                          if (!conveyer.isSyncCompleted()) {
-                            sendPacketHashesRequestToRandomNeighbour(conveyer.currentNeededHashes(), round);
+                          if (!conveyer.isSyncCompleted(round)) {
+                            auto& neededHashes = conveyer.neededHashes(round);
+                            sendPacketHashesRequestToRandomNeighbour(neededHashes, round);
                           };
                        });
 }

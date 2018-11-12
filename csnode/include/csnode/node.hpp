@@ -241,10 +241,7 @@ private:
   // sync meta
   csdb::Pool::sequence_t sendBlockRequestSequence_;
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
-  std::map<csdb::Pool::sequence_t, csdb::Pool> poolSyncRequestMap_;   // meta information of pool sync from nodes
   cs::RoundNumber roundToSync_ = 0;
-
-  inline static const std::size_t maxPoolCountToSync_ = 10;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

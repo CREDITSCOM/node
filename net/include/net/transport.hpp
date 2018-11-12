@@ -204,12 +204,13 @@ class Transport {
     , pack(p) {
     }
   };
+
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
-  PPBuf                                              postponedPacketsFirst_;
-  PPBuf                                              postponedPacketsSecond_;
+  PPBuf postponedPacketsFirst_;
+  PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 
-  std::atomic_flag                                                         uLock_ = ATOMIC_FLAG_INIT;
+  std::atomic_flag uLock_ = ATOMIC_FLAG_INIT;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   uint32_t maxBlock_ = 0;

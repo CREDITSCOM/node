@@ -13,7 +13,7 @@
 
 #include <lib/system/utils.hpp>
 
-    cs::TransactionsPacket packet;
+cs::TransactionsPacket packet;
 
 
 TEST(TransactionsPacket, createPacket)

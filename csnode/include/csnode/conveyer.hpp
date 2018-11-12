@@ -105,6 +105,12 @@ namespace cs
         const cs::Hashes& currentNeededHashes() const;
 
         ///
+        /// @brief Returns round needed hashes.
+        /// @return returns cs::Hashes.
+        ///
+        const cs::Hashes& neededHashes(cs::RoundNumber round) const;
+
+        ///
         /// @brief Adds synced packet to conveyer.
         ///
         void addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet);
