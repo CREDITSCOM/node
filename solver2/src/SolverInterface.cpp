@@ -35,7 +35,14 @@ namespace slv2
             pslv_v1->runSpammer();
             return;
         }
-        opt_spammer_on = true;
+        if(!pspam) {
+            if(Consensus::Log) {
+                LOG_WARN("SolverCore: starting transaction spammer");
+            }
+            opt_spammer_on = true;
+            pspam = std::make_unique<cs::Spammer>();
+            pspam->StartSpamming(*pnode);
+        }
     }
 
     void SolverCore::countFeesInPool(csdb::Pool * pool)
@@ -78,7 +85,7 @@ namespace slv2
             }
         }
 
-        cslog() << "SolverCore: prepare transaction packet of " << pool.transactions_count() << " transactions or consensus to build vector";
+        cslog() << "SolverCore: prepare packet of " << pool.transactions_count() << " transactions for consensus to build vector";
         gotTransactionList(pool);
     }
 

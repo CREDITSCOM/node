@@ -84,8 +84,8 @@ void Spammer::SpamWithTransactions(Node& node) {
       if (target_wallet_counter == kTargetWalletsNum) {
         target_wallet_counter = 0;
       }
-      std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
     }
+    std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
   }
 }
 

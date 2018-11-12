@@ -252,7 +252,7 @@ private:
   bool good_ = true;
 
   // syncro variables
-  bool isSyncroStarted_ = false;
+  std::atomic<bool> isSyncroStarted_ = false; // read by spammer thread, read & write by "main" node thread
   bool isAwaitingSyncroBlock_ = false;
   uint32_t awaitingRecBlockCount_ = 0;
 

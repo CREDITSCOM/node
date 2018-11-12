@@ -23,6 +23,7 @@ namespace cs
     class WalletsState;
     class Solver;
     class Fee;
+    class Spammer;
 }
 
 //TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by SolverCore
@@ -149,13 +150,7 @@ namespace slv2
         // empty in Solver
         void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const
         {}
-#if 0 // added with conveyer
-        bool getIPoolClosed();
-        bool getBigBangStatus();
-        bool isPoolClosed() const;
-        NodeLevel nodeLevel() const;
-        const cs::PublicKey& nodePublicKey() const;
-#endif // 0
+
     private:
 
         // to use private data while serve for states as SolverCore context:
@@ -243,6 +238,7 @@ namespace slv2
         Node * pnode;
         std::unique_ptr<cs::WalletsState> pws_inst;
         cs::WalletsState * pws;
+        std::unique_ptr<cs::Spammer> pspam;
 
         void ExecuteStart(Event start_event);
 
