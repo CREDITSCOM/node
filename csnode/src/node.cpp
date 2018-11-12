@@ -210,33 +210,6 @@ void Node::blockchainSync() {
   }
 }
 
-void Node::processPoolSync() {
-  cslog() << "NODE> Processing pool syncronization algorithm";
-
-  const auto currentSequence = bc_.getLastWrittenSequence();
-  const auto needSequence = roundToSync_;
-  const std::size_t mainCount = 1;
-  const auto nodeSyncCount = mainCount + cs::Conveyer::instance().roundTable().confidants.size();
-  const auto neededPoolCounts = needSequence - currentSequence;
-
-  std::vector<csdb::Pool::sequence_t> sequences(neededPoolCounts, 0);
-  std::iota(sequences.begin(), sequences.end(), currentSequence + 1);
-
-  // choose strategy
-  if (neededPoolCounts <= maxPoolCountToSync_) {
-//    sendBlockRequest(sequences);
-  }
-  else {
-    auto splited = cs::Utils::splitVector(sequences, nodeSyncCount);
-
-    for (const auto& part : splited) {
-      std::size_t size = (part.size() < maxPoolCountToSync_) ? part.size() : maxPoolCountToSync_;
-
-//      sendBlockRequest(std::vector<csdb::Pool::sequence_t>(part.data(), part.data() + size));
-    }
-  }
-}
-
 void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence) {
   if (poolMetaMap_.count(sequence) == 0ul) {
     poolMetaMap_.emplace(sequence, std::move(meta));

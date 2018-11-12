@@ -160,7 +160,6 @@ private:
 
   // pool sync helpers
   void blockchainSync();
-  void processPoolSync();
 
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();

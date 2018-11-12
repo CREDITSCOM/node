@@ -394,6 +394,8 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
       }
     }
 
+    cslog() << "Solver -> Find next round hashes count: " << hashes.size();
+
     cs::RoundTable table;
     table.round = ++round;
     table.confidants = std::move(m_hashesReceivedKeys);
@@ -525,7 +527,7 @@ bool Solver::addVector(const HashVector& hashVector) {
   const auto receivedVectorsSize = m_receivedVectorFrom.size();
 
   csdebug() << "SOLVER> Trusted counter vector: " << receivedVectorsSize;
-  csdebug() << "SOVLER> Confidants size: " << confidantsSize;
+  csdebug() << "SOLVER> Confidants size: " << confidantsSize;
 
   if (receivedVectorsSize != confidantsSize) {
     return false;

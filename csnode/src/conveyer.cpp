@@ -183,7 +183,8 @@ void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&
         hashesPointer->erase(iterator);
 
         // add to current table
-        tablePointer->emplace(packet.hash(), std::move(packet));
+        auto hash = packet.hash();
+        tablePointer->emplace(std::move(hash), std::move(packet));
     }
 }
 
@@ -268,7 +269,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
     auto result = pimpl->characteristicMetas.extract(round);
 
     if (!result.has_value()) {
-        cslog() << "CONVEYER> Characteristic meta not received";
+        csdebug() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
 
