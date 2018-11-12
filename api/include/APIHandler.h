@@ -128,6 +128,9 @@ class APIHandler : public APIHandlerInterface
                     int64_t offset,
                     int64_t limit) override;
 
+    void WritersGet(api::WritersGetResult& _return,
+                    int32_t page) override;
+
   private:
     BlockChain& s_blockchain;
 

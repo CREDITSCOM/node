@@ -1189,3 +1189,38 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
                                     return true;
                                   });
 }
+
+
+void
+APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
+#ifdef MONITOR_NODE
+  const static uint32_t PER_PAGE = 256;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  _page = std::max(int32_t(0), _page);
+
+  uint32_t offset = _page * PER_PAGE;
+  uint32_t limit = PER_PAGE;
+  uint32_t total = 0;
+
+  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const Credits::WalletsCache::WalletData::Address& addr, const Credits::WalletsCache::WriterData& wd) {
+                                    if (offset == 0) {
+                                      if (limit > 0) {
+                                        api::WriterInfo wi;
+
+                                        wi.address = fromByteArray(addr);
+                                        wi.timesWriter = wd.times;
+                                        wi.feeCollected.integral = wd.totalFee.integral();
+                                        wi.feeCollected.fraction = wd.totalFee.fraction();
+
+                                        _return.writers.push_back(wi);
+                                        --limit;
+                                      }
+                                    }
+                                    else
+                                      --offset;
+
+                                    ++total;
+                                    return true;
+                                  });
+#endif
+}

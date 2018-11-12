@@ -93,10 +93,23 @@ void WalletsCache::load(csdb::Pool& curr, Mode mode)
 
     auto* walDataPtr = getWalletData(curr.writer_public_key(), timeStamp);
     WalletsCache::WalletData& walWriter = *walDataPtr;
+#ifdef MONITOR_NODE
+    auto wrWall = curr.writer_public_key();
+    auto wrWrIt = writers_.find(curr.writer_public_key());
+    if (wrWrIt == writers_.end()) {
+      auto res = writers_.insert(std::make_pair(curr.writer_public_key(), WriterData()));
+      wrWrIt = res.first;
+    }
+
+    ++wrWrIt->second.times;
+#endif
 
     for (size_t i = 0; i < curr.transactions_count(); i++)
     {
         csdb::Transaction tr = curr.transaction(i);
+#ifdef MONITOR_NODE
+        wrWrIt->second.totalFee+= tr.counted_fee();
+#endif
         load(tr, mode, poolHash, walWriter, timeStamp);
     }
 }
@@ -116,8 +129,8 @@ void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const Pool
     WalletsCache::WalletData& walData = *walDataPtr;
 
     walData.balance_ -= tr.amount();
-	walData.balance_ -= tr.counted_fee();
-	walWriter.balance_ += tr.counted_fee();
+    walData.balance_ -= tr.counted_fee();
+    walWriter.balance_ += tr.counted_fee();
 
 #ifdef MONITOR_NODE
     ++walData.transNum_;
@@ -219,6 +232,13 @@ const WalletsCache::WalletData* WalletsCache::findWallet(const csdb::internal::b
 void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)> func) {
   for (const auto& wdp : data_) {
     if (!func(wdp.first, wdp.second))
+      break;
+  }
+}
+
+void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)> func) {
+  for (const auto& wrd : writers_) {
+    if (!func(wrd.first, wrd.second))
       break;
   }
 }
