@@ -81,15 +81,19 @@ void installSignalHandler() {
     LOG_ERROR("Error to set SIGTERM!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == signal(SIGQUIT, sig_handler)) {
+  if (SIG_ERR == signal(SIGQUIT, sig_handler)) {
     LOG_ERROR("Error to set SIGQUIT!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == signal(SIGINT, sig_handler)) {
+  if (SIG_ERR == signal(SIGINT, sig_handler)) {
     LOG_ERROR("Error to set SIGINT!");
     exit(EXIT_FAILURE);
   }
-  else if (SIG_ERR == signal(SIGHUP, sig_handler)) {
+  if (SIG_ERR == signal(SIGHUP, sig_handler)) {
+    LOG_ERROR("Error to set SIGHUP!");
+    exit(EXIT_FAILURE);
+  }
+  if (SIG_ERR == signal(SIGBUS, sig_handler)) {
     LOG_ERROR("Error to set SIGHUP!");
     exit(EXIT_FAILURE);
   }
