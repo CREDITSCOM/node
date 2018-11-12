@@ -4,10 +4,10 @@
 
 #include <solver2/SolverCore.h>
 
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
-#include <csnode/datastream.h>
+#include <csnode/datastream.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -224,7 +224,7 @@ void Node::processPoolSync() {
 
   // choose strategy
   if (neededPoolCounts <= maxPoolCountToSync_) {
-    sendBlockRequest(sequences);
+//    sendBlockRequest(sequences);
   }
   else {
     auto splited = cs::Utils::splitVector(sequences, nodeSyncCount);
@@ -232,7 +232,7 @@ void Node::processPoolSync() {
     for (const auto& part : splited) {
       std::size_t size = (part.size() < maxPoolCountToSync_) ? part.size() : maxPoolCountToSync_;
 
-      sendBlockRequest(std::vector<csdb::Pool::sequence_t>(part.data(), part.data() + size));
+//      sendBlockRequest(std::vector<csdb::Pool::sequence_t>(part.data(), part.data() + size));
     }
   }
 }
@@ -923,7 +923,6 @@ void Node::sendWriterNotification() {
   ostream_.init(BaseFlags::Compressed | BaseFlags::Fragmented, writerPublicKey);
   ostream_ << MsgTypes::WriterNotification;
   ostream_ << roundNum_;
-
   ostream_ << createNotification(writerPublicKey);
 
   cslog() << "NODE> Notification sent to writer";
@@ -940,6 +939,10 @@ cs::Bytes Node::createNotification(const cs::PublicKey& writerPublicKey) {
   stream << characteristicHash << writerPublicKey;
 
   cs::Signature signature = cs::Utils::sign(bytes.data(), bytes.size(), solver_->getPrivateKey());
+
+  if (cs::Utils::verifySignature(signature, solver_->getPublicKey(), bytes.data(), bytes.size())) {
+    cslog() << "NODE: Verfication is OKAY";
+  }
 
   stream << signature;
   stream << solver_->getPublicKey();
@@ -1137,45 +1140,6 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
     sendBlockReply(pool, sender);
   }
-}
-
-void Node::sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences) {
-//  const auto& roundTable = cs::Conveyer::instance().roundTable();
-
-//  // create destinations
-//  std::vector<cs::PublicKey> keys;
-//  keys.push_back(roundTable.general);
-//  keys.insert(keys.end(), roundTable.confidants.begin(), roundTable.confidants.end());
-
-//  const auto maxTries = 10;
-//  const auto msgType = MsgTypes::BlockRequest;
-
-//  cs::Bytes bytes;
-//  cs::DataStream stream(bytes);
-
-//  stream << sequences.size();
-
-//  for (auto& seq : sequences) {
-//    stream << seq;
-//  }
-
-//  // random confidant search
-//  for (std::size_t i = 0; i < maxTries; ++i) {
-//    std::size_t randomIndex = static_cast<std::size_t>(cs::Utils::generateRandomValue(0, static_cast<int>(keys.size() - 1)));
-//    ConnectionPtr connection = transport_->getConnectionByKey(keys[randomIndex]);
-
-//    if (connection) {
-//      sendNeighbours(connection, msgType, roundNum_, bytes);
-//      csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequences.size();
-//      return;
-//    }
-//  }
-
-//  std::size_t randomIndex = static_cast<std::size_t>(cs::Utils::generateRandomValue(0, static_cast<int>(keys.size() - 1)));
-
-//  sendBroadcast(keys[randomIndex], msgType, roundNum_, bytes);
-
-//  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequences.size();
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {

@@ -1,4 +1,4 @@
-#include "../include/csnode/datastream.h"
+#include "../include/csnode/datastream.hpp"
 
 const constexpr std::size_t v4Size = 4;
 const constexpr std::size_t v6Size = 16;

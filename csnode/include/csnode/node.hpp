@@ -10,8 +10,6 @@
 #include <csconnector/csconnector.h>
 #include <client/config.hpp>
 
-#include <csnode/dynamicbuffer.h>
-
 #include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
@@ -82,7 +80,6 @@ public:
 
   // syncro send functions
   void sendBlockRequest();
-  void sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
 
   // start new round

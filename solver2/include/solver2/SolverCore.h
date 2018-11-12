@@ -9,7 +9,7 @@
 #include <solver/Fee.h>
 #include <solver/solver.hpp>
 #include <solver/WalletsState.h>
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 
 #include <memory>
 #include <map>

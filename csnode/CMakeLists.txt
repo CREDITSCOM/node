@@ -34,12 +34,12 @@ add_library(csnode
   include/csnode/CyclicBuffer.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
-  include/csnode/datastream.h
-  include/csnode/dynamicbuffer.h
+  include/csnode/datastream.hpp
+  include/csnode/dynamicbuffer.hpp
   include/csnode/threading.hpp
-  include/csnode/nodecore.h
+  include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
-  include/csnode/transactionspacket.h
+  include/csnode/transactionspacket.hpp
   include/csnode/TransactionsTail.h
   include/csnode/WalletsCache.h
   include/csnode/WalletsIds.h

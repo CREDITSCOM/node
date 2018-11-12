@@ -1,6 +1,6 @@
 
 #include <gtest/gtest.h>
-#include "datastream.h"
+#include "datastream.hpp"
 
 TEST(DataStream, DataPointerIsCorrectAfterCreation) {
   char data[8] = "1234567";

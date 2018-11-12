@@ -1,9 +1,9 @@
-#ifndef DATASTREAM_H
-#define DATASTREAM_H
+#ifndef DATASTREAM_HPP
+#define DATASTREAM_HPP
 
 #include <exception>
 #include <string>
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 #include <algorithm>
 #include <type_traits>
 
@@ -631,5 +631,5 @@ namespace cs
     }
 }
 
-#endif // DATASTREAM_H
+#endif // DATASTREAM_HPP
 

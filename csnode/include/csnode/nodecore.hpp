@@ -1,5 +1,5 @@
-#ifndef NODE_CORE_H
-#define NODE_CORE_H
+#ifndef NODE_CORE_HPP
+#define NODE_CORE_HPP
 
 #include <string>
 #include <vector>
@@ -15,7 +15,7 @@
 #include <boost/circular_buffer.hpp>
 
 #include <client/params.hpp>
-#include <csnode/transactionspacket.h>
+#include <csnode/transactionspacket.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/keys.hpp>
@@ -143,5 +143,5 @@ namespace cs
     using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;
 }
 
-#endif // NODE_CORE_H
+#endif // NODE_CORE_HPP
 
