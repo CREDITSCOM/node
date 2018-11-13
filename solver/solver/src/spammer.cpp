@@ -72,19 +72,20 @@ void Spammer::SpamWithTransactions(Node& node) {
   size_t target_wallet_counter = 0;
   int64_t inner_id_counter = 1;
   while (true) {
-      transaction.set_source(OptimizeAddress(csdb::Address::from_public_key(
-        reinterpret_cast<const char*>(public_key_)), node));
-      transaction.set_target(OptimizeAddress(target_wallets_[target_wallet_counter], node));
-      transaction.set_innerID(inner_id_counter);
-      SignTransaction(transaction, private_key_);
-      node.getSolver()->send_wallet_transaction(transaction);
-      ++inner_id_counter;
-      ++target_wallet_counter;
+      if(!node.getSyncroStarted()) {
+          transaction.set_source(OptimizeAddress(csdb::Address::from_public_key(
+              reinterpret_cast<const char*>(public_key_)), node));
+          transaction.set_target(OptimizeAddress(target_wallets_[target_wallet_counter], node));
+          transaction.set_innerID(inner_id_counter);
+          SignTransaction(transaction, private_key_);
+          node.getSolver()->send_wallet_transaction(transaction);
+          ++inner_id_counter;
+          ++target_wallet_counter;
 
-      if (target_wallet_counter == kTargetWalletsNum) {
-        target_wallet_counter = 0;
+          if(target_wallet_counter == kTargetWalletsNum) {
+              target_wallet_counter = 0;
+          }
       }
-
       std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
   }
 }
