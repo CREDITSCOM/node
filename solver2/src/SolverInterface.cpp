@@ -86,7 +86,7 @@ namespace slv2
         }
 
         cslog() << "SolverCore: prepare packet of " << pack.transactionsCount() << " transactions for consensus to build vector";
-        gotTransactionList(pack);
+        gotTransactionList(std::move(pack));
     }
 
     const cs::PublicKey& SolverCore::getWriterPublicKey() const
@@ -157,7 +157,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotTransactionList(cs::TransactionsPacket& p)
+    void SolverCore::gotTransactionList(cs::TransactionsPacket&& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             if(Consensus::Log) {
