@@ -2352,9 +2352,9 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   transport_->processPostponed(roundNum_);
 
   cslog() << "NODE> Get Round info_ - > got Round";
-  if(roundTable.hashes.size()==0 ) {
+
     solver_->gotRound(rNum);
-  }
+  
 
  /* uint8_t stageThreeNumber = 0;
   istream_ >> stageThreeNumber;
