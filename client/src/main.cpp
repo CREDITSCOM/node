@@ -64,14 +64,11 @@ extern "C" void sigHandler(int sig) {
   case SIGTERM:
     LOG_WARN("Signal SIGTERM received, exiting");
     break;
-  case SIGQUIT:
-    LOG_WARN("Signal SIGBREAK received, exiting");
-    break;
   case SIGHUP:
     LOG_WARN("Signal SIGHUP received, exiting");
     break;
   default:
-    LOG_WARN("Uncknown signal received, exiting");
+    LOG_WARN("Uncknown signal received!!!");
     break;
   }
 }
@@ -152,8 +149,8 @@ int main(int argc, char* argv[]) {
   if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
   {
     std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-    std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
-    std::cout << "\n\t !!! try logging off or closing the console...\n" << std::flush;
+    std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
+    std::cout << "\n\t !!! closing the console...\n" << std::flush;
     Sleep(2000);
   }
   else
@@ -164,8 +161,8 @@ int main(int argc, char* argv[]) {
 #else
   installSignalHandler();
   std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-  std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or Ctrl+Break, or" << std::flush;
-  std::cout << "\n\t !!! try logging off or closing the console...\n" << std::flush;
+  std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
+  std::cout << "\n\t !!! closing the console...\n" << std::flush;
   sleep(2);
 #endif // WIN32
   mouseSelectionDisable();
