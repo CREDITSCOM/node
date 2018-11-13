@@ -332,7 +332,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
+inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool)
 {
     cs::Bytes bytes;
     (*this) >> bytes;
@@ -341,7 +341,7 @@ inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
 }
 
 template <>
-inline IPackStream& IPackStream::operator>>(csdb::PoolHash& pool_hash)
+inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& pool_hash)
 {
     uint8_t len;
     *this >> len;
@@ -545,7 +545,7 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) 
 }
 #endif // 0
 template <>
-inline OPackStream& OPackStream::operator<<(const csdb::PoolHash& pool_hash)
+inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& pool_hash)
 {
     const auto& raw_bytes = pool_hash.to_binary();
     *this << (uint8_t) raw_bytes.size();

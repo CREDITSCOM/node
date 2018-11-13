@@ -1614,7 +1614,7 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
     return;
 }
   // std::cout << "NODE> Getting StageOne 0" << std::endl;
-  if (myPublicKey_ == requester) {
+  if (nodeIdKey_ == requester) {
     return;
   }
   //std::cout << "NODE> Getting StageOne 1" << std::endl;
@@ -1684,7 +1684,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
  // std::cout << "NODE> Getting StageOne 0" << std::endl;
-  if (myPublicKey_ == sender) {
+  if (nodeIdKey_ == sender) {
     return;
   }
   istream_.init(data, size);
@@ -1800,7 +1800,7 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     return;
   }
-  if (myPublicKey_ == requester) {
+  if (nodeIdKey_ == requester) {
     return;
   }
   //LOG_EVENT(FILE_NAME_ << "Getting Stage Two Request from " << byteStreamToHex(sender.str, 32));
@@ -1862,7 +1862,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     return;
   }
-  if (myPublicKey_ == sender) {
+  if (nodeIdKey_ == sender) {
     return;
   }
   //LOG_EVENT(FILE_NAME_ << "Getting Stage Two from " << byteStreamToHex(sender.str, 32));
@@ -1967,7 +1967,7 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
-  if (myPublicKey_ == requester) {
+  if (nodeIdKey_ == requester) {
     return;
   }
   //LOG_EVENT(FILE_NAME_ << "Getting Stage Three Request from " << byteStreamToHex(sender.str, 32));
@@ -2022,7 +2022,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   if (myLevel_ != NodeLevel::Confidant && myLevel_ != NodeLevel::Writer) {
     return;
   }
-  if (myPublicKey_ == sender) {
+  if (nodeIdKey_ == sender) {
     return;
   }
   //std::cout << "NODE> Getting Stage Three  " << std::endl;
@@ -2640,7 +2640,7 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
   if (myLevel_ != NodeLevel::Confidant || myLevel_ != NodeLevel::Writer) {
     return;
   }
-  if (myPublicKey_ == requester) {
+  if (nodeIdKey_ == requester) {
     return;
   }
   //LOG_EVENT(FILE_NAME_ << "Getting RoundInfo Request from " << byteStreamToHex(sender.str, 32));
@@ -2694,7 +2694,7 @@ void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::R
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
-  if (myPublicKey_ == respondent) {
+  if (nodeIdKey_ == respondent) {
     return;
   }
   //LOG_EVENT(FILE_NAME_ << "Getting RoundInfo Request from " << byteStreamToHex(sender.str, 32));
@@ -2720,7 +2720,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     //}
     roundNum_ = roundTable.round;
     cslog() << "======================================== ROUND " << roundNum_ << " ========================================";
-    cslog() << "Node PK = " << cs::Utils::byteStreamToHex(myPublicKey_.data(), myPublicKey_.size());
+    cslog() << "Node PK = " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
     //if(getBlockChain().getGlobalSequence()!= roundNum_-1) getBlockChain().setGlobalSequence(roundNum_-1);
 
 
@@ -2730,7 +2730,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     const auto& conf_nodes = roundTable.confidants;
 
     for(auto& conf : roundTable.confidants) {
-        if(conf == myPublicKey_) {
+        if(conf == nodeIdKey_) {
             myLevel_ = NodeLevel::Confidant;
             myConfidantIndex_ = conf_no;
             cslog() << "===================== NODE LEVEL SET TO CONFIDANT ============================";

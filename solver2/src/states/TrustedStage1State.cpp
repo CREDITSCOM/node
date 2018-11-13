@@ -2,7 +2,7 @@
 #include <SolverContext.h>
 #include <Consensus.h>
 
-#include <csnode/transactionspacket.h>
+#include <csnode/transactionspacket.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
 #include <lib/system/logger.hpp>
