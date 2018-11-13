@@ -1,12 +1,15 @@
 #ifndef TRANSACTIONS_VALIDATOR_H
 #define TRANSACTIONS_VALIDATOR_H
 
-#include <limits>
 #include <vector>
 #include <lib/system/common.hpp>
-#include <csdb/pool.h>
 #include <csdb/transaction.h>
 #include <solver/WalletsState.h>
+
+namespace csdb
+{
+	class Pool;
+}
 
 namespace cs
 {

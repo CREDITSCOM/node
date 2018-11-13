@@ -5,8 +5,6 @@
 #include <csdb/pool.h>
 #include <lib/system/logger.hpp>
 
-#include <algorithm>
-
 // provide find by sequence() capability
 namespace std
 {

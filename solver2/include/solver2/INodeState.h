@@ -2,7 +2,6 @@
 
 #include "Result.h"
 #include <csnode/nodecore.hpp>
-#include <lib/system/keys.hpp> // PublicKey, Hash
 #include <cstdint>
 
 namespace csdb

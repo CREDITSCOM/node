@@ -1,10 +1,10 @@
+#define DATASTREAM_H
 #ifndef DATASTREAM_HPP
 #define DATASTREAM_HPP
 
 #include <exception>
 #include <string>
 #include <csnode/nodecore.hpp>
-#include <algorithm>
 #include <type_traits>
 
 #include <boost/asio/ip/udp.hpp>

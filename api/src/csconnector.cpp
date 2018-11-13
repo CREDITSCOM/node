@@ -1,9 +1,6 @@
-//#define TRACE_ENABLER
+#include "stdafx.h"
 
 #include "csconnector/csconnector.h"
-#include <csdb/currency.h>
-#include <thrift/protocol/TJSONProtocol.h>
-#include <thrift/transport/THttpServer.h>
 
 namespace csconnector {
 

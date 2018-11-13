@@ -1,10 +1,7 @@
 #pragma once
 #include "DefaultStateBehavior.h"
-#include "../CallsQueueScheduler.h"
 
 #include <csdb/pool.h>
-
-#include <memory>
 
 namespace slv2
 {

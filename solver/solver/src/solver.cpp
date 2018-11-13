@@ -5,15 +5,12 @@
 #include <boost/dynamic_bitset.hpp>
 
 #include <chrono>
-#include <fstream>
-#include <iostream>
 #include <random>
 #include <sstream>
 #include <cassert>
 
 #include <csdb/address.h>
 #include <csdb/currency.h>
-#include <csdb/wallet.h>
 
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
@@ -27,7 +24,6 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <base58.h>
 #include <sodium.h>
 
 namespace {

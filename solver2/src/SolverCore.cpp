@@ -2,7 +2,6 @@
 #include "SolverContext.h"
 #include "CallsQueueScheduler.h"
 #include "Consensus.h"
-#include "Node.h"
 #include "SolverCompat.h"
 #include <solver/WalletsState.h>
 #include <solver/Fee.h>

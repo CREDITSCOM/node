@@ -4,16 +4,14 @@
 
 #include <cstring>
 #include <iostream>
-#include <map>
-#include <sstream>
-#include <string>
+#include <blake2-impl.h>
+#include <blake2.h>
 #ifdef _MSC_VER
 #include <intrin.h>
 #else
 #include <x86intrin.h>
 #endif
 
-#include <csdb/address.h>
 #include <csdb/currency.h>
 #include <csdb/pool.h>
 #include <csdb/transaction.h>

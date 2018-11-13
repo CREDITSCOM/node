@@ -1,7 +1,6 @@
 #include "TrustedState.h"
 #include "../SolverContext.h"
 #include "../Consensus.h"
-#include "../SolverCompat.h"
 #include "../Generals.h"
 #include <lib/system/logger.hpp>
 

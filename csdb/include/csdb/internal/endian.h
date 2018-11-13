@@ -8,7 +8,6 @@
 #define _CREDITS_CSDB_INTERNAL_ENDIAN_H_INCLUDED_
 
 #include <cstddef>
-#include <cinttypes>
 #include <type_traits>
 
 namespace csdb {

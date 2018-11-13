@@ -4,24 +4,14 @@
 #ifndef SOLVER_HPP
 #define SOLVER_HPP
 
-#include <csdb/csdb.h>
 #include <csdb/transaction.h>
-#include <api_types.h>
 
 #include <memory>
-#include <thread>
-#include <functional>
 #include <atomic>
-#include <shared_mutex>
-#include <set>
-#include <string>
 #include <vector>
-#include <optional>
 
 #include <csnode/nodecore.hpp>
-#include <lib/system/timer.hpp>
 #include <client/params.hpp>
-#include <lib/system/keys.hpp>
 #include <solver/WalletsState.h>
 #include <solver/Fee.h>
 #include <solver/spammer.h>

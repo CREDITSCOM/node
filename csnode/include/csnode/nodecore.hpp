@@ -5,16 +5,13 @@
 #include <vector>
 #include <array>
 #include <csdb/pool.h>
-#include <unordered_map>
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
 #include <map>
 
 #include <boost/smart_ptr/detail/spinlock.hpp>
-#include <boost/circular_buffer.hpp>
 
-#include <client/params.hpp>
 #include <csnode/transactionspacket.hpp>
 
 #include <lib/system/common.hpp>

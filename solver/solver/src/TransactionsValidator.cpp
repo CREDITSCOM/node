@@ -6,6 +6,7 @@
 #include <solver/TransactionsValidator.h>
 #include <lib/system/logger.hpp>
 #include <client/params.hpp>
+#include <csdb/pool.h>
 
 namespace cs
 {

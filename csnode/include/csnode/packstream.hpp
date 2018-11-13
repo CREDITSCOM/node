@@ -10,10 +10,7 @@
 #include <csdb/transaction.h>
 
 #include <lib/system/hash.hpp>
-#include <lib/system/keys.hpp>
-
 #include <net/packet.hpp>
-#include "solver/solver.hpp"
 
 namespace cs {
 class IPackStream {
