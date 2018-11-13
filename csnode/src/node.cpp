@@ -2154,12 +2154,12 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
     }
   }
 
-  const cs::Hashes& hashes = table.hashes;
-  cslog() << "Hashes count: " << hashes.size();
+  //const cs::Hashes& hashes = table.hashes;
+  //cslog() << "Hashes count: " << hashes.size();
 
-  for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csdebug() << i << ". " << hashes[i].toString();
-  }
+  //for (std::size_t i = 0; i < hashes.size(); ++i) {
+  //  csdebug() << i << ". " << hashes[i].toString();
+  //}
 
  
   transport_->clearTasks();
@@ -2231,16 +2231,16 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
 
 
-  for (std::size_t i = 0; i < confidants_.size(); ++i) {
-    const cs::PublicKey& confidant = confidants_.at(i);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-  }
-  const cs::Hashes hashes_ = roundTable.hashes;
-  cslog() << "Hashes [" << hashes_.size() << "]: ";
-  for (std::size_t i = 0; i < hashes_.size(); ++i) {
-    const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
-  }
+  //for (std::size_t i = 0; i < confidants_.size(); ++i) {
+  //  const cs::PublicKey& confidant = confidants_.at(i);
+  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+  //}
+  //const cs::Hashes hashes_ = roundTable.hashes;
+  //cslog() << "Hashes [" << hashes_.size() << "]: ";
+  //for (std::size_t i = 0; i < hashes_.size(); ++i) {
+  //  const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
+  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
+  //}
   ///////////////////////////////////// Round table received 
   onRoundStart_V3(roundTable);
 
