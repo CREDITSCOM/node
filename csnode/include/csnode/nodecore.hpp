@@ -1,5 +1,5 @@
-#ifndef NODE_CORE_H
-#define NODE_CORE_H
+#ifndef NODE_CORE_HPP
+#define NODE_CORE_HPP
 
 #include <string>
 #include <vector>
@@ -15,21 +15,16 @@
 #include <boost/circular_buffer.hpp>
 
 #include <client/params.hpp>
-#include <csnode/transactionspacket.h>
+#include <csnode/transactionspacket.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/metastorage.hpp>
 
-#ifdef NO_DELAYS
-const std::size_t TIME_TO_AWAIT_ACTIVITY = 0;
-const std::size_t ROUND_DELAY = 0;
-#else
-const std::size_t TIME_TO_AWAIT_ACTIVITY = 300;         // ms
-const std::size_t ROUND_DELAY = 1000;                   // ms
-#endif
-
-const std::size_t TIME_TO_AWAIT_SS_ROUND = 50;        // ms
+// ms
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 200;
+const std::size_t ROUND_DELAY = 1000;
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 70;
 
 namespace std
 {
@@ -150,5 +145,5 @@ namespace cs
     using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;
 }
 
-#endif // NODE_CORE_H
+#endif // NODE_CORE_HPP
 

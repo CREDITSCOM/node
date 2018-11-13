@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "transactionspacket.h"
+#include "transactionspacket.hpp"
 
 #include <csdb/transaction.h>
 #include <csdb/address.h>
@@ -13,7 +13,7 @@
 
 #include <lib/system/utils.hpp>
 
-    cs::TransactionsPacket packet;
+cs::TransactionsPacket packet;
 
 
 TEST(TransactionsPacket, createPacket)

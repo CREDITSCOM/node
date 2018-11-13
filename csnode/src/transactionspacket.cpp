@@ -1,11 +1,10 @@
-#include "csnode/transactionspacket.h"
+#include "csnode/transactionspacket.hpp"
 
 #include <csdb/internal/utils.h>
 #include <lz4.h>
 #include <csdb/csdb.h>
 #include <src/binary_streams.h>
 #include <src/priv_crypto.h>
-#include <csnode/dynamicbuffer.h>
 
 namespace cs
 {

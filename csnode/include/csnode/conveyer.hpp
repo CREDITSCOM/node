@@ -1,7 +1,7 @@
-#ifndef CONVEYER_H
-#define CONVEYER_H
+#ifndef CONVEYER_HPP
+#define CONVEYER_HPP
 
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
@@ -103,6 +103,12 @@ namespace cs
         /// @brief Returns current round needed hashes.
         ///
         const cs::Hashes& currentNeededHashes() const;
+
+        ///
+        /// @brief Returns round needed hashes.
+        /// @return returns cs::Hashes.
+        ///
+        const cs::Hashes& neededHashes(cs::RoundNumber round) const;
 
         ///
         /// @brief Adds synced packet to conveyer.
@@ -215,4 +221,4 @@ namespace cs
     };
 }
 
-#endif // CONVEYER_H
+#endif // CONVEYER_HPP

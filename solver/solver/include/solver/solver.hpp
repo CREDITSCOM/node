@@ -18,7 +18,7 @@
 #include <vector>
 #include <optional>
 
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 #include <lib/system/timer.hpp>
 #include <client/params.hpp>
 #include <lib/system/keys.hpp>

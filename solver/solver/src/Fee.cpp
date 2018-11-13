@@ -14,7 +14,7 @@
 #include <csdb/amount_commission.h>
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
-#include <transactionspacket.h>
+#include <transactionspacket.hpp>
 
 namespace cs {
 namespace {

@@ -148,7 +148,12 @@ cs::RoundNumber cs::Conveyer::currentRoundNumber() const
 
 const cs::Hashes& cs::Conveyer::currentNeededHashes() const
 {
-    auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
+    return neededHashes(currentRoundNumber());
+}
+
+const cs::Hashes& cs::Conveyer::neededHashes(cs::RoundNumber round) const
+{
+    auto pointer = pimpl->neededHashesMeta.get(round);
 
     if (!pointer) {
         throw std::out_of_range("Bad needed hashes, fatal error");
@@ -184,20 +189,14 @@ void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&
         hashesPointer->erase(iterator);
 
         // add to current table
-        tablePointer->emplace(packet.hash(), std::move(packet));
+        auto hash = packet.hash();
+        tablePointer->emplace(std::move(hash), std::move(packet));
     }
 }
 
 bool cs::Conveyer::isSyncCompleted() const
 {
-    auto pointer = pimpl->neededHashesMeta.get(currentRoundNumber());
-
-    if (!pointer) {
-        cserror() << "CONVEYER> Needed hashes of current round not found";
-        return false;
-    }
-
-    return pointer->empty();
+    return isSyncCompleted(currentRoundNumber());
 }
 
 bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
@@ -269,7 +268,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
     auto result = pimpl->characteristicMetas.extract(round);
 
     if (!result.has_value()) {
-        cslog() << "CONVEYER> Characteristic meta not received";
+        csdebug() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
 

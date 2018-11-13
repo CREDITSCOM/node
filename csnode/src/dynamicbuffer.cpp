@@ -1,4 +1,4 @@
-#include "../include/csnode/dynamicbuffer.h"
+#include "../include/csnode/dynamicbuffer.hpp"
 #include <algorithm>
 
 cs::DynamicBuffer::DynamicBuffer(size_t size):

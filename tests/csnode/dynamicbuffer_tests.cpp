@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
-#include "dynamicbuffer.h"
+#include "dynamicbuffer.hpp"
 
 using namespace cs;
 

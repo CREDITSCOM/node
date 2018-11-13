@@ -6,7 +6,7 @@
 #define PROJECT_NODEMOCK_HPP
 
 #include <gmock/gmock.h>
-#include "csnode/nodecore.h"
+#include "csnode/nodecore.hpp"
 #include "csnode/node.hpp"
 
 class NodeMock : public Node

@@ -34,19 +34,6 @@ void CreateRegionAllocatorAndThenAllocateInIt(
   final_number_of_pages = allocator.getPagesNum();
 }
 
-TEST(RegionAllocator,
-     NoAdditionalPageIsAddedIfInitialPagesAreEnough_const_version) {
-  ASSERT_EQ(sizeof(Region), 64);  // following numbers are based on this size,
-                                  // change them if sizeof(Region) changes
-  constexpr uint32_t kPageSize = 640, kInitialNumberOfPages = 2,
-                     kNumberOfAllocations = 10, kAllocationSize = 4;
-  uint32_t final_number_of_pages;
-  CreateRegionAllocatorAndThenAllocateInIt(
-      kPageSize, kInitialNumberOfPages, kNumberOfAllocations, kAllocationSize,
-      final_number_of_pages);
-  ASSERT_EQ(final_number_of_pages, kInitialNumberOfPages);
-}
-
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
 constexpr int32_t AlignNumberToPowerOfTwo(const int32_t number,
                                           const uint32_t align) {
@@ -238,7 +225,6 @@ TEST(fuqueue, multithreaded_stress) {
   std::thread r1(rdFunc);
   std::thread r2(rdFunc);
   std::thread r3(rdFunc);
-  ;
 
   w1.join();
   w2.join();
@@ -387,7 +373,7 @@ TEST(fixed_hash_map, destroy) {
   }
 
   // Todo: Typed allocator destructor
-  // ASSERT_EQ(IntWithCounter::counter, 0);
+   ASSERT_EQ(IntWithCounter::counter, 0);
 }
 
 TEST(fixed_circular_buffer, short) {

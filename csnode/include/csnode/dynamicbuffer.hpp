@@ -1,5 +1,5 @@
-#ifndef DYNAMICBUFFER_H
-#define DYNAMICBUFFER_H
+#ifndef DYNAMICBUFFER_HPP
+#define DYNAMICBUFFER_HPP
 
 #include <cstddef>
 #include <memory>
@@ -71,4 +71,4 @@ namespace cs
     using DynamicBufferPtr = std::shared_ptr<DynamicBuffer>;
 }
 
-#endif // DYNAMICBUFFER_H
+#endif // DYNAMICBUFFER_HPP

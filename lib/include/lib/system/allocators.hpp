@@ -244,7 +244,7 @@ private:
   }
 
   RegionPage* allocatePage() {
-    RegionPage* result = new RegionPage;
+    RegionPage* result = new RegionPage();
 
     result->allocator = this;
     result->regions = new uint8_t[PageSize];
