@@ -318,7 +318,8 @@ public:
   using Type = T;
 
   template <typename... Args>
-  TypedSlot(Args&&... args): element_(std::forward<Args>(args)...) { }
+  TypedSlot(Allocator* all, Args&&... args): allocator_(all),
+      element_(std::forward<Args>(args)...) { }
 
   void use() {
     users_.fetch_add(1, std::memory_order_relaxed);
@@ -369,7 +370,7 @@ public:
                                    std::memory_order_release,
                                    std::memory_order_relaxed));
 
-    return new(*place) IntType(std::forward<Args>(args)...);
+    return new(*place) IntType(this, std::forward<Args>(args)...);
   }
 
   void remove(IntType* toFree) {
@@ -406,7 +407,6 @@ private:
 
     for (IntType* ptr = page; ptr != pageEnd; ++ptr) {
       *(--chunkPtr) = ptr;
-      ptr->allocator_ = this;
     }
 
     auto newChunks = static_cast<IntType**>(freeChunks_) + PageSize - 1;
