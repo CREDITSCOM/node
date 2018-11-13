@@ -11,6 +11,7 @@
 #include <client/config.hpp>
 
 #include <lib/system/keys.hpp>
+#include <csnode/datastream.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
