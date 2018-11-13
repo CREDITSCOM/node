@@ -205,6 +205,11 @@ public slots:
 
 private:
   bool init();
+  void createRoundPackage(const cs::RoundTable& roundTableconst,
+    const cs::PoolMetaInfo& poolMetaInfo,
+    const cs::Characteristic& characteristic,
+    const cs::Signature& signature,
+    const cs::Notifications& notifications);
 
   // signature verification
   bool checkKeysFile();
