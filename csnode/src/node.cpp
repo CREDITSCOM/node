@@ -2114,24 +2114,9 @@ void Node::sendRoundInfo_(const cs::RoundTable& roundTable) {
     ostream_ << hash;
   }
   ostream_ << solver_->getPublicKey();
-  cs::Bytes charFunc = createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
+  createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
 
-  ostream_ << charFunc.size()<< charFunc;
-
-
- /* cs::Bytes bytes;
-  cs::DataStream stream(bytes);*/
-
-
-  //stream << roundTable.general;
-  //LOG_DEBUG(__func__);
-
-  //if (myLevel_ != NodeLevel::Writer) {
-  //  LOG_WARN("Only WRITER nodes can send ROUNDINFO");
-  //  return;
-  //}
-
- flushCurrentTasks();
+  flushCurrentTasks();
 
 
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
@@ -2246,14 +2231,11 @@ void Node::getRoundInfo_(const uint8_t * data, const size_t size, const cs::Roun
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
 
-  std::size_t charFuncSize = 0;
-  istream_ >> charFuncSize;
-
   if (!conveyer.isSyncCompleted(rNum-1)) { // здесть не по€вл€ютс€ хеши!!!!!!!!!!!
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
-    characteristicBytes.assign(istream_.getCurrPtr(), istream_.getCurrPtr() + charFuncSize);
+    istream_ >> characteristicBytes;
 
     cs::CharacteristicMetaStorage::MetaElement metaElement;
     metaElement.meta.bytes = std::move(characteristicBytes);
@@ -2786,31 +2768,31 @@ void Node::addCompressedPoolToPack(const csdb::Pool& pool)
     ostream_ << std::string(cs::numeric_cast<const char *>(memPtr.get()), realSize);
 }
 
-csdb::Pool Node::getCompressedPoolFromPack()
-{
-    csdb::Pool pool{};
-
-    uint32_t uncompressedSize;
-    uint32_t compressedSize;
-    istream_ >> uncompressedSize >> compressedSize;
-
-    //TODO: review that condition (2) is legal
-    constexpr size_t abnormal_len = 1 << 20;
-    //TODO: how to get avail bytes from istream?
-    if(uncompressedSize >= abnormal_len) {
-        // data is corrupted
-        //ptr_ = end_;
-        //good_ = false;
-        //return *this;
-        return pool;
-    }
-
-    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(istream_.getCurrPtr()),
-        compressedSize, uncompressedSize);
-    //ptr_ += compressedSize;
-    istream_.safeSkip<uint8_t>(compressedSize);
-    return pool;
-}
+//csdb::Pool Node::getCompressedPoolFromPack()
+//{
+//    csdb::Pool pool{};
+//
+//    uint32_t uncompressedSize;
+//    uint32_t compressedSize;
+//    istream_ >> uncompressedSize >> compressedSize;
+//
+//    //TODO: review that condition (2) is legal
+//    constexpr size_t abnormal_len = 1 << 20;
+//    //TODO: how to get avail bytes from istream?
+//    if(uncompressedSize >= abnormal_len) {
+//        // data is corrupted
+//        //ptr_ = end_;
+//        //good_ = false;
+//        //return *this;
+//        return pool;
+//    }
+//
+//    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(istream_.getCurrPtr()),
+//        compressedSize, uncompressedSize);
+//    //ptr_ += compressedSize;
+//    istream_.safeSkip<uint8_t>(compressedSize);
+//    return pool;
+//}
 
 void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
 {
