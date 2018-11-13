@@ -1335,8 +1335,10 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
 
   if (conveyer.isSyncCompleted()) {
     cslog() << "NODE> All hashes in conveyer";
+    solver_->gotRound(roundTable.round);
   }
   else {
+
     sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
@@ -1718,7 +1720,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   cs::StageOne stage;
   istream_  >> msgSize
             >> stage.sig;
-
+           
   std::string raw_bytes;
   istream_ >> raw_bytes;
   if(!istream_.good() || !istream_.end()) {
@@ -2123,6 +2125,16 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  // update hashes in round table here, they are free of stored packets' hashes
+  if(!roundTable.hashes.empty()) {
+    roundTable.hashes.clear();
+  }
+  {
+    cs::SharedLock lock(conveyer.sharedMutex());
+    for (const auto& element : conveyer.transactionsPacketTable()) {
+      roundTable.hashes.push_back(element.first);
+    }
+  }
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
   createRoundPackage(conveyer.roundTable(), poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
@@ -2158,9 +2170,9 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
 
   onRoundStart_V3(table);
 
-  if (getNodeLevel() == NodeLevel::Confidant) {
+ // if (getNodeLevel() == NodeLevel::Confidant) {
     solver_->gotRound(roundNum_);
-  }
+ // }
 }
 
 void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2219,16 +2231,16 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
 
 
-  //for (std::size_t i = 0; i < confidants_.size(); ++i) {
-  //  const cs::PublicKey& confidant = confidants_.at(i);
-  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-  //}
-  //const cs::Hashes hashes_ = roundTable.hashes;
-  //cslog() << "Hashes [" << hashes_.size() << "]: ";
-  //for (std::size_t i = 0; i < hashes_.size(); ++i) {
-  //  const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
-  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
-  //}
+  for (std::size_t i = 0; i < confidants_.size(); ++i) {
+    const cs::PublicKey& confidant = confidants_.at(i);
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+  }
+  const cs::Hashes hashes_ = roundTable.hashes;
+  cslog() << "Hashes [" << hashes_.size() << "]: ";
+  for (std::size_t i = 0; i < hashes_.size(); ++i) {
+    const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
+  }
   ///////////////////////////////////// Round table received 
   onRoundStart_V3(roundTable);
 
@@ -2348,16 +2360,18 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   blockchainSync();
 
   cslog() << "NODE> Finishing Writing block";
-  for (int i = 0; i < roundTable.confidants.size(); i++) {
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
-  }
+  //for (int i = 0; i < roundTable.confidants.size(); i++) {
+  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
+  //}
 
 
 
-  cslog() << "NODE> Get Round info_ - > got Round";
+
   if(roundTable.hashes.size()==0) {
+    cslog() << "NODE> Get Round info_ - > got Round";
     solver_->gotRound(rNum);
   }
+ 
   onRoundStartConveyer(std::move(roundTable));
   transport_->processPostponed(roundNum_);
 

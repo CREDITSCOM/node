@@ -248,8 +248,6 @@ namespace slv2
         return (Result::Finish == res);
     }
 
-    // Copied methods from solver.v1
-
     void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& trusted_nodes)
     {
         //if(accepted_pool.to_binary().size() > 0) {
@@ -258,76 +256,11 @@ namespace slv2
  
         LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
 
-          LOG_NOTICE("Node: init next round1");
-          // copied from Solver::gotHash():
-          cs::Hashes hashes;
-          cs::Conveyer& conveyer = cs::Conveyer::instance();
-          cs::RoundNumber round = conveyer.currentRoundNumber();
-
-          {
-            cs::SharedLock lock(conveyer.sharedMutex());
-            for (const auto& element : conveyer.transactionsPacketTable()) {
-              hashes.push_back(element.first);
-            }
-          }
-
-          cs::RoundTable table;
-          table.round = ++round;
-          table.confidants = trusted_nodes;
-          //table.general = mainNode;
-
-          table.hashes = std::move(hashes);
-
-          ///////////////////////////////////////////////////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          // Place this function after creating the block!!!
-
-          ///////////////////////////////////////////////////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-          pnode->sendRoundInfo(table);
-          //pnode->onRoundStart(conveyer.roundTable());
-
-        // see Solver-1, writeNewBlock() method
-        //accepted_pool.set_writer_public_key(csdb::internal::byte_array(public_key.cbegin(), public_key.cend()));
-        //auto& bc = pnode->getBlockChain();
-        //bc.finishNewBlock(accepted_pool);
-        //// see: Solver-1, addTimestampToPool() method
-        //accepted_pool.add_user_field(0, std::to_string(
-        //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
-        //));
-        //// finalize
-        //// see Solver-1, prepareBlockForSend() method
-        //accepted_pool.set_previous_hash(bc.getLastWrittenHash()); // also set in bc.putBlock()
-        //accepted_pool.set_sequence((bc.getLastWrittenSequence()) + 1); // also set in bc.finishNewBlock()
-        //accepted_pool.sign(private_key);
-
-        //if(Consensus::Log) {
-        //    LOG_NOTICE("SolverCore: defer & send block[" << accepted_pool.sequence() << "] of "
-        //        << accepted_pool.transactions_count() << " trans.");
-        //    LOG_NOTICE("SolverCore: block previous hash " << accepted_pool.previous_hash().to_string());
-        //    LOG_DEBUG("SolverCore: signed with secret which public is "
-        //        << cs::Utils::byteStreamToHex((const char *)accepted_pool.writer_public_key().data(), accepted_pool.writer_public_key().size()));
-        //}
-
-        //bc.putBlock(accepted_pool/*, true*/); // defer_write
-        //cnt_deferred_trans += accepted_pool.transactions_count();
-
-        //csdb::Pool tmp;
-        //{
-        //    // at this section adding new transactions unavailable
-        //    std::lock_guard<std::mutex> lock(trans_mtx);
-        //    trans_pool.set_sequence(pnode->getRoundNumber() + 1);
-        //    trans_pool.compose();
-        //    tmp = trans_pool;
-        //    trans_pool = csdb::Pool {};
-        //}
-        //if(Consensus::Log) {
-        //    LOG_NOTICE("SolverCore: send pool [" << tmp.sequence() << "] of "
-        //        << tmp.transactions_count() << " trans.");
-        //}
-        
-
-        //TODO: store transactions sent until they found in future accepted blocks
+        cs::RoundTable table;
+        table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
+        table.confidants = trusted_nodes;
+        pnode->sendRoundInfo(table);
+        //pnode->onRoundStart(conveyer.roundTable());
     }
 
     void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)
