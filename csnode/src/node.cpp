@@ -2302,6 +2302,12 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
     }
   }
 
+  // before call to applyCharacteristic()
+  cslog() << "NODE> Get Round info_ - > got Round";
+  if(roundTable.hashes.size() == 0) {
+      solver_->gotRound(rNum);
+  }
+
   cslog() << "NODE> GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
   cslog() << "NODE> Time >> " << poolMetaInfo.timestamp << "  << Time";
 
@@ -2337,7 +2343,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
       writeBlock_V3(pool.value(), sequence, sender);
     }
     else {
-      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+      cswarning() << "NODE> RECEIVED KEY Writer verification failed, do not write block";
       cswarning() << "NODE> remove wallets from wallets cache";
       getBlockChain().removeWalletsInPoolFromCache(pool.value());
     }
@@ -2350,11 +2356,6 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   }
 
   transport_->processPostponed(roundNum_);
-
-  cslog() << "NODE> Get Round info_ - > got Round";
-  if(roundTable.hashes.size()==0 ) {
-    solver_->gotRound(rNum);
-  }
 
  /* uint8_t stageThreeNumber = 0;
   istream_ >> stageThreeNumber;
@@ -2558,7 +2559,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 
     const auto& conf_nodes = roundTable.confidants;
 
-    for(auto& conf : roundTable.confidants) {
+    for(const auto& conf : conf_nodes) {
         if(conf == nodeIdKey_) {
             myLevel_ = NodeLevel::Confidant;
             myConfidantIndex_ = conf_no;
@@ -2575,14 +2576,9 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
         cslog() << "===================== NODE LEVEL SET TO NORMAL ============================" ;
     }
 
-
-
-
     // Pretty printing...
-    cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
-        << std::endl << "Confidants: " ;
     int i = 0;
-    for(auto& e : roundTable.confidants) {
+    for(const auto& e : conf_nodes) {
       cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
       i++;
     }
