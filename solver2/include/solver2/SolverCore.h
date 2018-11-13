@@ -80,7 +80,7 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(cs::TransactionsPacket& p);
+        void gotTransactionList(cs::TransactionsPacket&& p);
         void gotVector(const cs::HashVector& vect);
         void gotMatrix(cs::HashMatrix&& matr);
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
@@ -103,8 +103,7 @@ namespace slv2
         // TODO: remove when obsolete
         void gotTransactionList_V3(cs::TransactionsPacket&& p)
         {
-            cs::TransactionsPacket tmp(p);
-            gotTransactionList(tmp);
+            gotTransactionList(std::move(p));
         }
 
         void gotStageOneRequest(uint8_t requester, uint8_t required);

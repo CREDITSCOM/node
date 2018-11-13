@@ -70,7 +70,19 @@ namespace slv2
         cs::StageOne stage;
         std::unique_ptr<cs::TransactionsValidator> ptransval;
 
-        csdb::Pool filter_test_signatures(SolverContext& context, const csdb::Pool& p);
+        /**
+         * @fn  void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
+         *
+         * @brief   Filter transactions in packet by testing signatures and remove them
+         *
+         * @author  Alexander Avramenko
+         * @date    13.11.2018
+         *
+         * @param [in,out]  context The context.
+         * @param [in,out]  p       A cs::TransactionsPacket to remove transactions with bad signatures.
+         */
+
+        void filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
         bool check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction);
         cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
 

@@ -136,17 +136,20 @@ namespace slv2
         return Result::Ignore;
     }
 
-    // outdated
-    csdb::Pool TrustedStage1State::filter_test_signatures(SolverContext& context, const csdb::Pool& p)
+    // removes "bad" transactions from p:
+    void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p)
     {
-        csdb::Pool good;
-        BlockChain::WalletData data_to_fetch_pulic_key;
+        auto& vec = p.transactions();
+        if(vec.empty()) {
+            return;
+        }
         const BlockChain& bc = context.blockchain();
-        bool force_permit_reported = false; // flag to report only once per round, not per every transaction
-        for(const auto& tr : p.transactions()) {
-            const auto& src = tr.source();
+        auto cnt_filtered = 0;
+        for(auto it = vec.begin(); it != vec.end(); ++it) {
+            const auto& src = it->source();
             csdb::internal::byte_array pk;
             if(src.is_wallet_id()) {
+                BlockChain::WalletData data_to_fetch_pulic_key;
                 bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
                 pk.assign(data_to_fetch_pulic_key.address_.cbegin(), data_to_fetch_pulic_key.address_.cend());
             }
@@ -154,25 +157,19 @@ namespace slv2
                 const auto& tmpref = src.public_key();
                 pk.assign(tmpref.cbegin(), tmpref.cend());
             }
-            bool force_permit = (!force_permit_reported && context.is_spammer() && pk == context.address_spammer().public_key());
-            if(force_permit || tr.verify_signature(pk)) {
-                if(Consensus::Log) {
-                    if(force_permit) {
-                        force_permit_reported = true;
-                        LOG_WARN(name() << ": permit drain " << static_cast<int>(tr.amount().to_double()) << " from spammer wallet ignoring check signature");
-                    }
+            if(!it->verify_signature(pk)) {
+                it = vec.erase(it);
+                ++cnt_filtered;
+                if(it == vec.end()) {
+                    break;
                 }
-                good.add_transaction(tr);
             }
         }
         if(Consensus::Log) {
-            auto cnt_before = p.transactions_count();
-            auto cnt_after = good.transactions_count();
-            if(cnt_before != cnt_after) {
-                LOG_WARN(name() << ": " << cnt_before - cnt_after << " trans. filtered while test signatures");
+            if(cnt_filtered > 0) {
+                LOG_WARN(name() << ": " << cnt_filtered << " trans. filtered while test signatures");
             }
         }
-        return good;
     }
 
     cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::TransactionsPacket& packet)
