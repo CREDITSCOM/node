@@ -1,5 +1,6 @@
 #include "csdb/pool.h"
 
+#include <sstream>
 #include <iomanip>
 #include <map>
 #include <algorithm>

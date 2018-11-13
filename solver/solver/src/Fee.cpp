@@ -5,6 +5,7 @@
 
 #include "solver/Fee.h"
 
+#include <cstdint>
 #include <vector>
 #include <string>
 

@@ -3,7 +3,9 @@
 #include "CallsQueueScheduler.h"
 #include "INodeState.h"
 
+#include "SolverCompat.h" // temporary, while cs::HashVector defined there
 #include <csdb/pool.h>
+#include <lib/system/keys.hpp>
 #include <solver/Fee.h>
 #include <solver/solver.hpp>
 #include <solver/WalletsState.h>
@@ -13,6 +15,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <algorithm>
 #include <optional>
 #include <array>
 

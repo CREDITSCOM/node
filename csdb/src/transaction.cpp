@@ -4,6 +4,7 @@
 #include <cinttypes>
 #include <iomanip>
 #include <sstream>
+#include <iterator>
 
 #include "binary_streams.h"
 #include "csdb/address.h"

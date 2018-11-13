@@ -2,6 +2,7 @@
 #include "DefaultStateBehavior.h"
 #include "../Consensus.h"
 #include "../CallsQueueScheduler.h"
+#include <lib/system/keys.hpp>
 #include <memory>
 
 namespace slv2

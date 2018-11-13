@@ -7,6 +7,7 @@
 #include <mutex>
 #include <thread>
 #include <cassert>
+#include <stdexcept>
 #include <algorithm>
 
 #include "csdb/address.h"

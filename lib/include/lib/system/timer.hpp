@@ -2,6 +2,7 @@
 #define TIMER_HPP
 
 #include <functional>
+#include <memory>
 #include <atomic>
 #include <thread>
 #include <chrono>

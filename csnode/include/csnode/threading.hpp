@@ -1,7 +1,9 @@
 #pragma once
 
 #include <assert.h>
+#include <lib/system/logger.hpp>
 #include <lib/system/cache.hpp>
+#include <client/params.hpp>
 
 #define BOTTLENECKED_SMARTS
 

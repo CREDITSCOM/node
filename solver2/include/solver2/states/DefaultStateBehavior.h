@@ -2,6 +2,10 @@
 
 #include "../INodeState.h"
 
+#include <lib/system/keys.hpp>
+
+#include <vector>
+
 namespace slv2
 {
     /**

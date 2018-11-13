@@ -1,6 +1,8 @@
 #pragma once
 #include "INodeState.h"
 
+#include <lib/system/keys.hpp>
+
 namespace slv2
 {
     /**

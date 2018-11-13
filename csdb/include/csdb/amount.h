@@ -10,6 +10,7 @@
 #include <cinttypes>
 #include <type_traits>
 #include <limits>
+#include <iostream>
 #include <string>
 #include <stdexcept>
 

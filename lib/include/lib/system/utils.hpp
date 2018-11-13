@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cstdlib>
+#include <memory>
 #include <string>
 #include <random>
 #include <array>
@@ -8,6 +10,7 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 #include <cassert>
 #include <limits>
 #include <thread>

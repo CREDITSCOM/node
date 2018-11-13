@@ -11,6 +11,9 @@
 
 #include <lz4.h>
 
+#include <iostream>
+#include <memory>
+
 #include "lib/system/utils.hpp"
 
 namespace ip = boost::asio::ip;

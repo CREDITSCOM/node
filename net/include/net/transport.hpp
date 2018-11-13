@@ -8,6 +8,7 @@
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
 #include <lib/system/common.hpp>
+#include <lib/system/logger.hpp>
 #include <lib/system/cache.hpp>
 #include <net/network.hpp>
 

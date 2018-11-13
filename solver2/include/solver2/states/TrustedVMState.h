@@ -1,5 +1,6 @@
 #pragma once
 #include "TrustedState.h"
+#include <lib/system/keys.hpp>
 
 
 namespace slv2

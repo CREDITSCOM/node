@@ -7,6 +7,7 @@
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/manipulators/dump.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 
 /*

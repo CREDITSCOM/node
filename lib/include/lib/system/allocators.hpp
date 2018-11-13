@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <thread>
 
 #include "cache.hpp"
