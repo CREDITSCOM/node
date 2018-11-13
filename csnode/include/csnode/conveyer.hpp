@@ -156,7 +156,7 @@ namespace cs
         /// @brief Adds characteristic meta if early characteristic recevied from network.
         /// @param meta Created on network characteristic meta information.
         ///
-        void addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta);
+        void addCharacteristicMeta(cs::RoundNumber round, CharacteristicMeta&& characteristic);
 
         ///
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
@@ -167,10 +167,10 @@ namespace cs
         // characteristic
 
         ///
-        /// @brief Sets ct round characteristic function.
+        /// @brief Sets round characteristic function.
         /// @param characteristic Created characteristic on network level.
         ///
-        void setCharacteristic(const cs::Characteristic& characteristic);
+        void setCharacteristic(const Characteristic& characteristic);
 
         ///
         /// @brief Returns current round characteristic.

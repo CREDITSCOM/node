@@ -85,12 +85,6 @@ namespace cs
         cs::Bytes mask;
     };
 
-    struct CharacteristicMeta
-    {
-        cs::Bytes bytes;
-        cs::PublicKey sender;
-    };
-
     struct PoolMetaInfo
     {
         std::string timestamp;
@@ -113,6 +107,7 @@ namespace cs
         cs::Signature signature;
     };
 
+    // metas
     struct PoolSyncMeta
     {
         csdb::Pool pool;
@@ -124,20 +119,22 @@ namespace cs
 
     struct ConveyerMeta
     {
-        cs::CharacteristicMeta characteristicMeta;
+        cs::Characteristic characteristic;
         cs::TransactionsPacketTable hashTable;
         cs::Hashes neededHashes;
         cs::RoundTable roundTable;
         cs::Notifications notifications;
     };
 
-    // metas
+    struct CharacteristicMeta
+    {
+        cs::Bytes bytes;
+        cs::PublicKey sender;
+    };
+
+    // meta storages
     using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
     using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
-    using TablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketTable>;
-    using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
-    using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
-    using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;
 }
 
 #endif // NODE_CORE_HPP

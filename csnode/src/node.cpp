@@ -620,15 +620,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   if (!conveyer.isSyncCompleted(round)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
-    cs::Bytes characteristicBytes;
-    characteristicBytes.assign(data, data + size);
+    cs::Bytes characteristicBytes(data, data + size);
 
-    cs::CharacteristicMetaStorage::MetaElement metaElement;
-    metaElement.meta.bytes = std::move(characteristicBytes);
-    metaElement.meta.sender = sender;
-    metaElement.round = conveyer.currentRoundNumber();
+    cs::CharacteristicMeta meta;
+    meta.bytes = std::move(characteristicBytes);
+    meta.sender = sender;
 
-    conveyer.addCharacteristicMeta(std::move(metaElement));
+    conveyer.addCharacteristicMeta(round, std::move(meta));
     return;
   }
 
@@ -682,13 +680,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
+  conveyer.setCharacteristic(std::move(characteristic));
 
   assert(sequence <= this->getRoundNumber());
 
   cs::PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
 
-  conveyer.setCharacteristic(characteristic);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
   if (isSyncroStarted_) {

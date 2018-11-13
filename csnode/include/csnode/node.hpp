@@ -232,6 +232,7 @@ private:
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
 
+  // serialization/deserialization entities
   cs::IPackStream istream_;
   cs::OPackStream ostream_;
 
