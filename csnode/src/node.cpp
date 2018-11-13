@@ -199,8 +199,11 @@ bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::Priva
 }
 
 void Node::blockchainSync() {
+#ifdef SYNCRO
+  LOG_NOTICE("Node: last written sequence = " << getBlockChain().getLastWrittenSequence());
+#endif
   if (!isSyncroStarted_) {
-    if (roundNum_ > getBlockChain().getLastWrittenSequence() + 2) {
+    if (roundNum_ > getBlockChain().getLastWrittenSequence() + 1) {
       isSyncroStarted_ = true;
       roundToSync_ = roundNum_;
 
@@ -774,11 +777,11 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
     this->getBlockChain().putBlock(newPool);
 
-    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
+    if (this->getNodeLevel() != NodeLevel::Writer) {
       auto poolHash = this->getBlockChain().getLastWrittenHash();
       sendHash_V3();
 
-      cslog() << "SENDING HASH to writer: " << poolHash.to_string();
+      cslog() << "SENDING HASH to ALL";
     }
     else {
       cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
@@ -2216,16 +2219,16 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
 
 
-  for (std::size_t i = 0; i < confidants_.size(); ++i) {
-    const cs::PublicKey& confidant = confidants_.at(i);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-  }
-  const cs::Hashes hashes_ = roundTable.hashes;
-  cslog() << "Hashes [" << hashes_.size() << "]: ";
-  for (std::size_t i = 0; i < hashes_.size(); ++i) {
-    const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
-  }
+  //for (std::size_t i = 0; i < confidants_.size(); ++i) {
+  //  const cs::PublicKey& confidant = confidants_.at(i);
+  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+  //}
+  //const cs::Hashes hashes_ = roundTable.hashes;
+  //cslog() << "Hashes [" << hashes_.size() << "]: ";
+  //for (std::size_t i = 0; i < hashes_.size(); ++i) {
+  //  const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
+  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
+  //}
   ///////////////////////////////////// Round table received 
   onRoundStart_V3(roundTable);
 
@@ -2310,7 +2313,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
   assert(sequence <= this->getRoundNumber());
   ////////////////////////////////////////////////////////////////////////////////////////////////////
-  onRoundStartConveyer(std::move(roundTable));
+ 
 
 
   conveyer.setCharacteristic(characteristic);
@@ -2342,65 +2345,24 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
       getBlockChain().removeWalletsInPoolFromCache(pool.value());
     }
    }
+  blockchainSync();
 
-
-
+  cslog() << "NODE> Finishing Writing block";
   for (int i = 0; i < roundTable.confidants.size(); i++) {
-    std::cout << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size()) << std::endl;
+    cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
   }
 
-  transport_->processPostponed(roundNum_);
+
 
   cslog() << "NODE> Get Round info_ - > got Round";
-
+  if(roundTable.hashes.size()==0) {
     solver_->gotRound(rNum);
-  
+  }
+  onRoundStartConveyer(std::move(roundTable));
+  transport_->processPostponed(roundNum_);
 
- /* uint8_t stageThreeNumber = 0;
-  istream_ >> stageThreeNumber;
-  std::vector<cs::StageThree> stageThreeIncoming;
-  stageThreeIncoming.reserve(stageThreeNumber);
-  cs::StageThree tempStage;
 
-  for (int i = 0; i < stageThreeNumber; i++) {
-    istream_ >> tempStage;
-    stageThreeIncoming.push_back(tempStage);
-  }*/
-//#ifdef MYLOG
-//  std::cout << "--------------------------------------------------------------------------------------" << std::endl;
-//  std::cout << (int)stageThreeNumber << " : ";
-//  for (int i = 0; i < stageThreeNumber; i++) {
-//    std::cout << (int)stageThreeIncoming.at(i).sender;
-//  }
-//  std::cout << std::endl << "--------------------------------------------------------------------------------------" << std::endl;
-//#endif
-//
-//  istream_ >> newPool >> poolToVerify;
-//
-//  if (!istream_.good()) {
-//    LOG_ERROR("Node: packet with round info is corrupted");
-//    //TODO: decide what to do
-//  }
-//#ifdef MYLOG
-//  uint32_t bSize;
-//  const char* bl = poolToVerify.to_byte_stream(bSize);
-//  std::cout << "GET> PoolToVerify: " << poolToVerify.sequence() << ", tr_amount =" << poolToVerify.transactions_count() << ", " << ", " << byteStreamToHex(bl, bSize) << std::endl;
-//  const char* b2 = newPool.to_byte_stream(bSize);
-//  std::cout << "newPool: " << newPool.sequence() << ", " << byteStreamToHex(b2, bSize) << std::endl << std::endl;
-//#endif
-//  passBlockToSolver(newPool, sender);
-//
-//  getBlockChain().setGlobalSequence(newPool.sequence());
-//  transport_->clearTasks();
-
-  //TODO: обновить таблицу раунда в cs::Conveyer::instance()
-  // std::swap(confidants, cs::Conveyer::instance().roundTable().confidants);
-  /*assert(false);*/
-
- /* onRoundStart_V3();*/
-  // let solver to decide what to do: if (getMyLevel() == NodeLevel::Confidant) {
-  //solver_->gotTransactionList_V3(std::move(poolToVerify));
-  //}
+ 
 }
 
 void Node::sendHash_V3() {
@@ -2579,26 +2541,16 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 
 
     // Pretty printing...
-    cslog() << "Round " << roundNum_ << " started. Mynode_type:=" << myLevel_
+    cslog() << "Round " << roundNum_ << " started. Mynode_type: " << myLevel_
         << std::endl << "Confidants: " ;
     int i = 0;
     for(auto& e : roundTable.confidants) {
       cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
       i++;
     }
-#ifdef SYNCRO
-    LOG_NOTICE("Node: last written sequence = " << getBlockChain().getLastWrittenSequence());
-    
-    
-    
-    
-    
-    blockchainSync();
-#endif // !1
-    solver_->nextRound();
-
-
    
+    solver_->nextRound();
+    
 }
 
 void Node::addCompressedPoolToPack(const csdb::Pool& pool)
