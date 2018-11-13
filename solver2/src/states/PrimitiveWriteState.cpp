@@ -63,12 +63,12 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result PrimitiveWriteState::onTransactionList(SolverContext & context, csdb::Pool & pool)
+    Result PrimitiveWriteState::onTransactionList(SolverContext & context, cs::TransactionsPacket& pack)
     {
-        DefaultStateBehavior::onTransactionList(context, pool);
+        DefaultStateBehavior::onTransactionList(context, pack);
         csdb::Pool accepted {};
-        if(pool.transactions_count() > 0) {
-            for(const auto& t : pool.transactions()) {
+        if(pack.transactionsCount() > 0) {
+            for(const auto& t : pack.transactions()) {
                 accepted.add_transaction(t);
             }
         }

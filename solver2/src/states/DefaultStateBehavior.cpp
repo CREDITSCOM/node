@@ -116,10 +116,10 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, csdb::Pool& /*pool*/)
+    Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, cs::TransactionsPacket& /*pack*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": transaction list ignored in this state");
+            LOG_DEBUG(name() << ": transactions packet ignored in this state");
         }
         return Result::Ignore;
     }

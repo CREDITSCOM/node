@@ -6,7 +6,7 @@
 #include "Stage.h"
 
 #include <csdb/pool.h>
-
+#include <csnode/transactionspacket.hpp>
 #include <memory>
 #include <map>
 #include <vector>
@@ -80,7 +80,7 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(csdb::Pool& p);
+        void gotTransactionList(cs::TransactionsPacket& p);
         void gotVector(const cs::HashVector& vect);
         void gotMatrix(cs::HashMatrix&& matr);
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
@@ -101,9 +101,9 @@ namespace slv2
         void gotStageTwo(const cs::StageTwo& stage);
         void gotStageThree(const cs::StageThree& stage);
         // TODO: remove when obsolete
-        void gotTransactionList_V3(csdb::Pool&& tl)
+        void gotTransactionList_V3(cs::TransactionsPacket&& p)
         {
-            csdb::Pool tmp(tl);
+            cs::TransactionsPacket tmp(p);
             gotTransactionList(tmp);
         }
 

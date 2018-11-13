@@ -11,11 +11,9 @@ namespace csdb
 }
 namespace cs
 {
+    class TransactionsPacket;
     struct HashVector;
     struct HashMatrix;
-}
-namespace cs
-{
     struct StageOne;
     struct StageTwo;
     struct StageThree;
@@ -194,7 +192,7 @@ namespace slv2
          *          in current state, Failed - error occurs.
          */
 
-        virtual Result onTransactionList(SolverContext& context, csdb::Pool& pool) = 0;
+        virtual Result onTransactionList(SolverContext& context, cs::TransactionsPacket& pack) = 0;
 
         // Solver3 new methods
         
