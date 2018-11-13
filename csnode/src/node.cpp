@@ -2082,7 +2082,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   solver_->gotStageThree(std::move(stage));
 }
 
-void Node::sendRoundInfo(const cs::RoundTable& roundTable) {
+void Node::sendRoundInfo(cs::RoundTable& roundTable) {
 
   csdebug() << "NODE> Apply notifications";
   roundNum_ = roundTable.round; // only for new consensus
@@ -2120,26 +2120,26 @@ void Node::sendRoundInfo(const cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
-
+  conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(roundTable, poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
+  createRoundPackage(conveyer.roundTable(), poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
   cslog() << "Round " << roundNum_ << ", Confidants: ";
-
-  const cs::ConfidantsKeys confidants = roundTable.confidants;
+  const cs::RoundTable& table = conveyer.roundTable();
+  const cs::ConfidantsKeys confidants = table.confidants;
 
   for (std::size_t i = 0; i < confidants.size(); ++i) {
     const cs::PublicKey& confidant = confidants[i];
 
-    if (confidant != roundTable.general) {
+    if (confidant != table.general) {
       cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
     }
   }
 
-  const cs::Hashes& hashes = roundTable.hashes;
+  const cs::Hashes& hashes = table.hashes;
   cslog() << "Hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
@@ -2153,7 +2153,7 @@ void Node::sendRoundInfo(const cs::RoundTable& roundTable) {
   //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
   assert(false);
 
-  onRoundStart_V3(roundTable);
+  onRoundStart_V3(table);
 
   if (getNodeLevel() == NodeLevel::Confidant) {
     solver_->gotRound(roundNum_);

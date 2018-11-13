@@ -47,6 +47,7 @@ public:
   void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+  void getRoundInfo_(const uint8_t *, const size_t , const cs::RoundNumber, const cs::PublicKey&);
 
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
@@ -81,12 +82,7 @@ public:
   csdb::Pool getCompressedPoolFromPack();
   void composeMessageWithBlock1(const csdb::Pool& pool);
 
-  //void sendRoundInfo(const std::vector<cs::PublicKey>& confidantNodes,
-  //    const csdb::Pool& poolToVerify,
-  //    const csdb::Pool& newPool,
-  //    const std::vector <cs::StageThree>& stageThreeStorage);
-
-  void sendRoundInfo(const cs::RoundTable& roundTable);
+  void sendRoundInfo(cs::RoundTable& roundTable);
 
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);

@@ -277,8 +277,14 @@ namespace slv2
           //table.general = mainNode;
 
           table.hashes = std::move(hashes);
-          conveyer.setRound(std::move(table));
-          pnode->sendRoundInfo(conveyer.roundTable());
+
+          ///////////////////////////////////////////////////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          // Place this function after creating the block!!!
+
+          ///////////////////////////////////////////////////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+          pnode->sendRoundInfo(table);
           //pnode->onRoundStart(conveyer.roundTable());
 
         // see Solver-1, writeNewBlock() method

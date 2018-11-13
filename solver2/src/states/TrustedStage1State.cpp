@@ -223,6 +223,7 @@ namespace slv2
             cserror() << "Trusted-1: Build vector, characteristic mask size not equals transactions count";
         }
 
+
         blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
 
         //m_findUntrusted.fill(0);
