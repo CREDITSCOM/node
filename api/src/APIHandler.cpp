@@ -663,8 +663,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return;
   }*/
 
-  send_transaction.add_user_field(0, serialize(transaction.smartContract).c_str());
-  send_transaction.add_user_field(smart_state_idx, api_resp.contractState.c_str());
+  send_transaction.add_user_field(0, serialize(transaction.smartContract));
+  send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy)
