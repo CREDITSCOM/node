@@ -141,7 +141,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onTransactionList(SolverContext& context, csdb::Pool& pool) override;
+        Result onTransactionList(SolverContext& context, cs::TransactionsPacket& pack) override;
 
         Result onStage1(SolverContext& context, const cs::StageOne& stage) override;
         Result onStage2(SolverContext& context, const cs::StageTwo& stage) override;

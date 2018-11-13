@@ -65,7 +65,7 @@ namespace slv2
         // perform similar actions, but use csdb::Pool instead of cs::TransactionsPacket
         
         cslog() << "SolverCore: got round, start consensus = " << rNum;
-        csdb::Pool pool {};
+        cs::TransactionsPacket pack;
         cs::Conveyer& conveyer = cs::Conveyer::instance();
 
         for(const auto& hash : conveyer.roundTable().hashes) {
@@ -79,14 +79,14 @@ namespace slv2
             const auto& transactions = conveyer.packet(hash).transactions();
 
             for(const auto& transaction : transactions) {
-                if(!pool.add_transaction(transaction)) {
+                if(!pack.addTransaction(transaction)) {
                     cserror() << "SolverCore: cannot add transaction to packet while prepare consensus to build vector";
                 }
             }
         }
 
-        cslog() << "SolverCore: prepare packet of " << pool.transactions_count() << " transactions for consensus to build vector";
-        gotTransactionList(pool);
+        cslog() << "SolverCore: prepare packet of " << pack.transactionsCount() << " transactions for consensus to build vector";
+        gotTransactionList(pack);
     }
 
     const cs::PublicKey& SolverCore::getWriterPublicKey() const
@@ -157,7 +157,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotTransactionList(csdb::Pool& p)
+    void SolverCore::gotTransactionList(cs::TransactionsPacket& p)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             if(Consensus::Log) {
@@ -167,7 +167,7 @@ namespace slv2
         }
 
         // any way processed transactions
-        total_recv_trans += p.transactions_count();
+        total_recv_trans += p.transactionsCount();
 
         // clear data
         markUntrusted.fill(0);

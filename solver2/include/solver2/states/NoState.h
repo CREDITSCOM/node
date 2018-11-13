@@ -67,7 +67,7 @@ namespace slv2
             return Result::Failure;
         }
 
-        Result onTransactionList(SolverContext& /*context*/, csdb::Pool& /*pool*/) override
+        Result onTransactionList(SolverContext& /*context*/, cs::TransactionsPacket& /*pack*/) override
         {
             return Result::Failure;
         }

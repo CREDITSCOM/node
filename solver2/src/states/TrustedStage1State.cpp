@@ -57,10 +57,10 @@ namespace slv2
         }
     }
 
-    Result TrustedStage1State::onTransactionList(SolverContext & context, csdb::Pool & pool)
+    Result TrustedStage1State::onTransactionList(SolverContext & context, cs::TransactionsPacket& pack)
     {
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": <-- tr.list [" << pool.sequence() << "] of " << pool.transactions_count());
+            LOG_NOTICE(name() << ": <-- packet of " << pack.transactionsCount() << " transactions");
 #if LOG_LEVEL & FLAG_LOG_DEBUG
             std::ostringstream os;
             for(const auto& t : p.transactions()) {
@@ -75,29 +75,13 @@ namespace slv2
         // bad tansactions storage:
         csdb::Pool rejected_pool {};
 
-        // TODO: update own hash vector?
-        
-        pool = filter_test_signatures(context, pool);
+        // obsolete?
+        //pool = filter_test_signatures(context, pool);
 
         // see Solver::runCinsensus()
-        cs::TransactionsPacket packet;
-        cs::Conveyer& conveyer = cs::Conveyer::instance();
-        for(const auto& hash : conveyer.roundTable().hashes) {
-            const auto& hashTable = conveyer.transactionsPacketTable();
-            if(!hashTable.count(hash)) {
-                cserror() << name() << ": consensus build vector: HASH NOT FOUND";
-                return Result::Failure;
-            }
-            const auto& transactions = conveyer.packet(hash).transactions();
-            for(const auto& transaction : transactions) {
-                if(!packet.addTransaction(transaction)) {
-                    cserror() << name() << ": cannot add transaction to packet in consensus";
-                }
-            }
-        }
-        cslog() << name() << ": consensus transaction packet of " << packet.transactionsCount() << " transactions";
-        context.update_fees(packet);
-        auto result = build_vector(context, packet);
+        cslog() << name() << ": consensus transaction packet of " << pack.transactionsCount() << " transactions";
+        context.update_fees(pack);
+        auto result = build_vector(context, pack);
         if(Consensus::Log) {
             LOG_NOTICE(name() << ": accepted " << accepted_pool.transactions_count()
                 << " trans, rejected " << rejected_pool.transactions_count());
@@ -152,6 +136,7 @@ namespace slv2
         return Result::Ignore;
     }
 
+    // outdated
     csdb::Pool TrustedStage1State::filter_test_signatures(SolverContext& context, const csdb::Pool& p)
     {
         csdb::Pool good;
