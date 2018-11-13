@@ -242,6 +242,8 @@ std::size_t cs::Conveyer::neededNotificationsCount() const
 
 bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) const
 {
+    cs::SharedLock lock(m_sharedMutex);
+
     const std::size_t neededConfidantsCount = neededNotificationsCount();
     const std::size_t notificationsCount = notifications().size();
 
