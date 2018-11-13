@@ -6,6 +6,9 @@
 #include <type_traits>
 #include <cstring>
 
+#include <csnode/nodecore.hpp>
+#include <csnode/transactionspacket.hpp>
+
 #include <csdb/pool.h>
 #include <csdb/transaction.h>
 

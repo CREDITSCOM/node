@@ -1,8 +1,16 @@
-#include "stdafx.h"
 /* Send blaming letters to @yrtimd */
+#include <iostream>
 #include <string>
 #include <regex>
 #include <stdexcept>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/log/utility/setup/settings_parser.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 
 #include <lib/system/logger.hpp>
 #include <base58.h>
