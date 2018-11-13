@@ -786,6 +786,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
       cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
       writeBlock(pool.value(), sequence, sender);
+      getBlockChain().recount_trxns(pool);
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
