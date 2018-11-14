@@ -339,6 +339,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     csdb::Pool newPool;
     std::size_t maskIndex = 0;
     const cs::Bytes& mask = characteristic.mask;
+    cs::TransactionsPacket invalidTransactions;
 
     for (const auto& hash : localHashes)
     {
@@ -358,6 +359,9 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
                 if (mask[maskIndex] != 0u) {
                     newPool.add_transaction(transaction);
                 }
+                else {
+                    invalidTransactions.addTransaction(transaction);
+                }
             }
 
             ++maskIndex;
@@ -376,6 +380,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);
+    meta->invalidTransactions = std::move(invalidTransactions);
 
     if (characteristic.mask.size() != newPool.transactions_count())
     {
@@ -415,6 +420,26 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
     }
 
     return std::nullopt;
+}
+
+bool cs::Conveyer::isMetaTransactionInvalid(int64_t id)
+{
+    cs::SharedLock lock(m_sharedMutex);
+
+    for (const cs::ConveyerMetaStorage::Element& element : pimpl->metaStorage)
+    {
+        const auto& invalidTransactions = element.meta.invalidTransactions.transactions();
+        const auto iterator = std::find_if(invalidTransactions.begin(), invalidTransactions.end(),
+            [=](const auto& transaction) {
+                return transaction.innerID() == id;
+            });
+
+        if (iterator != invalidTransactions.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 cs::SharedMutex& cs::Conveyer::sharedMutex() const

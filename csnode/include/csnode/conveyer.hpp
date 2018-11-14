@@ -199,6 +199,13 @@ namespace cs
         ///
         std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
 
+        ///
+        /// @brief Returns existing of invalid transaction in meta storage.
+        /// @param innerId of transaction to search equal transaction.
+        /// @warning thread safe method.
+        ///
+        bool isMetaTransactionInvalid(int64_t id);
+
         // sync, try do not use it :]
 
         ///

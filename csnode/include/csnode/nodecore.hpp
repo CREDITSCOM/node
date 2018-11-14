@@ -124,6 +124,7 @@ namespace cs
         cs::Hashes neededHashes;
         cs::RoundTable roundTable;
         cs::Notifications notifications;
+        cs::TransactionsPacket invalidTransactions;
     };
 
     struct CharacteristicMeta
