@@ -30,7 +30,6 @@
 #endif // _MSC_VER
 
 #include <iomanip>
-#include <scope_guard.h>
 #include <solver/solvercore.hpp>
 #include <ContractExecutor.h>
 

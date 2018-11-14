@@ -10,6 +10,8 @@
 
 #include "priv_crypto.hpp"
 
+#include <lib/system/scope_guard.h>
+
 namespace csdb {
 
 namespace {
@@ -79,6 +81,7 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 #ifdef TRANSACTIONS_INDEX
   db_trans_idx_->close(0);
 #endif
+  env_.close(0);
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
@@ -113,53 +116,47 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
 
-#ifdef TRANSACTIONS_INDEX
-  db_trans_idx_.reset(nullptr);
-#endif
+  uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL
+	  | DB_THREAD | DB_RECOVER | DB_INIT_TXN | DB_INIT_LOCK;
+  int status = env_.open(path.c_str(), db_env_open_flags, 0);
+  status = status ? status : env_.set_flags(DB_TXN_NOSYNC, 1);
 
-  DbEnv env(static_cast<uint32_t>(0));
-  uint32_t db_env_open_flags =
-      DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
-  try {
-    //    env.open(path.c_str(), db_env_open_flags, 0);
-    //    env.close(0); // this recover method does not work
-  }
-  catch (DbException &e) {
-    std::cerr << "Error opening database environment: " << path << " and database "
-              << "blockchain.db" << std::endl;
-    std::cerr << e.what() << std::endl;
-    return false;
-  }
-  catch (std::exception &e) {
-    std::cerr << "Error opening database environment: " << path << " and database "
-              << "blockchain.db" << std::endl;
-    std::cerr << e.what() << std::endl;
-    return false;
-  }
+  DbTxn *txn;
+  status = status ? status : env_.txn_begin(nullptr, &txn, DB_READ_UNCOMMITTED);
+  auto txn_create_status = status;
 
-  db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_CDB | DB_THREAD;
-  env_.open(path.c_str(), db_env_open_flags, 0);
+  auto g = scopeGuard([&]() {
+    if (txn_create_status) {
+      return;
+    }
+    if (status) {
+      txn->abort();
+    }
+    else {
+      txn->commit(0);
+    }
+  });
 
-  auto db_blocks = std::make_unique<Db>(&env_, 0);
-  auto db_seq_no = std::make_unique<Db>(&env_, 0);
 
 #ifdef TRANSACTIONS_INDEX
   auto db_trans_idx = new Db(&env_, 0);
 #endif
 
-  int status = db_blocks->open(nullptr, "blockchain.db", nullptr, DB_RECNO, DB_CREATE, 0);
-  if (status != 0) {
-    set_last_error_from_berkeleydb(status);
-    return false;
+  if (!status) {
+    decltype(db_blocks_) db_blocks(new Db(&env_, 0));
+    status = db_blocks->open(txn, "blockchain.db", NULL, DB_RECNO, DB_CREATE | DB_READ_UNCOMMITTED, 0);
+    db_blocks_.swap(db_blocks);
   }
-  db_blocks_.reset(db_blocks.release());
+  if (!status) {
+    decltype(db_seq_no_) db_seq_no(new Db(&env_, 0));
+    status = db_seq_no->open(txn, "sequence.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
+    db_seq_no_.swap(db_seq_no);
+  }
 
-  status = db_seq_no->open(nullptr, "sequence.db", nullptr, DB_HASH, DB_CREATE, 0);
-  if (status != 0) {
+  if (status) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
-  db_seq_no_.reset(db_seq_no.release());
 
 #ifdef TRANSACTIONS_INDEX
   status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
@@ -184,24 +181,37 @@ bool DatabaseBerkeleyDB::put(const cs::Bytes& key, uint32_t seq_no, const cs::By
     return false;
   }
 
+  DbTxn *tid;
+  int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
+  int txn_create_status = status;
+  auto g = scopeGuard([&]() {
+    if (txn_create_status) {
+      return;
+    }
+    if (status) {
+      tid->abort();
+    }
+    else {
+      tid->commit(0);
+    }
+  });
   Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
-  Dbt_copy<cs::Bytes> db_value(value);
+  if (!status) {
+    Dbt_copy<cs::Bytes> db_value(value);
+    status = db_blocks_->put(tid, &db_seq_no, &db_value, 0);
+  }
+  if (!status) {
+    Dbt_copy<cs::Bytes> db_key(key);
+    status = db_seq_no_->put(tid, &db_key, &db_seq_no, 0);
+  }
 
-  int status = db_blocks_->put(nullptr, &db_seq_no, &db_value, 0);
-  if (status != 0) {
+  if (!status) {
+    set_last_error();
+    return true;
+  } else {
     set_last_error_from_berkeleydb(status);
     return false;
   }
-
-  Dbt_copy<cs::Bytes> db_key(key);
-  status = db_seq_no_->put(nullptr, &db_key, &db_seq_no, 0);
-  if (status != 0) {
-    set_last_error_from_berkeleydb(status);
-    return false;
-  }
-
-  set_last_error();
-  return true;
 }
 
 bool DatabaseBerkeleyDB::get(const cs::Bytes& key, cs::Bytes* value) {
@@ -216,16 +226,16 @@ bool DatabaseBerkeleyDB::get(const cs::Bytes& key, cs::Bytes* value) {
   }
 
   Dbt_copy<uint32_t> db_seq_no;
-  int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, 0);
-  if (status != 0) {
+  int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, DB_READ_UNCOMMITTED);
+  if (status) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
 
   Dbt_safe db_value;
 
-  status = db_blocks_->get(nullptr, &db_seq_no, &db_value, 0);
-  if (status != 0) {
+  status = db_blocks_->get(nullptr, &db_seq_no, &db_value, DB_READ_UNCOMMITTED);
+  if (status) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
