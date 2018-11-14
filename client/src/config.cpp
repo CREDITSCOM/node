@@ -5,6 +5,7 @@
 #include <lib/system/logger.hpp>
 #include <base58.h>
 #include "config.hpp"
+#include "EndpointData.h"
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
@@ -25,21 +26,9 @@ const std::string PARAM_NAME_PORT = "port";
 const std::map<std::string, NodeType> NODE_TYPES_MAP = { { "client", NodeType::Client }, { "router", NodeType::Router } };
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = { { "signal_server", BootstrapType::SignalServer }, { "list", BootstrapType::IpList } };
 
-namespace ip = boost::asio::ip;
-struct EndpointData final {
-  EndpointData()
-    : ipSpecified(false)
-	, port(0)
-  {}
-  bool ipSpecified;
-  short unsigned port;
-  ip::address ip;
-
-  static EndpointData fromString(const std::string&);
-};
 struct Config::ConfigImpl final
 {
-	Config::ConfigImpl()
+	ConfigImpl()
       : good_(false)
       , twoSockets_(false)
       , nType_()
@@ -87,7 +76,7 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
   EndpointData result;
   if (epTree.count(PARAM_NAME_IP)) {
     result.ipSpecified = true;
-    result.ip = ip::make_address(epTree.get<std::string>(PARAM_NAME_IP));
+    result.ip = boost::asio::ip::make_address(epTree.get<std::string>(PARAM_NAME_IP));
   }
   else
     result.ipSpecified = false;
@@ -97,24 +86,7 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
   return result;
 }
 
-EndpointData EndpointData::fromString(const std::string& str) {
-  static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5})$");
-  static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
 
-  std::smatch match;
-  EndpointData result;
-
-  if (std::regex_match(str, match, ipv4Regex))
-    result.ip = ip::make_address_v4(match[1]);
-  else if (std::regex_match(str, match, ipv6Regex))
-    result.ip = ip::make_address_v6(match[1]);
-  else
-    throw std::invalid_argument(str);
-
-  result.port = std::stoul(match[2]);
-
-  return result;
-}
 
 template <typename MapType>
 typename MapType::mapped_type getFromMap(const std::string& pName, const MapType& map) {
@@ -132,9 +104,20 @@ Config::Config()
 Config::Config(const Config& other)
 	:m_pImpl(std::make_unique<ConfigImpl>(*other.m_pImpl))
 {}
-Config::Config(Config&& other)
+Config::Config(Config&& other)  noexcept
 	: m_pImpl(std::move(other.m_pImpl))
 {}
+void Config::Swap(Config& other) noexcept
+{
+	m_pImpl.swap(other.m_pImpl);
+}
+const Config& Config::operator=(const Config& other)
+{
+	Config tmp(other);
+	Swap(tmp);
+	return *this;
+}
+Config::~Config() = default;
 inline const EndpointData& Config::getInputEndpoint() const { return m_pImpl->inputEp_; }
 inline const EndpointData& Config::getOutputEndpoint() const { return m_pImpl->outputEp_; }
 inline const EndpointData& Config::getSignalServerEndpoint() const { return m_pImpl->signalServerEp_; }

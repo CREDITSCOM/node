@@ -41,8 +41,11 @@ class Config
 public:
   Config();
   Config(const Config&);
+  const Config& operator=(const Config& other);
   Config(Config&&) noexcept;
-  ~Config() = default;
+  ~Config();
+  void Swap(Config& other) noexcept;
+
   using variables_map = boost::program_options::variables_map;
 
   static Config read(variables_map&);
@@ -68,7 +71,7 @@ private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
 private:
-  struct ConfigImpl; 
+  struct ConfigImpl;
   std::unique_ptr<ConfigImpl> m_pImpl;
 };
 
