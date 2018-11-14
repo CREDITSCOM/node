@@ -1,20 +1,13 @@
 #pragma once
 #include <APIHandler.h>
 
-#include <DebugLog.h>
-
 #include <memory>
 #include <thread>
 
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TSimpleServer.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TBufferTransports.h>
-#include <thrift/transport/TServerSocket.h>
 
 #include <solver2/SolverCore.h>
-#include <csdb/storage.h>
 
 #include <client/params.hpp>
 
