@@ -21,6 +21,7 @@
 #include <mutex>
 
 #include <csnode/threading.hpp>
+#include <client/params.hpp>
 
 class BlockChain
 {

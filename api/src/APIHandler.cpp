@@ -1271,6 +1271,7 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t total = 0;
 
   s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const Credits::WalletsCache::WalletData::Address& addr, const Credits::WalletsCache::WriterData& wd) {
+                                    if (addr.empty()) return true;
                                     if (offset == 0) {
                                       if (limit > 0) {
                                         api::WriterInfo wi;
@@ -1290,5 +1291,6 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
                                     ++total;
                                     return true;
                                   });
+  _return.pages = (total / PER_PAGE) + (int)(total % PER_PAGE != 0);
 #endif
 }
