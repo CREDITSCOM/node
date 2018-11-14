@@ -636,7 +636,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     cs::CharacteristicMetaStorage::MetaElement metaElement;
     metaElement.meta.bytes = std::move(characteristicBytes);
     metaElement.meta.sender = sender;
-    metaElement.round = conveyer.currentRoundNumber();
+    metaElement.round = round;
 
     conveyer.addCharacteristicMeta(std::move(metaElement));
     return;
