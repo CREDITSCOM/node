@@ -298,6 +298,8 @@ namespace slv2
         void accept_transactions(const csdb::Pool& pool)
         {
             core.accepted_pool = pool;
+            // any way processed transactions
+            core.total_recv_trans += core.accepted_pool.transactions_count();
         }
 
         /**

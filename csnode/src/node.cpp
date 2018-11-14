@@ -653,12 +653,15 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Signature signature;
   istream_ >> signature;
+  cslog() << "NODE> >> signature, size=" << signature.size();
 
   cs::Notifications notifications;
   istream_ >> notifications;
+  cslog() << "NODE> >> notifications, size=" << notifications.size();
 
   for (std::size_t i = 0; i < notifications.size(); ++i) {
     conveyer.addNotification(notifications[i]);
+    cslog() << "NODE> >> notifications[" << i << "], size=" << notifications[i].size();
   }
 
   std::vector<cs::Hash> confidantsHashes;
@@ -671,8 +674,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     confidantsHashes.push_back(hash);
   }
+  cslog() << "NODE> >> confidantsHashes, size=" << confidantsHashes.size();
 
+  cslog() << "NODE> getBlake2Hash(..., characteristicMask.size()=" << characteristicMask.size() << ")";
   cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
+  cslog() << "NODE> getBlake2Hash(...) ok";
 
   for (const auto& hash : confidantsHashes) {
     if (hash != characteristicHash) {
@@ -1332,13 +1338,18 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
+  const auto& rt = conveyer.roundTable();
 
-  if (conveyer.isSyncCompleted()) {
-    cslog() << "NODE> All hashes in conveyer";
-    solver_->gotRound(roundTable.round);
+  if(rt.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table - > got round now";
+      solver_->gotRound(rt.round);
+  }
+  else if (conveyer.isSyncCompleted()) {
+    cslog() << "NODE> All hashes in conveyer -> got round now";
+    solver_->gotRound(rt.round);
   }
   else {
-
+    //TODO: whether possible roundNum_ != rt.round at this point?
     sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
@@ -2364,14 +2375,6 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   //  cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
   //}
 
-
-
-
-  if(roundTable.hashes.size()==0) {
-    cslog() << "NODE> Get Round info_ - > got Round";
-    solver_->gotRound(rNum);
-  }
- 
   onRoundStartConveyer(std::move(roundTable));
   transport_->processPostponed(roundNum_);
 

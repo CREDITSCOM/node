@@ -34,13 +34,13 @@ namespace slv2
         transactions_checked = false;
 
         if(Consensus::Log) {
-            LOG_NOTICE(name() << ": I am [" << context.own_conf_number() << "]");
+            cslog() << name() << ": I am [" << context.own_conf_number() << "]";
         }
     }
 
     void TrustedStage1State::off(SolverContext & context)
     {
-        LOG_NOTICE(name() << ": --> stage-1 [" << (int) stage.sender << "]");
+        cslog() << name() << ": --> stage-1 [" << (int) stage.sender << "]";
         context.add_stage1(stage, true);
     }
 
@@ -57,18 +57,38 @@ namespace slv2
         }
     }
 
-    Result TrustedStage1State::onTransactionList(SolverContext & context, cs::TransactionsPacket& pack)
+    Result TrustedStage1State::onSyncTransactions(SolverContext & context, cs::RoundNumber round)
     {
-        if(Consensus::Log) {
-            LOG_NOTICE(name() << ": <-- packet of " << pack.transactionsCount() << " transactions");
-#if LOG_LEVEL & FLAG_LOG_DEBUG
-            std::ostringstream os;
-            for(const auto& t : p.transactions()) {
-                os << " " << t.innerID();
-            }
-            LOG_DEBUG("SolverCore:" << os.str());
-#endif // FLAG_LOG_DEBUG
+        if(round < context.round()) {
+            cserror() << name() << ": cannot handle previous round transactions";
+            return Result::Ignore;
         }
+        cslog() << name() << ": transactions sync completed, start consensus in " << context.round() << " round";
+        cs::TransactionsPacket pack;
+        cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+        for(const auto& hash : conveyer.roundTable().hashes) {
+            const auto& hashTable = conveyer.transactionsPacketTable();
+            if(hashTable.count(hash) == 0) {
+                cserror() << name() <<
+                    ": HASH NOT FOUND while prepare consensus to build vector, maybe method called before sync completed?";
+                return Result::Ignore;
+            }
+            const auto& transactions = conveyer.packet(hash).transactions();
+            for(const auto& transaction : transactions) {
+                if(!pack.addTransaction(transaction)) {
+                    cserror() << name() << ": cannot add transaction to packet while prepare consensus to build vector";
+                }
+            }
+        }
+        cslog() << name() << ": <-- packet of " << pack.transactionsCount() << " transactions";
+#if LOG_LEVEL & FLAG_LOG_DEBUG
+        std::ostringstream os;
+        for(const auto& t : p.transactions()) {
+            os << " " << t.innerID();
+        }
+        csdebug() << name() << ":" << os.str());
+#endif // FLAG_LOG_DEBUG
 
         // good transactions storage
         csdb::Pool accepted_pool {};
@@ -79,16 +99,10 @@ namespace slv2
         //pool = filter_test_signatures(context, pool);
 
         // see Solver::runCinsensus()
-        cslog() << name() << ": consensus transaction packet of " << pack.transactionsCount() << " transactions";
         context.update_fees(pack);
-        auto result = build_vector(context, pack);
-        if(Consensus::Log) {
-            LOG_NOTICE(name() << ": accepted " << accepted_pool.transactions_count()
-                << " trans, rejected " << rejected_pool.transactions_count());
-        }
-
-        std::copy(result.cbegin(), result.cend(), stage.hash.begin());
-
+        stage.hash = build_vector(context, pack);
+        cslog() << name() << ": accepted " << accepted_pool.transactions_count()
+            << " trans, rejected " << rejected_pool.transactions_count();
         context.accept_transactions(accepted_pool);
         transactions_checked = true;
 
@@ -97,14 +111,14 @@ namespace slv2
 
     Result TrustedStage1State::onHash(SolverContext & context, const cs::Hash & hash, const cs::PublicKey & sender)
     {
-        LOG_NOTICE(name() << ": <-- hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
-            << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()));
+        cslog() << name() << ": <-- hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
+            << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
         cs::Hash myHash;
         const auto& lwh = context.blockchain().getLastWrittenHash().to_binary();
         std::copy(lwh.cbegin(), lwh.cend(), myHash.begin());
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
             if(hash == myHash) {
-              LOG_NOTICE(name() << ": Hashes are good"); 
+              cslog() << name() << ": hash is OK"; 
 
                 bool keyFound = false;
                 for(uint8_t i = 0; i < stage.candidatesAmount; i++) {
@@ -120,7 +134,7 @@ namespace slv2
             }
             else {
                 // hash does not match to own hash
-                LOG_NOTICE(name() << ": Hashes DOESN'T match");
+                cslog() << name() << ": hash DOESN'T match to my one";
                 return Result::Ignore;
             }
         }
@@ -165,10 +179,8 @@ namespace slv2
                 }
             }
         }
-        if(Consensus::Log) {
-            if(cnt_filtered > 0) {
-                LOG_WARN(name() << ": " << cnt_filtered << " trans. filtered while test signatures");
-            }
+        if(cnt_filtered > 0) {
+            cswarning() << name() << ": " << cnt_filtered << " trans. filtered while test signatures";
         }
     }
 

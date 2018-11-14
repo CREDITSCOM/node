@@ -177,7 +177,7 @@ namespace slv2
         virtual Result onTransaction(SolverContext& context, const csdb::Transaction& trans) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onTransactionList(SolverContext& context, const csdb::Pool& pool) = 0;
+         * @fn  virtual Result INodeState::onSyncTransactions(SolverContext& context, cs::RoundNumber round) = 0;
          *
          * @brief   Is called when new transaction list is received. The SolverCore always updates own
          *          vector before call this method.
@@ -186,13 +186,13 @@ namespace slv2
          * @date    01.10.2018
          *
          * @param [in]  context The core context.
-         * @param       pool    The pool of transaction list received.
+         * @param       round   The round.
          *
          * @return  A Result of event: Finish - core has to make a transition, Ignore - continue to work
          *          in current state, Failed - error occurs.
          */
 
-        virtual Result onTransactionList(SolverContext& context, cs::TransactionsPacket& pack) = 0;
+        virtual Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) = 0;
 
         // Solver3 new methods
         

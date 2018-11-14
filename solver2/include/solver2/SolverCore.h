@@ -64,7 +64,7 @@ namespace slv2
         void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
         void runSpammer();
         void countFeesInPool(csdb::Pool* pool);
-        void gotRound(const cs::RoundNumber rNum);
+        void gotRound(cs::RoundNumber rNum);
         void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
         const cs::PublicKey& getPublicKey() const
         {
@@ -80,7 +80,6 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(cs::TransactionsPacket&& p);
         void gotVector(const cs::HashVector& vect);
         void gotMatrix(cs::HashMatrix&& matr);
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
@@ -100,11 +99,6 @@ namespace slv2
         void gotStageOne(const cs::StageOne& stage);
         void gotStageTwo(const cs::StageTwo& stage);
         void gotStageThree(const cs::StageThree& stage);
-        // TODO: remove when obsolete
-        void gotTransactionList_V3(cs::TransactionsPacket&& p)
-        {
-            gotTransactionList(std::move(p));
-        }
 
         void gotStageOneRequest(uint8_t requester, uint8_t required);
         void gotStageTwoRequest(uint8_t requester, uint8_t required);
