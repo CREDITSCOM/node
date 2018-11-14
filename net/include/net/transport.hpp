@@ -17,6 +17,8 @@
 #include "packet.hpp"
 #include "pacmans.hpp"
 
+extern volatile std::sig_atomic_t gSignalStatus;
+
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
 

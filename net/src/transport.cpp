@@ -11,7 +11,7 @@
 volatile std::sig_atomic_t Transport::gSignalStatus = 0;
 
 // variable defined in client/main.cpp
-extern volatile std::sig_atomic_t gSignalStatus;
+volatile std::sig_atomic_t gSignalStatus = 0;
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {

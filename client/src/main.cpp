@@ -15,9 +15,6 @@
 
 #include "config.hpp"
 
-
-volatile std::sig_atomic_t gSignalStatus = 0;
-
 #ifdef BUILD_WITH_GPROF
 #include <dlfcn.h>
 #include <signal.h>
