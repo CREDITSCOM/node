@@ -74,10 +74,10 @@ namespace cs
         const cs::TransactionsBlock& transactionsBlock() const;
 
         ///
-        /// @brief Returns transactions packet by hash.
-        /// Search in current hash table
+        /// @brief Returns transactions packet created in current round.
+        /// @warning Slow-performance method. No thread safe.
         ///
-        const cs::TransactionsPacket& packet(const cs::TransactionsPacketHash& hash) const;
+        std::optional<cs::TransactionsPacket> createPacket() const;
 
         // round info
 

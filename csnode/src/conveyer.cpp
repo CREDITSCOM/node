@@ -84,9 +84,41 @@ const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
     return pimpl->transactionsBlock;
 }
 
-const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketHash& hash) const
+std::optional<cs::TransactionsPacket> cs::Conveyer::createPacket() const
 {
-    return pimpl->hashTable[hash];
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
+
+    if (!meta)
+    {
+        cserror() << "CONVEYER> Can not create transactions packet";
+        return std::nullopt;
+    }
+
+    cs::TransactionsPacket packet;
+    cs::Hashes& hashes = meta->roundTable.hashes;
+    cs::TransactionsPacketTable& table = pimpl->hashTable;
+
+    for (const auto& hash : hashes)
+    {
+        const auto iterator = table.find(hash);
+
+        if (iterator == table.end())
+        {
+            cserror() << "CONVEYER>: PACKET CREATION HASH NOT FOUND";
+            return std::nullopt;
+        }
+
+        const auto& transactions = iterator->second.transactions();
+
+        for (const auto& transaction : transactions)
+        {
+            if (!packet.addTransaction(transaction)) {
+                cserror() << "Can not add transaction to packet in consensus";
+            }
+        }
+    }
+
+    return std::make_optional<cs::TransactionsPacket>(std::move(packet));
 }
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)

@@ -689,33 +689,34 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-  if (isSyncroStarted_) {
-    if (pool) {
-      cs::PoolSyncMeta meta;
-      meta.sender = sender;
-      meta.signature = signature;
-      meta.pool = std::move(pool).value();
+  if (!pool) {
+    cserror() << "NODE> Get characteristic, created pool is not valid";
+    return;
+  }
 
-      addPoolMetaToMap(std::move(meta), sequence);
-    }
+  if (isSyncroStarted_) {
+    cs::PoolSyncMeta meta;
+    meta.sender = sender;
+    meta.signature = signature;
+    meta.pool = std::move(pool).value();
+
+    addPoolMetaToMap(std::move(meta), sequence);
 
     return;
   }
 
-  if (pool) {
-    solver_->countFeesInPool(&pool.value());
-    pool.value().set_previous_hash(bc_.getLastWrittenHash());
-    getBlockChain().finishNewBlock(pool.value());
+  solver_->countFeesInPool(&pool.value());
+  pool.value().set_previous_hash(bc_.getLastWrittenHash());
+  getBlockChain().finishNewBlock(pool.value());
 
-    if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock(pool.value(), sequence, sender);
-    }
-    else {
-      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
-      cswarning() << "NODE> remove wallets from wallets cache";
-      getBlockChain().removeWalletsInPoolFromCache(pool.value());
-    }
+  if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
+    cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+    writeBlock(pool.value(), sequence, sender);
+  }
+  else {
+    cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+    cswarning() << "NODE> remove wallets from wallets cache";
+    getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
 }
 
