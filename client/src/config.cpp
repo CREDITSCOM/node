@@ -1,11 +1,9 @@
 #include "stdafx.h"
 /* Send blaming letters to @yrtimd */
 
-
 #include <lib/system/logger.hpp>
 #include <base58.h>
 #include "config.hpp"
-#include "EndpointData.h"
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
@@ -25,6 +23,25 @@ const std::string PARAM_NAME_PORT = "port";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = { { "client", NodeType::Client }, { "router", NodeType::Router } };
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = { { "signal_server", BootstrapType::SignalServer }, { "list", BootstrapType::IpList } };
+
+EndpointData EndpointData::fromString(const std::string& str) {
+	static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5})$");
+	static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
+
+	std::smatch match;
+	EndpointData result;
+
+	if (std::regex_match(str, match, ipv4Regex))
+		result.ip = boost::asio::ip::make_address_v4(match[1]);
+	else if (std::regex_match(str, match, ipv6Regex))
+		result.ip = boost::asio::ip::make_address_v6(match[1]);
+	else
+		throw std::invalid_argument(str);
+
+	result.port = std::stoul(match[2]);
+
+	return result;
+}
 
 struct Config::ConfigImpl final
 {
@@ -86,8 +103,6 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
   return result;
 }
 
-
-
 template <typename MapType>
 typename MapType::mapped_type getFromMap(const std::string& pName, const MapType& map) {
   auto it = map.find(pName);
@@ -118,21 +133,21 @@ const Config& Config::operator=(const Config& other)
 	return *this;
 }
 Config::~Config() = default;
-inline const EndpointData& Config::getInputEndpoint() const { return m_pImpl->inputEp_; }
-inline const EndpointData& Config::getOutputEndpoint() const { return m_pImpl->outputEp_; }
-inline const EndpointData& Config::getSignalServerEndpoint() const { return m_pImpl->signalServerEp_; }
-inline BootstrapType Config::getBootstrapType() const { return m_pImpl->bType_; }
-inline NodeType Config::getNodeType() const { return m_pImpl->nType_; }
-inline const std::vector<EndpointData>& Config::getIpList() const { return m_pImpl->bList_; }
-inline const cs::PublicKey& Config::getMyPublicKey() const { return m_pImpl->publicKey_; }
-inline const std::string& Config::getPathToDB() const { return m_pImpl->pathToDb_; }
-inline bool Config::isGood() const { return m_pImpl->good_; }
-inline bool Config::useIPv6() const { return m_pImpl->ipv6_; }
-inline bool Config::hasTwoSockets() const { return m_pImpl->twoSockets_; }
-inline uint32_t Config::getMaxNeighbours() const { return m_pImpl->maxNeighbours_; }
-inline uint64_t Config::getConnectionBandwidth() const { return m_pImpl->connectionBandwidth_; }
-inline bool Config::isSymmetric() const { return m_pImpl->symmetric_; }
-inline const EndpointData& Config::getAddressEndpoint() const { return m_pImpl->hostAddressEp_; }
+const EndpointData& Config::getInputEndpoint() const { return m_pImpl->inputEp_; }
+const EndpointData& Config::getOutputEndpoint() const { return m_pImpl->outputEp_; }
+const EndpointData& Config::getSignalServerEndpoint() const { return m_pImpl->signalServerEp_; }
+BootstrapType Config::getBootstrapType() const { return m_pImpl->bType_; }
+NodeType Config::getNodeType() const { return m_pImpl->nType_; }
+const std::vector<EndpointData>& Config::getIpList() const { return m_pImpl->bList_; }
+const cs::PublicKey& Config::getMyPublicKey() const { return m_pImpl->publicKey_; }
+const std::string& Config::getPathToDB() const { return m_pImpl->pathToDb_; }
+bool Config::isGood() const { return m_pImpl->good_; }
+bool Config::useIPv6() const { return m_pImpl->ipv6_; }
+bool Config::hasTwoSockets() const { return m_pImpl->twoSockets_; }
+uint32_t Config::getMaxNeighbours() const { return m_pImpl->maxNeighbours_; }
+uint64_t Config::getConnectionBandwidth() const { return m_pImpl->connectionBandwidth_; }
+bool Config::isSymmetric() const { return m_pImpl->symmetric_; }
+const EndpointData& Config::getAddressEndpoint() const { return m_pImpl->hostAddressEp_; }
 
 Config Config::read(variables_map& vm) {
   Config result = readFromFile(vm.count("config-file") ?

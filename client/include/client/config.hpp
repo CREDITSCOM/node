@@ -2,6 +2,8 @@
 #ifndef __CONFIG_HPP__
 #define __CONFIG_HPP__
 
+#include <boost/asio.hpp>
+
 #include <lib/system/keys.hpp>
 #include <lib/system/common.hpp>
 
@@ -24,7 +26,14 @@ namespace boost
 		class variables_map;
 	}
 }
-struct EndpointData;
+
+struct EndpointData {
+	bool ipSpecified = false;
+	short unsigned port = 0;
+	boost::asio::ip::address ip;
+
+	static EndpointData fromString(const std::string&);
+};
 
 enum NodeType {
   Client,
