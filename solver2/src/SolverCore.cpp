@@ -12,12 +12,12 @@
 
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 #pragma warning(pop)
 
-#include <Solver/WalletsState.h>
-#include <Solver/Fee.h>
-#include <Solver/spammer.h>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
+#include <solver/spammer.h>
 
 #pragma warning(push)
 #pragma warning(disable: 4324)
@@ -43,7 +43,7 @@ namespace slv2
     // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
     constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-    constexpr const bool ProxyToOldSolver = false;
+    constexpr const bool ProxyToOldSolver = true;
     // Special mode: uses debug transition table
     constexpr const bool DebugModeOn = false;
 

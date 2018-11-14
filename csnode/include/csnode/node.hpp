@@ -11,6 +11,7 @@
 #include <client/config.hpp>
 
 #include <lib/system/keys.hpp>
+#include <csnode/conveyer.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -47,7 +48,6 @@ public:
   void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
-  void getRoundInfo_(const uint8_t *, const size_t , const cs::RoundNumber, const cs::PublicKey&);
 
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
@@ -79,8 +79,6 @@ public:
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
   void addCompressedPoolToPack(const csdb::Pool& pool);
-  csdb::Pool getCompressedPoolFromPack();
-  void composeMessageWithBlock1(const csdb::Pool& pool);
 
   void sendRoundInfo(cs::RoundTable& roundTable);
 
