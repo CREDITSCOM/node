@@ -12,12 +12,12 @@
 
 #pragma warning(push)
 #pragma warning(disable: 4267 4244 4100 4245)
-#include <Solver/Solver.hpp>
+#include <solver/solver.hpp>
 #pragma warning(pop)
 
-#include <Solver/WalletsState.h>
-#include <Solver/Fee.h>
-#include <Solver/spammer.h>
+#include <solver/WalletsState.h>
+#include <solver/Fee.h>
+#include <solver/spammer.h>
 
 #pragma warning(push)
 #pragma warning(disable: 4324)
