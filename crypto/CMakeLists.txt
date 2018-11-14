@@ -12,7 +12,7 @@ add_library(${PROJECT_NAME} STATIC
   src/cscrypto.cpp
   )
 
-target_link_libraries (${PROJECT_NAME} ed25519 blake2)
+target_link_libraries (${PROJECT_NAME} blake2)
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC

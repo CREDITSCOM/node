@@ -137,13 +137,7 @@ namespace cscrypto
 		return result;
 	}
 
-	KeyPair generateKeyPair();
-
 	Address toAddress(const PublicKey& publicKey);
-
-	Signature sign(const Hash& hash, const KeyPair& keyPair);
-
-	bool verify(const PublicKey& publicKey, const Hash& hash, const Signature& signature);
 }
 
 #endif // CSCRYPTO_H
