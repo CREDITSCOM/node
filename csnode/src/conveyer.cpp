@@ -157,7 +157,7 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
         cs::Lock lock(m_sharedMutex);
 
         if (!pimpl->metaStorage.contains(pimpl->currentRound)) {
-            pimpl->metaStorage.append(element);
+            pimpl->metaStorage.append(std::move(element));
         }
         else {
             csfatal() << "CONVEYER> Meta round currently in conveyer";

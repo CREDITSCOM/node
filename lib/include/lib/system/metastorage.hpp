@@ -89,17 +89,6 @@ namespace cs
         }
 
         ///
-        /// @brief Appends meta element to buffer.
-        /// @param element Created from outside no needed lvalue, cuz it would be moved.
-        /// @return Returns true if append is success, otherwise returns false.
-        /// @warning value would be moved.
-        ///
-        bool append(MetaElement& value)
-        {
-            return append(std::move(value));
-        }
-
-        ///
         /// @brief Appends value with round key.
         /// @param round Current round to add as a key.
         /// @param value Movable value created from outside.
