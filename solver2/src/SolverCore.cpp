@@ -40,8 +40,6 @@ namespace slv2
     constexpr const bool TimeoutsEnabled = false;
     // To enable make a transition to the same state
     constexpr const bool RepeatStateEnabled = true;
-    // to activate transaction spammer in normal state; currently, define SPAMMER 'in params.hpp' overrides this value
-    constexpr const bool SpammerOn = true;
     // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
     constexpr const bool ProxyToOldSolver = false;
     // Special mode: uses debug transition table
@@ -52,7 +50,6 @@ namespace slv2
         // options
         : opt_timeouts_enabled(TimeoutsEnabled)
         , opt_repeat_state_enabled(RepeatStateEnabled)
-        , opt_spammer_on(SpammerOn)
         , opt_is_proxy_v1(ProxyToOldSolver)
         , opt_debug_mode(DebugModeOn)
         // inner data
@@ -65,7 +62,6 @@ namespace slv2
         , cnt_deferred_trans(0)
         , total_duration_ms(0)
         // consensus data
-        , addr_spam(std::nullopt)
         , cur_round(0)
         , pfee(std::make_unique<cs::Fee>())
         , is_bigbang(false)
@@ -97,24 +93,14 @@ namespace slv2
     }
 
     // actual constructor
-    SolverCore::SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddress /*= {}*/)
+    SolverCore::SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress)
         : SolverCore()
     {
         addr_genesis = GenesisAddress;
         addr_start = StartAddress;
-        addr_spam = SpammerAddress;
-        opt_spammer_on = addr_spam.has_value();
         pnode = pNode;
         if(opt_is_proxy_v1) {
-
-#if !defined(SPAMMER) // see: client\include\client\params.hpp
-            // thanks to Solver constructor :-), it has 3 args in this case
             pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start);
-#else
-            // thanks to Solver constructor :-), it has 4 args in this case
-            pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start, addr_spam.value_or(csdb::Address {}));
-#endif
-
             pws = pslv_v1->m_walletsState.get();
         }
         else {

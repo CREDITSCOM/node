@@ -30,33 +30,16 @@
 #include <base58.h>
 #include <sodium.h>
 
-namespace {
-#if defined(SPAMMER)
-static int randFT(int min, int max) {
-  return rand() % (max - min + 1) + min;
-}
-
-static const int NUM_OF_SPAM_KEYS = 10;
-#endif
-}  // namespace
-
 namespace cs {
 constexpr short min_nodes = 3;
 
-Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress
-#ifdef SPAMMER
-  , csdb::Address _spammerAddress
-#endif
-  )
+Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAddress)
 : m_node(node)
 , m_spammer()
 , m_walletsState(new WalletsState(node->getBlockChain()))
 , m_generals(std::unique_ptr<Generals>(new Generals(*m_walletsState)))
 , m_genesisAddress(_genesisAddress)
 , m_startAddress(_startAddress)
-#ifdef SPAMMER
-, m_spammerAddress(_spammerAddress)
-#endif
 , m_feeCounter()
 , m_writerIndex(0) {
   m_receivedVectorFrom.reserve(cs::hashVectorCount); // TODO Maybe = 100. Is max trusted count
@@ -446,9 +429,7 @@ void Solver::addInitialBalance() {
 }
 
 void Solver::runSpammer() {
-#ifdef SPAMMER
   m_spammer.StartSpamming(*m_node);
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
