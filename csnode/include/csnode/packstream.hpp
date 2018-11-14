@@ -133,6 +133,15 @@ public:
     return ptr_;
   }
 
+  const cs::Byte* getEndPtr() const
+  {
+      return end_;
+  }
+
+  size_t remainsBytes() const
+  {
+      return end_ - ptr_;
+  }
 private:
   const cs::Byte* ptr_ = nullptr;
   const cs::Byte* end_ = nullptr;
