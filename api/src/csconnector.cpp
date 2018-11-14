@@ -1,4 +1,4 @@
-//#define TRACE_ENABLER
+#include "stdafx.h"
 
 #include "csconnector/csconnector.h"
 #include <csdb/currency.h>
