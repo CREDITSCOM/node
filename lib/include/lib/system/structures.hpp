@@ -47,7 +47,7 @@ public:
 
   ~FixedCircularBuffer() {
     clear();
-    delete[] elements_;
+    delete[] reinterpret_cast<uint8_t*>(elements_);
   }
 
   FixedCircularBuffer(const FixedCircularBuffer&) = delete;
