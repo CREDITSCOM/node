@@ -17,6 +17,7 @@
 #include <base58.h>
 
 #include <boost/optional.hpp>
+#include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
 #include <sodium.h>
@@ -1120,7 +1121,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
 
-    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+    if (roundToSync_ > 0) {
+      Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+    }
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
@@ -1396,33 +1399,16 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
-  if (!globalSequence) {
+  if (globalSequence == 0) {
     return;
   }
-
   auto last = float(lastWrittenSequence);
   auto global = float(globalSequence);
   const float maxValue = 100.0f;
   const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
-
   if (syncStatus <= maxValue) {
-    std::stringstream progress;
-    progress << "SYNC: [";
-
-    for (uint32_t i = 0; i < syncStatus; ++i) {
-      if (i % 2) {
-        progress << "#";
-      }
-    }
-
-    for (uint32_t i = syncStatus; i < maxValue; ++i) {
-      if (i % 2) {
-        progress << "-";
-      }
-    }
-
-    progress << "] " << syncStatus << "%";
-    cslog() << progress.str();
+    ProgressBar bar;
+    cslog() << "SYNC: " << bar.string(syncStatus);
   }
 }
 

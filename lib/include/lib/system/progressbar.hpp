@@ -1,25 +1,30 @@
 #ifndef PROGRESSBAR_HPP
 #define PROGRESSBAR_HPP
 
+#include <sstream>
+
 class ProgressBar {
     using Progress = unsigned int;
 public:
-    /// usage:
-    /// ProgressBar() << currentProgress;
-    ProgressBar(Progress progress);
+    /// @brief ProgressBar
+    /// @param completeSymbol symbol that mark completed progress
+    /// @param incompleteSymbol symbol that mark incompleted bar ticks
+    /// @param totalProgressLimit in other words total progress percentage of completion
+    /// @param barWidthInSymbols displayed real width of progress bar in symbols
+    ProgressBar(char completeSymbol = ' ', char incompleteSymbol = ' ', unsigned totalProgressLimit = 100,
+        unsigned barWidthInSymbols = 50);
+
+   /// @brief string
+   /// @param ticks current completed progress in ticks
+   /// @return symbolic (std::string) progress representation
+    std::string string(Progress ticks);
+
     ~ProgressBar();
 
-    /// @brief display current progress to terminal
-    void display() const;
-
-
-    /// @brief if progressbar not displayed print progressbar
-private:
-    Progress ticks = 0;
-    const Progress totalTicks = 100;
-    const Progress barWidth = 50;
-    const char completeSymbol = ' ';
-    const char incompleteSymbol = ' ';
+    char completeSymbol;
+    char incompleteSymbol;
+    Progress totalTicks;
+    Progress barWidth;
 };
 
 #endif // PROGRESSBAR_HPP

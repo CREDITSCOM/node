@@ -1,29 +1,35 @@
 #include "lib/system/progressbar.hpp"
-#include <iostream>
+
 #include <rang.hpp>
 
-ProgressBar::ProgressBar(ProgressBar::Progress progress) :ticks(progress) {}
-
-ProgressBar::~ProgressBar() {
-    display();
+ProgressBar::ProgressBar(
+    char completeSymbol, char incompleteSymbol, unsigned totalProgressLimit, unsigned barWidthInSymbols)
+: completeSymbol(completeSymbol)
+, incompleteSymbol(incompleteSymbol)
+, totalTicks(totalProgressLimit)
+, barWidth(barWidthInSymbols)
+{
+    rang::setControlMode(rang::control::Force);
 }
 
-void ProgressBar::display() const {
+ProgressBar::~ProgressBar() {
+    rang::setControlMode(rang::control::Auto);
+}
+
+std::string ProgressBar::string(ProgressBar::Progress ticks) {
+    std::stringstream result;
+    result.clear();
     float progress = float(ticks) / totalTicks;
-    unsigned pos = unsigned(barWidth * progress);
+    auto pos = unsigned(barWidth * progress);
 
-    std::cout << std::endl;
-    for (auto i = 0u; i < barWidth; ++i) {
-        if (i < pos) {
-            std::cout << rang::bg::blue << completeSymbol;
-        }
-        else {
-            std::cout << rang::bg::black << incompleteSymbol;
-        }
-    }
+    std::string completed(pos, completeSymbol);
+    std::string incompleted(barWidth - pos, incompleteSymbol);
+    result << rang::bg::blue << completed;
+    result << rang::bg::black << incompleted;
+    result << rang::bg::reset << rang::fg::reset << rang::style::reset;
+    result << " " << (progress * 100.0f) << "%";
 
-    std::cout << rang::bg::reset << " ";
-    std::cout << (progress * 100.0f) << "% ";
-    std::cout.flush();
-    std::cout << std::endl;
+    result.flush();
+    result << std::endl;
+    return result.str();
 }

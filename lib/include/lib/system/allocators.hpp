@@ -318,7 +318,7 @@ public:
   using Type = T;
 
   template <typename... Args>
-  TypedSlot(Allocator* all, Args&&... args): allocator_(all),
+  TypedSlot(Allocator* allocator, Args&&... args): allocator_(allocator),
       element_(std::forward<Args>(args)...) { }
 
   void use() {
