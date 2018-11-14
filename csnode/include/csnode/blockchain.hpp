@@ -42,7 +42,7 @@ public:
   using WalletData = cs::WalletsCache::WalletData;
   using Mask = boost::dynamic_bitset<uint64_t>;
 
-  BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress);
+  BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
   bool isGood() const { return good_; }
@@ -147,7 +147,6 @@ private:
 
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
-  const csdb::Address spammerAddress_;
   std::unique_ptr<cs::WalletsIds> walletIds_;
   std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
   std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;

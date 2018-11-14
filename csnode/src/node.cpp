@@ -1,6 +1,7 @@
 #include <sstream>
 #include <numeric>
 #include <algorithm>
+#include <csignal>
 
 #include <solver2/SolverCore.h>
 
@@ -29,16 +30,11 @@ const unsigned MAX_CONFIDANTS = 100;
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_   = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
-const csdb::Address Node::spammerAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003");
 
 Node::Node(const Config& config):
   nodeIdKey_(config.getMyPublicKey()),
-  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_, spammerAddress_),
-  solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_
-#ifdef SPAMMER
-    , spammerAddress_
-#endif
-  )),
+  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_),
+  solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_)),
   transport_(new Transport(config, this)),
 #ifdef MONITOR_NODE
   stats_(bc_),
@@ -77,7 +73,9 @@ bool Node::init() {
     return false;
   }
 
+#ifdef SPAMMER
   solver_->runSpammer();
+#endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
@@ -249,6 +247,14 @@ void Node::processMetaMap() {
 
 void Node::run() {
   transport_->run();
+}
+
+void Node::stop() {
+  solver_->finish();
+  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
+  auto bcStorage = bc_.getStorage();
+  bcStorage.close();
+  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
 }
 
 /* Requests */

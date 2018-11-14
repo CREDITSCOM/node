@@ -11,13 +11,12 @@
 using namespace cs;
 
 
-BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress, csdb::Address spammerAddress)
+BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
   : good_(false)
   , global_sequence(static_cast<decltype(global_sequence)>(-1))
   , blockRequestIsNeeded(false)
   , genesisAddress_(genesisAddress)
   , startAddress_(startAddress)
-  , spammerAddress_(spammerAddress)
   , walletIds_(new WalletsIds)
   , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
   , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
@@ -174,17 +173,6 @@ bool BlockChain::writeGenesisBlock()
   transaction.set_max_fee(csdb::AmountCommission(0.0));
   transaction.set_counted_fee(csdb::AmountCommission(0.0));
   transaction.set_innerID(0);
-
-  genesis.add_transaction(transaction);
-
-  transaction.set_target(spammerAddress_);
-  transaction.set_source(genesisAddress_);
-
-  transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100'000'000, 0));
-  transaction.set_max_fee(csdb::AmountCommission(0.0));
-  transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_innerID(1);
 
   genesis.add_transaction(transaction);
 

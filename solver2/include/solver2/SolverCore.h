@@ -37,7 +37,7 @@ namespace slv2
         using Counter = size_t;
 
         SolverCore();
-        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddres = {});
+        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress);
 
         ~SolverCore();
 
@@ -178,9 +178,6 @@ namespace slv2
         /** @brief   True to enable, false to disable the option repeat the same state */
         bool opt_repeat_state_enabled;
 
-        /** @brief   True to enable, false to disable the option of spammer activation */
-        bool opt_spammer_on;
-
         /** @brief   True if proxy to solver-1 mode is on */
         bool opt_is_proxy_v1;
 
@@ -209,7 +206,6 @@ namespace slv2
         
         csdb::Address addr_genesis;
         csdb::Address addr_start;
-        std::optional<csdb::Address> addr_spam;
         size_t cur_round;
         cs::PublicKey public_key;
         cs::PrivateKey private_key;

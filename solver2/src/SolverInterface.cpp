@@ -39,7 +39,6 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_WARN("SolverCore: starting transaction spammer");
             }
-            opt_spammer_on = true;
             pspam = std::make_unique<cs::Spammer>();
             pspam->StartSpamming(*pnode);
         }

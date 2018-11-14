@@ -1,5 +1,8 @@
 #pragma once
 
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TBufferTransports.h>
+
 #include <csnode/blockchain.hpp>
 
 #include <API.h>

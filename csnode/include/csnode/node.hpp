@@ -35,6 +35,9 @@ public:
   }
 
   void run();
+  void stop();
+
+  //static void stop();
 
   // incoming requests processing
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
@@ -242,7 +245,6 @@ private:
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
-  static const csdb::Address spammerAddress_;
 
   const cs::PublicKey nodeIdKey_;
   bool good_ = true;

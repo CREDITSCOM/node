@@ -40,13 +40,16 @@ private:
   void writerRoutine(const Config&);
   void processorRoutine();
 
-
   ip::udp::socket* getSocketInThread(const bool,
                                      const EndpointData&,
                                      std::atomic<ThreadStatus>&,
                                      const bool useIPv6);
 
   bool good_;
+  bool stopReaderRoutine = false;
+  bool stopWriterRoutine = false;
+  bool stopProcessorRoutine = false;
+
 
   io_context context_;
   ip::udp::resolver resolver_;

@@ -212,7 +212,7 @@ bool WalletsCache::Initer::moveData(WalletId srcIdSpecial, WalletId destIdNormal
     if (data_.wallets_[destIdNormal])
     {
         LOG_ERROR("Dest wallet data should be empty");
-        return false;
+//        return false; // examine it
     }
     data_.wallets_[destIdNormal] = walletsSpecial_[srcIdSpecial];
     walletsSpecial_[srcIdSpecial] = nullptr;
