@@ -185,6 +185,22 @@ namespace cs
             return &(iterator->meta);
         }
 
+        ///
+        /// @brief Returns const begin interator of circular buffer.
+        ///
+        auto begin() const
+        {
+            return m_buffer.begin();
+        }
+
+        ///
+        /// @brief Returns const end interator of circular buffer.
+        ///
+        auto end() const
+        {
+            return m_buffer.end();
+        }
+
     private:
         boost::circular_buffer<MetaElement> m_buffer;
     };
