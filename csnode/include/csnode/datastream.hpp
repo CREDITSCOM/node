@@ -507,6 +507,38 @@ namespace cs
     }
 
     ///
+    /// Gets vector of entities from stream.
+    ///
+    template<typename T, typename U>
+    inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities)
+    {
+        std::size_t size;
+        stream >> size;
+
+        if (size == 0) {
+            cserror() << "Data stream parsing of vector: nothing to parse";
+        }
+
+        std::vector<T, U> expectedEntities;
+        expectedEntities.reserve(size);
+
+        for (std::size_t i = 0; i < size; i++)
+        {
+            T entity;
+            stream >> entity;
+
+            expectedEntities.push_back(entity);
+        }
+
+        if (size != expectedEntities.size()) {
+            cserror() << "Data stream parsing of vector: vector parsing failed";
+        }
+
+        entities = std::move(expectedEntities);
+        return stream;
+    }
+
+    ///
     /// Writes array to stream.
     ///
     template<std::size_t size>
@@ -574,7 +606,7 @@ namespace cs
     }
 
     ///
-    /// Writes fixed string to stream
+    /// Writes fixed string to stream.
     ///
     template<std::size_t size>
     inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString)
@@ -584,7 +616,7 @@ namespace cs
     }
 
     ///
-    /// Writes hash vector structure to stream
+    /// Writes hash vector structure to stream.
     ///
     inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector)
     {
@@ -593,7 +625,7 @@ namespace cs
     }
 
     ///
-    /// Writes hash matrix structure to stream
+    /// Writes hash matrix structure to stream.
     ///
     inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& hashMatrix)
     {
@@ -602,7 +634,7 @@ namespace cs
     }
 
     ///
-    /// Writes hash matrix structure to stream
+    /// Writes hash matrix structure to stream.
     ///
     inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacket& packet)
     {
@@ -611,7 +643,7 @@ namespace cs
     }
 
     ///
-    /// Writes hash matrix structure to stream
+    /// Writes hash matrix structure to stream.
     ///
     inline DataStream& operator<<(DataStream& stream, const csdb::PoolHash& hash)
     {
@@ -620,13 +652,28 @@ namespace cs
     }
 
     ///
-    /// Writes pool structure to stream as byte representation
+    /// Writes pool structure to stream as byte representation.
     ///
     inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool)
     {
         uint32_t bSize;
         auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
         stream << cs::Bytes(dataPtr, dataPtr + bSize);
+        return stream;
+    }
+
+    ///
+    /// Writes vector of entities to stream.
+    ///
+    template<typename T, typename U>
+    inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entities)
+    {
+        stream << entities.size();
+
+        for (const auto& entity : entities) {
+            stream << entity;
+        }
+
         return stream;
     }
 }
