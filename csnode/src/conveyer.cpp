@@ -15,21 +15,14 @@ struct cs::Conveyer::Impl
     // current round transactions packets storage
     cs::TransactionsPacketTable hashTable;
 
-    // sync fields
-    cs::NeededHashesMetaStorage neededHashesMeta;
+    // main conveyer meta data
+    cs::ConveyerMetaStorage metaStorage;
 
-    // writer notifications
-    cs::NotificationsMetaStorage notificationsMeta;
-
-    // storage of received characteristic for slow motion nodes
+    // characteristic meta base
     cs::CharacteristicMetaStorage characteristicMetas;
-    cs::Characteristic characteristic;
 
-    // hash tables storage
-    cs::TablesMetaStorage hashTablesStorage;
-
-    // round table
-    cs::RoundTable roundTable;
+    // cached active current round number
+    std::atomic<cs::RoundNumber> currentRound = 0;
 
 public signals:
     cs::PacketFlushSignal flushPacket;
@@ -74,7 +67,7 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     cs::Lock lock(m_sharedMutex);
 
     if (pimpl->hashTable.count(hash) == 0u) {
-        pimpl->hashTable.emplace(hash, packet);
+        pimpl->hashTable.emplace(std::move(hash), packet);
     }
     else {
         cswarning() << "CONVEYER> Can not add network transactions packet";
@@ -91,9 +84,41 @@ const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
     return pimpl->transactionsBlock;
 }
 
-const cs::TransactionsPacket& cs::Conveyer::packet(const cs::TransactionsPacketHash& hash) const
+std::optional<cs::TransactionsPacket> cs::Conveyer::createPacket() const
 {
-    return pimpl->hashTable[hash];
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
+
+    if (!meta)
+    {
+        cserror() << "CONVEYER> Can not create transactions packet";
+        return std::nullopt;
+    }
+
+    cs::TransactionsPacket packet;
+    cs::Hashes& hashes = meta->roundTable.hashes;
+    cs::TransactionsPacketTable& table = pimpl->hashTable;
+
+    for (const auto& hash : hashes)
+    {
+        const auto iterator = table.find(hash);
+
+        if (iterator == table.end())
+        {
+            cserror() << "CONVEYER>: PACKET CREATION HASH NOT FOUND";
+            return std::nullopt;
+        }
+
+        const auto& transactions = iterator->second.transactions();
+
+        for (const auto& transaction : transactions)
+        {
+            if (!packet.addTransaction(transaction)) {
+                cserror() << "Can not add transaction to packet in consensus";
+            }
+        }
+    }
+
+    return std::make_optional<cs::TransactionsPacket>(std::move(packet));
 }
 
 void cs::Conveyer::setRound(cs::RoundTable&& table)
@@ -118,31 +143,48 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
         csdebug() << "CONVEYER> Need hash > " << hash.toString();
     }
 
-    // stoge needed hashes
-    if (!pimpl->neededHashesMeta.append(table.round, std::move(neededHashes))) {
-        csfatal() << "CONVEYER> Undefined behaviour of conveyer or node, can not add round needed hashes";
+    {
+        cs::Lock lock(m_sharedMutex);
+        pimpl->currentRound = table.round;
     }
+
+    cs::ConveyerMetaStorage::Element element;
+    element.round = table.round;
+    element.meta.neededHashes = std::move(neededHashes);
+    element.meta.roundTable = std::move(table);
 
     {
         cs::Lock lock(m_sharedMutex);
-        pimpl->roundTable = std::move(table);
-    }
 
-    // clean data
-    if (!pimpl->notificationsMeta.contains(currentRoundNumber())) {
-        pimpl->notificationsMeta.append(currentRoundNumber(), cs::Notifications());
+        if (!pimpl->metaStorage.contains(pimpl->currentRound)) {
+            pimpl->metaStorage.append(element);
+        }
+        else {
+            csfatal() << "CONVEYER> Meta round currently in conveyer";
+        }
     }
 }
 
 const cs::RoundTable& cs::Conveyer::roundTable() const
 {
-    return pimpl->roundTable;
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+    return meta->roundTable;
+}
+
+const cs::RoundTable* cs::Conveyer::roundTable(cs::RoundNumber round) const
+{
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+
+    if (!meta) {
+        return nullptr;
+    }
+
+    return &meta->roundTable;
 }
 
 cs::RoundNumber cs::Conveyer::currentRoundNumber() const
 {
-    cs::SharedLock lock(m_sharedMutex);
-    return pimpl->roundTable.round;
+    return pimpl->currentRound;
 }
 
 const cs::Hashes& cs::Conveyer::currentNeededHashes() const
@@ -152,40 +194,42 @@ const cs::Hashes& cs::Conveyer::currentNeededHashes() const
 
 const cs::Hashes& cs::Conveyer::neededHashes(cs::RoundNumber round) const
 {
-    auto pointer = pimpl->neededHashesMeta.get(round);
+    cs::ConveyerMeta* pointer = pimpl->metaStorage.get(round);
 
     if (!pointer) {
         throw std::out_of_range("Bad needed hashes, fatal error");
     }
 
-    return *pointer;
+    return pointer->neededHashes;
 }
 
 void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet)
 {
     cs::Lock lock(m_sharedMutex);
 
+    cs::ConveyerMeta* metaPointer = pimpl->metaStorage.get(round);
     cs::TransactionsPacketTable* tablePointer = nullptr;
-    cs::Hashes* hashesPointer = nullptr;
 
-    if (round == pimpl->roundTable.round) {
-        tablePointer = &pimpl->hashTable;
-    }
-    else {
-        tablePointer = pimpl->hashTablesStorage.get(round);
-    }
-
-    hashesPointer = pimpl->neededHashesMeta.get(round);
-
-    if (tablePointer == nullptr || hashesPointer == nullptr) {
-        cserror() << "CONVEYER> Can not add sync packet because hash table or needed hashes do not exist";
+    if (metaPointer == nullptr)
+    {
+        cserror() << "CONVEYER> Can not add sync packet because meta pointer do not exist";
         return;
     }
 
-    if (auto iterator = std::find(hashesPointer->begin(), hashesPointer->end(), packet.hash()); iterator != hashesPointer->end())
+    tablePointer = (round == pimpl->currentRound) ? &pimpl->hashTable : &metaPointer->hashTable;
+
+    if (tablePointer == nullptr)
+    {
+        cserror() << "CONVEYER> Can not add sync packet because table pointer do not exist";
+        return;
+    }
+
+    cs::Hashes& hashes = metaPointer->neededHashes;
+
+    if (auto iterator = std::find(hashes.begin(), hashes.end(), packet.hash()); iterator != hashes.end())
     {
         csdebug() << "CONVEYER> Adding synced packet";
-        hashesPointer->erase(iterator);
+        hashes.erase(iterator);
 
         // add to current table
         auto hash = packet.hash();
@@ -200,22 +244,22 @@ bool cs::Conveyer::isSyncCompleted() const
 
 bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
 {
-    auto pointer = pimpl->neededHashesMeta.get(round);
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
-    if (!pointer) {
+    if (!meta) {
         cserror() << "CONVEYER> Needed hashes of" << round << " round not found";
         return false;
     }
 
-    return pointer->empty();
+    return meta->neededHashes.empty();
 }
 
 const cs::Notifications& cs::Conveyer::notifications() const
 {
-    auto notifications = pimpl->notificationsMeta.get(currentRoundNumber());
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
 
-    if (notifications) {
-        return *notifications;
+    if (meta) {
+        return meta->notifications;
     }
     else {
         throw std::out_of_range("There is no notifications at current round");
@@ -224,24 +268,32 @@ const cs::Notifications& cs::Conveyer::notifications() const
 
 void cs::Conveyer::addNotification(const cs::Bytes& bytes)
 {
-    auto notifications = pimpl->notificationsMeta.get(currentRoundNumber());
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
 
-    if (notifications)
+    if (meta)
     {
         csdebug() << "CONVEYER> Writer notification added";
-        notifications->push_back(bytes);
+        meta->notifications.push_back(bytes);
     }
 }
 
 std::size_t cs::Conveyer::neededNotificationsCount() const
 {
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+
     // TODO: check if +1 is correct
-    const auto& roundTable = pimpl->roundTable;
-    return (roundTable.confidants.size() / 2) + 1;
+    if (meta) {
+        return (meta->roundTable.confidants.size() / 2) + 1;
+    }
+
+    csdebug() << "CONVEYER> No notifications at current round";
+    return 0;
 }
 
 bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) const
 {
+    cs::SharedLock lock(m_sharedMutex);
+
     const std::size_t neededConfidantsCount = neededNotificationsCount();
     const std::size_t notificationsCount = notifications().size();
 
@@ -255,40 +307,54 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     return notificationsCount >= neededConfidantsCount;
 }
 
-void cs::Conveyer::addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta)
+void cs::Conveyer::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&& characteristic)
 {
-    if (!pimpl->characteristicMetas.append(meta)) {
+    if (!pimpl->characteristicMetas.contains(round))
+    {
+        cs::CharacteristicMetaStorage::Element metaElement;
+        metaElement.meta = std::move(characteristic);
+        metaElement.round = round;
+
+        pimpl->characteristicMetas.append(std::move(metaElement));
+    }
+    else {
         csdebug() << "CONVEYER> Received meta is currently in meta stack";
     }
 }
 
 std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
 {
-    auto result = pimpl->characteristicMetas.extract(round);
-
-    if (!result.has_value()) {
+    if (!pimpl->characteristicMetas.contains(round))
+    {
         csdebug() << "CONVEYER> Characteristic meta not received";
         return std::nullopt;
     }
 
-    return std::make_optional<cs::CharacteristicMeta>((std::move(result)).value());
+    auto meta = pimpl->characteristicMetas.extract(round);
+    return std::make_optional<cs::CharacteristicMeta>(std::move(meta).value());
 }
 
-void cs::Conveyer::setCharacteristic(const cs::Characteristic& characteristic)
+void cs::Conveyer::setCharacteristic(const Characteristic& characteristic)
 {
-    csdebug() << "CONVEYER> Characteristic set to conveyer";
-    pimpl->characteristic = characteristic;
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+
+    if (meta)
+    {
+        csdebug() << "CONVEYER> Characteristic set to conveyer";
+        meta->characteristic = characteristic;
+    }
 }
 
 const cs::Characteristic& cs::Conveyer::characteristic() const
 {
-    return pimpl->characteristic;
+    auto meta = pimpl->metaStorage.get(pimpl->currentRound);
+    return meta->characteristic;
 }
 
 cs::Hash cs::Conveyer::characteristicHash() const
 {
-    const Characteristic& characteristic = pimpl->characteristic;
-    return getBlake2Hash(characteristic.mask.data(), characteristic.mask.size());
+    const Characteristic& reference = characteristic();
+    return getBlake2Hash(reference.mask.data(), reference.mask.size());
 }
 
 std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
@@ -296,11 +362,18 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     cslog() << "CONVEYER> ApplyCharacteristic";
 
     cs::Lock lock(m_sharedMutex);
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber));
 
-    const cs::Hashes& localHashes = pimpl->roundTable.hashes;
+    if (!meta)
+    {
+        cserror() << "CONVEYER> Apply characteristic failed, no meta in meta storage";
+        return std::nullopt;
+    }
+
+    const cs::Hashes& localHashes = meta->roundTable.hashes;
     cs::TransactionsPacketTable hashTable;
 
-    const cs::Characteristic& characteristic = pimpl->characteristic;
+    const cs::Characteristic& characteristic = meta->characteristic;
     cs::TransactionsPacketTable& currentHashTable = pimpl->hashTable;
 
     cslog() << "CONVEYER> Characteristic bytes size " << characteristic.mask.size();
@@ -308,6 +381,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     csdb::Pool newPool;
     std::size_t maskIndex = 0;
     const cs::Bytes& mask = characteristic.mask;
+    cs::TransactionsPacket invalidTransactions;
 
     for (const auto& hash : localHashes)
     {
@@ -327,6 +401,9 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
                 if (mask[maskIndex] != 0u) {
                     newPool.add_transaction(transaction);
                 }
+                else {
+                    invalidTransactions.addTransaction(transaction);
+                }
             }
 
             ++maskIndex;
@@ -343,12 +420,9 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         pimpl->hashTable.erase(hash);
     }
 
-    cs::TablesMetaStorage::MetaElement element;
-    element.round = pimpl->roundTable.round,
-    element.meta = std::move(hashTable);
-
     // add current round hashes to storage
-    pimpl->hashTablesStorage.append(element);
+    meta->hashTable = std::move(hashTable);
+    meta->invalidTransactions = std::move(invalidTransactions);
 
     if (characteristic.mask.size() != newPool.transactions_count())
     {
@@ -375,17 +449,39 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
         return pimpl->hashTable[hash];
     }
 
-    const auto optional = pimpl->hashTablesStorage.value(round);
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
-    if (optional.has_value()) {
-        const auto& value = optional.value();
+    if (!meta) {
+        return std::nullopt;
+    }
 
-        if (auto iter = value.find(hash); iter != value.end()) {
-            return iter->second;
-        }
+    const auto& value = meta->hashTable;
+
+    if (auto iter = value.find(hash); iter != value.end()) {
+        return iter->second;
     }
 
     return std::nullopt;
+}
+
+bool cs::Conveyer::isMetaTransactionInvalid(int64_t id)
+{
+    cs::SharedLock lock(m_sharedMutex);
+
+    for (const cs::ConveyerMetaStorage::Element& element : pimpl->metaStorage)
+    {
+        const auto& invalidTransactions = element.meta.invalidTransactions.transactions();
+        const auto iterator = std::find_if(invalidTransactions.begin(), invalidTransactions.end(),
+            [=](const auto& transaction) {
+                return transaction.innerID() == id;
+            });
+
+        if (iterator != invalidTransactions.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 cs::SharedMutex& cs::Conveyer::sharedMutex() const
