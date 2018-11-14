@@ -15,6 +15,7 @@
 #include <csnode/cyclic_buffer.hpp>
 
 #include <client/params.hpp>
+#include <map>
 
 namespace std
 {

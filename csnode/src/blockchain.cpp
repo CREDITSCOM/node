@@ -4,6 +4,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
+#include <client/params.hpp>
 
 #include "wallets_cache.hpp"
 #include "blockchain.hpp"
