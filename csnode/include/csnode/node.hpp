@@ -35,6 +35,9 @@ public:
   }
 
   void run();
+  void stop();
+
+  //static void stop();
 
   // incoming requests processing
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);

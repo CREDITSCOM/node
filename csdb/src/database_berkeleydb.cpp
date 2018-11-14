@@ -81,8 +81,12 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB() :
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB()
 {
+  std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
   db_blocks_->close(0);
+  std::cout << "DB db_blocks_ was closed.\n" << std::flush;
+  std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
   db_seq_no_->close(0);
+  std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status)
