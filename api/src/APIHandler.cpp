@@ -100,10 +100,10 @@ void APIHandler::state_updater_work_function()
 {
 	try
 	{
-		auto ррр = s_blockchain.getLastHash();
+		auto ppp = s_blockchain.getLastHash();
 		while (state_updater_running.test_and_set(std::memory_order_acquire)) {
-			if (!update_smart_caches_once(ррр)) {
-				ррр = s_blockchain.wait_for_block(ррр);
+			if (!update_smart_caches_once(ppp)) {
+				ppp = s_blockchain.wait_for_block(ppp);
 			}
 		}
 	}
