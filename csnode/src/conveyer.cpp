@@ -22,7 +22,7 @@ struct cs::Conveyer::Impl
     cs::CharacteristicMetaStorage characteristicMetas;
 
     // cached active current round number
-    cs::RoundNumber currentRound = 0;
+    std::atomic<cs::RoundNumber> currentRound = 0;
 
 public signals:
     cs::PacketFlushSignal flushPacket;
@@ -139,9 +139,19 @@ const cs::RoundTable& cs::Conveyer::roundTable() const
     return meta->roundTable;
 }
 
+const cs::RoundTable* cs::Conveyer::roundTable(cs::RoundNumber round) const
+{
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+
+    if (!meta) {
+        return nullptr;
+    }
+
+    return &meta->roundTable;
+}
+
 cs::RoundNumber cs::Conveyer::currentRoundNumber() const
 {
-    cs::SharedLock lock(m_sharedMutex);
     return pimpl->currentRound;
 }
 

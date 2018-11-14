@@ -94,6 +94,12 @@ namespace cs
         const cs::RoundTable& roundTable() const;
 
         ///
+        /// @brief Returns blockchain round table of Round key.
+        /// @warning If round table does not exist in meta, returns nullptr.
+        ///
+        const cs::RoundTable* roundTable(cs::RoundNumber round) const;
+
+        ///
         /// @brief Returns current round number.
         /// Locks mutex and returns safe round number.
         ///
