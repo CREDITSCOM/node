@@ -1,6 +1,7 @@
 #include <sstream>
 #include <numeric>
 #include <algorithm>
+#include <csignal>
 
 #include <solver2/SolverCore.h>
 
@@ -249,6 +250,14 @@ void Node::processMetaMap() {
 
 void Node::run() {
   transport_->run();
+}
+
+void Node::stop() {
+  solver_->finish();
+  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
+  auto bcStorage = bc_.getStorage();
+  bcStorage.close();
+  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
 }
 
 /* Requests */

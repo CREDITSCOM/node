@@ -1,4 +1,6 @@
 /* Send blaming letters to @yrtimd */
+#include <thread>
+#include <chrono>
 #include <lib/system/utils.hpp>
 #include <net/logger.hpp>
 #include <sys/timeb.h>
@@ -46,7 +48,7 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     LOG_ERROR("Cannot bind socket on " << e.what());
     return ip::udp::socket(context);
   }
-}
+} //  bindSocket
 
 ip::udp::endpoint Network::resolve(const EndpointData& data) {
   return ip::udp::endpoint(data.ip, data.port);
@@ -70,7 +72,7 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn,
   status.store(result ? ThreadStatus::Success : ThreadStatus::Failed);
 
   return result;
-}
+} //resolve
 
 void Network::readerRoutine(const Config& config) {
   ip::udp::socket* sock =
@@ -81,23 +83,26 @@ void Network::readerRoutine(const Config& config) {
 
   boost::system::error_code lastError;
 
-  while (true) {
+  while (stopReaderRoutine == false) { // changed from true
     auto& task = iPacMan_.allocNext();
 
     size_t packetSize = 0;
     uint32_t cnt = 0;
     do {
+      if (stopReaderRoutine) {
+        return;
+      }
       packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
       task.size = task.pack.decode(packetSize);
-
       if (++cnt == 10) {
         cnt = 0;
         std::this_thread::yield();
       }
-    } while (lastError == boost::asio::error::would_block);
+    } while (!stopReaderRoutine && lastError == boost::asio::error::would_block);
 
     if (!lastError) {
       iPacMan_.enQueueLast();
+      csdebug(logger::Net) << "Received packet" << std::endl << task.pack;
     }
     else {
       LOG_ERROR("Cannot receive packet. Error " << lastError);
@@ -109,6 +114,7 @@ void Network::readerRoutine(const Config& config) {
       << "Read " << packetSize << std::endl
       << "Returned " << lastError;
   }
+  LOG_WARN("readerRoutine STOPPED!!!\n");
 }
 
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
@@ -117,6 +123,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   size_t encodedSize = 0;
 
   uint32_t cnt = 0;
+
   do {
     // net code was built on this constant (Packet::MaxSize)
     // and is used it implicitly in a lot of places( 
@@ -144,6 +151,9 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 }
 
 void Network::writerRoutine(const Config& config) {
+  boost::system::error_code lastError;
+  size_t size;
+  uint32_t cnt = 0;
   ip::udp::socket* sock =
       getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
 
@@ -151,10 +161,27 @@ void Network::writerRoutine(const Config& config) {
     return;
   }
 
-  while (true) {
+  while (stopWriterRoutine == false) { //changed from true
     auto task = oPacMan_.getNextTask();
-    sendPack(*sock, task, task->endpoint);
+    csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
+    //sendPack(*sock, task, task->endpoint);
+    do {
+      if (stopWriterRoutine) {
+        return;
+      }
+      size = sock->send_to(buffer(task->pack.data(), task->pack.size()), task->endpoint, NO_FLAGS, lastError);
+
+      if (++cnt == 10) {
+        cnt = 0;
+        std::this_thread::yield();
+      }
+    } while (!stopWriterRoutine && lastError == boost::asio::error::would_block);
+
+    if (lastError || size < task->pack.size()) {
+      LOG_ERROR("Cannot send packet. Error " << lastError);
+    }
   }
+  LOG_WARN("writerRoutine STOPPED!!!\n");
 }
 
 // Processors
@@ -163,7 +190,7 @@ void Network::processorRoutine() {
   FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
-  while (true) {
+  while (stopProcessorRoutine == false) {
     externals.callAll();
 
     auto task = iPacMan_.getNextTask();
@@ -211,6 +238,7 @@ void Network::processorRoutine() {
     transport_->redirectPacket(task->pack, remoteSender);
     ++recCounter;
   }
+  LOG_WARN("processorRoutine STOPPED!!!\n");
 }
 
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
@@ -225,9 +253,10 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 Network::Network(const Config& config, Transport* transport)
 : resolver_(context_)
 , transport_(transport)
-, readerThread_(&Network::readerRoutine, this, config)
-, writerThread_(&Network::writerRoutine, this, config)
-, processorThread_(&Network::processorRoutine, this) {
+, readerThread_{ &Network::readerRoutine, this, config }
+, writerThread_{ &Network::writerRoutine, this, config }
+, processorThread_{ &Network::processorRoutine, this }
+{
   if (!config.hasTwoSockets()) {
     auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 
@@ -304,7 +333,17 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 }
 
 Network::~Network() {
-  readerThread_.join();
-  writerThread_.join();
-  processorThread_.join();
+  stopReaderRoutine = true;
+  if (readerThread_.joinable()) {
+    readerThread_.join();
+  }
+  stopWriterRoutine = true;
+  if (writerThread_.joinable()) {
+    writerThread_.join();
+  }
+  stopProcessorRoutine = true;
+  if (processorThread_.joinable()) {
+    processorThread_.join();
+  }
+  delete singleSock_.load();
 }
