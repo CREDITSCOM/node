@@ -17,13 +17,13 @@ ProgressBar::~ProgressBar() {
 }
 
 std::string ProgressBar::string(ProgressBar::Progress ticks) {
-    std::stringstream result;
-    result.clear();
     float progress = float(ticks) / totalTicks;
     auto pos = unsigned(barWidth * progress);
 
     std::string completed(pos, completeSymbol);
     std::string incompleted(barWidth - pos, incompleteSymbol);
+
+    std::stringstream result;
     result << rang::bg::blue << completed;
     result << rang::bg::black << incompleted;
     result << rang::bg::reset << rang::fg::reset << rang::style::reset;
