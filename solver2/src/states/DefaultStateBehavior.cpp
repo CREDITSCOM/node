@@ -116,7 +116,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onTransactionList(SolverContext& /*context*/, cs::TransactionsPacket& /*pack*/)
+    Result DefaultStateBehavior::onSyncTransactions(SolverContext& /*context*/, cs::RoundNumber /*round*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": transactions packet ignored in this state");

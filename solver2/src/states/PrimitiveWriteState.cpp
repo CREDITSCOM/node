@@ -63,16 +63,17 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result PrimitiveWriteState::onTransactionList(SolverContext & context, cs::TransactionsPacket& pack)
+    Result PrimitiveWriteState::onSyncTransactions(SolverContext & context, cs::RoundNumber round)
     {
-        DefaultStateBehavior::onTransactionList(context, pack);
-        csdb::Pool accepted {};
-        if(pack.transactionsCount() > 0) {
-            for(const auto& t : pack.transactions()) {
-                accepted.add_transaction(t);
-            }
-        }
-        context.accept_transactions(accepted);
+        DefaultStateBehavior::onSyncTransactions(context, round);
+        //csdb::Pool accepted {};
+        //TODO: accept all transactions!
+        //if(pack.transactionsCount() > 0) {
+        //    for(const auto& t : pack.transactions()) {
+        //        accepted.add_transaction(t);
+        //    }
+        //}
+        //context.accept_transactions(accepted);
         return Result::Ignore;
     }
 } // slv2

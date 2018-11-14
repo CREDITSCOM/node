@@ -126,7 +126,7 @@ namespace slv2
         Result onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
 
         /**
-         * @fn  Result DefaultStateBehavior::onTransactionList(SolverContext& context, const csdb::Pool& pool) override;
+         * @fn  Result DefaultStateBehavior::onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
          *
          * @brief   Ignores the transaction list received
          *
@@ -134,14 +134,12 @@ namespace slv2
          * @date    01.10.2018
          *
          * @param [in,out]  context The context.
-         * @param           pool    The pool.
+         * @param           round   The round.
          *
          * @return  A Result::Ignore value.
-         *
-         * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onTransactionList(SolverContext& context, cs::TransactionsPacket& pack) override;
+        Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
         Result onStage1(SolverContext& context, const cs::StageOne& stage) override;
         Result onStage2(SolverContext& context, const cs::StageTwo& stage) override;

@@ -342,12 +342,16 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         // create storage hash table and remove from current hash table
         hashTable.emplace(hash, std::move(packet));
         //csdebug() << "CONVEYER> Hash deleted > " << hash.toString();
-        pimpl->hashTable.erase(hash);
+        currentHashTable.erase(hash);
     }
+    
+    cslog() << "CONVEYER> ApplyCharacteristic: local hashes has been processed";
 
     cs::TablesMetaStorage::MetaElement element;
     element.round = pimpl->roundTable.round,
     element.meta = std::move(hashTable);
+
+    cslog() << "CONVEYER> ApplyCharacteristic: storage hash table ready for storing";
 
     // add current round hashes to storage
     pimpl->hashTablesStorage.append(element);

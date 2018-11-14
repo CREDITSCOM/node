@@ -298,6 +298,8 @@ namespace slv2
         void accept_transactions(const csdb::Pool& pool)
         {
             core.accepted_pool = pool;
+            // any way processed transactions
+            core.total_recv_trans += core.accepted_pool.transactions_count();
         }
 
         /**
@@ -379,24 +381,6 @@ namespace slv2
          */
 
         const std::vector<cs::PublicKey>& trusted() const;
-
-        /**
-         * @fn  bool SolverContext::is_spammer() const;
-         *
-         * @brief   Query if this node is in spammer mode.
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  True if spammer, false if not.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        bool is_spammer() const
-        {
-            return core.opt_spammer_on;
-        }
 
         void update_fees(cs::TransactionsPacket& p);
 
@@ -560,22 +544,6 @@ namespace slv2
         size_t cnt_hash_recv() const
         {
             return core.recv_hash.size();
-        }
-
-        /**
-         * @fn  csdb::Address SolverContext::address_spammer() const
-         *
-         * @brief   Address spammer
-         *
-         * @author  Alexander Avramenko
-         * @date    10.10.2018
-         *
-         * @return  The csdb::Address.
-         */
-
-        csdb::Address address_spammer() const
-        {
-            return core.addr_spam.value_or(csdb::Address {});
         }
 
         /**

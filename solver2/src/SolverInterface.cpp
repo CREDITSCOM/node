@@ -39,7 +39,6 @@ namespace slv2
             if(Consensus::Log) {
                 LOG_WARN("SolverCore: starting transaction spammer");
             }
-            opt_spammer_on = true;
             pspam = std::make_unique<cs::Spammer>();
             pspam->StartSpamming(*pnode);
         }
@@ -54,7 +53,7 @@ namespace slv2
         this->pfee->CountFeesInPool(pnode->getBlockChain(), pool);
     }
 
-    void SolverCore::gotRound(const cs::RoundNumber rNum)
+    void SolverCore::gotRound(cs::RoundNumber rNum)
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotRound();
@@ -62,31 +61,17 @@ namespace slv2
         }
         
         // previous solver implementation calls to runConsensus method() here
-        // perform similar actions, but use csdb::Pool instead of cs::TransactionsPacket
+        // perform similar actions, but only in proper state (TrustedStage1State for now)
         
-        cslog() << "SolverCore: got round, start consensus = " << rNum;
-        cs::TransactionsPacket pack;
-        cs::Conveyer& conveyer = cs::Conveyer::instance();
+        // clear data
+        markUntrusted.fill(0);
 
-        for(const auto& hash : conveyer.roundTable().hashes) {
-            const auto& hashTable = conveyer.transactionsPacketTable();
-
-            if(hashTable.count(hash) == 0) {
-                cserror() << "SolverCore: HASH NOT FOUND while prepare consensus to build vector";
-                return;
-            }
-
-            const auto& transactions = conveyer.packet(hash).transactions();
-
-            for(const auto& transaction : transactions) {
-                if(!pack.addTransaction(transaction)) {
-                    cserror() << "SolverCore: cannot add transaction to packet while prepare consensus to build vector";
-                }
-            }
+        if(!pstate) {
+            return;
         }
-
-        cslog() << "SolverCore: prepare packet of " << pack.transactionsCount() << " transactions for consensus to build vector";
-        gotTransactionList(std::move(pack));
+        if(stateCompleted(pstate->onSyncTransactions(*pcontext, rNum))) {
+            handleTransitions(Event::Transactions);
+        }
     }
 
     const cs::PublicKey& SolverCore::getWriterPublicKey() const
@@ -153,29 +138,6 @@ namespace slv2
             LOG_DEBUG("SolverCore: got transaction " << trans.innerID() << " from " << trans.source().to_string());
         }
         if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
-            handleTransitions(Event::Transactions);
-        }
-    }
-
-    void SolverCore::gotTransactionList(cs::TransactionsPacket&& p)
-    {
-        if(opt_is_proxy_v1 && pslv_v1) {
-            if(Consensus::Log) {
-                LOG_ERROR("SolverCore: method gotTransactionList() is not implemented in proxied solver object");
-            }
-            return;
-        }
-
-        // any way processed transactions
-        total_recv_trans += p.transactionsCount();
-
-        // clear data
-        markUntrusted.fill(0);
-
-        if(!pstate) {
-            return;
-        }
-        if(stateCompleted(pstate->onTransactionList(*pcontext, p))) {
             handleTransitions(Event::Transactions);
         }
     }

@@ -39,11 +39,7 @@ class Generals;
 
 class Solver {
 public:
-  explicit Solver(Node*, csdb::Address m_genesisAddress, csdb::Address startAddres
-#ifdef SPAMMER
-  , csdb::Address m_spammerAddress
-#endif
-  );
+  explicit Solver(Node*, csdb::Address m_genesisAddress, csdb::Address startAddres);
   ~Solver();
 
   Solver(const Solver&) = delete;
@@ -123,10 +119,6 @@ private:
 
   const csdb::Address m_genesisAddress;
   const csdb::Address m_startAddress;
-
-#ifdef SPAMMER
-  const csdb::Address m_spammerAddress;
-#endif
 
   Fee m_feeCounter;
   HashVector m_hashVector;

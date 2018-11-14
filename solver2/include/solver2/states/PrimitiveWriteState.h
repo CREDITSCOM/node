@@ -29,7 +29,7 @@ namespace slv2
 
         Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
 
-        Result onTransactionList(SolverContext& context, cs::TransactionsPacket& pack) override;
+        Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
         const char * name() const override
         {

@@ -67,7 +67,7 @@ namespace slv2
             return Result::Failure;
         }
 
-        Result onTransactionList(SolverContext& /*context*/, cs::TransactionsPacket& /*pack*/) override
+        Result onSyncTransactions(SolverContext& /*context*/, cs::RoundNumber /*round*/) override
         {
             return Result::Failure;
         }

@@ -7,6 +7,34 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+// Variable to store Class signal status.
+volatile std::sig_atomic_t Transport::gSignalStatus = 0;
+
+// variable defined in client/main.cpp
+volatile std::sig_atomic_t gSignalStatus = 0;
+
+// Signal transport to stop and stop Node
+static void stopNode() noexcept(false) {
+  Transport::stop();
+}
+
+// Called periodically to poll the signal flag.
+void poll_signal_flag() {
+  if (gSignalStatus == 1) {
+    gSignalStatus = 0;
+    try {
+      stopNode();
+    }
+    catch (...) {
+      // Handle error
+      LOG_ERROR("Poll signal error!");
+      std::raise(SIGABRT);
+    }
+  }
+}
+
+// Extern function dfined in main.cpp to poll and handle signal status.
+extern void poll_signal_flag();
 
 enum RegFlags : uint8_t { UsingIPv6 = 1, RedirectIP = 1 << 1, RedirectPort = 1 << 2 };
 
@@ -102,7 +130,11 @@ void Transport::run() {
   // Okay, now let's get to business
 
   uint32_t ctr = 0;
-  while (true) {
+  LOG_WARN("+++++++>>> Transport Run Task Start <<<+++++++++++++++");
+
+  // Check if thread is requested to stop ?
+  while (Transport::gSignalStatus == 0)
+  {
     ++ctr;
     bool askMissing    = true;
     bool resendPacks   = ctr % 4 == 0;
@@ -129,8 +161,10 @@ void Transport::run() {
     if (refreshLimits)
       nh_.refreshLimits();
 
+    poll_signal_flag();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
+  LOG_WARN("[WARNING] : [Transport::run STOPED!]");
 }
 
 template <>

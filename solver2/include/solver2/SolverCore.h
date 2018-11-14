@@ -37,7 +37,7 @@ namespace slv2
         using Counter = size_t;
 
         SolverCore();
-        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress, std::optional<csdb::Address> SpammerAddres = {});
+        explicit SolverCore(Node * pNode, csdb::Address GenesisAddress, csdb::Address StartAddress);
 
         ~SolverCore();
 
@@ -64,7 +64,7 @@ namespace slv2
         void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
         void runSpammer();
         void countFeesInPool(csdb::Pool* pool);
-        void gotRound(const cs::RoundNumber rNum);
+        void gotRound(cs::RoundNumber rNum);
         void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
         const cs::PublicKey& getPublicKey() const
         {
@@ -80,7 +80,6 @@ namespace slv2
         void addInitialBalance();
         void setBigBangStatus(bool status);
         void gotTransaction(const csdb::Transaction& trans);
-        void gotTransactionList(cs::TransactionsPacket&& p);
         void gotVector(const cs::HashVector& vect);
         void gotMatrix(cs::HashMatrix&& matr);
         void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
@@ -100,11 +99,6 @@ namespace slv2
         void gotStageOne(const cs::StageOne& stage);
         void gotStageTwo(const cs::StageTwo& stage);
         void gotStageThree(const cs::StageThree& stage);
-        // TODO: remove when obsolete
-        void gotTransactionList_V3(cs::TransactionsPacket&& p)
-        {
-            gotTransactionList(std::move(p));
-        }
 
         void gotStageOneRequest(uint8_t requester, uint8_t required);
         void gotStageTwoRequest(uint8_t requester, uint8_t required);
@@ -184,9 +178,6 @@ namespace slv2
         /** @brief   True to enable, false to disable the option repeat the same state */
         bool opt_repeat_state_enabled;
 
-        /** @brief   True to enable, false to disable the option of spammer activation */
-        bool opt_spammer_on;
-
         /** @brief   True if proxy to solver-1 mode is on */
         bool opt_is_proxy_v1;
 
@@ -215,7 +206,6 @@ namespace slv2
         
         csdb::Address addr_genesis;
         csdb::Address addr_start;
-        std::optional<csdb::Address> addr_spam;
         size_t cur_round;
         cs::PublicKey public_key;
         cs::PrivateKey private_key;

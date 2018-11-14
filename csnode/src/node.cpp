@@ -1,6 +1,7 @@
 #include <sstream>
 #include <numeric>
 #include <algorithm>
+#include <csignal>
 
 #include <solver2/SolverCore.h>
 
@@ -29,16 +30,11 @@ const unsigned MAX_CONFIDANTS = 100;
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_   = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
-const csdb::Address Node::spammerAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000003");
 
 Node::Node(const Config& config):
   nodeIdKey_(config.getMyPublicKey()),
-  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_, spammerAddress_),
-  solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_
-#ifdef SPAMMER
-    , spammerAddress_
-#endif
-  )),
+  bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_),
+  solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_)),
   transport_(new Transport(config, this)),
 #ifdef MONITOR_NODE
   stats_(bc_),
@@ -77,7 +73,9 @@ bool Node::init() {
     return false;
   }
 
+#ifdef SPAMMER
   solver_->runSpammer();
+#endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
@@ -249,6 +247,14 @@ void Node::processMetaMap() {
 
 void Node::run() {
   transport_->run();
+}
+
+void Node::stop() {
+  solver_->finish();
+  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
+  auto bcStorage = bc_.getStorage();
+  bcStorage.close();
+  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
 }
 
 /* Requests */
@@ -653,12 +659,15 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Signature signature;
   istream_ >> signature;
+  cslog() << "NODE> >> signature, size=" << signature.size();
 
   cs::Notifications notifications;
   istream_ >> notifications;
+  cslog() << "NODE> >> notifications, size=" << notifications.size();
 
   for (std::size_t i = 0; i < notifications.size(); ++i) {
     conveyer.addNotification(notifications[i]);
+    cslog() << "NODE> >> notifications[" << i << "], size=" << notifications[i].size();
   }
 
   std::vector<cs::Hash> confidantsHashes;
@@ -671,8 +680,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     confidantsHashes.push_back(hash);
   }
+  cslog() << "NODE> >> confidantsHashes, size=" << confidantsHashes.size();
 
+  cslog() << "NODE> getBlake2Hash(..., characteristicMask.size()=" << characteristicMask.size() << ")";
   cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
+  cslog() << "NODE> getBlake2Hash(...) ok";
 
   for (const auto& hash : confidantsHashes) {
     if (hash != characteristicHash) {
@@ -1332,13 +1344,18 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
+  const auto& rt = conveyer.roundTable();
 
-  if (conveyer.isSyncCompleted()) {
-    cslog() << "NODE> All hashes in conveyer";
-    solver_->gotRound(roundTable.round);
+  if(rt.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table - > got round now";
+      solver_->gotRound(rt.round);
+  }
+  else if (conveyer.isSyncCompleted()) {
+    cslog() << "NODE> All hashes in conveyer -> got round now";
+    solver_->gotRound(rt.round);
   }
   else {
-
+    //TODO: whether possible roundNum_ != rt.round at this point?
     sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
@@ -2364,14 +2381,6 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   //  cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
   //}
 
-
-
-
-  if(roundTable.hashes.size()==0) {
-    cslog() << "NODE> Get Round info_ - > got Round";
-    solver_->gotRound(rNum);
-  }
- 
   onRoundStartConveyer(std::move(roundTable));
   transport_->processPostponed(roundNum_);
 

@@ -81,8 +81,12 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB() :
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB()
 {
+  std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
   db_blocks_->close(0);
+  std::cout << "DB db_blocks_ was closed.\n" << std::flush;
+  std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
   db_seq_no_->close(0);
+  std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status)
@@ -117,8 +121,8 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
   DbEnv env(static_cast<uint32_t>(0));
   uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
   try {
-    env.open(path.c_str(), db_env_open_flags, 0);
-    env.close(0);
+//    env.open(path.c_str(), db_env_open_flags, 0);
+//    env.close(0); // this recover method does not work
   }
   catch (DbException &e) {
     std::cerr << "Error opening database environment: "
