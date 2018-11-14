@@ -17,7 +17,6 @@
 
 
 volatile std::sig_atomic_t gSignalStatus = 0;
-static void stopNode() noexcept(false);
 
 #ifdef BUILD_WITH_GPROF
 #include <dlfcn.h>
@@ -123,26 +122,6 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
   }
 }
 #endif // !WIN32
-
-// Signal transport to stop and stop Node
-static void stopNode() noexcept(false) {
-  Transport::stop();
-}
-
-// Called periodically to poll the signal flag.
-void poll_signal_flag() {
-  if (gSignalStatus == 1) {
-    gSignalStatus = 0;
-    try {
-      stopNode();
-    }
-    catch (...) {
-      // Handle error
-      LOG_ERROR("Poll signal error!");
-      std::raise(SIGABRT);
-    }
-  }
-}
 
 int main(int argc, char* argv[]) {
 #ifdef WIN32

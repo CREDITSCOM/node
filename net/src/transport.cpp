@@ -10,6 +10,29 @@
 // Variable to store Class signal status.
 volatile std::sig_atomic_t Transport::gSignalStatus = 0;
 
+// variable defined in client/main.cpp
+extern volatile std::sig_atomic_t gSignalStatus;
+
+// Signal transport to stop and stop Node
+static void stopNode() noexcept(false) {
+  Transport::stop();
+}
+
+// Called periodically to poll the signal flag.
+void poll_signal_flag() {
+  if (gSignalStatus == 1) {
+    gSignalStatus = 0;
+    try {
+      stopNode();
+    }
+    catch (...) {
+      // Handle error
+      LOG_ERROR("Poll signal error!");
+      std::raise(SIGABRT);
+    }
+  }
+}
+
 // Extern function dfined in main.cpp to poll and handle signal status.
 extern void poll_signal_flag();
 

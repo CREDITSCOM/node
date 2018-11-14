@@ -151,9 +151,6 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 }
 
 void Network::writerRoutine(const Config& config) {
-  boost::system::error_code lastError;
-  size_t size;
-  uint32_t cnt = 0;
   ip::udp::socket* sock =
       getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
 
@@ -164,22 +161,7 @@ void Network::writerRoutine(const Config& config) {
   while (stopWriterRoutine == false) { //changed from true
     auto task = oPacMan_.getNextTask();
     csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
-    //sendPack(*sock, task, task->endpoint);
-    do {
-      if (stopWriterRoutine) {
-        return;
-      }
-      size = sock->send_to(buffer(task->pack.data(), task->pack.size()), task->endpoint, NO_FLAGS, lastError);
-
-      if (++cnt == 10) {
-        cnt = 0;
-        std::this_thread::yield();
-      }
-    } while (!stopWriterRoutine && lastError == boost::asio::error::would_block);
-
-    if (lastError || size < task->pack.size()) {
-      LOG_ERROR("Cannot send packet. Error " << lastError);
-    }
+    sendPack(*sock, task, task->endpoint);
   }
   LOG_WARN("writerRoutine STOPPED!!!\n");
 }
