@@ -1178,7 +1178,7 @@ void walletStep(const Credits::WalletsCache::WalletData::Address* addr,
     // Guess why I can't use std::upper_bound in here
     // C++ is not as expressive as I've imagined it to be...
     auto it = lst.begin();
-    while (!comparator(val, getter(*(it->second)))) /* <-- this looks more like Lisp, doesn't it... */
+    while (it != lst.end() && !comparator(val, getter(*(it->second)))) /* <-- this looks more like Lisp, doesn't it... */
       ++it;
 
     lst.insert(it, std::make_pair(addr, wd));
