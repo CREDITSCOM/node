@@ -15,7 +15,7 @@ enum Platform : uint8_t { Linux, MacOS, Windows };
 namespace {
 // Packets formation
 
-void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagValue = 0) {
+void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initFlagValue = 0) {
   uint8_t regFlag = 0;
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -30,7 +30,7 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
     regFlag |= RegFlags::RedirectPort;
   }
 
-  uint8_t* flagChar = stream.getCurrPtr();
+  uint8_t* flagChar = stream.getCurrentPtr();
 
   if (!config.isSymmetric()) {
     if (config.getAddressEndpoint().ipSpecified) {
@@ -52,18 +52,18 @@ void addMyOut(const Config& config, OPackStream& stream, const uint8_t initFlagV
   *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
+void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
 
   stream << NetworkCommand::Registration << NODE_VERSION;
 
   addMyOut(config, stream);
-  *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrPtr());
+  *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
 
   stream << static_cast<ConnectionId>(0) << pk;
 }
 
-void formSSConnectPack(const Config& config, OPackStream& stream, const cs::PublicKey& pk) {
+void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk) {
   stream.init(BaseFlags::NetworkMsg);
   stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
@@ -306,7 +306,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   cs::RoundNumber rNum = 0;
   iPackStream_ >> rNum;
 
-  auto trStart = iPackStream_.getCurrPtr();
+  auto trStart = iPackStream_.getCurrentPtr();
 
   uint8_t numConf;
   iPackStream_ >> numConf;
@@ -316,7 +316,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
-  auto trFinish = iPackStream_.getCurrPtr();
+  auto trFinish = iPackStream_.getCurrentPtr();
   node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
   uint8_t numCirc;

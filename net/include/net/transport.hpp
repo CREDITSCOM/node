@@ -65,8 +65,8 @@ class Transport {
   : config_(config)
   , remoteNodes_(MaxRemoteNodes + 1)
   , netPacksAllocator_(1 << 24, 1)
-  , myPublicKey_(node->getPublicKey())
-  , oPackStream_(&netPacksAllocator_, node->getPublicKey())
+  , myPublicKey_(node->getNodeIdKey())
+  , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
   , net_(new Network(config, this))
   , node_(node)
   , nh_(this) {
@@ -179,10 +179,10 @@ class Transport {
   RegionAllocator netPacksAllocator_;
   cs::PublicKey myPublicKey_;
 
-  IPackStream iPackStream_;
+  cs::IPackStream iPackStream_;
 
   std::atomic_flag oLock_ = ATOMIC_FLAG_INIT;
-  OPackStream      oPackStream_;
+  cs::OPackStream oPackStream_;
 
   // SS Data
   SSBootstrapStatus ssStatus_ = SSBootstrapStatus::Empty;
@@ -204,12 +204,13 @@ class Transport {
     , pack(p) {
     }
   };
+
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
-  PPBuf                                              postponedPacketsFirst_;
-  PPBuf                                              postponedPacketsSecond_;
+  PPBuf postponedPacketsFirst_;
+  PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 
-  std::atomic_flag                                                         uLock_ = ATOMIC_FLAG_INIT;
+  std::atomic_flag uLock_ = ATOMIC_FLAG_INIT;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   uint32_t maxBlock_ = 0;

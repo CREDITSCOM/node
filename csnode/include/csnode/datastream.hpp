@@ -1,9 +1,9 @@
-#ifndef DATASTREAM_H
-#define DATASTREAM_H
+#ifndef DATASTREAM_HPP
+#define DATASTREAM_HPP
 
 #include <exception>
 #include <string>
-#include <csnode/nodecore.h>
+#include <csnode/nodecore.hpp>
 #include <algorithm>
 #include <type_traits>
 
@@ -624,10 +624,12 @@ namespace cs
     ///
     inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool)
     {
-        stream << pool.to_binary();
+        uint32_t bSize;
+        auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
+        stream << cs::Bytes(dataPtr, dataPtr + bSize);
         return stream;
     }
 }
 
-#endif // DATASTREAM_H
+#endif // DATASTREAM_HPP
 

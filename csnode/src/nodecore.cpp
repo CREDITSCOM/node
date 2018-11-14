@@ -1,4 +1,4 @@
-#include "nodecore.h"
+#include "nodecore.hpp"
 
 std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::TransactionsPacketHash& packetHash) const noexcept
 {

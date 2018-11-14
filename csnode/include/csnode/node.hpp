@@ -10,9 +10,8 @@
 #include <csconnector/csconnector.h>
 #include <client/config.hpp>
 
-#include <csnode/datastream.h>
-#include <csnode/dynamicbuffer.h>
 #include <lib/system/keys.hpp>
+#include <csnode/datastream.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -60,8 +59,8 @@ public:
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
 
-  cs::Bytes createNotification();
-  cs::Bytes createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+  cs::Bytes createNotification(const cs::PublicKey& writerPublicKey);
+  void createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                                         const cs::Signature& signature, const cs::Notifications& notifications);
 
   // syncro get functions
@@ -82,28 +81,25 @@ public:
 
   // syncro send functions
   void sendBlockRequest();
-  void sendBlockRequest(const std::vector<csdb::Pool::sequence_t>& sequences);
   void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
 
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
 
-  template<class... Args>
+  template<typename... Args>
   bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+
+  template<typename... Args>
+  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -119,8 +115,8 @@ public:
 
   MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes);
 
-  const cs::PublicKey& getPublicKey() const {
-    return myPublicKey_;
+  const cs::PublicKey& getNodeIdKey() const {
+    return nodeIdKey_;
   }
 
   NodeLevel getNodeLevel() const {
@@ -165,7 +161,6 @@ private:
 
   // pool sync helpers
   void blockchainSync();
-  void processPoolSync();
 
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
@@ -182,21 +177,24 @@ private:
   // pool sync progress
   static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
 
-  template <class T, class... Args>
-  void writeDefaultStream(cs::DataStream& stream, const T& value, const Args&... args);
+  template <typename T, typename... Args>
+  void writeDefaultStream(const T& value, const Args&... args);
 
-  template<class T>
-  void writeDefaultStream(cs::DataStream& stream, const T& value);
+  template<typename T>
+  void writeDefaultStream(const T& value);
 
-  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
-  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const cs::Bytes& bytes);
+  template<typename... Args>
+  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+
+  template<typename... Args>
+  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
   static const csdb::Address spammerAddress_;
 
-  const cs::PublicKey myPublicKey_;
+  const cs::PublicKey nodeIdKey_;
   bool good_ = true;
 
   // syncro variables
@@ -235,8 +233,8 @@ private:
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
 
-  IPackStream istream_;
-  OPackStream ostream_;
+  cs::IPackStream istream_;
+  cs::OPackStream ostream_;
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
@@ -244,10 +242,7 @@ private:
   // sync meta
   csdb::Pool::sequence_t sendBlockRequestSequence_;
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
-  std::map<csdb::Pool::sequence_t, csdb::Pool> poolSyncRequestMap_;   // meta information of pool sync from nodes
   cs::RoundNumber roundToSync_ = 0;
-
-  inline static const std::size_t maxPoolCountToSync_ = 10;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

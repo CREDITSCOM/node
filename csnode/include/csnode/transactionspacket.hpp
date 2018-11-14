@@ -1,5 +1,5 @@
-#ifndef TRANSACTIONS_PACKET_H
-#define TRANSACTIONS_PACKET_H
+#ifndef TRANSACTIONS_PACKET_HPP
+#define TRANSACTIONS_PACKET_HPP
 
 #include <vector>
 #include <string>
@@ -171,4 +171,4 @@ namespace cs
     };
 }
 
-#endif // TRANSACTIONS_PACKET_H
+#endif // TRANSACTIONS_PACKET_HPP

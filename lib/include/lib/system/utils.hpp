@@ -72,6 +72,12 @@ namespace cs
         return os;
     }
 
+    template<typename T>
+    struct is_vector : public std::false_type {};
+
+    template<typename T, typename A>
+    struct is_vector<std::vector<T, A>> : public std::true_type {};
+
     ///
     /// Static utils helper class
     ///
@@ -345,18 +351,26 @@ namespace cs
         ///
         /// Signs data with security key
         ///
-        static cs::Signature sign(const cs::Bytes& data, const cs::PrivateKey& securityKey)
+        static cs::Signature sign(const cs::Byte* byte, std::size_t size, const cs::PrivateKey& securityKey)
         {
             cs::Signature signature;
             std::fill(signature.begin(), signature.end(), 0);
 
             unsigned long long signLength = 0;
 
-            crypto_sign_detached(signature.data(), &signLength, data.data(), data.size(), securityKey.data());
+            crypto_sign_detached(signature.data(), &signLength, byte, size, securityKey.data());
 
             assert(signature.size() == signLength);
 
             return signature;
+        }
+
+        ///
+        /// Signs data with security key
+        ///
+        static cs::Signature sign(const cs::Bytes& data, const cs::PrivateKey& securityKey)
+        {
+            return cs::Utils::sign(data.data(), data.size(), securityKey);
         }
 
         ///
@@ -425,6 +439,11 @@ namespace cs
     #endif
     }
 
+    template<typename T>
+    constexpr bool isVector()
+    {
+        return cs::is_vector<T>::value;
+    }
 }
 
 inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept

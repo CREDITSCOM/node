@@ -12,75 +12,93 @@
 
 #include "gtest/gtest.h"
 
-void testRegionAllocator(uint32_t size, uint32_t pages, uint32_t num, uint32_t& resultPages) {
-  RegionAllocator a(size, pages);
+void CreateRegionAllocatorAndThenAllocateInIt(
+    const uint32_t page_size, const uint32_t initial_number_of_pages,
+    const uint32_t number_of_additional_allocations,
+    const uint32_t additional_allocation_size,
+    uint32_t& final_number_of_pages) {
+  RegionAllocator allocator(page_size, initial_number_of_pages);
 
-  std::vector<RegionPtr> ptrs;
-
-  for (uint32_t i = 0; i < num; ++i) {
-    ptrs.push_back(a.allocateNext(4));
-    ASSERT_EQ(ptrs.back().size(), 4);
-    *((uint32_t*)ptrs.back().get()) = i;
+  std::vector<RegionPtr> pointers;
+  for (uint32_t i = 0; i < number_of_additional_allocations; ++i) {
+    pointers.push_back(allocator.allocateNext(additional_allocation_size));
+    ASSERT_EQ(pointers.back().size(), additional_allocation_size);
+    *((uint32_t*)pointers.back().get()) = i;
   }
-
   uint32_t i = 0;
-  for (auto ptr : ptrs) {
+  for (auto ptr : pointers) {
     ASSERT_EQ(i, *(uint32_t*)ptr.get());
     ++i;
   }
 
-  resultPages = a.getPagesNum();
+  final_number_of_pages = allocator.getPagesNum();
 }
 
-TEST(region_allocator, one_page) {
-  uint32_t p;
-  testRegionAllocator(400, 2, 10, p);
-  ASSERT_EQ(p, 2);
+// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+constexpr int32_t AlignNumberToPowerOfTwo(const int32_t number,
+                                          const uint32_t align) {
+  return number + ((-number) & (align - 1));
 }
 
-TEST(region_allocator, start_pages) {
-  uint32_t p;
-  testRegionAllocator((sizeof(Region) + 4) * 10, 2, 15, p);
-  ASSERT_EQ(p, 2);
+constexpr int32_t AlignNumberTo64(const int32_t number) {
+  return AlignNumberToPowerOfTwo(number, 64);
 }
 
-TEST(region_allocator, alloc_pages) {
-  uint32_t p1, p2;
-  testRegionAllocator((sizeof(Region) + 4) * 10, 2, 50, p1);
-  ASSERT_EQ(p1, 5);
-
-  testRegionAllocator((sizeof(Region) + 4) * 10, 2, 51, p2);
-  ASSERT_EQ(p2, 6);
+TEST(RegionAllocator, NoAdditionalPageIsAddedIfInitialPagesAreEnough) {
+  constexpr uint32_t kAllocationSize = 4,
+                     kPageSize =
+                         AlignNumberTo64(sizeof(Region) + kAllocationSize) * 10,
+                     kInitialNumberOfPages = 2, kNumberOfAllocations = 20;
+  uint32_t final_number_of_pages;
+  CreateRegionAllocatorAndThenAllocateInIt(
+      kPageSize, kInitialNumberOfPages, kNumberOfAllocations, kAllocationSize,
+      final_number_of_pages);
+  ASSERT_EQ(final_number_of_pages, kInitialNumberOfPages);
 }
 
-TEST(region_allocator, alloc_with_frees) {
-  RegionAllocator a(1000, 1);
+TEST(RegionAllocator, CorrectNumberOfPagesAllocated) {
+  constexpr uint32_t kAllocationSize = 4,
+                     kPageSize =
+                         AlignNumberTo64(sizeof(Region) + kAllocationSize) * 10,
+                     kInitialNumberOfPages = 2, kNumberOfAllocations = 50;
 
+  uint32_t final_number_of_pages;
+  CreateRegionAllocatorAndThenAllocateInIt(
+      kPageSize, kInitialNumberOfPages, kNumberOfAllocations, kAllocationSize,
+      final_number_of_pages);
+  ASSERT_EQ(final_number_of_pages, 5);
+  CreateRegionAllocatorAndThenAllocateInIt(
+      kPageSize, kInitialNumberOfPages, kNumberOfAllocations + 1,
+      kAllocationSize, final_number_of_pages);
+  ASSERT_EQ(final_number_of_pages, 6);
+}
+
+TEST(RegionAllocator, AllocateAndFreeUnusedObject) {
+  RegionAllocator allocator(1000, 1);
   for (uint32_t i = 0; i < 100; ++i) {
-    auto p = a.allocateNext(i + 1);
-    *(char*)p.get() = 'x';
+    // every iteration this object is destructed and automatically removed from
+    // allocator, so allocator is empty every iteration
+    auto destructed_object = allocator.allocateNext(i + 1);
+    *(char*)destructed_object.get() = 'x';
   }
-
-  ASSERT_EQ(a.getPagesNum(), 1);
+  ASSERT_EQ(allocator.getPagesNum(), 1);
 }
 
-TEST(region_allocator, alloc_with_resizes) {
-  RegionAllocator a((sizeof(Region) + 1) * 100 + 101, 1);
+TEST(RegionAllocator, alloc_with_resizes) {
+  constexpr uint32_t kPageSize = AlignNumberTo64(sizeof(Region) + 1) * 100;
 
+  RegionAllocator allocator(kPageSize, 1);
   std::vector<RegionPtr> regs;
-
   for (uint32_t i = 0; i < 100; ++i) {
-    auto p = a.allocateNext(i + 1);
+    auto p = allocator.allocateNext(50);
     *(char*)p.get() = 'x';
-
-    a.shrinkLast(1);
+    allocator.shrinkLast(1);
     regs.push_back(p);
   }
-
-  ASSERT_EQ(a.getPagesNum(), 1);
+  ASSERT_EQ(allocator.getPagesNum(), 1);
 }
 
-TEST(region_allocator, multithreaded_stress) {
+TEST(RegionAllocator, multithreaded_stress) {
   RegionAllocator a(10000, 10);
   uint64_t total = 0;
 
@@ -89,44 +107,43 @@ TEST(region_allocator, multithreaded_stress) {
   uint64_t lTot = 0;
 
   std::thread wr([&]() {
-                   for (uint32_t i = 0; i < 1000000; ++i) {
-                     uint32_t s = rand() % 100 + 4;
-                     auto p = a.allocateNext(s);
-                     *(uint32_t*)p.get() = i;
-                     total+= i;
+    for (uint32_t i = 0; i < 1000000; ++i) {
+      uint32_t s = rand() % 100 + 4;
+      auto p = a.allocateNext(s);
+      *(uint32_t*)p.get() = i;
+      total += i;
 
-                     if (i % 7 == 0)
-                       a.shrinkLast(std::max((uint32_t)4, s % 25));
+      if (i % 7 == 0) a.shrinkLast(std::max((uint32_t)4, s % 25));
 
-                     {
-                       std::lock_guard<std::mutex> l(m);
-                       regs.push_back(p);
-                     }
-                   }
-                 });
+      {
+        std::lock_guard<std::mutex> l(m);
+        regs.push_back(p);
+      }
+    }
+  });
 
   auto rrout = [&]() {
-                 std::vector<RegionPtr> inCase;
-                 uint64_t t = 0;
+    std::vector<RegionPtr> inCase;
+    uint64_t t = 0;
 
-                 for (uint32_t i = 0; i < 250000; ++i) {
-                   for (;;) {
-                     RegionPtr p;
-                     {
-                       std::lock_guard<std::mutex> l(m);
-                       if (regs.empty()) continue;
-                       p = regs.front();
-                       regs.pop_front();
-                     }
-                     t+= *(uint32_t*)p.get();
-                     if (i % 17 == 0) inCase.push_back(p);
-                     break;
-                   }
-                 }
+    for (uint32_t i = 0; i < 250000; ++i) {
+      for (;;) {
+        RegionPtr p;
+        {
+          std::lock_guard<std::mutex> l(m);
+          if (regs.empty()) continue;
+          p = regs.front();
+          regs.pop_front();
+        }
+        t += *(uint32_t*)p.get();
+        if (i % 17 == 0) inCase.push_back(p);
+        break;
+      }
+    }
 
-                 std::lock_guard<std::mutex> l(m);
-                 lTot+= t;
-               };
+    std::lock_guard<std::mutex> l(m);
+    lTot += t;
+  };
 
   std::thread p1(rrout);
   std::thread p2(rrout);
@@ -176,31 +193,30 @@ TEST(fuqueue, overwrite) {
   }
 }
 
-
 TEST(fuqueue, multithreaded_stress) {
   FUQueue<uint32_t, 1000> q;
 
-  std::atomic<uint64_t> wSum = { 0 };
-  std::atomic<uint64_t> rSum = { 0 };
+  std::atomic<uint64_t> wSum = {0};
+  std::atomic<uint64_t> rSum = {0};
 
   auto wrFunc = [&]() {
-                  for (int i = 0; i < 100000; ++i) {
-                    const uint32_t t = rand() % 500;
-                    auto s = q.lockWrite();
-                    s->element = t;
-                    q.unlockWrite(s);
+    for (int i = 0; i < 100000; ++i) {
+      const uint32_t t = rand() % 500;
+      auto s = q.lockWrite();
+      s->element = t;
+      q.unlockWrite(s);
 
-                    wSum.fetch_add(t, std::memory_order_relaxed);
-                  }
-                };
+      wSum.fetch_add(t, std::memory_order_relaxed);
+    }
+  };
 
   auto rdFunc = [&]() {
-                  for (int i = 0; i < 100000; ++i) {
-                    auto s = q.lockRead();
-                    rSum.fetch_add(s->element, std::memory_order_relaxed);
-                    q.unlockRead(s);
-                  }
-                };
+    for (int i = 0; i < 100000; ++i) {
+      auto s = q.lockRead();
+      rSum.fetch_add(s->element, std::memory_order_relaxed);
+      q.unlockRead(s);
+    }
+  };
 
   std::thread w1(wrFunc);
   std::thread w2(wrFunc);
@@ -209,7 +225,6 @@ TEST(fuqueue, multithreaded_stress) {
   std::thread r1(rdFunc);
   std::thread r2(rdFunc);
   std::thread r3(rdFunc);
-;
 
   w1.join();
   w2.join();
@@ -225,14 +240,11 @@ TEST(typed_allocator, one_page) {
 
   std::array<MemPtr<TypedSlot<uint32_t>>, 100> uis = {};
 
-  for (uint32_t i = 0; i < 100; ++i)
-    uis[i] = allocator.emplace(i);
+  for (uint32_t i = 0; i < 100; ++i) uis[i] = allocator.emplace(i);
 
-  for (uint32_t i = 0; i < 100; ++i)
-    ASSERT_EQ(**(uis[i]), i);
+  for (uint32_t i = 0; i < 100; ++i) ASSERT_EQ(**(uis[i]), i);
 
-  for (uint32_t i = 0; i < 100; ++i)
-    uis[i] = MemPtr<TypedSlot<uint32_t>>();
+  for (uint32_t i = 0; i < 100; ++i) uis[i] = MemPtr<TypedSlot<uint32_t>>();
 }
 
 TEST(typed_allocator, multiple_pages) {
@@ -240,14 +252,11 @@ TEST(typed_allocator, multiple_pages) {
 
   std::array<MemPtr<TypedSlot<uint32_t>>, 1000> uis;
 
-  for (uint32_t i = 0; i < 1000; ++i)
-    uis[i] = allocator.emplace(i);
+  for (uint32_t i = 0; i < 1000; ++i) uis[i] = allocator.emplace(i);
 
-  for (uint32_t i = 0; i < 1000; ++i)
-    ASSERT_EQ(**(uis[i]), i);
+  for (uint32_t i = 0; i < 1000; ++i) ASSERT_EQ(**(uis[i]), i);
 
-  for (uint32_t i = 0; i < 1000; ++i)
-    uis[i] = MemPtr<TypedSlot<uint32_t>>();
+  for (uint32_t i = 0; i < 1000; ++i) uis[i] = MemPtr<TypedSlot<uint32_t>>();
 }
 
 TEST(typed_allocator, reput) {
@@ -255,8 +264,7 @@ TEST(typed_allocator, reput) {
 
   auto first = *allocator.emplace(42);
 
-  for (uint32_t i = 0; i < 10; ++i)
-    ASSERT_EQ(*allocator.emplace(i), first);
+  for (uint32_t i = 0; i < 10; ++i) ASSERT_EQ(*allocator.emplace(i), first);
 }
 
 TEST(typed_allocator, inconsistent) {
@@ -270,7 +278,9 @@ TEST(typed_allocator, inconsistent) {
   }
 
   for (uint32_t i = 0; i < 1000; ++i)
-    if (i % 7) { ASSERT_EQ(**(uis[i]), i); }
+    if (i % 7) {
+      ASSERT_EQ(**(uis[i]), i);
+    }
 }
 
 template <>
@@ -290,8 +300,7 @@ TEST(fixed_hash_map, base) {
     c = 2;
   }
 
-  for (uint32_t i = 0; i < COUNT; ++i)
-    ASSERT_EQ(hm.tryStore(hs[i]), 2);
+  for (uint32_t i = 0; i < COUNT; ++i) ASSERT_EQ(hm.tryStore(hs[i]), 2);
 }
 
 TEST(fixed_hash_map, depush) {
@@ -343,7 +352,7 @@ struct IntWithCounter {
   static uint32_t counter;
   uint32_t i;
 
-  IntWithCounter(uint32_t _i): i(_i) { ++counter; }
+  IntWithCounter(uint32_t _i) : i(_i) { ++counter; }
   IntWithCounter() { ++counter; }
   ~IntWithCounter() { --counter; }
 };
@@ -364,15 +373,14 @@ TEST(fixed_hash_map, destroy) {
   }
 
   // Todo: Typed allocator destructor
-  // ASSERT_EQ(IntWithCounter::counter, 0);
+   ASSERT_EQ(IntWithCounter::counter, 0);
 }
 
 TEST(fixed_circular_buffer, short) {
   IntWithCounter::counter = 0;
 
   FixedCircularBuffer<IntWithCounter, 32> fcb;
-  for (uint32_t i = 0; i < 30; ++i)
-    fcb.emplace(i);
+  for (uint32_t i = 0; i < 30; ++i) fcb.emplace(i);
 
   uint32_t j = 0;
   for (auto& ii : fcb) {
@@ -391,8 +399,7 @@ TEST(fixed_circular_buffer, override) {
 
   {
     FixedCircularBuffer<IntWithCounter, 32> fcb;
-    for (uint32_t i = 0; i < 40; ++i)
-      fcb.emplace(i);
+    for (uint32_t i = 0; i < 40; ++i) fcb.emplace(i);
 
     uint32_t j = 32;
     auto iter = fcb.begin();
@@ -409,8 +416,7 @@ TEST(fixed_circular_buffer, override) {
 
 TEST(fixed_circular_buffer, deletions) {
   FixedCircularBuffer<uint32_t, 32> fcb;
-  for (uint32_t i = 0; i < 20; ++i)
-    fcb.emplace(i);
+  for (uint32_t i = 0; i < 20; ++i) fcb.emplace(i);
 
   fcb.remove(fcb.frontPtr() + 10);
   fcb.remove(fcb.frontPtr() + 15);
