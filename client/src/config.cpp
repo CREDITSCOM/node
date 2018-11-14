@@ -1,16 +1,6 @@
+#include "stdafx.h"
 /* Send blaming letters to @yrtimd */
-#include <iostream>
-#include <string>
-#include <regex>
-#include <stdexcept>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/asio.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/log/utility/setup/settings_parser.hpp>
-#include <boost/property_tree/ini_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/xml_parser.hpp>
 
 #include <lib/system/logger.hpp>
 #include <base58.h>
@@ -34,6 +24,62 @@ const std::string PARAM_NAME_PORT = "port";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = { { "client", NodeType::Client }, { "router", NodeType::Router } };
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = { { "signal_server", BootstrapType::SignalServer }, { "list", BootstrapType::IpList } };
+
+namespace ip = boost::asio::ip;
+struct EndpointData final {
+  EndpointData()
+    : ipSpecified(false)
+	, port(0)
+  {}
+  bool ipSpecified;
+  short unsigned port;
+  ip::address ip;
+
+  static EndpointData fromString(const std::string&);
+};
+struct Config::ConfigImpl final
+{
+	Config::ConfigImpl()
+      : good_(false)
+      , twoSockets_(false)
+      , nType_()
+      , ipv6_(false)
+      , maxNeighbours_(0)
+      , connectionBandwidth_(0)
+      , symmetric_(false)
+      , bType_()
+      , server_(false)
+      , publicKey_()
+	{
+	}
+
+	bool good_;
+
+	EndpointData inputEp_;
+
+	bool twoSockets_;
+	EndpointData outputEp_;
+
+	NodeType nType_;
+
+	bool ipv6_;
+	uint32_t maxNeighbours_;
+	uint64_t connectionBandwidth_;
+
+	bool symmetric_;
+	EndpointData hostAddressEp_;
+
+	BootstrapType bType_;
+	EndpointData signalServerEp_;
+
+	std::vector<EndpointData> bList_{};
+	bool server_;
+
+	std::string pathToDb_;
+	cs::PublicKey publicKey_;
+
+	boost::log::settings loggerSettings_;
+};
 
 static EndpointData readEndpoint(const boost::property_tree::ptree& config, const std::string& propName) {
   const boost::property_tree::ptree& epTree = config.get_child(propName);
@@ -80,12 +126,37 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
 
-Config Config::read(po::variables_map& vm) {
+Config::Config()
+	:m_pImpl(std::make_unique<ConfigImpl>())
+{}
+Config::Config(const Config& other)
+	:m_pImpl(std::make_unique<ConfigImpl>(*other.m_pImpl))
+{}
+Config::Config(Config&& other)
+	: m_pImpl(std::move(other.m_pImpl))
+{}
+inline const EndpointData& Config::getInputEndpoint() const { return m_pImpl->inputEp_; }
+inline const EndpointData& Config::getOutputEndpoint() const { return m_pImpl->outputEp_; }
+inline const EndpointData& Config::getSignalServerEndpoint() const { return m_pImpl->signalServerEp_; }
+inline BootstrapType Config::getBootstrapType() const { return m_pImpl->bType_; }
+inline NodeType Config::getNodeType() const { return m_pImpl->nType_; }
+inline const std::vector<EndpointData>& Config::getIpList() const { return m_pImpl->bList_; }
+inline const cs::PublicKey& Config::getMyPublicKey() const { return m_pImpl->publicKey_; }
+inline const std::string& Config::getPathToDB() const { return m_pImpl->pathToDb_; }
+inline bool Config::isGood() const { return m_pImpl->good_; }
+inline bool Config::useIPv6() const { return m_pImpl->ipv6_; }
+inline bool Config::hasTwoSockets() const { return m_pImpl->twoSockets_; }
+inline uint32_t Config::getMaxNeighbours() const { return m_pImpl->maxNeighbours_; }
+inline uint64_t Config::getConnectionBandwidth() const { return m_pImpl->connectionBandwidth_; }
+inline bool Config::isSymmetric() const { return m_pImpl->symmetric_; }
+inline const EndpointData& Config::getAddressEndpoint() const { return m_pImpl->hostAddressEp_; }
+
+Config Config::read(variables_map& vm) {
   Config result = readFromFile(vm.count("config-file") ?
                                vm["config-file"].as<std::string>() :
                                DEFAULT_PATH_TO_CONFIG);
 
-  result.pathToDb_ = vm.count("db-path") ?
+  result.m_pImpl->pathToDb_ = vm.count("db-path") ?
     vm["db-path"].as<std::string>() :
     DEFAULT_PATH_TO_DB;
 
@@ -101,16 +172,16 @@ Config Config::read(po::variables_map& vm) {
     pub.close();
     DecodeBase58(pub58, myPublic);
     if (myPublic.size() != 32) {
-      result.good_ = false;
+      result.m_pImpl->good_ = false;
       LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
     }
 
-    std::copy(myPublic.begin(), myPublic.end(), result.publicKey_.begin());
+    std::copy(myPublic.begin(), myPublic.end(), result.m_pImpl->publicKey_.begin());
   }
   else {
-    srand(time(NULL));
+    srand(time(nullptr));
     for (int i = 0; i < 32; ++i) {
-      *(result.publicKey_.data() + i) = (char)(rand() % 255);
+      *(result.m_pImpl->publicKey_.data() + i) = (char)(rand() % 255);
     }
   }
 
@@ -135,52 +206,52 @@ Config Config::readFromFile(const std::string& fileName) {
       boost::property_tree::read_ini(fileName, config);
     }
 
-    result.inputEp_ = readEndpoint(config,
+    result.m_pImpl->inputEp_ = readEndpoint(config,
                                    BLOCK_NAME_HOST_INPUT);
 
     if (config.count(BLOCK_NAME_HOST_OUTPUT)) {
-      result.outputEp_ = readEndpoint(config,
+      result.m_pImpl->outputEp_ = readEndpoint(config,
                                       BLOCK_NAME_HOST_OUTPUT);
 
-      result.twoSockets_ = true;/*(result.outputEp_.ip != result.inputEp_.ip ||
+      result.m_pImpl->twoSockets_ = true;/*(result.outputEp_.ip != result.inputEp_.ip ||
                                   result.outputEp_.port != result.inputEp_.port);*/
     }
     else
-      result.twoSockets_ = false;
+      result.m_pImpl->twoSockets_ = false;
 
     const boost::property_tree::ptree& params =
       config.get_child(BLOCK_NAME_PARAMS);
 
-    result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) &&
+    result.m_pImpl->ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) &&
                      params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
-    result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ?
+    result.m_pImpl->maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ?
       params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) :
       DEFAULT_MAX_NEIGHBOURS;
 
-    result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ?
+    result.m_pImpl->connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ?
       params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) :
       DEFAULT_CONNECTION_BANDWIDTH;
 
-    result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE),
+    result.m_pImpl->nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE),
                                NODE_TYPES_MAP);
 
     if (config.count(BLOCK_NAME_HOST_ADDRESS)) {
-      result.hostAddressEp_ = readEndpoint(config,
+      result.m_pImpl->hostAddressEp_ = readEndpoint(config,
                                            BLOCK_NAME_HOST_ADDRESS);
-      result.symmetric_ = false;
+      result.m_pImpl->symmetric_ = false;
     }
     else
-      result.symmetric_ = true;
+      result.m_pImpl->symmetric_ = true;
 
-    result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE),
+    result.m_pImpl->bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE),
                                BOOTSTRAP_TYPES_MAP);
 
-    if (result.bType_ == BootstrapType::SignalServer ||
-        result.nType_ == NodeType::Router)
-      result.signalServerEp_ = readEndpoint(config,
+    if (result.m_pImpl->bType_ == BootstrapType::SignalServer ||
+        result.m_pImpl->nType_ == NodeType::Router)
+      result.m_pImpl->signalServerEp_ = readEndpoint(config,
                                             BLOCK_NAME_SIGNAL_SERVER);
-    if (result.bType_ == BootstrapType::IpList) {
+    if (result.m_pImpl->bType_ == BootstrapType::IpList) {
       const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
       std::string line;
@@ -192,18 +263,18 @@ Config Config::readFromFile(const std::string& fileName) {
 
       while (getline(hostsFile, line))
         if (!line.empty())
-          result.bList_.push_back(EndpointData::fromString(line));
+          result.m_pImpl->bList_.push_back(EndpointData::fromString(line));
 
-      if (result.bList_.empty())
+      if (result.m_pImpl->bList_.empty())
         throw std::length_error("No hosts specified");
     }
 
     result.setLoggerSettings(config);
-    result.good_ = true;
+    result.m_pImpl->good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
     LOG_ERROR("Couldn't read config file \"" << fileName << "\": " << e.what());
-    result.good_ = false;
+    result.m_pImpl->good_ = false;
   }
   catch (boost::property_tree::ptree_bad_data& e) {
     LOG_ERROR(e.what() << ": " << e.data<std::string>());
@@ -229,11 +300,11 @@ Config Config::readFromFile(const std::string& fileName) {
 
 void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   boost::property_tree::ptree settings;
-  auto core = config.get_child_optional("Core");
+  const auto core = config.get_child_optional("Core");
   if (core) {
     settings.add_child("Core", *core);
   }
-  auto sinks = config.get_child_optional("Sinks");
+  const auto sinks = config.get_child_optional("Sinks");
   if (sinks) {
     for (const auto& val: *sinks) {
       settings.add_child(boost::property_tree::ptree::path_type("Sinks." + val.first, '/'), val.second);
@@ -245,9 +316,9 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   }
   std::stringstream ss;
   boost::property_tree::write_ini(ss, settings);
-  loggerSettings_ = boost::log::parse_settings(ss);
+  m_pImpl->loggerSettings_ = boost::log::parse_settings(ss);
 }
 
 const boost::log::settings& Config::getLoggerSettings() const {
-  return loggerSettings_;
+  return m_pImpl->loggerSettings_;
 }
