@@ -364,7 +364,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)
+    void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester)
     {
 
 
