@@ -126,7 +126,9 @@ class APIHandler : public APIHandlerInterface
 
     void WalletsGet(api::WalletsGetResult& _return,
                     int64_t offset,
-                    int64_t limit) override;
+                    int64_t limit,
+                    int8_t ordCol,
+                    bool desc) override;
 
     void WritersGet(api::WritersGetResult& _return,
                     int32_t page) override;
