@@ -121,8 +121,8 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
   DbEnv env(static_cast<uint32_t>(0));
   uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
   try {
-    env.open(path.c_str(), db_env_open_flags, 0);
-    env.close(0);
+//    env.open(path.c_str(), db_env_open_flags, 0);
+//    env.close(0); // this recover method does not work
   }
   catch (DbException &e) {
     std::cerr << "Error opening database environment: "
