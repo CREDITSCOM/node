@@ -96,8 +96,15 @@ public:
   bool putBlock(csdb::Pool& pool);
   const csdb::Storage & getStorage() const;
 
-private:
+  struct AddrTrnxCount {
+    uint64_t sendCount;
+    uint64_t recvCount;
+  };
 
+  void recount_trxns(const std::optional<csdb::Pool> &new_pool);
+  const AddrTrnxCount &get_trxns_count(const csdb::Address &addr);
+
+private:
   bool writeGenesisBlock();
   
   void writeBlock(csdb::Pool& pool);
@@ -156,4 +163,5 @@ private:
 
   std::condition_variable_any new_block_cv;
   cs::spinlock waiters_locker;
+  std::map<csdb::Address, AddrTrnxCount> m_trxns_count;
 };
