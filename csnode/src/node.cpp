@@ -18,6 +18,7 @@
 #include <base58.h>
 
 #include <boost/optional.hpp>
+#include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
 #include <sodium.h>
@@ -630,15 +631,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   if (!conveyer.isSyncCompleted(round)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
-    cs::Bytes characteristicBytes;
-    characteristicBytes.assign(data, data + size);
+    cs::Bytes characteristicBytes(data, data + size);
 
-    cs::CharacteristicMetaStorage::MetaElement metaElement;
-    metaElement.meta.bytes = std::move(characteristicBytes);
-    metaElement.meta.sender = sender;
-    metaElement.round = round;
+    cs::CharacteristicMeta meta;
+    meta.bytes = std::move(characteristicBytes);
+    meta.sender = sender;
 
-    conveyer.addCharacteristicMeta(std::move(metaElement));
+    conveyer.addCharacteristicMeta(round, std::move(meta));
     return;
   }
 
@@ -659,15 +658,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Signature signature;
   istream_ >> signature;
-  cslog() << "NODE> >> signature, size=" << signature.size();
 
   cs::Notifications notifications;
   istream_ >> notifications;
-  cslog() << "NODE> >> notifications, size=" << notifications.size();
 
   for (std::size_t i = 0; i < notifications.size(); ++i) {
     conveyer.addNotification(notifications[i]);
-    cslog() << "NODE> >> notifications[" << i << "], size=" << notifications[i].size();
   }
 
   std::vector<cs::Hash> confidantsHashes;
@@ -680,11 +676,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     confidantsHashes.push_back(hash);
   }
-  cslog() << "NODE> >> confidantsHashes, size=" << confidantsHashes.size();
 
-  cslog() << "NODE> getBlake2Hash(..., characteristicMask.size()=" << characteristicMask.size() << ")";
   cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
-  cslog() << "NODE> getBlake2Hash(...) ok";
 
   for (const auto& hash : confidantsHashes) {
     if (hash != characteristicHash) {
@@ -698,42 +691,43 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
+  conveyer.setCharacteristic(std::move(characteristic));
 
   assert(sequence <= this->getRoundNumber());
 
   cs::PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
 
-  conveyer.setCharacteristic(characteristic);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-  if (isSyncroStarted_) {
-    if (pool) {
-      cs::PoolSyncMeta meta;
-      meta.sender = sender;
-      meta.signature = signature;
-      meta.pool = std::move(pool).value();
+  if (!pool) {
+    cserror() << "NODE> Get characteristic, created pool is not valid";
+    return;
+  }
 
-      addPoolMetaToMap(std::move(meta), sequence);
-    }
+  if (isSyncroStarted_) {
+    cs::PoolSyncMeta meta;
+    meta.sender = sender;
+    meta.signature = signature;
+    meta.pool = std::move(pool).value();
+
+    addPoolMetaToMap(std::move(meta), sequence);
 
     return;
   }
 
-  if (pool) {
-    solver_->countFeesInPool(&pool.value());
-    pool.value().set_previous_hash(bc_.getLastWrittenHash());
-    getBlockChain().finishNewBlock(pool.value());
+  solver_->countFeesInPool(&pool.value());
+  pool.value().set_previous_hash(bc_.getLastWrittenHash());
+  getBlockChain().finishNewBlock(pool.value());
 
-    if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-      cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock_V3(pool.value(), sequence, sender);
-    }
-    else {
-      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
-      cswarning() << "NODE> remove wallets from wallets cache";
-      getBlockChain().removeWalletsInPoolFromCache(pool.value());
-    }
+  if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
+    cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+    writeBlock_V3(pool.value(), sequence, sender);
+  }
+  else {
+    cswarning() << "NODE> RECEIVED KEY Writer verification failed";
+    cswarning() << "NODE> remove wallets from wallets cache";
+    getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
 }
 
@@ -1194,7 +1188,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   if (pool.sequence() == sendBlockRequestSequence_) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
 
-    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+    if (roundToSync_ > 0) {
+      Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+    }
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
@@ -1506,33 +1502,16 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
 }
 
 void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence) {
-  if (!globalSequence) {
+  if (globalSequence == 0) {
     return;
   }
-
   auto last = float(lastWrittenSequence);
   auto global = float(globalSequence);
   const float maxValue = 100.0f;
   const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
-
   if (syncStatus <= maxValue) {
-    std::stringstream progress;
-    progress << "SYNC: [";
-
-    for (uint32_t i = 0; i < syncStatus; ++i) {
-      if (i % 2) {
-        progress << "#";
-      }
-    }
-
-    for (uint32_t i = syncStatus; i < maxValue; ++i) {
-      if (i % 2) {
-        progress << "-";
-      }
-    }
-
-    progress << "] " << syncStatus << "%";
-    cslog() << progress.str();
+    ProgressBar bar;
+    cslog() << "SYNC: " << bar.string(syncStatus);
   }
 }
 
@@ -2266,19 +2245,19 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   cslog() << "NODE> Characteric has arrived";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
+  // rNum has been incremented just before:
   if (!conveyer.isSyncCompleted(rNum-1)) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes;
     characteristicBytes.assign(istream_.getCurrentPtr(), istream_.getEndPtr());
 
-    cs::CharacteristicMetaStorage::MetaElement metaElement;
-    metaElement.meta.bytes = std::move(characteristicBytes);
-    metaElement.meta.sender = sender;
-    metaElement.round = rNum - 1;
+    cs::CharacteristicMeta meta;
+    meta.bytes = std::move(characteristicBytes);
+    meta.sender = sender;
 
-    conveyer.addCharacteristicMeta(std::move(metaElement));
-    //return;
+    conveyer.addCharacteristicMeta(rNum-1, std::move(meta));
+    // no return, perform some more actions at the end
   }
   else {
       std::string time;

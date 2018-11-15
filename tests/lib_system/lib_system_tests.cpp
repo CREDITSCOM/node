@@ -288,7 +288,7 @@ uint16_t getHashIndex(const uint32_t& h) {
   return h % (1 << 16);
 }
 
-TEST(fixed_hash_map, base) {
+TEST(FixedHashMap, base) {
   FixedHashMap<uint32_t, uint64_t, uint16_t, 100000> hm;
   const uint32_t COUNT = 100000ll;
   uint32_t hs[COUNT];
@@ -303,7 +303,7 @@ TEST(fixed_hash_map, base) {
   for (uint32_t i = 0; i < COUNT; ++i) ASSERT_EQ(hm.tryStore(hs[i]), 2);
 }
 
-TEST(fixed_hash_map, depush) {
+TEST(FixedHashMap, depush) {
   FixedHashMap<uint32_t, uint64_t, uint16_t, 10> hm;
   uint32_t hs[1000];
 
@@ -330,7 +330,7 @@ uint8_t getHashIndex(const uint16_t& h) {
   return h % (1 << 8);
 }
 
-TEST(fixed_hash_map, heap) {
+TEST(FixedHashMap, heap) {
   const uint16_t COUNT = 10000;
   FixedHashMap<uint16_t, uint32_t, uint8_t, COUNT> hm;
   uint16_t hs[COUNT];
@@ -351,7 +351,6 @@ TEST(fixed_hash_map, heap) {
 struct IntWithCounter {
   static uint32_t counter;
   uint32_t i;
-
   IntWithCounter(uint32_t _i) : i(_i) { ++counter; }
   IntWithCounter() { ++counter; }
   ~IntWithCounter() { --counter; }
@@ -359,7 +358,7 @@ struct IntWithCounter {
 
 uint32_t IntWithCounter::counter = 0;
 
-TEST(fixed_hash_map, destroy) {
+TEST(FixedHashMap, destroy) {
   IntWithCounter::counter = 0;
 
   {
@@ -373,85 +372,70 @@ TEST(fixed_hash_map, destroy) {
   }
 
   // Todo: Typed allocator destructor
-   ASSERT_EQ(IntWithCounter::counter, 0);
-}
-
-TEST(fixed_circular_buffer, short) {
-  IntWithCounter::counter = 0;
-
-  FixedCircularBuffer<IntWithCounter, 32> fcb;
-  for (uint32_t i = 0; i < 30; ++i) fcb.emplace(i);
-
-  uint32_t j = 0;
-  for (auto& ii : fcb) {
-    ASSERT_EQ(ii.i, j);
-    ++j;
-  }
-
-  ASSERT_EQ(j, 30);
-
-  fcb.clear();
   ASSERT_EQ(IntWithCounter::counter, 0);
 }
 
-TEST(fixed_circular_buffer, override) {
+TEST(FixedCircularBuffer, BasicCreation) {
   IntWithCounter::counter = 0;
+  FixedCircularBuffer<IntWithCounter, 32> buffer;
+  for (uint32_t i = 0; i < 30; ++i) {
+    buffer.emplace(i);
+  }
+  uint32_t j = 0;
+  for (auto& x : buffer) {
+    ASSERT_EQ(x.i, j);
+    ++j;
+  }
+  ASSERT_EQ(j, 30);
+  buffer.clear();
+  ASSERT_EQ(IntWithCounter::counter, 0);
+}
 
+TEST(FixedCircularBuffer, OverlappingWhenAddingMoreThanBufferSize) {
+  IntWithCounter::counter = 0;
   {
-    FixedCircularBuffer<IntWithCounter, 32> fcb;
-    for (uint32_t i = 0; i < 40; ++i) fcb.emplace(i);
-
+    FixedCircularBuffer<IntWithCounter, 32> buffer;
+    for (uint32_t i = 0; i < 40; ++i) {
+      buffer.emplace(i);
+    }
     uint32_t j = 32;
-    auto iter = fcb.begin();
+    auto iter = buffer.begin();
     for (uint32_t i = 8; i < 40; ++i) {
       ASSERT_EQ(iter->i, i);
       ++iter;
     }
-
     ASSERT_EQ(IntWithCounter::counter, 32);
   }
-
   ASSERT_EQ(IntWithCounter::counter, 0);
 }
 
-TEST(fixed_circular_buffer, deletions) {
-  FixedCircularBuffer<uint32_t, 32> fcb;
-  for (uint32_t i = 0; i < 20; ++i) fcb.emplace(i);
+TEST(FixedCircularBuffer, RemovingTwoElements) {
+  FixedCircularBuffer<uint32_t, 32> buffer;
+  for (uint32_t i = 0; i < 20; ++i) {
+    buffer.emplace(i);
+  }
 
-  fcb.remove(fcb.frontPtr() + 10);
-  fcb.remove(fcb.frontPtr() + 15);
+  buffer.remove(buffer.frontPtr() + 10);
+  buffer.remove(buffer.frontPtr() + 15);
 
-  auto iter = fcb.begin();
+  auto iter = buffer.begin();
   for (uint32_t i = 0; i < 18; ++i) {
-    ASSERT_EQ(*iter, i < 10 ? i : i - (i < 14 ? 1 : 2));
+    ASSERT_EQ(*iter, (i < 10 ? i : i + (i < 15 ? 1 : 2)));
     ++iter;
   }
-
-  /*for (uint32_t i = 0; i < 20; ++i)
-    fcb.emplace(i);
-
-  auto iter2 = fcb.begin();
-  for (uint32_t i = 6; i < 32; ++i) {
-    ASSERT_EQ(iter2->i, i < 10 ? i : i + (i < 14 ? 1 : 2));
-    ++iter2;
-  }
-
-  for (uint32_t i = 6; i < 32; ++i) {
-
-  }*/
 }
 
-TEST(fixed_vector, base) {
-  FixedVector<uint32_t, 10> fv;
+TEST(FixedVector, base) {
+  FixedVector<int, 10> fv;
 
   for (uint32_t i = 0; i < 10; ++i) {
     fv.emplace(i);
   }
 
-  uint32_t cnt = 0;
+  uint32_t count = 0;
   for (auto& i : fv) {
-    ASSERT_EQ(cnt, i);
-    ++cnt;
+    ASSERT_EQ(count, i);
+    ++count;
   }
 
   fv.remove(fv.begin() + 7);

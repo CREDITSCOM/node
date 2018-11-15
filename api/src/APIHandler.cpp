@@ -420,22 +420,23 @@ APIHandler::TransactionGet(TransactionGetResult& _return,
 }
 
 void
-APIHandler::TransactionsGet(TransactionsGetResult& _return,
-                            const Address& address,
-                            const int64_t _offset,
-                            const int64_t limit)
+APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& address, const int64_t _offset, const int64_t limit)
 {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
   BlockChain::Transactions transactions;
 
-  if (limit > 0)
-  {
+  if (limit > 0){
 	  const int64_t offset = (_offset < 0) ? 0 : _offset;
       s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
   }
 
   _return.transactions = convertTransactions(transactions);
+
+  decltype(auto) trxnsCount = s_blockchain.get_trxns_count(addr);
+
+  _return.totalTrxns.sendCount = trxnsCount.sendCount;
+  _return.totalTrxns.recvCount = trxnsCount.recvCount;
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

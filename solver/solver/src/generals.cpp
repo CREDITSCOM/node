@@ -79,11 +79,9 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* sol
     m_transactionsValidator->validateByGraph(characteristicMask, packet.transactions(), newPool);
 
     characteristic.mask = std::move(characteristicMask);
-    conveyer.setCharacteristic(characteristic);
   }
-  else {
-    conveyer.setCharacteristic(characteristic);
-  }
+
+  conveyer.setCharacteristic(characteristic);
 
   if (characteristic.mask.size() != transactionsCount) {
     cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";

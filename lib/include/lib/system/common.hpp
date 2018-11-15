@@ -4,6 +4,10 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <mutex>
+#include <shared_mutex>
+
+#include <boost/smart_ptr/detail/spinlock.hpp>
 
 #define STL_STRUCTURES
 
@@ -47,6 +51,14 @@ namespace cs
     using Blacke2Hash = FixedString<BLAKE2_HASH_LENGTH>;
     using PrivateKey = FixedString<PRIVATE_KEY_LENGTH>;
 #endif
+    // sync types
+    using SharedMutex = std::shared_mutex;
+    using SpinLock = boost::detail::spinlock;
+
+    // RAII locks
+    using Lock = std::lock_guard<cs::SharedMutex>;
+    using SharedLock = std::shared_lock<cs::SharedMutex>;
+    using SpinGuard = std::lock_guard<SpinLock>;
 }
 
 #endif // COMMON_HPP

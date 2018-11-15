@@ -350,7 +350,7 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester)
+    void SolverCore::gotRoundInfoRequest(const cs::PublicKey& /*requester*/)
     {
 
 

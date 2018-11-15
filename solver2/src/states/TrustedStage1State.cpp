@@ -64,23 +64,14 @@ namespace slv2
             return Result::Ignore;
         }
         cslog() << name() << ": transactions sync completed, start consensus in " << context.round() << " round";
-        cs::TransactionsPacket pack;
         cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-        for(const auto& hash : conveyer.roundTable().hashes) {
-            const auto& hashTable = conveyer.transactionsPacketTable();
-            if(hashTable.count(hash) == 0) {
-                cserror() << name() <<
-                    ": HASH NOT FOUND while prepare consensus to build vector, maybe method called before sync completed?";
-                return Result::Ignore;
-            }
-            const auto& transactions = conveyer.packet(hash).transactions();
-            for(const auto& transaction : transactions) {
-                if(!pack.addTransaction(transaction)) {
-                    cserror() << name() << ": cannot add transaction to packet while prepare consensus to build vector";
-                }
-            }
+        auto maybe_pack = conveyer.createPacket();
+        if(!maybe_pack.has_value()) {
+            cserror() << name() <<
+                ": error while prepare consensus to build vector, maybe method called before sync completed?";
+            return Result::Ignore;
         }
+        cs::TransactionsPacket pack = std::move(maybe_pack.value());
         cslog() << name() << ": <-- packet of " << pack.transactionsCount() << " transactions";
 #if LOG_LEVEL & FLAG_LOG_DEBUG
         std::ostringstream os;

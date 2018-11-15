@@ -119,26 +119,13 @@ void Solver::runConsensus() {
   m_isConsensusRunning = true;
 
   cslog() << "SOLVER> Run Consensus";
-  cs::TransactionsPacket packet;
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  auto optionalPacket = cs::Conveyer::instance().createPacket();
 
-  for (const auto& hash : conveyer.roundTable().hashes) {
-    const auto& hashTable = conveyer.transactionsPacketTable();
-
-    if (!hashTable.count(hash)) {
-      cserror() << "Consensus build vector: HASH NOT FOUND";
-      return;
-    }
-
-    const auto& transactions = conveyer.packet(hash).transactions();
-
-    for (const auto& transaction : transactions) {
-      if (!packet.addTransaction(transaction)) {
-        cserror() << "Can not add transaction to packet in consensus";
-      }
-    }
+  if (!optionalPacket) {
+    return;
   }
 
+  cs::TransactionsPacket packet = std::move(optionalPacket).value();
   cslog() << "SOLVER> Consensus transaction packet of " << packet.transactionsCount() << " transactions";
 
   m_feeCounter.CountFeesInPool(m_node->getBlockChain(), &packet);

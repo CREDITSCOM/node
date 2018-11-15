@@ -150,11 +150,15 @@ private:
 
 class OPackStream {
 public:
-  OPackStream(RegionAllocator* allocator, const cs::PublicKey& myKey)
+  OPackStream(RegionAllocator* allocator, const cs::PublicKey& nodeIdKey)
   : allocator_(allocator)
-  , packets_(static_cast<Packet*>(calloc(Packet::MaxFragments, sizeof(Packet))))
+  , packets_(new Packet [Packet::MaxFragments]())
   , packetsEnd_(packets_)
-  , senderKey_(myKey) {
+  , senderKey_(nodeIdKey) {
+  }
+
+  ~OPackStream() {
+    delete[] packets_;
   }
 
   void init(cs::Byte flags) {
@@ -192,17 +196,17 @@ public:
   template <typename T>
   OPackStream& operator<<(const T& value) {
     static_assert(sizeof(T) <= Packet::MaxSize, "Type too long");
-
-    const uint32_t left = static_cast<uint32_t>(end_ - ptr_);
+    const auto left = static_cast<uint32_t>(end_ - ptr_);
 
     if (left >= sizeof(T)) {
       *((T*)ptr_) = value;
       ptr_ += sizeof(T);
     }
     else {
-      std::copy(reinterpret_cast<const cs::Byte*>(&value), (reinterpret_cast<const cs::Byte*>(&value) + left), ptr_);
+      const auto pointer = reinterpret_cast<const cs::Byte*>(&value);
+      std::copy(pointer, (pointer + left), ptr_);
       newPack();
-      std::copy((reinterpret_cast<const cs::Byte*>(&value)) + left, (reinterpret_cast<const cs::Byte*>(&value)) + sizeof(T), ptr_);
+      std::copy(pointer + left, pointer + sizeof(T), ptr_);
       ptr_ += sizeof(T) - left;
     }
 
