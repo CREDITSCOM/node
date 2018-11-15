@@ -33,6 +33,7 @@ private:
   bool is_open() const override final;
   bool put(const byte_array &key, uint32_t seq_no, const byte_array &value) override final;
   bool get(const byte_array &key, byte_array *value) override final;
+  bool get(const uint32_t seq_no, byte_array *value) override final;
   bool remove(const byte_array &key) override final;
   bool write_batch(const ItemList &items) override final;
   IteratorPtr new_iterator() override final;

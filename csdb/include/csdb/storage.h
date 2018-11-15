@@ -188,6 +188,7 @@ public:
    * \sa ::csdb::Pool::load
    */
   Pool pool_load(const PoolHash &hash) const;
+  Pool pool_load(const uint32_t sequence) const;
   Pool pool_load_meta(const PoolHash &hash, size_t& cnt) const;
 
   /**

@@ -482,6 +482,32 @@ Pool Storage::pool_load(const PoolHash &hash) const
   return res;
 }
 
+Pool Storage::pool_load(const uint32_t sequence) const
+{
+  Pool empty_Pool{};
+
+  if (!isOpen()) {
+    d->set_last_error(NotOpen);
+    return Pool{};
+  }
+
+  ::csdb::internal::byte_array data;
+  if (!d->db->get(sequence, &data)) {
+    d->set_last_error(DatabaseError);
+    return Pool{};
+  }
+
+  Pool res = Pool::from_binary(data);
+  if (!res.is_valid()) {
+    d->set_last_error(DataIntegrityError);
+  }
+  else {
+    d->set_last_error();
+  }
+
+  return res;
+}
+
 Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
 {
   if (!isOpen()) {

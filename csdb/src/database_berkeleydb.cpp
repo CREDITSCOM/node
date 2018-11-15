@@ -235,6 +235,32 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value)
   return true;
 }
 
+bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value)
+{
+  if (!db_blocks_) {
+    set_last_error(NotOpen);
+    return false;
+  }
+
+  if (value == nullptr) {
+    return false;
+  }
+
+  Dbt_safe db_value;
+  Dbt_copy<uint32_t> db_seq_no(seq_no);
+
+  int status = db_blocks_->get(nullptr, &db_seq_no, &db_value, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  auto begin = reinterpret_cast<uint8_t *>(db_value.get_data());
+  value->assign(begin, begin + db_value.get_size());
+  set_last_error();
+  return true;
+}
+
 bool DatabaseBerkeleyDB::remove(const byte_array &key)
 {
   assert(false);
