@@ -55,7 +55,7 @@ public:
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
   // sends StageOne request to respondent about required
-  void getHash_V3(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void requestStageOne(uint8_t respondent, uint8_t required);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
@@ -70,7 +70,7 @@ public:
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
-  void sendHash_V3();
+  void sendHash_V3(cs::RoundNumber round);
   void writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   const cs::ConfidantsKeys confidants() const

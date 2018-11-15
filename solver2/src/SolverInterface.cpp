@@ -434,7 +434,7 @@ namespace slv2
 
         if(1 == cur_round) {
             scheduler.InsertOnce(Consensus::T_round, [this]() {
-                pnode->sendHash_V3();
+                pnode->sendHash_V3(1);
                 //gotTransactionList_V3(std::move(csdb::Pool{}));
             });
         }
