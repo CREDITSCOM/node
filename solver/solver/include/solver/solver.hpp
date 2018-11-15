@@ -85,7 +85,6 @@ public:
   // node interface
   NodeLevel nodeLevel() const;
   const cs::PublicKey& nodePublicKey() const;
-  const cs::Hashes& getNeededHashes() const;
 
   const HashVector& hashVector() const;
   const HashMatrix& hashMatrix() const;

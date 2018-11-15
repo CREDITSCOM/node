@@ -189,18 +189,20 @@ cs::RoundNumber cs::Conveyer::currentRoundNumber() const
 
 const cs::Hashes& cs::Conveyer::currentNeededHashes() const
 {
-    return neededHashes(currentRoundNumber());
+    return *(neededHashes(currentRoundNumber()));
 }
 
-const cs::Hashes& cs::Conveyer::neededHashes(cs::RoundNumber round) const
+const cs::Hashes* cs::Conveyer::neededHashes(cs::RoundNumber round) const
 {
-    cs::ConveyerMeta* pointer = pimpl->metaStorage.get(round);
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
-    if (!pointer) {
-        throw std::out_of_range("Bad needed hashes, fatal error");
+    if (!meta)
+    {
+        cserror() << "CONVEYER: Bad needed hashes, check node logic";
+        return nullptr;
     }
 
-    return pointer->neededHashes;
+    return &(meta->neededHashes);
 }
 
 void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet)
@@ -246,9 +248,10 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
-    if (!meta) {
-        cserror() << "CONVEYER> Needed hashes of" << round << " round not found";
-        return false;
+    if (!meta)
+    {
+        cserror() << "CONVEYER> Needed hashes of " << round << " round not found";
+        return true;
     }
 
     return meta->neededHashes.empty();
@@ -257,13 +260,7 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
 const cs::Notifications& cs::Conveyer::notifications() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
-
-    if (meta) {
-        return meta->notifications;
-    }
-    else {
-        throw std::out_of_range("There is no notifications at current round");
-    }
+    return meta->notifications;
 }
 
 void cs::Conveyer::addNotification(const cs::Bytes& bytes)
