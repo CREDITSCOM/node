@@ -83,23 +83,22 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer)
     bool res = false;
     try
     {
-        //blockHashes_->loadDbStructure();
-        blockHashes_->initStart();
+        csdb::Pool pool = loadBlock(getLastHash());
+        uint32_t last_written_sequence = static_cast<uint32_t>(pool.sequence());
+        uint32_t current_sequence = 1;
 
-        csdb::Pool prev = loadBlock(getLastHash());
-
-        while (prev.is_valid())
+        while (current_sequence <= last_written_sequence + 1)
         {
-            if (!updateWalletIds(prev, initer))
+            pool = loadBlock(current_sequence);
+            if (!updateWalletIds(pool, initer))
                 return false;
-            initer.loadPrevBlock(prev);
-            if (!blockHashes_->initFromPrevBlock(prev))
+            initer.loadPrevBlock(pool);
+            if (!blockHashes_->initFromPrevBlock(pool))
                 return false;
 
-            prev = loadBlock(prev.previous_hash());
+            ++current_sequence;
         }
 
-        blockHashes_->initFinish();
         blockHashes_->saveDbStructure();
 
         lastHash_ = getLastHash();
@@ -237,6 +236,12 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const
 {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
     return storage_.pool_load(ph);
+}
+
+csdb::Pool BlockChain::loadBlock(const uint32_t sequence) const
+{
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.pool_load(sequence);
 }
 
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const

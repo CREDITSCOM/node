@@ -41,6 +41,7 @@ public:
   virtual bool is_open() const = 0;
   virtual bool put(const byte_array &key, uint32_t seq_no, const byte_array &value) = 0;
   virtual bool get(const byte_array &key, byte_array *value = nullptr) = 0;
+  virtual bool get(const uint32_t seq_no, byte_array *value = nullptr) = 0;
   virtual bool remove(const byte_array &key) = 0;
 
   using Item = std::pair<byte_array, byte_array>;
