@@ -1178,8 +1178,12 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
-      if (!finish_for_idx) // if hash table doesn't contain trx
-        _return.states[inner_id] = INVALID;
+      if (!finish_for_idx) { // if hash table doesn't contain trx
+        if (conveyer.isMetaTransactionInvalid(inner_id)) // return true if in last 5 rounds trx is invalid (time between del from hash table and add to blockchain)
+          _return.states[inner_id] = INVALID;
+        else
+          _return.states[inner_id] = VALID;
+      }
     }
   }
   _return.roundNum = cs::Conveyer::instance().roundTable().round;

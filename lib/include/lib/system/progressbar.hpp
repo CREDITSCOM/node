@@ -11,15 +11,14 @@ public:
     /// @param incompleteSymbol symbol that mark incompleted bar ticks
     /// @param totalProgressLimit in other words total progress percentage of completion
     /// @param barWidthInSymbols displayed real width of progress bar in symbols
-    ProgressBar(char completeSymbol = ' ', char incompleteSymbol = '_', unsigned totalProgressLimit = 100,
+    ProgressBar(char completeSymbol = '#', char incompleteSymbol = '_', unsigned totalProgressLimit = 100,
         unsigned barWidthInSymbols = 50);
-
-   /// @brief string
-   /// @param ticks current completed progress in ticks
-   /// @return symbolic (std::string) progress representation
-    std::string string(Progress ticks);
-
     ~ProgressBar();
+
+    /// @brief string
+    /// @param ticks current completed progress in ticks
+    /// @return symbolic (std::string) progress representation
+    std::string string(Progress ticks);
 
     char completeSymbol;
     char incompleteSymbol;

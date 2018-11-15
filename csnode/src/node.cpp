@@ -212,6 +212,25 @@ void Node::blockchainSync() {
   }
 }
 
+void Node::processSyncPools() {
+  if (!isSyncroStarted_) {
+    return;
+  }
+
+  while (true) {
+    auto iterator = syncPools_.find(bc_.getLastWrittenSequence() + 1);
+
+    if (iterator == syncPools_.end()) {
+      break;
+    }
+
+    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+
+    bc_.onBlockReceived(iterator->second);
+    syncPools_.erase(iterator);
+  }
+}
+
 void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence) {
   if (poolMetaMap_.count(sequence) == 0ul) {
     poolMetaMap_.emplace(sequence, std::move(meta));
@@ -1079,8 +1098,10 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   cs::Timer::singleShot(cs::PacketHashesRequestDelay, [round, this] {
                           const cs::Conveyer& conveyer = cs::Conveyer::instance();
                           if (!conveyer.isSyncCompleted(round)) {
-                            auto& neededHashes = conveyer.neededHashes(round);
-                            sendPacketHashesRequestToRandomNeighbour(neededHashes, round);
+                            auto neededHashes = conveyer.neededHashes(round);
+                            if (neededHashes) {
+                              sendPacketHashesRequestToRandomNeighbour(*neededHashes, round);
+                            }
                           };
                        });
 }
@@ -1143,7 +1164,6 @@ void Node::sendBlockRequest() {
     reqSeq = cs::numeric_cast<uint32_t>(solver_->getNextMissingBlock(reqSeq));
   }
 
-  sendBlockRequestSequence_ = sequence;
   isAwaitingSyncroBlock_ = true;
   awaitingRecBlockCount_ = 0;
 
@@ -1189,27 +1209,28 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  if (pool.sequence() == sendBlockRequestSequence_) {
+  if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
     cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
 
     if (roundToSync_ > 0) {
       Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
     }
 
-    if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
-      bc_.onBlockReceived(pool);
-      solver_->gotBlockReply(pool);
-    }
-
+    bc_.onBlockReceived(pool);
+    solver_->gotBlockReply(pool);
     isAwaitingSyncroBlock_ = false;
   }
   else {
-    cswarning() << "GET STRANGE SYNC POOL";
+    syncPools_[pool.sequence()] = std::move(pool);
+    cswarning() << "GET NO NEXT SYNC POOL";
   }
+
+  processSyncPools();
 
   if (roundToSync_ != bc_.getLastWrittenSequence()) {
     sendBlockRequest();
-  } else {
+  }
+  else {
     isSyncroStarted_ = false;
     roundToSync_ = 0;
 

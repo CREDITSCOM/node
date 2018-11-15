@@ -214,6 +214,7 @@ private:
 
   // pool sync helpers
   void blockchainSync();
+  void processSyncPools();
 
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
@@ -293,9 +294,9 @@ private:
   cs::Timer sendingTimer_;
 
   // sync meta
-  csdb::Pool::sequence_t sendBlockRequestSequence_;
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
   cs::RoundNumber roundToSync_ = 0;
+  std::map<csdb::Pool::sequence_t, csdb::Pool> syncPools_;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
