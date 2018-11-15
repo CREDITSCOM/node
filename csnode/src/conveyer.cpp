@@ -155,8 +155,10 @@ const cs::Hashes& cs::Conveyer::neededHashes(cs::RoundNumber round) const
 {
     auto pointer = pimpl->neededHashesMeta.get(round);
 
-    if (!pointer) {
-        throw std::out_of_range("Bad needed hashes, fatal error");
+    if (!pointer)
+    {
+        cserror() << "Bad needed hashes, fatal error";
+        return cs::Hashes();
     }
 
     return *pointer;
@@ -204,7 +206,7 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
     auto pointer = pimpl->neededHashesMeta.get(round);
 
     if (!pointer) {
-        cserror() << "CONVEYER> Needed hashes of" << round << " round not found";
+        cserror() << "CONVEYER> Needed hashes of " << round << " round not found";
         return false;
     }
 
@@ -218,8 +220,10 @@ const cs::Notifications& cs::Conveyer::notifications() const
     if (notifications) {
         return *notifications;
     }
-    else {
-        throw std::out_of_range("There is no notifications at current round");
+    else
+    {
+        cswarning() << "There is no notifications at current round";
+        return cs::Notifications();
     }
 }
 
