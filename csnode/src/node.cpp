@@ -1198,6 +1198,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
       bc_.onBlockReceived(pool);
+      solver_->gotBlockReply(pool);
     }
 
     isAwaitingSyncroBlock_ = false;

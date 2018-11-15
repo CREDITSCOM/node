@@ -235,16 +235,21 @@ namespace slv2
             pslv_v1->gotBlockReply(std::move(p));
             return;
         }
-
-        if(Consensus::Log) {
-            //LOG_NOTICE("SolverCore: gotBlockReply()");
-            LOG_EVENT("SolverCore: got block [" << p.sequence() << "] on my request");
+        if(!pstate) {
+            return;
         }
-        if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
-            store_received_block(p, false);
-        }
-        else {
-            gotIncorrectBlock(std::move(p), cs::PublicKey {});
+        // "uncache" stored hashes if any
+        if(!recv_hash.empty()) {
+            if(cur_round - pnode->getBlockChain().getLastWrittenSequence() == 1) {
+                for(const auto& hash_sender : recv_hash) {
+                    const auto& bytes = hash_sender.first.to_binary();
+                    cs::Hash h;
+                    std::copy(bytes.cbegin(), bytes.cend(), h.begin());
+                    if(stateCompleted(pstate->onHash(*pcontext, h, hash_sender.second))) {
+                        handleTransitions(Event::Hashes);
+                    }
+                }
+            }
         }
     }
 
@@ -252,6 +257,12 @@ namespace slv2
     {
         if(opt_is_proxy_v1 && pslv_v1) {
             pslv_v1->gotHash(std::move(hash), sender);
+            return;
+        }
+
+        csdb::Pool::sequence_t delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
+        if(delta > 1) {
+            recv_hash.push_back(std::make_pair<>(hash, sender));
             return;
         }
 

@@ -211,7 +211,7 @@ namespace slv2
         cs::PrivateKey private_key;
         std::unique_ptr<cs::Fee> pfee;
         // senders of hashes received this round
-        std::vector<cs::PublicKey> recv_hash;
+        std::vector< std::pair<csdb::PoolHash, cs::PublicKey>> recv_hash;
         // pool for storing individual transactions from wallets and candidates for transaction list,
         // good transactions storage, serve as source for new block
         csdb::Pool  accepted_pool {};
