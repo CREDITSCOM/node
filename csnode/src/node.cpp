@@ -804,7 +804,7 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
 
     if (this->getNodeLevel() != NodeLevel::Writer) {
       auto poolHash = this->getBlockChain().getLastWrittenHash();
-      sendHash_V3();
+      sendHash_V3(roundNum_ +1);
 
       cslog() << "SENDING HASH to ALL";
     }
@@ -882,6 +882,7 @@ void Node::applyNotifications() {
 
   writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
+  cslog() << "NODE> send characteristic of size " << conveyer.characteristic().mask.size();
   createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
 
   flushCurrentTasks();
@@ -962,6 +963,9 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable,
     ostream_ << hash;
   }
   ostream_ << poolMetaInfo.timestamp;
+  if(!characteristic.mask.empty()) {
+      cslog() << "NODE> packing " << characteristic.mask.size() << " bytes of char. mask to send";
+  }
   ostream_ << characteristic.mask;
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
@@ -1346,10 +1350,11 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
     resetNeighbours();
     cslog() << "NODE> processPacketsReply -> got Round";
     solver_->gotRound(round);
+    transport_->processPostponed(roundNum_);
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round-1, meta->sender);
     }
   }
 }
@@ -1363,13 +1368,15 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   conveyer.setRound(std::move(roundTable));
   const auto& rt = conveyer.roundTable();
 
-  if(rt.hashes.empty()) {
-      cslog() << "NODE> No hashes in round table - > got round now";
+  if(rt.hashes.empty() || conveyer.isSyncCompleted()) {
+      if(rt.hashes.empty()) {
+          cslog() << "NODE> No hashes in round table - > got round now";
+      }
+      else {
+          cslog() << "NODE> All hashes in conveyer -> got round now";
+      }
       solver_->gotRound(rt.round);
-  }
-  else if (conveyer.isSyncCompleted()) {
-    cslog() << "NODE> All hashes in conveyer -> got round now";
-    solver_->gotRound(rt.round);
+      transport_->processPostponed(roundNum_);
   }
   else {
     //TODO: whether possible roundNum_ != rt.round at this point?
@@ -1394,7 +1401,6 @@ void Node::processTimer() {
 
   cs::Conveyer::instance().flushTransactions();
 }
-
 
 void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
 {
@@ -1468,6 +1474,13 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
     return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  }
+
+  if(type == MsgTypes::BlockHashV3) {
+      if(rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
+          return MessageActions::Process;
+      }
+      return MessageActions::Postpone;
   }
 
   if (rNum < roundNum_) {
@@ -1630,7 +1643,6 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   csdebug() << "done" ;
   flushCurrentTasks();
 }
-
 
 // sends StageOne request to respondent about required
 void Node::requestStageOne(uint8_t respondent, uint8_t required) {
@@ -2107,7 +2119,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 void Node::sendRoundInfo(cs::RoundTable& roundTable) {
 
   csdebug() << "NODE> Apply notifications";
-  roundNum_ = roundTable.round; // only for new consensus
+ // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1; // change for roundNumber
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
@@ -2142,6 +2154,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  roundNum_ = roundTable.round;
   // update hashes in round table here, they are free of stored packets' hashes
   if(!roundTable.hashes.empty()) {
     roundTable.hashes.clear();
@@ -2152,9 +2165,10 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
       roundTable.hashes.push_back(element.first);
     }
   }
+  const auto block_characteristic = conveyer.characteristic();
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(conveyer.roundTable(), poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
+  createRoundPackage(conveyer.roundTable(), poolMetaInfo, block_characteristic, poolSignature, conveyer.notifications());
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
@@ -2187,9 +2201,10 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
 
   onRoundStart_V3(table);
 
- // if (getNodeLevel() == NodeLevel::Confidant) {
-    solver_->gotRound(roundNum_);
- // }
+ solver_->gotRound(roundNum_);
+
+ //TODO: need or not?
+ transport_->processPostponed(roundNum_);
 }
 
 void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2218,7 +2233,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   cs::RoundTable roundTable;
   roundTable.round = rNum;
   // to node
-  roundNum_ = rNum;
+
 
   cs::ConfidantsKeys confidants;
   confidants.reserve(confidantsCount);
@@ -2244,22 +2259,9 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   roundTable.hashes = std::move(hashes);
 
   const cs::ConfidantsKeys confidants_ = roundTable.confidants;
-  cslog() << "Confidants [" << confidants_.size() << "]: ";
-
-
-
-  //for (std::size_t i = 0; i < confidants_.size(); ++i) {
-  //  const cs::PublicKey& confidant = confidants_.at(i);
-  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-  //}
-  //const cs::Hashes hashes_ = roundTable.hashes;
-  //cslog() << "Hashes [" << hashes_.size() << "]: ";
-  //for (std::size_t i = 0; i < hashes_.size(); ++i) {
-  //  const cs::TransactionsPacketHash& ha_ = hashes_.at(i);
-  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(ha_.toBinary().data(), ha_.size());
-  //}
+  cslog() << "Node> confidants: " << confidants_.size();
   ///////////////////////////////////// Round table received 
-  onRoundStart_V3(roundTable);
+
 
   ///////////////////////////////////// Parcing char func
 
@@ -2285,7 +2287,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
       cs::Bytes characteristicMask;
       csdb::Pool::sequence_t sequence = 0;
 
-      cslog() << "NODE> Characteristic data size: " << size;
+      cslog() << "NODE> getCharacteristic(): conveyer sync completed, parsing data size " << size;
 
       istream_ >> time;
       istream_ >> characteristicMask >> sequence;
@@ -2301,7 +2303,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
       istream_ >> notificationsSize;
 
       if(notificationsSize == 0) {
-          cserror() << "NODE> Get characteristic: notifications count is zero";
+          cserror() << "NODE> getCharacteristic(): notifications count is zero";
       }
 
       for(std::size_t i = 0; i < notificationsSize; ++i) {
@@ -2334,16 +2336,14 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
           }
       }
 
-      cslog() << "NODE> GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
-      cslog() << "NODE> Time >> " << poolMetaInfo.timestamp << "  << Time";
+      cslog() << "NODE> getCharacteristic(): sequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
+      csdebug() << "NODE> getCharacteristic(): time = " << poolMetaInfo.timestamp;
 
       cs::Characteristic characteristic;
       characteristic.mask = std::move(characteristicMask);
 
       assert(sequence <= this->getRoundNumber());
       ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
       conveyer.setCharacteristic(characteristic);
       std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
@@ -2374,8 +2374,9 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
               getBlockChain().removeWalletsInPoolFromCache(pool.value());
           }
       }
-  }
 
+  }
+  onRoundStart_V3(roundTable);
   blockchainSync();
 
   cslog() << "NODE> Finishing Writing block";
@@ -2384,10 +2385,11 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   //}
 
   onRoundStartConveyer(std::move(roundTable));
-  transport_->processPostponed(roundNum_);
+  // defer until solver_->gotRound() called
+  /*transport_->processPostponed(roundNum_);*/
 }
 
-void Node::sendHash_V3() {
+void Node::sendHash_V3(cs::RoundNumber round) {
   /* if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
      cserror() <<"Writer and Main node shouldn't send hashes";
      return;
@@ -2400,17 +2402,17 @@ void Node::sendHash_V3() {
   cswarning() <<"Sending hash of " << tmp.to_string() << " to ALL";
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::BlockHashV3
-    << roundNum_
+    << round
     << tmp;
   flushCurrentTasks();
 }
 
-void Node::getHash_V3(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
 
-  cslog() << "Get hash size: " << size;
+  cslog() << "Get hash of round " << rNum << ", data size " << size;
 
   istream_.init(data, size);
 
@@ -2494,9 +2496,6 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
 */
   solver_->gotRoundInfoRequest(requester);
 }
-
-
-
 
 void Node::sendRoundInfoReply(const cs::PublicKey& requester, uint8_t reply)
 {
