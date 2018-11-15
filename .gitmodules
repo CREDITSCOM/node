@@ -7,9 +7,6 @@
 [submodule "third-party/thrift"]
 	path = third-party/thrift
 	url = ../../credits_bc/third_party/thrift.git
-[submodule "third-party/ed25519"]
-	path = third-party/ed25519
-	url = ../../credits_bc/third_party/ed25519
 [submodule "third-party/libsodium.git"]
 	path = third-party/libsodium
 	url = ../../main-credits-dev/libsodium.git
