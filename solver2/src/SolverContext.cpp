@@ -196,4 +196,10 @@ namespace slv2
         return false;
     }
 
+    void SolverContext::request_round_info(uint8_t respondent)
+    {
+      LOG_NOTICE("SolverCore: ask [" << (int)respondent << "] for RoundInfo");
+      core.pnode->sendRoundInfoRequest(respondent);
+    }
+
 } // slv2

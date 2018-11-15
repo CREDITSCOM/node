@@ -33,7 +33,7 @@ namespace slv2
         timeout_round.start(
             context.scheduler(), value, [pctx, this]() {
             if(Consensus::Log) {
-                LOG_EVENT(name() << ": time to wait new round is expired");
+                cslog() << name() << ": time to wait new round is expired";
             }   
             activate_new_round(*pctx);
         }, true/*replace existing*/);
@@ -43,14 +43,15 @@ namespace slv2
     {
         if(timeout_round.cancel()) {
             if(Consensus::Log) {
-                LOG_EVENT(name() << ": cancel wait new round");
+                cslog() << name() << ": cancel wait new round";
             }
         }
     }
 
-    void WaitingState::activate_new_round(SolverContext & /*context*/)
+    void WaitingState::activate_new_round(SolverContext & context)
     {
-      LOG_EVENT(name() << ": activating new round ");
+      cslog() << name() << ": activating new round ";
+      context.request_round_info(context.stage3((uint8_t)context.own_conf_number())->writer);
     }
 
 }

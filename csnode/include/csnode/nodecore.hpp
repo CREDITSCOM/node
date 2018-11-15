@@ -1,17 +1,11 @@
 #ifndef NODE_CORE_HPP
 #define NODE_CORE_HPP
 
-#include <string>
-#include <vector>
-#include <array>
 #include <csdb/pool.h>
 #include <unordered_map>
 #include <unordered_set>
-#include <mutex>
-#include <shared_mutex>
 #include <map>
 
-#include <boost/smart_ptr/detail/spinlock.hpp>
 #include <boost/circular_buffer.hpp>
 
 #include <client/params.hpp>
@@ -36,7 +30,8 @@ namespace std
     };
 }
 
-enum NodeLevel {
+enum NodeLevel
+{
     Normal,
     Confidant,
     Main,
@@ -58,15 +53,6 @@ namespace cs
     using ConfidantsKeys = std::vector<PublicKey>;
     using Hashes = std::vector<cs::TransactionsPacketHash>;
     using Packets = std::vector<cs::TransactionsPacket>;
-
-    // sync types
-    using SharedMutex = std::shared_mutex;
-    using SpinLock = boost::detail::spinlock;
-
-    // RAII locks
-    using Lock = std::lock_guard<cs::SharedMutex>;
-    using SharedLock = std::shared_lock<cs::SharedMutex>;
-    using SpinGuard = std::lock_guard<SpinLock>;
 
     enum NodeConsts : uint32_t
     {
@@ -100,12 +86,6 @@ namespace cs
         Characteristic charBytes;
     };
 
-    struct CharacteristicMeta
-    {
-        cs::Bytes bytes;
-        cs::PublicKey sender;
-    };
-
     struct PoolMetaInfo
     {
         std::string timestamp;
@@ -128,6 +108,7 @@ namespace cs
         cs::Signature signature;
     };
 
+    // metas
     struct PoolSyncMeta
     {
         csdb::Pool pool;
@@ -137,12 +118,25 @@ namespace cs
 
     using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
 
-    // metas
+    struct ConveyerMeta
+    {
+        cs::Characteristic characteristic;
+        cs::TransactionsPacketTable hashTable;
+        cs::Hashes neededHashes;
+        cs::RoundTable roundTable;
+        cs::Notifications notifications;
+        cs::TransactionsPacket invalidTransactions;
+    };
+
+    struct CharacteristicMeta
+    {
+        cs::Bytes bytes;
+        cs::PublicKey sender;
+    };
+
+    // meta storages
+    using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
     using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
-    using TablesMetaStorage = cs::MetaStorage<cs::TransactionsPacketTable>;
-    using RoundTablesMetaStorage = cs::MetaStorage<cs::RoundTable>;
-    using NeededHashesMetaStorage = cs::MetaStorage<cs::Hashes>;
-    using NotificationsMetaStorage = cs::MetaStorage<cs::Notifications>;
 }
 
 #endif // NODE_CORE_HPP

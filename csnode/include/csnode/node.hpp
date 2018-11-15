@@ -87,7 +87,7 @@ public:
 
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
-  void sendRoundInfoReply(uint8_t, uint8_t);
+  void sendRoundInfoReply(const cs::PublicKey&, uint8_t);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
 
   // transaction's pack syncro
@@ -285,6 +285,7 @@ private:
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
 
+  // serialization/deserialization entities
   cs::IPackStream istream_;
   cs::OPackStream ostream_;
 

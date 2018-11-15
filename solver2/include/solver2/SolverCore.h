@@ -93,7 +93,7 @@ namespace slv2
         void tmpStorageProcessing();
         void beforeNextRound();
         void nextRound();
-        void gotRoundInfoRequest(uint8_t requesterNumber);
+        void gotRoundInfoRequest(const cs::PublicKey& requester);
 
         // Solver3 "public" extension
         void gotStageOne(const cs::StageOne& stage);

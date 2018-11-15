@@ -789,3 +789,29 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address &addr) cons
     return false;
   return true;
 }
+
+void BlockChain::recount_trxns(const std::optional<csdb::Pool> & new_pool) {
+  if (new_pool.value().transactions_count()) {
+    csdb::Address addr_send, addr_recv;
+    for (const auto &trx : new_pool.value().transactions()) {
+      addr_send = trx.source();
+      if (addr_send.is_wallet_id()) {
+          WalletId id = *reinterpret_cast<const WalletId*>(addr_send.to_api_addr().data());
+        if (!findAddrByWalletId(id, addr_send))
+          return;
+      }
+      addr_recv = trx.target();
+      if (addr_recv.is_wallet_id()) {
+        WalletId id = *reinterpret_cast<const WalletId*>(addr_recv.to_api_addr().data());
+        if (!findAddrByWalletId(id, addr_recv))
+          return;
+      }
+      m_trxns_count[addr_send].sendCount++;
+      m_trxns_count[addr_send].recvCount++;
+    }
+  }
+}
+
+const BlockChain::AddrTrnxCount &BlockChain::get_trxns_count(const csdb::Address &addr) {
+  return m_trxns_count[addr];
+}

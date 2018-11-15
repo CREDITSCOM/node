@@ -637,6 +637,7 @@ namespace slv2
          */
 
         bool transaction_still_in_pool(int64_t inner_id) const;
+        void request_round_info(uint8_t respondent);
 
     private:
 

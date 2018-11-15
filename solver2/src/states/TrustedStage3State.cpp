@@ -126,6 +126,7 @@ namespace slv2
             }
             else {
                 LOG_WARN(name() << ": consensus is not achieved");
+                /*the action is needed*/
             }
             // all trusted nodes must send stage3 data
             LOG_NOTICE(name() << ": --> stage-3 [" << (int) stage.sender << "]");
