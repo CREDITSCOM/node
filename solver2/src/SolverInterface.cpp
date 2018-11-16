@@ -260,14 +260,12 @@ namespace slv2
         csdb::Pool::sequence_t delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
         if(delta > 1) {
             recv_hash.push_back(std::make_pair<>(hash, sender));
+            csdebug() << "SolverCore: cache hash until last block ready";
             return;
         }
 
         if(!pstate) {
             return;
-        }
-        if(Consensus::Log) {
-            LOG_EVENT("SolverCore: gotHash()");
         }
 
         if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {

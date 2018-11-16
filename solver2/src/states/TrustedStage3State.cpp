@@ -187,24 +187,29 @@ namespace slv2
                 std::copy(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.begin());
             }
         }
-        cslog() << "================================= SUMMARY ======================================= ";
+        cslog() << "============================ CONSENSUS SUMMARY =================================";
         uint8_t liarNumber = 0;
         /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32);*/
         for(const auto& it : context.stage1_data()) {
 
             if(std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
-                cslog() << "\t[" << (int) it.sender << "] is not liar "
+                cslog() << "[" << (int) it.sender << "] is not liar "
                     << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
             else {
                 ++liarNumber;
-                cslog() << "\t[" << (int) it.sender << "] IS LIAR "
+                cslog() << "[" << (int) it.sender << "] IS LIAR "
                     << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
         }
 
-        cslog() << "\tLiars amount: " << (int) liarNumber;
-        cslog() << "================================================================================= ";
+        if(liarNumber > 0) {
+            cslog() << "\tLiars detected: " << (int) liarNumber;
+        }
+        else {
+            cslog() << "\tNo liars detected";
+        }
+        cslog() << "================================================================================";
         if(liarNumber > context.cnt_trusted() / 2) {
             return false;
         }

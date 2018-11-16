@@ -51,7 +51,8 @@ namespace slv2
     void WaitingState::activate_new_round(SolverContext & context)
     {
       cslog() << name() << ": activating new round ";
-      context.request_round_info(context.stage3((uint8_t)context.own_conf_number())->writer);
+      context.request_round_info(
+          (uint8_t) (context.stage3((uint8_t) context.own_conf_number())->writer + writing_queue_num) % context.cnt_trusted());
     }
 
 }
