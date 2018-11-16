@@ -310,43 +310,34 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 bool BlockChain::putBlock(csdb::Pool& pool)
 {
     // Put on top
-    cslog() << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions" << " --------------------------------";
+    cslog() << "----------------------------- Write New Block ------------------------------";
+    cslog() << " sequence " << pool.sequence() << ", transactions count " << pool.transactions_count();
 
-    csdebug() << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str();
-    csdebug() << " Last      hash: " << lastHash_.to_string();
-    csdebug() << "Checking Sequence ... ";
+    csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
+    csdebug() << " last hash: " << lastHash_.to_string();
+    csdebug() << " last storage size: " << storage_.size();
 
+    bool result = false;
     if (pool.sequence() == getLastWrittenSequence() + 1) {
-        cslog()  << "OK";
+        cslog()  << " sequence OK";
 
         pool.set_previous_hash(lastHash_);
-
         writeBlock(pool);
-
         lastHash_ = pool.hash();
-
-        csdebug() << "New last hash: " << lastHash_.to_string();
-        csdebug() << "New last storage size: " << storage_.size();
-
-        if (global_sequence == getLastWrittenSequence())
-        {
+        if (global_sequence == getLastWrittenSequence()) {
             blockRequestIsNeeded = false;
         }
-
-        return true;
+        result = true;
     }
-    else
-    {
-        cslog() << "Failed";
-
+    else {
+        cslog() << " sequence failed, chain syncro start";
         ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
-        cslog() << "Chain syncro part ... start ";
-
         global_sequence = pool.sequence();
         blockRequestIsNeeded = true;
-
-        return false;
+        result = false;
     }
+    cslog() << "----------------------------------------------------------------------------";
+    return result;
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const

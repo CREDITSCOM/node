@@ -1731,7 +1731,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   stage.sender = *rawData;
   if (crypto_sign_ed25519_verify_detached(stage.sig.data(), rawData,
     msgSize, (const unsigned char*) cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data())) {
-    cslog() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!" ;
+    cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!" ;
       return;
   }
   //cslog() << "NODE> Signature is OK!" ;
@@ -1739,13 +1739,13 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   stage.candidatesAmount = *(rawData + 33);
   for (int i = 0; i < stage.candidatesAmount; i++) {
     memcpy(stage.candiates[i].data(), rawData + 34 + 32 * i, 32);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(stage.candiates[i].data(), stage.candiates[i].size());
+  //  csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.candiates[i].data(), stage.candiates[i].size());
   }
   allocator_.shrinkLast(msgSize);
-  LOG_DEBUG( "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
-    << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
-    << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
-    << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size()));
+  //csdebug() << "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
+  //  << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
+  //  << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
+  //  << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size());
     
   solver_->gotStageOne(std::move(stage));
 }
@@ -1767,7 +1767,7 @@ void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo)
   *rawData = stageTwoInfo.sender;
   *(rawData + 1) = stageTwoInfo.trustedAmount;
   for (int i = 0; i < stageTwoInfo.trustedAmount; i++) {
-    memcpy(rawData + 2 + 64 * i, stageTwoInfo.signatures[i].data(), stageTwoInfo.signatures[i].size());
+    memcpy(rawData + 2*sizeof(uint8_t) + i * sizeof(cs::Signature), stageTwoInfo.signatures[i].data(), stageTwoInfo.signatures[i].size());
   }
   //cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize;
 
@@ -1796,11 +1796,10 @@ void Node::requestStageTwo(uint8_t respondent, uint8_t required)
     cswarning() <<"Only confidant nodes can request consensus stages";
     return;
   }
-  //#ifdef MYLOG
+
   cslog() << "==============================";
   cslog() << "NODE> Stage TWO requesting ... ";
   cslog() << "==============================";
-  //#endif
 
   ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
 
@@ -2078,12 +2077,9 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   solver_->gotStageThree(std::move(stage));
 }
 
-
-
-void Node::sendRoundInfo(cs::RoundTable& roundTable) {
-
+void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   csdebug() << "NODE> Apply notifications";
- // only for new consensus
+  // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1; // change for roundNumber
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
@@ -2118,8 +2114,12 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
+}
 
 
+void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature) {
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNum_ = roundTable.round;
   // update hashes in round table here, they are free of stored packets' hashes
   if(!roundTable.hashes.empty()) {
@@ -2161,7 +2161,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
  
   transport_->clearTasks();
 
-  //TODO: обновить таблицу раунда в cs::Conveyer::instance()
+  //TODO: \EE\E1\ED\EE\E2\E8\F2\FC \F2\E0\E1\EB\E8\F6\F3 \F0\E0\F3\ED\E4\E0 \E2 cs::Conveyer::instance()
   //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
   assert(false);
 
@@ -2564,7 +2564,12 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     }
     cslog() << line2.str();
     solver_->nextRound();
- }
+
+    if(!sendingTimer_.isRunning()) {
+        cslog() << "NODE> Transaction timer started";
+        sendingTimer_.start(cs::TransactionsPacketInterval);
+    }
+}
 
 
  void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
