@@ -1474,7 +1474,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
-    return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    // which round would not be on the remote we may require the requested block
+    return MessageActions::Process;
+    //return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if(type == MsgTypes::BlockHashV3) {

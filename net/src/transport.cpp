@@ -403,7 +403,7 @@ void Transport::processNodeMessage(const Message& msg) {
       csdebug() << "TRANSPORT> Process Node Message: FirstTransaction, rNum=" << rNum;
       break;
     case MsgTypes::RequestedBlock:
-      csdebug() << "TRANSPORT> Process Node Message: RequestedBlock, rNum=" << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: RequestedBlock";
       break;
     case MsgTypes::RoundTableSS:
       csdebug() << "TRANSPORT> Process Node Message: RoundTable, rNum=" << rNum;
