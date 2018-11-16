@@ -322,7 +322,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   // start round on node
-  onRoundStart(roundTable);
+  onRoundStart_V3(roundTable);
   onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
@@ -1208,7 +1208,8 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
+  auto desired_seq = bc_.getLastWrittenSequence() + 1;
+  if (pool.sequence() == desired_seq) {
     cslog() << "BLOCK REPLY> sequence is appropriate, store";
 
     if (roundToSync_ > 0) {
@@ -1219,7 +1220,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     solver_->gotBlockReply(pool);
     isAwaitingSyncroBlock_ = false;
   }
-  else {
+  else if(pool.sequence() > desired_seq) {
     syncPools_[pool.sequence()] = std::move(pool);
     cslog() << "BLOCK REPLY> cache outrunning block";
   }
@@ -2540,95 +2541,69 @@ void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::R
 
 void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 {
-    //if (!solver_->mPoolClosed())
-    //{
-    //  solver_->sendTL();
-    //}
     roundNum_ = roundTable.round;
-    cslog() << "======================================== ROUND " << roundNum_ << " ========================================";
-    cslog() << "Node PK = " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
-    //if(getBlockChain().getGlobalSequence()!= roundNum_-1) getBlockChain().setGlobalSequence(roundNum_-1);
-
-
     bool found = false;
     uint8_t conf_no = 0;
-
-    const auto& conf_nodes = roundTable.confidants;
-
     for(auto& conf : roundTable.confidants) {
         if(conf == nodeIdKey_) {
             myLevel_ = NodeLevel::Confidant;
             myConfidantIndex_ = conf_no;
-            cslog() << "===================== NODE LEVEL SET TO CONFIDANT ============================";
             found = true;
-            //solver_->initConfRound();
             break;
         }
         conf_no++;
     }
-
     if(!found) {
         myLevel_ = NodeLevel::Normal;
-        cslog() << "===================== NODE LEVEL SET TO NORMAL ============================" ;
     }
 
+    constexpr int pad_width = 30;
+    int width = 0;
+    std::ostringstream line1;
+    for(int i = 0; i < pad_width; i++) {
+        line1 << '=';
+    }
+    width += pad_width;
+    line1 << " ROUND " << roundNum_ << ". ";
+    width += 9;
+    if(NodeLevel::Normal == myLevel_) {
+        line1 << "NORMAL";
+        width += 6;
+    }
+    else {
+        line1 << "TRUSTED";
+        width += 7;
+    }
+    line1 << ' ';
+    width += 1;
+    for(int i = 0; i < pad_width; i++) {
+        line1 << '=';
+    }
+    width += pad_width;
+    const auto s = line1.str();
+    int fixed_width = (int) s.size();
+    cslog() << s;
+    cslog() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
 
+    std::ostringstream line2;
+    for(int i = 0; i < fixed_width; ++i) {
+        line2 << '-';
+    }
+    cslog() << line2.str();
 
-
-    // Pretty printing...
-    cslog() << "Confidants: " ;
+    cslog() << " Confidants:";
     int i = 0;
-    for(auto& e : roundTable.confidants) {
-      cslog() << "[" << i << "] " << cs::Utils::byteStreamToHex(e.data(), e.size());
-      i++;
+    for(const auto& e : roundTable.confidants) {
+        cslog() << "[" << i << "] " << cs::Utils::byteStreamToHex(e.data(), e.size());
+        i++;
     }
-   
+    cslog() << line2.str();
     solver_->nextRound();
-    
-}
+ }
 
-void Node::addCompressedPoolToPack(const csdb::Pool& pool)
-{
-    uint32_t bSize;
-    const void* data = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
-    auto max = LZ4_compressBound(bSize);
-    auto memPtr = allocator_.allocateNext(max);
-    auto realSize = LZ4_compress_default((const char*) data, (char*) memPtr.get(), bSize, memPtr.size());
-    allocator_.shrinkLast(realSize);
-    //uint32_t required_size = sizeof(bSize) + sizeof(realSize) + realSize;
-    ostream_ << (uint32_t) bSize;
-    ostream_ << (uint32_t) realSize;
-    ostream_ << std::string(cs::numeric_cast<const char *>(memPtr.get()), realSize);
-}
 
-//csdb::Pool Node::getCompressedPoolFromPack()
-//{
-//    csdb::Pool pool{};
-//
-//    uint32_t uncompressedSize;
-//    uint32_t compressedSize;
-//    istream_ >> uncompressedSize >> compressedSize;
-//
-//    //TODO: review that condition (2) is legal
-//    constexpr size_t abnormal_len = 1 << 20;
-//    //TODO: how to get avail bytes from istream?
-//    if(uncompressedSize >= abnormal_len) {
-//        // data is corrupted
-//        //ptr_ = end_;
-//        //good_ = false;
-//        //return *this;
-//        return pool;
-//    }
-//
-//    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(istream_.getCurrPtr()),
-//        compressedSize, uncompressedSize);
-//    //ptr_ += compressedSize;
-//    istream_.safeSkip<uint8_t>(compressedSize);
-//    return pool;
-//}
-
-void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
-{
+ void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
+ {
     solver_->rndStorageProcessing();
     if(pool.sequence() == getBlockChain().getLastWrittenSequence() + 1) {
         if(getBlockChain().getLastHash() == pool.previous_hash()) {
@@ -2648,10 +2623,10 @@ void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
     else {
         solver_->gotIncorrectBlock(std::move(pool), sender);
     }
-}
-//          A                                          A                                              A
-//         / \                                        / \                                            / \
-//         | |                                        | |                                            | |
+ }
+ //          A                                          A                                              A
+ //         / \                                        / \                                            / \
+ //         | |                                        | |                                            | |
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////                                              SOLVER 3 METHODS (FINISH)                                    ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
