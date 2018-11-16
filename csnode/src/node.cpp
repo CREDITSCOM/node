@@ -1732,7 +1732,6 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
     << " Sig: " << cs::Utils::byteStreamToHex(stageOneInfo.sig.data(), stageOneInfo.sig.size());
 
   for (int i = 0; i < stageOneInfo.candidatesAmount; i++) {
-    ostream_ << stageOneInfo.candiates[i];
     csdebug() << i << ". " << cs::Utils::byteStreamToHex(stageOneInfo.candiates[i].data(), stageOneInfo.candiates[i].size());
   }
   flushCurrentTasks();
