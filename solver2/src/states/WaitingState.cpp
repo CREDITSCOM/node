@@ -24,7 +24,7 @@ namespace slv2
         my_name = os.str();
 
         //TODO: value = (Consensus::PostConsensusTimeout * "own number in "writing" queue")
-        uint32_t value = 60000;
+        uint32_t value = 6000* writing_queue_num;
 
         if(Consensus::Log) {
             LOG_EVENT(name() << ": start wait " << value / 60 << " sec until new round");

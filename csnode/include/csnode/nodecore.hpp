@@ -61,7 +61,7 @@ namespace cs
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
         PrivateKeyLength = PRIVATE_KEY_LENGTH,
-        PacketHashesRequestDelay = 200 // ms
+        PacketHashesRequestDelay = 50 // ms
     };
 
     enum SolverConsts : uint32_t

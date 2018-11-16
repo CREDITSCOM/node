@@ -104,6 +104,9 @@ namespace slv2
           cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
           ++i;
         }
+        if(stage3(own_conf_number())->writer == (uint8_t)own_conf_number() && round() == 10) return;
+        if (stage3(own_conf_number())->writer == (uint8_t)own_conf_number() && round() == 20) return;
+        if (stage3(own_conf_number())->writer == (uint8_t)own_conf_number() && round() == 30) return;
         core.spawn_next_round(core.trusted_candidates);
     }
 
@@ -200,6 +203,7 @@ namespace slv2
     {
       LOG_NOTICE("SolverCore: ask [" << (int)respondent << "] for RoundInfo");
       core.pnode->sendRoundInfoRequest(respondent);
+      core.pnode->sendRoundInfoRequest(int(respondent + 2)%((int)this->trusted().size()));
     }
 
 } // slv2
