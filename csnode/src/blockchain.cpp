@@ -310,13 +310,14 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 bool BlockChain::putBlock(csdb::Pool& pool)
 {
     // Put on top
-    cslog() << "------------------------------- Write New Block --------------------------------";
+    cslog() << "----------------------------- Write New Block ------------------------------";
     cslog() << " sequence " << pool.sequence() << ", transactions count " << pool.transactions_count();
 
     csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
     csdebug() << " last hash: " << lastHash_.to_string();
     csdebug() << " last storage size: " << storage_.size();
 
+    bool result = false;
     if (pool.sequence() == getLastWrittenSequence() + 1) {
         cslog()  << " sequence OK";
 
@@ -326,17 +327,17 @@ bool BlockChain::putBlock(csdb::Pool& pool)
         if (global_sequence == getLastWrittenSequence()) {
             blockRequestIsNeeded = false;
         }
-
-        return true;
+        result = true;
     }
     else {
         cslog() << " sequence failed, chain syncro start";
         ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
         global_sequence = pool.sequence();
         blockRequestIsNeeded = true;
-        return false;
+        result = false;
     }
-    cslog() << "--------------------------------------------------------------------------------";
+    cslog() << "----------------------------------------------------------------------------";
+    return result;
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const
