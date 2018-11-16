@@ -92,16 +92,14 @@ namespace slv2
         return (enough_hashes ? Result::Finish : Result::Ignore);
     }
 
-    Result TrustedStage1State::onHash(SolverContext & context, const cs::Hash & hash, const cs::PublicKey & sender)
+    Result TrustedStage1State::onHash(SolverContext & context, const csdb::PoolHash & pool_hash, const cs::PublicKey & sender)
     {
-        cslog() << name() << ": <-- hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
+        cslog() << name() << ": <-- hash " << pool_hash.to_string()
             << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-        cs::Hash myHash;
-        const auto& lwh = context.blockchain().getLastWrittenHash().to_binary();
-        std::copy(lwh.cbegin(), lwh.cend(), myHash.begin());
+        const auto& lwh = context.blockchain().getLastWrittenHash();
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
-            if(hash == myHash) {
-              cslog() << name() << ": hash is OK"; 
+            if(pool_hash == lwh) {
+                cslog() << name() << ": hash is OK"; 
 
                 bool keyFound = false;
                 for(uint8_t i = 0; i < stage.candidatesAmount; i++) {
@@ -117,7 +115,9 @@ namespace slv2
             }
             else {
                 // hash does not match to own hash
-                cslog() << name() << ": hash DOESN'T match to my one " << cs::Utils::byteStreamToHex(myHash.data(), myHash.size());
+                cswarning() << name() << ": hash " << pool_hash.to_string()
+                    << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " DOESN'T match to my value " << lwh.to_string();
                 return Result::Ignore;
             }
         }

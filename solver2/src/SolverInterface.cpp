@@ -273,11 +273,7 @@ namespace slv2
             LOG_EVENT("SolverCore: gotHash()");
         }
 
-        //TODO: replace cs::Hash with csdb::PoolHash in INodeState::onHash(.., hash, ..) interface
-        const auto& bytes = hash.to_binary();
-        cs::Hash h;
-        std::copy(bytes.cbegin(), bytes.cend(), h.begin());
-        if(stateCompleted(pstate->onHash(*pcontext, h, sender))) {
+        if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
             handleTransitions(Event::Hashes);
         }
     }

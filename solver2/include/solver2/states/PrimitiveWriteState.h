@@ -27,7 +27,7 @@ namespace slv2
 
         void off(SolverContext& context) override;
 
-        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
+        Result onHash(SolverContext& context, const csdb::PoolHash & pool_hash, const cs::PublicKey& sender) override;
 
         Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 

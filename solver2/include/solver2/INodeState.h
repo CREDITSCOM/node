@@ -131,31 +131,27 @@ namespace slv2
          *
          * @return  A Result of event: Finish - core has to make a transition, Ignore - continue to work
          *          in current state, Failed - error occurs.
-         *
-         * ### remarks  Aae, 30.09.2018.
          */
 
         virtual Result onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;
 
         /**
-         * @fn  virtual Result INodeState::onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
+         * @fn  virtual Result INodeState::onHash(SolverContext& context, const csdb::PoolHash & pool_hash, const cs::PublicKey& sender) = 0;
          *
          * @brief   Is called when new hash is received.
          *
          * @author  aae
          * @date    01.10.2018
          *
-         * @param [in]  context The core context.
-         * @param       hash    The hash received.
-         * @param       sender  The sender of hash.
+         * @param [in]  context     The core context.
+         * @param       pool_hash   The hash received.
+         * @param       sender      The sender of hash.
          *
          * @return  A Result of event: Finish - core has to make a transition, Ignore - continue to work
          *          in current state, Failed - error occurs.
-         *
-         * ### remarks  Aae, 30.09.2018.
          */
 
-        virtual Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) = 0;
+        virtual Result onHash(SolverContext& context, const csdb::PoolHash & pool_hash, const cs::PublicKey& sender) = 0;
 
         /**
          * @fn  virtual Result INodeState::onTransaction(SolverContext& context, const csdb::Transaction& trans) = 0;

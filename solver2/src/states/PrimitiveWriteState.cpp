@@ -56,7 +56,7 @@ namespace slv2
         DefaultStateBehavior::off(context);
     }
 
-    Result PrimitiveWriteState::onHash(SolverContext & /*context*/, const cs::Hash & /*hash*/, const cs::PublicKey & sender)
+    Result PrimitiveWriteState::onHash(SolverContext & /*context*/, const csdb::PoolHash & /*pool_hash*/, const cs::PublicKey & sender)
     {
         // form "trusted candidates"
         trusted_candidates.emplace_back(sender);
