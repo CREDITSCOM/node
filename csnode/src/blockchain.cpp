@@ -93,6 +93,7 @@ BlockChain::BlockChain(const char* path) {
 
 #ifdef MYLOG
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
+      std::cout << "Building the chain..." << std::endl;
 #endif
       setLastWrittenSequence(ht.tag);
 
@@ -110,7 +111,7 @@ BlockChain::BlockChain(const char* path) {
         PrettyLogging::finish();
 
 #ifdef MYLOG
-        std::cout << "Hashes read from DB" << std::endl;
+        std::cout << "Build successful. Checking blocks..." << std::endl;
 #endif
         uint32_t j = 0;
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
@@ -122,7 +123,7 @@ BlockChain::BlockChain(const char* path) {
         }
         PrettyLogging::finish();
 #ifdef MYLOG
-        std::cout << "Hashes vector converted" << std::endl;
+        std::cout << "All done, we have a nice blockchain" << std::endl;
 #endif
 
         tempHashes.clear();
