@@ -1811,7 +1811,7 @@ void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo)
   *rawData = stageTwoInfo.sender;
   *(rawData + 1) = stageTwoInfo.trustedAmount;
   for (int i = 0; i < stageTwoInfo.trustedAmount; i++) {
-    memcpy(rawData + 2 + 64 * i, stageTwoInfo.signatures[i].data(), stageTwoInfo.signatures[i].size());
+    memcpy(rawData + 2*sizeof(uint8_t) + i * sizeof(cs::Signature), stageTwoInfo.signatures[i].data(), stageTwoInfo.signatures[i].size());
   }
   //cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize;
 
@@ -1840,11 +1840,10 @@ void Node::requestStageTwo(uint8_t respondent, uint8_t required)
     cswarning() <<"Only confidant nodes can request consensus stages";
     return;
   }
-  //#ifdef MYLOG
+
   cslog() << "==============================";
   cslog() << "NODE> Stage TWO requesting ... ";
   cslog() << "==============================";
-  //#endif
 
   ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
 
@@ -2122,12 +2121,9 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   solver_->gotStageThree(std::move(stage));
 }
 
-
-
-void Node::sendRoundInfo(cs::RoundTable& roundTable) {
-
+void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   csdebug() << "NODE> Apply notifications";
- // only for new consensus
+  // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1; // change for roundNumber
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
@@ -2162,8 +2158,12 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
+}
 
 
+void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature) {
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNum_ = roundTable.round;
   // update hashes in round table here, they are free of stored packets' hashes
   if(!roundTable.hashes.empty()) {
