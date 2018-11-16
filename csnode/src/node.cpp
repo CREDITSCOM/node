@@ -1775,21 +1775,21 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   stage.sender = *rawData;
   if (crypto_sign_ed25519_verify_detached(stage.sig.data(), rawData,
     msgSize, (const unsigned char*) cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data())) {
-    cslog() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!" ;
+    cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!" ;
       return;
   }
   //cslog() << "NODE> Signature is OK!" ;
   memcpy(stage.hash.data(), rawData + 1, 32);
   stage.candidatesAmount = *(rawData + 33);
-  for (int i = 0; i < stage.candidatesAmount; i++) {
-    memcpy(stage.candiates[i].data(), rawData + 34 + 32 * i, 32);
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(stage.candiates[i].data(), stage.candiates[i].size());
-  }
+  //for (int i = 0; i < stage.candidatesAmount; i++) {
+  //  memcpy(stage.candiates[i].data(), rawData + 34 + 32 * i, 32);
+  //  csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.candiates[i].data(), stage.candiates[i].size());
+  //}
   allocator_.shrinkLast(msgSize);
-  LOG_DEBUG( "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
-    << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
-    << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
-    << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size()));
+  //csdebug() << "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
+  //  << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
+  //  << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
+  //  << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size());
     
   solver_->gotStageOne(std::move(stage));
 }
