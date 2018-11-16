@@ -53,9 +53,11 @@ Node::Node(const Config& config):
 }
 
 Node::~Node() {
+  sendingTimer_.stop();
+
   delete solver_;
   delete transport_;
-    delete poolSynchronizer_;
+  delete poolSynchronizer_;
 }
 
 bool Node::init() {
@@ -703,7 +705,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  if (isSyncroStarted_) {
+  if (isPoolsSyncroStarted()) {
     cs::PoolSyncMeta meta;
     meta.sender = sender;
     meta.signature = signature;
@@ -1326,7 +1328,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
 }
 
-bool Node::getSyncroStarted() {
+bool Node::isPoolsSyncroStarted() {
   return poolSynchronizer_->isSyncroStarted();
 }
 

@@ -1,6 +1,6 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __NODE_HPP__
-#define __NODE_HPP__
+#ifndef NODE_HPP
+#define NODE_HPP
 
 #include <iostream>
 #include <memory>
@@ -21,12 +21,12 @@
 
 class Transport;
 
-namespace cs {
-  class PoolSynchronizer;
-}
-
 namespace slv2 {
   class SolverCore;
+}
+
+namespace cs {
+  class PoolSynchronizer;
 }
 
 class Node {
@@ -154,7 +154,7 @@ public:
   void initNextRound( std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
-  bool getSyncroStarted();
+  bool isPoolsSyncroStarted();
 
   enum MessageActions {
     Process,
@@ -253,7 +253,6 @@ private:
   bool good_ = true;
 
   // syncro variables
-  std::atomic<bool> isSyncroStarted_ = false; // read by spammer thread, read & write by "main" node thread
   bool isAwaitingSyncroBlock_ = false;
   uint32_t awaitingRecBlockCount_ = 0;
 

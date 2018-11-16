@@ -72,7 +72,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   size_t target_wallet_counter = 0;
   int64_t inner_id_counter = 1;
   while (true) {
-      if(!node.getSyncroStarted()) {
+      if(!node.isPoolsSyncroStarted()) {
           transaction.set_source(OptimizeAddress(csdb::Address::from_public_key(
               reinterpret_cast<const char*>(public_key_)), node));
           transaction.set_target(OptimizeAddress(target_wallets_[target_wallet_counter], node));
