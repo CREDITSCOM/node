@@ -100,7 +100,7 @@ namespace slv2
         return Result::Ignore;
     }
 
-    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const cs::Hash& /*hash*/, const cs::PublicKey& /*sender*/)
+    Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const csdb::PoolHash & /*pool_hash*/, const cs::PublicKey& /*sender*/)
     {
         if(Consensus::Log) {
             LOG_DEBUG(name() << ": hash ignored in this state");

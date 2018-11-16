@@ -11,7 +11,12 @@ ProgressBar::ProgressBar(
 , barWidth(barWidthInSymbols)
 {
     rang::setControlMode(rang::control::Force);
-    rang::setWinTermMode(rang::winTerm::Native);
+    rang::setWinTermMode(rang::winTerm::Ansi);
+#ifdef _WINDOWS
+    //FIXME: it's a temporary hack to turn on ANSI sequences on windows terminal
+    //because bar outputs progress to _any_ stream, so we need to force ansi 
+    rang::rang_implementation::setWinTermAnsiColors(std::cout.rdbuf());
+#endif
 }
 
 ProgressBar::~ProgressBar() {

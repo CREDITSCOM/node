@@ -55,7 +55,7 @@ namespace slv2
 
         Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
-        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
+        Result onHash(SolverContext& context, const csdb::PoolHash & pool_hash, const cs::PublicKey& sender) override;
 
         const char * name() const override
         {
