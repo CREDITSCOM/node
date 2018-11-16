@@ -2204,7 +2204,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
  
   transport_->clearTasks();
 
-  //TODO: обновить таблицу раунда в cs::Conveyer::instance()
+  //TODO: \EE\E1\ED\EE\E2\E8\F2\FC \F2\E0\E1\EB\E8\F6\F3 \F0\E0\F3\ED\E4\E0 \E2 cs::Conveyer::instance()
   //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
   assert(false);
 
