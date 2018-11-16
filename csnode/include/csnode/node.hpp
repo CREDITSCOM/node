@@ -83,7 +83,8 @@ public:
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
   void addCompressedPoolToPack(const csdb::Pool& pool);
 
-  void sendRoundInfo(cs::RoundTable& roundTable);
+  void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
+  void prepareMetaForSending(cs::RoundTable& roundTable);
 
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
