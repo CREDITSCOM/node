@@ -18,7 +18,7 @@ namespace cs {
     using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences)>;
     using PoolSynchronizerSynchroFinished = cs::Signal<void()>;
 
-#define USE_REQUEST_TIMER
+//#define USE_REQUEST_TIMER
 
     class PoolSynchronizer
     {
@@ -58,9 +58,8 @@ namespace cs {
 
         Transport* m_transport;
         BlockChain* m_blockChain;
-        Timer m_timer;
 
-        const int m_maxBlockCount = 7;
+        inline static const int m_maxBlockCount = 2;
         const int m_maxWaitingTimeReply;
 
         // syncro variables

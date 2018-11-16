@@ -1030,7 +1030,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   }
 
   const auto msgType = MsgTypes::TransactionsPacketRequest;
-  const auto neighboursCount = transport_->getNeighboursCount();
+  const auto neighboursCount = 4;//transport_->getNeighboursCount();
   const auto hashesCount = hashes.size();
   const bool isHashesLess = hashesCount < neighboursCount;
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
