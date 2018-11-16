@@ -215,7 +215,7 @@ namespace slv2
             csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
             if(p.is_valid()) {
                 os << "[" << p.sequence() << "] found, sending";
-                pnode->sendBlockReply(p, sender);
+//                pnode->sendBlockReply(p, sender);
             }
             else {
                 os << "not found";
@@ -429,7 +429,7 @@ namespace slv2
         auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 2;
         if(desired_seq < cur_round) {
             // empty args requests exactly what we need:
-            pnode->sendBlockRequest();
+//            pnode->sendBlockRequest();
         }
 
         if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {

@@ -426,7 +426,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
   if (pool.is_valid()) {
     auto prev_hash = csdb::PoolHash::from_string("");
     pool.set_previous_hash(prev_hash);
-    m_node->sendBlockReply(pool, nodeId);
+//    m_node->sendBlockReply(pool, nodeId);
   }
 }
 

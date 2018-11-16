@@ -50,6 +50,7 @@ add_library(csnode
   include/csnode/WalletsIds.h
   include/csnode/WalletsPools.h
   include/csnode/BlockHashes.h
+  include/csnode/poolsynchronizer.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -61,6 +62,7 @@ add_library(csnode
   src/WalletsIds.cpp
   src/WalletsPools.cpp
   src/BlockHashes.cpp
+  src/poolsynchronizer.cpp
 )
 
 target_link_libraries (csnode net csdb solver2 lib base58 lz4 Boost::thread)

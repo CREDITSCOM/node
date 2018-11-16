@@ -21,6 +21,10 @@
 
 class Transport;
 
+namespace cs {
+  class PoolSynchronizer;
+}
+
 namespace slv2 {
   class SolverCore;
 }
@@ -96,8 +100,6 @@ public:
   void getRoundTable(const uint8_t*, const size_t, const cs::RoundNumber);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
-  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
   void writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
@@ -111,7 +113,7 @@ public:
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getBlockReply(const uint8_t*, const size_t);
+  void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   // outcoming requests forming
   void sendVector(const cs::HashVector&);
@@ -126,8 +128,7 @@ public:
   void resetNeighbours();
 
   // syncro send functions
-  void sendBlockRequest();
-  void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
+  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
 
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
@@ -197,6 +198,8 @@ public:
 
 public slots:
   void processTimer();
+  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
+  void onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences);
 
 private:
   bool init();
@@ -213,7 +216,6 @@ private:
 
   // pool sync helpers
   void blockchainSync();
-  void processSyncPools();
 
   void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
   void processMetaMap();
@@ -270,6 +272,7 @@ private:
   // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
+  cs::PoolSynchronizer* poolSynchronizer_;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;
@@ -294,8 +297,6 @@ private:
 
   // sync meta
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
-  cs::RoundNumber roundToSync_ = 0;
-  std::map<csdb::Pool::sequence_t, csdb::Pool> syncPools_;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

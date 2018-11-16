@@ -598,7 +598,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::BlockRequest:
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
-    return node_->getBlockReply(data, size);
+    return node_->getBlockReply(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
@@ -662,8 +662,8 @@ void Transport::clearTasks() {
   sendPacks_.clear();
 }
 
-uint32_t Transport::getMaxNeighbours() const {
-  return config_.getMaxNeighbours();
+uint32_t Transport::getNeighboursCount() {
+  return nh_.size();
 }
 
 ConnectionPtr Transport::getSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
