@@ -357,7 +357,7 @@ namespace slv2
 
     }
 
-    void SolverCore::gotRoundInfoReply(const uint8_t reply, const cs::PublicKey& respondent)
+    void SolverCore::gotRoundInfoReply(const uint8_t reply, const cs::PublicKey& /*respondent*/)
     {
       if (reply != 0) {
         cslog() << "SolverCore: the received RoundInfoReply doesn't need any reply";
