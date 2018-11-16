@@ -2608,7 +2608,12 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     }
     cslog() << line2.str();
     solver_->nextRound();
- }
+
+    if(!sendingTimer_.isRunning()) {
+        cslog() << "NODE> Transaction timer started";
+        sendingTimer_.start(cs::TransactionsPacketInterval);
+    }
+}
 
 
  void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
