@@ -85,7 +85,7 @@ TEST(RegionAllocator, AllocateAndFreeUnusedObject) {
 }
 
 TEST(RegionAllocator, alloc_with_resizes) {
-  constexpr uint32_t kPageSize = AlignNumberTo64(sizeof(Region) + 1) * 100;
+  constexpr uint32_t kPageSize = AlignNumberTo64(sizeof(Region) + 1) * 101;
 
   RegionAllocator allocator(kPageSize, 1);
   std::vector<RegionPtr> regs;

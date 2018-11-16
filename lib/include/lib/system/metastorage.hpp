@@ -156,7 +156,7 @@ namespace cs
         }
 
         ///
-        /// @brief Returns reference to existing element, otherwise returns nullptr.
+        /// @brief Returns pointer to existing element, otherwise returns nullptr.
         /// @param round Round of searching element.
         /// @return Reference to element.
         /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.

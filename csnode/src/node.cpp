@@ -2119,6 +2119,8 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   solver_->gotStageThree(std::move(stage));
 }
 
+
+
 void Node::sendRoundInfo(cs::RoundTable& roundTable) {
 
   csdebug() << "NODE> Apply notifications";
@@ -2157,6 +2159,8 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+
+
   roundNum_ = roundTable.round;
   // update hashes in round table here, they are free of stored packets' hashes
   if(!roundTable.hashes.empty()) {
@@ -2471,7 +2475,7 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
     return;
   }
   if (rNum == roundNum_) {
-    sendRoundInfoReply(requester, 0);
+    sendRoundInfoReply(requester, 0 , requesterNumber);
     return;
   }
   else {
@@ -2483,7 +2487,7 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
       }
     }
     if (!found) {
-      sendRoundInfoReply(requester, 1);
+      sendRoundInfoReply(requester, 1,requesterNumber);
       return;
     }
     }
@@ -2496,11 +2500,11 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
   solver_->gotRoundInfoRequest(requester);
 }
 
-void Node::sendRoundInfoReply(const cs::PublicKey& requester, uint8_t reply)
+void Node::sendRoundInfoReply(const cs::PublicKey& requester, uint8_t reply, uint8_t reqNumber)
 {
-#ifdef MYLOG
-  cslog() << "NODE> Stage THREE requesting ... ";
-#endif
+
+  cslog() << "NODE> Sending RoundInfoRely to [" << (int) reqNumber << "]";
+
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() <<"Only confidant nodes can request consensus stages";
     //return;
@@ -2510,7 +2514,7 @@ void Node::sendRoundInfoReply(const cs::PublicKey& requester, uint8_t reply)
 
   ostream_ << MsgTypes::RoundInfoReply
     << roundNum_
-    << myConfidantIndex_;
+    << reply;
 
   flushCurrentTasks();
   LOG_DEBUG("done");
@@ -2529,16 +2533,16 @@ void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::R
   //LOG_EVENT(FILE_NAME_ << "Getting RoundInfo Request from " << byteStreamToHex(sender.str, 32));
   istream_.init(data, size);
 
-  uint8_t requesterNumber;
-  istream_ >> requesterNumber;
+  uint8_t reply;
+  istream_ >> reply;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() <<"Bad StageThree packet format";
     return;
   }
-  if (respondent != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;
+  //if (respondent != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;
 
-  solver_->gotRoundInfoRequest(respondent);
+  solver_->gotRoundInfoReply(reply, respondent);
 }
 
 void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
