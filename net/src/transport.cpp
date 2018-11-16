@@ -394,37 +394,37 @@ void Transport::processNodeMessage(const Message& msg) {
 
   switch (type) {
     case MsgTypes::BlockHash:
-      csdebug() << "TRANSPORT> Process Node Message MSG: BlockHash - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: BlockHash, rNum=" << rNum;
       break;
     case MsgTypes::BlockRequest:
-      csdebug() << "TRANSPORT> Process Node Message MSG: BlockRequest  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: BlockRequest, rNum=" << rNum;
       break;
     case MsgTypes::FirstTransaction:
-      csdebug() << "TRANSPORT> Process Node Message MSG: FirstTransaction  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: FirstTransaction, rNum=" << rNum;
       break;
     case MsgTypes::RequestedBlock:
-      csdebug() << "TRANSPORT> Process Node Message MSG: RequestedBlock  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: RequestedBlock, rNum=" << rNum;
       break;
     case MsgTypes::RoundTableSS:
-      csdebug() << "TRANSPORT> Process Node Message MSG: RoundTable  - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: RoundTable, rNum=" << rNum;
       break;
     case MsgTypes::TransactionList:
-      csdebug() << "TRANSPORT> Process Node Message MSG: TransactionList - rNum = " << rNum;
+      csdebug() << "TRANSPORT> Process Node Message: TransactionList, rNum=" << rNum;
       break;
     case MsgTypes::NewCharacteristic:
-      csdebug() << "TRANSPORT> Process Node Message MSG: Characteristic received";
+      csdebug() << "TRANSPORT> Process Node Message: Characteristic received";
       break;
     case MsgTypes::WriterNotification:
-      csdebug() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
+      csdebug() << "TRANSPORT> Process Node Message: Writer Notification received";
       break;
     case MsgTypes::BigBang:
-      csdebug() << "TRANSPORT> Process Node Message MSG: BigBang ";
+      csdebug() << "TRANSPORT> Process Node Message: BigBang ";
       break;
     case MsgTypes::TransactionsPacketRequest:
-      csdebug() << "TRANSPORT> Process Node Message MSG: Transactions packet request";
+      csdebug() << "TRANSPORT> Process Node Message: Transactions packet request";
       break;
     case MsgTypes::TransactionsPacketReply:
-      csdebug() << "TRANSPORT> Process Node Message MSG: Transactions packet reply";
+      csdebug() << "TRANSPORT> Process Node Message: Transactions packet reply";
       break;
   default:
       break;
