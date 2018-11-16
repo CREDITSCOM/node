@@ -242,10 +242,7 @@ namespace slv2
         if(!recv_hash.empty()) {
             if(cur_round - pnode->getBlockChain().getLastWrittenSequence() == 1) {
                 for(const auto& hash_sender : recv_hash) {
-                    const auto& bytes = hash_sender.first.to_binary();
-                    cs::Hash h;
-                    std::copy(bytes.cbegin(), bytes.cend(), h.begin());
-                    if(stateCompleted(pstate->onHash(*pcontext, h, hash_sender.second))) {
+                    if(stateCompleted(pstate->onHash(*pcontext, hash_sender.first, hash_sender.second))) {
                         handleTransitions(Event::Hashes);
                     }
                 }

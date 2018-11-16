@@ -7,6 +7,7 @@
 namespace csdb
 {
     class Pool;
+    class PoolHash;
     class Transaction;
 }
 namespace cs
