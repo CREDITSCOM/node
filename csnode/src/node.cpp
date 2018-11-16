@@ -199,7 +199,7 @@ bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::Priva
 
 void Node::blockchainSync() {
 #ifdef SYNCRO
-  cslog() <<"Node: last written sequence = " << getBlockChain().getLastWrittenSequence();
+  cslog() <<"NODE> last written sequence = " << getBlockChain().getLastWrittenSequence();
 #endif
   if (!isSyncroStarted_) {
     if (roundNum_ > getBlockChain().getLastWrittenSequence() + 1) {
@@ -390,8 +390,7 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 
   writeDefaultStream(args...);
 
-  csdebug() << "NODE> Sending data Direct: data size " << ostream_.getCurrentSize();
-  csdebug() << "NODE> Sending data Direct: to " << target->getOut();
+  csdebug() << "NODE> Sending Direct data of size " << ostream_.getCurrentSize() << " to " << target->getOut();
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -1167,7 +1166,7 @@ void Node::sendBlockRequest() {
   isAwaitingSyncroBlock_ = true;
   awaitingRecBlockCount_ = 0;
 
-  csdebug() << "SEND BLOCK REQUEST> Sending request for block: " << sequence;
+  csdebug() << "BLOCK REQUEST> requesting #" << sequence;
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1176,10 +1175,10 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   istream_.init(data, size);
   istream_ >> requested_seq;
 
-  cslog() << "GET BLOCK REQUEST> Getting the request for block: " << requested_seq;
+  cslog() << "BLOCK REQUEST> requested #" << requested_seq;
 
   if (requested_seq > getBlockChain().getLastWrittenSequence()) {
-    cslog() << "GET BLOCK REQUEST> The requested block: " << requested_seq << " is BEYOND my CHAIN";
+    cslog() << "BLOCK REQUEST> #" << requested_seq << " is BEYOND my CHAIN";
     return;
   }
 
@@ -1201,7 +1200,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   istream_.init(data, size);
   istream_ >> pool;
 
-  cslog() << "GET BLOCK REPLY> Getting block " << pool.sequence();
+  cslog() << "BLOCK REPLY> get #" << pool.sequence();
 
   transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
 
@@ -1210,7 +1209,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
 
   if (pool.sequence() == bc_.getLastWrittenSequence() + 1) {
-    cslog() << "GET BLOCK REPLY> Block Sequence is Ok";
+    cslog() << "BLOCK REPLY> sequence is appropriate, store";
 
     if (roundToSync_ > 0) {
       Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
@@ -1222,7 +1221,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
   else {
     syncPools_[pool.sequence()] = std::move(pool);
-    cswarning() << "GET NO NEXT SYNC POOL";
+    cslog() << "BLOCK REPLY> cache outrunning block";
   }
 
   processSyncPools();
@@ -1235,14 +1234,14 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     roundToSync_ = 0;
 
     processMetaMap();
-    cslog() << "POOL SYNCRO FINISHED";
+    cslog() << "BLOCK REPLY> block sync finished";
   }
 }
 
 void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& target) {
   ConnectionPtr conn = transport_->getConnectionByKey(target);
   if (!conn) {
-    cswarning() << "Cannot get a connection with a specified public key";
+    cswarning() << "BLOCK REPLY> Cannot get a connection with a specified public key";
     return;
   }
 
@@ -1371,10 +1370,10 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
 
   if(rt.hashes.empty() || conveyer.isSyncCompleted()) {
       if(rt.hashes.empty()) {
-          cslog() << "NODE> No hashes in round table - > got round now";
+          cslog() << "NODE> No hashes in round table - > start consensus now";
       }
       else {
-          cslog() << "NODE> All hashes in conveyer -> got round now";
+          cslog() << "NODE> All hashes in conveyer -> start consensus now";
       }
       solver_->gotRound(rt.round);
       transport_->processPostponed(roundNum_);
@@ -2379,15 +2378,11 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
   }
   onRoundStart_V3(roundTable);
   blockchainSync();
-
-  cslog() << "NODE> Finishing Writing block";
-  //for (int i = 0; i < roundTable.confidants.size(); i++) {
-  //  cslog() << i << ". " << cs::Utils::byteStreamToHex(roundTable.confidants.at(i).data(), confidants.at(i).size());
-  //}
-
   onRoundStartConveyer(std::move(roundTable));
   // defer until solver_->gotRound() called
   /*transport_->processPostponed(roundNum_);*/
+
+  cslog() << "NODE> round info handled";
 }
 
 void Node::sendHash_V3(cs::RoundNumber round) {
@@ -2581,11 +2576,10 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 
 
     // Pretty printing...
-    cslog() << "Round " << roundNum_ << " started. Mynode_type: " << myLevel_
-        << std::endl << "Confidants: " ;
+    cslog() << "Confidants: " ;
     int i = 0;
     for(auto& e : roundTable.confidants) {
-      cslog() << i << ". " << cs::Utils::byteStreamToHex(e.data(), e.size());
+      cslog() << "[" << i << "] " << cs::Utils::byteStreamToHex(e.data(), e.size());
       i++;
     }
    
