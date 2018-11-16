@@ -16,7 +16,7 @@
 #include <lib/system/metastorage.hpp>
 
 // ms
-const std::size_t TIME_TO_AWAIT_ACTIVITY = 200;
+const std::size_t TIME_TO_AWAIT_ACTIVITY = 50;
 const std::size_t ROUND_DELAY = 1000;
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 70;
 

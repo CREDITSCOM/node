@@ -350,46 +350,11 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool)
 {
-    cs::Bytes bytes;
-    (*this) >> bytes;
-    pool = csdb::Pool::from_binary(bytes);
-    return *this;
+  cs::Bytes bytes;
+  (*this) >> bytes;
+  pool = csdb::Pool::from_binary(bytes);
+  return *this;
 }
-
-template <>
-inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& pool_hash)
-{
-    uint8_t len;
-    *this >> len;
-    csdb::internal::byte_array raw_bytes(ptr_, ptr_ + len);
-    pool_hash = csdb::PoolHash::from_binary(raw_bytes);
-    safeSkip<uint8_t>(len);
-    return *this;
-}
-
-#if 0 // compressed pool (opposite to Node::addCompressedPoolToPack() method) deserialization
-template <>
-inline IPackStream& IPackStream::operator>>(csdb::Pool& pool)
-{
-    uint32_t uncompressedSize;
-    uint32_t compressedSize;
-    *this >> uncompressedSize >> compressedSize;
-
-    //TODO: review that condition (2) is legal
-    constexpr size_t abnormal_len = 1 << 20;
-    if(end_ - ptr_ < compressedSize || uncompressedSize >= abnormal_len) {
-        // data is corrupted
-        pool = csdb::Pool {};
-        ptr_ = end_;
-        good_ = false;
-        return *this;
-    }
-
-    pool = csdb::Pool::from_lz4_byte_stream(reinterpret_cast<const char*>(ptr_), compressedSize, uncompressedSize);
-    ptr_ += compressedSize;
-    return *this;
-}
-#endif // 0
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(ip::address& addr) {
@@ -461,7 +426,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashMatrix& hashMatrix) 
 
   return *this;
 }
-#if 0
+
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
   cs::Bytes bytes;
@@ -469,8 +434,6 @@ inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
   hash = csdb::PoolHash::from_binary(bytes);
   return *this;
 }
-#endif // 0
-// writable entities
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
@@ -553,20 +516,12 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashMatrix& hashMa
   (*this) << hashMatrix.signature;
   return *this;
 }
-#if 0
+
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) {
   (*this) << hash.to_binary();
   return *this;
 }
-#endif // 0
-template <>
-inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& pool_hash)
-{
-    const auto& raw_bytes = pool_hash.to_binary();
-    *this << (uint8_t) raw_bytes.size();
-    insertBytes((const char*) raw_bytes.data(), raw_bytes.size());
-    return *this;
-}
+
 
 #endif  // __PACKSTREAM_HPP__

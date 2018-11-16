@@ -105,7 +105,7 @@ namespace slv2
          * ### remarks  Aae, 30.09.2018.
          */
 
-        Result onHash(SolverContext& context, const cs::Hash& hash, const cs::PublicKey& sender) override;
+        Result onHash(SolverContext& context, const csdb::PoolHash & pool_hash, const cs::PublicKey& sender) override;
 
         /**
          * @fn  Result DefaultStateBehavior::onTransaction(SolverContext& context, const csdb::Transaction& trans) override;
