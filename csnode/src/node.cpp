@@ -1224,6 +1224,9 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     syncPools_[pool.sequence()] = std::move(pool);
     cslog() << "BLOCK REPLY> cache outrunning block";
   }
+  else {
+      cslog() << "BLOCK REPLY> ignore outdated block";
+  }
 
   processSyncPools();
 
