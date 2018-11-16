@@ -4,7 +4,9 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
+
 #include <client/params.hpp>
+#include <client/config.hpp>
 
 #include "wallets_cache.hpp"
 #include "blockchain.hpp"
@@ -13,44 +15,41 @@
 
 using namespace Credits;
 
-//BlockChain::BlockChain(const char* path)
-//{
-//	std::cerr << "Trying to open DB..." << std::endl;
-//    if (!storage_.open(path))
-//    {
-//        LOG_ERROR("Couldn't open database at " << path);
-//        return;
-//    }
-//
-//    if (!loadCache())
-//        return;
-//
-//    good_ = true;
-//}
-
 BlockChain::BlockChain(const char* path) {
 
-  if (!loadCache()) return;
+  if (!loadCache()) return; // This only clears the data since lastHash is empty for now
 #ifdef MYLOG
-  std::cout << "Trying to open DB..." << std::endl;
-  #endif
-  char  kk[14];
+  std::clog << "Trying to open DB...  ";
+#endif
+
   std::vector <uint8_t> v_hash(32);
   std::vector <csdb::PoolHash> tempHashes;
   csdb::PoolHash temp_hash;
   blockHashes_.reserve(1000000);
   blockRequestIsNeeded = false;
 
-  if (storage_.open(path))
+  const bool dbOpened = storage_.open(path);
+  PrettyLogging::finish();
+
+  if (dbOpened)
   {
     std::cout << "DB is opened" << std::endl;
+    static const std::string CHEAT_FILENAME = std::string(path) + "/__integr.seq";
+
     if (storage_.last_hash().is_empty())
     {
 #ifdef MYLOG
       std::cout << "Last hash is empty..." << std::endl;
-      #endif
+#endif
       if (!storage_.size())
       {
+        const uint64_t sec = (uint64_t)(rand() / 100) * (uint64_t)100 + (uint64_t)NODE_VERSION;
+        std::string secHash = EncodeBase58((unsigned char*)&sec, (unsigned char*)&sec + 8);
+
+        std::ofstream sf(CHEAT_FILENAME);
+        sf << secHash;
+        sf.close();
+
         //std::cout << "Storage is empty... writing genesis block" << std::endl;
         writeGenesisBlock();
         good_ = true;
@@ -65,6 +64,26 @@ BlockChain::BlockChain(const char* path) {
     }
     else
     {
+      uint16_t dbVersion = 0;
+
+      std::ifstream sf(CHEAT_FILENAME);
+      if (sf.is_open()) {
+        std::string rSec;
+        sf >> rSec;
+        sf.close();
+
+        std::vector<unsigned char> dec;
+        if (DecodeBase58(rSec, dec) && dec.size() == 8) {
+          dbVersion = *((uint64_t*)dec.data()) % 100;
+        }
+      }
+
+      if (dbVersion != NODE_VERSION) {
+        std::cout << "Bad database version" << std::endl;
+        good_ = false;
+        return;
+      }
+
 #ifdef MYLOG
       std::cout << "Last hash is not empty..." << std::endl;
 #endif
@@ -76,33 +95,36 @@ BlockChain::BlockChain(const char* path) {
       std::cout << "DB structure: " << ht.head << "->" << ht.tag << std::endl;
 #endif
       setLastWrittenSequence(ht.tag);
+
       {
         tempHashes.reserve(ht.tag + 1);
         temp_hash = storage_.last_hash();
 
         for (uint32_t i = 0; i <= ht.tag; ++i)
         {
+          PrettyLogging::drawTickProgress(i, ht.tag);
           tempHashes.push_back(temp_hash);
-          //std::cout << "READ> " << temp_hash.to_string() << std::endl;
           temp_hash = loadBlock(temp_hash).previous_hash();
           if (temp_hash.is_empty()) break;
         }
+        PrettyLogging::finish();
+
 #ifdef MYLOG
         std::cout << "Hashes read from DB" << std::endl;
 #endif
+        uint32_t j = 0;
         for (auto iter = tempHashes.rbegin(); iter != tempHashes.rend(); ++iter)
         {
+          PrettyLogging::drawTickProgress(++j, tempHashes.size());
           auto p = loadBlock(*iter);
           updateCache(p);
           blockHashes_.push_back(*iter);
         }
+        PrettyLogging::finish();
 #ifdef MYLOG
         std::cout << "Hashes vector converted" << std::endl;
 #endif
-        //for (uint32_t i = 0; i <= ht.tag; i++)
-        //{
-        //  std::cout << "READ> " << i << " : " << blockHashes_.at(i).to_string() << std::endl;
-        //}
+
         tempHashes.clear();
         lastHash_ = storage_.last_hash();
         good_ = true;
@@ -121,61 +143,65 @@ BlockChain::BlockChain(const char* path) {
 void BlockChain::putBlock(csdb::Pool& pool) {
 #ifdef MYLOG
   std::cout << "Put block is running" << std::endl;
-  #endif
+#endif
   onBlockReceived(pool);
 }
 
 
 bool BlockChain::writeBlock(csdb::Pool& pool) {
-	//TRACE("");
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  pool.set_storage(storage_);
 
-        std::lock_guard<decltype(dbLock_)> l(dbLock_);
-        pool.set_storage(storage_);
-
-	//	std::cout << "OK" << std::endl << "Pool is composing ... ";
-	if (!pool.compose()) {
-          LOG_ERROR("Couldn't compose block");
-          return false;
-	}
+  if (!pool.compose()) {
+    LOG_ERROR("Couldn't compose block");
+    return false;
+  }
 
   if (!pool.save()) {
+    // This block may still exist in the database
     if (pool.hash().is_empty() || !storage_.pool_load(pool.hash()).is_valid()) {
       LOG_ERROR("Couldn't save block");
       return false;
     }
-	}
+    else {
+      // And it does
+      storage_.set_last_hash(pool.hash());
+      storage_.set_size(pool.sequence() + 1);
+    }
+  }
 
-	std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
-        //LOG_DEBUG("DATA: " << byteStreamToHex((const char*)pool.to_binary().data(), pool.to_binary().size()));
-	{
-		//TRACE("");
-		std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
-		//TRACE("");
-		new_block_cv.notify_all();
-		//TRACE("");
-	}
+  std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
 
-	if (!updateCache(pool)) {
-          LOG_ERROR("Couldn't update cache");
-	}
+  lastHash_ = pool.hash();
+  blockHashes_.push_back(lastHash_);
+  last_written_sequence = pool.sequence();
 
-        return true;
+#ifdef MYLOG
+  std::cout << "New last hash: " << lastHash_.to_string() << std::endl;
+  std::cout << "New last storage size: " << storage_.size() << std::endl;
+#endif
+
+  if (global_sequence == last_written_sequence) {
+    blockRequestIsNeeded = false;
+  }
+
+  if (!updateCache(pool)) {
+    LOG_ERROR("Couldn't update cache");
+  }
+
+  new_block_cv.notify_all();
+
+  return true;
 }
 
 void BlockChain::setLastWrittenSequence(uint32_t seq) {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   last_written_sequence = seq;
 }
 
-void BlockChain::updateLastHash() {
-  blockHashes_.resize(last_written_sequence + 1);
-  lastHash_ = getHashBySequence(last_written_sequence);
-  storage_.set_last_hash(lastHash_);
-  storage_.set_size(last_written_sequence + 1);
-}
-
-
-uint32_t BlockChain::getLastWrittenSequence()
+uint32_t BlockChain::getLastWrittenSequence() const
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return last_written_sequence;
 }
 
@@ -327,21 +353,18 @@ void BlockChain::writeGenesisBlock() {
   vchRet.clear();
   genesis.add_transaction(transaction);
 
-
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(0);
   setLastWrittenSequence(0);
 #ifdef MYLOG
   std::cout << "Genesis block completed ... trying to save" << std::endl;
 #endif
-  writeBlock(genesis);
   global_sequence = 0;
+  writeBlock(genesis);
   std::cout << genesis.hash().to_string() << std::endl;
-  lastHash_ = genesis.hash();
-  blockHashes_.push_back(lastHash_);
 #ifdef MYLOG
   std::cout << "Hash inserted into the hash-vector" << std::endl;
-  #endif
+#endif
   uint32_t bSize;
   const char* bl = genesis.to_byte_stream(bSize);
   //std::cout << "GB: " << byteStreamToHex(bl, bSize) << std::endl;
@@ -395,36 +418,36 @@ void BlockChain::iterateOverWriters(const std::function<bool(const Credits::Wall
 csdb::PoolHash
 BlockChain::getLastHash() const
 {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    return storage_.last_hash();
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.last_hash();
 }
 
 size_t
 BlockChain::getSize() const
 {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    return storage_.size();
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.size();
 }
 
 csdb::Pool
 BlockChain::loadBlock(const csdb::PoolHash& ph) const
 {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    return storage_.pool_load(ph);
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.pool_load(ph);
 }
 
 csdb::Pool
 BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const
 {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    return storage_.pool_load_meta(ph, cnt);
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.pool_load_meta(ph, cnt);
 }
 
 csdb::Transaction
 BlockChain::loadTransaction(const csdb::TransactionID& transId) const
 {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    return storage_.transaction(transId);
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.transaction(transId);
 }
 
 csdb::PoolHash
@@ -464,32 +487,8 @@ BlockChain::getBalance(const csdb::Address& address) const
         if (walData)
             return walData->balance_;
     }
-    return calcBalance(address);
+    return csdb::Amount(0);
 }
-
-csdb::Amount
-BlockChain::calcBalance(const csdb::Address &address) const
-{
-    csdb::Amount result(0);
-    return result;
-
-    /*csdb::Pool curr = loadBlock(getLastHash());
-    while (curr.is_valid())
-	{
-		size_t transactions_count = curr.transactions_count();
-        for (size_t i = 0; i < transactions_count; ++i)
-		{
-            csdb::Transaction tr = curr.transaction(i);
-            if (tr.source() == address)
-                result -= tr.amount();
-            else if (tr.target() == address)
-                result += tr.amount();
-        }
-        curr = loadBlock(curr.previous_hash());
-    }
-    return result;*/
-}
-
 
 void BlockChain::onBlockReceived(csdb::Pool& pool)
 {
@@ -508,72 +507,42 @@ void BlockChain::onBlockReceived(csdb::Pool& pool)
       return;
     }
     //std::cout << "Preparing to calculate last hash" << std::endl;
-    lastHash_ = pool.hash();
-    blockHashes_.push_back(lastHash_);
-    //std::cout << "Hash inserted into the hash-vector" << std::endl;
-
-    setLastWrittenSequence(pool.sequence());
-#ifdef MYLOG
-    std::cout << "New last hash: " << lastHash_.to_string() << std::endl;
-    std::cout << "New last storage size: " << storage_.size() << std::endl;
-#endif
-    if (global_sequence == getLastWrittenSequence())
-    {
-      blockRequestIsNeeded = false;
-    }
-
-    return;
   }
   else
     LOG_ERROR("Cannot put block: last sequence incorrect");
- // std::cout << "Failed" << std::endl;
-
-  ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
- // std::cout << "Chain syncro part ... start " << std::endl;
-  global_sequence = pool.sequence();
-  blockRequestIsNeeded = true;
 }
 
 const csdb::PoolHash & BlockChain::getLastWrittenHash() const
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return lastHash_;
 }
 
-const csdb::Storage & BlockChain::getStorage() const
-{
-  return storage_;
-}
-
-//void
-//BlockChain::wait_for_block()
-//{
-//  std::unique_lock<std::mutex> l(dbLock_);
-//  auto ls = storage_.size();
-//  new_block_cv.wait(l, [ls, this] { return storage_.size() != ls; });
-//}
-
-
 uint32_t BlockChain::getGlobalSequence() const
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return global_sequence;
 }
 
 csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return blockHashes_.at(seq);
 }
 
 uint32_t BlockChain::getRequestedBlockNumber() const
 {
-  return (last_written_sequence + 1);
+  return (getLastWrittenSequence() + 1);
 }
 void BlockChain::setGlobalSequence(uint32_t seq)
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   global_sequence = seq;
 }
 
 bool BlockChain::getBlockRequestNeed() const
 {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return blockRequestIsNeeded;
 }
 
@@ -684,6 +653,7 @@ BlockChain::getTransactions(Transactions &transactions,
     }
 }
 
+/* Private under lock */
 void BlockChain::revertLastBlock() {
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -699,5 +669,9 @@ void BlockChain::revertLastBlock() {
   }
 
   --last_written_sequence;
-  updateLastHash();
+
+  blockHashes_.resize(last_written_sequence + 1);
+  lastHash_ = lastBlock.previous_hash();
+  storage_.set_last_hash(lastHash_);
+  storage_.set_size(last_written_sequence + 1);
 }

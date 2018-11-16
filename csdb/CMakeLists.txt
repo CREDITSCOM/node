@@ -59,6 +59,7 @@ find_package (Boost REQUIRED COMPONENTS system filesystem)
 target_include_directories(
   ${PROJECT_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
 )
 target_link_libraries(
@@ -77,7 +78,7 @@ else()
 endif()
 
 set_property(TARGET csdb PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-  
+
 if(CSDB_BUILD_UNITTESTS)
   add_subdirectory(unittests)
 endif()

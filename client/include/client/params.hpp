@@ -1,6 +1,6 @@
 #pragma once
 
-#define MONITOR_NODE
+//#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
 //#define NO_CONSENSUS

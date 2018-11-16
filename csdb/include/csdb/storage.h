@@ -253,6 +253,8 @@ public:
   bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
 
 private:
+  Pool pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const;
+
   ::std::shared_ptr<priv> d;
 };
 

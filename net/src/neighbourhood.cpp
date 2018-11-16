@@ -90,8 +90,6 @@ bool Neighbourhood::canHaveNewConnection() {
 
 void Neighbourhood::checkPending(const uint32_t) {
   SpinLock l1(mLockFlag_);
-  //LOG_DEBUG("CONNECTIONS: ");
-  // If the connection cannot be established, retry it
   for (auto conn = connections_.begin();
        conn != connections_.end();
        ++conn) {
@@ -100,17 +98,6 @@ void Neighbourhood::checkPending(const uint32_t) {
       transport_->sendRegistrationRequest(****conn);
 
   }
-  /*for (auto conn = connections_.begin();
-       conn != connections_.end();
-       ++conn) {
-    LOG_DEBUG((conn->data)->id << ". " << (conn->data).get() << ": " << (conn->data)->in << " : " << (conn->data)->out << " ~ " << (conn->data)->specialOut << " ~ " << (conn->data)->connected << " ~ " << (conn->data)->node.get());
-  }*/
-
-  /*SpinLock l2(nLockFlag_);
-  LOG_DEBUG("NEIGHBOURS: ");
-  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
-    LOG_DEBUG(conn->get() << " : " << (*conn)->in << " : " << (*conn)->getOut() << " : " << (*conn)->id << " ~ " << (bool)(*conn)->node);
-*/
 }
 
 void Neighbourhood::refreshLimits() {
@@ -338,14 +325,8 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 
   if (!realPtr) {
     if (nConn) {
-      nConn->id = id;
-      if (!nConn->specialOut && nConn->in != ep) {
-        nConn->specialOut = true;
-        nConn->out = nConn->in;
-        nConn->in = ep;
-        nConn->key = pk;
-        nConn->lastSeq = lastSeq;
-      }
+      transport_->sendRegistrationRequest(*nConn);
+      nConn->lastSeq = lastSeq;
     }
     else {
       Connection conn;
@@ -356,14 +337,12 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
     }
   }
   else if (realPtr->get() != nConn) {
-    if (!(*realPtr)->specialOut && (*realPtr)->in != ep) {
-      (*realPtr)->specialOut = true;
-      (*realPtr)->out = (*realPtr)->in;
-    }
-    (*realPtr)->in = ep;
-    (*realPtr)->key = pk;
+    if (nConn)
+      transport_->sendRegistrationRequest(*nConn);
+
     (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
+    transport_->sendRegistrationRequest(***realPtr);
   }
   else {
     (*realPtr)->lastSeq = lastSeq;

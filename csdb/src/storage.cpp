@@ -2,7 +2,7 @@
 
 #include <sstream>
 #include <cstdarg>
-#include <queue>
+#include <deque>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -17,6 +17,8 @@
 #include "csdb/database_berkeleydb.h"
 #include "csdb/internal/utils.h"
 #include "binary_streams.h"
+
+#include <lib/system/logger.hpp>
 
 namespace {
 struct last_error_struct {
@@ -114,7 +116,7 @@ public:
   ~priv()
   {
     if (write_thread.joinable()) {
-      quit = true;
+      quit.store(true);
       write_cond_var.notify_one();
       write_thread.join();
     }
@@ -132,9 +134,11 @@ private:
   void set_last_error(Storage::Error error, const char* message, ...);
 
   std::thread write_thread;
-  bool quit = false;
+  std::atomic<bool> quit = { false };
 
-  std::queue<Pool> write_queue;
+  std::mutex data_lock;
+
+  std::deque<Pool> write_queue;
   std::mutex write_lock;
   std::condition_variable write_cond_var;
 
@@ -185,8 +189,10 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
   std::vector<std::pair<PoolHash, PoolHash>> als;
 
   Storage::OpenProgress progress{0};
+  uint32_t i = 0;
   for(it->seek_to_first(); it->is_valid(); it->next())
   {
+    if (++i % 1000 == 0) PrettyLogging::drawTick();
 //    const ::csdb::internal::byte_array k = it->key();
     const ::csdb::internal::byte_array v = it->value();
 /*
@@ -247,23 +253,28 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
 }
 
 void Storage::priv::write_routine() {
-  std::unique_lock<std::mutex> lock(write_lock);
-  while (!quit) {
-    write_cond_var.wait(lock);
-    while (!write_queue.empty()) {
-      Pool &pool = write_queue.front();
-      if (!pool.is_read_only()) {
-        pool.compose();
-      }
-      const PoolHash hash = pool.hash();
+  Pool pool;
 
-      db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
-      ++count_pool;
-      if (last_hash == pool.previous_hash()) {
-        last_hash = hash;
+  while (!quit.load()) {
+    for (;;) {
+      std::unique_lock<std::mutex> lock(write_lock);
+      write_cond_var.wait(lock);
+
+      if (quit.load()) return;
+
+      if (!write_queue.empty()) {
+        pool = write_queue.front();
+        write_queue.pop_front();
+        break;
       }
-      write_queue.pop();
     }
+
+    if (!pool.is_read_only()) {
+      pool.compose();
+    }
+
+    const PoolHash hash = pool.hash();
+    db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
   }
 }
 
@@ -379,21 +390,25 @@ bool Storage::isOpen() const
 
 void Storage::set_last_hash(const csdb::PoolHash& h) noexcept
 {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   d->last_hash = h;
 }
 
 void Storage::set_size(const size_t size) noexcept
 {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   d->count_pool = size;
 }
 
 PoolHash Storage::last_hash() const noexcept
 {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   return d->last_hash;
 }
 
 size_t Storage::size() const noexcept
 {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   return d->count_pool;
 }
 
@@ -417,15 +432,26 @@ bool Storage::pool_save(Pool pool)
     return false;
   }
 
-  std::unique_lock<std::mutex> lock(d->write_lock);
-  d->write_queue.push(pool);
+  {
+    std::unique_lock<std::mutex> lock(d->write_lock);
+    d->write_queue.push_back(pool);
+  }
+
+  {
+    std::unique_lock<std::mutex> lock(d->data_lock);
+    ++d->count_pool;
+    if (d->last_hash == pool.previous_hash()) {
+      d->last_hash = hash;
+    }
+  }
+
   d->write_cond_var.notify_one();
 
   d->set_last_error();
   return true;
 }
 
-Pool Storage::pool_load(const PoolHash &hash) const
+Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const
 {
   if (!isOpen()) {
     d->set_last_error(NotOpen);
@@ -438,50 +464,55 @@ Pool Storage::pool_load(const PoolHash &hash) const
     return Pool{};
   }
 
+  Pool res;
+  bool needParseData = true;
   ::csdb::internal::byte_array data;
+
   if (!d->db->get(hash.to_binary(), &data)) {
-    d->set_last_error(DatabaseError);
-    return Pool{};
+    {
+      std::unique_lock<std::mutex> lock(d->write_lock);
+      for (auto& poolToWrite : d->write_queue) {
+        if (poolToWrite.hash() == hash) {
+          res = poolToWrite;
+          needParseData = false;
+          trxCnt = res.transactions().size();
+          break;
+        }
+      }
+    }
+
+    if (needParseData && !d->db->get(hash.to_binary(), &data)) {
+      d->set_last_error(DatabaseError);
+      return Pool{};
+    }
   }
 
-  Pool res = Pool::from_binary(data);
+  if (needParseData) {
+    if (metaOnly)
+      res = Pool::meta_from_binary(data, trxCnt);
+    else
+      res = Pool::from_binary(data);
+  }
+
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
+    return Pool{};
   }
   else {
     d->set_last_error();
   }
+
   return res;
+}
+
+Pool Storage::pool_load(const PoolHash &hash) const {
+  size_t _;
+  return pool_load_internal(hash, false, _);
 }
 
 Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
 {
-  if (!isOpen()) {
-    d->set_last_error(NotOpen);
-    return Pool{};
-  }
-
-  if (hash.is_empty())
-  {
-    d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
-    return Pool{};
-  }
-
-  ::csdb::internal::byte_array data;
-  if (!d->db->get(hash.to_binary(), &data)) {
-    d->set_last_error(DatabaseError);
-    return Pool{};
-  }
-
-  Pool res = Pool::meta_from_binary(data, cnt);
-  if (!res.is_valid()) {
-    d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
-  }
-  else {
-    d->set_last_error();
-  }
-
-  return res;
+  return pool_load_internal(hash, true, cnt);
 }
 
 Wallet Storage::wallet(const Address &addr) const

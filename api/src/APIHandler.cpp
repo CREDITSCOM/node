@@ -98,9 +98,12 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
                                   TRACE("");
   auto lapooh = s_blockchain.getLastHash();
   trace = false;
+
+  std::cout << "Updating the caches, please be patient..." << std::endl;
   while (update_smart_caches_once(lapooh, true)) {
     //      TRACE("");
   }
+
   trace = true;
   //   TRACE("");
   state_updater_running.test_and_set(std::memory_order_acquire);
@@ -852,9 +855,16 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     locked_ref(this->pending_smart_transactions);
   //  TRACE("");
 
+  static bool firstRun = true;
+  static uint64_t ticks;
+  static uint64_t qTick = 0;
+  if (firstRun)
+    ticks = s_blockchain.getSize() * 2;
+
   std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
   while (curph != pending_smart_transactions->last_pull_hash) {
+    if (init) PrettyLogging::drawTickProgress(++qTick, ticks);
     // LOG_ERROR("pm.hash(): " << curph.to_string());
     new_blocks.push_back(curph);
     size_t _;
@@ -880,6 +890,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
   pending_smart_transactions->last_pull_hash = start;
 
   while (!new_blocks.empty()) {
+    if (init) PrettyLogging::drawTickProgress(++qTick, ticks);
     auto trace = false;
 
     //   TRACE("");
@@ -903,7 +914,20 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
       }
     }
   }
+
+  if (firstRun) {
+    PrettyLogging::finish();
+    std::cout << "Updating smart contracts states..." << std::endl;
+    ticks = pending_smart_transactions->queue.size();
+    qTick = 0;
+    firstRun = false;
+  }
+
   if (!pending_smart_transactions->queue.empty()) {
+    if (init) {
+      PrettyLogging::drawTickProgress(++qTick, ticks);
+      if (qTick == ticks) PrettyLogging::finish();
+    }
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
     //  TRACE(std::endl << convertTransaction(tr));
@@ -1152,11 +1176,30 @@ api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete)
 
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, const Address &address, const int64_t id) {
   csdb::Transaction trx;
+  bool found = false;
+
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
-  if (!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
+  csdb::Pool curr;
+
+  auto lastHash = s_blockchain.getLastHash();
+  while (!found && !lastHash.is_empty()) {
+    curr = s_blockchain.loadBlock(lastHash);
+    for (auto& tr : curr.transactions()) {
+      if (tr.source() == addr && tr.innerID() == id) {
+        trx = tr;
+        found = true;
+        break;
+      }
+    }
+
+    lastHash = curr.previous_hash();
+  }
+
+  if (!found) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
+
   _return.method = convertTransaction(trx).trxn.smartContract.method;
   _return.params = convertTransaction(trx).trxn.smartContract.params;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);

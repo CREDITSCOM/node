@@ -62,7 +62,7 @@ public:
   static csdb::Address getAddressFromKey(const std::string&);
 
   void setLastWrittenSequence(uint32_t seq);
-  uint32_t getLastWrittenSequence();
+  uint32_t getLastWrittenSequence() const;
 
   uint32_t getRequestedBlockNumber() const;
 
@@ -74,8 +74,6 @@ public:
   csdb::PoolHash getHashBySequence(uint32_t seq) const;
   const csdb::PoolHash & getLastWrittenHash() const;
 
-  const csdb::Storage & getStorage() const;
-
   void iterateOverWallets(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WalletData&)>);
 #ifdef MONITOR_NODE
   void iterateOverWriters(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WriterData&)>);
@@ -84,10 +82,8 @@ public:
 private:
   Headtag ht;
 
-  void updateLastHash();
   bool loadCache();
   bool updateCache(csdb::Pool& pool);
-  csdb::Amount calcBalance(const csdb::Address &) const;
   bool writeBlock(csdb::Pool& pool);
   void onBlockReceived(csdb::Pool& pool);
   void writeGenesisBlock();

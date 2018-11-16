@@ -111,4 +111,11 @@ static inline std::string byteStreamToHex(const char* stream, const size_t lengt
   return result;
 }
 
+namespace PrettyLogging {
+  void redrawTickSymbol();
+  void drawTick();
+  void drawTickProgress(const uint32_t, const uint32_t, const uint32_t tickEvery = 1000);
+  void finish();
+}
+
 #endif // __LOGGER_HPP__
