@@ -6,6 +6,8 @@
 #include <csnode/blockchain.hpp>
 
 #include <API.h>
+#include <general_types.h>
+#include <executor_types.h>
 
 #include <csstats.h>
 #include <deque>
@@ -26,10 +28,10 @@ class APIHandlerBase
         MAX
     };
 
-    static void SetResponseStatus(api::APIResponse& response,
+    static void SetResponseStatus(general::APIResponse& response,
                                   APIRequestStatusType status,
                                   const std::string& details = "");
-    static void SetResponseStatus(api::APIResponse& response,
+    static void SetResponseStatus(general::APIResponse& response,
                                   bool commandWasHandled);
 };
 
@@ -169,8 +171,8 @@ private:
 	std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
 private:
 	void state_updater_work_function();
-    void execute_byte_code(executor::APIResponse& resp, const std::string& address, const std::string& code,
-        const std::string& state, const std::string& method, const std::vector<::variant::Variant>& params);
+    void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& code,
+        const std::string& state, const std::string& method, const std::vector<::general::Variant>& params);
 
     
     std::vector<api::SealedTransaction>
