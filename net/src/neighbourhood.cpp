@@ -103,9 +103,11 @@ void Neighbourhood::checkPending(const uint32_t) {
 void Neighbourhood::refreshLimits() {
   SpinLock l(nLockFlag_);
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-    if (++((*conn)->syncSeqRetries) >= MaxSyncAttempts) {
-      (*conn)->syncSeqRetries = 0;
-      (*conn)->syncSeq = 0;
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
+        (*conn)->syncSeqs[i] = 0;
+        (*conn)->syncSeqsRetries[i] = 0;
+      }
     }
     (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
   }
@@ -544,22 +546,33 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   ConnectionPtr candidate;
   for (auto& nb : neighbours_) {
     if (nb->isSignal || nb->lastSeq < seq) continue;
-    if (nb->syncSeq == seq) {
-      if (nb->syncSeqRetries < MaxSyncAttempts) {
-        alreadyRequested = true;
-        return nb;
-      }
 
-      nb->syncSeq = 0;
-      nb->syncSeqRetries = 0;
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (nb->syncSeqs[i] == seq) {
+        if (nb->syncSeqsRetries[i] < MaxSyncAttempts) {
+          alreadyRequested = true;
+          return nb;
+        }
+
+        nb->syncSeqs[i] = 0;
+        nb->syncSeqsRetries[i] = 0;
+        break;
+      }
+      else if (!nb->syncSeqs[i]) {
+        candidate = nb;
+        break;
+      }
     }
-    else if (!nb->syncSeq)
-      candidate = nb;
   }
 
   if (candidate) {
-    candidate->syncSeq = seq;
-    candidate->syncSeqRetries = rand() % (MaxSyncAttempts / 2);
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (!candidate->syncSeqs[i]) {
+        candidate->syncSeqs[i] = seq;
+        candidate->syncSeqsRetries[i] = rand() % (MaxSyncAttempts / 2);
+        break;
+      }
+    }
   }
 
   return candidate;
@@ -589,9 +602,12 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
   SpinLock n(nLockFlag_);
 
   for (auto& nb : neighbours_) {
-    if (nb->syncSeq == seq) {
-      nb->syncSeq = 0;
-      nb->syncSeqRetries = 0;
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (nb->syncSeqs[i] == seq) {
+        nb->syncSeqs[i] = 0;
+        nb->syncSeqsRetries[i] = 0;
+        break;
+      }
     }
   }
 }

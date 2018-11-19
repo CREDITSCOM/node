@@ -19,6 +19,8 @@ const uint32_t MaxMessagesToKeep = 128;
 const uint32_t MaxResendTimes = 32;
 const uint32_t MaxSyncAttempts = 8;
 
+const uint32_t BlocksToSync = 16;
+
 struct Connection;
 struct RemoteNode {
   std::atomic<uint64_t> packets = { 0 };
@@ -54,7 +56,10 @@ struct Connection {
                                 node(std::move(rhs.node)),
                                 isSignal(rhs.isSignal),
                                 connected(rhs.connected),
-                                msgRels(std::move(rhs.msgRels)) { }
+                                msgRels(std::move(rhs.msgRels)) {
+    memset(syncSeqs, 0, sizeof(uint32_t) * BlocksToSync);
+    memset(syncSeqsRetries, 0, sizeof(uint32_t) * BlocksToSync);
+  }
 
   Connection(const Connection&) = delete;
   ~Connection() { }
@@ -86,8 +91,8 @@ struct Connection {
   };
   FixedHashMap<Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  uint32_t syncSeq = 0;
-  uint32_t syncSeqRetries = 0;
+  uint32_t syncSeqs[BlocksToSync];
+  uint32_t syncSeqsRetries[BlocksToSync];
 
   uint32_t lastSeq = 0;
 
