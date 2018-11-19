@@ -9,9 +9,7 @@
 #include <lib/system/utils.hpp>
 
 #include <blake2.h>
-#if LOG_LEVEL & FLAG_LOG_DEBUG
 #include <sstream>
-#endif
 
 namespace slv2
 {
@@ -94,8 +92,20 @@ namespace slv2
 
     Result TrustedStage1State::onHash(SolverContext & context, const csdb::PoolHash & pool_hash, const cs::PublicKey & sender)
     {
-        cslog() << name() << ": <-- hash " << pool_hash.to_string()
-            << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        // get node status for useful logging
+        std::string sender_status("N");
+        unsigned idx = 0;
+        for(const auto& key : context.trusted()) {
+            if(std::equal(key.cbegin(), key.cend(), sender.cbegin())) {
+                std::ostringstream os;
+                os << "T[" << idx << "]";
+                sender_status = os.str();
+                break;
+            }
+            ++idx;
+        }
+
+        cslog() << name() << ": <-- hash from " << sender_status << " (" << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
         const auto& lwh = context.blockchain().getLastWrittenHash();
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
             if(pool_hash == lwh) {

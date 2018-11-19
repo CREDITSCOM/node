@@ -984,7 +984,7 @@ void Node::sendHash(const csdb::PoolHash& hash, const cs::PublicKey& target) {
     return;
   }
 
-  cslog() << "NODE> Sending hash of " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  cslog() << "NODE> Sending hash " << roundNum_ << " to " << cs::Utils::byteStreamToHex(target.data(), target.size());
   cslog() << "NODE> Hash is " << hash.to_string();
 
   ostream_.init(BaseFlags::Fragmented, target);
@@ -2375,7 +2375,7 @@ void Node::sendHash_V3(cs::RoundNumber round) {
   //cs::Hash testHash;
   //std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
  
-  cswarning() <<"Sending hash of " << tmp.to_string() << " to ALL";
+  cswarning() <<"Sending hash " << tmp.to_string() << " to ALL";
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::BlockHashV3
     << round

@@ -122,14 +122,18 @@ namespace slv2
             }
 
             trusted_election(context);
+
+            cswarning() << "============================ CONSENSUS SUMMARY =================================";
             if(pool_solution_analysis(context)) {
                 stage.writer = take_urgent_decision(context);
-                LOG_NOTICE(name() << ": consensus -> [" << (int)stage.writer << "]");
+                cswarning() << "\t==> [" << (int)stage.writer << "]";
             }
             else {
-                LOG_WARN(name() << ": consensus is not achieved");
+                cswarning() << "\tconsensus is not achieved";
                 /*the action is needed*/
             }
+            cswarning() << "================================================================================";
+
             // all trusted nodes must send stage3 data
             LOG_NOTICE(name() << ": --> stage-3 [" << (int) stage.sender << "]");
             context.add_stage3(stage);//, stage.writer != stage.sender);
@@ -189,7 +193,6 @@ namespace slv2
                 std::copy(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.begin());
             }
         }
-        cslog() << "============================ CONSENSUS SUMMARY =================================";
         uint8_t liarNumber = 0;
         /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32);*/
         for(const auto& it : context.stage1_data()) {
@@ -205,12 +208,11 @@ namespace slv2
         }
 
         if(liarNumber > 0) {
-            cslog() << "\tLiars detected: " << (int) liarNumber;
+            cswarning() << "\tLiars detected: " << (int) liarNumber;
         }
         else {
-            cslog() << "\tNo liars detected";
+            cswarning() << "\tNo liars detected";
         }
-        cslog() << "================================================================================";
         if(liarNumber > context.cnt_trusted() / 2) {
             return false;
         }
@@ -282,13 +284,13 @@ namespace slv2
             LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
                 << " - " << (int) candidatesElection.at(tmp));
         }
-        LOG_NOTICE(name() << ": final list of next round trusted:");
+        cslog() << name() << ": final list of next round trusted:";
 
         if(aboveThreshold.size() >= max_conf) { // Consensus::MinTrustedNodes) {
             for(unsigned int i = 0; i < max_conf; ++i) {
                 const auto& tmp = aboveThreshold.at(i);
                 next_round_trust.push_back(tmp);
-                LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+                cslog() << "\t" << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
             }
         }
         else {
