@@ -2215,6 +2215,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
+  roundTable.general = sender;
 
   const cs::ConfidantsKeys confidants_ = roundTable.confidants;
   cslog() << "Node> confidants: " << confidants_.size();
