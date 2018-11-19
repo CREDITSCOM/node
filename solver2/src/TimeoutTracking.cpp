@@ -9,8 +9,11 @@ namespace slv2
         call_tag = pscheduler->InsertOnce(
             wait_for_ms,
             [this, proc]() {
-                call_tag = CallsQueueScheduler::no_tag;
-                proc();
+                // extra test whether to execute proc():
+                if(call_tag != CallsQueueScheduler::no_tag) {
+                    call_tag = CallsQueueScheduler::no_tag;
+                    proc();
+                }
             },
             replace_existing);
     }

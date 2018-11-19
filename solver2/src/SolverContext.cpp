@@ -199,11 +199,12 @@ namespace slv2
         return false;
     }
 
-    void SolverContext::request_round_info(uint8_t respondent)
+    void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
     {
-      LOG_NOTICE("SolverCore: ask [" << (int)respondent << "] for RoundInfo");
-      core.pnode->sendRoundInfoRequest(respondent);
-      core.pnode->sendRoundInfoRequest(int(respondent + 2)%((int)this->trusted().size()));
+        cslog() << "SolverCore: ask [" << (int) respondent1 << "] for RoundInfo";
+        core.pnode->sendRoundInfoRequest(respondent1);
+        cslog() << "SolverCore: ask [" << (int) respondent2 << "] for RoundInfo";
+        core.pnode->sendRoundInfoRequest(respondent2);
     }
 
 } // slv2

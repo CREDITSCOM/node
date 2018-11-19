@@ -1428,8 +1428,16 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if (type == MsgTypes::RoundTableSS) {
-    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if(type == MsgTypes::RoundTableRequest) {
+      return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  }
+
+  if (type == MsgTypes::RoundInfoRequest) {
+    return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  }
+
+  if(type == MsgTypes::RoundInfoReply) {
+      return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
@@ -1568,30 +1576,37 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 //       V                                            V                                                 V
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-  LOG_DEBUG(__func__);
+  csdebug() << __func__ << ": start";
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() <<"Only confidant nodes can send consensus stages";
     return;
   }
-  LOG_DEBUG( "Round = " << roundNum_
-    << " Sender: " << (int)stageOneInfo.sender << std::endl
-    << " Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size())
-    << " Cand Amount: " << (int)stageOneInfo.candidatesAmount);
+  csdebug() << __func__ << ": round = " << roundNum_
+    << " sender: " << (int)stageOneInfo.sender
+    << " , hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size())
+    << " , cand. amount: " << (int)stageOneInfo.candidatesAmount;
     
-
-  
-  size_t msgSize = 34 + 32 * stageOneInfo.candidatesAmount;//hash size + 2*sizeof(uint8_t) + sizeof(PublicKey) * ...
+  size_t msgSize = stageOneInfo.hash.size()
+      + sizeof(stageOneInfo.sender) + sizeof(stageOneInfo.candidatesAmount)
+      + stageOneInfo.candiates[0].size() * (size_t)stageOneInfo.candidatesAmount;//hash size + 2*sizeof(uint8_t) + sizeof(PublicKey) * n
   auto memPtr = allocator_.allocateNext(msgSize);
   uint8_t* rawData = (uint8_t*)memPtr.get();
 
-  *rawData = stageOneInfo.sender;
-  memcpy(rawData + 1, stageOneInfo.hash.data(), stageOneInfo.hash.size());
-  *(rawData + 33) = stageOneInfo.candidatesAmount;
-  for (int i = 0; i < stageOneInfo.candidatesAmount; i++) {
-    memcpy(rawData + 34 + 32 * i, stageOneInfo.candiates[i].data(), stageOneInfo.candiates[i].size());
+  uint8_t* ptr = rawData;
+  *ptr = stageOneInfo.sender;
+  ptr += sizeof(stageOneInfo.sender);
+  memcpy(ptr, stageOneInfo.hash.data(), stageOneInfo.hash.size());
+  ptr += stageOneInfo.hash.size();
+  *ptr = stageOneInfo.candidatesAmount;
+  ptr += sizeof(stageOneInfo.candidatesAmount);
+  for (size_t i = 0; i < (size_t) stageOneInfo.candidatesAmount; ++i) {
+    memcpy(ptr, stageOneInfo.candiates[i].data(), stageOneInfo.candiates[i].size());
+    ptr += stageOneInfo.candiates[i].size();
   }
+  assert(ptr - rawData == msgSize);
+
   //cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize);
-  
+      
   unsigned long long sig_size;
   crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
   //cslog() << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64);
@@ -1602,7 +1617,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     << stageOneInfo.sig;
   ostream_ << std::string(cs::numeric_cast<const char*>((void*)rawData), msgSize);
   allocator_.shrinkLast(msgSize);
-  csdebug() << "done" ;
+  csdebug() << __func__ << ": done" ;
   flushCurrentTasks();
 }
 
@@ -2205,7 +2220,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
   for (std::size_t i = 0; i < confidantsCount; ++i) {
     cs::PublicKey key;
-    istream_>> key;
+    istream_ >> key;
 
     confidants.push_back(std::move(key));
   }
@@ -2373,7 +2388,7 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
     return;
   }
 
-  cslog() << "Get hash of round " << rNum << ", data size " << size;
+  cslog() << "NODE> get hash of round " << rNum << ", data size " << size;
 
   istream_.init(data, size);
 
@@ -2445,10 +2460,13 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
       }
     }
     if (!found) {
-      sendRoundInfoReply(requester, 1,requesterNumber);
+        sendRoundInfoReply(requester, 1, requesterNumber);
       return;
     }
+    else {
+        //TODO: send round info to normal node
     }
+  }
 
   /*if (isConf(requester)) {
     sendRoundInfoReply(requesterNumber, 1);
@@ -2495,7 +2513,7 @@ void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::R
   istream_ >> reply;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() <<"Bad StageThree packet format";
+    cserror() <<"Bad RoundInfo Reply packet format";
     return;
   }
   //if (respondent != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;

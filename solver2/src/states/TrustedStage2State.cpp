@@ -22,10 +22,13 @@ namespace slv2
             stage.signatures[ptr->sender] = ptr->sig;
         }
         // if have already received stage-1, make possible to go further (to stage-3)
-        for(const auto& st : context.stage1_data()) {
-            if(Result::Finish == onStage1(context, st)) {
-                context.complete_stage2();
-                return;
+        if(!context.stage1_data().empty()) {
+            cslog() << name() << ": handle early received stages-1";
+            for(const auto& st : context.stage1_data()) {
+                if(Result::Finish == onStage1(context, st)) {
+                    context.complete_stage2();
+                    return;
+                }
             }
         }
 

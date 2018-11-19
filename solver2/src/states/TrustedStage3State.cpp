@@ -20,10 +20,13 @@ namespace slv2
           }
         }
         // process already received stage-2, possible to go further to stage-3
-        for(const auto& st : context.stage2_data()) {
-            if(Result::Finish == onStage2(context, st)) {
-                context.complete_stage3();
-                return;
+        if(!context.stage2_data().empty()) {
+            cslog() << name() << ": handle early received stages-2";
+            for(const auto& st : context.stage2_data()) {
+                if(Result::Finish == onStage2(context, st)) {
+                    context.complete_stage3();
+                    return;
+                }
             }
         }
 
@@ -104,7 +107,6 @@ namespace slv2
 
     Result TrustedStage3State::onStage2(SolverContext & context, const cs::StageTwo & st)
     {
-        LOG_DEBUG(__func__);
         const auto ptr = context.stage2((uint8_t)context.own_conf_number());
         if(ptr != nullptr && context.enough_stage2()) {
             LOG_NOTICE(name() << ": enough stage-2 received");
@@ -139,7 +141,7 @@ namespace slv2
             //}
             return Result::Finish;
         }
-        LOG_DEBUG(name() << ": ignore prepare block");
+        LOG_DEBUG(name() << ": continue to receive stages-2");
         return Result::Ignore;
     }
 
@@ -193,12 +195,11 @@ namespace slv2
         for(const auto& it : context.stage1_data()) {
 
             if(std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
-                cslog() << "[" << (int) it.sender << "] is not liar "
-                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
+                cslog() << "[" << (int) it.sender << "] is not liar";
             }
             else {
                 ++liarNumber;
-                cslog() << "[" << (int) it.sender << "] IS LIAR "
+                cslog() << "[" << (int) it.sender << "] IS LIAR with hash "
                     << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
         }
