@@ -137,6 +137,7 @@ private:
   std::atomic<bool> quit = { false };
 
   std::mutex data_lock;
+  std::mutex bc_lock;
 
   std::deque<Pool> write_queue;
   std::mutex write_lock;
@@ -274,6 +275,7 @@ void Storage::priv::write_routine() {
     }
 
     const PoolHash hash = pool.hash();
+    std::unique_lock<std::mutex> lock(bc_lock);
     db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
   }
 }
@@ -453,6 +455,7 @@ bool Storage::pool_save(Pool pool)
 
 Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const
 {
+  std::unique_lock<std::mutex> lock(d->bc_lock);
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
@@ -470,7 +473,7 @@ Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size
 
   if (!d->db->get(hash.to_binary(), &data)) {
     {
-      std::unique_lock<std::mutex> lock(d->write_lock);
+      //std::unique_lock<std::mutex> lock(d->write_lock);
       for (auto& poolToWrite : d->write_queue) {
         if (poolToWrite.hash() == hash) {
           res = poolToWrite;

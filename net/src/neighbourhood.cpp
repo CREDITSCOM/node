@@ -325,10 +325,12 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 
   if (!realPtr) {
     if (nConn) {
+      LOG_WARN("[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut());
       transport_->sendRegistrationRequest(*nConn);
       nConn->lastSeq = lastSeq;
     }
     else {
+      LOG_WARN("[NET] got ping from " << ep << " but no connection bound, sending refusal");
       Connection conn;
       conn.id = id;
       conn.in = ep;
@@ -337,8 +339,12 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
     }
   }
   else if (realPtr->get() != nConn) {
-    if (nConn)
+    if (nConn) {
+      LOG_WARN("[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " but the remote node is bound to " << nConn->getOut());
       transport_->sendRegistrationRequest(*nConn);
+    }
+    else
+      LOG_WARN("[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " and there is no bindings, sending reg");
 
     (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
