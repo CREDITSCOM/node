@@ -234,7 +234,7 @@ void Node::processMetaMap() {
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
       csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock(meta.pool, sequence, meta.sender);
+      writeBlock_V3(meta.pool, sequence, meta.sender);
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
@@ -1173,11 +1173,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
     csdb::Pool pool;
     istream_ >> pool;
 
-    const auto sequence = pool.sequence();
-
-    cslog() << "NODE> Get block reply> Getting block: " << sequence;
-
-    transport_->syncReplied(cs::numeric_cast<uint32_t>(sequence));
+    transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
     poolsBlock.push_back(std::move(pool));
   }
 
@@ -1241,6 +1237,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
 #ifdef SYNCRO
   blockchainSync();
+  poolSynchronizer_->checkActivity();
 #endif
 
   if (!sendingTimer_.isRunning()) {
@@ -1351,14 +1348,14 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 }
 
 void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
 
-  if (!target) {
-    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
+  if (target) {
+    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   }
   else {
-    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
+    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   }
 
   ostream_.clear();

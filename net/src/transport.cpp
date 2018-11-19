@@ -666,6 +666,10 @@ uint32_t Transport::getNeighboursCount() {
   return nh_.size();
 }
 
+uint32_t Transport::getMaxNeighbours() const {
+  return config_.getMaxNeighbours();
+}
+
 ConnectionPtr Transport::getSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
   return nh_.getNextSyncRequestee(seq, alreadyRequested);
 }

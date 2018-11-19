@@ -252,10 +252,6 @@ private:
   const cs::PublicKey nodeIdKey_;
   bool good_ = true;
 
-  // syncro variables
-  bool isAwaitingSyncroBlock_ = false;
-  uint32_t awaitingRecBlockCount_ = 0;
-
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
