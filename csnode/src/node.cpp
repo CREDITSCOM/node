@@ -1237,7 +1237,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
 #ifdef SYNCRO
   blockchainSync();
-  poolSynchronizer_->checkActivity();
 #endif
 
   if (!sendingTimer_.isRunning()) {
@@ -1351,12 +1350,7 @@ void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsReques
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
 
-  if (target) {
-    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
-  }
-  else {
-    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
-  }
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
   ostream_.clear();
 }

@@ -24,6 +24,9 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
             sendBlockRequest();
         }
     }
+    else {
+        checkActivity();
+    }
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
@@ -120,7 +123,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         isRequest = true;
 
         if (alreadyRequested) {  // Already requested this block from this guy?
-            csdebug() << "POOL SYNCHRONIZER> taget is already requested " << target->getOut();
+            csdebug() << "POOL SYNCHRONIZER> target is already requested " << target->getOut();
             m_transport->syncReplied(sequence);
             ++neighbours;
             isRepeat = true;
@@ -135,29 +138,6 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         m_isSyncroStarted = false;
         csdebug() << "POOL SYNCHRONIZER> !!! syncro started is false";
     }
-}
-
-
-bool cs::PoolSynchronizer::checkActivity() {
-    if (!m_isSyncroStarted) {
-        return false;
-    }
-    csdebug() << "POOL SYNCHRONIZER> checkActivity";
-
-    bool isNeedRequest = false;
-
-    for (auto& [sequence, timeWaiting] : m_requestedSequences) {
-        --timeWaiting;
-        if (--timeWaiting <= 0 && !isNeedRequest) {
-            isNeedRequest = true;
-        }
-    }
-
-    if (isNeedRequest) {
-        sendBlockRequest();
-    }
-
-    return isNeedRequest;
 }
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
@@ -186,18 +166,35 @@ void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
 // Service
 //
 
-void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
-    if (target) {
-        csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
+bool cs::PoolSynchronizer::checkActivity() {
+    csdebug() << "POOL SYNCHRONIZER> Check activity";
+
+    bool isNeedRequest = false;
+
+    for (auto& [sequence, timeWaiting] : m_requestedSequences) {
+        --timeWaiting;
+        if (!isNeedRequest && timeWaiting <= 0) {
+            isNeedRequest = true;
+        }
     }
 
+    if (isNeedRequest) {
+        sendBlockRequest();
+    }
+
+    return isNeedRequest;
+}
+
+void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
+    csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
     cslog() << "POOL SYNCHRONIZER> Sending block request, sequences from: " << sequences.front() << "   to: " << sequences.back();
 
     for (const auto& sequence : sequences) {
-        if (!m_requestedSequences.count(sequence)) { /// Optimize on iterator
+        if (!m_requestedSequences.count(sequence)) {
             m_requestedSequences.emplace(std::make_pair(sequence, m_maxWaitingTimeReply));
         }
     }
+
     csdebug() << "POOL SYNCHRONIZER> Storage requested sequences from: " << m_requestedSequences.begin()->first << "   to: " << m_requestedSequences.rbegin()->first;
 
     emit sendRequest(target, sequences);
@@ -246,32 +243,32 @@ csdb::Pool::sequence_t cs::PoolSynchronizer::processingTemporaryStorage() {
 bool cs::PoolSynchronizer::getPoolRequestedSequences() {
     uint32_t lastSequence = 0;
     bool isFromStorage = false;
-    auto firstSequenceIt = m_requestedSequences.begin();
+    auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
+        return pair.second == 0;
+    });
 
     m_receivedSequences.clear();
 
-    csdebug() << "POOL SYNCHRONIZER> Requested sequences begin: " << m_requestedSequences.begin()->first << ", end: " << m_requestedSequences.rbegin()->first;
-    csdebug() << "POOL SYNCHRONIZER> Temporary Storage begin: " << m_temporaryStorage.begin()->first << ", end: " << m_temporaryStorage.rbegin()->first;
+    if (!m_requestedSequences.empty()) {
+        csdebug() << "POOL SYNCHRONIZER> Requested sequences begin: " << m_requestedSequences.begin()->first << ", end: " << m_requestedSequences.rbegin()->first;
+    }
+    if (!m_temporaryStorage.empty()) {
+        csdebug() << "POOL SYNCHRONIZER> Temporary Storage begin: " << m_temporaryStorage.begin()->first << ", end: " << m_temporaryStorage.rbegin()->first;
+    }
 
     // if storage requested sequences is impty
     if (m_requestedSequences.empty()) {
         lastSequence = m_blockChain->getLastWrittenSequence();
     }
-    else if (firstSequenceIt->second > 0) {
-        const uint32_t lastSeqFromRequested = cs::numeric_cast<uint32_t>(m_requestedSequences.rbegin()->first);
-        const uint32_t lastSeqFromStorage = m_temporaryStorage.empty() ? 0 : cs::numeric_cast<uint32_t>(m_temporaryStorage.rbegin()->first);
-
-        lastSequence = std::max(lastSeqFromRequested, lastSeqFromStorage);
-    }
-    else { // if maxWaitingTimeReply <= 0 for first element
+    else if (firstSequenceIt != m_requestedSequences.end()) {
+        // if maxWaitingTimeReply <= 0
         lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
         isFromStorage = true;
     }
-
-    if (lastSequence == m_roundToSync) {
-        const uint32_t lastSeqFromBlockChain = m_blockChain->getLastWrittenSequence();
-        const uint32_t lastSeqFromStorage = m_temporaryStorage.empty() ? m_roundToSync : cs::numeric_cast<uint32_t>(m_temporaryStorage.begin()->first);
-        lastSequence = std::max(lastSeqFromBlockChain, lastSeqFromStorage);
+    else {
+        const uint32_t lastSeqFromRequested = cs::numeric_cast<uint32_t>(m_requestedSequences.rbegin()->first);
+        const uint32_t lastSeqFromStorage = m_temporaryStorage.empty() ? 0 : cs::numeric_cast<uint32_t>(m_temporaryStorage.rbegin()->first);
+        lastSequence = std::max(lastSeqFromRequested, lastSeqFromStorage);
     }
 
     for (std::size_t i = 0; i < m_maxBlockCount; ++i) {
@@ -289,6 +286,9 @@ bool cs::PoolSynchronizer::getPoolRequestedSequences() {
         if (isFromStorage) {
             firstSequenceIt->second = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
             ++firstSequenceIt; // next sequence
+            if (firstSequenceIt == m_requestedSequences.end()) {
+                break;
+            }
             lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
         }
     }
