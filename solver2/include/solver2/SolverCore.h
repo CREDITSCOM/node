@@ -94,7 +94,7 @@ namespace slv2
         void beforeNextRound();
         void nextRound();
         void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);
-        void gotRoundInfoReply(const uint8_t reply, const cs::PublicKey& respondent);
+        void gotRoundInfoReply(bool next_round_started, const cs::PublicKey& respondent);
 
         // Solver3 "public" extension
         void gotStageOne(const cs::StageOne& stage);

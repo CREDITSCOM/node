@@ -11,6 +11,10 @@ namespace slv2
         //TODO:: calculate my queue number starting from writing node:
         const auto ptr = context.stage3((uint8_t)context.own_conf_number());
         writing_queue_num = (int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer)) % (int)context.cnt_trusted();
+        std::ostringstream os;
+        os << prefix << "-" << (size_t) writing_queue_num;
+        my_name = os.str();
+
         cslog() << name() << ": Sender = " << (int)ptr->sender << ", TrustedAmount = " << (int)context.cnt_trusted() << ", Writer = "<< (int)ptr->writer;
         if (writing_queue_num == 0) {
             cslog() << name() << ": becoming WRITER";
@@ -18,15 +22,12 @@ namespace slv2
             return;
         }
 
-        std::ostringstream os;
-        os << prefix << "-" << (size_t) writing_queue_num;
-        my_name = os.str();
 
         //TODO: value = (Consensus::PostConsensusTimeout * "own number in "writing" queue")
-        uint32_t value = 6000* writing_queue_num;
+        uint32_t value = 6000 * writing_queue_num;
 
         if(Consensus::Log) {
-            LOG_EVENT(name() << ": start wait " << value / 60 << " sec until new round");
+            LOG_EVENT(name() << ": start wait " << value / 1000 << " sec until new round");
         }
         SolverContext *pctx = &context;
         timeout_round.start(

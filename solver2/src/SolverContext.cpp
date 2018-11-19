@@ -92,7 +92,7 @@ namespace slv2
 
     void SolverContext::spawn_next_round()
     {
-        LOG_NOTICE("SolverCore: spawn next round 0");
+        LOG_NOTICE("SolverCore: spawn next round");
         if(Consensus::Log) {
             if(core.trusted_candidates.empty()) {
                 LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
