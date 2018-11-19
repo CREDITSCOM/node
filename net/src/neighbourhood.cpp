@@ -591,7 +591,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
       nb->syncSeq = 0;
       nb->syncSeqRetries = 0;
     }
-    else if (!nb->syncSeq)
+    if (!candidate && !nb->syncSeq)
       candidate = nb;
   }
 

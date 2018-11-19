@@ -598,7 +598,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::BlockRequest:
     return node_->getBlockRequest(data, size, firstPack.getSender());
   case MsgTypes::RequestedBlock:
-    return node_->getBlockReply(data, size);
+    return node_->getBlockReply(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
@@ -660,6 +660,10 @@ void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhen
 void Transport::clearTasks() {
   SpinLock l(sendPacksFlag_);
   sendPacks_.clear();
+}
+
+uint32_t Transport::getNeighboursCount() {
+  return nh_.size();
 }
 
 uint32_t Transport::getMaxNeighbours() const {

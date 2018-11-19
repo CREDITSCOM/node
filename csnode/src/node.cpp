@@ -26,6 +26,8 @@
 #include <snappy.h>
 #include <sodium.h>
 
+#include <poolsynchronizer.hpp>
+
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 100;
 
@@ -45,13 +47,17 @@ Node::Node(const Config& config):
 #endif
   allocator_(1 << 24, 5),
   packStreamAllocator_(1 << 26, 5),
-  ostream_(&packStreamAllocator_, nodeIdKey_) {
+  ostream_(&packStreamAllocator_, nodeIdKey_),
+  poolSynchronizer_(new cs::PoolSynchronizer(transport_, &bc_)) {
   good_ = init();
 }
 
 Node::~Node() {
+  sendingTimer_.stop();
+
   delete solver_;
   delete transport_;
+  delete poolSynchronizer_;
 }
 
 bool Node::init() {
@@ -80,6 +86,8 @@ bool Node::init() {
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+  cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::onSendBlockRequest);
+  cs::Connector::connect(&poolSynchronizer_->synchroFinished, this, &Node::processMetaMap);
 
   return true;
 }
@@ -201,35 +209,9 @@ void Node::blockchainSync() {
 #ifdef SYNCRO
   cslog() <<"NODE> last written sequence = " << getBlockChain().getLastWrittenSequence();
 #endif
-  if (!isSyncroStarted_) {
-    if (roundNum_ > getBlockChain().getLastWrittenSequence() + 1) {
-      isSyncroStarted_ = true;
-      roundToSync_ = roundNum_;
-
-      cslog() << "Processing pools sync....";
-      sendBlockRequest();
-    }
-  }
+  poolSynchronizer_->processingSync(roundNum_);
 }
 
-void Node::processSyncPools() {
-  if (!isSyncroStarted_) {
-    return;
-  }
-
-  while (true) {
-    auto iterator = syncPools_.find(bc_.getLastWrittenSequence() + 1);
-
-    if (iterator == syncPools_.end()) {
-      break;
-    }
-
-    Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
-
-    bc_.onBlockReceived(iterator->second);
-    syncPools_.erase(iterator);
-  }
-}
 
 void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence) {
   if (poolMetaMap_.count(sequence) == 0ul) {
@@ -252,7 +234,7 @@ void Node::processMetaMap() {
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
       csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock(meta.pool, sequence, meta.sender);
+      writeBlock_V3(meta.pool, sequence, meta.sender);
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
@@ -723,7 +705,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  if (isSyncroStarted_) {
+  if (isPoolsSyncroStarted()) {
     cs::PoolSyncMeta meta;
     meta.sender = sender;
     meta.signature = signature;
@@ -747,10 +729,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     cswarning() << "NODE> remove wallets from wallets cache";
     getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
-}
-
-void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
-  CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
 void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
@@ -1054,7 +1032,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
   }
 
   const auto msgType = MsgTypes::TransactionsPacketRequest;
-  const auto neighboursCount = transport_->getMaxNeighbours();
+  const auto neighboursCount = 4;//transport_->getNeighboursCount();
   const auto hashesCount = hashes.size();
   const bool isHashesLess = hashesCount < neighboursCount;
   const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
@@ -1094,7 +1072,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
     return;
   }
 
-  cs::Timer::singleShot(cs::PacketHashesRequestDelay, [round, this] {
+  cs::Timer::singleShot(cs::NeighboursRequestDelay, [round, this] {
                           const cs::Conveyer& conveyer = cs::Conveyer::instance();
                           if (!conveyer.isSyncCompleted(round)) {
                             auto neededHashes = conveyer.neededHashes(round);
@@ -1126,130 +1104,88 @@ void Node::resetNeighbours() {
   transport_->resetNeighbours();
 }
 
-void Node::sendBlockRequest() {
-  static uint32_t lfReq, lfTimes;
-
-  csdb::Pool::sequence_t sequence = getBlockChain().getLastWrittenSequence() + 1;
-  uint32_t reqSeq = sequence;
-
-  if (lfReq != sequence) {
-    lfReq = sequence;
-    lfTimes = 0;
-  }
-
-  while (reqSeq) {
-    bool alreadyRequested = false;
-    ConnectionPtr requestee = transport_->getSyncRequestee(reqSeq, alreadyRequested);
-
-    if (!requestee) {
-      break;  // No more free requestees
-    }
-
-    if (!alreadyRequested) {  // Already requested this block from this guy?
-      cslog() << "NODE> Sending request for block " << reqSeq << " from nbr " << requestee->id;
-
-      ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
-      ostream_ << MsgTypes::BlockRequest << roundNum_ << reqSeq;
-
-      transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), requestee);
-
-      if (lfReq == reqSeq && ++lfTimes >= 4) {
-        transport_->sendBroadcast(ostream_.getPackets());
-      }
-
-      ostream_.clear();
-    }
-
-    reqSeq = cs::numeric_cast<uint32_t>(solver_->getNextMissingBlock(reqSeq));
-  }
-
-  isAwaitingSyncroBlock_ = true;
-  awaitingRecBlockCount_ = 0;
-
-  csdebug() << "BLOCK REQUEST> requesting #" << sequence;
-}
-
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  uint32_t requested_seq = 0u;
+  cslog() << "NODE> Get Block Request";
+
+  std::size_t sequencesCount = 0;
 
   istream_.init(data, size);
-  istream_ >> requested_seq;
+  istream_ >> sequencesCount;
 
-  cslog() << "BLOCK REQUEST> requested #" << requested_seq;
+  csdebug() << "NODE> Packet hashes request got sequences count: " << sequencesCount;
+  csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  if (requested_seq > getBlockChain().getLastWrittenSequence()) {
-    cslog() << "BLOCK REQUEST> #" << requested_seq << " is BEYOND my CHAIN";
+  if (sequencesCount == 0) {
     return;
   }
 
-  csdb::Pool pool = bc_.loadBlock(bc_.getHashBySequence(requested_seq));
+  cs::PoolsRequestedSequences sequences;
+  sequences.reserve(sequencesCount);
 
-  if (pool.is_valid()) {
-    auto prev_hash = csdb::PoolHash::from_string("");
-    pool.set_previous_hash(prev_hash);
+  for (std::size_t i = 0; i < sequencesCount; ++i) {
+    cs::RoundNumber sequence;
+    istream_ >> sequence;
 
-    sendBlockReply(pool, sender);
-  }
-}
-
-void Node::getBlockReply(const uint8_t* data, const size_t size) {
-  cslog() << __func__;
-
-  csdb::Pool pool;
-
-  istream_.init(data, size);
-  istream_ >> pool;
-
-  cslog() << "BLOCK REPLY> get #" << pool.sequence();
-
-  transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
-
-  if (getBlockChain().getGlobalSequence() < pool.sequence()) {
-    getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(pool.sequence()));
+    cslog() << "NODE> Get block request> Getting the request for block: " << sequence;
+    sequences.push_back(std::move(sequence));
   }
 
-  auto desired_seq = bc_.getLastWrittenSequence() + 1;
-  if (pool.sequence() == desired_seq) {
-    cslog() << "BLOCK REPLY> sequence is appropriate, store";
+  if (sequencesCount != sequences.size()) {
+    cserror() << "Bad sequences created";
+    return;
+  }
 
-    if (roundToSync_ > 0) {
-      Node::showSyncronizationProgress(getBlockChain().getLastWrittenSequence(), roundToSync_);
+  if (sequences.front() > bc_.getLastWrittenSequence()) {
+    cslog() << "NODE> Get block request> The requested block: " << sequences.front() << " is BEYOND my CHAIN";
+    return;
+  }
+
+  cs::PoolsBlock poolsBlock;
+  poolsBlock.reserve(sequencesCount);
+
+  for (auto& sequence : sequences) {
+    csdb::Pool pool = bc_.loadBlock(bc_.getHashBySequence(sequence));
+
+    if (pool.is_valid()) {
+      auto prev_hash = csdb::PoolHash::from_string("");
+      pool.set_previous_hash(prev_hash);
+
+      poolsBlock.push_back(std::move(pool));
     }
-
-    bc_.onBlockReceived(pool);
-    solver_->gotBlockReply(pool);
-    isAwaitingSyncroBlock_ = false;
-  }
-  else if(pool.sequence() > desired_seq) {
-    syncPools_[pool.sequence()] = std::move(pool);
-    cslog() << "BLOCK REPLY> cache outrunning block";
-  }
-  else {
-      cslog() << "BLOCK REPLY> ignore outdated block";
   }
 
-  processSyncPools();
-
-  if (roundToSync_ != bc_.getLastWrittenSequence()) {
-    sendBlockRequest();
-  }
-  else {
-    isSyncroStarted_ = false;
-    roundToSync_ = 0;
-
-    processMetaMap();
-    cslog() << "BLOCK REPLY> block sync finished";
-  }
+  sendBlockReply(poolsBlock, sender);
 }
 
-void Node::sendBlockReply(const csdb::Pool& pool, const cs::PublicKey& target) {
-  ConnectionPtr conn = transport_->getConnectionByKey(target);
-  if (!conn) {
-    cswarning() << "BLOCK REPLY> Cannot get a connection with a specified public key";
-    return;
+void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+  cslog() << "NODE> Get Block Reply";
+  csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
+   std::size_t poolsCount = 0;
+
+   istream_.init(data, size);
+   istream_ >> poolsCount;
+
+  cs::PoolsBlock poolsBlock;
+  poolsBlock.reserve(poolsCount);
+
+  for (std::size_t i = 0; i < poolsCount; ++i) {
+    csdb::Pool pool;
+    istream_ >> pool;
+
+    transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
+    poolsBlock.push_back(std::move(pool));
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, roundNum_, pool);
+  poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+}
+
+void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target) {
+  for (const auto& pool : poolsBlock) {
+    csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
+  }
+
+  tryToSendDirect(target, MsgTypes::RequestedBlock, roundNum_, poolsBlock);
 }
 
 void Node::becomeWriter() {
@@ -1301,6 +1237,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
 #ifdef SYNCRO
   blockchainSync();
+  poolSynchronizer_->checkActivity();
 #endif
 
   if (!sendingTimer_.isRunning()) {
@@ -1388,8 +1325,8 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
 }
 
-bool Node::getSyncroStarted() {
-  return isSyncroStarted_;
+bool Node::isPoolsSyncroStarted() {
+  return poolSynchronizer_->isSyncroStarted();
 }
 
 uint8_t Node::getConfidantNumber() {
@@ -1404,6 +1341,24 @@ void Node::processTimer() {
   }
 
   cs::Conveyer::instance().flushTransactions();
+}
+
+void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
+  CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
+}
+
+void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
+
+  if (target) {
+    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
+  }
+  else {
+    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
+  }
+
+  ostream_.clear();
 }
 
 void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
@@ -2357,7 +2312,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
       conveyer.setCharacteristic(characteristic);
       std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-      if(isSyncroStarted_) {
+      if(poolSynchronizer_->isSyncroStarted()) {
           if(pool) {
               cs::PoolSyncMeta meta;
               meta.sender = sender;

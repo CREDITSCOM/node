@@ -54,6 +54,9 @@ namespace cs
     using Hashes = std::vector<cs::TransactionsPacketHash>;
     using Packets = std::vector<cs::TransactionsPacket>;
 
+    using PoolsRequestedSequences = std::vector<RoundNumber>;
+    using PoolsBlock = std::vector<csdb::Pool>;
+
     enum NodeConsts : uint32_t
     {
         PublicKeyLength = PUBLIC_KEY_LENGTH,
@@ -61,7 +64,7 @@ namespace cs
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
         PrivateKeyLength = PRIVATE_KEY_LENGTH,
-        PacketHashesRequestDelay = 50 // ms
+        NeighboursRequestDelay = 50 // ms
     };
 
     enum SolverConsts : uint32_t
