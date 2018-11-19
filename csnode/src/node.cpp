@@ -53,9 +53,11 @@ Node::Node(const Config& config):
 }
 
 Node::~Node() {
+  sendingTimer_.stop();
+
   delete solver_;
   delete transport_;
-    delete poolSynchronizer_;
+  delete poolSynchronizer_;
 }
 
 bool Node::init() {
@@ -232,7 +234,7 @@ void Node::processMetaMap() {
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
       csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock(meta.pool, sequence, meta.sender);
+      writeBlock_V3(meta.pool, sequence, meta.sender);
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
@@ -703,7 +705,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  if (isSyncroStarted_) {
+  if (isPoolsSyncroStarted()) {
     cs::PoolSyncMeta meta;
     meta.sender = sender;
     meta.signature = signature;
@@ -1195,11 +1197,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
     csdb::Pool pool;
     istream_ >> pool;
 
-    const auto sequence = pool.sequence();
-
-    cslog() << "NODE> Get block reply> Getting block: " << sequence;
-
-    transport_->syncReplied(cs::numeric_cast<uint32_t>(sequence));
+    transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
     poolsBlock.push_back(std::move(pool));
   }
 
@@ -1350,7 +1348,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   }
 }
 
-bool Node::getSyncroStarted() {
+bool Node::isPoolsSyncroStarted() {
   return poolSynchronizer_->isSyncroStarted();
 }
 
@@ -1373,15 +1371,10 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 }
 
 void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
 
-  if (!target) {
-    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
-  }
-  else {
-    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
-  }
+  transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
   ostream_.clear();
 }
@@ -2263,6 +2256,7 @@ void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::Round
 
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
+  roundTable.general = sender;
 
   const cs::ConfidantsKeys confidants_ = roundTable.confidants;
   cslog() << "Node> confidants: " << confidants_.size();

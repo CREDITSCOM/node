@@ -131,6 +131,7 @@ class Transport {
   void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
   uint32_t getNeighboursCount();
+  uint32_t getMaxNeighbours() const;
   ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested);
   ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
   ConnectionPtr getRandomNeighbour();

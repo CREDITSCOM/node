@@ -115,7 +115,7 @@ void TestConcreteTypeWriteToOPackStream(
   stream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
   stream << value;
   auto encoded = GetStreamData(stream);
-  displayStreamData(stream);
+  // displayStreamData(stream);
   ASSERT_EQ(1, stream.getPacketsCount());
   ASSERT_EQ(encoded.size(), sizeof expected_encoded_data);
   ASSERT_TRUE(0 ==

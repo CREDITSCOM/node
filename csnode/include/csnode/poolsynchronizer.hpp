@@ -18,13 +18,11 @@ namespace cs {
     using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences)>;
     using PoolSynchronizerSynchroFinished = cs::Signal<void()>;
 
-//#define USE_REQUEST_TIMER
-
     class PoolSynchronizer
     {
     public: // Interface
 
-        PoolSynchronizer(Transport* transport, BlockChain* blockChain);
+        explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
         void processingSync(const cs::RoundNumber roundNum);
 
@@ -32,13 +30,12 @@ namespace cs {
         void getBlockReply(cs::PoolsBlock&& poolsBlock);
 
         // syncro send functions
-        void sendBlockRequest(const bool isAllRequest = true);
-        void reSendBlockRequestToRandomNeighbour();
+        void sendBlockRequest();
 
         bool isSyncroStarted() const;
 
         // pool sync progress
-        /*static*/ void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
+        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
     public signals: // Signals
 
@@ -47,19 +44,21 @@ namespace cs {
 
     private: // Service
 
+        bool checkActivity();
+
         void sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences);
 
         void addToTemporaryStorage(const csdb::Pool& pool);
-        void processingTemporaryStorage();
+        csdb::Pool::sequence_t processingTemporaryStorage();
 
-        void getPoolRequestedSequences(PoolsRequestedSequences& sequences);
+        bool getPoolRequestedSequences();
 
     private: // Members
 
         Transport* m_transport;
         BlockChain* m_blockChain;
 
-        inline static const int m_maxBlockCount = 2;
+        inline static const int m_maxBlockCount = 4;
         const int m_maxWaitingTimeReply;
 
         // syncro variables
