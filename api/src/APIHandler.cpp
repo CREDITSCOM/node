@@ -537,6 +537,7 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Tra
 {
   work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
+  tr.add_user_field(1, transaction.userFields);
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -665,6 +666,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+  send_transaction.add_user_field(1, transaction.userFields);
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy)
