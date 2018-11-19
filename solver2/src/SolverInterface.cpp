@@ -605,7 +605,7 @@ namespace slv2
         cslog() << "SolverCore: got request for round info from " << cs::Utils::byteStreamToHex(requester.data(), requester.size());
 
         if(requester_round == cur_round) {
-            const auto ptr = cur_round == 10 ? nullptr : find_stage3(pnode->getConfidantNumber());
+            const auto ptr = /*cur_round == 10 ? nullptr :*/ find_stage3(pnode->getConfidantNumber());
             if(ptr != nullptr) {
                 if(ptr->sender == ptr->writer) {
                     if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber) cur_round)) {

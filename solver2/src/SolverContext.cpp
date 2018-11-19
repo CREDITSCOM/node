@@ -104,15 +104,15 @@ namespace slv2
             cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
             ++i;
         }
-        if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 10) {
-            return;
-        }
-        if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 20) {
-            return;
-        }
-        if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 30) {
-            return;
-        }
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 10) {
+        //    return;
+        //}
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 20) {
+        //    return;
+        //}
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 30) {
+        //    return;
+        //}
         core.spawn_next_round(core.trusted_candidates);
     }
 

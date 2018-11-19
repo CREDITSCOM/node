@@ -1136,8 +1136,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   istream_.init(data, size);
   istream_ >> sequencesCount;
 
-  csdebug() << "NODE> Packet hashes request got sequences count: " << sequencesCount;
-  csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  cslog() << "NODE> Packet hashes request got sequences count: " << sequencesCount;
+  cslog() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (sequencesCount == 0) {
     return;
@@ -1466,6 +1466,12 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   if(type == MsgTypes::BlockHashV3) {
       if(rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
           return MessageActions::Process;
+      }
+      if(rNum != roundNum_) {
+          cslog() << "NODE> hash is postponed due to rNum (" << rNum << ") != roundNum_ (" << roundNum_ << ")";
+      }
+      else {
+          cslog() << "NODE> hash is postponed due to !conveyer.isSyncCompleted()";
       }
       return MessageActions::Postpone;
   }
