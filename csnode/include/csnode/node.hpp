@@ -90,9 +90,10 @@ public:
   void prepareMetaForSending(cs::RoundTable& roundTable);
 
   void sendRoundInfoRequest(uint8_t respondent);
-  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
-  void sendRoundInfoReply(const cs::PublicKey&, uint8_t, uint8_t);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
+  void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
+  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
+  bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -204,11 +205,16 @@ public slots:
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTableconst,
+  void createRoundPackage(const cs::RoundTable& roundTable,
     const cs::PoolMetaInfo& poolMetaInfo,
     const cs::Characteristic& characteristic,
     const cs::Signature& signature,
     const cs::Notifications& notifications);
+  void storeRoundPackageData(const cs::RoundTable& roundTable,
+      const cs::PoolMetaInfo& poolMetaInfo,
+      const cs::Characteristic& characteristic,
+      const cs::Signature& signature,
+      const cs::Notifications& notifications);
 
   // signature verification
   bool checkKeysFile();
@@ -298,6 +304,17 @@ private:
 
   // sync meta
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
+
+  // round package sent data storage
+  struct SentRoundData
+  {
+      cs::RoundTable round_table;
+      cs::PoolMetaInfo pool_meta_info;
+      cs::Characteristic characteristic;
+      cs::Signature pool_signature;
+      cs::Notifications notifications;
+  };
+  SentRoundData last_sent_round_data;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

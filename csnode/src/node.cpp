@@ -948,6 +948,30 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable,
   ostream_ << solver_->getPublicKey();
 }
 
+void Node::storeRoundPackageData(const cs::RoundTable& roundTable,
+    const cs::PoolMetaInfo& poolMetaInfo,
+    const cs::Characteristic& characteristic,
+    const cs::Signature& signature,
+    const cs::Notifications& notifications)
+{
+    last_sent_round_data.round_table.round = roundTable.round;
+    // no general stored!
+    last_sent_round_data.round_table.confidants.resize(roundTable.confidants.size());
+    std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(), last_sent_round_data.round_table.confidants.begin());
+    last_sent_round_data.round_table.hashes.resize(roundTable.hashes.size());
+    std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), last_sent_round_data.round_table.hashes.begin());
+    // do no store charBytes, they are not in use while send round info
+    //last_sent_round_data.round_table.charBytes.mask.resize(roundTable.charBytes.mask.size());
+    //std::copy(roundTable.charBytes.mask.cbegin(), roundTable.charBytes.mask.cend(), last_sent_round_data.round_table.charBytes.mask.begin());
+    last_sent_round_data.characteristic.mask.resize(characteristic.mask.size());
+    std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), last_sent_round_data.characteristic.mask.begin());
+    last_sent_round_data.pool_meta_info.sequenceNumber = poolMetaInfo.sequenceNumber;
+    last_sent_round_data.pool_meta_info.timestamp = poolMetaInfo.timestamp;
+    last_sent_round_data.pool_signature = signature;
+    last_sent_round_data.notifications.resize(notifications.size());
+    std::copy(notifications.cbegin(), notifications.cend(), last_sent_round_data.notifications.begin());
+}
+
 
 void Node::sendWriterNotification() {
   cs::PublicKey writerPublicKey = solver_->getWriterPublicKey();
@@ -2149,6 +2173,8 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
   createRoundPackage(conveyer.roundTable(), poolMetaInfo, block_characteristic, poolSignature, conveyer.notifications());
+  // save sent data for future
+  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, block_characteristic, poolSignature, conveyer.notifications());
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
@@ -2181,10 +2207,10 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
   onRoundStart_V3(table);
 
- solver_->gotRound(roundNum_);
+  solver_->gotRound(roundNum_);
 
- //TODO: need or not?
- transport_->processPostponed(roundNum_);
+  //TODO: need or not?
+  transport_->processPostponed(roundNum_);
 }
 
 void Node::getRoundInfo(const uint8_t * data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2397,7 +2423,7 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
   istream_ >> tmp;
 
   if (!istream_.good() || !istream_.end()) {
-    cswarning() << "Bad hash packet format";
+    cswarning() << "NODE> bad hash packet format";
     return;
   }
 
@@ -2406,119 +2432,85 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
 
 void Node::sendRoundInfoRequest(uint8_t respondent)
 {
-#ifdef MYLOG
-  cslog() << "NODE> Stage THREE requesting ... ";
-#endif
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() <<"Only confidant nodes can request consensus stages";
-    //return;
+    cswarning() <<"NODE> only confidant nodes can request consensus stages";
   }
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
+  cslog() << "NODE> send request for next round info after #" << roundNum_;
 
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
   ostream_ << MsgTypes::RoundInfoRequest
     << roundNum_
     << myConfidantIndex_;
-;
   flushCurrentTasks();
-  csdebug() << "done";
 }
 
 void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester)
 {
-  csdebug() << __func__;
-  //std::cout << "NODE> Getting StageThree Request" << std::endl;
-  //if (myLevel_ != NodeLevel::Confidant || myLevel_ != NodeLevel::Writer) {
-  //  return;
-  //}
+  csdebug() << "NODE> " << __func__;
   if (nodeIdKey_ == requester) {
     return;
   }
-  //LOG_EVENT(FILE_NAME_ << "Getting RoundInfo Request from " << byteStreamToHex(sender.str, 32));
   istream_.init(data, size);
 
   uint8_t requesterNumber;
   istream_ >> requesterNumber;
 
-  //if (requester != confidantNodes_.at(requesterNumber)) return; - this will not fullfill when the round changed
-  auto& confidantNodes_ = cs::Conveyer::instance().roundTable().confidants;
-
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad RoundInfo Request packet format";
+    cserror() << "NODE> bad RoundInfo request packet format";
     return;
   }
-  if (rNum == roundNum_) {
-    sendRoundInfoReply(requester, 0 , requesterNumber);
-    return;
-  }
-  else {
-    bool found = false;
-    uint8_t cNum = confidantNodes_.size();
-    for (int i = 0; i < cNum; i++) {
-      if (requester == confidantNodes_.at(i)) {
-        found = true;
-      }
-    }
-    if (!found) {
-        sendRoundInfoReply(requester, 1, requesterNumber);
-      return;
-    }
-    else {
-        //TODO: send round info to normal node
-    }
-  }
-
-  /*if (isConf(requester)) {
-    sendRoundInfoReply(requesterNumber, 1);
-    return;
-  }
-*/
-  solver_->gotRoundInfoRequest(requester);
+  cslog() << "NODE> get request for next round info after #" << rNum << " from [" << (int) requesterNumber << "]";
+  solver_->gotRoundInfoRequest(requester, rNum);
 }
 
-void Node::sendRoundInfoReply(const cs::PublicKey& requester, uint8_t reply, uint8_t reqNumber)
+void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info)
 {
 
-  cslog() << "NODE> Sending RoundInfoRely to [" << (int) reqNumber << "]";
-
+  cslog() << "NODE> send RoundInfo reply to " << cs::Utils::byteStreamToHex(target.data(), target.size());
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() <<"Only confidant nodes can request consensus stages";
+    cswarning() <<"Only confidant nodes can reply consensus stages";
     //return;
   }
 
-  ostream_.init(0/*need no flags!*/, requester);
-
+  ostream_.init(0/*need no flags!*/, target);
   ostream_ << MsgTypes::RoundInfoReply
     << roundNum_
-    << reply;
-
+    << (has_requested_info ? (uint8_t)1 : (uint8_t)0);
   flushCurrentTasks();
-  LOG_DEBUG("done");
+}
+
+bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum)
+{
+    if(last_sent_round_data.round_table.round != rNum) {
+        cswarning() << "NODE> unable to repeat round data #" << rNum;
+        return false;
+    }
+    createRoundPackage(last_sent_round_data.round_table, last_sent_round_data.pool_meta_info,
+        last_sent_round_data.characteristic, last_sent_round_data.pool_signature, last_sent_round_data.notifications);
+    flushCurrentTasks();
+    cslog() << "NODE> re-send last round info #" << rNum << " to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+    return true;
 }
 
 void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent)
 {
-  LOG_DEBUG(__func__);
-  //cslog() << "NODE> Getting StageThree Request";
+  csdebug() << "NODE> " << __func__;
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
   if (nodeIdKey_ == respondent) {
     return;
   }
-  //LOG_EVENT(FILE_NAME_ << "Getting RoundInfo Request from " << byteStreamToHex(sender.str, 32));
   istream_.init(data, size);
 
   uint8_t reply;
   istream_ >> reply;
-
   if (!istream_.good() || !istream_.end()) {
-    cserror() <<"Bad RoundInfo Reply packet format";
+    cserror() <<"NODE> bad RoundInfo reply packet format";
     return;
   }
-  //if (respondent != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;
-
-  solver_->gotRoundInfoReply(reply, respondent);
+  solver_->gotRoundInfoReply(reply != 0, respondent);
 }
 
 void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
