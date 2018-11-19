@@ -22,7 +22,7 @@ namespace cs {
     {
     public: // Interface
 
-        PoolSynchronizer(Transport* transport, BlockChain* blockChain);
+        explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
         void processingSync(const cs::RoundNumber roundNum);
 
@@ -32,12 +32,10 @@ namespace cs {
         // syncro send functions
         void sendBlockRequest();
 
-        bool checkActivity();
-
         bool isSyncroStarted() const;
 
         // pool sync progress
-        /*static*/ void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
+        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
     public signals: // Signals
 
@@ -45,6 +43,8 @@ namespace cs {
         PoolSynchronizerSynchroFinished synchroFinished;
 
     private: // Service
+
+        bool checkActivity();
 
         void sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences);
 
