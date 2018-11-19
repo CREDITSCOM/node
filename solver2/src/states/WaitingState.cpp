@@ -10,7 +10,7 @@ namespace slv2
     {
         //TODO:: calculate my queue number starting from writing node:
         const auto ptr = context.stage3((uint8_t)context.own_conf_number());
-        writing_queue_num = (int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer) % (int)context.cnt_trusted());
+        writing_queue_num = (int)((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer) % ((int)context.cnt_trusted());
         LOG_EVENT(name() << ": Sender = " << (int)ptr->sender << ", TrustedAmount = " << (int)context.cnt_trusted() << ", Writer = "<< (int)ptr->writer );
         LOG_EVENT(name() << ": before becoming WRITER!!!! ");
         if (writing_queue_num == 0) {
