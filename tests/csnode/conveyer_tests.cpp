@@ -46,8 +46,8 @@ bool operator==(const cs::RoundTable& left, const cs::RoundTable& right) {
        hashes_is_equal = left.hashes == right.hashes,
        charBytes_is_equal = left.charBytes.mask == right.charBytes.mask;
 
-  return round_is_equal and general_is_equal and confidants_is_equal and
-         hashes_is_equal and charBytes_is_equal;
+  return round_is_equal && general_is_equal && confidants_is_equal &&
+         hashes_is_equal && charBytes_is_equal;
 }
 
 bool operator==(const cs::Characteristic& left,
@@ -58,11 +58,11 @@ bool operator==(const cs::Characteristic& left,
 
 namespace csdb {
 bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
-  return left.id() == right.id() and left.innerID() == right.innerID() and
-         left.source() == right.source() and left.target() == right.target() and
-         left.currency() == right.currency() and
-         left.max_fee() == right.max_fee() and
-         left.counted_fee() == right.counted_fee() and
+  return left.id() == right.id() && left.innerID() == right.innerID() &&
+         left.source() == right.source() && left.target() == right.target() &&
+         left.currency() == right.currency() &&
+         left.max_fee() == right.max_fee() &&
+         left.counted_fee() == right.counted_fee() &&
          left.signature() == right.signature();
 }
 }  // namespace csdb
