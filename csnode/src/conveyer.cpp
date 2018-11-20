@@ -403,20 +403,20 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
                 if (mask[maskIndex] != 0u) {
                     csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] +++ " << std::right
                         << std::setw(6) << transaction.innerID() << " "
-                        << std::setw(33) << transaction.source().to_string();
+                        << std::setw(65) << transaction.source().to_string();
                     newPool.add_transaction(transaction);
                 }
                 else {
                     csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] --- " << std::right
                         << std::setw(6) << transaction.innerID() << " "
-                        << std::setw(33) << transaction.source().to_string();
+                        << std::setw(65) << transaction.source().to_string();
                     invalidTransactions.addTransaction(transaction);
                 }
             }
             else {
                 csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] ??? " << std::left
                     << std::setw(6) << transaction.innerID() << " "
-                    << std::setw(33) << transaction.source().to_string();
+                    << std::setw(65) << transaction.source().to_string();
             }
             ++maskIndex;
         }
