@@ -5,6 +5,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <exception>
+#include <iomanip>
 
 /// pointer implementation realization
 struct cs::Conveyer::Impl
@@ -381,6 +382,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const cs::Bytes& mask = characteristic.mask;
     cs::TransactionsPacket invalidTransactions;
 
+    csdebug() << "CONVEYER> process transactions protocol";
     for (const auto& hash : localHashes)
     {
         if (currentHashTable.count(hash) == 0u)
@@ -397,13 +399,23 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
             if (maskIndex < mask.size())
             {
                 if (mask[maskIndex] != 0u) {
+                    csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] +++ " << std::right
+                        << std::setw(6) << transaction.innerID() << " "
+                        << std::setw(33) << transaction.source().to_string();
                     newPool.add_transaction(transaction);
                 }
                 else {
+                    csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] --- " << std::right
+                        << std::setw(6) << transaction.innerID() << " "
+                        << std::setw(33) << transaction.source().to_string();
                     invalidTransactions.addTransaction(transaction);
                 }
             }
-
+            else {
+                csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] ??? " << std::left
+                    << std::setw(6) << transaction.innerID() << " "
+                    << std::setw(33) << transaction.source().to_string();
+            }
             ++maskIndex;
         }
 
@@ -418,6 +430,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         //csdebug() << "CONVEYER> Hash deleted > " << hash.toString();
         currentHashTable.erase(hash);
     }
+    csdebug() << "CONVEYER> process transactions finished";
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);
