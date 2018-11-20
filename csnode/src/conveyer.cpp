@@ -411,30 +411,40 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         auto& packet = currentHashTable[hash];
         const auto& transactions = packet.transactions();
 
+        unsigned cnt_accepted = 0;
+        unsigned cnt_rejected = 0;
+        unsigned cnt_ignored = 0;
         for (const auto& transaction : transactions)
         {
             if (maskIndex < mask.size())
             {
                 if (mask[maskIndex] != 0u) {
-                    csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] +++ " << std::right
-                        << std::setw(6) << transaction.innerID() << " "
-                        << std::setw(65) << transaction.source().to_string();
+                    //csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] +++ " << std::right
+                    //    << std::setw(6) << transaction.innerID() << " "
+                    //    << std::setw(65) << transaction.source().to_string();
                     newPool.add_transaction(transaction);
+                    ++cnt_accepted;
                 }
                 else {
-                    csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] --- " << std::right
-                        << std::setw(6) << transaction.innerID() << " "
-                        << std::setw(65) << transaction.source().to_string();
+                    //csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] --- " << std::right
+                    //    << std::setw(6) << transaction.innerID() << " "
+                    //    << std::setw(65) << transaction.source().to_string();
                     invalidTransactions.addTransaction(transaction);
+                    ++cnt_rejected;
                 }
             }
             else {
-                csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] ??? " << std::left
-                    << std::setw(6) << transaction.innerID() << " "
-                    << std::setw(65) << transaction.source().to_string();
+                //csdebug() << "CONVEYER> [" << std::left << std::setw(3) << maskIndex << "] ??? " << std::left
+                //    << std::setw(6) << transaction.innerID() << " "
+                //    << std::setw(65) << transaction.source().to_string();
+                ++cnt_ignored;
             }
 
             ++maskIndex;
+        }
+
+        if(maskIndex > 0) {
+            csdebug() << "CONVEYER: accepted " << cnt_accepted << ", rejected " << cnt_rejected << ", ignored " << cnt_ignored << " trans.";
         }
 
         if (maskIndex > mask.size())

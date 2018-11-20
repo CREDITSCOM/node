@@ -525,10 +525,10 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     hashes.push_back(std::move(hash));
   }
 
-  cslog() << "NODE> Hashes request got hashes count: " << hashesCount;
+  cslog() << "NODE> Requested packet hashes: " << hashesCount;
 
   if (hashesCount != hashes.size()) {
-    cserror() << "Bad hashes created";
+    cserror() << "NODE> wrong hashes list requested";
     return;
   }
 
@@ -537,7 +537,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
-    csdebug() << "NODE> Sync packets already synced in round: " << round;
+    csdebug() << "NODE> sync packets have already finished in round " << round;
     return;
   }
 
@@ -1100,14 +1100,13 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
     return;
   }
 
-  csdebug() << "NODE> Sending transaction packet reply: packets count: " << packets.size();
+  csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
   const bool success = sendNeighbours(target, msgType, round, packets);
 
   if (!success) {
-    csdebug() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(target.data(), target.size());
-
+    csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
     sendBroadcast(target, msgType, round, packets);
   }
 }
@@ -1289,11 +1288,11 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   }
 
   if (packets.size()) {
-    csdebug() << "NODE> Found hashes count in hash table storage: " << packets.size();
+    csdebug() << "NODE> Found packets in storage: " << packets.size();
     sendPacketHashesReply(packets, round, sender);
   }
   else {
-    csdebug() << "NODE> Can not find round in storage, hash not found";
+    csdebug() << "NODE> Cannot find packets in storage";
   }
 }
 
