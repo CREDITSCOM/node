@@ -309,7 +309,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, rNum, roundTable]() mutable {
     onRoundStart_V3(roundTable);
     onRoundStartConveyer(std::move(roundTable));
-    solver_->gotRound(rNum);
+    startConsensus();
   });
 }
 
@@ -620,7 +620,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   onRoundStart(roundTable);
   onRoundStartConveyer(std::move(roundTable));
   cslog() << "NODE> Get Round table -> got Round =" << round;
-  solver_->gotRound(round);
+  startConsensus();
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -777,16 +777,6 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
 #ifndef MONITOR_NODE
   if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
     this->getBlockChain().putBlock(newPool);
-
-    if (this->getNodeLevel() != NodeLevel::Writer) {
-      auto poolHash = this->getBlockChain().getLastWrittenHash();
-      sendHash_V3(roundNum_ +1);
-
-      cslog() << "SENDING HASH to ALL";
-    }
-    else {
-      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
-    }
   }
   else {
     cswarning() << "NODE> Can not write block with sequence " << sequence;
@@ -1320,8 +1310,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
     csdebug() << "NODE> Packets sync completed";
     resetNeighbours();
     cslog() << "NODE> processPacketsReply -> got Round";
-    solver_->gotRound(round);
-    transport_->processPostponed(roundNum_);
+    startConsensus();
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
@@ -1346,8 +1335,7 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
       else {
           cslog() << "NODE> All hashes in conveyer -> start consensus now";
       }
-      solver_->gotRound(rt.round);
-      transport_->processPostponed(roundNum_);
+      startConsensus();
   }
   else {
     //TODO: whether possible roundNum_ != rt.round at this point?
@@ -2219,11 +2207,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
   assert(false);
 
   onRoundStart_V3(table);
-
-  solver_->gotRound(roundNum_);
-
-  //TODO: need or not?
-  transport_->processPostponed(roundNum_);
+  startConsensus();
 }
 
 void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
@@ -2400,8 +2384,8 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   blockchainSync();
 #endif
   onRoundStartConveyer(std::move(roundTable));
-  // defer until solver_->gotRound() called
-  /*transport_->processPostponed(roundNum_);*/
+  // defer until solver_->gotRound() called:
+  //transport_->processPostponed(roundNum_);
 
   cslog() << "NODE> round info handled";
 }
@@ -2595,6 +2579,13 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     }
 }
 
+void Node::startConsensus()
+{
+    cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
+    solver_->gotRound(rnum);
+    transport_->processPostponed(rnum);
+    sendHash_V3(rnum);
+}
 
  void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
  {
