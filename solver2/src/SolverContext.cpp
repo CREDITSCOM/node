@@ -95,24 +95,25 @@ namespace slv2
         LOG_NOTICE("SolverCore: spawn next round");
         if(Consensus::Log) {
             if(core.trusted_candidates.empty()) {
-                LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
+                cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
             }
         }
-        LOG_NOTICE("New confidant nodes: ");
+        cslog() << "SolverCore: new confidant nodes: ";
         int i = 0;
         for(auto& it : core.trusted_candidates) {
-            cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
+            cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
             ++i;
         }
-        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 10) {
-        //    return;
-        //}
-        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 20) {
-        //    return;
-        //}
-        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 30) {
-        //    return;
-        //}
+        uint8_t own_num = (uint8_t) own_conf_number();
+        const auto ptr = stage3(own_num);
+        if(ptr != nullptr && ptr->writer == own_num) {
+            switch(round()) {
+                case 10:
+                case 20:
+                case 30:
+                    return;
+            }
+        }
         core.spawn_next_round(core.trusted_candidates);
     }
 

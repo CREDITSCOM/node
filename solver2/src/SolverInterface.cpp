@@ -609,7 +609,7 @@ namespace slv2
             if(ptr != nullptr) {
                 if(ptr->sender == ptr->writer) {
                     if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber) cur_round)) {
-                        cslog() << "SolverCore: re-send full round info #" << cur_round;
+                        cslog() << "SolverCore: re-send full round info #" << cur_round << " completed";
                         return;
                     }
                 }

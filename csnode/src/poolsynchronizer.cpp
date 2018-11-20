@@ -16,7 +16,7 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
 
 void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
     if (!m_isSyncroStarted) {
-        if (roundNum != m_blockChain->getLastWrittenSequence() + 1) {
+        if (roundNum >= m_blockChain->getLastWrittenSequence() + s_roundDifferent) {
             cslog() << "POOL SYNCHRONIZER> Processing Pools Sync Start. Needed sequence: " << roundNum;
             m_isSyncroStarted = true;
             m_roundToSync = roundNum;
@@ -115,6 +115,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
         if (!target) {
             csdebug() << "POOL SYNCHRONIZER> No more free requestees";
+            m_transport->syncReplied(sequence);
             break;  // No more free requestees
         }
 

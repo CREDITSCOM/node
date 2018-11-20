@@ -9,10 +9,10 @@ set(THRIFT_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 # банально может не быть собран. При изменении thrift-файла список надо будет
 # обновить вручную.
 set(THRIFT_GENERATED_FILES
-  ${THRIFT_GEN_DIR}/variant_constants.cpp
-  ${THRIFT_GEN_DIR}/variant_types.cpp
-  ${THRIFT_GEN_DIR}/variant_constants.h
-  ${THRIFT_GEN_DIR}/variant_types.h
+  ${THRIFT_GEN_DIR}/general_constants.cpp
+  ${THRIFT_GEN_DIR}/general_types.cpp
+  ${THRIFT_GEN_DIR}/general_constants.h
+  ${THRIFT_GEN_DIR}/general_types.h
   )
 
 # Вызов thrift compiler лучше добавлять в фазу сборки - иначе
@@ -21,8 +21,8 @@ add_custom_command(
   OUTPUT ${THRIFT_GENERATED_FILES}
   COMMAND thrift-compiler -r -gen cpp:no_skeleton,pure_enums,moveable_types
     -out ${THRIFT_GEN_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/variant.thrift
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/variant.thrift
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/general.thrift
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/general.thrift
   )
 
 add_library(variant_gen
