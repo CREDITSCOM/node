@@ -1464,6 +1464,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if(type == MsgTypes::BlockHashV3) {
+      if(rNum < roundNum_) {
+          return MessageActions::Drop;
+      }
       if(rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
           return MessageActions::Process;
       }
@@ -1599,7 +1602,6 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 //       V                                            V                                                 V
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-  csdebug() << __func__ << ": start";
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() <<"Only confidant nodes can send consensus stages";
     return;
@@ -1640,7 +1642,6 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     << stageOneInfo.sig;
   ostream_ << std::string(cs::numeric_cast<const char*>((void*)rawData), msgSize);
   allocator_.shrinkLast(msgSize);
-  csdebug() << __func__ << ": done" ;
   flushCurrentTasks();
 }
 
