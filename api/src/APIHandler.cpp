@@ -656,14 +656,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return;
   }
 
-  if (_return.__isset.smart_contract_result = api_resp.__isset.ret_val)
+  _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
+  if (_return.__isset.smart_contract_result)
     _return.smart_contract_result = api_resp.ret_val;
-
-  /*if (input_smart.forgetNewState) {
-    contract_state_entry.update_state([&]()->decltype(auto) { return std::move(contract_state); });
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
-    return;
-  }*/
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);

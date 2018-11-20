@@ -193,7 +193,7 @@ private:
   void connectNode(RemoteNodePtr, ConnectionPtr);
   void disconnectNode(ConnectionPtr*);
 
-  int getRandomSyncNeighbourNumber(const int attemptCount = 0);
+  int getRandomSyncNeighbourNumber(const std::size_t attemptCount = 0);
 
   Transport* transport_;
 

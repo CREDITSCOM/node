@@ -69,8 +69,8 @@ bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
 
 TEST(Conveyer, CharacteristicSetAndGet) {
   auto& conveyer{cs::Conveyer::instance()};
-  conveyer.setCharacteristic(kCharacteristic);
-  ASSERT_EQ(kCharacteristic, conveyer.characteristic());
+  conveyer.setCharacteristic(kCharacteristic, kRoundNumber);
+  ASSERT_EQ(kCharacteristic, *conveyer.characteristic(kRoundNumber));
 }
 
 csdb::Transaction CreateTestTransaction(const int64_t id,
@@ -136,9 +136,9 @@ TEST(Conveyer, MainLogic) {
 
   const auto characteristic{cs::Characteristic{
       {0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
-  conveyer.setCharacteristic(characteristic);
-  ASSERT_EQ(characteristic, conveyer.characteristic());
-  auto characteristic_hash{conveyer.characteristicHash()};
+  conveyer.setCharacteristic(characteristic, kRoundNumber);
+  ASSERT_EQ(characteristic, *conveyer.characteristic(kRoundNumber));
+  auto characteristic_hash{conveyer.characteristicHash(kRoundNumber)};
   const cs::Hash kCharacteristicHash{
       0xc8, 0xb0, 0xaa, 0x4c, 0x78, 0x28, 0xb8, 0xe2, 0x04, 0x69, 0x23,
       0x3a, 0x47, 0x7e, 0x12, 0x56, 0x63, 0x33, 0x82, 0x1b, 0x0c, 0xd4,
