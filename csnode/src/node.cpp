@@ -371,7 +371,10 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 
   writeDefaultStream(args...);
 
-  csdebug() << "NODE> Sending Direct data of size " << ostream_.getCurrentSize() << " to " << target->getOut();
+  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize()
+    << ", out = " << target->out
+    << ", in = " << target->in
+    << ", specialOut = " << target->specialOut;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -1289,12 +1292,11 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
 
   if (packets.size()) {
     csdebug() << "NODE> Found hashes count in hash table storage: " << packets.size();
+    sendPacketHashesReply(packets, round, sender);
   }
   else {
     csdebug() << "NODE> Can not find round in storage, hash not found";
   }
-
-  sendPacketHashesReply(packets, round, sender);
 }
 
 void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round) {
@@ -2581,6 +2583,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 
 void Node::startConsensus()
 {
+    cslog() << "NODE> -------> STARTING CONSENSUS <-------";
     cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
     solver_->gotRound(rnum);
     transport_->processPostponed(rnum);
