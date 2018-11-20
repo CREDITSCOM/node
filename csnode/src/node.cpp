@@ -86,7 +86,7 @@ bool Node::init() {
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
-  cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::onSendBlockRequest);
+  cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
   cs::Connector::connect(&poolSynchronizer_->synchroFinished, this, &Node::processMetaMap);
 
   return true;
@@ -1365,7 +1365,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
+void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
 
@@ -2192,19 +2192,14 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
     }
   }
 
-  //const cs::Hashes& hashes = table.hashes;
-  //cslog() << "Hashes count: " << hashes.size();
+  const cs::Hashes& hashes = table.hashes;
+  cslog() << "Hashes count: " << hashes.size();
 
-  //for (std::size_t i = 0; i < hashes.size(); ++i) {
-  //  csdebug() << i << ". " << hashes[i].toString();
-  //}
-
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    csdebug() << i << ". " << hashes[i].toString();
+  }
  
   transport_->clearTasks();
-
-  //TODO: \EE\E1\ED\EE\E2\E8\F2\FC \F2\E0\E1\EB\E8\F6\F3 \F0\E0\F3\ED\E4\E0 \E2 cs::Conveyer::instance()
-  //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
-  assert(false);
 
   onRoundStart_V3(table);
   startConsensus();
