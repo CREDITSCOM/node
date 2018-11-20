@@ -97,12 +97,13 @@ void Spammer::SpamWithTransactions(Node& node) {
 }
 
 void Spammer::FundMyWallets(Node& node) {
+  csdb::Address genesis_address;
+  std::vector<uint8_t> genesis;
+  DecodeBase58(kGenesisPublic, genesis);
+  genesis_address = csdb::Address::from_public_key(genesis);
+  DecodeBase58(kGenesisPrivate, genesis);
   for (int i = 0; i < kMyWalletsNum; ++i) {
     csdb::Transaction transaction;
-    csdb::Address genesis_address;
-    std::vector<uint8_t> genesis;
-    DecodeBase58(kGenesisPublic, genesis);
-    genesis_address = csdb::Address::from_public_key(genesis);
     transaction.set_source(OptimizeAddress(genesis_address, node));
     transaction.set_target(my_wallets_[i].first);
     transaction.set_currency(csdb::Currency(1));
@@ -111,8 +112,6 @@ void Spammer::FundMyWallets(Node& node) {
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     srand(time(0));
     transaction.set_innerID((rand() + 2) & 0x3fffffffffff);
-    genesis.clear();
-    DecodeBase58(kGenesisPrivate, genesis);
     SignTransaction(transaction, genesis.data());
     node.getSolver()->send_wallet_transaction(transaction);
   }
