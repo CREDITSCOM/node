@@ -302,12 +302,13 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   // start round on node
-  onRoundStart_V3(roundTable);
-  onRoundStartConveyer(std::move(roundTable));
 
   // TODO: think how to improve this code
   cslog() << "NODE> Get Round table SS -> got Round = " << rNum;
-  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this,rNum]() {
+
+  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, rNum, roundTable]() mutable {
+    onRoundStart_V3(roundTable);
+    onRoundStartConveyer(std::move(roundTable));
     solver_->gotRound(rNum);
   });
 }
