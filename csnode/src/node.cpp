@@ -206,7 +206,6 @@ bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::Priva
 }
 
 void Node::blockchainSync() {
-  cslog() <<"NODE> last written sequence = " << getBlockChain().getLastWrittenSequence();
   poolSynchronizer_->processingSync(roundNum_);
 }
 
@@ -309,7 +308,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, rNum, roundTable]() mutable {
     onRoundStart_V3(roundTable);
     onRoundStartConveyer(std::move(roundTable));
-    startConsensus();
   });
 }
 
@@ -1468,10 +1466,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
           return MessageActions::Process;
       }
       if(rNum != roundNum_) {
-          cslog() << "NODE> hash is postponed due to rNum (" << rNum << ") != roundNum_ (" << roundNum_ << ")";
+          cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
       }
       else {
-          cslog() << "NODE> hash is postponed due to !conveyer.isSyncCompleted()";
+          cslog() << "NODE> hash is postponed until conveyer sync is completed";
       }
       return MessageActions::Postpone;
   }
@@ -2559,6 +2557,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     int fixed_width = (int) s.size();
     cslog() << s;
     cslog() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
+    cslog() << " last written sequence = " << getBlockChain().getLastWrittenSequence();
 
     std::ostringstream line2;
     for(int i = 0; i < fixed_width; ++i) {
