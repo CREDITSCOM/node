@@ -476,8 +476,8 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::Trans
 {
     cs::SharedLock lock(m_sharedMutex);
 
-    if (pimpl->hashTable.count(hash) != 0u) {
-        return pimpl->hashTable[hash];
+    if (auto iterator = pimpl->hashTable.find(hash); iterator != pimpl->hashTable.end()) {
+        return iterator->second;
     }
 
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
