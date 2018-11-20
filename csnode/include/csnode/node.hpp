@@ -83,6 +83,7 @@ public:
   }
 
   void onRoundStart_V3(const cs::RoundTable& roundTable);
+  void startConsensus();
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
 

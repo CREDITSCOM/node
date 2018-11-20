@@ -81,7 +81,7 @@ cs::Hash Generals::buildVector(const cs::TransactionsPacket& packet, Solver* sol
     characteristic.mask = std::move(characteristicMask);
   }
 
-  conveyer.setCharacteristic(characteristic);
+  conveyer.setCharacteristic(characteristic, conveyer.currentRoundNumber());
 
   if (characteristic.mask.size() != transactionsCount) {
     cserror() << "GENERALS> Build vector, characteristic mask size not equals transactions count";

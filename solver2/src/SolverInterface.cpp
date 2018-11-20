@@ -424,29 +424,8 @@ namespace slv2
             cnt_trusted_desired = cnt_trusted;
         }
 
-        auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 2;
-        if(desired_seq < cur_round) {
-            // empty args requests exactly what we need:
-//            pnode->sendBlockRequest();
-        }
-
         if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {
             handleTransitions(Event::RoundTable);
-        }
-
-        if(1 == cur_round) {
-            scheduler.InsertOnce(Consensus::T_round, [this]() {
-                pnode->sendHash_V3(1);
-                //gotTransactionList_V3(std::move(csdb::Pool{}));
-            });
-        }
-        //TODO: not good solution, to reproduce solver-1 logic only:
-        else if(is_bigbang) {
-            scheduler.InsertOnce(Consensus::T_coll_trans, [this]() {
-                csdb::Pool tmp {};
-                tmp.set_sequence(cur_round - 1);
-                //gotTransactionList_V3(std::move(tmp));
-            });
         }
     }
 

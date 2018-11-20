@@ -212,11 +212,9 @@ namespace slv2
             }
 
             characteristic.mask = std::move(characteristicMask);
-            conveyer.setCharacteristic(characteristic);
         }
-        else {
-            conveyer.setCharacteristic(characteristic);
-        }
+
+        conveyer.setCharacteristic(characteristic, context.round());
 
         if(characteristic.mask.size() != transactionsCount) {
             cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";

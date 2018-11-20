@@ -104,16 +104,16 @@ namespace slv2
             cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
             ++i;
         }
-        uint8_t own_num = (uint8_t) own_conf_number();
-        const auto ptr = stage3(own_num);
-        if(ptr != nullptr && ptr->writer == own_num) {
-            switch(round()) {
-                case 10:
-                case 20:
-                case 30:
-                    return;
-            }
-        }
+        //uint8_t own_num = (uint8_t) own_conf_number();
+        //const auto ptr = stage3(own_num);
+        //if(ptr != nullptr && ptr->writer == own_num) {
+        //    switch(round()) {
+        //        case 10:
+        //        case 20:
+        //        case 30:
+        //            return;
+        //    }
+        //}
         core.spawn_next_round(core.trusted_candidates);
     }
 

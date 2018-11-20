@@ -176,17 +176,17 @@ namespace cs
         /// @brief Sets round characteristic function.
         /// @param characteristic Created characteristic on network level.
         ///
-        void setCharacteristic(const Characteristic& characteristic);
+        void setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round);
 
         ///
         /// @brief Returns current round characteristic.
         ///
-        const cs::Characteristic& characteristic() const;
+        const cs::Characteristic* characteristic(cs::RoundNumber round) const;
 
         ///
         /// @brief Returns calcualted characteristic hash by blake2.
         ///
-        cs::Hash characteristicHash() const;
+        cs::Hash characteristicHash(cs::RoundNumber round) const;
 
         ///
         /// @brief Applyies current round characteristic to create csdb::Pool.
