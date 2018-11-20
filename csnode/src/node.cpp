@@ -1014,16 +1014,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   }
 
   csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
-
-  const auto msgType = MsgTypes::TransactionsPacketRequest;
-  const auto& general = cs::Conveyer::instance().roundTable().general;
-
-  const bool sendToGeneral = sendNeighbours(general, msgType, round, hashes);
-
-  if (!sendToGeneral) {
-    csdebug() << "NODE> Sending transaction packet request: Cannot get a connection with a general ";
-    sendPacketHashesRequestToRandomNeighbour(hashes, round);
-  }
+  sendPacketHashesRequestToRandomNeighbour(hashes, round);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
