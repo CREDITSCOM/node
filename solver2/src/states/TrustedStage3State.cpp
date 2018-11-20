@@ -20,10 +20,13 @@ namespace slv2
           }
         }
         // process already received stage-2, possible to go further to stage-3
-        for(const auto& st : context.stage2_data()) {
-            if(Result::Finish == onStage2(context, st)) {
-                context.complete_stage3();
-                return;
+        if(!context.stage2_data().empty()) {
+            cslog() << name() << ": handle early received stages-2";
+            for(const auto& st : context.stage2_data()) {
+                if(Result::Finish == onStage2(context, st)) {
+                    context.complete_stage3();
+                    return;
+                }
             }
         }
 
@@ -104,7 +107,6 @@ namespace slv2
 
     Result TrustedStage3State::onStage2(SolverContext & context, const cs::StageTwo & st)
     {
-        LOG_DEBUG(__func__);
         const auto ptr = context.stage2((uint8_t)context.own_conf_number());
         if(ptr != nullptr && context.enough_stage2()) {
             LOG_NOTICE(name() << ": enough stage-2 received");
@@ -120,14 +122,18 @@ namespace slv2
             }
 
             trusted_election(context);
+
+            cswarning() << "============================ CONSENSUS SUMMARY =================================";
             if(pool_solution_analysis(context)) {
                 stage.writer = take_urgent_decision(context);
-                LOG_NOTICE(name() << ": consensus -> [" << (int)stage.writer << "]");
+                cswarning() << "\t==> [" << (int)stage.writer << "]";
             }
             else {
-                LOG_WARN(name() << ": consensus is not achieved");
+                cswarning() << "\tconsensus is not achieved";
                 /*the action is needed*/
             }
+            cswarning() << "================================================================================";
+
             // all trusted nodes must send stage3 data
             LOG_NOTICE(name() << ": --> stage-3 [" << (int) stage.sender << "]");
             context.add_stage3(stage);//, stage.writer != stage.sender);
@@ -139,7 +145,7 @@ namespace slv2
             //}
             return Result::Finish;
         }
-        LOG_DEBUG(name() << ": ignore prepare block");
+        LOG_DEBUG(name() << ": continue to receive stages-2");
         return Result::Ignore;
     }
 
@@ -187,29 +193,26 @@ namespace slv2
                 std::copy(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.begin());
             }
         }
-        cslog() << "============================ CONSENSUS SUMMARY =================================";
         uint8_t liarNumber = 0;
         /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32);*/
         for(const auto& it : context.stage1_data()) {
 
             if(std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
-                cslog() << "[" << (int) it.sender << "] is not liar "
-                    << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
+                cslog() << "[" << (int) it.sender << "] is not liar";
             }
             else {
                 ++liarNumber;
-                cslog() << "[" << (int) it.sender << "] IS LIAR "
+                cslog() << "[" << (int) it.sender << "] IS LIAR with hash "
                     << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
             }
         }
 
         if(liarNumber > 0) {
-            cslog() << "\tLiars detected: " << (int) liarNumber;
+            cswarning() << "\tLiars detected: " << (int) liarNumber;
         }
         else {
-            cslog() << "\tNo liars detected";
+            cswarning() << "\tNo liars detected";
         }
-        cslog() << "================================================================================";
         if(liarNumber > context.cnt_trusted() / 2) {
             return false;
         }
@@ -281,13 +284,13 @@ namespace slv2
             LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
                 << " - " << (int) candidatesElection.at(tmp));
         }
-        LOG_NOTICE(name() << ": final list of next round trusted:");
+        cslog() << name() << ": final list of next round trusted:";
 
         if(aboveThreshold.size() >= max_conf) { // Consensus::MinTrustedNodes) {
             for(unsigned int i = 0; i < max_conf; ++i) {
                 const auto& tmp = aboveThreshold.at(i);
                 next_round_trust.push_back(tmp);
-                LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+                cslog() << "\t" << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
             }
         }
         else {

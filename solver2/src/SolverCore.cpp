@@ -351,20 +351,4 @@ namespace slv2
         }
     }
 
-    void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester)
-    {
-      cslog() << "SolverCore> Got roundInfoRequest from " << cs::Utils::byteStreamToHex(requester.data(),sizeof(requester));
-
-    }
-
-    void SolverCore::gotRoundInfoReply(const uint8_t reply, const cs::PublicKey& /*respondent*/)
-    {
-      if (reply != 0) {
-        cslog() << "SolverCore: the received RoundInfoReply doesn't need any reply";
-        return;
-      }
-      pcontext->request_role(Role::Writer);
-
-    }
-
 } // slv2
