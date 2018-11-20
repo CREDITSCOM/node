@@ -453,24 +453,29 @@ namespace cs
     }
 }
 
-inline constexpr unsigned char operator "" _u8( unsigned long long arg ) noexcept
+inline constexpr unsigned char operator "" _u8(unsigned long long arg) noexcept
 {
     return static_cast<unsigned char>( arg );
 }
 
-inline constexpr unsigned char operator "" _i8( unsigned long long arg ) noexcept
+inline constexpr unsigned char operator "" _i8(unsigned long long arg) noexcept
 {
     return static_cast<signed char>( arg );
 }
 
-inline constexpr unsigned short operator "" _u16( unsigned long long arg ) noexcept
+inline constexpr unsigned short operator "" _u16(unsigned long long arg) noexcept
 {
     return static_cast<unsigned short>( arg );
 }
 
-inline constexpr short operator "" _i16( unsigned long long arg ) noexcept
+inline constexpr short operator "" _i16(unsigned long long arg) noexcept
 {
     return static_cast<short>( arg );
+}
+
+inline constexpr std::size_t operator "" _sz(unsigned long long arg) noexcept
+{
+    return static_cast<std::size_t>( arg );
 }
 
 #endif 
