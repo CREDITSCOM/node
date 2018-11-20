@@ -613,7 +613,7 @@ ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
     return ConnectionPtr();
   }
 
-  ConnectionPtr& candidate = *(neighbours_.begin() + candidateNumber);
+  ConnectionPtr candidate = *(neighbours_.begin() + candidateNumber);
 
   if (!candidate->syncNeighbourRetries) {
     candidate->syncNeighbourRetries = cs::Utils::generateRandomValue(1, MaxSyncAttempts * 3);
@@ -666,7 +666,7 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
   }
 }
 
-int Neighbourhood::getRandomSyncNeighbourNumber(const int attemptCount) {
+int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) {
   const std::size_t neighbourCount = neighbours_.size() - 1;
 
   if (attemptCount > (neighbourCount * 3)) {
@@ -683,7 +683,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const int attemptCount) {
   }
 
   const int randomNumber = cs::Utils::generateRandomValue(0, neighbourCount);
-  const ConnectionPtr& nb = *(neighbours_.begin() + randomNumber);
+  const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
 
   if (!nb) {
     return -1;
