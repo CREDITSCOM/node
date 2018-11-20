@@ -399,16 +399,18 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const cs::Bytes& mask = characteristic.mask;
     cs::TransactionsPacket invalidTransactions;
 
-    csdebug() << "CONVEYER> process transactions protocol";
     for (const auto& hash : localHashes)
     {
-        if (currentHashTable.count(hash) == 0u)
+        // try to get from meta if can
+        auto optionalPacket = findPacket(hash, round);
+
+        if (!optionalPacket.has_value())
         {
             cserror() << "CONVEYER> ApplyCharacteristic: HASH NOT FOUND " << hash.toString();
             return std::nullopt;
         }
 
-        auto& packet = currentHashTable[hash];
+        auto packet = std::move(optionalPacket).value();
         const auto& transactions = packet.transactions();
 
         for (const auto& transaction : transactions)
@@ -445,8 +447,10 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
 
         // create storage hash table and remove from current hash table
         hashTable.emplace(hash, std::move(packet));
-        //csdebug() << "CONVEYER> Hash deleted > " << hash.toString();
-        currentHashTable.erase(hash);
+
+        if (auto iterator = currentHashTable.find(hash); iterator != currentHashTable.end()) {
+            currentHashTable.erase(hash);
+        }
     }
 
     csdebug() << "CONVEYER> ApplyCharacteristic, invalid transactions count " << invalidTransactions.transactionsCount();
@@ -472,10 +476,8 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::searchPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
+std::optional<cs::TransactionsPacket> cs::Conveyer::findPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
 {
-    cs::SharedLock lock(m_sharedMutex);
-
     if (auto iterator = pimpl->hashTable.find(hash); iterator != pimpl->hashTable.end()) {
         return iterator->second;
     }
