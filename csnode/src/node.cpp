@@ -689,7 +689,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
-  conveyer.setCharacteristic(std::move(characteristic));
+  conveyer.setCharacteristic(std::move(characteristic), round);
 
   assert(sequence <= this->getRoundNumber());
 
@@ -857,8 +857,15 @@ void Node::applyNotifications() {
 
   writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
-  cslog() << "NODE> send characteristic of size " << conveyer.characteristic().mask.size();
-  createBlockValidatingPacket(poolMetaInfo, conveyer.characteristic(), poolSignature, conveyer.notifications());
+  const cs::Characteristic* characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
+
+  if (!characteristic) {
+    csfatal() << "NODE> Apply notifications, no characteristic in conveyer, logic error";
+    return;
+  }
+
+  cslog() << "NODE> send characteristic of size " << characteristic->mask.size();
+  createBlockValidatingPacket(poolMetaInfo, *characteristic, poolSignature, conveyer.notifications());
 
   flushCurrentTasks();
 }
@@ -870,7 +877,7 @@ bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
   stream >> characteristicHash;
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  cs::Hash currentCharacteristicHash = conveyer.characteristicHash();
+  cs::Hash currentCharacteristicHash = conveyer.characteristicHash(conveyer.currentRoundNumber());
 
   if (characteristicHash != currentCharacteristicHash) {
     csdebug() << "NODE> Characteristic equals failed";
@@ -987,7 +994,7 @@ void Node::sendWriterNotification() {
 }
 
 cs::Bytes Node::createNotification(const cs::PublicKey& writerPublicKey) {
-  cs::Hash characteristicHash = cs::Conveyer::instance().characteristicHash();
+  cs::Hash characteristicHash = cs::Conveyer::instance().characteristicHash(roundNum_);
 
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
@@ -1312,7 +1319,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round-1, meta->sender);
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
     }
   }
 }
@@ -2163,12 +2170,18 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
       roundTable.hashes.push_back(element.first);
     }
   }
-  const auto block_characteristic = conveyer.characteristic();
+  const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
+
+  if (!block_characteristic) {
+    cserror() << "Send round info characteristic not found, logic error";
+    return;
+  }
+
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(conveyer.roundTable(), poolMetaInfo, block_characteristic, poolSignature, conveyer.notifications());
+  createRoundPackage(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
   // save sent data for future
-  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, block_characteristic, poolSignature, conveyer.notifications());
+  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
@@ -2268,7 +2281,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   // rNum has been incremented just before:
-  if (!conveyer.isSyncCompleted(rNum - 1)) {
+  if (!conveyer.isSyncCompleted(conveyer.currentRoundNumber())) {
     cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes(istream_.getCurrentPtr(), istream_.getEndPtr());
@@ -2279,7 +2292,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     meta.bytes = std::move(characteristicBytes);
     meta.sender = sender;
 
-    conveyer.addCharacteristicMeta(rNum - 1, std::move(meta));
+    conveyer.addCharacteristicMeta(conveyer.currentRoundNumber(), std::move(meta));
     // no return, perform some more actions at the end
   }
   else {
@@ -2346,7 +2359,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     assert(sequence <= this->getRoundNumber());
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    conveyer.setCharacteristic(characteristic);
+    conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
     if (pool) {

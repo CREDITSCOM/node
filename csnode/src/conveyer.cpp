@@ -333,9 +333,9 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
     return std::make_optional<cs::CharacteristicMeta>(std::move(meta).value());
 }
 
-void cs::Conveyer::setCharacteristic(const Characteristic& characteristic)
+void cs::Conveyer::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round)
 {
-    cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
     if (meta)
     {
@@ -344,24 +344,39 @@ void cs::Conveyer::setCharacteristic(const Characteristic& characteristic)
     }
 }
 
-const cs::Characteristic& cs::Conveyer::characteristic() const
+const cs::Characteristic* cs::Conveyer::characteristic(cs::RoundNumber round) const
 {
-    auto meta = pimpl->metaStorage.get(pimpl->currentRound);
-    return meta->characteristic;
+    auto meta = pimpl->metaStorage.get(round);
+
+    if(!meta)
+    {
+        cserror() << "CONVEYER> Get characteristic, logic error, can not find characteristic, #" << round;
+        return nullptr;
+    }
+
+    return &meta->characteristic;
 }
 
-cs::Hash cs::Conveyer::characteristicHash() const
+cs::Hash cs::Conveyer::characteristicHash(cs::RoundNumber round) const
 {
-    const Characteristic& reference = characteristic();
-    return getBlake2Hash(reference.mask.data(), reference.mask.size());
+    const Characteristic* pointer = characteristic(round);
+
+    if (!pointer)
+    {
+        cserror() << "CONVEYER> Null pointer of characteristic, return empty Hash, round " << round;
+        return cs::Hash();
+    }
+
+    return getBlake2Hash(pointer->mask.data(), pointer->mask.size());
 }
 
 std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
 {
-    cslog() << "CONVEYER> ApplyCharacteristic";
+    cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
+    cslog() << "CONVEYER> ApplyCharacteristic, round " << round;
 
     cs::Lock lock(m_sharedMutex);
-    cs::ConveyerMeta* meta = pimpl->metaStorage.get(static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber));
+    cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
     if (!meta)
     {
