@@ -59,6 +59,7 @@ namespace cs {
         BlockChain* m_blockChain;
 
         inline static const int m_maxBlockCount = 4;
+        inline static const cs::RoundNumber s_roundDifferent = 2;
         const int m_maxWaitingTimeReply;
 
         // syncro variables

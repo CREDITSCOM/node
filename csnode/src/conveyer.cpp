@@ -375,7 +375,9 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     const cs::Characteristic& characteristic = meta->characteristic;
     cs::TransactionsPacketTable& currentHashTable = pimpl->hashTable;
 
-    cslog() << "CONVEYER> Characteristic bytes size " << characteristic.mask.size();
+    cslog() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
+    csdebug() << "CONVEYER> ApplyCharacteristic, viewing hashes count " << localHashes.size();
+    csdebug() << "CONVEYER> ApplyCharacteristic, viewing hash table size " << hashTable.size();
 
     csdb::Pool newPool;
     std::size_t maskIndex = 0;
@@ -431,6 +433,8 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         currentHashTable.erase(hash);
     }
     csdebug() << "CONVEYER> process transactions finished";
+
+    csdebug() << "CONVEYER> ApplyCharacteristic, invalid transactions count " << invalidTransactions.transactionsCount();
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);

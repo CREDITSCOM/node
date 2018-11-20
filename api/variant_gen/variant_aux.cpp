@@ -1,7 +1,7 @@
 #include <algorithm>
-#include <variant_types.h>
+#include <general_types.h>
 
-using namespace variant;
+using namespace general;
 
 bool
 operator<(const _Variant__isset& a, const _Variant__isset& b)

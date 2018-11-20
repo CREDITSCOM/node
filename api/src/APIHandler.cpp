@@ -122,7 +122,7 @@ void APIHandler::state_updater_work_function()
 }
 
 void
-APIHandlerBase::SetResponseStatus(APIResponse& response,
+APIHandlerBase::SetResponseStatus(general::APIResponse& response,
                                   APIRequestStatusType status,
                                   const std::string& details)
 {
@@ -148,7 +148,7 @@ APIHandlerBase::SetResponseStatus(APIResponse& response,
 }
 
 void
-APIHandlerBase::SetResponseStatus(APIResponse& response, bool commandWasHandled)
+APIHandlerBase::SetResponseStatus(general::APIResponse& response, bool commandWasHandled)
 {
   SetResponseStatus(response,
                     (commandWasHandled
@@ -455,9 +455,9 @@ fetch_smart_body(const csdb::Transaction& tr)
   }
   const auto sci = deserialize<api::SmartContractInvocation>(
     tr.user_field(0).value<std::string>());
-  res.byteCode = sci.byteCode;
-  res.sourceCode = sci.sourceCode;
-  res.hashState = sci.hashState;
+  res.smartContractDeploy.byteCode = sci.smartContractDeploy.byteCode;
+  res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
+  res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
 
   res.deployer = fromByteArray(tr.source().public_key());
   res.address = fromByteArray(tr.target().public_key());
@@ -538,6 +538,7 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Tra
 {
   work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
+  tr.add_user_field(1, transaction.userFields);
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -550,8 +551,8 @@ operator<<(std::ostream& s, const T& t)
   return s;
 }
 
-void APIHandler::execute_byte_code(executor::APIResponse& resp, 
-	const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<::variant::Variant> & params)
+void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp,
+	const std::string& address, const std::string& code, const std::string& state, const std::string& method, const std::vector<general::Variant> & params)
 {
   static std::mutex m;
   std::lock_guard<std::mutex> lk(m);
@@ -571,21 +572,21 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
   const auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
   const auto api_addr = transaction.source().to_api_addr();
 
-  executor::APIResponse api_resp;
+  executor::ExecuteByteCodeResult api_resp;
   //name
-  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getName", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getName", std::vector<::general::Variant>());
   _return.name = api_resp.ret_val.v_string;
   //decimal
   api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getDecimal", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getDecimal", std::vector<::general::Variant>());
   _return.decimal = api_resp.ret_val.v_string;
   //total coins
   api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "totalSupply", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "totalSupply", std::vector<::general::Variant>());
   _return.totalCoins = api_resp.ret_val.v_string;
   //symbol
   api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.byteCode, smart_state, "getSymbol", std::vector<::variant::Variant>());
+  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getSymbol", std::vector<::general::Variant>());
   _return.symbol = api_resp.ret_val.v_string;
   //owner
   _return.owner = api_resp.contractVariables["owner"].v_string;
@@ -605,13 +606,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   std::string origin_bytecode;
   if (!deploy) {
-    input_smart.byteCode.clear();
-    input_smart.sourceCode.clear();
+    input_smart.smartContractDeploy.byteCode.clear();
+    input_smart.smartContractDeploy.sourceCode.clear();
 
     decltype(auto) smart_origin = locked_ref(this->smart_origin);
     auto it = smart_origin->find(smart_addr);
     if (it != smart_origin->end())
-      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
     else {
       SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
       return;
@@ -644,13 +645,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
 
-  executor::APIResponse api_resp;
-  const std::string& bytecode = deploy ? input_smart.byteCode : origin_bytecode;
+  executor::ExecuteByteCodeResult api_resp;
+  const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
   execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
-  if (api_resp.code) {
-    _return.status.code     = api_resp.code;
-    _return.status.message  = api_resp.message;
+  if (api_resp.status.code) {
+    _return.status.code     = api_resp.status.code;
+    _return.status.message  = api_resp.status.message;
     contract_state_entry.update_state([&]()->decltype(auto) { return std::move(contract_state); });
     return;
   }
@@ -666,6 +667,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+  send_transaction.add_user_field(1, transaction.userFields);
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy)
@@ -1205,8 +1207,8 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) {
   executor::GetContractMethodsResult executor_ret;
   executor->getContractMethods(executor_ret, bytecode);
-  _return.code = executor_ret.code;
-  _return.message = executor_ret.message;
+  _return.code = executor_ret.status.code;
+  _return.message = executor_ret.status.message;
   for (int Count = 0; Count < executor_ret.methods.size(); Count++) {
     _return.methods[Count].name = executor_ret.methods[Count].name;
     _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
