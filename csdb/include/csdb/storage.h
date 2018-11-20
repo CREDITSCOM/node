@@ -188,6 +188,7 @@ public:
    * \sa ::csdb::Pool::load
    */
   Pool pool_load(const PoolHash &hash) const;
+  Pool pool_load(const uint32_t sequence) const;
   Pool pool_load_meta(const PoolHash &hash, size_t& cnt) const;
 
   /**
@@ -252,7 +253,7 @@ public:
   * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
   * \используется для входного параметра addr в виде id кошелька
   */
-  bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const;
+  bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const;
 
 private:
   ::std::shared_ptr<priv> d;

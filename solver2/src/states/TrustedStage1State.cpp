@@ -9,9 +9,7 @@
 #include <lib/system/utils.hpp>
 
 #include <blake2.h>
-#if LOG_LEVEL & FLAG_LOG_DEBUG
 #include <sstream>
-#endif
 
 namespace slv2
 {
@@ -64,24 +62,15 @@ namespace slv2
             return Result::Ignore;
         }
         cslog() << name() << ": transactions sync completed, start consensus in " << context.round() << " round";
-        cs::TransactionsPacket pack;
         cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-        for(const auto& hash : conveyer.roundTable().hashes) {
-            const auto& hashTable = conveyer.transactionsPacketTable();
-            if(hashTable.count(hash) == 0) {
-                cserror() << name() <<
-                    ": HASH NOT FOUND while prepare consensus to build vector, maybe method called before sync completed?";
-                return Result::Ignore;
-            }
-            const auto& transactions = conveyer.packet(hash).transactions();
-            for(const auto& transaction : transactions) {
-                if(!pack.addTransaction(transaction)) {
-                    cserror() << name() << ": cannot add transaction to packet while prepare consensus to build vector";
-                }
-            }
+        auto maybe_pack = conveyer.createPacket();
+        if(!maybe_pack.has_value()) {
+            cserror() << name() <<
+                ": error while prepare consensus to build vector, maybe method called before sync completed?";
+            return Result::Ignore;
         }
-        cslog() << name() << ": <-- packet of " << pack.transactionsCount() << " transactions";
+        cs::TransactionsPacket pack = std::move(maybe_pack.value());
+        cslog() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
 #if LOG_LEVEL & FLAG_LOG_DEBUG
         std::ostringstream os;
         for(const auto& t : p.transactions()) {
@@ -90,35 +79,37 @@ namespace slv2
         csdebug() << name() << ":" << os.str());
 #endif // FLAG_LOG_DEBUG
 
-        // good transactions storage
-        csdb::Pool accepted_pool {};
-        // bad tansactions storage:
-        csdb::Pool rejected_pool {};
-
         // obsolete?
         //pool = filter_test_signatures(context, pool);
 
         // see Solver::runCinsensus()
         context.update_fees(pack);
         stage.hash = build_vector(context, pack);
-        cslog() << name() << ": accepted " << accepted_pool.transactions_count()
-            << " trans, rejected " << rejected_pool.transactions_count();
-        context.accept_transactions(accepted_pool);
         transactions_checked = true;
 
         return (enough_hashes ? Result::Finish : Result::Ignore);
     }
 
-    Result TrustedStage1State::onHash(SolverContext & context, const cs::Hash & hash, const cs::PublicKey & sender)
+    Result TrustedStage1State::onHash(SolverContext & context, const csdb::PoolHash & pool_hash, const cs::PublicKey & sender)
     {
-        cslog() << name() << ": <-- hash " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
-            << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-        cs::Hash myHash;
-        const auto& lwh = context.blockchain().getLastWrittenHash().to_binary();
-        std::copy(lwh.cbegin(), lwh.cend(), myHash.begin());
+        // get node status for useful logging
+        std::string sender_status("N");
+        unsigned idx = 0;
+        for(const auto& key : context.trusted()) {
+            if(std::equal(key.cbegin(), key.cend(), sender.cbegin())) {
+                std::ostringstream os;
+                os << "T[" << idx << "]";
+                sender_status = os.str();
+                break;
+            }
+            ++idx;
+        }
+
+        cslog() << name() << ": <-- hash from " << sender_status << " (" << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
+        const auto& lwh = context.blockchain().getLastWrittenHash();
         if(stage.candidatesAmount < Consensus::MinTrustedNodes) {
-            if(hash == myHash) {
-              cslog() << name() << ": hash is OK"; 
+            if(pool_hash == lwh) {
+                cslog() << name() << ": hash is OK"; 
 
                 bool keyFound = false;
                 for(uint8_t i = 0; i < stage.candidatesAmount; i++) {
@@ -134,7 +125,9 @@ namespace slv2
             }
             else {
                 // hash does not match to own hash
-                cslog() << name() << ": hash DOESN'T match to my one";
+                cswarning() << name() << ": hash " << pool_hash.to_string()
+                    << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " DOESN'T match to my value " << lwh.to_string();
                 return Result::Ignore;
             }
         }
@@ -186,12 +179,6 @@ namespace slv2
 
     cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::TransactionsPacket& packet)
     {
-        cslog() << "Trusted-1: buildVector: " << packet.transactionsCount() << " transactions";
-
-        //std::memset(&m_hMatrix, 0, sizeof(m_hMatrix));
-
-        cs::Hash hash;
-
         const std::size_t transactionsCount = packet.transactionsCount();
         const auto& transactions = packet.transactions();
 
@@ -206,7 +193,6 @@ namespace slv2
             characteristicMask.reserve(transactionsCount);
 
             uint8_t del1;
-            csdb::Pool newPool;
 
             for(std::size_t i = 0; i < transactionsCount; ++i) {
                 const csdb::Transaction& transaction = transactions[i];
@@ -219,7 +205,11 @@ namespace slv2
                 characteristicMask.push_back(byte);
             }
 
-            ptransval->validateByGraph(characteristicMask, packet.transactions(), newPool);
+            csdb::Pool excluded;
+            ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
+            if(excluded.transactions_count() > 0) {
+                cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in build_vector()";
+            }
 
             characteristic.mask = std::move(characteristicMask);
             conveyer.setCharacteristic(characteristic);
@@ -229,16 +219,11 @@ namespace slv2
         }
 
         if(characteristic.mask.size() != transactionsCount) {
-            cserror() << "Trusted-1: Build vector, characteristic mask size not equals transactions count";
+            cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";
         }
 
-
+        cs::Hash hash;
         blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
-
-        //m_findUntrusted.fill(0);
-        //m_newTrusted.fill(0);
-        //m_hwTotal.fill(HashWeigth {});
-
         csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
         return hash;

@@ -93,7 +93,7 @@ Config Config::read(po::variables_map& vm) {
     vm["key-file"].as<std::string>() :
     DEFAULT_PATH_TO_PUBLIC_KEY;
   std::ifstream pub(keyFile);
-  
+
   if (pub.is_open()) {
     std::string pub58;
     std::vector<uint8_t> myPublic;
@@ -240,7 +240,7 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
     }
   }
   for (const auto& item: config) {
-    if (item.first.find("Sinks.") == 0)  
+    if (item.first.find("Sinks.") == 0)
       settings.add_child(boost::property_tree::ptree::path_type(item.first, '/'), item.second);
   }
   std::stringstream ss;

@@ -491,62 +491,6 @@ namespace slv2
         }
 
         /**
-         * @fn  bool SolverContext::is_hash_recv_from(const cs::PublicKey& sender) const;
-         *
-         * @brief   Query if is hash received from passed sender
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * @return  True if hash receive from, false if not.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        bool is_hash_recv_from(const cs::PublicKey& sender) const
-        {
-            return (std::find(core.recv_hash.cbegin(), core.recv_hash.cend(), sender) != core.recv_hash.cend());
-        }
-
-        /**
-         * @fn  void SolverContext::recv_hash_from(const cs::PublicKey& sender);
-         *
-         * @brief   Inform core to remember that hash from passed sender is received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @param   sender  The sender.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        void recv_hash_from(const cs::PublicKey& sender)
-        {
-            core.recv_hash.push_back(sender);
-        }
-
-        /**
-         * @fn  size_t SolverContext::cnt_hash_recv() const;
-         *
-         * @brief   Count of hashes received
-         *
-         * @author  aae
-         * @date    03.10.2018
-         *
-         * @return  The total number of hash receive.
-         *
-         * ### remarks  Aae, 30.09.2018.
-         */
-
-        size_t cnt_hash_recv() const
-        {
-            return core.recv_hash.size();
-        }
-
-        /**
          * @fn  csdb::Address SolverContext::address_genesis() const
          *
          * @brief   Address genesis
@@ -637,6 +581,7 @@ namespace slv2
          */
 
         bool transaction_still_in_pool(int64_t inner_id) const;
+        void request_round_info(uint8_t respondent1, uint8_t respondent2);
 
     private:
 

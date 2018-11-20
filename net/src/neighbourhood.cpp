@@ -42,10 +42,11 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
     }
 
     if (!found) {
-      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundTable))
+      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundInfo))
         sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
-      if (nb->isSignal)  // Assume the SS got this
-        *(bp.recEnd++) = nb->id;
+      if (nb->isSignal && bp.pack.getType() == MsgTypes::RoundInfo) // Assume the SS got this
+        sent = transport_->sendDirect(&(bp.pack), **nb);
+        //*(bp.recEnd++) = nb->id;
       else
         result = true;
     }
@@ -591,7 +592,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
       nb->syncSeq = 0;
       nb->syncSeqRetries = 0;
     }
-    else if (!nb->syncSeq)
+    if (!candidate && !nb->syncSeq)
       candidate = nb;
   }
 

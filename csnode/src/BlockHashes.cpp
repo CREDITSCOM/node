@@ -42,6 +42,7 @@ void BlockHashes::initStart()
 bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock)
 {
     csdb::Pool::sequence_t seq = prevBlock.sequence();
+    db_.last_ = seq;
     if (!isDbInited_)
     {
         db_.first_ = 0;
@@ -49,12 +50,6 @@ bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock)
         hashes_.reserve(db_.last_ + 1);
         isDbInited_ = true;
     }
-    else if (seq > db_.last_)
-        return false;
-
-    size_t tmpInd = db_.last_ - seq;
-    if (tmpInd != hashes_.size())
-        return false;// see BlockChain::putBlock
 
     hashes_.emplace_back(prevBlock.hash());
     return true;

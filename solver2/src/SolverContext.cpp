@@ -92,7 +92,7 @@ namespace slv2
 
     void SolverContext::spawn_next_round()
     {
-        LOG_NOTICE("SolverCore: spawn next round 0");
+        LOG_NOTICE("SolverCore: spawn next round");
         if(Consensus::Log) {
             if(core.trusted_candidates.empty()) {
                 LOG_ERROR("SolverCore: trusted candidates list must not be empty while spawn next round");
@@ -100,10 +100,19 @@ namespace slv2
         }
         LOG_NOTICE("New confidant nodes: ");
         int i = 0;
-        for (auto& it : core.trusted_candidates) {
-          cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
-          ++i;
+        for(auto& it : core.trusted_candidates) {
+            cslog() << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
+            ++i;
         }
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 10) {
+        //    return;
+        //}
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 20) {
+        //    return;
+        //}
+        //if(stage3((uint8_t) own_conf_number())->writer == (uint8_t) own_conf_number() && round() == 30) {
+        //    return;
+        //}
         core.spawn_next_round(core.trusted_candidates);
     }
 
@@ -194,6 +203,14 @@ namespace slv2
             }
         }
         return false;
+    }
+
+    void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
+    {
+        cslog() << "SolverCore: ask [" << (int) respondent1 << "] for RoundInfo";
+        core.pnode->sendRoundInfoRequest(respondent1);
+        cslog() << "SolverCore: ask [" << (int) respondent2 << "] for RoundInfo";
+        core.pnode->sendRoundInfoRequest(respondent2);
     }
 
 } // slv2

@@ -47,7 +47,7 @@ public:
 
   ~FixedCircularBuffer() {
     clear();
-    delete[] elements_;
+    delete[] reinterpret_cast<uint8_t*>(elements_);
   }
 
   FixedCircularBuffer(const FixedCircularBuffer&) = delete;
@@ -152,7 +152,7 @@ public:
     for (auto ptr = elements_; ptr != end_; ++ptr)
       ptr->~T();
 
-    delete[] elements_;
+    delete[] reinterpret_cast<uint8_t*>(elements_);
   }
 
   FixedVector(const FixedVector&) = delete;

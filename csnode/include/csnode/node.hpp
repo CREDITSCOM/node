@@ -1,6 +1,6 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __NODE_HPP__
-#define __NODE_HPP__
+#ifndef NODE_HPP
+#define NODE_HPP
 
 #include <iostream>
 #include <memory>
@@ -23,6 +23,10 @@ class Transport;
 
 namespace slv2 {
   class SolverCore;
+}
+
+namespace cs {
+  class PoolSynchronizer;
 }
 
 class Node {
@@ -55,7 +59,7 @@ public:
   //SOLVER3 methods
   void sendStageOne(cs::StageOne&);
   // sends StageOne request to respondent about required
-  void getHash_V3(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void requestStageOne(uint8_t respondent, uint8_t required);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
@@ -70,7 +74,7 @@ public:
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
-  void sendHash_V3();
+  void sendHash_V3(cs::RoundNumber round);
   void writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   const cs::ConfidantsKeys confidants() const
@@ -81,14 +85,15 @@ public:
   void onRoundStart_V3(const cs::RoundTable& roundTable);
 
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
-  void addCompressedPoolToPack(const csdb::Pool& pool);
 
-  void sendRoundInfo(cs::RoundTable& roundTable);
+  void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
+  void prepareMetaForSending(cs::RoundTable& roundTable);
 
   void sendRoundInfoRequest(uint8_t respondent);
-  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
-  void sendRoundInfoReply(uint8_t, uint8_t);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
+  void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
+  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
+  bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -96,8 +101,6 @@ public:
 
   void getRoundTable(const uint8_t*, const size_t, const cs::RoundNumber);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
-
-  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
@@ -112,7 +115,7 @@ public:
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getBlockReply(const uint8_t*, const size_t);
+  void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
 
   // outcoming requests forming
   void sendVector(const cs::HashVector&);
@@ -127,8 +130,7 @@ public:
   void resetNeighbours();
 
   // syncro send functions
-  void sendBlockRequest();
-  void sendBlockReply(const csdb::Pool&, const cs::PublicKey& target);
+  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
 
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
@@ -153,7 +155,7 @@ public:
   void initNextRound( std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
-  bool getSyncroStarted();
+  bool isPoolsSyncroStarted();
 
   enum MessageActions {
     Process,
@@ -198,14 +200,21 @@ public:
 
 public slots:
   void processTimer();
+  void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
+  void onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences);
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTableconst,
+  void createRoundPackage(const cs::RoundTable& roundTable,
     const cs::PoolMetaInfo& poolMetaInfo,
     const cs::Characteristic& characteristic,
     const cs::Signature& signature,
     const cs::Notifications& notifications);
+  void storeRoundPackageData(const cs::RoundTable& roundTable,
+      const cs::PoolMetaInfo& poolMetaInfo,
+      const cs::Characteristic& characteristic,
+      const cs::Signature& signature,
+      const cs::Notifications& notifications);
 
   // signature verification
   bool checkKeysFile();
@@ -249,11 +258,6 @@ private:
   const cs::PublicKey nodeIdKey_;
   bool good_ = true;
 
-  // syncro variables
-  std::atomic<bool> isSyncroStarted_ = false; // read by spammer thread, read & write by "main" node thread
-  bool isAwaitingSyncroBlock_ = false;
-  uint32_t awaitingRecBlockCount_ = 0;
-
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
@@ -270,6 +274,7 @@ private:
   // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
+  cs::PoolSynchronizer* poolSynchronizer_;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;
@@ -285,6 +290,7 @@ private:
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
 
+  // serialization/deserialization entities
   cs::IPackStream istream_;
   cs::OPackStream ostream_;
 
@@ -292,9 +298,18 @@ private:
   cs::Timer sendingTimer_;
 
   // sync meta
-  csdb::Pool::sequence_t sendBlockRequestSequence_;
   cs::PoolMetaMap poolMetaMap_;   // active pool meta information
-  cs::RoundNumber roundToSync_ = 0;
+
+  // round package sent data storage
+  struct SentRoundData
+  {
+      cs::RoundTable round_table;
+      cs::PoolMetaInfo pool_meta_info;
+      cs::Characteristic characteristic;
+      cs::Signature pool_signature;
+      cs::Notifications notifications;
+  };
+  SentRoundData last_sent_round_data;
 };
 
 std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);

@@ -245,7 +245,8 @@ namespace slv2
         cs::RoundTable table;
         table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
         table.confidants = trusted_nodes;
-        pnode->sendRoundInfo(table);
+        pnode->prepareMetaForSending(table);
+
         //pnode->onRoundStart(conveyer.roundTable());
     }
 
@@ -348,12 +349,6 @@ namespace slv2
                 break;
             }
         }
-    }
-
-    void SolverCore::gotRoundInfoRequest(uint8_t /*requesterNumber*/)
-    {
-
-
     }
 
 } // slv2

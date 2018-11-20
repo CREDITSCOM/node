@@ -215,7 +215,7 @@ namespace slv2
             csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
             if(p.is_valid()) {
                 os << "[" << p.sequence() << "] found, sending";
-                pnode->sendBlockReply(p, sender);
+//                pnode->sendBlockReply(p, sender);
             }
             else {
                 os << "not found";
@@ -235,16 +235,18 @@ namespace slv2
             pslv_v1->gotBlockReply(std::move(p));
             return;
         }
-
-        if(Consensus::Log) {
-            //LOG_NOTICE("SolverCore: gotBlockReply()");
-            LOG_EVENT("SolverCore: got block [" << p.sequence() << "] on my request");
+        if(!pstate) {
+            return;
         }
-        if(p.sequence() == pnode->getBlockChain().getLastWrittenSequence() + 1) {
-            store_received_block(p, false);
-        }
-        else {
-            gotIncorrectBlock(std::move(p), cs::PublicKey {});
+        // "uncache" stored hashes if any
+        if(!recv_hash.empty()) {
+            if(cur_round - pnode->getBlockChain().getLastWrittenSequence() == 1) {
+                for(const auto& hash_sender : recv_hash) {
+                    if(stateCompleted(pstate->onHash(*pcontext, hash_sender.first, hash_sender.second))) {
+                        handleTransitions(Event::Hashes);
+                    }
+                }
+            }
         }
     }
 
@@ -255,18 +257,18 @@ namespace slv2
             return;
         }
 
+        csdb::Pool::sequence_t delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
+        if(delta > 1) {
+            recv_hash.push_back(std::make_pair<>(hash, sender));
+            csdebug() << "SolverCore: cache hash until last block ready";
+            return;
+        }
+
         if(!pstate) {
             return;
         }
-        if(Consensus::Log) {
-            LOG_EVENT("SolverCore: gotHash()");
-        }
 
-        //TODO: replace cs::Hash with csdb::PoolHash in INodeState::onHash(.., hash, ..) interface
-        const auto& bytes = hash.to_binary();
-        cs::Hash h;
-        std::copy(bytes.cbegin(), bytes.cend(), h.begin());
-        if(stateCompleted(pstate->onHash(*pcontext, h, sender))) {
+        if(stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
             handleTransitions(Event::Hashes);
         }
     }
@@ -425,7 +427,7 @@ namespace slv2
         auto desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 2;
         if(desired_seq < cur_round) {
             // empty args requests exactly what we need:
-            pnode->sendBlockRequest();
+//            pnode->sendBlockRequest();
         }
 
         if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {
@@ -434,7 +436,7 @@ namespace slv2
 
         if(1 == cur_round) {
             scheduler.InsertOnce(Consensus::T_round, [this]() {
-                pnode->sendHash_V3();
+                pnode->sendHash_V3(1);
                 //gotTransactionList_V3(std::move(csdb::Pool{}));
             });
         }
@@ -596,6 +598,60 @@ namespace slv2
             }
         }
         return cnt;
+    }
+
+    void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)
+    {
+        cslog() << "SolverCore: got request for round info from " << cs::Utils::byteStreamToHex(requester.data(), requester.size());
+
+        if(requester_round == cur_round) {
+            const auto ptr = /*cur_round == 10 ? nullptr :*/ find_stage3(pnode->getConfidantNumber());
+            if(ptr != nullptr) {
+                if(ptr->sender == ptr->writer) {
+                    if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber) cur_round)) {
+                        cslog() << "SolverCore: re-send full round info #" << cur_round;
+                        return;
+                    }
+                }
+            }
+            cslog() << "SolverCore: also on the same round, inform cannot help with";
+            pnode->sendRoundInfoReply(requester, false);
+        }
+        else if(requester_round < cur_round) {
+            for(const auto& node : pnode->confidants()) {
+                if(requester == node) {
+                    if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber) cur_round)) {
+                        cslog() << "SolverCore: requester is trusted next round, supply it with round info";
+                        return;
+                    }
+                    cslog() << "SolverCore: try but cannot send full round info";
+                    break;
+                }
+            }
+            cslog() << "SolverCore: inform requester next round has come";
+            pnode->sendRoundInfoReply(requester, true);
+        }
+        else {
+            // requester_round > cur_round, cannot help with!
+            cslog() << "SolverCore: cannot help with outrunning round info";
+        }
+    }
+
+    void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey& /*respondent*/)
+    {
+        if(next_round_started) {
+            cslog() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
+            return;
+        }
+        cswarning() << "SolverCore: round info reply means next round is not started, become writer in 2 sec";
+        size_t stored_round = cur_round;
+        scheduler.InsertOnce(1000, [this, stored_round]() {
+            if(stored_round == cur_round) {
+                // still did not receive next round info - become writer
+                handleTransitions(SolverCore::Event::SetWriter);
+            }
+        }, true);
+        
     }
 
 } // slv2

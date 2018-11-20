@@ -74,10 +74,10 @@ namespace cs
         const cs::TransactionsBlock& transactionsBlock() const;
 
         ///
-        /// @brief Returns transactions packet by hash.
-        /// Search in current hash table
+        /// @brief Returns transactions packet created in current round.
+        /// @warning Slow-performance method. No thread safe.
         ///
-        const cs::TransactionsPacket& packet(const cs::TransactionsPacketHash& hash) const;
+        std::optional<cs::TransactionsPacket> createPacket() const;
 
         // round info
 
@@ -94,6 +94,12 @@ namespace cs
         const cs::RoundTable& roundTable() const;
 
         ///
+        /// @brief Returns blockchain round table of Round key.
+        /// @warning If round table does not exist in meta, returns nullptr.
+        ///
+        const cs::RoundTable* roundTable(cs::RoundNumber round) const;
+
+        ///
         /// @brief Returns current round number.
         /// Locks mutex and returns safe round number.
         ///
@@ -106,9 +112,9 @@ namespace cs
 
         ///
         /// @brief Returns round needed hashes.
-        /// @return returns cs::Hashes.
+        /// @return returns cs::Hashes. If no hashes found returns nullptr.
         ///
-        const cs::Hashes& neededHashes(cs::RoundNumber round) const;
+        const cs::Hashes* neededHashes(cs::RoundNumber round) const;
 
         ///
         /// @brief Adds synced packet to conveyer.
@@ -156,7 +162,7 @@ namespace cs
         /// @brief Adds characteristic meta if early characteristic recevied from network.
         /// @param meta Created on network characteristic meta information.
         ///
-        void addCharacteristicMeta(cs::CharacteristicMetaStorage::MetaElement&& meta);
+        void addCharacteristicMeta(cs::RoundNumber round, CharacteristicMeta&& characteristic);
 
         ///
         /// @brief Returns characteristic meta from storage if found otherwise return empty meta.
@@ -167,10 +173,10 @@ namespace cs
         // characteristic
 
         ///
-        /// @brief Sets ct round characteristic function.
+        /// @brief Sets round characteristic function.
         /// @param characteristic Created characteristic on network level.
         ///
-        void setCharacteristic(const cs::Characteristic& characteristic);
+        void setCharacteristic(const Characteristic& characteristic);
 
         ///
         /// @brief Returns current round characteristic.
@@ -198,6 +204,13 @@ namespace cs
         /// @return Returns transactions packet if its found, otherwise returns nothing.
         ///
         std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
+
+        ///
+        /// @brief Returns existing of invalid transaction in meta storage.
+        /// @param innerId of transaction to search equal transaction.
+        /// @warning thread safe method.
+        ///
+        bool isMetaTransactionInvalid(int64_t id);
 
         // sync, try do not use it :]
 

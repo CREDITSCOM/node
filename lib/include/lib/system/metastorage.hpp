@@ -89,17 +89,6 @@ namespace cs
         }
 
         ///
-        /// @brief Appends meta element to buffer.
-        /// @param element Created from outside no needed lvalue, cuz it would be moved.
-        /// @return Returns true if append is success, otherwise returns false.
-        /// @warning value would be moved.
-        ///
-        bool append(MetaElement& value)
-        {
-            return append(std::move(value));
-        }
-
-        ///
         /// @brief Appends value with round key.
         /// @param round Current round to add as a key.
         /// @param value Movable value created from outside.
@@ -167,7 +156,7 @@ namespace cs
         }
 
         ///
-        /// @brief Returns reference to existing element, otherwise returns nullptr.
+        /// @brief Returns pointer to existing element, otherwise returns nullptr.
         /// @param round Round of searching element.
         /// @return Reference to element.
         /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
@@ -183,6 +172,22 @@ namespace cs
             }
 
             return &(iterator->meta);
+        }
+
+        ///
+        /// @brief Returns const begin interator of circular buffer.
+        ///
+        auto begin() const
+        {
+            return m_buffer.begin();
+        }
+
+        ///
+        /// @brief Returns const end interator of circular buffer.
+        ///
+        auto end() const
+        {
+            return m_buffer.end();
         }
 
     private:

@@ -125,8 +125,19 @@ class Pool::priv : public ::csdb::internal::shared_data
         os.put(wall);
     }
 
-      os.put(writer_public_key_);
-      os.put(signature_);
+    os.put(next_confidants_.size());
+    for(const auto& it : next_confidants_) {
+      os.put(it);
+    }
+
+    os.put(signatures_.size());
+    for(const auto& it : signatures_) {
+      os.put(it.first);
+      os.put(it.second);
+    }
+
+    os.put(writer_public_key_);
+    os.put(signature_);
   }
 
   void put_for_sig(::csdb::priv::obstream& os)
@@ -146,7 +157,12 @@ class Pool::priv : public ::csdb::internal::shared_data
         os.put(wall);
     }
 
-      os.put(writer_public_key_);
+    os.put(next_confidants_.size());
+    for(const auto& it : next_confidants_) {
+      os.put(it);
+    }
+
+    os.put(writer_public_key_);
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
@@ -185,6 +201,47 @@ class Pool::priv : public ::csdb::internal::shared_data
       return true;
   }
 
+  bool getConfidants(::csdb::priv::ibstream& is)
+  {
+    size_t cnt = 0;
+    if (!is.get(cnt))
+      return false;
+
+    next_confidants_.clear();
+    next_confidants_.reserve(cnt);
+    for (size_t i = 0; i < cnt; ++i)
+    {
+      ::std::vector<uint8_t> conf;
+      if (!is.get(conf))
+        return false;
+      next_confidants_.emplace_back(conf);
+    }
+    return true;
+  }
+
+  bool getSignatures(::csdb::priv::ibstream& is)
+  {
+    size_t cnt = 0;
+    if (!is.get(cnt))
+      return false;
+
+    next_confidants_.clear();
+    next_confidants_.reserve(cnt);
+    for (size_t i = 0; i < cnt; ++i)
+    {
+      int index;
+      ::std::string sig;
+
+      if (!is.get(index))
+        return false;
+      if (!is.get(sig))
+        return false;
+
+      signatures_.emplace_back(make_pair(index, sig));
+    }
+    return true;
+  }
+
   bool getNewWallets(::csdb::priv::ibstream& is)
    {
       size_t cnt = 0;
@@ -202,6 +259,7 @@ class Pool::priv : public ::csdb::internal::shared_data
       }
       return true;
   }
+
   bool get(::csdb::priv::ibstream& is)
   {
     size_t cnt;
@@ -212,6 +270,12 @@ class Pool::priv : public ::csdb::internal::shared_data
         return false;
 
     if (!getNewWallets(is))
+        return false;
+
+    if (!getConfidants(is))
+        return false;
+
+    if (!getSignatures(is))
         return false;
 
     if (!is.get(writer_public_key_))
@@ -271,12 +335,14 @@ class Pool::priv : public ::csdb::internal::shared_data
   PoolHash hash_;
   PoolHash previous_hash_;
   Pool::sequence_t sequence_;
-  std::vector<Transaction> transactions_;
+  ::std::vector<::std::vector<uint8_t>> next_confidants_;
+  ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   ::std::vector<uint8_t> writer_public_key_;
+  ::std::vector<std::pair<int, ::std::string>> signatures_;
   ::csdb::internal::byte_array binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
@@ -429,6 +495,16 @@ std::string Pool::signature() const noexcept
   return d->signature_;
 }
 
+const ::std::vector<::std::vector<uint8_t>>& Pool::confidants() const noexcept
+{
+  return d->next_confidants_;
+}
+
+const ::std::vector<std::pair<int, ::std::string>>& Pool::signatures() const noexcept
+{
+  return d->signatures_;
+}
+
 void Pool::set_sequence(Pool::sequence_t seq) noexcept
 {
   if (d.constData()->read_only_) {
@@ -471,6 +547,27 @@ void Pool::set_signature(const std::string& signature) noexcept
   priv* data = d.data();
   data->is_valid_ = true;
   data->signature_ = signature;
+}
+
+void Pool::set_confidants(std::vector<::std::vector<uint8_t>>& confidants) noexcept
+{
+  if (d.constData()->read_only_) {
+    return;
+  }
+
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->next_confidants_ = confidants;
+}
+
+void Pool::add_signature(int index, ::std::string& signature) noexcept
+{
+  if (d.constData()->read_only_) {
+    return;
+  }
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->signatures_.emplace_back(std::make_pair(index, signature));
 }
 
 void Pool::set_storage(Storage storage) noexcept

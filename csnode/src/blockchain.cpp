@@ -83,23 +83,22 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer)
     bool res = false;
     try
     {
-        //blockHashes_->loadDbStructure();
-        blockHashes_->initStart();
+        csdb::Pool pool = loadBlock(getLastHash());
+        uint32_t last_written_sequence = static_cast<uint32_t>(pool.sequence());
+        uint32_t current_sequence = 1;
 
-        csdb::Pool prev = loadBlock(getLastHash());
-
-        while (prev.is_valid())
+        while (current_sequence <= last_written_sequence + 1)
         {
-            if (!updateWalletIds(prev, initer))
+            pool = loadBlock(current_sequence);
+            if (!updateWalletIds(pool, initer))
                 return false;
-            initer.loadPrevBlock(prev);
-            if (!blockHashes_->initFromPrevBlock(prev))
+            initer.loadPrevBlock(pool);
+            if (!blockHashes_->initFromPrevBlock(pool))
                 return false;
 
-            prev = loadBlock(prev.previous_hash());
+            ++current_sequence;
         }
 
-        blockHashes_->initFinish();
         blockHashes_->saveDbStructure();
 
         lastHash_ = getLastHash();
@@ -239,6 +238,12 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const
     return storage_.pool_load(ph);
 }
 
+csdb::Pool BlockChain::loadBlock(const uint32_t sequence) const
+{
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  return storage_.pool_load(sequence);
+}
+
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const
 {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -305,43 +310,34 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 bool BlockChain::putBlock(csdb::Pool& pool)
 {
     // Put on top
-    cslog() << "---------------------------  Write New Block: " << pool.sequence() << " :  " << pool.transactions_count() << " transactions" << " --------------------------------";
+    cslog() << "----------------------------- Write New Block ------------------------------";
+    cslog() << " sequence " << pool.sequence() << ", transactions count " << pool.transactions_count();
 
-    csdebug() << "sequence: " << pool.sequence() << ", time: " << pool.user_field(0).value<std::string>().c_str();
-    csdebug() << " Last      hash: " << lastHash_.to_string();
-    csdebug() << "Checking Sequence ... ";
+    csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
+    csdebug() << " last hash: " << lastHash_.to_string();
+    csdebug() << " last storage size: " << storage_.size();
 
+    bool result = false;
     if (pool.sequence() == getLastWrittenSequence() + 1) {
-        cslog()  << "OK";
+        cslog()  << " sequence OK";
 
         pool.set_previous_hash(lastHash_);
-
         writeBlock(pool);
-
         lastHash_ = pool.hash();
-
-        csdebug() << "New last hash: " << lastHash_.to_string();
-        csdebug() << "New last storage size: " << storage_.size();
-
-        if (global_sequence == getLastWrittenSequence())
-        {
+        if (global_sequence == getLastWrittenSequence()) {
             blockRequestIsNeeded = false;
         }
-
-        return true;
+        result = true;
     }
-    else
-    {
-        cslog() << "Failed";
-
+    else {
+        cslog() << " sequence failed, chain syncro start";
         ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
-        cslog() << "Chain syncro part ... start ";
-
         global_sequence = pool.sequence();
         blockRequestIsNeeded = true;
-
-        return false;
+        result = false;
     }
+    cslog() << "----------------------------------------------------------------------------";
+    return result;
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const
@@ -783,4 +779,30 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address &addr) cons
   if (!walletIds_->normal().findaddr(id, addr))
     return false;
   return true;
+}
+
+void BlockChain::recount_trxns(const std::optional<csdb::Pool> & new_pool) {
+  if (new_pool.value().transactions_count()) {
+    csdb::Address addr_send, addr_recv;
+    for (const auto &trx : new_pool.value().transactions()) {
+      addr_send = trx.source();
+      if (addr_send.is_wallet_id()) {
+          WalletId id = *reinterpret_cast<const WalletId*>(addr_send.to_api_addr().data());
+        if (!findAddrByWalletId(id, addr_send))
+          return;
+      }
+      addr_recv = trx.target();
+      if (addr_recv.is_wallet_id()) {
+        WalletId id = *reinterpret_cast<const WalletId*>(addr_recv.to_api_addr().data());
+        if (!findAddrByWalletId(id, addr_recv))
+          return;
+      }
+      m_trxns_count[addr_send].sendCount++;
+      m_trxns_count[addr_send].recvCount++;
+    }
+  }
+}
+
+const BlockChain::AddrTrnxCount &BlockChain::get_trxns_count(const csdb::Address &addr) {
+  return m_trxns_count[addr];
 }

@@ -67,7 +67,7 @@ public:
   MOCK_METHOD0(flushCurrentTasks, void());
   MOCK_METHOD0(becomeWriter, void());
   MOCK_METHOD1(initNextRound, void(const cs::RoundTable& roundInfo));
-  MOCK_METHOD0(getSyncroStarted, bool());
+  MOCK_METHOD0(isPoolsSyncroStarted, bool());
 
   MOCK_METHOD2(chooseMessageActionm, MessageActions(const cs::RoundNumber, const MsgTypes));
 
