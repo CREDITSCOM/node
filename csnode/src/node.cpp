@@ -2577,11 +2577,14 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
 
 void Node::startConsensus()
 {
-    cslog() << "NODE> -------> STARTING CONSENSUS <-------";
     cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
     solver_->gotRound(rnum);
     transport_->processPostponed(rnum);
-    sendHash_V3(rnum);
+    auto lws = getBlockChain().getLastWrittenSequence();
+    // claim the trusted role only if have got proper blockchain:
+    if(rnum > lws && rnum - lws == 1) {
+        sendHash_V3(rnum);
+    }
 }
 
  void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)
