@@ -433,6 +433,7 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
                     << std::setw(6) << transaction.innerID() << " "
                     << std::setw(65) << transaction.source().to_string();
             }
+
             ++maskIndex;
         }
 
@@ -447,7 +448,6 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
         //csdebug() << "CONVEYER> Hash deleted > " << hash.toString();
         currentHashTable.erase(hash);
     }
-    csdebug() << "CONVEYER> process transactions finished";
 
     csdebug() << "CONVEYER> ApplyCharacteristic, invalid transactions count " << invalidTransactions.transactionsCount();
 
@@ -466,8 +466,8 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     newPool.set_sequence(metaPoolInfo.sequenceNumber);
     newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-    const auto& writerPublicKey = sender;
-    newPool.set_writer_public_key(csdb::internal::byte_array(writerPublicKey.begin(), writerPublicKey.end()));
+    csdb::internal::byte_array writerPublicKey(sender.begin(), sender.end());
+    newPool.set_writer_public_key(std::move(writerPublicKey));
 
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }
