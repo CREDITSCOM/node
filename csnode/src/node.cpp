@@ -1038,16 +1038,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   }
 
   csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
-
-  const auto msgType = MsgTypes::TransactionsPacketRequest;
-  const auto& general = cs::Conveyer::instance().roundTable().general;
-
-  const bool sendToGeneral = sendNeighbours(general, msgType, round, hashes);
-
-  if (!sendToGeneral) {
-    csdebug() << "NODE> Sending transaction packet request: Cannot get a connection with a general ";
-    sendPacketHashesRequestToRandomNeighbour(hashes, round);
-  }
+  sendPacketHashesRequestToRandomNeighbour(hashes, round);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
@@ -1136,7 +1127,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   istream_.init(data, size);
   istream_ >> sequencesCount;
 
-  cslog() << "NODE> Packet hashes request got sequences count: " << sequencesCount;
+  cslog() << "NODE> Block request got sequences count: " << sequencesCount;
   cslog() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (sequencesCount == 0) {
@@ -1185,10 +1176,20 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
   cslog() << "NODE> Get Block Reply";
   csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-   std::size_t poolsCount = 0;
+  if (!poolSynchronizer_->isSyncroStarted()) {
+    cswarning() << "NODE> Get block reply> Pool synchronizer already is syncro started";
+    return;
+  }
 
-   istream_.init(data, size);
-   istream_ >> poolsCount;
+  std::size_t poolsCount = 0;
+
+  istream_.init(data, size);
+  istream_ >> poolsCount;
+
+  if (!poolsCount) {
+    cserror() << "NODE> Get block reply> Pools count is 0";
+    return;
+  }
 
   cs::PoolsBlock poolsBlock;
   poolsBlock.reserve(poolsCount);
