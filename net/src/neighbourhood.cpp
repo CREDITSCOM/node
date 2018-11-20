@@ -667,6 +667,11 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
 }
 
 int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) {
+  if (neighbours_.size() == 0) {
+    cslog() << "No neighbours!!!";
+    return -1;
+  }
+
   const std::size_t neighbourCount = neighbours_.size() - 1;
 
   if (attemptCount > (neighbourCount * 3)) {
