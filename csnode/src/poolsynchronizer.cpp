@@ -117,6 +117,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
         if (!target) {
             csdebug() << "POOL SYNCHRONIZER> No more free requestees";
+            m_transport->syncReplied(sequence);
             break;  // No more free requestees
         }
 
