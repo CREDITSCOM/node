@@ -474,10 +474,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return;
   }
 
-  constexpr cs::RoundNumber roundDifferent = 10;
+  constexpr cs::RoundNumber roundDifferent = 5;
 
-  if ((rNum + roundDifferent) <= node_->getRoundNumber()) {
-    csdebug() << "TRANSPORT> Ignore super previous round packs, # " << rNum;
+  if ((rNum + roundDifferent) < node_->getRoundNumber()) {
+    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << " message type " << static_cast<int>(type);
     return;
   }
 
