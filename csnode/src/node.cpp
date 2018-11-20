@@ -1278,9 +1278,10 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   cs::Packets packets;
 
   const auto& conveyer = cs::Conveyer::instance();
+  cs::SharedLock lock(conveyer.sharedMutex());
 
   for (const auto& hash : hashes) {
-    std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
+    std::optional<cs::TransactionsPacket> packet = conveyer.findPacket(hash, round);
 
     if (packet) {
       packets.push_back(std::move(packet).value());

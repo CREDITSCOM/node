@@ -202,8 +202,9 @@ namespace cs
         /// @brief Searches transactions packet in current hash table, or in hash table storage.
         /// @param hash Created transactions packet hash.
         /// @return Returns transactions packet if its found, otherwise returns nothing.
+        /// @warning No thread safe.
         ///
-        std::optional<cs::TransactionsPacket> searchPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
+        std::optional<cs::TransactionsPacket> findPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
 
         ///
         /// @brief Returns existing of invalid transaction in meta storage.
