@@ -30,11 +30,7 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
-    if (!m_isSyncroStarted) {
-        return;
-    }
-
-    cslog() << "POOL SYNCHRONIZER> Get Block Reply from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() ;
+    cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() ;
 
     /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
     const csdb::Pool::sequence_t writtenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
@@ -42,6 +38,8 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
 
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
+
+        m_transport->syncReplied(cs::numeric_cast<uint32_t>(sequence));
 
         if (m_blockChain->getGlobalSequence() < sequence) {
             m_blockChain->setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
@@ -92,7 +90,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
 }
 
 void cs::PoolSynchronizer::sendBlockRequest() {
-    uint32_t neighbours = m_transport->getNeighboursCount();
+    uint32_t neighboursCount = m_transport->getNeighboursCount();
 
     if (m_transport->getNeighboursCount() == 0) {
         csdebug() << "POOL SYNCHRONIZER> Neighbours count is 0";
@@ -104,7 +102,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     bool isRequest = false;
     bool isRepeat = false;
 
-    for (; neighbours > 0; --neighbours) {
+    for (; neighboursCount > 0; ) {
         if (!isRepeat && !getPoolRequestedSequences()) {
             csdebug() << "POOL SYNCHRONIZER> >>> All sequences already requested";
             break;
@@ -126,12 +124,12 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         if (alreadyRequested) {  // Already requested this block from this guy?
             csdebug() << "POOL SYNCHRONIZER> target is already requested " << target->getOut();
             m_transport->syncReplied(sequence);
-            ++neighbours;
             isRepeat = true;
         }
         else { /// Fix me
             isRepeat = false;
             sendBlock(target, m_receivedSequences);
+            --neighboursCount;
         }
     }
 
@@ -188,7 +186,7 @@ bool cs::PoolSynchronizer::checkActivity() {
 
 void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
     csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
-    cslog() << "POOL SYNCHRONIZER> Sending block request, sequences from: " << sequences.front() << "   to: " << sequences.back();
+    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> sequences from: " << sequences.front() << "   to: " << sequences.back();
 
     for (const auto& sequence : sequences) {
         if (!m_requestedSequences.count(sequence)) {
@@ -212,16 +210,17 @@ void cs::PoolSynchronizer::addToTemporaryStorage(const csdb::Pool& pool) {
 }
 
 csdb::Pool::sequence_t cs::PoolSynchronizer::processingTemporaryStorage() {
-    csdb::Pool::sequence_t neededSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
+    csdb::Pool::sequence_t lastSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
 
     if (m_temporaryStorage.empty()) {
         csdebug() << "POOL SYNCHRONIZER> temaporary storage is empty";
-        return neededSequence;
+        return lastSequence;
     }
 
-    bool loop = true;
+    csdb::Pool::sequence_t neededSequence = lastSequence;
+    const auto storageSize = m_temporaryStorage.size();
 
-    while (loop) {
+    for (std::size_t i = 0; i < storageSize; ++i) {
         ++neededSequence;
         csdebug() << "POOL SYNCHRONIZER> Processing TemporaryStorage: needed sequence: " << neededSequence;
 
@@ -231,14 +230,15 @@ csdb::Pool::sequence_t cs::PoolSynchronizer::processingTemporaryStorage() {
             csdebug() << "POOL SYNCHRONIZER> Temporary storage contains sequence: " << neededSequence << ", with transactions: " << it->second.transactions_count();
             m_blockChain->onBlockReceived(it->second);
             m_temporaryStorage.erase(it);
+            lastSequence = neededSequence;
         }
         else {
             csdebug() << "POOL SYNCHRONIZER> Processing TemporaryStorage: needed sequence: " << neededSequence << " not contained in storage";
-            loop = false;
+            break;
         }
     }
 
-    return --neededSequence;
+    return lastSequence;
 }
 
 bool cs::PoolSynchronizer::getPoolRequestedSequences() {

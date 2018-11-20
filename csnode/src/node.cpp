@@ -1132,7 +1132,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   istream_.init(data, size);
   istream_ >> sequencesCount;
 
-  cslog() << "NODE> Packet hashes request got sequences count: " << sequencesCount;
+  cslog() << "NODE> Block request got sequences count: " << sequencesCount;
   cslog() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (sequencesCount == 0) {
@@ -1181,13 +1181,18 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
   cslog() << "NODE> Get Block Reply";
   csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
+  if (!poolSynchronizer_->isSyncroStarted()) {
+    cswarning() << "NODE> Get block reply> Pool synchronizer already is syncro started";
+    return;
+  }
+
   std::size_t poolsCount = 0;
 
   istream_.init(data, size);
   istream_ >> poolsCount;
 
-  if (poolsCount == 0_sz) {
-    cswarning() << "NODE> Get block reply with pools count 0, ignore";
+  if (!poolsCount) {
+    cserror() << "NODE> Get block reply> Pools count is 0";
     return;
   }
 
