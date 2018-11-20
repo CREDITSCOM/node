@@ -678,14 +678,24 @@ ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
   return nh_.getNeighbourByKey(pk);
 }
 
+ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number)
+{
+  csdebug() << "Transport> Get neighbour by number: " << number;
+  return nh_.getNeighbour(number);
+}
+
 ConnectionPtr Transport::getRandomNeighbour()
 {
-  csdebug() << "Transport> Get random neighbour";
+  csdebug() << "Transport> Get random neighbour for Sync";
   return nh_.getRandomSyncNeighbour();
 }
 
 void Transport::syncReplied(const uint32_t seq) {
   return nh_.releaseSyncRequestee(seq);
+}
+
+bool Transport::isPingDone() {
+  return nh_.isPingDone();
 }
 
 void Transport::resetNeighbours()
