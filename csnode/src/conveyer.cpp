@@ -33,6 +33,7 @@ public signals:
 cs::ConveyerBase::ConveyerBase()
 {
     pimpl = std::make_unique<cs::ConveyerBase::Impl>();
+    pimpl->metaStorage.append(cs::ConveyerMetaStorage::Element());
 }
 
 cs::ConveyerBase::~ConveyerBase() = default;
@@ -121,6 +122,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const
 void cs::ConveyerBase::setRound(cs::RoundTable&& table)
 {
     cslog() << "CONVEYER> SetRound";
+
     if (table.round <= currentRoundNumber())
     {
         cserror() << "CONVEYER> Setting round in conveyer failed";
@@ -161,9 +163,11 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table)
             csfatal() << "CONVEYER> Meta round currently in conveyer";
         }
     }
+
+    csdebug() << "CONVEYER> Current table size " << pimpl->hashTable.size();
 }
 
-const cs::RoundTable& cs::ConveyerBase::roundTable() const
+const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
     return meta->roundTable;
@@ -380,15 +384,15 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         return std::nullopt;
     }
 
-    const cs::Hashes& localHashes = meta->roundTable.hashes;
-    cs::TransactionsPacketTable hashTable;
 
+    cs::TransactionsPacketTable hashTable;
+    const cs::Hashes& localHashes = meta->roundTable.hashes;
     const cs::Characteristic& characteristic = meta->characteristic;
     cs::TransactionsPacketTable& currentHashTable = pimpl->hashTable;
 
     cslog() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
     csdebug() << "CONVEYER> ApplyCharacteristic, viewing hashes count " << localHashes.size();
-    csdebug() << "CONVEYER> ApplyCharacteristic, viewing hash table size " << hashTable.size();
+    csdebug() << "CONVEYER> ApplyCharacteristic, viewing hash table size " << currentHashTable.size();
 
     csdb::Pool newPool;
     std::size_t maskIndex = 0;

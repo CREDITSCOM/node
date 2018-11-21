@@ -15,7 +15,7 @@
 #include <lib/system/keys.hpp>
 #include <lib/system/metastorage.hpp>
 
-// ms
+// time in ms only
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 50;
 const std::size_t ROUND_DELAY = 1000;
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 7000;
@@ -64,13 +64,13 @@ namespace cs
         HashLength = HASH_LENGTH,
         SignatureLength = SIGNATURE_LENGTH,
         PrivateKeyLength = PRIVATE_KEY_LENGTH,
-        NeighboursRequestDelay = 50 // ms
+        NeighboursRequestDelay = 100
     };
 
     enum SolverConsts : uint32_t
     {
         TransactionsFlushRound = 2,
-        TransactionsPacketInterval = 50,    // ms
+        TransactionsPacketInterval = 50,
         MaxPacketTransactions = 500,
     };
 

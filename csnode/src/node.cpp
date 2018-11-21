@@ -297,6 +297,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   transport_->clearTasks();
 
   if (getBlockChain().getLastWrittenSequence() < roundNum_ - 1) {
+    cswarning() << "NODE> Last written sequence lower than current round - 1";
     return;
   }
 
@@ -798,7 +799,7 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
 }
 
 const cs::ConfidantsKeys& Node::confidants() const {
-  return cs::Conveyer::instance().roundTable().confidants;
+  return cs::Conveyer::instance().currentRoundTable().confidants;
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
@@ -1335,19 +1336,18 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
-  const auto& rt = conveyer.roundTable();
+  const auto& rt = conveyer.currentRoundTable();
 
-  if(rt.hashes.empty() || conveyer.isSyncCompleted()) {
-      if(rt.hashes.empty()) {
-          cslog() << "NODE> No hashes in round table - > start consensus now";
-      }
-      else {
-          cslog() << "NODE> All hashes in conveyer -> start consensus now";
-      }
-      startConsensus();
+  if (rt.hashes.empty() || conveyer.isSyncCompleted()) {
+    if (rt.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table - > start consensus now";
+    } else {
+      cslog() << "NODE> All hashes in conveyer -> start consensus now";
+    }
+    startConsensus();
   }
   else {
-    //TODO: whether possible roundNum_ != rt.round at this point?
+    // TODO: whether possible roundNum_ != rt.round at this point?
     sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
   }
 }
@@ -1406,7 +1406,7 @@ void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes)
     table.hashes = std::move(hashes);
     conveyer.setRound(std::move(table));
 
-    initNextRound(conveyer.roundTable());
+    initNextRound(conveyer.currentRoundTable());
 }
 
 void Node::initNextRound(const cs::RoundTable& roundTable) {
@@ -1658,7 +1658,7 @@ void Node::requestStageOne(uint8_t respondent, uint8_t required) {
     //return;
   }
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
   ostream_ << MsgTypes::FirstStageRequest
       << roundNum_
       << myConfidantIndex_
@@ -1685,7 +1685,7 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   uint8_t requiredNumber;
   istream_ >> requesterNumber >> requiredNumber;
 
-  if(requester != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) {
+  if(requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
       return;
   }
   if (!istream_.good() || !istream_.end()) {
@@ -1716,7 +1716,7 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
     //cslog() << i << ". " << byteStreamToHex(stageOneInfo.candiates[i].str, 32);
   }
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(requester));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(requester));
 
   ostream_ << MsgTypes::FirstStage
     << roundNum_
@@ -1771,7 +1771,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   stage.sender = *rawData;
   if (crypto_sign_ed25519_verify_detached(stage.sig.data(), rawData,
-    msgSize, (const unsigned char*) cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data())) {
+    msgSize, (const unsigned char*) cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
     cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!" ;
       return;
   }
@@ -1842,7 +1842,7 @@ void Node::requestStageTwo(uint8_t respondent, uint8_t required)
   cslog() << "NODE> Stage TWO requesting ... ";
   cslog() << "==============================";
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
 
   ostream_ << MsgTypes::SecondStageRequest
       << roundNum_
@@ -1869,7 +1869,7 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   istream_ >> requesterNumber >> requiredNumber;
 
   cslog() << "NODE> Getting StageTwo Request from [" << (int)requesterNumber <<"] " ;
-  if (requester != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;
+  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) return;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() <<"Bad StageTwo packet format";
@@ -1898,7 +1898,7 @@ void Node::sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t req
   }
   //cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize);
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(requester));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(requester));
 
   ostream_ << MsgTypes::SecondStage
     << roundNum_
@@ -1947,7 +1947,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   stage.sender = *rawData;
   //cslog() << "Received message: "<< byteStreamToHex((const char*)stagePtr, msgSize);
   if (crypto_sign_ed25519_verify_detached(stage.sig.data(), rawData,
-    msgSize, (const unsigned char*) cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data()))
+    msgSize, (const unsigned char*) cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data()))
   {
     cslog() << "NODE> Stage Two from ["<< (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
@@ -2009,7 +2009,7 @@ void Node::requestStageThree(uint8_t respondent, uint8_t required)
     //return;
   }
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
 
   ostream_ << MsgTypes::ThirdStageRequest
       << roundNum_
@@ -2035,7 +2035,7 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
   uint8_t requiredNumber;
   istream_ >> requesterNumber >> requiredNumber;
 
-  if (requester != cs::Conveyer::instance().roundTable().confidants.at(requesterNumber)) return;
+  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) return;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() <<"Bad StageThree packet format";
@@ -2064,7 +2064,7 @@ void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8
   memcpy(rawData + 2, stageThreeInfo.hashBlock.data(), 32);
   memcpy(rawData + 34, stageThreeInfo.hashCandidatesList.data(), 32);
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(requester));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(requester));
 
   ostream_ << MsgTypes::ThirdStage
     << roundNum_
@@ -2106,7 +2106,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 
   //cslog() << "Received message: "<< byteStreamToHex((const char*)rawData, msgSize);
   if (crypto_sign_ed25519_verify_detached(stage.sig.data(), rawData,
-    msgSize, (const unsigned char*)cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data())) {
+    msgSize, (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
     cslog() << "NODE> Stage Three from ["<< (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -2181,15 +2181,15 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
+  createRoundPackage(conveyer.currentRoundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
   // save sent data for future
-  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
+  storeRoundPackageData(conveyer.currentRoundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
   cslog() << "Round " << roundNum_ << ", Confidants: ";
-  const cs::RoundTable& table = conveyer.roundTable();
+  const cs::RoundTable& table = conveyer.currentRoundTable();
   const cs::ConfidantsKeys confidants = table.confidants;
 
   for (std::size_t i = 0; i < confidants.size(); ++i) {
@@ -2444,7 +2444,7 @@ void Node::sendRoundInfoRequest(uint8_t respondent)
 
   cslog() << "NODE> send request for next round info after #" << roundNum_;
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable().confidants.at(respondent));
+  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
   ostream_ << MsgTypes::RoundInfoRequest
     << roundNum_
     << myConfidantIndex_;

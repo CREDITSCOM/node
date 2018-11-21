@@ -56,7 +56,7 @@ void Solver::setKeysPair(const cs::PublicKey& publicKey, const cs::PrivateKey& p
 
 cs::PublicKey Solver::writerPublicKey() const {
   PublicKey result;
-  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().roundTable().confidants;
+  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
 
   if (m_writerIndex < confidants.size()) {
     result = confidants[m_writerIndex];
@@ -141,7 +141,7 @@ void Solver::runConsensus() {
 }
 
 void Solver::runFinalConsensus() {
-  const auto& confidants = cs::Conveyer::instance().roundTable().confidants;
+  const auto& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
 
   if (m_receivedMatrixFrom.size() == confidants.size()) {
     const auto& hash = m_node->getBlockChain().getHashBySequence(m_node->getRoundNumber() - 1);
@@ -202,7 +202,7 @@ void Solver::gotMatrix(HashMatrix&& matrix) {
   }
 
   m_receivedMatrixFrom.push_back(matrix.sender);
-  m_generals->addMatrix(matrix, cs::Conveyer::instance().roundTable().confidants);
+  m_generals->addMatrix(matrix, cs::Conveyer::instance().currentRoundTable().confidants);
 
   runFinalConsensus();
 }
@@ -390,7 +390,7 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
     cslog() << "Solver -> NEW ROUND initialization done";
 
     if (!m_roundTableSent) {
-      m_node->initNextRound(cs::Conveyer::instance().roundTable());
+      m_node->initNextRound(cs::Conveyer::instance().currentRoundTable());
       m_roundTableSent = true;
     }
   }
@@ -501,7 +501,7 @@ bool Solver::addVector(const HashVector& hashVector) {
   m_receivedVectorFrom.push_back(hashVector.sender);
   m_generals->addVector(hashVector);
 
-  const auto& confidants = cs::Conveyer::instance().roundTable().confidants;
+  const auto& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
   const auto confidantsSize = confidants.size();
   const auto receivedVectorsSize = m_receivedVectorFrom.size();
 

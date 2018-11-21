@@ -86,7 +86,7 @@ namespace cs
         ///
         /// @brief Returns current blockchain round table.
         ///
-        const cs::RoundTable& roundTable() const;
+        const cs::RoundTable& currentRoundTable() const;
 
         ///
         /// @brief Returns blockchain round table of Round key.

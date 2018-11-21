@@ -171,8 +171,7 @@ private:
 public:
   SpinLockedRef(SpinLockable<T>& l)
   : l(&l) {
-    while (this->l->af.test_and_set(std::memory_order_acquire))
-      ;
+    while (this->l->af.test_and_set(std::memory_order_acquire));
   }
   ~SpinLockedRef() {
     if (l)

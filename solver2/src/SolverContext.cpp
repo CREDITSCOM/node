@@ -59,12 +59,12 @@ namespace slv2
 
     size_t SolverContext::cnt_trusted() const
     {
-        return cs::Conveyer::instance().roundTable().confidants.size(); //core.pnode->getConfidants().size();
+        return cs::Conveyer::instance().currentRoundTable().confidants.size(); //core.pnode->getConfidants().size();
     }
 
     const std::vector<cs::PublicKey>& SolverContext::trusted() const
     {
-        return cs::Conveyer::instance().roundTable().confidants;
+        return cs::Conveyer::instance().currentRoundTable().confidants;
     }
 
     void SolverContext::request_round_table() const

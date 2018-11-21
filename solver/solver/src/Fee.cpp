@@ -61,7 +61,7 @@ inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
   num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
   // Now we don't have tools to estimate number of all nodes in the network.
   // So we use number of trusted. In fact it is a constant. Will be fixed soon.
-  num_of_nodes_ = cs::Conveyer::instance().roundTable().confidants.size();
+  num_of_nodes_ = cs::Conveyer::instance().currentRoundTable().confidants.size();
 }
 
 inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) {
@@ -70,7 +70,7 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
   num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
   // Now we don't have tools to estimate number of all nodes in the network.
   // So we use number of trusted. In fact it is a constant. Will be fixed soon.
-  num_of_nodes_ = cs::Conveyer::instance().roundTable().confidants.size();
+  num_of_nodes_ = cs::Conveyer::instance().currentRoundTable().confidants.size();
 }
 
 void Fee::SetCountedFee() {

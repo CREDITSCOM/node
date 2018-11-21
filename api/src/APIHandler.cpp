@@ -678,7 +678,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
   else 
     smart_transaction_flow(_return, transaction);
 
-  _return.roundNum = cs::Conveyer::instance().roundTable().round;
+  _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
 }
 
 void
@@ -1183,7 +1183,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
       }
     }
   }
-  _return.roundNum = cs::Conveyer::instance().roundTable().round;
+  _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 

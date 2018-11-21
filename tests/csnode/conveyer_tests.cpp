@@ -142,7 +142,7 @@ TEST(Conveyer, RoundTableReturnsSameAsThatWasSetWithSetRound) {
   auto round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& round_table_copy{cs::RoundTable{round_table}};
   conveyer.setRound(std::move(round_table_copy));
-  ASSERT_EQ(round_table, conveyer.roundTable());
+  ASSERT_EQ(round_table, conveyer.currentRoundTable());
 }
 
 TEST(Conveyer, SetRoundDoesNotSetInvalidRoundNumber) {

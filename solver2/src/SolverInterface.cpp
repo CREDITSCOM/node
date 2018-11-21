@@ -87,7 +87,7 @@ namespace slv2
         // As analogue, found writer's index in stage3 if exists, otherwise return empty object as prev. solver does
         auto ptr = find_stage3(pnode->getConfidantNumber());
         if(ptr != nullptr) {
-            const auto& trusted = cs::Conveyer::instance().roundTable().confidants;
+            const auto& trusted = cs::Conveyer::instance().currentRoundTable().confidants;
             if(trusted.size() >= ptr->writer) {
                 return *(trusted.cbegin() + ptr->writer);
             }
@@ -419,7 +419,7 @@ namespace slv2
         }
 
         // update desired count of trusted nodes
-        size_t cnt_trusted = cs::Conveyer::instance().roundTable().confidants.size();
+        size_t cnt_trusted = cs::Conveyer::instance().currentRoundTable().confidants.size();
         if(cnt_trusted > cnt_trusted_desired) {
             cnt_trusted_desired = cnt_trusted;
         }
