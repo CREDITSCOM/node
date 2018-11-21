@@ -629,11 +629,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
-  cslog() << "NODE> Characteric has arrived";
+  cslog() << "NODE> " << __func__ << "():";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isSyncCompleted(round)) {
-    cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
+    cslog() << "\tPacket sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes(data, data + size);
 
@@ -651,7 +651,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Bytes characteristicMask;
   uint64_t sequence = 0;
 
-  cslog() << "NODE> Characteristic data size: " << size;
+  cslog() << "\tCharacteristic data size: " << size;
 
   istream_ >> time;
   istream_ >> characteristicMask >> sequence;
@@ -663,35 +663,31 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Signature signature;
   istream_ >> signature;
 
-  cs::Notifications notifications;
-  istream_ >> notifications;
+  //cs::Notifications notifications;
+  //istream_ >> notifications;
 
-  for (std::size_t i = 0; i < notifications.size(); ++i) {
-    conveyer.addNotification(notifications[i]);
-  }
-
-  std::vector<cs::Hash> confidantsHashes;
-
-  for (const auto& notification : conveyer.notifications()) {
-    cs::Hash hash;
-    cs::DataStream notificationStream(notification.data(), notification.size());
-
-    notificationStream >> hash;
-
-    confidantsHashes.push_back(hash);
-  }
+  //for (std::size_t i = 0; i < notifications.size(); ++i) {
+  //  conveyer.addNotification(notifications[i]);
+  //}
+  //std::vector<cs::Hash> confidantsHashes;
+  //for (const auto& notification : conveyer.notifications()) {
+  //  cs::Hash hash;
+  //  cs::DataStream notificationStream(notification.data(), notification.size());
+  //  notificationStream >> hash;
+  //  confidantsHashes.push_back(hash);
+  //}
 
   cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
 
-  for (const auto& hash : confidantsHashes) {
-    if (hash != characteristicHash) {
-      cserror() << "NODE> Some of confidants hashes is dirty";
-      return;
-    }
-  }
+  //for (const auto& hash : confidantsHashes) {
+  //  if (hash != characteristicHash) {
+  //    cserror() << "NODE> getCharacteristic(): some of confidants hashes is dirty";
+  //    return;
+  //  }
+  //}
 
-  cslog() << "NODE> GetCharacteristic " << poolMetaInfo.sequenceNumber << " maskbit count " << characteristicMask.size();
-  cslog() << "NODE> Time >> " << poolMetaInfo.timestamp << "  << Time";
+  cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
+  cslog() << "\tTime " << poolMetaInfo.timestamp;
 
   cs::Characteristic characteristic;
   characteristic.mask = std::move(characteristicMask);
@@ -703,14 +699,14 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   istream_ >> writerPublicKey;
 
   if (!istream_.good()) {
-    cserror() << "NODE> Get characteristic, parsing failed";
+    cserror() << "NODE> getCharacteristic(): packet parsing failed";
     return;
   }
 
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
   if (!pool) {
-    cserror() << "NODE> Get characteristic, created pool is not valid";
+    cserror() << "NODE> getCharacteristic(): created pool is not valid";
     return;
   }
 
@@ -730,15 +726,16 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   getBlockChain().finishNewBlock(pool.value());
 
   if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-    cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+    cswarning() << "\tRECEIVED KEY Writer verification successfull";
     writeBlock_V3(pool.value(), sequence, sender);
   }
   else {
-    cswarning() << "NODE> RECEIVED KEY Writer verification failed";
-    cswarning() << "NODE> remove wallets from wallets cache";
+    cswarning() << "\tRECEIVED KEY Writer verification failed";
+    cswarning() << "\tremove wallets from wallets cache";
     logPool(pool.value());
     getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
@@ -942,8 +939,8 @@ void Node::createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo,
 void Node::createRoundPackage(const cs::RoundTable& roundTable,
   const cs::PoolMetaInfo& poolMetaInfo,
   const cs::Characteristic& characteristic,
-  const cs::Signature& signature,
-  const cs::Notifications& notifications) {
+  const cs::Signature& signature/*,
+  const cs::Notifications& notifications*/) {
 
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::RoundInfo << roundNum_;
@@ -962,15 +959,15 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable,
   ostream_ << characteristic.mask;
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
-  ostream_ << notifications;
+  //ostream_ << notifications;
   ostream_ << solver_->getPublicKey();
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable,
     const cs::PoolMetaInfo& poolMetaInfo,
     const cs::Characteristic& characteristic,
-    const cs::Signature& signature,
-    const cs::Notifications& notifications)
+    const cs::Signature& signature/*,
+    const cs::Notifications& notifications*/)
 {
     last_sent_round_data.round_table.round = roundTable.round;
     // no general stored!
@@ -986,8 +983,8 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable,
     last_sent_round_data.pool_meta_info.sequenceNumber = poolMetaInfo.sequenceNumber;
     last_sent_round_data.pool_meta_info.timestamp = poolMetaInfo.timestamp;
     last_sent_round_data.pool_signature = signature;
-    last_sent_round_data.notifications.resize(notifications.size());
-    std::copy(notifications.cbegin(), notifications.cend(), last_sent_round_data.notifications.begin());
+    //last_sent_round_data.notifications.resize(notifications.size());
+    //std::copy(notifications.cbegin(), notifications.cend(), last_sent_round_data.notifications.begin());
 }
 
 
@@ -1232,9 +1229,9 @@ void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
   cslog() << "NODE> Became writer";
 
-  if (cs::Conveyer::instance().isEnoughNotifications(cs::Conveyer::NotificationState::GreaterEqual)) {
-    applyNotifications();
-  }
+  //if (cs::Conveyer::instance().isEnoughNotifications(cs::Conveyer::NotificationState::GreaterEqual)) {
+  //  applyNotifications();
+  //}
 }
 
 void Node::onRoundStart(const cs::RoundTable& roundTable) {
@@ -1485,7 +1482,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
           return MessageActions::Process;
       }
       if(rNum != roundNum_) {
-          cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed";
+          cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
       }
       else {
           cslog() << "NODE> block hash is postponed until conveyer sync is completed";
@@ -1745,7 +1742,7 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
   }
   flushCurrentTasks();
   allocator_.shrinkLast(msgSize);
-  csdebug() << "done";
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -2130,7 +2127,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 }
 
 void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
-  csdebug() << "NODE> Apply notifications";
+  csdebug() << "NODE> " << __func__ << "():";
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1; // change for roundNumber
@@ -2160,10 +2157,10 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   const auto& signature = pool.value().signature();
   std::copy(signature.begin(), signature.end(), poolSignature.begin());
 
-  csdebug() << "NODE> ApplyNotification " << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+  csdebug() << "\tsignature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
 
   const bool isVerified = pool.value().verify_signature();
-  cslog() << "NODE> After sign: isVerified == " << isVerified;
+  cslog() << "\tafter sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
   logPool(pool.value());
@@ -2193,31 +2190,30 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
+  createRoundPackage(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature/*, conveyer.notifications()*/);
   // save sent data for future
-  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature, conveyer.notifications());
+  storeRoundPackageData(conveyer.roundTable(), poolMetaInfo, *block_characteristic, poolSignature/*, conveyer.notifications()*/);
   flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-  cslog() << "Round " << roundNum_ << ", Confidants: ";
   const cs::RoundTable& table = conveyer.roundTable();
   const cs::ConfidantsKeys confidants = table.confidants;
+  cslog() << "Round " << roundNum_ << ", Confidants count " << confidants.size();
 
-  for (std::size_t i = 0; i < confidants.size(); ++i) {
-    const cs::PublicKey& confidant = confidants[i];
-
-    if (confidant != table.general) {
-      cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-    }
-  }
+  //for (std::size_t i = 0; i < confidants.size(); ++i) {
+  //  const cs::PublicKey& confidant = confidants[i];
+  //  if (confidant != table.general) {
+  //    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+  //  }
+  //}
 
   const cs::Hashes& hashes = table.hashes;
   cslog() << "Hashes count: " << hashes.size();
 
-  for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csdebug() << i << ". " << hashes[i].toString();
-  }
+  //for (std::size_t i = 0; i < hashes.size(); ++i) {
+  //  csdebug() << i << ". " << hashes[i].toString();
+  //}
  
   transport_->clearTasks();
 
@@ -2227,10 +2223,10 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
 void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
                         const cs::PublicKey& sender) {
-  cslog() << "NODE> Get ROUND INFO ... start processing " << __func__;
+  cslog() << "\nNODE> " << __func__ << "():";
 
   if (myLevel_ == NodeLevel::Writer) {
-    cswarning() << "NODE> Writers don't need ROUNDINFO";
+    cswarning() << "\tWriters don't need ROUNDINFO";
     return;
   }
 
@@ -2241,7 +2237,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   istream_ >> confidantsCount;
 
   if (confidantsCount == 0) {
-    cserror() << "Bad confidants count in round table";
+    cserror() << "NODE> " << __func__ << "(): Bad confidants count in round table";
     return;
   }
 
@@ -2277,21 +2273,20 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   roundTable.general = sender;
 
   const cs::ConfidantsKeys confidants_ = roundTable.confidants;
-  cslog() << "Node> confidants: " << confidants_.size();
+  cslog() << "\tconfidants: " << confidants_.size();
   ///////////////////////////////////// Round table received
 
   ///////////////////////////////////// Parcing char func
 
-  cslog() << "NODE> Characteric has arrived";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   // rNum has been incremented just before:
   if (!conveyer.isSyncCompleted(conveyer.currentRoundNumber())) {
-    cslog() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
+    cslog() << "\tpacket sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes(istream_.getCurrentPtr(), istream_.getEndPtr());
 
-    cslog() << "NODE> Saving characteristic meta with bytes size " << characteristicBytes.size();
+    cslog() << "\tsaving characteristic meta with bytes size " << characteristicBytes.size();
 
     cs::CharacteristicMeta meta;
     meta.bytes = std::move(characteristicBytes);
@@ -2305,7 +2300,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Bytes characteristicMask;
     csdb::Pool::sequence_t sequence = 0;
 
-    cslog() << "NODE> getCharacteristic(): conveyer sync completed, parsing data size " << size;
+    cslog() << "\tconveyer sync completed, parsing data size " << size;
 
     istream_ >> time;
     istream_ >> characteristicMask >> sequence;
@@ -2317,54 +2312,49 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Signature signature;
     istream_ >> signature;
 
-    std::size_t notificationsSize;
-    istream_ >> notificationsSize;
+    //std::size_t notificationsSize;
+    //istream_ >> notificationsSize;
 
-    if (notificationsSize == 0) {
-      cserror() << "NODE> getCharacteristic(): notifications count is zero";
-    }
+    //if (notificationsSize == 0) {
+    //  cserror() << "NODE> " << __func__ << "(): notifications count is zero";
+    //}
 
-    for (std::size_t i = 0; i < notificationsSize; ++i) {
-      cs::Bytes notification;
-      istream_ >> notification;
+    //for (std::size_t i = 0; i < notificationsSize; ++i) {
+    //  cs::Bytes notification;
+    //  istream_ >> notification;
 
-      conveyer.addNotification(notification);
-    }
+    //  conveyer.addNotification(notification);
+    //}
 
     cs::PublicKey writerPublicKey;
     istream_ >> writerPublicKey;
 
     if(!istream_.good()) {
-        cserror() << "NODE> round info parsing failed, data is corrupted";
+        cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
     }
 
-    std::vector<cs::Hash> confidantsHashes;
+    //std::vector<cs::Hash> confidantsHashes;
 
-    for (const auto& notification : conveyer.notifications()) {
-      cs::Hash hash;
-      cs::DataStream notificationStream(notification.data(), notification.size());
+    //for (const auto& notification : conveyer.notifications()) {
+    //  cs::Hash hash;
+    //  cs::DataStream notificationStream(notification.data(), notification.size());
 
-      notificationStream >> hash;
+    //  notificationStream >> hash;
 
-      confidantsHashes.push_back(hash);
-    }
-
-    if (!istream_.good()) {
-      cserror() << "NODE> Get round table parsing failed";
-    }
+    //  confidantsHashes.push_back(hash);
+    //}
 
     cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
 
-    for (const auto& hash : confidantsHashes) {
-      if (hash != characteristicHash) {
-        cserror() << "NODE> Some of confidants hashes is dirty";
-        return;
-      }
-    }
+    //for (const auto& hash : confidantsHashes) {
+    //  if (hash != characteristicHash) {
+    //    cserror() << "NODE> " << __func__ << "(): some of confidants hashes is dirty";
+    //    return;
+    //  }
+    //}
 
-    cslog() << "NODE> getCharacteristic(): sequence " << poolMetaInfo.sequenceNumber << ", mask size "
-            << characteristicMask.size();
-    csdebug() << "NODE> getCharacteristic(): time = " << poolMetaInfo.timestamp;
+    cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
+    csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
     cs::Characteristic characteristic;
     characteristic.mask = std::move(characteristicMask);
@@ -2390,12 +2380,12 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         getBlockChain().finishNewBlock(pool.value());
 
         if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-          cswarning() << "NODE> RECEIVED KEY Writer verification successfull";
+          cswarning() << "\tRECEIVED KEY Writer verification successfull";
           writeBlock_V3(pool.value(), sequence, sender);
         }
         else {
-          cswarning() << "NODE> RECEIVED KEY Writer verification failed";
-          cswarning() << "NODE> Remove wallets from wallets cache";
+          cswarning() << "\tRECEIVED KEY Writer verification failed";
+          cswarning() << "\tRemove wallets from wallets cache";
           logPool(pool.value());
           getBlockChain().removeWalletsInPoolFromCache(pool.value());
         }
@@ -2411,7 +2401,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   // defer until solver_->gotRound() called:
   //transport_->processPostponed(roundNum_);
 
-  cslog() << "NODE> round info handled";
+  cslog() << "NODE> " << __func__ << "(): done\n";
 }
 
 void Node::logPool(csdb::Pool& pool)
@@ -2466,6 +2456,7 @@ void Node::sendHash_V3(cs::RoundNumber round) {
 
 void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
   if (myLevel_ != NodeLevel::Confidant) {
+    csdebug() << "NODE> ignore hash as no confidant";
     return;
   }
 
@@ -2542,7 +2533,7 @@ bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber r
         return false;
     }
     createRoundPackage(last_sent_round_data.round_table, last_sent_round_data.pool_meta_info,
-        last_sent_round_data.characteristic, last_sent_round_data.pool_signature, last_sent_round_data.notifications);
+        last_sent_round_data.characteristic, last_sent_round_data.pool_signature/*, last_sent_round_data.notifications*/);
     flushCurrentTasks();
     cslog() << "NODE> re-send last round info #" << rNum << " to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     return true;
@@ -2627,7 +2618,8 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     cslog() << " Confidants:";
     int i = 0;
     for(const auto& e : roundTable.confidants) {
-        cslog() << "[" << i << "] " << cs::Utils::byteStreamToHex(e.data(), e.size());
+        cslog() << "[" << i << "] "
+            << (NodeLevel::Confidant == myLevel_ && i == myConfidantIndex_ ? "me" : cs::Utils::byteStreamToHex(e.data(), e.size()));
         i++;
     }
     cslog() << line2.str();
