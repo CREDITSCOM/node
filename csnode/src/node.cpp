@@ -698,6 +698,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
 
+  if (!istream_.good()) {
+    cserror() << "NODE> Get characteristic, parsing failed";
+    return;
+  }
+
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
   if (!pool) {
@@ -2326,6 +2331,10 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
       notificationStream >> hash;
 
       confidantsHashes.push_back(hash);
+    }
+
+    if (!istream_.good()) {
+      cserror() << "NODE> Get round table parsing failed";
     }
 
     cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
