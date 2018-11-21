@@ -476,17 +476,30 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
   constexpr cs::RoundNumber roundDifferent = 5;
 
+  // never cut packets
+  switch (type) {
+    case MsgTypes::BlockRequest:
+      return node_->getBlockRequest(data, size, firstPack.getSender());
+    case MsgTypes::RequestedBlock:
+      return node_->getBlockReply(data, size, firstPack.getSender());
+    default:
+      break;
+  }
+
+  // cut slow packs
   if ((rNum + roundDifferent) < node_->getRoundNumber()) {
     csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << " message type " << static_cast<int>(type);
     return;
   }
 
+  // cut my packs
   if (firstPack.getSender() == node_->getNodeIdKey()) {
     csdebug() << "TRANSPORT> Ignore myself packs";
     return;
   }
 
-  switch(type) {
+  // packets which transport may cut
+  switch (type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::RoundTable:
@@ -499,10 +512,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockHashV3:
     return node_->getHash_V3(data, size, rNum, firstPack.getSender());
-  case MsgTypes::BlockRequest:
-    return node_->getBlockRequest(data, size, firstPack.getSender());
-  case MsgTypes::RequestedBlock:
-    return node_->getBlockReply(data, size, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
@@ -532,7 +541,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::RoundInfoReply:
     return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
   default:
-    cserror() << "Unknown type";
+    cserror() << "TRANSPORT> Unknown message type " << static_cast<int>(type) << " pack round " << rNum;
     break;
   }
 }
@@ -610,7 +619,8 @@ void Transport::resetNeighbours()
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
-  LOG_EVENT("Sending registration request to " << (conn.specialOut ? conn.out : conn.in));
+  cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
+
   Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
@@ -620,7 +630,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 }
 
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
-  LOG_EVENT("Confirming registration with " << conn.getOut());
+  cslog() << "Confirming registration with " << conn.getOut();
 
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
@@ -631,7 +641,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 }
 
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
-  LOG_EVENT("Refusing registration with " << conn.in);
+  cslog() << "Refusing registration with " << conn.in;
 
   SpinLock l(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
@@ -644,7 +654,7 @@ void Transport::sendRegistrationRefusal(const Connection& conn, const Registrati
 // Requests processing
 
 bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  LOG_EVENT("Got registration request from " << task->sender);
+  cslog() << "Got registration request from " << task->sender;
 
   NodeVersion vers;
   iPackStream_ >> vers;
@@ -698,7 +708,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-  LOG_EVENT("Got registration confirmation from " << task->sender);
+  cslog() << "Got registration confirmation from " << task->sender;
 
   ConnectionId myCId;
   ConnectionId realCId;
@@ -714,7 +724,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
 }
 
 bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodePtr&) {
-  LOG_EVENT("Got registration refusal from " << task->sender);
+  cslog() << "Got registration refusal from " << task->sender;
 
   RegistrationRefuseReasons reason;
   Connection::Id            id;
@@ -726,14 +736,14 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
   nh_.gotRefusal(id);
 
-  LOG_EVENT("Registration to " << task->sender << " refused. Reason: " << static_cast<int>(reason));
+  cslog() << "Registration to " << task->sender << " refused. Reason: " << static_cast<int>(reason);
 
   return true;
 }
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
   if (ssStatus_ != SSBootstrapStatus::Requested) {
-    LOG_WARN("Unexpected Signal Server response");
+    cswarning() << "Unexpected Signal Server response";
     return false;
   }
 
@@ -1009,25 +1019,5 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   }
 
   nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
-
-  if (lastSeq > maxBlock_) {
-    maxBlock_ = lastSeq;
-    maxBlockCount_ = 1;
-  }
-  else if (lastSeq == maxBlock_) {
-    if (lastSeq > node_->getBlockChain().getLastWrittenSequence() && ++maxBlockCount_ > ((rand() % 5) + 5)) {
-      auto conn = sender->connection.load(std::memory_order_relaxed);
-      if (!conn) return false;
-
-      SpinLock l(oLock_);
-      oPackStream_.init(BaseFlags::Neighbours | BaseFlags::Signed);
-      oPackStream_ << MsgTypes::BlockRequest << node_->getRoundNumber() << lastSeq;
-      sendDirect(oPackStream_.getPackets(), *conn);
-      oPackStream_.clear();
-
-      maxBlockCount_ = 0;
-    }
-  }
-
   return true;
 }

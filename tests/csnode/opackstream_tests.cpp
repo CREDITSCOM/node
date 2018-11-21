@@ -1,6 +1,3 @@
-
-//#define TESTING
-
 #include <gtest/gtest.h>
 #include "csdb/address.h"
 #include "packstream.hpp"

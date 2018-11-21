@@ -348,7 +348,7 @@ const cs::Characteristic* cs::Conveyer::characteristic(cs::RoundNumber round) co
 {
     auto meta = pimpl->metaStorage.get(round);
 
-    if(!meta)
+    if (!meta)
     {
         cserror() << "CONVEYER> Get characteristic, logic error, can not find characteristic, #" << round;
         return nullptr;
