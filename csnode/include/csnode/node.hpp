@@ -206,13 +206,13 @@ private:
   void createRoundPackage(const cs::RoundTable& roundTable,
     const cs::PoolMetaInfo& poolMetaInfo,
     const cs::Characteristic& characteristic,
-    const cs::Signature& signature,
-    const cs::Notifications& notifications);
+    const cs::Signature& signature/*,
+    const cs::Notifications& notifications*/);
   void storeRoundPackageData(const cs::RoundTable& roundTable,
       const cs::PoolMetaInfo& poolMetaInfo,
       const cs::Characteristic& characteristic,
-      const cs::Signature& signature,
-      const cs::Notifications& notifications);
+      const cs::Signature& signature/*,
+      const cs::Notifications& notifications*/);
 
   // signature verification
   bool checkKeysFile();
