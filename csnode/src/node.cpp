@@ -792,6 +792,10 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
 #endif
 }
 
+const cs::ConfidantsKeys& Node::confidants() const {
+  return cs::Conveyer::instance().roundTable().confidants;
+}
+
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
@@ -1440,38 +1444,37 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if(type == MsgTypes::RoundTableRequest) {
-      return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if (type == MsgTypes::RoundTableRequest) {
+    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::RoundInfoRequest) {
     return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if(type == MsgTypes::RoundInfoReply) {
-      return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if (type == MsgTypes::RoundInfoReply) {
+    return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
     // which round would not be on the remote we may require the requested block
     return MessageActions::Process;
-    //return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    // return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if(type == MsgTypes::BlockHashV3) {
-      if(rNum < roundNum_) {
-          return MessageActions::Drop;
-      }
-      if(rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
-          return MessageActions::Process;
-      }
-      if(rNum != roundNum_) {
-          cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
-      }
-      else {
-          cslog() << "NODE> hash is postponed until conveyer sync is completed";
-      }
-      return MessageActions::Postpone;
+  if (type == MsgTypes::BlockHashV3) {
+    if (rNum < roundNum_) {
+      return MessageActions::Drop;
+    }
+    if (rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
+      return MessageActions::Process;
+    }
+    if (rNum != roundNum_) {
+      cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
+    } else {
+      cslog() << "NODE> hash is postponed until conveyer sync is completed";
+    }
+    return MessageActions::Postpone;
   }
 
   if (rNum < roundNum_) {
