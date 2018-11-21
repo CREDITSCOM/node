@@ -34,15 +34,15 @@ namespace cs {
 
         bool isSyncroStarted() const;
 
-        // pool sync progress
-        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
-
     public signals: // Signals
 
         PoolSynchronizerRequestSignal sendRequest;
         PoolSynchronizerSynchroFinished synchroFinished;
 
     private: // Service
+
+        // pool sync progress
+        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
         bool checkActivity();
 
@@ -51,7 +51,10 @@ namespace cs {
         void addToTemporaryStorage(const csdb::Pool& pool);
         csdb::Pool::sequence_t processingTemporaryStorage();
 
-        bool getPoolRequestedSequences();
+        bool getNeededSequences();
+
+        void checkNeighbours(const csdb::Pool::sequence_t sequence);
+        void refreshNeighbours();
 
     private: // Members
 
@@ -59,7 +62,7 @@ namespace cs {
         BlockChain* m_blockChain;
 
         inline static const int m_maxBlockCount = 4;
-        inline static const cs::RoundNumber s_roundDifferent = 2;
+        inline static const cs::RoundNumber s_roundDifferent = 4;
         const int m_maxWaitingTimeReply;
 
         // syncro variables
@@ -76,7 +79,25 @@ namespace cs {
         // value: Decreases, soon as a response is received for another requested block.
         std::map<csdb::Pool::sequence_t, int> m_requestedSequences;
 
-        PoolsRequestedSequences m_receivedSequences;
+        PoolsRequestedSequences m_neededSequences;
+
+        struct NeighboursSetElemet{
+            NeighboursSetElemet(csdb::Pool::sequence_t seq, ConnectionPtr conn = ConnectionPtr()) :
+              sequnce(seq),
+              connection(conn)
+            {}
+
+            csdb::Pool::sequence_t sequnce = 0; // requested sequence
+            ConnectionPtr connection;
+
+            const bool operator < (const NeighboursSetElemet& rhs) const {
+                return sequnce < rhs.sequnce;
+            }
+        };
+
+        // [key] = neighbour,
+        // [value] = last requested sequence
+        std::multiset<NeighboursSetElemet> m_neighbours;
     };
 
 
