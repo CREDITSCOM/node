@@ -593,7 +593,6 @@ ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
 
 ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number)
 {
-  csdebug() << "Transport> Get neighbour by number: " << number;
   return nh_.getNeighbour(number);
 }
 

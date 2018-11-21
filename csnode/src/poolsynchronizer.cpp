@@ -12,6 +12,7 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
     m_maxWaitingTimeReply(cs::numeric_cast<int>(m_transport->getMaxNeighbours() - 1))
 {
     m_neededSequences.reserve(m_maxBlockCount);
+    m_neighbours.reserve(m_transport->getMaxNeighbours());
 
     refreshNeighbours();
 }
@@ -42,7 +43,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
     csdb::Pool::sequence_t lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
 
     if (poolsBlock.back().sequence() > lastWrittenSequence) {
-        checkNeighbours(poolsBlock.front().sequence());
+        checkNeighbourSequence(poolsBlock.front().sequence());
 
         for (auto& pool : poolsBlock) {
             const auto sequence = pool.sequence();
@@ -111,13 +112,13 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         return;
     }
 
-    checkNeighbours(m_neededSequences.front());
-    //            csdebug() << "POOL SYNCHRONIZER> target is already requested " << neighbour.c->getOut();
-
-    cslog() << "POOL SYNCHRONIZER> Send Block Request";
+    // sequence = 0 if already requested
+    checkNeighbourSequence(m_neededSequences.front());
 
     for (auto& neighbour : m_neighbours) {
-        if (neighbour.sequnce == 0) {
+        if (neighbour.sequence == 0) {
+            neighbour.sequence = m_neededSequences.front();
+
             sendBlock(neighbour.connection, m_neededSequences);
 
             if (!getNeededSequences()) {
@@ -283,13 +284,16 @@ bool cs::PoolSynchronizer::getNeededSequences() {
     return !m_neededSequences.empty();
 }
 
-void cs::PoolSynchronizer::checkNeighbours(const csdb::Pool::sequence_t sequence) {
-    m_neighbours.erase(NeighboursSetElemet(sequence));
+void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t sequence) {
+    for (auto& neighbour : m_neighbours) {
+        if (neighbour.sequence == sequence) {
+            neighbour.sequence = 0;
+        }
+    }
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
   const uint32_t neighboursCount = m_transport->getNeighboursCount();
-  csdebug() << "POOL SYNCHRONIZER> Neighbours count from nh is: " << neighboursCount;
 
   if (neighboursCount == m_neighbours.size() + 1) { // + Signal
       return;
@@ -300,7 +304,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
   for (std::size_t i = 0; i != neighboursCount; ++i) {
       ConnectionPtr target = m_transport->getNeighbourByNumber(i);
       if (target && !target->isSignal) {
-          m_neighbours.emplace(NeighboursSetElemet(0, target));
+          m_neighbours.push_back(NeighboursSetElemet(0, target));
       }
   }
 

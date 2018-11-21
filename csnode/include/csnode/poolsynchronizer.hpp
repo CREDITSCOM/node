@@ -53,7 +53,7 @@ namespace cs {
 
         bool getNeededSequences();
 
-        void checkNeighbours(const csdb::Pool::sequence_t sequence);
+        void checkNeighbourSequence(const csdb::Pool::sequence_t sequence);
         void refreshNeighbours();
 
     private: // Members
@@ -83,21 +83,19 @@ namespace cs {
 
         struct NeighboursSetElemet{
             NeighboursSetElemet(csdb::Pool::sequence_t seq, ConnectionPtr conn = ConnectionPtr()) :
-              sequnce(seq),
-              connection(conn)
+                sequence(seq),
+                connection(conn)
             {}
 
-            csdb::Pool::sequence_t sequnce = 0; // requested sequence
-            ConnectionPtr connection;
+            csdb::Pool::sequence_t sequence = 0; // requested sequence
+            ConnectionPtr connection;            // neighbour
 
             const bool operator < (const NeighboursSetElemet& rhs) const {
-                return sequnce < rhs.sequnce;
+                return sequence < rhs.sequence;
             }
         };
 
-        // [key] = neighbour,
-        // [value] = last requested sequence
-        std::multiset<NeighboursSetElemet> m_neighbours;
+        std::vector<NeighboursSetElemet> m_neighbours;
     };
 
 

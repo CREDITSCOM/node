@@ -1123,8 +1123,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   istream_.init(data, size);
   istream_ >> sequencesCount;
 
-  cslog() << "NODE> Block request got sequences count: " << sequencesCount;
-  cslog() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Block request got sequences count: " << sequencesCount;
+  csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (sequencesCount == 0) {
     return;
@@ -1137,9 +1137,10 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     cs::RoundNumber sequence;
     istream_ >> sequence;
 
-    cslog() << "NODE> Get block request> Getting the request for block: " << sequence;
     sequences.push_back(std::move(sequence));
   }
+
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back();
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -2344,7 +2345,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     assert(sequence <= this->getRoundNumber());
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
+    conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
     if (pool) {
