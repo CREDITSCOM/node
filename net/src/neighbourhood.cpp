@@ -519,6 +519,16 @@ void Neighbourhood::pingNeighbours() {
   }
 }
 
+bool Neighbourhood::isPingDone() {
+  SpinLock l(nLockFlag_);
+  for (auto& nb : neighbours_) {
+    if (nb->lastSeq) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Neighbourhood::resendPackets() {
   SpinLock l(nLockFlag_);
   uint32_t cnt1 = 0;
@@ -599,6 +609,22 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   if (candidate) {
     candidate->syncSeq = seq;
     candidate->syncSeqRetries = rand() % (MaxSyncAttempts / 2);
+  }
+
+  return candidate;
+}
+
+ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
+  SpinLock l(nLockFlag_);
+
+  if (number > neighbours_.size()) {
+    return ConnectionPtr();
+  }
+
+  ConnectionPtr candidate = *(neighbours_.begin() + number);
+
+  if (!candidate) {
+    return ConnectionPtr();
   }
 
   return candidate;

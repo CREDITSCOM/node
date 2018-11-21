@@ -1182,7 +1182,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
   csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (!poolSynchronizer_->isSyncroStarted()) {
-    cswarning() << "NODE> Get block reply> Pool synchronizer already is syncro started";
+    csdebug() << "NODE> Get block reply> Pool synchronizer already is syncro started";
     return;
   }
 
@@ -1215,7 +1215,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, roundNum_, poolsBlock);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock);
 }
 
 void Node::becomeWriter() {
@@ -1376,7 +1376,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 
 void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
-  ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
+  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 

@@ -538,7 +538,8 @@ APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Tra
 {
   work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
-  tr.add_user_field(1, transaction.userFields);
+  if (!transaction.userFields.empty())
+    tr.add_user_field(1, transaction.userFields);
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }

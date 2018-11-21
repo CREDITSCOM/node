@@ -147,6 +147,7 @@ public:
   uint32_t size();
 
   void pingNeighbours();
+  bool isPingDone();
   void validateConnectionId(RemoteNodePtr,
                             const Connection::Id,
                             const ip::udp::endpoint&,
@@ -157,6 +158,7 @@ public:
 
   ConnectionPtr getNextRequestee(const cs::Hash&);
   ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getNeighbour(const std::size_t number);
   ConnectionPtr getRandomSyncNeighbour();
   ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
   void resetSyncNeighbours();
