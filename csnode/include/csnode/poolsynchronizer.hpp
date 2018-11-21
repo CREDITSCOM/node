@@ -44,7 +44,7 @@ namespace cs {
         // pool sync progress
         void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
-        bool checkActivity();
+        bool checkActivity(bool isRound = true);
 
         void sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences);
 
@@ -61,9 +61,10 @@ namespace cs {
         Transport* m_transport;
         BlockChain* m_blockChain;
 
-        inline static const int m_maxBlockCount = 3;
+        inline static const int m_maxBlockCount = 2;
         inline static const cs::RoundNumber s_roundDifferent = 2;
-        inline static const int m_maxWaitingTimeReply = 3; // round or reply count
+        inline static const int m_maxWaitingTimeReply = 3; // reply count
+        inline static const int m_maxWaitingTimeRound = 1; // round count
 
         // syncro variables
         bool m_isSyncroStarted = false;
@@ -74,10 +75,19 @@ namespace cs {
         // to store new blocks
         std::map<csdb::Pool::sequence_t, csdb::Pool> m_temporaryStorage;
 
+        struct WaitinTimeReply {
+            explicit WaitinTimeReply(int round, int replyCount) :
+                roundCount(round),
+                replyBlockCount(replyCount)
+            {}
+
+            int roundCount = m_maxWaitingTimeReply;
+            int replyBlockCount = m_maxWaitingTimeRound;
+        };
         // [key] = sequence,
         // [value] = m_maxWaitingTimeReply
-        // value: Decreases, soon as a response is received for another requested block.
-        std::map<csdb::Pool::sequence_t, int> m_requestedSequences;
+        // value: Decreases, soon as a response is received for another requested block or init new round.
+        std::map<csdb::Pool::sequence_t, WaitinTimeReply> m_requestedSequences;
 
         PoolsRequestedSequences m_neededSequences;
 

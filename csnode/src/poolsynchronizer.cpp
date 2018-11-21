@@ -32,7 +32,7 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
         }
     }
     else {
-        checkActivity();
+        checkActivity(false);
     }
 }
 
@@ -78,7 +78,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
     }
 
     // Decreases, soon as a response is received for another requested block.
-    const bool alreadyRequest = checkActivity();
+    const bool alreadyRequest = checkActivity(false);
 
     /// or m_roundToSync > lastWrittenSequence
     if (m_roundToSync != cs::numeric_cast<cs::RoundNumber>(lastWrittenSequence)) {
@@ -155,15 +155,23 @@ void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
     }
 }
 
-bool cs::PoolSynchronizer::checkActivity() {
+bool cs::PoolSynchronizer::checkActivity(bool isRound) {
     csdebug() << "POOL SYNCHRONIZER> Check activity";
 
     bool isNeedRequest = false;
 
     for (auto& [sequence, timeWaiting] : m_requestedSequences) {
-        --timeWaiting;
-        if (!isNeedRequest && timeWaiting <= 0) {
-            isNeedRequest = true;
+        if (isRound) {
+            --(timeWaiting.roundCount);
+            if (!isNeedRequest && timeWaiting.roundCount <= 0) {
+                isNeedRequest = true;
+            }
+        }
+        else {
+            --(timeWaiting.replyBlockCount);
+            if (!isNeedRequest && timeWaiting.replyBlockCount <= 0) {
+                isNeedRequest = true;
+            }
         }
     }
 
@@ -180,7 +188,7 @@ void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsReq
 
     for (const auto& sequence : sequences) {
         if (!m_requestedSequences.count(sequence)) {
-            m_requestedSequences.emplace(std::make_pair(sequence, m_maxWaitingTimeReply));
+            m_requestedSequences.emplace(std::make_pair(sequence, WaitinTimeReply(m_maxWaitingTimeRound, m_maxWaitingTimeReply)));
         }
     }
 
@@ -235,7 +243,7 @@ bool cs::PoolSynchronizer::getNeededSequences() {
     uint32_t lastSequence = 0;
     bool isFromStorage = false;
     auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
-        return pair.second == 0;
+        return pair.second.roundCount == 0 || pair.second.replyBlockCount == 0;
     });
 
     if (!m_temporaryStorage.empty()) {
@@ -272,7 +280,8 @@ bool cs::PoolSynchronizer::getNeededSequences() {
         m_neededSequences.push_back(lastSequence);
 
         if (isFromStorage) {
-            firstSequenceIt->second = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
+            firstSequenceIt->second.roundCount = m_maxWaitingTimeRound; // reset maxWaitingTimeReply
+            firstSequenceIt->second.replyBlockCount = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
             ++firstSequenceIt; // next sequence
             if (firstSequenceIt == m_requestedSequences.end()) {
                 break;
