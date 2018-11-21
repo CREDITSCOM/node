@@ -1383,7 +1383,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 }
 
 void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed | BaseFlags::Fragmented);
   ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);

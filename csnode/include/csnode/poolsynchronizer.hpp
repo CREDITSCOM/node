@@ -81,8 +81,8 @@ namespace cs {
                 replyBlockCount(replyCount)
             {}
 
-            int roundCount = m_maxWaitingTimeReply;
-            int replyBlockCount = m_maxWaitingTimeRound;
+            int roundCount = 0;
+            int replyBlockCount = 0;
         };
         // [key] = sequence,
         // [value] = m_maxWaitingTimeReply
