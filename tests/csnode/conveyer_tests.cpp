@@ -103,15 +103,112 @@ auto CreateTestRoundTable(const cs::Hashes& hashes) {
                         kCharacteristic};
 }
 
+TEST(TransactionsEqualityOperator, SameAreEqual) {
+  auto transaction1 = CreateTestTransaction(123, uint8_t{45}),
+       transaction2 = transaction1;
+  ASSERT_EQ(transaction1, transaction2);
+  ASSERT_TRUE(transaction1 == transaction2);
+}
+
+TEST(TransactionsEqualityOperator, DifferentId) {
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
+               CreateTestTransaction(321, uint8_t{45}));
+}
+
+TEST(TransactionsEqualityOperator, DifferentAmount) {
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
+               CreateTestTransaction(123, uint8_t{00}));
+}
+
+class ConveyerTest : public cs::ConveyerBase {
+public:
+  ConveyerTest() : ConveyerBase() {}
+  ~ConveyerTest() = default;
+};
+
 TEST(Conveyer, RoundTableReturnsNullIfRoundDoesNotExist) {
-  auto& conveyer{cs::Conveyer::instance()};
+  ConveyerTest conveyer{};
   ASSERT_EQ(conveyer.roundTable(1), nullptr);
+}
+
+TEST(Conveyer, GetCharacteristicReturnsNullIfConveyerHasNoMeta) {
+  ConveyerTest conveyer{};
+  const auto kAnyRoundNumber{123};
+  ASSERT_EQ(nullptr, conveyer.characteristic(kAnyRoundNumber));
+}
+
+TEST(Conveyer, RoundTableReturnsSameAsThatWasSetWithSetRound) {
+  ConveyerTest conveyer{};
+  auto round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
+  auto&& round_table_copy{cs::RoundTable{round_table}};
+  conveyer.setRound(std::move(round_table_copy));
+  ASSERT_EQ(round_table, conveyer.roundTable());
+}
+
+TEST(Conveyer, SetRoundDoesNotSetInvalidRoundNumber) {
+  ConveyerTest conveyer{};
+  auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
+  auto&& incorrect_round_table{cs::RoundTable{round_table}};
+  conveyer.setRound(std::move(round_table));
+  ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
+  incorrect_round_table.round = round_table.round - 1;
+  conveyer.setRound(std::move(incorrect_round_table));
+  ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
+  incorrect_round_table.round = 0;
+  conveyer.setRound(std::move(incorrect_round_table));
+  ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
+}
+
+TEST(Conveyer, RoundTableReturnsNullIfRoundWasNotAdded) {
+  ConveyerTest conveyer{};
+  auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
+  conveyer.setRound(std::move(round_table));
+  ASSERT_EQ(conveyer.roundTable(1), nullptr);
+}
+
+TEST(Conveyer, AddTransaction) {
+  ConveyerTest conveyer{};
+  auto transaction{CreateTestTransaction(3, 1)};
+  conveyer.addTransaction(transaction);
+  auto transactions_block{conveyer.transactionsBlock()};
+  ASSERT_EQ(1, transactions_block.size());
+  auto packet{cs::TransactionsPacket{}};
+  packet.addTransaction(transaction);
+  ASSERT_EQ(packet.toBinary(), transactions_block.back().toBinary());
+}
+
+TEST(Conveyer, TransactionPacketTableIsEmptyAtCreation) {
+  ConveyerTest conveyer{};
+  auto& table = conveyer.transactionsPacketTable();
+  ASSERT_EQ(0, table.size());
+}
+
+TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
+  ConveyerTest conveyer{};
+  auto packet = CreateTestPacket(2);
+  conveyer.addTransactionsPacket(packet);
+  auto& table{conveyer.transactionsPacketTable()};
+  ASSERT_EQ(table.at(packet.hash()).toBinary(), packet.toBinary());
+}
+
+TEST(Conveyer, CanAddTransactionToLastBlock) {
+  ConveyerTest conveyer{};
+  auto& table = conveyer.transactionsBlock();
+  ASSERT_TRUE(table.empty());
+  auto transaction1 = CreateTestTransaction(1, 1),
+       transaction2 = CreateTestTransaction(2, 1);
+  conveyer.addTransaction(transaction1);
+  conveyer.addTransaction(transaction2);
+  ASSERT_EQ(1, table.size());
+  ASSERT_EQ(2, table.back().transactionsCount());
+  ASSERT_EQ(transaction1, table.back().transactions().at(0));
+  ASSERT_EQ(transaction2, table.back().transactions().at(1));
 }
 
 TEST(Conveyer, MainLogic) {
   auto packet = CreateTestPacket(20);
   auto&& packet_copy{cs::TransactionsPacket{packet}};
-  auto& conveyer{cs::Conveyer::instance()};
+  ConveyerTest conveyer{};
   auto hash = packet_copy.hash();
   conveyer.setRound(CreateTestRoundTable({packet_copy.hash()}));
   ASSERT_EQ(1, conveyer.currentNeededHashes().size());
@@ -146,10 +243,4 @@ TEST(Conveyer, MainLogic) {
   ASSERT_EQ(packet.transactions().at(2), pool.value().transaction(0));
   ASSERT_EQ(packet.transactions().at(9), pool.value().transaction(1));
   ASSERT_EQ(packet.transactions().at(16), pool.value().transaction(2));
-}
-
-TEST(Conveyer, CharacteristicSetAndGet) {
-  cs::Conveyer& conveyer{cs::Conveyer::instance()};
-  conveyer.setCharacteristic(kCharacteristic, kRoundNumber);
-  ASSERT_EQ(kCharacteristic, *conveyer.characteristic(kRoundNumber));
 }

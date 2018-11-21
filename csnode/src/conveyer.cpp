@@ -8,7 +8,7 @@
 #include <iomanip>
 
 /// pointer implementation realization
-struct cs::Conveyer::Impl
+struct cs::ConveyerBase::Impl
 {
     // first storage of transactions, before sending to network
     cs::TransactionsBlock transactionsBlock;
@@ -30,23 +30,19 @@ public signals:
 };
 
 
-cs::Conveyer::Conveyer()
+cs::ConveyerBase::ConveyerBase()
 {
-    pimpl = std::make_unique<cs::Conveyer::Impl>();
+    pimpl = std::make_unique<cs::ConveyerBase::Impl>();
 }
 
-cs::Conveyer& cs::Conveyer::instance()
-{
-    static cs::Conveyer conveyer;
-    return conveyer;
-}
+cs::ConveyerBase::~ConveyerBase() = default;
 
-cs::PacketFlushSignal& cs::Conveyer::flushSignal()
+cs::PacketFlushSignal& cs::ConveyerBase::flushSignal()
 {
     return pimpl->flushPacket;
 }
 
-void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
+void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction)
 {
     if (!transaction.is_valid()) {
         cswarning() << "CONVEYER> Can not add no valid transaction to conveyer";
@@ -62,7 +58,7 @@ void cs::Conveyer::addTransaction(const csdb::Transaction& transaction)
     pimpl->transactionsBlock.back().addTransaction(transaction);
 }
 
-void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
+void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet)
 {
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(m_sharedMutex);
@@ -75,17 +71,17 @@ void cs::Conveyer::addTransactionsPacket(const cs::TransactionsPacket& packet)
     }
 }
 
-const cs::TransactionsPacketTable& cs::Conveyer::transactionsPacketTable() const
+const cs::TransactionsPacketTable& cs::ConveyerBase::transactionsPacketTable() const
 {
     return pimpl->hashTable;
 }
 
-const cs::TransactionsBlock& cs::Conveyer::transactionsBlock() const
+const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const
 {
     return pimpl->transactionsBlock;
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::createPacket() const
+std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
 
@@ -122,7 +118,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::createPacket() const
     return std::make_optional<cs::TransactionsPacket>(std::move(packet));
 }
 
-void cs::Conveyer::setRound(cs::RoundTable&& table)
+void cs::ConveyerBase::setRound(cs::RoundTable&& table)
 {
     cslog() << "CONVEYER> SetRound";
     if (table.round <= currentRoundNumber())
@@ -167,13 +163,13 @@ void cs::Conveyer::setRound(cs::RoundTable&& table)
     }
 }
 
-const cs::RoundTable& cs::Conveyer::roundTable() const
+const cs::RoundTable& cs::ConveyerBase::roundTable() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
     return meta->roundTable;
 }
 
-const cs::RoundTable* cs::Conveyer::roundTable(cs::RoundNumber round) const
+const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
@@ -184,17 +180,17 @@ const cs::RoundTable* cs::Conveyer::roundTable(cs::RoundNumber round) const
     return &meta->roundTable;
 }
 
-cs::RoundNumber cs::Conveyer::currentRoundNumber() const
+cs::RoundNumber cs::ConveyerBase::currentRoundNumber() const
 {
     return pimpl->currentRound;
 }
 
-const cs::Hashes& cs::Conveyer::currentNeededHashes() const
+const cs::Hashes& cs::ConveyerBase::currentNeededHashes() const
 {
     return *(neededHashes(currentRoundNumber()));
 }
 
-const cs::Hashes* cs::Conveyer::neededHashes(cs::RoundNumber round) const
+const cs::Hashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
@@ -207,7 +203,7 @@ const cs::Hashes* cs::Conveyer::neededHashes(cs::RoundNumber round) const
     return &(meta->neededHashes);
 }
 
-void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet)
+void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet)
 {
     cs::Lock lock(m_sharedMutex);
 
@@ -241,12 +237,12 @@ void cs::Conveyer::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&
     }
 }
 
-bool cs::Conveyer::isSyncCompleted() const
+bool cs::ConveyerBase::isSyncCompleted() const
 {
     return isSyncCompleted(currentRoundNumber());
 }
 
-bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
+bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
@@ -259,13 +255,13 @@ bool cs::Conveyer::isSyncCompleted(cs::RoundNumber round) const
     return meta->neededHashes.empty();
 }
 
-const cs::Notifications& cs::Conveyer::notifications() const
+const cs::Notifications& cs::ConveyerBase::notifications() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
     return meta->notifications;
 }
 
-void cs::Conveyer::addNotification(const cs::Bytes& bytes)
+void cs::ConveyerBase::addNotification(const cs::Bytes& bytes)
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
 
@@ -276,7 +272,7 @@ void cs::Conveyer::addNotification(const cs::Bytes& bytes)
     }
 }
 
-std::size_t cs::Conveyer::neededNotificationsCount() const
+std::size_t cs::ConveyerBase::neededNotificationsCount() const
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
 
@@ -289,7 +285,7 @@ std::size_t cs::Conveyer::neededNotificationsCount() const
     return 0;
 }
 
-bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) const
+bool cs::ConveyerBase::isEnoughNotifications(cs::ConveyerBase::NotificationState state) const
 {
     cs::SharedLock lock(m_sharedMutex);
 
@@ -306,7 +302,7 @@ bool cs::Conveyer::isEnoughNotifications(cs::Conveyer::NotificationState state) 
     return notificationsCount >= neededConfidantsCount;
 }
 
-void cs::Conveyer::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&& characteristic)
+void cs::ConveyerBase::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&& characteristic)
 {
     if (!pimpl->characteristicMetas.contains(round))
     {
@@ -321,7 +317,7 @@ void cs::Conveyer::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&&
     }
 }
 
-std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs::RoundNumber round)
+std::optional<cs::CharacteristicMeta> cs::ConveyerBase::characteristicMeta(const cs::RoundNumber round)
 {
     if (!pimpl->characteristicMetas.contains(round))
     {
@@ -333,7 +329,7 @@ std::optional<cs::CharacteristicMeta> cs::Conveyer::characteristicMeta(const cs:
     return std::make_optional<cs::CharacteristicMeta>(std::move(meta).value());
 }
 
-void cs::Conveyer::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round)
+void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round)
 {
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
 
@@ -344,7 +340,7 @@ void cs::Conveyer::setCharacteristic(const Characteristic& characteristic, cs::R
     }
 }
 
-const cs::Characteristic* cs::Conveyer::characteristic(cs::RoundNumber round) const
+const cs::Characteristic* cs::ConveyerBase::characteristic(cs::RoundNumber round) const
 {
     auto meta = pimpl->metaStorage.get(round);
 
@@ -357,7 +353,7 @@ const cs::Characteristic* cs::Conveyer::characteristic(cs::RoundNumber round) co
     return &meta->characteristic;
 }
 
-cs::Hash cs::Conveyer::characteristicHash(cs::RoundNumber round) const
+cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const
 {
     const Characteristic* pointer = characteristic(round);
 
@@ -370,7 +366,7 @@ cs::Hash cs::Conveyer::characteristicHash(cs::RoundNumber round) const
     return getBlake2Hash(pointer->mask.data(), pointer->mask.size());
 }
 
-std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
+std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
 {
     cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
     cslog() << "CONVEYER> ApplyCharacteristic, round " << round;
@@ -465,7 +461,8 @@ std::optional<csdb::Pool> cs::Conveyer::applyCharacteristic(const cs::PoolMetaIn
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
-std::optional<cs::TransactionsPacket> cs::Conveyer::findPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
+
+std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const
 {
     if (auto iterator = pimpl->hashTable.find(hash); iterator != pimpl->hashTable.end()) {
         return iterator->second;
@@ -486,7 +483,7 @@ std::optional<cs::TransactionsPacket> cs::Conveyer::findPacket(const cs::Transac
     return std::nullopt;
 }
 
-bool cs::Conveyer::isMetaTransactionInvalid(int64_t id)
+bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id)
 {
     cs::SharedLock lock(m_sharedMutex);
 
@@ -506,12 +503,12 @@ bool cs::Conveyer::isMetaTransactionInvalid(int64_t id)
     return false;
 }
 
-cs::SharedMutex& cs::Conveyer::sharedMutex() const
+cs::SharedMutex& cs::ConveyerBase::sharedMutex() const
 {
     return m_sharedMutex;
 }
 
-void cs::Conveyer::flushTransactions()
+void cs::ConveyerBase::flushTransactions()
 {
     cs::Lock lock(m_sharedMutex);
     std::size_t allTransactionsCount = 0;
@@ -547,4 +544,10 @@ void cs::Conveyer::flushTransactions()
     if (!pimpl->transactionsBlock.empty()) {
         pimpl->transactionsBlock.clear();
     }
+}
+
+cs::Conveyer& cs::Conveyer::instance()
+{
+    static cs::Conveyer conveyer;
+    return conveyer;
 }
