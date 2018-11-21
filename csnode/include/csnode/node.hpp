@@ -221,6 +221,7 @@ private:
   bool checkKeysFile();
   std::pair<cs::PublicKey, cs::PrivateKey> generateKeys();
   bool checkKeysForSignature(const cs::PublicKey&, const cs::PrivateKey&);
+  void logPool(csdb::Pool& pool);
 
   // pool sync helpers
   void blockchainSync();

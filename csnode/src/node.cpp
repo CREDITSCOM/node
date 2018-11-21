@@ -731,6 +731,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   else {
     cswarning() << "NODE> RECEIVED KEY Writer verification failed";
     cswarning() << "NODE> remove wallets from wallets cache";
+    logPool(pool.value());
     getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
 }
@@ -2156,6 +2157,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  logPool(pool.value());
   sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
 }
 
@@ -2323,6 +2325,10 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::PublicKey writerPublicKey;
     istream_ >> writerPublicKey;
 
+    if(!istream_.good()) {
+        cserror() << "NODE> round info parsing failed, data is corrupted";
+    }
+
     std::vector<cs::Hash> confidantsHashes;
 
     for (const auto& notification : conveyer.notifications()) {
@@ -2377,6 +2383,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         else {
           cswarning() << "NODE> RECEIVED KEY Writer verification failed";
           cswarning() << "NODE> Remove wallets from wallets cache";
+          logPool(pool.value());
           getBlockChain().removeWalletsInPoolFromCache(pool.value());
         }
       }
@@ -2392,6 +2399,32 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   //transport_->processPostponed(roundNum_);
 
   cslog() << "NODE> round info handled";
+}
+
+void Node::logPool(csdb::Pool& pool)
+{
+    csdebug() << "======== BLOCK DETAILS ========";
+    const auto& conf = pool.confidants();
+    if(conf.empty()) {
+        csdebug() << "    trusted: empty";
+    }
+    else {
+        csdebug() << "    trusted: " << conf.size();
+    }
+    csdebug() << " prev. hash: " << pool.previous_hash().to_string();
+    csdebug() << "       hash: " << pool.hash().to_string();
+    csdebug() << " writer key: " << cs::Utils::byteStreamToHex(pool.writer_public_key().data(), pool.writer_public_key().size());
+    if(pool.transactions().empty()) {
+        csdebug() << "      trans: empty";
+    }
+    else {
+        std::ostringstream os;
+        for(const auto& t : pool.transactions()) {
+            os << ' ' << t.innerID();
+        }
+        csdebug() << "      trans. " << pool.transactions_count() << ":" << os.str();
+    }
+    csdebug() << "===============================";
 }
 
 void Node::sendHash_V3(cs::RoundNumber round) {
