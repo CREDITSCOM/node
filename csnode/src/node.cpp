@@ -572,7 +572,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
   cserror() << "NODE> starting new round via getRoundTable() is not supported, getRoundInfo() must be called";
   return;
-    
+#if 0
   cslog() << "NODE> RoundTable";
 
   istream_.init(data, size);
@@ -625,6 +625,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   onRoundStartConveyer(std::move(roundTable));
   cslog() << "NODE> Get Round table -> got Round =" << round;
   startConsensus();
+#endif // 0
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -737,7 +738,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
   cserror() << "NODE> method writeBlock() is obsolete, call to writeBlock_V3() instead";
   return;
-
+#if 0
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -770,6 +771,8 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
     solver_->gotIncorrectBlock(std::move(newPool), sender);
   }
 #endif
+
+#endif // 0
 }
 
 void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
@@ -2545,8 +2548,11 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
         width += 6;
     }
     else {
-        line1 << "TRUSTED";
-        width += 7;
+        line1 << "TRUSTED [" << (int) myConfidantIndex_ << "]";
+        width += 11;
+        if(myConfidantIndex_ > 9) {
+            width += 1;
+        }
     }
     line1 << ' ';
     width += 1;
