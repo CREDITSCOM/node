@@ -178,7 +178,7 @@ class Transport {
   static const uint32_t MaxPacksQueue  = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
 
-  __cacheline_aligned std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock sendPacksFlag_;
   struct PackSendTask {
     Packet   pack;
     uint32_t resendTimes = 0;
@@ -195,7 +195,7 @@ class Transport {
 
   cs::IPackStream iPackStream_;
 
-  std::atomic_flag oLock_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock oLock_;
   cs::OPackStream oPackStream_;
 
   // SS Data
@@ -224,7 +224,7 @@ class Transport {
   PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 
-  std::atomic_flag uLock_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock uLock_;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   uint32_t maxBlock_ = 0;

@@ -267,7 +267,7 @@ bool Network::resendFragment(const cs::Hash& hash,
   //LOG_WARN("Got resend req " << id << " from " << ep);
   MessagePtr msg;
   {
-    SpinLock l(collector_.mLock_);
+    cs::SpinGuard l(collector_.mLock_);
     msg = collector_.map_.tryStore(hash);
   }
 
@@ -276,7 +276,7 @@ bool Network::resendFragment(const cs::Hash& hash,
   }
 
   {
-    SpinLock l(msg->pLock_);
+    cs::SpinGuard l(msg->pLock_);
     if (id < msg->packetsTotal_ && *(msg->packets_ + id)) {
       sendDirect(*(msg->packets_ + id), ep);
       return true;
@@ -294,7 +294,7 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
   MessagePtr msg;
 
   {
-    SpinLock l(collector_.mLock_);
+    cs::SpinGuard l(collector_.mLock_);
     msg = collector_.msgAllocator_.emplace();
   }
 
@@ -309,7 +309,7 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
   }
 
   {
-    SpinLock l(collector_.mLock_);
+    cs::SpinGuard l(collector_.mLock_);
     collector_.map_.tryStore(pack->getHeaderHash()) = msg;
   }
 }

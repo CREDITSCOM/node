@@ -201,10 +201,10 @@ private:
 
   TypedAllocator<Connection> connectionsAllocator_;
 
-  __cacheline_aligned std::atomic_flag nLockFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock nLockFlag_;
   FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
-  __cacheline_aligned std::atomic_flag mLockFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock mLockFlag_;
   FixedHashMap<ip::udp::endpoint,
                ConnectionPtr,
                uint16_t,
