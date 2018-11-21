@@ -52,6 +52,26 @@ class UserField::priv : public ::csdb::internal::shared_data
     }
   }
 
+  inline void put_for_sig(::csdb::priv::obstream& os) const
+  {
+    switch (type_) {
+    case UserField::Integer:
+      os.put(i_value_);
+      break;
+
+    case UserField::String:
+      os.put(s_value_);
+      break;
+
+    case UserField::Amount:
+      os.put(a_value_);
+      break;
+
+    default:
+      break;
+    }
+  }
+
   inline bool get(::csdb::priv::ibstream& is)
   {
     UserField::Type type;
@@ -168,6 +188,11 @@ bool UserField::operator ==(const UserField& other) const noexcept
 void UserField::put(::csdb::priv::obstream &os) const
 {
   d->put(os);
+}
+
+void UserField::put_for_sig(::csdb::priv::obstream &os) const
+{
+  d->put_for_sig(os);
 }
 
 bool UserField::get(::csdb::priv::ibstream &is)

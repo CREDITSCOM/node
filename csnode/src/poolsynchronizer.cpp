@@ -8,8 +8,7 @@
 
 cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockChain) :
     m_transport(transport), /// TODO Fix me. Think about how to do without it
-    m_blockChain(blockChain),
-    m_maxWaitingTimeReply(cs::numeric_cast<int>(m_transport->getMaxNeighbours() - 1))
+    m_blockChain(blockChain)
 {
     m_neededSequences.reserve(m_maxBlockCount);
     m_neighbours.reserve(m_transport->getMaxNeighbours());
@@ -18,7 +17,8 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
 }
 
 void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
-    if (!m_transport->isPingDone()) {
+    if (m_transport->getNeighboursCount() == 0) {
+        cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum;
         return;
     }
 

@@ -34,6 +34,10 @@ public:
   decltype(std::declval<T>().put(std::declval<obstream&>()))
   put(const T& value);
 
+  template<typename T>
+  decltype(std::declval<T>().put(std::declval<obstream&>()))
+  put_for_sig(const T& value);
+
   template<class K, class T, class C, class A>
   void put(const ::std::map<K, T, C, A>& value);
 
@@ -105,6 +109,13 @@ inline obstream::put(const T& value)
 	value.put(*this);
 }
 
+template<typename T>
+decltype(std::declval<T>().put(std::declval<obstream&>()))
+inline obstream::put_for_sig(const T& value)
+{
+  value.put_for_sig(*this);
+}
+
 template<class K, class T, class C, class A>
 void obstream::put(const ::std::map<K, T, C, A>& value)
 {
@@ -118,11 +129,10 @@ void obstream::put(const ::std::map<K, T, C, A>& value)
 template<class K, class T, class C, class A>
 void obstream::put_smart(const ::std::map<K, T, C, A>& value)
 {
-	put(static_cast<uint8_t>(value.size()));
-	for (const auto& it : value) {
-		//put(it.first);
-		put(it.second);
-	}
+  put(static_cast<uint8_t>(value.size()));
+  for (const auto& it : value) {
+    put_for_sig(it.second);
+  }
 }
 
 template<typename T>

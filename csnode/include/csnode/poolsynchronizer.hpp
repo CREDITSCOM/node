@@ -63,7 +63,7 @@ namespace cs {
 
         inline static const int m_maxBlockCount = 4;
         inline static const cs::RoundNumber s_roundDifferent = 4;
-        const int m_maxWaitingTimeReply;
+        inline static const int m_maxWaitingTimeReply = 2; // round or reply count
 
         // syncro variables
         bool m_isSyncroStarted = false;

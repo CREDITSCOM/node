@@ -570,6 +570,9 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
+  cserror() << "NODE> starting new round via getRoundTable() is not supported, getRoundInfo() must be called";
+  return;
+#if 0
   cslog() << "NODE> RoundTable";
 
   istream_.init(data, size);
@@ -622,6 +625,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   onRoundStartConveyer(std::move(roundTable));
   cslog() << "NODE> Get Round table -> got Round =" << round;
   startConsensus();
+#endif // 0
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -698,6 +702,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::PublicKey writerPublicKey;
   istream_ >> writerPublicKey;
 
+  if (!istream_.good()) {
+    cserror() << "NODE> Get characteristic, parsing failed";
+    return;
+  }
+
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
   if (!pool) {
@@ -727,11 +736,15 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   else {
     cswarning() << "NODE> RECEIVED KEY Writer verification failed";
     cswarning() << "NODE> remove wallets from wallets cache";
+    logPool(pool.value());
     getBlockChain().removeWalletsInPoolFromCache(pool.value());
   }
 }
 
 void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
+  cserror() << "NODE> method writeBlock() is obsolete, call to writeBlock_V3() instead";
+  return;
+#if 0
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -764,6 +777,8 @@ void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey&
     solver_->gotIncorrectBlock(std::move(newPool), sender);
   }
 #endif
+
+#endif // 0
 }
 
 void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
@@ -790,6 +805,10 @@ void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicK
     solver_->gotIncorrectBlock(std::move(newPool), sender);
   }
 #endif
+}
+
+const cs::ConfidantsKeys& Node::confidants() const {
+  return cs::Conveyer::instance().roundTable().confidants;
 }
 
 void Node::getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
@@ -1441,22 +1460,22 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if(type == MsgTypes::RoundTableRequest) {
-      return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if (type == MsgTypes::RoundTableRequest) {
+    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::RoundInfoRequest) {
     return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if(type == MsgTypes::RoundInfoReply) {
-      return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+  if (type == MsgTypes::RoundInfoReply) {
+    return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
     // which round would not be on the remote we may require the requested block
     return MessageActions::Process;
-    //return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    // return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
   if(type == MsgTypes::BlockHashV3) {
@@ -1467,10 +1486,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
           return MessageActions::Process;
       }
       if(rNum != roundNum_) {
-          cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
+          cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed";
       }
       else {
-          cslog() << "NODE> hash is postponed until conveyer sync is completed";
+          cslog() << "NODE> block hash is postponed until conveyer sync is completed";
       }
       return MessageActions::Postpone;
   }
@@ -2148,6 +2167,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   cslog() << "NODE> After sign: isVerified == " << isVerified;
 
   writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  logPool(pool.value());
   sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
 }
 
@@ -2315,6 +2335,10 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::PublicKey writerPublicKey;
     istream_ >> writerPublicKey;
 
+    if(!istream_.good()) {
+        cserror() << "NODE> round info parsing failed, data is corrupted";
+    }
+
     std::vector<cs::Hash> confidantsHashes;
 
     for (const auto& notification : conveyer.notifications()) {
@@ -2324,6 +2348,10 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
       notificationStream >> hash;
 
       confidantsHashes.push_back(hash);
+    }
+
+    if (!istream_.good()) {
+      cserror() << "NODE> Get round table parsing failed";
     }
 
     cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
@@ -2369,6 +2397,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         else {
           cswarning() << "NODE> RECEIVED KEY Writer verification failed";
           cswarning() << "NODE> Remove wallets from wallets cache";
+          logPool(pool.value());
           getBlockChain().removeWalletsInPoolFromCache(pool.value());
         }
       }
@@ -2384,6 +2413,38 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
   //transport_->processPostponed(roundNum_);
 
   cslog() << "NODE> round info handled";
+}
+
+void Node::logPool(csdb::Pool& pool)
+{
+    csdebug() << "======== BLOCK DETAILS ========";
+    const auto& conf = pool.confidants();
+    if(conf.empty()) {
+        csdebug() << "    trusted: empty";
+    }
+    else {
+        csdebug() << "    trusted: " << conf.size();
+    }
+    csdebug() << " prev. hash: " << pool.previous_hash().to_string();
+    csdebug() << "       hash: " << pool.hash().to_string();
+    csdebug() << " writer key: " << cs::Utils::byteStreamToHex(pool.writer_public_key().data(), pool.writer_public_key().size());
+    if(pool.transactions().empty()) {
+        csdebug() << "      trans: empty";
+    }
+    else {
+        std::ostringstream os;
+        int i = 0;
+        for(const auto& t : pool.transactions()) {
+            os << ' ' << t.innerID();
+            ++i;
+            if(i == 15) {
+                os << "...";
+                break;
+            }
+        }
+        csdebug() << "trans. (" << pool.transactions_count() << "):" << os.str();
+    }
+    csdebug() << "===============================";
 }
 
 void Node::sendHash_V3(cs::RoundNumber round) {
@@ -2540,8 +2601,11 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
         width += 6;
     }
     else {
-        line1 << "TRUSTED";
-        width += 7;
+        line1 << "TRUSTED [" << (int) myConfidantIndex_ << "]";
+        width += 11;
+        if(myConfidantIndex_ > 9) {
+            width += 1;
+        }
     }
     line1 << ' ';
     width += 1;
