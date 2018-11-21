@@ -570,6 +570,9 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
+  cserror() << "NODE> starting new round via getRoundTable() is not supported, getRoundInfo() must be called";
+  return;
+    
   cslog() << "NODE> RoundTable";
 
   istream_.init(data, size);
@@ -732,6 +735,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 }
 
 void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
+  cserror() << "NODE> method writeBlock() is obsolete, call to writeBlock_V3() instead";
+  return;
+
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -1466,10 +1472,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
           return MessageActions::Process;
       }
       if(rNum != roundNum_) {
-          cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
+          cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed";
       }
       else {
-          cslog() << "NODE> hash is postponed until conveyer sync is completed";
+          cslog() << "NODE> block hash is postponed until conveyer sync is completed";
       }
       return MessageActions::Postpone;
   }
