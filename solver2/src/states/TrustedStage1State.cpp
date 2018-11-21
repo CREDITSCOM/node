@@ -61,7 +61,7 @@ namespace slv2
             cserror() << name() << ": cannot handle previous round transactions";
             return Result::Ignore;
         }
-        cslog() << name() << ": transactions sync completed, start consensus in " << context.round() << " round";
+        cslog() << name() << ": -------> STARTING CONSENSUS #" << context.round() << " <------- ";
         cs::Conveyer& conveyer = cs::Conveyer::instance();
         auto maybe_pack = conveyer.createPacket();
         if(!maybe_pack.has_value()) {

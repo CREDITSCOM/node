@@ -86,7 +86,7 @@ bool Node::init() {
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
-  cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::onSendBlockRequest);
+  cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
   cs::Connector::connect(&poolSynchronizer_->synchroFinished, this, &Node::processMetaMap);
 
   return true;
@@ -206,7 +206,6 @@ bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::Priva
 }
 
 void Node::blockchainSync() {
-  cslog() <<"NODE> last written sequence = " << getBlockChain().getLastWrittenSequence();
   poolSynchronizer_->processingSync(roundNum_);
 }
 
@@ -309,7 +308,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, rNum, roundTable]() mutable {
     onRoundStart_V3(roundTable);
     onRoundStartConveyer(std::move(roundTable));
-    startConsensus();
   });
 }
 
@@ -371,7 +369,10 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 
   writeDefaultStream(args...);
 
-  csdebug() << "NODE> Sending Direct data of size " << ostream_.getCurrentSize() << " to " << target->getOut();
+  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize()
+    << ", out = " << target->out
+    << ", in = " << target->in
+    << ", specialOut = " << target->specialOut;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -524,10 +525,10 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     hashes.push_back(std::move(hash));
   }
 
-  cslog() << "NODE> Hashes request got hashes count: " << hashesCount;
+  cslog() << "NODE> Requested packet hashes: " << hashesCount;
 
   if (hashesCount != hashes.size()) {
-    cserror() << "Bad hashes created";
+    cserror() << "NODE> wrong hashes list requested";
     return;
   }
 
@@ -536,7 +537,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
-    csdebug() << "NODE> Sync packets already synced in round: " << round;
+    csdebug() << "NODE> sync packets have already finished in round " << round;
     return;
   }
 
@@ -1099,14 +1100,13 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
     return;
   }
 
-  csdebug() << "NODE> Sending transaction packet reply: packets count: " << packets.size();
+  csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
   const bool success = sendNeighbours(target, msgType, round, packets);
 
   if (!success) {
-    csdebug() << "NODE> Sending transaction packet reply: Cannot get a connection with a specified public key " << cs::Utils::byteStreamToHex(target.data(), target.size());
-
+    csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
     sendBroadcast(target, msgType, round, packets);
   }
 }
@@ -1206,7 +1206,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, roundNum_, poolsBlock);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock);
 }
 
 void Node::becomeWriter() {
@@ -1278,9 +1278,10 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   cs::Packets packets;
 
   const auto& conveyer = cs::Conveyer::instance();
+  cs::SharedLock lock(conveyer.sharedMutex());
 
   for (const auto& hash : hashes) {
-    std::optional<cs::TransactionsPacket> packet = conveyer.searchPacket(hash, round);
+    std::optional<cs::TransactionsPacket> packet = conveyer.findPacket(hash, round);
 
     if (packet) {
       packets.push_back(std::move(packet).value());
@@ -1288,13 +1289,12 @@ void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber roun
   }
 
   if (packets.size()) {
-    csdebug() << "NODE> Found hashes count in hash table storage: " << packets.size();
+    csdebug() << "NODE> Found packets in storage: " << packets.size();
+    sendPacketHashesReply(packets, round, sender);
   }
   else {
-    csdebug() << "NODE> Can not find round in storage, hash not found";
+    csdebug() << "NODE> Cannot find packets in storage";
   }
-
-  sendPacketHashesReply(packets, round, sender);
 }
 
 void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round) {
@@ -1365,9 +1365,9 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
+void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
-  ostream_ << MsgTypes::BlockRequest << roundNum_ << sequences;
+  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
@@ -1466,10 +1466,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
           return MessageActions::Process;
       }
       if(rNum != roundNum_) {
-          cslog() << "NODE> hash is postponed due to rNum (" << rNum << ") != roundNum_ (" << roundNum_ << ")";
+          cslog() << "NODE> outrunning hash (#" << rNum << ") is postponed";
       }
       else {
-          cslog() << "NODE> hash is postponed due to !conveyer.isSyncCompleted()";
+          cslog() << "NODE> hash is postponed until conveyer sync is completed";
       }
       return MessageActions::Postpone;
   }
@@ -2192,19 +2192,14 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
     }
   }
 
-  //const cs::Hashes& hashes = table.hashes;
-  //cslog() << "Hashes count: " << hashes.size();
+  const cs::Hashes& hashes = table.hashes;
+  cslog() << "Hashes count: " << hashes.size();
 
-  //for (std::size_t i = 0; i < hashes.size(); ++i) {
-  //  csdebug() << i << ". " << hashes[i].toString();
-  //}
-
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    csdebug() << i << ". " << hashes[i].toString();
+  }
  
   transport_->clearTasks();
-
-  //TODO: \EE\E1\ED\EE\E2\E8\F2\FC \F2\E0\E1\EB\E8\F6\F3 \F0\E0\F3\ED\E4\E0 \E2 cs::Conveyer::instance()
-  //cs::Conveyer::instance().roundTable().confidants.assign(confidantNodes.cbegin(), confidantNodes.cend());
-  assert(false);
 
   onRoundStart_V3(table);
   startConsensus();
@@ -2557,6 +2552,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable)
     int fixed_width = (int) s.size();
     cslog() << s;
     cslog() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
+    cslog() << " last written sequence = " << getBlockChain().getLastWrittenSequence();
 
     std::ostringstream line2;
     for(int i = 0; i < fixed_width; ++i) {
@@ -2584,7 +2580,11 @@ void Node::startConsensus()
     cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
     solver_->gotRound(rnum);
     transport_->processPostponed(rnum);
-    sendHash_V3(rnum);
+    auto lws = getBlockChain().getLastWrittenSequence();
+    // claim the trusted role only if have got proper blockchain:
+    if(rnum > lws && rnum - lws == 1) {
+        sendHash_V3(rnum);
+    }
 }
 
  void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender)

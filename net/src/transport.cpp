@@ -392,44 +392,6 @@ void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
 
-  switch (type) {
-    case MsgTypes::BlockHash:
-      csdebug() << "TRANSPORT> Process Node Message: BlockHash, rNum=" << rNum;
-      break;
-    case MsgTypes::BlockRequest:
-      csdebug() << "TRANSPORT> Process Node Message: BlockRequest, rNum=" << rNum;
-      break;
-    case MsgTypes::FirstTransaction:
-      csdebug() << "TRANSPORT> Process Node Message: FirstTransaction, rNum=" << rNum;
-      break;
-    case MsgTypes::RequestedBlock:
-      csdebug() << "TRANSPORT> Process Node Message: RequestedBlock";
-      break;
-    case MsgTypes::RoundTableSS:
-      csdebug() << "TRANSPORT> Process Node Message: RoundTable, rNum=" << rNum;
-      break;
-    case MsgTypes::TransactionList:
-      csdebug() << "TRANSPORT> Process Node Message: TransactionList, rNum=" << rNum;
-      break;
-    case MsgTypes::NewCharacteristic:
-      csdebug() << "TRANSPORT> Process Node Message: Characteristic received";
-      break;
-    case MsgTypes::WriterNotification:
-      csdebug() << "TRANSPORT> Process Node Message: Writer Notification received";
-      break;
-    case MsgTypes::BigBang:
-      csdebug() << "TRANSPORT> Process Node Message: BigBang ";
-      break;
-    case MsgTypes::TransactionsPacketRequest:
-      csdebug() << "TRANSPORT> Process Node Message: Transactions packet request";
-      break;
-    case MsgTypes::TransactionsPacketReply:
-      csdebug() << "TRANSPORT> Process Node Message: Transactions packet reply";
-      break;
-  default:
-      break;
-  }
-
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
     return dispatchNodeMessage(type,
@@ -465,44 +427,6 @@ bool Transport::shouldSendPacket(const Packet& pack) {
 void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
-
-  switch (type) {
-    case MsgTypes::BlockHash:
-      csdebug() << "TRANSPORT> Process Node Message PKG: BlockHash ";
-      break;
-    case MsgTypes::BlockRequest:
-      csdebug() << "TRANSPORT> Process Node Message PKG: BlockRequest ";
-      break;
-    case MsgTypes::FirstTransaction:
-      csdebug() << "TRANSPORT> Process Node Message PKG: FirstTransaction ";
-      break;
-    case MsgTypes::RequestedBlock:
-      csdebug() << "TRANSPORT> Process Node Message PKG: RequestedBlock ";
-      break;
-    case MsgTypes::RoundTableSS:
-      csdebug() << "TRANSPORT> Process Node Message PKG: RoundTable ";
-      break;
-    case MsgTypes::TransactionList:
-      csdebug() << "TRANSPORT> Process Node Message PKG: TransactionList ";
-      break;
-    case MsgTypes::NewCharacteristic:
-      csdebug() << "TRANSPORT> Process Node Message PKG:  Characteristic received";
-      break;
-    case MsgTypes::WriterNotification:
-      csdebug() << "TRANSPORT> Process Node Message MSG: Writer Notification received";
-      break;
-    case MsgTypes::BigBang:
-      csdebug() << "TRANSPORT> Process Node Message PKG: BigBang ";
-      break;
-    case MsgTypes::TransactionsPacketRequest:
-      csdebug() << "TRANSPORT> Process Node Message PKG: Transactions packet request";
-      break;
-    case MsgTypes::TransactionsPacketReply:
-      csdebug() << "TRANSPORT> Process Node Message PKG: Transactions packet reply";
-      break;
-    default:
-      break;
-  }
 
   switch(node_->chooseMessageAction(rNum, type)) {
   case Node::MessageActions::Process:
@@ -550,37 +474,17 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return;
   }
 
-#ifdef CUT_PACKETS_ON_SYNCRO
-  /// algorithm of slow node performance or lag detection
-  constexpr size_t roundNumberLagLimit = 2;  // experimental
-  const uint32_t lastSequenceNumber = node_->getBlockChain().getLastWrittenSequence();
-  const uint32_t lagBeetweenRounds = rNum - lastSequenceNumber;
-  const bool isNeedSync = lastSequenceNumber < ((rNum <= roundNumberLagLimit) ? 0 : rNum - roundNumberLagLimit);
+  constexpr cs::RoundNumber roundDifferent = 5;
 
-  if (isNeedSync) {
-    csdebug() << "BLOCKCHAIN NEEDS SYNC. LAST BLOCK: " << lastSequenceNumber
-            << ", RECEIVED: " << rNum << ", LAG: " << lagBeetweenRounds << " Msgtype: " << type << ";";
-    if (type == MsgTypes::RoundTableSS) {
-      csdebug() << "TRANSPORT> No cut, RoundTableSS";
-      return node_->getRoundTableSS(data, size, rNum);
-    }
-    else if (type == MsgTypes::RoundTable) {
-      csdebug() << "TRANSPORT> No cut, Round table";
-      return node_->getRoundTable(data, size, rNum);
-    }
-    else if (type == MsgTypes::BlockRequest) {
-      csdebug() << "TRANSPORT> No cut, BlockRequest";
-      return node_->getBlockRequest(data, size, firstPack.getSender());
-    }
-    else if (type == MsgTypes::RequestedBlock) {
-      csdebug() << "TRANSPORT> No cut, RequestedBlock";
-      return node_->getBlockReply(data, size);
-    }
-
-    csdebug() << "TRANSPORT> No command type choosen";
+  if ((rNum + roundDifferent) < node_->getRoundNumber()) {
+    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << " message type " << static_cast<int>(type);
     return;
   }
-#endif
+
+  if (firstPack.getSender() == node_->getNodeIdKey()) {
+    csdebug() << "TRANSPORT> Ignore myself packs";
+    return;
+  }
 
   switch(type) {
   case MsgTypes::RoundTableSS:

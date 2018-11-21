@@ -202,7 +202,7 @@ public:
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-  void onSendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences);
+  void sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences);
 
 private:
   bool init();
