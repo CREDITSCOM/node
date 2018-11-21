@@ -2432,10 +2432,16 @@ void Node::logPool(csdb::Pool& pool)
     }
     else {
         std::ostringstream os;
+        int i = 0;
         for(const auto& t : pool.transactions()) {
             os << ' ' << t.innerID();
+            ++i;
+            if(i == 15) {
+                os << "...";
+                break;
+            }
         }
-        csdebug() << "      trans. " << pool.transactions_count() << ":" << os.str();
+        csdebug() << "trans. (" << pool.transactions_count() << "):" << os.str();
     }
     csdebug() << "===============================";
 }
