@@ -34,15 +34,15 @@ namespace cs {
 
         bool isSyncroStarted() const;
 
-        // pool sync progress
-        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
-
     public signals: // Signals
 
         PoolSynchronizerRequestSignal sendRequest;
         PoolSynchronizerSynchroFinished synchroFinished;
 
     private: // Service
+
+        // pool sync progress
+        void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
         bool checkActivity();
 

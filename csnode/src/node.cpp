@@ -1173,7 +1173,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
   csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   if (!poolSynchronizer_->isSyncroStarted()) {
-    cswarning() << "NODE> Get block reply> Pool synchronizer already is syncro started";
+    csdebug() << "NODE> Get block reply> Pool synchronizer already is syncro started";
     return;
   }
 

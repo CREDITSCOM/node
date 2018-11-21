@@ -39,11 +39,9 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
     cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() ;
 
     /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
-    const csdb::Pool::sequence_t writtenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
-    csdb::Pool::sequence_t lastWrittenSequence = writtenSequence;
+    csdb::Pool::sequence_t lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
 
-    if (poolsBlock.back().sequence() > writtenSequence) {
-
+    if (poolsBlock.back().sequence() > lastWrittenSequence) {
         checkNeighbours(poolsBlock.front().sequence());
 
         for (auto& pool : poolsBlock) {
@@ -75,9 +73,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
         lastWrittenSequence = processingTemporaryStorage();
 
         csdebug() << "POOL SYNCHRONIZER> Last written sequence on blockchain: " << lastWrittenSequence << ", needed seq: " << m_roundToSync;
-        if (writtenSequence != lastWrittenSequence) {
-            showSyncronizationProgress(lastWrittenSequence);
-        }
+        showSyncronizationProgress(lastWrittenSequence);
     }
 
     // Decreases, soon as a response is received for another requested block.
@@ -136,27 +132,27 @@ bool cs::PoolSynchronizer::isSyncroStarted() const {
     return m_isSyncroStarted;
 }
 
+//
+// Service
+//
+
 void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence) {
     const csdb::Pool::sequence_t globalSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_roundToSync);
 
     if (!globalSequence) {
-      return;
+        return;
     }
 
-    const auto last = float(lastWrittenSequence);
+    const auto last = float(lastWrittenSequence + m_temporaryStorage.size());
     const auto global = float(globalSequence);
     const float maxValue = 100.0f;
-    const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
+    const uint32_t syncStatus = cs::numeric_cast<uint32_t>((last / global) * maxValue);
 
     if (syncStatus <= maxValue) {
         ProgressBar bar;
         cslog() << "SYNC: " << bar.string(syncStatus);
     }
 }
-
-//
-// Service
-//
 
 bool cs::PoolSynchronizer::checkActivity() {
     csdebug() << "POOL SYNCHRONIZER> Check activity";
