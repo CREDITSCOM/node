@@ -22,10 +22,11 @@ namespace cs
     /// @brief The Conveyer class, represents utils and mechanics
     /// to transfer packets of transactions, consensus helper.
     ///
-    class Conveyer
+    class ConveyerBase
     {
-        Conveyer();
-        ~Conveyer() = default;
+    protected:
+        ConveyerBase();
+        ~ConveyerBase();
 
     public:
         enum class NotificationState {
@@ -37,12 +38,6 @@ namespace cs
             HashTablesStorageCapacity = 5,
             CharacteristicMetaCapacity = HashTablesStorageCapacity,
         };
-
-        ///
-        /// @brief Instance of conveyer, singleton.
-        /// @return Returns static conveyer object reference, Meyers singleton.
-        ///
-        static Conveyer& instance();
 
         ///
         /// @brief Returns transactions packet flush signal.
@@ -232,6 +227,19 @@ namespace cs
         std::unique_ptr<Impl> pimpl;
 
         mutable cs::SharedMutex m_sharedMutex;
+    };
+
+    class Conveyer : public ConveyerBase {
+    public:
+        ///
+        /// @brief Instance of conveyer, singleton.
+        /// @return Returns static conveyer object reference, Meyers singleton.
+        ///
+        static Conveyer& instance();
+
+    private:
+        Conveyer() : ConveyerBase() {}
+        ~Conveyer() = default;
     };
 }
 
