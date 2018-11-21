@@ -1,6 +1,3 @@
-
-//#define TESTING
-
 #include <gtest/gtest.h>
 #include "csdb/address.h"
 #include "packstream.hpp"
@@ -170,7 +167,7 @@ TEST(OPackStream, TransactionWrite) {
   TestConcreteTypeWriteToOPackStream(transaction, expected);
 }  //*/
 
-TEST(OPackStream, EmptyPoolWrite) {
+TEST(OPackStream, DISABLED_EmptyPoolWrite) {
   const unsigned char expected[] = {
       0x03, 0x00, 0x00, 0x01, 0x00, 0x2d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
