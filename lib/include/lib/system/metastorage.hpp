@@ -8,7 +8,7 @@
 /// nested namespace
 namespace cs::values
 {
-    constexpr std::size_t defaultMetaStorageSize = 5;
+    constexpr std::size_t defaultMetaStorageMaxSize = 5;
 }
 
 namespace cs
@@ -27,11 +27,12 @@ namespace cs
         ///
         struct MetaElement
         {
-            RoundNumber round;
+            cs::RoundNumber round = 0;
             T meta;
 
             MetaElement() = default;
-            MetaElement(RoundNumber number, T&& value) noexcept : round(number), meta(std::move(value)) {}
+            MetaElement(cs::RoundNumber number, T&& value) noexcept : round(number), meta(std::move(value)) {}
+            MetaElement(cs::RoundNumber number, const T& value) noexcept : round(number), meta(value) {}
 
             bool operator ==(const MetaElement& element) const
             {
@@ -48,10 +49,7 @@ namespace cs
         using Element = MetaStorage<T>::MetaElement;
 
         // default initialization
-        inline MetaStorage() noexcept
-        {
-            m_buffer.resize(cs::values::defaultMetaStorageSize);
-        }
+        inline MetaStorage() noexcept : m_buffer(cs::values::defaultMetaStorageMaxSize) {}
 
         // storage interface
 
@@ -86,6 +84,20 @@ namespace cs
             }
 
             return result;
+        }
+
+        ///
+        /// @brief Appends meta element to buffer.
+        /// @return Returns true if append is success, otherwise returns false.
+        ///
+        bool append(const MetaElement& value)
+        {
+            MetaElement element = {
+                value.round,
+                value.meta
+            };
+
+            return append(std::move(element));
         }
 
         ///
