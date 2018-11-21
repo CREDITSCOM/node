@@ -77,10 +77,7 @@ public:
   void sendHash_V3(cs::RoundNumber round);
   void writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
-  const cs::ConfidantsKeys confidants() const
-  {
-      return cs::Conveyer::instance().roundTable().confidants;
-  }
+  const cs::ConfidantsKeys& confidants() const;
 
   void onRoundStart_V3(const cs::RoundTable& roundTable);
   void startConsensus();

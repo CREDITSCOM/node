@@ -1,4 +1,4 @@
-set(TEST_NAME node)
+set(TEST_NAME nodetests)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

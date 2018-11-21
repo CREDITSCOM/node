@@ -27,7 +27,7 @@ void poll_signal_flag() {
     }
     catch (...) {
       // Handle error
-      LOG_ERROR("Poll signal error!");
+      cserror() << "Poll signal error!";
       std::raise(SIGABRT);
     }
   }
@@ -127,15 +127,16 @@ void Transport::run() {
   }
 
   refillNeighbourhood();
-  // Okay, now let's get to business
 
+  // Okay, now let's get to business
   uint32_t ctr = 0;
-  LOG_WARN("+++++++>>> Transport Run Task Start <<<+++++++++++++++");
+  cswarning() << "+++++++>>> Transport Run Task Start <<<+++++++++++++++";
 
   // Check if thread is requested to stop ?
   while (Transport::gSignalStatus == 0)
   {
     ++ctr;
+
     bool askMissing    = true;
     bool resendPacks   = ctr % 4 == 0;
     bool sendPing      = ctr % 20 == 0;
@@ -143,28 +144,35 @@ void Transport::run() {
     bool checkPending  = ctr % 100 == 0;
     bool checkSilent   = ctr % 150 == 0;
 
-    if (askMissing)
+    if (askMissing) {
       askForMissingPackages();
+    }
 
-    if (checkPending)
+    if (checkPending) {
       nh_.checkPending(config_.getMaxNeighbours());
+    }
 
-    if (checkSilent)
+    if (checkSilent) {
       nh_.checkSilent();
+    }
 
-    if (resendPacks)
+    if (resendPacks) {
       nh_.resendPackets();
+    }
 
-    if (sendPing)
+    if (sendPing) {
       nh_.pingNeighbours();
+    }
 
-    if (refreshLimits)
+    if (refreshLimits) {
       nh_.refreshLimits();
+    }
 
     poll_signal_flag();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
-  LOG_WARN("[WARNING] : [Transport::run STOPED!]");
+
+  cswarning() << "[Transport::run STOPED!]";
 }
 
 template <>
@@ -176,8 +184,8 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
     result ^= *(reinterpret_cast<uint16_t*>(&addr));
     result ^= *(reinterpret_cast<uint16_t*>(&addr) + 1);
   } else {
-    auto bytes    = ep.address().to_v6().to_bytes();
-    auto ptr      = reinterpret_cast<uint8_t*>(&result);
+    auto bytes = ep.address().to_v6().to_bytes();
+    auto ptr = reinterpret_cast<uint8_t*>(&result);
     auto bytesPtr = bytes.data();
     for (size_t i = 0; i < 8; ++i)
       *ptr ^= *(bytesPtr++);
@@ -200,9 +208,9 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 }
 
 bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
-  uint32_t nextBytesCount = conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size();
+  uint32_t nextBytesCount = static_cast<uint32_t>(conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size());
   if (nextBytesCount <= config_.getConnectionBandwidth()) {
-    conn.lastBytesCount.fetch_add(pack->size(), std::memory_order_relaxed);
+    conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
     net_->sendDirect(*pack, conn.getOut());
     return true;
   }
@@ -279,12 +287,14 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     case NetworkCommand::SSSpecificBlock: {
       uint32_t round;
       iPackStream_ >> round;
+
       try {
         gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
       }
-      catch (std::out_of_range) {
-        LOG_WARN("[WARNING] : [BIGBANG] : [VERY BIG HARD ROUND] : round: " + std::to_string(round));
+      catch (const std::out_of_range&) {
+        cswarning() << "VERY BIG HARD ROUND: " << round;
       }
+
       break;
     }
     case NetworkCommand::PackInform:
@@ -298,7 +308,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       break;
     default:
       result = false;
-      LOG_WARN("Unexpected network command");
+      cswarning() << "Unexpected network command";
   }
 
   if (!result) {
@@ -310,11 +320,11 @@ void Transport::refillNeighbourhood() {
   if (config_.getBootstrapType() == BootstrapType::IpList) {
     for (auto& ep : config_.getIpList()) {
       if (!nh_.canHaveNewConnection()) {
-        LOG_WARN("Connections limit reached");
+        cswarning() << "Connections limit reached";
         break;
       }
 
-      LOG_EVENT("Creating connection to " << ep.ip);
+      cslog() << "Creating connection to " << ep.ip;
       nh_.establishConnection(net_->resolve(ep));
     }
   }
@@ -322,7 +332,7 @@ void Transport::refillNeighbourhood() {
   if (config_.getBootstrapType() == BootstrapType::SignalServer || config_.getNodeType() == NodeType::Router) {
     // Connect to SS logic
     ssEp_ = net_->resolve(config_.getSignalServerEndpoint());
-    LOG_EVENT("Connecting to Signal Server on " << ssEp_);
+    cslog() << "Connecting to Signal Server on " << ssEp_;
 
     {
       SpinLock l(oLock_);
@@ -550,9 +560,9 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
   auto end = pack + packNum;
   
   for (auto ptr = pack; ptr != end; ++ptr) {
-    SpinLock     l(sendPacksFlag_);
+    SpinLock l(sendPacksFlag_);
     PackSendTask pst;
-    pst.pack        = *ptr;
+    pst.pack = *ptr;
     pst.incrementId = incrementWhenResend;
     sendPacks_.emplace(pst);
   }
@@ -562,10 +572,12 @@ void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhen
   if (sendToNeighbours) {
     nh_.pourByNeighbours(pack, packNum);
   }
+
   if (packNum > 1) {
     net_->registerMessage(pack, packNum);
     registerTask(pack, 1, incrementWhenResend);
-  } else if (sendToNeighbours) {
+  }
+  else if (sendToNeighbours) {
     registerTask(pack, packNum, incrementWhenResend);
   }
 }
@@ -591,14 +603,12 @@ ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
   return nh_.getNeighbourByKey(pk);
 }
 
-ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number)
-{
+ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number) {
   csdebug() << "Transport> Get neighbour by number: " << number;
   return nh_.getNeighbour(number);
 }
 
-ConnectionPtr Transport::getRandomNeighbour()
-{
+ConnectionPtr Transport::getRandomNeighbour() {
   csdebug() << "Transport> Get random neighbour for Sync";
   return nh_.getRandomSyncNeighbour();
 }
@@ -611,8 +621,7 @@ bool Transport::isPingDone() {
   return nh_.isPingDone();
 }
 
-void Transport::resetNeighbours()
-{
+void Transport::resetNeighbours() {
   csdebug() << "Transport> Reset neighbours";
   return nh_.resetSyncNeighbours();
 }
@@ -652,7 +661,6 @@ void Transport::sendRegistrationRefusal(const Connection& conn, const Registrati
 }
 
 // Requests processing
-
 bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   cslog() << "Got registration request from " << task->sender;
 
@@ -747,12 +755,12 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
     return false;
   }
 
-  LOG_EVENT("Connection to the Signal Server has been established");
+  cslog() << "Connection to the Signal Server has been established";
   nh_.addSignalServer(task->sender, ssEp_, rNode);
 
   if (task->pack.getMsgSize() > 2) {
     if (!parseSSSignal(task)) {
-      LOG_WARN("Bad Signal Server response");
+      cswarning() << "Bad Signal Server response";
     }
   }
   else {
@@ -764,22 +772,24 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 
 bool Transport::gotSSReRegistration()
 {
-  LOG_WARN("ReRegistration on Signal Server");
+  cswarning() << "ReRegistration on Signal Server";
+
   {
     SpinLock l(oLock_);
     formSSConnectPack(config_, oPackStream_, myPublicKey_);
     net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
   }
+
   return true;
 }
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-    LOG_WARN("Unexpected Signal Server response");
+    cswarning() << "Unexpected Signal Server response";
   }
 
   if (!parseSSSignal(task)) {
-    LOG_WARN("Bad Signal Server response");
+    cswarning() << "Bad Signal Server response";
   }
 
   return true;
@@ -789,8 +799,8 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
   uint16_t expectedVersion;
   iPackStream_ >> expectedVersion;
 
-  LOG_ERROR("The Signal Server has refused the registration due to your bad client version. The expected version is "
-            << expectedVersion);
+  cserror() << "The Signal Server has refused the registration due to your bad client version. The expected version is "
+            << expectedVersion;
 
   return true;
 }
@@ -803,23 +813,24 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash & lastHash) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash& lastHash) {
 #ifdef MONITOR_NODE
   return true;
 #endif
+  csunused(task);
 
   Connection conn;
-  conn.in         = net_->resolve(config_.getSignalServerEndpoint());
+  conn.in = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
 
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
+
   cs::Hash lastHash_;
-  //std::copy(lastHash.to_binary().begin(), lastHash.to_binary().end(), lastHash_.data());
-  
-  memcpy(lastHash_.data(), ((const uint8_t*)lastHash.to_binary().data()), lastHash_.size());
+  const auto hashBinary = lastHash.to_binary();
+  std::copy(hashBinary.begin(), hashBinary.end(), lastHash_.begin());
+
   oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
-  //oPackStream_ << lastBlock << myPublicKey_;
 
   sendDirect(oPackStream_.getPackets(), conn);
   return true;
@@ -881,6 +892,7 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
   cs::Hash hHash;
 
   iPackStream_ >> hHash;
+
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
   }
@@ -892,8 +904,8 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
 
 void Transport::askForMissingPackages() {
   typename decltype(uncollected_)::const_iterator ptr;
-  MessagePtr                                      msg;
-  uint32_t                                        i = 0;
+  MessagePtr msg;
+  uint32_t i = 0;
 
   const uint64_t maxMask = 1ull << 63;
 
@@ -1014,6 +1026,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   cs::PublicKey pk;
 
   iPackStream_ >> id >> lastSeq >> pk;
+
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
   }
