@@ -37,8 +37,7 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packCounter) {
-  cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence()
-          << " to: " << poolsBlock.back().sequence() << ",   packCounter: " << packCounter;
+  cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << ", to: " << poolsBlock.back().sequence() << ",   packCounter: " << packCounter;
 
   /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
   csdb::Pool::sequence_t lastWrittenSequence =
@@ -189,9 +188,9 @@ bool cs::PoolSynchronizer::checkActivity(bool isRound) {
 }
 
 void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
-  csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
-  cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence()
-          << ", requested block sequences from: " << sequences.front() << " to: " << sequences.back();
+    csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
+    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence()
+            << ", requested block sequences from: " << sequences.front() << " to: " << sequences.back();
 
   uint32_t packCounter = 0;
 
@@ -204,8 +203,7 @@ void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsReq
     packCounter = m_requestedSequences.at(sequence).packCounter;
   }
 
-  csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first
-            << "   to: " << m_requestedSequences.rbegin()->first << ",   packCounter: " << packCounter;
+    csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first << "   to: " << m_requestedSequences.rbegin()->first << ",   packCounter: " << packCounter;
 
   emit sendRequest(target, sequences, packCounter);
 }
@@ -256,11 +254,11 @@ csdb::Pool::sequence_t cs::PoolSynchronizer::processingTemporaryStorage() {
 }
 
 bool cs::PoolSynchronizer::getNeededSequences() {
-  uint32_t lastSequence = 0;
-  bool isFromStorage = false;
-  auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
-    return (pair.second.roundCount == 0 || pair.second.replyBlockCount == 0);
-  });
+    uint32_t lastSequence = 0;
+    bool isFromStorage = false;
+    auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
+        return (pair.second.roundCount == 0 || pair.second.replyBlockCount == 0);
+    });
 
   if (!m_temporaryStorage.empty()) {
     csdebug() << "POOL SYNCHRONIZER> Temporary Storage begin: " << m_temporaryStorage.begin()->first
@@ -306,20 +304,20 @@ bool cs::PoolSynchronizer::getNeededSequences() {
 
     m_neededSequences.push_back(lastSequence);
 
-    if (isFromStorage) {
-      if (!firstSequenceIt->second.roundCount) {
-        firstSequenceIt->second.roundCount = m_maxWaitingTimeRound;  // reset maxWaitingTimeReply
-      }
-      if (!firstSequenceIt->second.replyBlockCount) {
-        firstSequenceIt->second.replyBlockCount = m_maxWaitingTimeReply;  // reset maxWaitingTimeReply
-      }
-      ++firstSequenceIt;  // next sequence
-      if (firstSequenceIt == m_requestedSequences.end()) {
-        break;
-      }
-      lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
+        if (isFromStorage) {
+            if (!firstSequenceIt->second.roundCount) {
+                firstSequenceIt->second.roundCount = m_maxWaitingTimeRound; // reset maxWaitingTimeReply
+            }
+            if (!firstSequenceIt->second.replyBlockCount) {
+                firstSequenceIt->second.replyBlockCount = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
+            }
+            ++firstSequenceIt; // next sequence
+            if (firstSequenceIt == m_requestedSequences.end()) {
+                break;
+            }
+            lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
+        }
     }
-  }
 
   if (!m_neededSequences.empty()) {
     csdebug() << "POOL SYNCHRONIZER> Get sequences: neededSequences: from: " << m_neededSequences.front()

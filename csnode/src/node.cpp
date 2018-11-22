@@ -228,6 +228,12 @@ void Node::processMetaMap() {
   cslog() << "NODE> Processing pool meta map, map size: " << poolMetaMap_.size();
 
   for (auto& [sequence, meta] : poolMetaMap_) {
+    csdebug() << "NODE> Processing pool meta map, sequence: " << sequence;
+
+    if(bc_.getLastWrittenSequence() > sequence) {
+      continue;
+    }
+
     solver_->countFeesInPool(&meta.pool);
     meta.pool.set_previous_hash(bc_.getLastWrittenHash());
 
@@ -379,8 +385,11 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 
   writeDefaultStream(std::forward<Args>(args)...);
 
-  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize() << ", out = " << target->out
-            << ", in = " << target->in << ", specialOut = " << target->specialOut;
+  csdebug() << "NODE> Sending Direct data: packets count = " << ostream_.getPacketsCount() << ", last size = " << (ostream_.getCurrentSize())
+    << ", out = " << target->out
+    << ", in = " << target->in
+    << ", specialOut = " << target->specialOut
+    << ", msgType: " << getMsgTypesString(msgType);
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -1048,8 +1057,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packCounter = 0;
   istream_ >> packCounter;
 
-  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front()
-          << ", to: " << sequences.back() << ",   packCounter: " << packCounter;
+  cslog() << "NODE> Get block request> <<< Getting the request for block from: " << sequences.front() << ", to: " << sequences.back() << ",   packCounter: " << packCounter;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -1115,12 +1123,17 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter) {
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    csdebug() << "NODE> " << __func__
+        << "() Target out(): " << cs::Utils::byteStreamToHex(target.data(), target.size())
+        << ", packCounter: " << packCounter
+        << ", round: " << round;
+  
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock,
-                  packCounter);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, round, poolsBlock, packCounter);
 }
 
 void Node::becomeWriter() {
@@ -1279,10 +1292,16 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences,
-                            uint32_t packCounter) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences << packCounter;
+void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter) {
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    csdebug() << "NODE> " << __func__
+        << "() Target out(): " << target->getOut()
+        << ", sequence from: " << sequences.front() << ", to: " << sequences.back()
+        << ", packCounter: " << packCounter
+        << ", round: " << round;
+
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_ << MsgTypes::BlockRequest << round << sequences << packCounter;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
@@ -1500,6 +1519,10 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
   ostream_ << msgType << round;
 
   writeDefaultStream(std::forward<Args>(args)...);
+
+  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize()
+      << ", round: " << round
+      << ", msgType: " << getMsgTypesString(msgType);
 
   transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();
