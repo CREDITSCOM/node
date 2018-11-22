@@ -498,7 +498,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
   // cut slow packs
   if ((rNum + roundDifferent) < node_->getRoundNumber()) {
-    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << " message type " << static_cast<int>(type);
+    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << getMsgTypesString(type) << ", fragments " << firstPack.getFragmentsNum();
     return;
   }
 
@@ -551,7 +551,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::RoundInfoReply:
     return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
   default:
-    cserror() << "TRANSPORT> Unknown message type " << static_cast<int>(type) << " pack round " << rNum;
+    cserror() << "TRANSPORT> Unknown message type " << getMsgTypesString(type) << " pack round " << rNum;
     break;
   }
 }

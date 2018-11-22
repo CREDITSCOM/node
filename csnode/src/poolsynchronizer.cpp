@@ -37,7 +37,7 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packCounter) {
-    cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() << ",   packCounter: " << packCounter;
+    cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << ", to: " << poolsBlock.back().sequence() << ",   packCounter: " << packCounter;
 
     /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
     csdb::Pool::sequence_t lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
@@ -187,8 +187,6 @@ bool cs::PoolSynchronizer::checkActivity(bool isRound) {
 
 void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
     csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
-    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence()
-            << ", requested block sequences from: " << sequences.front() << " to: " << sequences.back();
 
     uint32_t packCounter = 0;
 
@@ -200,7 +198,11 @@ void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsReq
         packCounter = m_requestedSequences.at(sequence).packCounter;
     }
 
-    csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first << "   to: " << m_requestedSequences.rbegin()->first << ",   packCounter: " << packCounter;
+    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence() + 1
+        << ", requested block sequences from: " << sequences.front() << ", to: " << sequences.back()
+        << ",   packCounter: " << packCounter;
+
+    csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first << ", to: " << m_requestedSequences.rbegin()->first;
 
     emit sendRequest(target, sequences, packCounter);
 }
@@ -251,7 +253,7 @@ bool cs::PoolSynchronizer::getNeededSequences() {
     uint32_t lastSequence = 0;
     bool isFromStorage = false;
     auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
-        return (pair.second.roundCount == 0 || pair.second.replyBlockCount == 0);
+        return (pair.second.roundCount <= 0 || pair.second.replyBlockCount <= 0);
     });
 
     if (!m_temporaryStorage.empty()) {
@@ -297,10 +299,8 @@ bool cs::PoolSynchronizer::getNeededSequences() {
         m_neededSequences.push_back(lastSequence);
 
         if (isFromStorage) {
-            if (!firstSequenceIt->second.roundCount) {
+            if (firstSequenceIt->second.roundCount <= 0 || firstSequenceIt->second.replyBlockCount <= 0) {
                 firstSequenceIt->second.roundCount = m_maxWaitingTimeRound; // reset maxWaitingTimeReply
-            }
-            if (!firstSequenceIt->second.replyBlockCount) {
                 firstSequenceIt->second.replyBlockCount = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
             }
             ++firstSequenceIt; // next sequence

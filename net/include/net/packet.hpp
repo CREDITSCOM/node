@@ -75,6 +75,8 @@ enum MsgTypes: uint8_t {
   BlockHashV3
 };
 
+const char* getMsgTypesString(MsgTypes messageType);
+
 class Packet {
 public:
   static const uint32_t MaxSize = 1 << 10;
