@@ -83,6 +83,7 @@ public:
 
 private:
   void put(::csdb::priv::obstream&) const;
+  void put_for_sig(::csdb::priv::obstream&) const;
   bool get(::csdb::priv::ibstream&);
   friend class ::csdb::priv::obstream;
   friend class ::csdb::priv::ibstream;

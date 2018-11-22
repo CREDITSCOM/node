@@ -373,7 +373,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender)
 {
     cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
-    cslog() << "CONVEYER> ApplyCharacteristic, round " << round;
+    cslog() << "CONVEYER> " << __func__ << "(), round " << round << ":";
 
     cs::Lock lock(m_sharedMutex);
     cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
@@ -383,7 +383,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         cserror() << "CONVEYER> Apply characteristic failed, no meta in meta storage";
         return std::nullopt;
     }
-
 
     cs::TransactionsPacketTable hashTable;
     const cs::Hashes& localHashes = meta->roundTable.hashes;
@@ -442,7 +441,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         }
     }
 
-    csdebug() << "CONVEYER> ApplyCharacteristic, invalid transactions count " << invalidTransactions.transactionsCount();
+    csdebug() << "\tinvalid transactions count " << invalidTransactions.transactionsCount();
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);
@@ -450,17 +449,19 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
     if (characteristic.mask.size() != newPool.transactions_count())
     {
-        cslog() << "CONVEYER> Characteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
-        cswarning() << "CONVEYER> ApplyCharacteristic: Some of transactions is not valid";
+        cslog() << "\tCharacteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
+        cswarning() << "\tSome of transactions is not valid";
     }
 
-    cslog() << "CONVEYER> ApplyCharacteristic : sequence = " << metaPoolInfo.sequenceNumber;
+    cslog() << "\tsequence = " << metaPoolInfo.sequenceNumber;
 
     newPool.set_sequence(metaPoolInfo.sequenceNumber);
     newPool.add_user_field(0, metaPoolInfo.timestamp);
 
     csdb::internal::byte_array writerPublicKey(sender.begin(), sender.end());
     newPool.set_writer_public_key(std::move(writerPublicKey));
+
+    csdebug() << "CONVEYER> " << __func__ << "(): done";
 
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }

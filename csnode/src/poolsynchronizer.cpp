@@ -8,16 +8,17 @@
 
 cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockChain) :
     m_transport(transport), /// TODO Fix me. Think about how to do without it
-    m_blockChain(blockChain),
-    m_maxWaitingTimeReply(cs::numeric_cast<int>(m_transport->getMaxNeighbours() - 1))
+    m_blockChain(blockChain)
 {
     m_neededSequences.reserve(m_maxBlockCount);
+    m_neighbours.reserve(m_transport->getMaxNeighbours());
 
     refreshNeighbours();
 }
 
 void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
-    if (!m_transport->isPingDone()) {
+    if (m_transport->getNeighboursCount() == 0) {
+        cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum;
         return;
     }
 
@@ -31,7 +32,7 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
         }
     }
     else {
-        checkActivity();
+        checkActivity(true);
     }
 }
 
@@ -42,7 +43,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
     csdb::Pool::sequence_t lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
 
     if (poolsBlock.back().sequence() > lastWrittenSequence) {
-        checkNeighbours(poolsBlock.front().sequence());
+        checkNeighbourSequence(poolsBlock.front().sequence());
 
         for (auto& pool : poolsBlock) {
             const auto sequence = pool.sequence();
@@ -77,7 +78,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
     }
 
     // Decreases, soon as a response is received for another requested block.
-    const bool alreadyRequest = checkActivity();
+    const bool alreadyRequest = checkActivity(false);
 
     /// or m_roundToSync > lastWrittenSequence
     if (m_roundToSync != cs::numeric_cast<cs::RoundNumber>(lastWrittenSequence)) {
@@ -111,17 +112,17 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         return;
     }
 
-    checkNeighbours(m_neededSequences.front());
-    //            csdebug() << "POOL SYNCHRONIZER> target is already requested " << neighbour.c->getOut();
-
-    cslog() << "POOL SYNCHRONIZER> Send Block Request";
+    // sequence = 0 if already requested
+    checkNeighbourSequence(m_neededSequences.front());
 
     for (auto& neighbour : m_neighbours) {
-        if (neighbour.sequnce == 0) {
+        if (neighbour.sequence == 0) {
+            neighbour.sequence = m_neededSequences.front();
+
             sendBlock(neighbour.connection, m_neededSequences);
 
             if (!getNeededSequences()) {
-                csdebug() << "POOL SYNCHRONIZER> >>> All sequences already requested";
+                csdebug() << "POOL SYNCHRONIZER> !!! All sequences already requested";
                 break;
             }
         }
@@ -154,15 +155,26 @@ void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
     }
 }
 
-bool cs::PoolSynchronizer::checkActivity() {
-    csdebug() << "POOL SYNCHRONIZER> Check activity";
+bool cs::PoolSynchronizer::checkActivity(bool isRound) {
+    const std::string flag = (isRound ? "round" : "syncro");
+    csdebug() << "POOL SYNCHRONIZER> Check activity " << flag;
 
     bool isNeedRequest = false;
 
     for (auto& [sequence, timeWaiting] : m_requestedSequences) {
-        --timeWaiting;
-        if (!isNeedRequest && timeWaiting <= 0) {
-            isNeedRequest = true;
+        if (isRound) {
+            --(timeWaiting.roundCount);
+            csdebug() << "POOL SYNCHRONIZER> seq: " << sequence << ", Activity round: " << timeWaiting.roundCount;
+            if (!isNeedRequest && timeWaiting.roundCount <= 0) {
+                isNeedRequest = true;
+            }
+        }
+        else {
+            --(timeWaiting.replyBlockCount);
+            csdebug() << "POOL SYNCHRONIZER> seq: " << sequence << ", Activity reply: " << timeWaiting.replyBlockCount;
+            if (!isNeedRequest && timeWaiting.replyBlockCount <= 0) {
+                isNeedRequest = true;
+            }
         }
     }
 
@@ -175,11 +187,12 @@ bool cs::PoolSynchronizer::checkActivity() {
 
 void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences) {
     csdebug() << "POOL SYNCHRONIZER> Sending block request : from nbr: " << target->getOut() << ", id: " << target->id;
-    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> sequences from: " << sequences.front() << " to: " << sequences.back();
+    cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence()
+            << ", requested block sequences from: " << sequences.front() << " to: " << sequences.back();
 
     for (const auto& sequence : sequences) {
         if (!m_requestedSequences.count(sequence)) {
-            m_requestedSequences.emplace(std::make_pair(sequence, m_maxWaitingTimeReply));
+            m_requestedSequences.emplace(std::make_pair(sequence, WaitinTimeReply(m_maxWaitingTimeRound, m_maxWaitingTimeReply)));
         }
     }
 
@@ -234,27 +247,36 @@ bool cs::PoolSynchronizer::getNeededSequences() {
     uint32_t lastSequence = 0;
     bool isFromStorage = false;
     auto firstSequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [](const auto& pair) {
-        return pair.second == 0;
+        return (pair.second.roundCount == 0 || pair.second.replyBlockCount == 0);
     });
 
     if (!m_temporaryStorage.empty()) {
         csdebug() << "POOL SYNCHRONIZER> Temporary Storage begin: " << m_temporaryStorage.begin()->first << ", end: " << m_temporaryStorage.rbegin()->first;
     }
+    if (!m_requestedSequences.empty()) {
+        csdebug() << "POOL SYNCHRONIZER> Request Storage begin: " << m_requestedSequences.begin()->first << ", end: " << m_requestedSequences.rbegin()->first;
+    }
+
 
     // if storage requested sequences is impty
     if (m_requestedSequences.empty()) {
+        csdebug() << "POOL SYNCHRONIZER> Get sequences: from blockchain";
         lastSequence = m_blockChain->getLastWrittenSequence();
     }
     else if (firstSequenceIt != m_requestedSequences.end()) {
         // if maxWaitingTimeReply <= 0
+        csdebug() << "POOL SYNCHRONIZER> Get sequences: from requestedSequences begin";
         lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
         isFromStorage = true;
     }
     else {
         const uint32_t lastSeqFromRequested = cs::numeric_cast<uint32_t>(m_requestedSequences.rbegin()->first);
         const uint32_t lastSeqFromStorage = m_temporaryStorage.empty() ? 0 : cs::numeric_cast<uint32_t>(m_temporaryStorage.rbegin()->first);
+        csdebug() << "POOL SYNCHRONIZER> Get sequences: from requested storage: " << lastSeqFromRequested;
+        csdebug() << "POOL SYNCHRONIZER> Get sequences: from temp storage: " << lastSeqFromStorage;
         lastSequence = std::max(lastSeqFromRequested, lastSeqFromStorage);
     }
+    csdebug() << "POOL SYNCHRONIZER> Get sequences: lastSequence: " << lastSequence;
 
     m_neededSequences.clear();
 
@@ -271,7 +293,12 @@ bool cs::PoolSynchronizer::getNeededSequences() {
         m_neededSequences.push_back(lastSequence);
 
         if (isFromStorage) {
-            firstSequenceIt->second = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
+            if (!firstSequenceIt->second.roundCount) {
+                firstSequenceIt->second.roundCount = m_maxWaitingTimeRound; // reset maxWaitingTimeReply
+            }
+            if (!firstSequenceIt->second.replyBlockCount) {
+                firstSequenceIt->second.replyBlockCount = m_maxWaitingTimeReply; // reset maxWaitingTimeReply
+            }
             ++firstSequenceIt; // next sequence
             if (firstSequenceIt == m_requestedSequences.end()) {
                 break;
@@ -283,13 +310,16 @@ bool cs::PoolSynchronizer::getNeededSequences() {
     return !m_neededSequences.empty();
 }
 
-void cs::PoolSynchronizer::checkNeighbours(const csdb::Pool::sequence_t sequence) {
-    m_neighbours.erase(NeighboursSetElemet(sequence));
+void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t sequence) {
+    for (auto& neighbour : m_neighbours) {
+        if (neighbour.sequence == sequence) {
+            neighbour.sequence = 0;
+        }
+    }
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
   const uint32_t neighboursCount = m_transport->getNeighboursCount();
-  csdebug() << "POOL SYNCHRONIZER> Neighbours count from nh is: " << neighboursCount;
 
   if (neighboursCount == m_neighbours.size() + 1) { // + Signal
       return;
@@ -300,7 +330,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
   for (std::size_t i = 0; i != neighboursCount; ++i) {
       ConnectionPtr target = m_transport->getNeighbourByNumber(i);
       if (target && !target->isSignal) {
-          m_neighbours.emplace(NeighboursSetElemet(0, target));
+          m_neighbours.emplace_back(NeighboursSetElemet(0, target));
       }
   }
 

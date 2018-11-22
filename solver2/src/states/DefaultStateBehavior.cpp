@@ -111,7 +111,7 @@ namespace slv2
     Result DefaultStateBehavior::onTransaction(SolverContext& /*context*/, const csdb::Transaction& /*trans*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": transactions ignored in this state");
+            LOG_DEBUG(name() << ": transaction ignored in this state");
         }
         return Result::Ignore;
     }
@@ -127,7 +127,7 @@ namespace slv2
     Result DefaultStateBehavior::onStage1(SolverContext & /*context*/, const cs::StageOne & /*stage*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": consensus stage 1 ignored in this state");
+            LOG_DEBUG(name() << ": stage-1 ignored in this state");
         }
         return Result::Ignore;
     }
@@ -135,7 +135,7 @@ namespace slv2
     Result DefaultStateBehavior::onStage2(SolverContext & /*context*/, const cs::StageTwo & /*stage*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": consensus stage 2 ignored in this state");
+            LOG_DEBUG(name() << ": stage-2 ignored in this state");
         }
         return Result::Ignore;
     }
@@ -143,7 +143,7 @@ namespace slv2
     Result DefaultStateBehavior::onStage3(SolverContext & /*context*/, const cs::StageThree & /*stage*/)
     {
         if(Consensus::Log) {
-            LOG_DEBUG(name() << ": consensus stage 3 ignored in this state");
+            LOG_DEBUG(name() << ": stage-3 ignored in this state");
         }
         return Result::Ignore;
     }

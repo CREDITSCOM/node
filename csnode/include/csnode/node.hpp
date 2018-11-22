@@ -206,18 +206,19 @@ private:
   void createRoundPackage(const cs::RoundTable& roundTable,
     const cs::PoolMetaInfo& poolMetaInfo,
     const cs::Characteristic& characteristic,
-    const cs::Signature& signature,
-    const cs::Notifications& notifications);
+    const cs::Signature& signature/*,
+    const cs::Notifications& notifications*/);
   void storeRoundPackageData(const cs::RoundTable& roundTable,
       const cs::PoolMetaInfo& poolMetaInfo,
       const cs::Characteristic& characteristic,
-      const cs::Signature& signature,
-      const cs::Notifications& notifications);
+      const cs::Signature& signature/*,
+      const cs::Notifications& notifications*/);
 
   // signature verification
   bool checkKeysFile();
   std::pair<cs::PublicKey, cs::PrivateKey> generateKeys();
   bool checkKeysForSignature(const cs::PublicKey&, const cs::PrivateKey&);
+  void logPool(csdb::Pool& pool);
 
   // pool sync helpers
   void blockchainSync();

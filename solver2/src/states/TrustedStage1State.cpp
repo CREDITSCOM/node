@@ -30,10 +30,6 @@ namespace slv2
         stage.sender = (uint8_t) context.own_conf_number();
         enough_hashes = false;
         transactions_checked = false;
-
-        if(Consensus::Log) {
-            cslog() << name() << ": I am [" << context.own_conf_number() << "]";
-        }
     }
 
     void TrustedStage1State::off(SolverContext & context)
@@ -214,7 +210,7 @@ namespace slv2
             characteristic.mask = std::move(characteristicMask);
         }
 
-        conveyer.setCharacteristic(characteristic, context.round());
+        conveyer.setCharacteristic(characteristic, static_cast<cs::RoundNumber>(context.round()));
 
         if(characteristic.mask.size() != transactionsCount) {
             cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";

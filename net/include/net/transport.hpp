@@ -63,7 +63,7 @@ template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
- public:
+public:
   Transport(const Config& config, Node* node)
   : config_(config)
   , remoteNodes_(MaxRemoteNodes + 1)
@@ -78,8 +78,6 @@ class Transport {
   }
 
   ~Transport();
-
-
 
 // [[noreturn]] void run();
   void run();
@@ -100,6 +98,7 @@ class Transport {
   const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
+
   bool isGood() const {
     return good_;
   }
@@ -140,7 +139,7 @@ class Transport {
   bool isPingDone();
   void resetNeighbours();
 
- private:
+private:
   void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
   // Dealing with network connections
@@ -178,12 +177,14 @@ class Transport {
   static const uint32_t MaxPacksQueue  = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
 
-  __cacheline_aligned std::atomic_flag sendPacksFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock sendPacksFlag_;
+
   struct PackSendTask {
-    Packet   pack;
+    Packet pack;
     uint32_t resendTimes = 0;
-    bool     incrementId;
+    bool incrementId;
   };
+
   FixedCircularBuffer<PackSendTask, MaxPacksQueue> sendPacks_;
 
   TypedAllocator<RemoteNode> remoteNodes_;
@@ -195,7 +196,7 @@ class Transport {
 
   cs::IPackStream iPackStream_;
 
-  std::atomic_flag oLock_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock oLock_;
   cs::OPackStream oPackStream_;
 
   // SS Data
@@ -203,9 +204,9 @@ class Transport {
   ip::udp::endpoint ssEp_;
 
   // Registration data
-  Packet    regPack_;
+  Packet regPack_;
   uint64_t* regPackConnId_;
-  bool      acceptRegistrations_ = false;
+  bool acceptRegistrations_ = false;
 
   struct PostponedPacket {
     cs::RoundNumber round;
@@ -220,18 +221,19 @@ class Transport {
   };
 
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
+
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 
-  std::atomic_flag uLock_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock uLock_;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   uint32_t maxBlock_ = 0;
   uint32_t maxBlockCount_;
 
   Network* net_;
-  Node*    node_;
+  Node* node_;
 
   Neighbourhood nh_;
   FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, 10000> fragOnRound_;

@@ -60,7 +60,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack,
   MessagePtr msg;
 
   {
-    SpinLock l(mLock_);
+    cs::SpinGuard l(mLock_);
     msgPtr = &map_.tryStore(pack.getHeaderHash());
   }
 
@@ -74,7 +74,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack,
   else msg = *msgPtr;
 
   {
-    SpinLock l(msg->pLock_);
+    cs::SpinGuard l(msg->pLock_);
     auto goodPlace = msg->packets_ + pack.getFragmentId();
     if (!*goodPlace) {
       msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
