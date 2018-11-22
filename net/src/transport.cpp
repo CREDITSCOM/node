@@ -138,7 +138,7 @@ void Transport::run() {
     ++ctr;
 
     bool askMissing    = true;
-    bool resendPacks   = ctr % 4 == 0;
+    bool resendPacks   = ctr % 5 == 0;
     bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending  = ctr % 100 == 0;

@@ -61,10 +61,10 @@ namespace cs {
         Transport* m_transport;
         BlockChain* m_blockChain;
 
-        inline static const int m_maxBlockCount = 2;
+        inline static const int m_maxBlockCount = 4;
         inline static const cs::RoundNumber s_roundDifferent = 2;
-        inline static const int m_maxWaitingTimeReply = 3; // reply count
-        inline static const int m_maxWaitingTimeRound = 1; // round count
+        inline static const int m_maxWaitingTimeReply = 15; // reply count
+        inline static const int m_maxWaitingTimeRound = 4; // round count
 
         // syncro variables
         bool m_isSyncroStarted = false;
