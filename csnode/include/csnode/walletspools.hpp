@@ -6,7 +6,7 @@
 #include <csdb/internal/types.h>
 #include <csdb/pool.h>
 #include <array>
-#include <csnode/CyclicBuffer.hpp>
+#include <csnode/cyclicbuffer.hpp>
 #include <limits>
 #include <memory>
 #include <vector>

@@ -236,9 +236,7 @@ public:
   static Conveyer& instance();
 
 private:
-  Conveyer()
-  : ConveyerBase() {
-  }
+  Conveyer() : ConveyerBase() {}
   ~Conveyer() = default;
 };
 }  // namespace cs

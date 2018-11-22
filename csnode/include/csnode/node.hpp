@@ -160,8 +160,7 @@ public:
   void onRoundStart(const cs::RoundTable& roundTable);
   bool isPoolsSyncroStarted();
 
-  enum MessageActions
-  {
+  enum MessageActions {
     Process,
     Postpone,
     Drop
