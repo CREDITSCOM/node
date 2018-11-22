@@ -18,7 +18,7 @@ add_library(solver
     include/solver/spammer.hpp
     src/solver.cpp
     src/generals.cpp
-    src/walletState.cpp
+    src/walletstate.cpp
     src/fee.cpp
     src/transactionsvalidator.cpp
     src/spammer.cpp
