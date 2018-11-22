@@ -15,7 +15,7 @@ class Node;
 
 namespace cs {
 
-    using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences)>;
+    using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences, uint32_t packCounter)>;
     using PoolSynchronizerSynchroFinished = cs::Signal<void()>;
 
     class PoolSynchronizer
@@ -27,7 +27,7 @@ namespace cs {
         void processingSync(const cs::RoundNumber roundNum);
 
         // syncro get functions
-        void getBlockReply(cs::PoolsBlock&& poolsBlock);
+        void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packCounter);
 
         // syncro send functions
         void sendBlockRequest();
@@ -76,13 +76,15 @@ namespace cs {
         std::map<csdb::Pool::sequence_t, csdb::Pool> m_temporaryStorage;
 
         struct WaitinTimeReply {
-            explicit WaitinTimeReply(int round, int replyCount) :
+            explicit WaitinTimeReply(int round, int replyCount ) :
                 roundCount(round),
-                replyBlockCount(replyCount)
+                replyBlockCount(replyCount),
+                packCounter(0)
             {}
 
             int roundCount = 0;
             int replyBlockCount = 0;
+            uint32_t packCounter = 0;
         };
         // [key] = sequence,
         // [value] = m_maxWaitingTimeReply
