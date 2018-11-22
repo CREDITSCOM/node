@@ -1,5 +1,4 @@
 #include "lib/system/timer.hpp"
-#include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
 cs::Timer::Timer()

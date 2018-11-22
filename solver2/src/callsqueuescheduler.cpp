@@ -1,6 +1,6 @@
 #include "callsqueuescheduler.hpp"
 #include <algorithm>
-#include <lib/system/structures.hpp>  // CallsQueue
+#include <lib/system/utils.hpp>  // CallsQueue
 
 void CallsQueueScheduler::SchedulerProc() {
   bool signaled{false};
