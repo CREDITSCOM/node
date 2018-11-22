@@ -518,8 +518,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   switch (type) {
     case MsgTypes::RoundTableSS:
       return node_->getRoundTableSS(data, size, rNum);
-    case MsgTypes::RoundTable:
-      return node_->getRoundTable(data, size, rNum);
     case MsgTypes::ConsVector:
       return node_->getVector(data, size, firstPack.getSender());
     case MsgTypes::ConsMatrix:
