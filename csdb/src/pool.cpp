@@ -748,7 +748,13 @@ bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddres
 }
 
 void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const {
-  os.put(*(size_t*)(&addressId_));
+  union {
+    Pool::NewWalletInfo::AddressId address_id;
+    size_t asSizeType;
+  } addresIdConverter;
+
+  addresIdConverter.address_id = addressId_;
+  os.put(addresIdConverter.asSizeType);
   os.put(walletId_);
 }
 

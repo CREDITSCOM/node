@@ -191,9 +191,10 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
   uint16_t result = ep.port();
 
   if (ep.protocol() == ip::udp::v4()) {
-    uint32_t addr = ep.address().to_v4().to_uint();
-    result ^= *(reinterpret_cast<uint16_t*>(&addr));
-    result ^= *(reinterpret_cast<uint16_t*>(&addr) + 1);
+    uint32_t address  = ep.address().to_v4().to_uint();
+    uint16_t lowBits  = address;
+    uint16_t highBits = address >> (sizeof(uint16_t) * CHAR_BIT);
+    result ^= lowBits ^ highBits;
   }
   else {
     auto bytes = ep.address().to_v6().to_bytes();
