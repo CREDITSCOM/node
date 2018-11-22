@@ -2,7 +2,7 @@
 //#define TESTING
 
 #include <gtest/gtest.h>
-#include "CyclicBuffer.hpp"
+#include "cyclicbuffer.hpp"
 
 TEST(CyclicBuffer, EmptyAfterCreation) {
   CyclicBuffer<int, 10> buffer;

@@ -41,7 +41,7 @@ add_library(${PROJECT_NAME} STATIC
 	src/solvercontext.cpp
 	src/solverinterface.cpp
 	src/solvertransitions.cpp
-	src/callsqueueScheduler.cpp
+	src/callsqueuescheduler.cpp
 	src/timeouttracking.cpp
 
 	src/states/defaultstatebehavior.cpp

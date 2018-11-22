@@ -60,7 +60,7 @@ add_library(csnode
   src/datastream.cpp
   src/walletscache.cpp
   src/walletsids.cpp
-  src/walletsPools.cpp
+  src/walletspools.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
 )
