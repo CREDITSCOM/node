@@ -36,8 +36,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
     }
 }
 
-void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
-    cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() ;
+void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packCounter) {
+    cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< from: " << poolsBlock.front().sequence() << " to: " << poolsBlock.back().sequence() << ",   packCounter: " << packCounter;
 
     /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
     csdb::Pool::sequence_t lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
@@ -190,15 +190,19 @@ void cs::PoolSynchronizer::sendBlock(const ConnectionPtr& target, const PoolsReq
     cslog() << "POOL SYNCHRONIZER> Sending block request >>>> needed seq: " << m_blockChain->getLastWrittenSequence()
             << ", requested block sequences from: " << sequences.front() << " to: " << sequences.back();
 
+    uint32_t packCounter = 0;
+
     for (const auto& sequence : sequences) {
         if (!m_requestedSequences.count(sequence)) {
             m_requestedSequences.emplace(std::make_pair(sequence, WaitinTimeReply(m_maxWaitingTimeRound, m_maxWaitingTimeReply)));
         }
+        ++(m_requestedSequences.at(sequence).packCounter);
+        packCounter = m_requestedSequences.at(sequence).packCounter;
     }
 
-    csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first << "   to: " << m_requestedSequences.rbegin()->first;
+    csdebug() << "POOL SYNCHRONIZER> Requested sequences from: " << m_requestedSequences.begin()->first << "   to: " << m_requestedSequences.rbegin()->first << ",   packCounter: " << packCounter;
 
-    emit sendRequest(target, sequences);
+    emit sendRequest(target, sequences, packCounter);
 }
 
 void cs::PoolSynchronizer::addToTemporaryStorage(const csdb::Pool& pool) {
@@ -305,6 +309,10 @@ bool cs::PoolSynchronizer::getNeededSequences() {
             }
             lastSequence = cs::numeric_cast<uint32_t>(firstSequenceIt->first);
         }
+    }
+
+    if (!m_neededSequences.empty()) {
+        csdebug() << "POOL SYNCHRONIZER> Get sequences: neededSequences: from: " << m_neededSequences.front() << ", to: " << m_neededSequences.back();
     }
 
     return !m_neededSequences.empty();

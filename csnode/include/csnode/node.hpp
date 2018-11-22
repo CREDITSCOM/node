@@ -128,7 +128,7 @@ public:
   void resetNeighbours();
 
   // syncro send functions
-  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
+  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
@@ -199,7 +199,7 @@ public:
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-  void sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences);
+  void sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter);
 
 private:
   bool init();
