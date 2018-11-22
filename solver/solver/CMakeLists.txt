@@ -12,15 +12,15 @@ set(SOLVER_DOC_BUILD FALSE)
 add_library(solver
     include/solver/generals.hpp
     include/solver/solver.hpp
-    include/solver/WalletsState.h
-    include/solver/Fee.h
-    include/solver/TransactionsValidator.h
-    include/solver/spammer.h
+    include/solver/walletsstate.hpp
+    include/solver/fee.hpp
+    include/solver/transactionsvalidator.hpp
+    include/solver/spammer.hpp
     src/solver.cpp
     src/generals.cpp
-    src/WalletState.cpp
-    src/Fee.cpp
-    src/TransactionsValidator.cpp
+    src/walletState.cpp
+    src/fee.cpp
+    src/transactionsvalidator.cpp
     src/spammer.cpp
     ${THRIFT_GENERATED_FILES}
 )

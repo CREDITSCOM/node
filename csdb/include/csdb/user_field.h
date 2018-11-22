@@ -1,16 +1,15 @@
 /**
-  * @file user_field.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file user_field.h
+ * @author Evgeny V. Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_USER_FIELD_H_INCLUDED_
 #define _CREDITS_CSDB_USER_FIELD_H_INCLUDED_
 
 #include <cinttypes>
 #include <string>
-#include <vector>
 #include <type_traits>
+#include <vector>
 
 #include "csdb/amount.h"
 #include "csdb/internal/shared_data.h"
@@ -20,7 +19,7 @@ namespace csdb {
 namespace priv {
 class obstream;
 class ibstream;
-} // namespace priv
+}  // namespace priv
 
 /**
  * Тип идентификатора поля. Тип знаковый. Предполагается, что "стандартные" идентификатор,
@@ -54,15 +53,20 @@ constexpr const user_field_id_t UFID_COMMENT = (-1);
  *
  * Дополнительные поля используются в классах \ref Transaction и \ref Pool.
  */
-class UserField
-{
+class UserField {
   SHARED_DATA_CLASS_DECLARE(UserField)
 public:
-  enum Type: char { Unknown = 0, Integer = 1, String = 2, Amount = 3};
+  enum Type : char
+  {
+    Unknown = 0,
+    Integer = 1,
+    String = 2,
+    Amount = 3
+  };
 
-  template<typename T, typename = typename ::std::enable_if<::std::is_integral<T>::value>::type>
+  template <typename T, typename = typename ::std::enable_if<::std::is_integral<T>::value>::type>
   UserField(T value);
-  template<typename T, typename = typename ::std::enable_if<!::std::is_integral<T>::value>::type>
+  template <typename T, typename = typename ::std::enable_if<!::std::is_integral<T>::value>::type>
   UserField(const T& value);
 
   UserField(const char* value);
@@ -70,16 +74,14 @@ public:
   bool is_valid() const noexcept;
   Type type() const noexcept;
 
-  template<typename T>
-  typename ::std::enable_if<!::std::is_integral<T>::value, T>::type
-  value() const noexcept;
+  template <typename T>
+  typename ::std::enable_if<!::std::is_integral<T>::value, T>::type value() const noexcept;
 
-  template<typename T>
-  typename ::std::enable_if<::std::is_integral<T>::value, T>::type
-  value() const noexcept;
+  template <typename T>
+  typename ::std::enable_if<::std::is_integral<T>::value, T>::type value() const noexcept;
 
-  bool operator ==(const UserField& other) const noexcept;
-  inline bool operator !=(const UserField& other) const noexcept;
+  bool operator==(const UserField& other) const noexcept;
+  inline bool operator!=(const UserField& other) const noexcept;
 
 private:
   void put(::csdb::priv::obstream&) const;
@@ -123,6 +125,6 @@ inline UserField::value() const noexcept
   return static_cast<T>(value<uint64_t>());
 }
 
-} // namespace csdb
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_USER_FIELD_H_INCLUDED_

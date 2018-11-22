@@ -1,9 +1,9 @@
-#ifndef __KEYS_HPP__
-#define __KEYS_HPP__
+#ifndef KEYS_HPP
+#define KEYS_HPP
 
+#include <lib/system/common.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/structures.hpp>
-#include <lib/system/common.hpp>
 
 inline cs::PublicKey getHashedPublicKey(const char* str) {
   cs::PublicKey result;
@@ -13,5 +13,4 @@ inline cs::PublicKey getHashedPublicKey(const char* str) {
   return result;
 }
 
-
-#endif // __KEYS_HPP__
+#endif  // KEYS_HPP

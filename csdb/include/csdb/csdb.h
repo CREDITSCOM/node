@@ -1,9 +1,8 @@
 /**
-  * @file csdb.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file csdb.h
+ * @author Evgeny V. Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_H_INCLUDED_
 #define _CREDITS_CSDB_H_INCLUDED_
 
@@ -76,6 +75,6 @@ Database::Error dbLastError();
  */
 Storage defaultStorage();
 
-} //namespace csdb
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_H_INCLUDED_

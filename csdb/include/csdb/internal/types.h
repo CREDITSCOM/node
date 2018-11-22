@@ -1,15 +1,15 @@
 /**
-  * @file types.h
-  * @author Roman Bukin
-  */
+ * @file types.h
+ * @author Roman Bukin
+ */
 
 #pragma once
 #ifndef _CREDITS_CSDB_TYPES_H_INCLUDED_
 #define _CREDITS_CSDB_TYPES_H_INCLUDED_
 
 #include <cinttypes>
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace csdb {
 namespace internal {
@@ -20,7 +20,7 @@ constexpr size_t kPublicKeySize = 32;
 constexpr size_t kPrivateKeySize = 64;
 constexpr size_t kSignatureLength = 64;
 
-} // namespace internal
-} // namespace csdb
+}  // namespace internal
+}  // namespace csdb
 
-#endif // _CREDITS_CSDB_TYPES_H_INCLUDED_
+#endif  // _CREDITS_CSDB_TYPES_H_INCLUDED_

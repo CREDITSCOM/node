@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __TRANSPORT_HPP__
-#define __TRANSPORT_HPP__
+#ifndef TRANSPORT_HPP
+#define TRANSPORT_HPP
+
 #include <boost/asio.hpp>
 #include <csignal>
 
@@ -8,9 +9,9 @@
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
+#include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
-#include <lib/system/cache.hpp>
 #include <net/network.hpp>
 
 #include "neighbourhood.hpp"
@@ -33,13 +34,13 @@ enum class NetworkCommand : uint8_t {
   PackRequest,
   PackRenounce,
   BlockSyncRequest,
-  SSRegistration        = 1,
-  SSFirstRound          = 31,
+  SSRegistration = 1,
+  SSFirstRound = 31,
   SSRegistrationRefused = 25,
-  SSPingWhiteNode       = 32,
-  SSLastBlock           = 34,
-  SSReRegistration      = 36,
-  SSSpecificBlock       = 37,
+  SSPingWhiteNode = 32,
+  SSLastBlock = 34,
+  SSReRegistration = 36,
+  SSSpecificBlock = 37,
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -72,19 +73,20 @@ public:
   , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
   , net_(new Network(config, this))
   , node_(node)
-  , nh_(this)
-  {
+  , nh_(this) {
     good_ = net_->isGood();
   }
 
   ~Transport();
 
-// [[noreturn]] void run();
+  // [[noreturn]] void run();
   void run();
 
   static volatile std::sig_atomic_t gSignalStatus;
 
-  static void stop() { Transport::gSignalStatus = 1; }
+  static void stop() {
+    Transport::gSignalStatus = 1;
+  }
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
@@ -171,10 +173,10 @@ private:
   void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
 
   /* Actions */
-  bool   good_;
+  bool good_;
   Config config_;
 
-  static const uint32_t MaxPacksQueue  = 2048;
+  static const uint32_t MaxPacksQueue = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
 
   cs::SpinLock sendPacksFlag_;
@@ -211,7 +213,7 @@ private:
   struct PostponedPacket {
     cs::RoundNumber round;
     MsgTypes type;
-    Packet   pack;
+    Packet pack;
 
     PostponedPacket(const cs::RoundNumber r, const MsgTypes t, const Packet& p)
     : round(r)
@@ -239,4 +241,4 @@ private:
   FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, 10000> fragOnRound_;
 };
 
-#endif  // __TRANSPORT_HPP__
+#endif  // TRANSPORT_HPP

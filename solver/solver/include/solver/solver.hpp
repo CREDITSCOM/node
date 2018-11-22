@@ -4,33 +4,32 @@
 #ifndef SOLVER_HPP
 #define SOLVER_HPP
 
+#include <api_types.h>
 #include <csdb/csdb.h>
 #include <csdb/transaction.h>
-#include <api_types.h>
 
-#include <memory>
-#include <thread>
-#include <functional>
 #include <atomic>
-#include <shared_mutex>
-#include <set>
-#include <string>
-#include <vector>
+#include <functional>
+#include <memory>
 #include <optional>
+#include <set>
+#include <shared_mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
-#include <csnode/nodecore.hpp>
-#include <lib/system/timer.hpp>
 #include <client/params.hpp>
+#include <csnode/nodecore.hpp>
 #include <lib/system/keys.hpp>
-#include <solver/WalletsState.h>
-#include <solver/Fee.h>
-#include <solver/spammer.h>
+#include <lib/system/timer.hpp>
+#include <solver/fee.hpp>
+#include <solver/spammer.hpp>
+#include <solver/walletsstate.hpp>
 
 class Node;
 
-namespace slv2
-{
-  class SolverCore;
+namespace slv2 {
+class SolverCore;
 }
 
 namespace cs {
@@ -125,11 +124,11 @@ private:
   std::vector<uint8_t> m_receivedVectorFrom;
   std::vector<uint8_t> m_receivedMatrixFrom;
 
-  uint8_t m_writerIndex; // index at confidants
+  uint8_t m_writerIndex;  // index at confidants
 
   std::vector<PublicKey> m_hashesReceivedKeys;
 
-  csdb::Pool m_vPool;   // TODO: what is v pool?
+  csdb::Pool m_vPool;  // TODO: what is v pool?
 
   bool m_isPoolClosed = true;
   bool m_blockCandidateArrived = false;
@@ -143,7 +142,7 @@ private:
   std::map<size_t, csdb::Pool> m_temporaryStorage;
 
   // to store unrequested syncro blocks
-  std::map<size_t, csdb::Pool> m_randomStorage; // TODO: RND pool or random?
+  std::map<size_t, csdb::Pool> m_randomStorage;  // TODO: RND pool or random?
 };
 }  // namespace cs
 #endif

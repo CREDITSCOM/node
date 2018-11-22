@@ -21,16 +21,16 @@
 #include <boost/dynamic_bitset.hpp>
 #include <lib/system/utils.hpp>
 
+#include <csnode/conveyer.hpp>
 #include <mutex>
 #include <solver/generals.hpp>
-#include <solver/WalletsState.h>
-#include <csnode/conveyer.hpp>
+#include <solver/walletsstate.hpp>
 
 namespace cs {
 Generals::Generals(WalletsState& _walletsState)
-  : m_walletsState(_walletsState)
-  , m_transactionsValidator(new TransactionsValidator(m_walletsState, TransactionsValidator::Config {}))
-  {}
+: m_walletsState(_walletsState)
+, m_transactionsValidator(new TransactionsValidator(m_walletsState, TransactionsValidator::Config{})) {
+}
 
 int8_t Generals::extractRaisedBitsCount(const csdb::Amount& delta) {
 #ifdef _MSC_VER
@@ -157,7 +157,6 @@ void Generals::addMatrix(const HashMatrix& matrix, const cs::ConfidantsKeys& con
         *(m_findUntrusted.data() + j * TrustedSize + i) = i_max;
 
         i_max++;
-
       }
     }
   }
@@ -197,8 +196,9 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
     if (j == 0) {
       hash_weights[0].hash = m_hwTotal[0].hash;
       (hash_weights[0].weight) = 1;
-      j_max                      = 1;
-    } else {
+      j_max = 1;
+    }
+    else {
       bool found = false;
 
       for (jj = 0; jj < j_max; jj++) {
@@ -225,7 +225,8 @@ uint8_t Generals::takeDecision(const cs::ConfidantsKeys& confidantNodes, const c
   for (int i = 0; i < nodes_amount; i++) {
     if (*(m_newTrusted.data() + i) < trusted_limit) {
       cslog() << "GENERALS> Take decision: Liar nodes : " << i;
-    } else {
+    }
+    else {
       j++;
     }
   }

@@ -2,90 +2,78 @@
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
-cs::Timer::Timer():
-    m_isRunning(false),
-    m_isRehabilitation(true),
-    m_interruption(false),
-    m_msec(std::chrono::milliseconds(0))
-{
+cs::Timer::Timer()
+: m_isRunning(false)
+, m_isRehabilitation(true)
+, m_interruption(false)
+, m_msec(std::chrono::milliseconds(0)) {
 }
 
-cs::Timer::~Timer()
-{
-    if (isRunning()) {
-        stop();
+cs::Timer::~Timer() {
+  if (isRunning()) {
+    stop();
+  }
+}
+
+void cs::Timer::start(int msec) {
+  m_interruption = false;
+  m_isRunning = true;
+  m_msec = std::chrono::milliseconds(msec);
+  m_thread = std::thread(&Timer::loop, this);
+  m_realMsec = m_msec;
+  m_allowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
+}
+
+void cs::Timer::stop() {
+  m_interruption = true;
+
+  if (m_thread.joinable()) {
+    m_thread.join();
+    m_isRunning = false;
+  }
+}
+
+bool cs::Timer::isRunning() {
+  return m_isRunning;
+}
+
+void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback) {
+  cs::Utils::runAfter(std::chrono::milliseconds(msec), callback);
+}
+
+void cs::Timer::loop() {
+  while (!m_interruption) {
+    if (m_isRehabilitation) {
+      m_isRehabilitation = false;
+      m_rehabilitationStartValue = std::chrono::system_clock::now();
     }
+
+    std::this_thread::sleep_for(m_msec);
+
+    rehabilitation();
+
+    emit timeOut();
+  }
 }
 
-void cs::Timer::start(int msec)
-{
-    m_interruption = false;
-    m_isRunning = true;
-    m_msec = std::chrono::milliseconds(msec);
-    m_thread = std::thread(&Timer::loop, this);
-    m_realMsec = m_msec;
-    m_allowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
-}
+void cs::Timer::rehabilitation() {
+  m_isRehabilitation = true;
 
-void cs::Timer::stop()
-{
-    m_interruption = true;
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
+                                                                        m_rehabilitationStartValue);
+  auto difference = duration - m_realMsec;
 
-    if (m_thread.joinable())
-    {
-        m_thread.join();
-        m_isRunning = false;
+  if (difference >= m_realMsec) {
+    m_msec = std::chrono::milliseconds(0);
+  }
+  else {
+    if (difference.count() > m_allowableDifference) {
+      m_msec = m_realMsec - (difference % m_realMsec);
     }
-}
-
-bool cs::Timer::isRunning()
-{
-    return m_isRunning;
-}
-
-void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback)
-{
-    cs::Utils::runAfter(std::chrono::milliseconds(msec), callback);
-}
-
-void cs::Timer::loop()
-{
-    while (!m_interruption)
-    {
-        if (m_isRehabilitation)
-        {
-            m_isRehabilitation = false;
-            m_rehabilitationStartValue = std::chrono::system_clock::now();
-        }
-
-        std::this_thread::sleep_for(m_msec);
-
-        rehabilitation();
-
-        emit timeOut();
+    else {
+      if (m_msec != m_realMsec) {
+        m_msec = m_realMsec;
+      }
     }
-}
-
-void cs::Timer::rehabilitation()
-{
-    m_isRehabilitation = true;
-
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - m_rehabilitationStartValue);
-    auto difference = duration - m_realMsec;
-
-    if (difference >= m_realMsec) {
-        m_msec = std::chrono::milliseconds(0);
-    }
-    else
-    {
-        if (difference.count() > m_allowableDifference) {
-            m_msec = m_realMsec - (difference % m_realMsec);
-        }
-        else
-        {
-            if (m_msec != m_realMsec) {
-                m_msec = m_realMsec;
-            }
-        }
-    }
+  }
 }

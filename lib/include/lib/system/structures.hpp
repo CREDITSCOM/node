@@ -1,8 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __STRUCTURES_HPP__
-#define __STRUCTURES_HPP__
+#ifndef STRUCTURES_HPP
+#define STRUCTURES_HPP
 #include <cstdint>
-#include <cstring>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -24,8 +23,12 @@ public:
     return ptr_ != rhs.ptr_ || circ_ != rhs.circ_;
   }
 
-  typename BufferType::value_type& operator*() { return *ptr_; }
-  typename BufferType::value_type* operator->() { return ptr_; }
+  typename BufferType::value_type& operator*() {
+    return *ptr_;
+  }
+  typename BufferType::value_type* operator->() {
+    return ptr_;
+  }
 
 private:
   typename BufferType::value_type* ptr_ = nullptr;
@@ -41,8 +44,8 @@ public:
   using value_type = T;
   using const_iterator = FixedBufferIterator<FixedCircularBuffer>;
 
-  FixedCircularBuffer():
-    elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Size])) {
+  FixedCircularBuffer()
+  : elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Size])) {
   }
 
   ~FixedCircularBuffer() {
@@ -51,10 +54,11 @@ public:
   }
 
   FixedCircularBuffer(const FixedCircularBuffer&) = delete;
-  FixedCircularBuffer(FixedCircularBuffer&& rhs): elements_(rhs.elements_),
-                                                  head_(rhs.head_),
-                                                  tail_(rhs.tail_),
-                                                  size_(rhs.size_) {
+  FixedCircularBuffer(FixedCircularBuffer&& rhs)
+  : elements_(rhs.elements_)
+  , head_(rhs.head_)
+  , tail_(rhs.tail_)
+  , size_(rhs.size_) {
     rhs.size_ = 0;
     rhs.elements_ = rhs.head_ = rhs.tail_ = nullptr;
   }
@@ -76,12 +80,13 @@ public:
       tail_ = head_ = incrementPtr(head_);
     }
 
-    return *(new(place) T(std::forward<Args>(args)...));
+    return *(new (place) T(std::forward<Args>(args)...));
   }
 
   const_iterator end() const {
     const_iterator ci;
-    if (size_) ci.circ_ = true;
+    if (size_)
+      ci.circ_ = true;
     ci.ptr_ = tail_;
     return ci;
   }
@@ -93,8 +98,12 @@ public:
     return ci;
   }
 
-  T* frontPtr() const { return head_; }
-  T* backPtr() const { return tail_; }
+  T* frontPtr() const {
+    return head_;
+  }
+  T* backPtr() const {
+    return tail_;
+  }
 
   void clear() {
     for (uint32_t i = size_; i > 0; --i) {
@@ -120,7 +129,9 @@ public:
     }
   }
 
-  uint32_t size() const { return size_; }
+  uint32_t size() const {
+    return size_;
+  }
 
 private:
   T* incrementPtr(T* ptr) const {
@@ -144,9 +155,10 @@ private:
 template <typename T, size_t Capacity>
 class FixedVector {
 public:
-  FixedVector():
-    elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Capacity])),
-    end_(elements_) { }
+  FixedVector()
+  : elements_(reinterpret_cast<T*>(new uint8_t[sizeof(T) * Capacity]))
+  , end_(elements_) {
+  }
 
   ~FixedVector() {
     for (auto ptr = elements_; ptr != end_; ++ptr)
@@ -156,8 +168,9 @@ public:
   }
 
   FixedVector(const FixedVector&) = delete;
-  FixedVector(FixedVector&& rhs): elements_(rhs.elements_),
-                                  end_(rhs.end_) {
+  FixedVector(FixedVector&& rhs)
+  : elements_(rhs.elements_)
+  , end_(rhs.end_) {
     rhs.elements_ = nullptr;
     rhs.end_ = nullptr;
   }
@@ -167,22 +180,26 @@ public:
 
   template <typename... Args>
   T& emplace(Args&&... args) {
-    return *(new(end_++) T(std::forward<Args>(args)...));
+    return *(new (end_++) T(std::forward<Args>(args)...));
   }
 
-  T* begin() const { return elements_; }
-  T* end() const { return end_; }
+  T* begin() const {
+    return elements_;
+  }
+  T* end() const {
+    return end_;
+  }
 
   void remove(T* element) {
     element->~T();
 
-    memmove(static_cast<void*>(element),
-            static_cast<const void*>(element + 1),
-            sizeof(T) * (end_ - element - 1));
+    memmove(static_cast<void*>(element), static_cast<const void*>(element + 1), sizeof(T) * (end_ - element - 1));
     --end_;
   }
 
-  uint32_t size() const { return static_cast<uint32_t>(end() - elements_); }
+  uint32_t size() const {
+    return static_cast<uint32_t>(end() - elements_);
+  }
 
   bool contains(T* ptr) const {
     return begin() <= ptr && ptr < end();
@@ -198,10 +215,7 @@ private:
 template <typename ResultType, typename ArgType>
 inline ResultType getHashIndex(const ArgType&);
 
-template <typename KeyType,
-          typename ArgType,
-          typename IndexType = uint16_t,
-          uint32_t MaxSize = 100000>
+template <typename KeyType, typename ArgType, typename IndexType = uint16_t, uint32_t MaxSize = 100000>
 class FixedHashMap {
 public:
   struct Element {
@@ -211,11 +225,14 @@ public:
     KeyType key;
     ArgType data = {};
 
-    ArgType& operator*() { return data; }
+    ArgType& operator*() {
+      return data;
+    }
 
-    Element(const KeyType& _key,
-            Element** _bucket): bucket(_bucket),
-                                key(_key) { }
+    Element(const KeyType& _key, Element** _bucket)
+    : bucket(_bucket)
+    , key(_key) {
+    }
   };
   using ElementPtr = Element*;
 
@@ -228,8 +245,9 @@ public:
   }
 
   FixedHashMap(const FixedHashMap&) = delete;
-  FixedHashMap(FixedHashMap&& rhs): buffer_(std::move(rhs.buffer_)),
-                                    buckets_(rhs.buckets_) {
+  FixedHashMap(FixedHashMap&& rhs)
+  : buffer_(std::move(rhs.buffer_))
+  , buckets_(rhs.buckets_) {
     rhs.buckets_ = nullptr;
   }
 
@@ -251,14 +269,19 @@ public:
     Element& newComer = buffer_.emplace(key, myBucket);
 
     newComer.up = *myBucket;
-    if (newComer.up) newComer.up->down = &newComer;
+    if (newComer.up)
+      newComer.up->down = &newComer;
     *myBucket = &newComer;
 
     return newComer.data;
   }
 
-  auto begin() { return buffer_.begin(); }
-  auto end() { return buffer_.end(); }
+  auto begin() {
+    return buffer_.begin();
+  }
+  auto end() {
+    return buffer_.end();
+  }
 
 private:
   Element* getElt(const KeyType& key, Element*** bucket) {
@@ -279,10 +302,13 @@ private:
   void preparePopLeft() {
     auto toRemove = buffer_.frontPtr();
 
-    if (toRemove->down) toRemove->down->up = toRemove->up;
-    else *(toRemove->bucket) = toRemove->up;
+    if (toRemove->down)
+      toRemove->down->up = toRemove->up;
+    else
+      *(toRemove->bucket) = toRemove->up;
 
-    if (toRemove->up) toRemove->up->down = toRemove->down;
+    if (toRemove->up)
+      toRemove->up->down = toRemove->down;
   }
 
   FixedCircularBuffer<Element, MaxSize> buffer_;
@@ -306,18 +332,17 @@ public:
   inline void insert(std::function<void()>);
 
 private:
-  CallsQueue() { }
-  __cacheline_aligned std::atomic<Call*> head_ = { nullptr };
+  CallsQueue() {
+  }
+  __cacheline_aligned std::atomic<Call*> head_ = {nullptr};
 };
 
 inline void CallsQueue::callAll() {
   Call* startHead = head_.load(std::memory_order_relaxed);
-  if (!startHead) return;
+  if (!startHead)
+    return;
   Call* newHead = startHead;
-  head_.compare_exchange_strong(newHead,
-                                nullptr,
-                                std::memory_order_relaxed,
-                                std::memory_order_relaxed);
+  head_.compare_exchange_strong(newHead, nullptr, std::memory_order_relaxed, std::memory_order_relaxed);
   Call* elt = startHead;
   do {
     elt->func();
@@ -328,8 +353,9 @@ inline void CallsQueue::callAll() {
 
   if (newHead != startHead) {
     do {
-      Call *next = newHead->next.load(std::memory_order_relaxed);
-      if (next == startHead) break;
+      Call* next = newHead->next.load(std::memory_order_relaxed);
+      if (next == startHead)
+        break;
       newHead = next;
     } while (true);
     newHead->next.store(nullptr, std::memory_order_relaxed);
@@ -343,12 +369,9 @@ inline void CallsQueue::insert(std::function<void()> f) {
   Call* head = head_.load(std::memory_order_relaxed);
   do {
     newElt->next.store(head, std::memory_order_relaxed);
-  } while (!head_.compare_exchange_weak(head,
-                                        newElt,
-                                        std::memory_order_acquire,
-                                        std::memory_order_relaxed));
+  } while (!head_.compare_exchange_weak(head, newElt, std::memory_order_acquire, std::memory_order_relaxed));
 
-  //LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
+  // LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
 }
 
 template <size_t Length>
@@ -420,7 +443,9 @@ public:
     memset(bytes_, 0, (bNum + ((bNum * 8) != realSize)));
   }
 
-  CharFunc(): CharFunc(MaxSize) { }
+  CharFunc()
+  : CharFunc(MaxSize) {
+  }
 
   bool checkPos(uint32_t id) const {
     uint32_t mask;
@@ -432,8 +457,10 @@ public:
     uint32_t mask;
     uint32_t& byte = getByte(id, mask);
 
-    if (val) byte|= mask;
-    else byte&= ~mask;
+    if (val)
+      byte |= mask;
+    else
+      byte &= ~mask;
   }
 
 private:
@@ -457,5 +484,4 @@ private:
   uint32_t bytes_[getMyBytesLength()];
 };
 
-
-#endif // __STRUCTURES_HPP__
+#endif  // __STRUCTURES_HPP

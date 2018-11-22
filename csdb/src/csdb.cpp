@@ -4,10 +4,9 @@ namespace csdb {
 
 namespace {
 ::csdb::Storage instance;
-} // namespace;
+}  // namespace
 
-bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback)
-{
+bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback) {
   if (instance.isOpen()) {
     return false;
   }
@@ -15,8 +14,7 @@ bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback)
   return instance.isOpen();
 }
 
-bool init(const char* path_to_bases, Storage::OpenCallback callback)
-{
+bool init(const char* path_to_bases, Storage::OpenCallback callback) {
   if (instance.isOpen()) {
     return false;
   }
@@ -24,39 +22,32 @@ bool init(const char* path_to_bases, Storage::OpenCallback callback)
   return instance.isOpen();
 }
 
-bool isInitialized()
-{
+bool isInitialized() {
   return instance.isOpen();
 }
 
-void done()
-{
+void done() {
   instance.close();
 }
 
-Storage::Error lastError()
-{
+Storage::Error lastError() {
   return instance.last_error();
 }
 
-::std::string lastErrorMessage()
-{
+::std::string lastErrorMessage() {
   return instance.last_error_message();
 }
 
-Database::Error dbLastError()
-{
+Database::Error dbLastError() {
   return instance.db_last_error();
 }
 
-::std::string dbLastErrorMessage()
-{
+::std::string dbLastErrorMessage() {
   return instance.last_error_message();
 }
 
-Storage defaultStorage()
-{
+Storage defaultStorage() {
   return instance;
 }
 
-}
+}  // namespace csdb

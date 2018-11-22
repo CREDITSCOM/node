@@ -10,13 +10,13 @@ add_subdirectory(variant_gen)
 # генератора Cmake. При добавлении файлов в папку он вызван не будет - и список файлов
 # не обновится.
 add_library(csconnector
-    include/csstats.h
+    include/csstats.hpp
     src/csstats.cpp
-    include/csconnector/csconnector.h
+    include/csconnector/csconnector.hpp
     src/csconnector.cpp
-    src/APIHandler.cpp
-    include/APIHandler.h
-    include/DebugLog.h
+    src/apihandler.cpp
+    include/apihandler.hpp
+    include/debuglog.hpp
     )
 
 target_link_libraries (csconnector PUBLIC csdb csnode csconnector_gen csconnector_executor_gen variant_gen)

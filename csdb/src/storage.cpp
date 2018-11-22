@@ -1,23 +1,23 @@
 #include "csdb/storage.h"
 
-#include <sstream>
+#include <algorithm>
+#include <cassert>
+#include <condition_variable>
 #include <cstdarg>
 #include <deque>
-#include <condition_variable>
 #include <mutex>
-#include <thread>
-#include <cassert>
+#include <sstream>
 #include <stdexcept>
-#include <algorithm>
+#include <thread>
 
-#include "csdb/address.h"
-#include "csdb/wallet.h"
-#include "csdb/pool.h"
-#include "csdb/database.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/database_berkeleydb.h"
-#include "csdb/internal/utils.h"
 #include "binary_streams.h"
+#include "csdb/address.h"
+#include "csdb/database.h"
+#include "csdb/database_berkeleydb.h"
+#include "csdb/internal/shared_data_ptr_implementation.h"
+#include "csdb/internal/utils.h"
+#include "csdb/pool.h"
+#include "csdb/wallet.h"
 
 namespace {
 struct last_error_struct {
@@ -25,29 +25,25 @@ struct last_error_struct {
   std::string last_error_message_;
 };
 
-last_error_struct& last_error_map(const void* p)
-{
-  static thread_local ::std::map<const void*, last_error_struct> last_errors_;
+last_error_struct &last_error_map(const void *p) {
+  static thread_local ::std::map<const void *, last_error_struct> last_errors_;
   return last_errors_[p];
 }
-} // namespace;
+}  // namespace
 
 namespace csdb {
 
-namespace
-{
+namespace {
 
-struct head_info_t
-{
-  size_t len_;        // Количество блоков в цепочке
-  PoolHash next_;     // хеш следующего пула, или пустая строка для первого пула
-                      // в цепочее (нет родителя, начало цепочки).
+struct head_info_t {
+  size_t len_;     // Количество блоков в цепочке
+  PoolHash next_;  // хеш следующего пула, или пустая строка для первого пула
+                   // в цепочее (нет родителя, начало цепочки).
 };
 using heads_t = std::map<PoolHash, head_info_t>;
 using tails_t = std::map<PoolHash, PoolHash>;
 
-void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_hash, const PoolHash &prev_hash)
-{
+void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_hash, const PoolHash &prev_hash) {
   auto ith = heads.find(prev_hash);
   auto itt = tails.find(cur_hash);
   bool eith = (heads.end() != ith);
@@ -55,7 +51,7 @@ void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_
   if (eith && eitt) {
     // Склеиваем две подцепочки.
     assert(1 == heads.count(itt->second));
-    head_info_t& ith1 = heads[itt->second];
+    head_info_t &ith1 = heads[itt->second];
     ith1.next_ = ith->second.next_;
     ith1.len_ += (1 + ith->second.len_);
     if (!ith->second.next_.is_empty()) {
@@ -66,7 +62,8 @@ void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_
     heads.erase(ith);
     // Мы, возможно, уже изменили tails - поэтому нельзя удалять по итератору!
     tails.erase(cur_hash);
-  } else if (eith && (!eitt)) {
+  }
+  else if (eith && (!eitt)) {
     // Добавляем в начало цепочки.
     if (!ith->second.next_.is_empty()) {
       /// \todo Проверить, почему выпадает assert!
@@ -74,12 +71,13 @@ void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_
       tails[ith->second.next_] = cur_hash;
     }
     assert(0 == heads.count(cur_hash));
-    heads.emplace(cur_hash, head_info_t{ith->second.len_ + 1, ith->second.next_} );
+    heads.emplace(cur_hash, head_info_t{ith->second.len_ + 1, ith->second.next_});
     heads.erase(prev_hash);
-  } else if ((!eith) && eitt) {
+  }
+  else if ((!eith) && eitt) {
     // Добавляем в конец цепочки.
     assert(1 == heads.count(itt->second));
-    head_info_t& ith1 = heads[itt->second];
+    head_info_t &ith1 = heads[itt->second];
     ith1.next_ = prev_hash;
     ++ith1.len_;
     if (!prev_hash.is_empty()) {
@@ -90,7 +88,8 @@ void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_
       tails.emplace(prev_hash, itt->second);
     }
     tails.erase(cur_hash);
-  } else {
+  }
+  else {
     // Ни с чем не пересекаемся! Просто подвешиваем.
     assert(0 == heads.count(cur_hash));
     heads.emplace(cur_hash, head_info_t{1, prev_hash});
@@ -102,18 +101,15 @@ void update_heads_and_tails(heads_t &heads, tails_t &tails, const PoolHash &cur_
   }
 }
 
-}
+}  // namespace
 
-class Storage::priv
-{
+class Storage::priv {
 public:
-  priv()
-  {
+  priv() {
     last_error_map(this) = last_error_struct();
   }
 
-  ~priv()
-  {
+  ~priv() {
     if (write_thread.joinable()) {
       quit = true;
       write_cond_var.notify_one();
@@ -126,11 +122,11 @@ private:
   void write_routine();
 
   std::shared_ptr<Database> db = nullptr;
-  PoolHash last_hash;           // Хеш последнего пула
-  size_t count_pool = 0;        // Количество пулов транзакций в хранилище (первоночально заполняется в check)
+  PoolHash last_hash;     // Хеш последнего пула
+  size_t count_pool = 0;  // Количество пулов транзакций в хранилище (первоночально заполняется в check)
 
-  void set_last_error(Storage::Error error = Storage::NoError, const ::std::string& message = ::std::string());
-  void set_last_error(Storage::Error error, const char* message, ...);
+  void set_last_error(Storage::Error error = Storage::NoError, const ::std::string &message = ::std::string());
+  void set_last_error(Storage::Error error, const char *message, ...);
 
   std::thread write_thread;
   bool quit = false;
@@ -144,15 +140,13 @@ private:
   friend class ::csdb::Storage;
 };
 
-void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message)
-{
+void Storage::priv::set_last_error(Storage::Error error, const ::std::string &message) {
   last_error_struct &les = last_error_map(this);
   les.last_error_ = error;
   les.last_error_message_ = message;
 }
 
-void Storage::priv::set_last_error(Storage::Error error, const char* message, ...)
-{
+void Storage::priv::set_last_error(Storage::Error error, const char *message, ...) {
   last_error_struct &les = last_error_map(this);
   les.last_error_ = error;
   if (nullptr != message) {
@@ -165,13 +159,13 @@ void Storage::priv::set_last_error(Storage::Error error, const char* message, ..
     std::vsnprintf(&(les.last_error_message_[0]), les.last_error_message_.size(), message, args2);
     va_end(args2);
     les.last_error_message_.resize(les.last_error_message_.size() - 1);
-  } else {
+  }
+  else {
     les.last_error_message_.clear();
   }
 }
 
-bool Storage::priv::rescan(Storage::OpenCallback callback)
-{
+bool Storage::priv::rescan(Storage::OpenCallback callback) {
   last_hash = {};
   count_pool = 0;
 
@@ -182,34 +176,33 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
   assert(it);
 
   Storage::OpenProgress progress{0};
-  for(it->seek_to_first(); it->is_valid(); it->next())
-  {
-//    const ::csdb::internal::byte_array k = it->key();
+  for (it->seek_to_first(); it->is_valid(); it->next()) {
+    //    const ::csdb::internal::byte_array k = it->key();
     const ::csdb::internal::byte_array v = it->value();
-/*
-    PoolHash hash = PoolHash::from_binary(k);
-    if(hash.is_empty())
-    {
-      set_last_error(Storage::DataIntegrityError, "Data integrity error: key '%s' is not a valid hash value",
-                     ::csdb::internal::to_hex(k).c_str());
-      return false;
-    }
-*/
+    /*
+        PoolHash hash = PoolHash::from_binary(k);
+        if(hash.is_empty())
+        {
+          set_last_error(Storage::DataIntegrityError, "Data integrity error: key '%s' is not a valid hash value",
+                         ::csdb::internal::to_hex(k).c_str());
+          return false;
+        }
+    */
     // Хеш в ключе совпадает с реальным хешем блока?
     PoolHash real_hash = PoolHash::calc_from_data(v);
 
     Pool p = Pool::from_binary(v);
-    if(!p.is_valid())
-    {
+    if (!p.is_valid()) {
       set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key '%s'.",
                      real_hash.to_string().c_str());
       return false;
     }
 
-    if(p.hash() != real_hash)
-    {
-      set_last_error(Storage::DataIntegrityError, "Data integrity error: key does not match real hash "
-                     "(key: '%s'; real hash: '%s')", p.hash().to_string().c_str(), real_hash.to_string().c_str());
+    if (p.hash() != real_hash) {
+      set_last_error(Storage::DataIntegrityError,
+                     "Data integrity error: key does not match real hash "
+                     "(key: '%s'; real hash: '%s')",
+                     p.hash().to_string().c_str(), real_hash.to_string().c_str());
       return false;
     }
 
@@ -217,7 +210,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
     count_pool++;
     progress.poolsProcessed++;
     if (nullptr != callback) {
-      if(callback(progress)) {
+      if (callback(progress)) {
         set_last_error(Storage::UserCancelled);
         return false;
       }
@@ -225,19 +218,18 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
   }
 
   // Посмотрим, сколько у нас завершённых цепочек.
-  if([this, &heads]() -> bool {
-      for(const auto it : heads)
-      {
-        if(!it.second.next_.is_empty())
-          continue;
+  if ([this, &heads]() -> bool {
+        for (const auto it : heads) {
+          if (!it.second.next_.is_empty())
+            continue;
 
-        if(!last_hash.is_empty())
-          return false;
+          if (!last_hash.is_empty())
+            return false;
 
-        last_hash = it.first;
-      }
-      return true;
-    }()) {
+          last_hash = it.first;
+        }
+        return true;
+      }()) {
     set_last_error();
     return true;
   }
@@ -248,7 +240,8 @@ bool Storage::priv::rescan(Storage::OpenCallback callback)
     ss << "  " << it->first.to_string() << " (lenght = " << it->second.len_ << "): ";
     if (it->second.next_.is_empty()) {
       ss << "Normal";
-    } else {
+    }
+    else {
       ss << "Orphan";
     }
     ss << std::endl;
@@ -280,69 +273,68 @@ void Storage::priv::write_routine() {
   }
 }
 
-Storage::Storage() :
-  d(::std::make_shared<priv>())
-{
+Storage::Storage()
+: d(::std::make_shared<priv>()) {
 }
 
-Storage::~Storage()
-{
+Storage::~Storage() {
 }
 
-Storage::Storage(WeakPtr ptr) noexcept :
-  d(ptr.lock())
-{
+Storage::Storage(WeakPtr ptr) noexcept
+: d(ptr.lock()) {
   if (!d) {
     d = ::std::make_shared<priv>();
   }
 }
 
-Storage::WeakPtr Storage::weak_ptr() const noexcept
-{
+Storage::WeakPtr Storage::weak_ptr() const noexcept {
   return d;
 }
 
-Storage::Error Storage::last_error() const
-{
+Storage::Error Storage::last_error() const {
   return last_error_map(d.get()).last_error_;
 }
 
-::std::string Storage::last_error_message() const
-{
+::std::string Storage::last_error_message() const {
   const last_error_struct &les = last_error_map(d.get());
   if (!les.last_error_message_.empty()) {
     return les.last_error_message_;
   }
   switch (les.last_error_) {
-  case NoError: return "No error";
-  case NotOpen: return "Storage is not open";
-  case DatabaseError: return "Database error: " + db_last_error_message();
-  case ChainError: return "Chain integrity error";
-  case DataIntegrityError: return "Data integrity error";
-  case UserCancelled: return "Operation cancalled by user";
-  case InvalidParameter: return "Invalid parameter passed to method.";
-  default: return "Unknown error";
+    case NoError:
+      return "No error";
+    case NotOpen:
+      return "Storage is not open";
+    case DatabaseError:
+      return "Database error: " + db_last_error_message();
+    case ChainError:
+      return "Chain integrity error";
+    case DataIntegrityError:
+      return "Data integrity error";
+    case UserCancelled:
+      return "Operation cancalled by user";
+    case InvalidParameter:
+      return "Invalid parameter passed to method.";
+    default:
+      return "Unknown error";
   }
 }
 
-Database::Error Storage::db_last_error() const
-{
+Database::Error Storage::db_last_error() const {
   if (d->db) {
     return d->db->last_error();
   }
   return Database::NotOpen;
 }
 
-::std::string Storage::db_last_error_message() const
-{
+::std::string Storage::db_last_error_message() const {
   if (d->db) {
     return d->db->last_error_message();
   }
   return ::std::string{"Database not specified"};
 }
 
-bool Storage::open(const OpenOptions &opt, OpenCallback callback)
-{
+bool Storage::open(const OpenOptions &opt, OpenCallback callback) {
   if (!opt.db) {
     d->set_last_error(DatabaseError, "No valid database driver specified.");
     return false;
@@ -355,7 +347,7 @@ bool Storage::open(const OpenOptions &opt, OpenCallback callback)
     return false;
   }
 
-  if(!d->rescan(callback)) {
+  if (!d->rescan(callback)) {
     d->db.reset();
     return false;
   }
@@ -364,8 +356,7 @@ bool Storage::open(const OpenOptions &opt, OpenCallback callback)
   return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback)
-{
+bool Storage::open(const ::std::string &path_to_base, OpenCallback callback) {
   ::std::string path{path_to_base};
   if (path.empty()) {
     path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -379,43 +370,37 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback)
   return open(OpenOptions{db}, callback);
 }
 
-void Storage::close()
-{
+void Storage::close() {
   d->db.reset();
   d->set_last_error();
 }
 
-bool Storage::isOpen() const
-{
+bool Storage::isOpen() const {
   return ((d->db) && (d->db->is_open()));
 }
 
-PoolHash Storage::last_hash() const noexcept
-{
+PoolHash Storage::last_hash() const noexcept {
   return d->last_hash;
 }
 
-size_t Storage::size() const noexcept
-{
+size_t Storage::size() const noexcept {
   return d->count_pool;
 }
 
-bool Storage::pool_save(Pool pool)
-{
+bool Storage::pool_save(Pool pool) {
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return false;
   }
 
-  if(!pool.is_valid()) {
+  if (!pool.is_valid()) {
     d->set_last_error(InvalidParameter, "%s: Invalid pool passed", __func__);
     return false;
   }
 
   const PoolHash hash = pool.hash();
 
-  if(d->db->get(hash.to_binary()))
-  {
+  if (d->db->get(hash.to_binary())) {
     d->set_last_error(InvalidParameter, "%s: Pool already pressent [hash: %s]", __func__, hash.to_string().c_str());
     return false;
   }
@@ -428,15 +413,12 @@ bool Storage::pool_save(Pool pool)
   return true;
 }
 
-bool Storage::write_queue_search(const PoolHash& hash, Pool& res_pool) const
-{
+bool Storage::write_queue_search(const PoolHash &hash, Pool &res_pool) const {
   std::unique_lock<std::mutex> lock(d->write_lock, std::defer_lock);
 
   if (!d->write_queue.empty() && lock.try_lock()) {
-    auto pos = std::find_if(d->write_queue.begin(), d->write_queue.end(),
-      [&](Pool &pool) {
-        return hash == pool.hash();
-      });
+    auto pos =
+        std::find_if(d->write_queue.begin(), d->write_queue.end(), [&](Pool &pool) { return hash == pool.hash(); });
     if (pos != d->write_queue.cend()) {
       res_pool = *pos;
       return true;
@@ -445,8 +427,7 @@ bool Storage::write_queue_search(const PoolHash& hash, Pool& res_pool) const
   return false;
 }
 
-Pool Storage::pool_load(const PoolHash &hash) const
-{
+Pool Storage::pool_load(const PoolHash &hash) const {
   Pool empty_Pool{};
 
   if (!isOpen()) {
@@ -454,7 +435,7 @@ Pool Storage::pool_load(const PoolHash &hash) const
     return Pool{};
   }
 
-  if(hash.is_empty()) {
+  if (hash.is_empty()) {
     d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
     return Pool{};
   }
@@ -482,8 +463,7 @@ Pool Storage::pool_load(const PoolHash &hash) const
   return res;
 }
 
-Pool Storage::pool_load(const uint32_t sequence) const
-{
+Pool Storage::pool_load(const uint32_t sequence) const {
   Pool empty_Pool{};
 
   if (!isOpen()) {
@@ -508,8 +488,7 @@ Pool Storage::pool_load(const uint32_t sequence) const
   return res;
 }
 
-Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
-{
+Pool Storage::pool_load_meta(const PoolHash &hash, size_t &cnt) const {
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
@@ -543,12 +522,12 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t& cnt) const
   return res;
 }
 
-Wallet Storage::wallet(const Address &addr) const
-{
+Wallet Storage::wallet(const Address &addr) const {
   return Wallet::get(addr);
 }
 
-bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx/*output*/) const {
+bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/,
+                                  Transaction &trx /*output*/) const {
   Pool curPool;
   TransactionID::sequence_t curIdx = InnerId;
   bool is_in_blockchain = false;
@@ -594,8 +573,7 @@ bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &
   return is_in_blockchain;
 }
 
-std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit, const TransactionID &offset) const
-{
+std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit, const TransactionID &offset) const {
   std::vector<Transaction> res;
   res.reserve(limit);
 
@@ -603,11 +581,9 @@ std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit
   TransactionID::sequence_t curIdx = 0;
 
   auto seekIt = [this, &curPool, &curIdx](const TransactionID &id) -> bool {
-    if(id.is_valid())
-    {
+    if (id.is_valid()) {
       curPool = pool_load(id.pool_hash());
-      if(curPool.is_valid() && id.index() < curPool.transactions_count())
-      {
+      if (curPool.is_valid() && id.index() < curPool.transactions_count()) {
         curIdx = id.index();
         return true;
       }
@@ -616,33 +592,27 @@ std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit
   };
 
   auto nextIt = [this, &curPool, &curIdx]() -> bool {
-    if(curPool.is_valid())
-    {
-      if(curIdx)
-      {
+    if (curPool.is_valid()) {
+      if (curIdx) {
         curIdx--;
         return true;
       }
-      else
-      {
+      else {
         do {
           curPool = pool_load(curPool.previous_hash());
         } while (curPool.is_valid() && !(curPool.transactions_count()));
-        if(curPool.is_valid())
-        {
+        if (curPool.is_valid()) {
           curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
           return true;
         }
       }
     }
-    else
-    {
+    else {
       curPool = pool_load(last_hash());
       while (curPool.is_valid() && !(curPool.transactions_count())) {
         curPool = pool_load(curPool.previous_hash());
       }
-      if(curPool.is_valid())
-      {
+      if (curPool.is_valid()) {
         curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
         return true;
       }
@@ -650,23 +620,21 @@ std::vector<Transaction> Storage::transactions(const Address &addr, size_t limit
     return false;
   };
 
-  if(offset.is_valid())
-    if(!seekIt(offset))
+  if (offset.is_valid())
+    if (!seekIt(offset))
       return res;
 
-  while(res.size() < limit && nextIt())
-  {
+  while (res.size() < limit && nextIt()) {
     const Transaction t = curPool.transaction(curIdx);
-    if((t.source() == addr) || (t.target() == addr))
+    if ((t.source() == addr) || (t.target() == addr))
       res.push_back(t);
   }
 
   return res;
 }
 
-Transaction Storage::transaction(const TransactionID &id) const
-{
-  if(!id.is_valid()) {
+Transaction Storage::transaction(const TransactionID &id) const {
+  if (!id.is_valid()) {
     d->set_last_error(InvalidParameter, "%s: Transaction id is not valid", __func__);
     return Transaction{};
   }
@@ -706,4 +674,4 @@ Transaction Storage::get_last_by_target(Address target) const noexcept
   return Transaction{};
 }
 
-}
+}  // namespace csdb

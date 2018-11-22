@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <csignal>
 
-#include <solver2/SolverCore.h>
+#include <solver2/solvercore.hpp>
 
 #include <csnode/nodecore.hpp>
 #include <csnode/node.hpp>
@@ -970,20 +970,20 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable,
     const cs::Signature& signature/*,
     const cs::Notifications& notifications*/)
 {
-    last_sent_round_data.round_table.round = roundTable.round;
+    lastSentRoundData_.roundTable.round = roundTable.round;
     // no general stored!
-    last_sent_round_data.round_table.confidants.resize(roundTable.confidants.size());
-    std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(), last_sent_round_data.round_table.confidants.begin());
-    last_sent_round_data.round_table.hashes.resize(roundTable.hashes.size());
-    std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), last_sent_round_data.round_table.hashes.begin());
+    lastSentRoundData_.roundTable.confidants.resize(roundTable.confidants.size());
+    std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(), lastSentRoundData_.roundTable.confidants.begin());
+    lastSentRoundData_.roundTable.hashes.resize(roundTable.hashes.size());
+    std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), lastSentRoundData_.roundTable.hashes.begin());
     // do no store charBytes, they are not in use while send round info
     //last_sent_round_data.round_table.charBytes.mask.resize(roundTable.charBytes.mask.size());
     //std::copy(roundTable.charBytes.mask.cbegin(), roundTable.charBytes.mask.cend(), last_sent_round_data.round_table.charBytes.mask.begin());
-    last_sent_round_data.characteristic.mask.resize(characteristic.mask.size());
-    std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), last_sent_round_data.characteristic.mask.begin());
-    last_sent_round_data.pool_meta_info.sequenceNumber = poolMetaInfo.sequenceNumber;
-    last_sent_round_data.pool_meta_info.timestamp = poolMetaInfo.timestamp;
-    last_sent_round_data.pool_signature = signature;
+    lastSentRoundData_.characteristic.mask.resize(characteristic.mask.size());
+    std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), lastSentRoundData_.characteristic.mask.begin());
+    lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
+    lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
+    lastSentRoundData_.poolSignature = signature;
     //last_sent_round_data.notifications.resize(notifications.size());
     //std::copy(notifications.cbegin(), notifications.cend(), last_sent_round_data.notifications.begin());
 }
@@ -2535,12 +2535,12 @@ void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_in
 
 bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum)
 {
-    if(last_sent_round_data.round_table.round != rNum) {
+    if(lastSentRoundData_.roundTable.round != rNum) {
         cswarning() << "NODE> unable to repeat round data #" << rNum;
         return false;
     }
-    createRoundPackage(last_sent_round_data.round_table, last_sent_round_data.pool_meta_info,
-        last_sent_round_data.characteristic, last_sent_round_data.pool_signature/*, last_sent_round_data.notifications*/);
+    createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo,
+        lastSentRoundData_.characteristic, lastSentRoundData_.poolSignature/*, last_sent_round_data.notifications*/);
     flushCurrentTasks();
     cslog() << "NODE> re-send last round info #" << rNum << " to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     return true;

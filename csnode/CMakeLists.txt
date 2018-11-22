@@ -34,9 +34,9 @@ if (Boost_FOUND)
 endif ()
 
 add_library(csnode
-  include/csnode/BitHeap.hpp
+  include/csnode/bitheap.hpp
   include/csnode/blockchain.hpp
-  include/csnode/CyclicBuffer.hpp
+  include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
   include/csnode/packstream.hpp
   include/csnode/datastream.hpp
@@ -45,11 +45,11 @@ add_library(csnode
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp
-  include/csnode/TransactionsTail.h
-  include/csnode/WalletsCache.h
-  include/csnode/WalletsIds.h
-  include/csnode/WalletsPools.h
-  include/csnode/BlockHashes.h
+  include/csnode/transactionstail.hpp
+  include/csnode/walletscache.hpp
+  include/csnode/walletsids.hpp
+  include/csnode/walletspools.hpp
+  include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   src/blockchain.cpp
   src/node.cpp
@@ -58,10 +58,10 @@ add_library(csnode
   src/transactionspacket.cpp
   src/dynamicbuffer.cpp
   src/datastream.cpp
-  src/WalletsCache.cpp
-  src/WalletsIds.cpp
-  src/WalletsPools.cpp
-  src/BlockHashes.cpp
+  src/walletscache.cpp
+  src/walletsids.cpp
+  src/walletsPools.cpp
+  src/blockhashes.cpp
   src/poolsynchronizer.cpp
 )
 

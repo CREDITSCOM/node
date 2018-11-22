@@ -1,6 +1,5 @@
-
-#ifndef __STDAFX_H__
-#define __STDAFX_H__
+#ifndef STDAFX_H
+#define STDAFX_H
 
 #include <cassert>
 #include <mutex>
@@ -24,7 +23,7 @@
 
 #include <iomanip>
 #include <scope_guard.h>
-#include <solver2/SolverCore.h>
+#include <solver2/solvercore.hpp>
 #include <ContractExecutor.h>
 
-#endif //__STDAFX_H__
+#endif //STDAFX_H

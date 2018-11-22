@@ -1,210 +1,192 @@
 #ifndef METASTORAGE_HPP
 #define METASTORAGE_HPP
 
-#include <optional>
-#include <lib/system/common.hpp>
 #include <boost/circular_buffer.hpp>
+#include <lib/system/common.hpp>
+#include <optional>
 
 /// nested namespace
-namespace cs::values
-{
-    constexpr std::size_t defaultMetaStorageMaxSize = 5;
+namespace cs::values {
+constexpr std::size_t defaultMetaStorageMaxSize = 5;
 }
 
-namespace cs
-{
-    ///
-    /// @brief Class for storage meta information with
-    /// common interface and dependency of round number.
-    ///
-    template<typename T>
-    class MetaStorage
-    {
-    public:
-        ///
-        /// @brief Represents meta element with storage
-        /// of round and generated (instantiated) meta class.
-        ///
-        struct MetaElement
-        {
-            cs::RoundNumber round = 0;
-            T meta;
+namespace cs {
+///
+/// @brief Class for storage meta information with
+/// common interface and dependency of round number.
+///
+template <typename T>
+class MetaStorage {
+public:
+  ///
+  /// @brief Represents meta element with storage
+  /// of round and generated (instantiated) meta class.
+  ///
+  struct MetaElement {
+    cs::RoundNumber round = 0;
+    T meta;
 
-            MetaElement() = default;
-            MetaElement(cs::RoundNumber number, T&& value) noexcept : round(number), meta(std::move(value)) {}
-            MetaElement(cs::RoundNumber number, const T& value) noexcept : round(number), meta(value) {}
+    MetaElement() = default;
+    MetaElement(cs::RoundNumber number, T&& value) noexcept
+    : round(number)
+    , meta(std::move(value)) {
+    }
 
-            bool operator ==(const MetaElement& element) const
-            {
-                return round == element.round;
-            }
+    MetaElement(cs::RoundNumber number, const T& value) noexcept
+    : round(number)
+    , meta(value) {
+    }
 
-            bool operator !=(const MetaElement& element) const
-            {
-                return !((*this) == element);
-            }
-        };
+    bool operator==(const MetaElement& element) const {
+      return round == element.round;
+    }
 
-        /// element type
-        using Element = MetaStorage<T>::MetaElement;
+    bool operator!=(const MetaElement& element) const {
+      return !((*this) == element);
+    }
+  };
 
-        // default initialization
-        inline MetaStorage() noexcept : m_buffer(cs::values::defaultMetaStorageMaxSize) {}
+  /// element type
+  using Element = MetaStorage<T>::MetaElement;
 
-        // storage interface
+  // default initialization
+  inline MetaStorage() noexcept
+  : m_buffer(cs::values::defaultMetaStorageMaxSize) {
+  }
 
-        ///
-        /// @brief Resizes circular storage buffer.
-        ///
-        void resize(std::size_t size)
-        {
-            m_buffer.resize(size);
-        }
+  // storage interface
 
-        ///
-        /// @brief Returns current circular buffer size
-        ///
-        std::size_t size() const
-        {
-            return m_buffer.size();
-        }
+  ///
+  /// @brief Resizes circular storage buffer.
+  ///
+  void resize(std::size_t size) {
+    m_buffer.resize(size);
+  }
 
-        ///
-        /// @brief Appends meta element to buffer.
-        /// @param element Created from outside rvalue.
-        /// @return Returns true if append is success, otherwise returns false.
-        ///
-        bool append(MetaElement&& value)
-        {
-            const auto iterator = std::find(m_buffer.begin(), m_buffer.end(), value);
-            const auto result = (iterator == m_buffer.end());
+  ///
+  /// @brief Returns current circular buffer size
+  ///
+  std::size_t size() const {
+    return m_buffer.size();
+  }
 
-            if (result) {
-                m_buffer.push_back(std::move(value));
-            }
+  ///
+  /// @brief Appends meta element to buffer.
+  /// @param element Created from outside rvalue.
+  /// @return Returns true if append is success, otherwise returns false.
+  ///
+  bool append(MetaElement&& value) {
+    const auto iterator = std::find(m_buffer.begin(), m_buffer.end(), value);
+    const auto result = (iterator == m_buffer.end());
 
-            return result;
-        }
+    if (result) {
+      m_buffer.push_back(std::move(value));
+    }
 
-        ///
-        /// @brief Appends meta element to buffer.
-        /// @return Returns true if append is success, otherwise returns false.
-        ///
-        bool append(const MetaElement& value)
-        {
-            MetaElement element = {
-                value.round,
-                value.meta
-            };
+    return result;
+  }
 
-            return append(std::move(element));
-        }
+  ///
+  /// @brief Appends meta element to buffer.
+  /// @return Returns true if append is success, otherwise returns false.
+  ///
+  bool append(const MetaElement& value) {
+    MetaElement element = {value.round, value.meta};
 
-        ///
-        /// @brief Appends value with round key.
-        /// @param round Current round to add as a key.
-        /// @param value Movable value created from outside.
-        /// @return Returns true if append is success, otherwise returns false.
-        ///
-        bool append(RoundNumber round, T&& value)
-        {
-            MetaElement element = {
-                round,
-                std::move(value)
-            };
+    return append(std::move(element));
+  }
 
-            return append(std::move(element));
-        }
+  ///
+  /// @brief Appends value with round key.
+  /// @param round Current round to add as a key.
+  /// @param value Movable value created from outside.
+  /// @return Returns true if append is success, otherwise returns false.
+  ///
+  bool append(RoundNumber round, T&& value) {
+    MetaElement element = {round, std::move(value)};
 
-        ///
-        /// @brief Returns contains meta storage this round or not.
-        ///
-        bool contains(RoundNumber round)
-        {
-            const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
-                return value.round == round;
-            });
+    return append(std::move(element));
+  }
 
-            return iterator != m_buffer.end();
-        }
+  ///
+  /// @brief Returns contains meta storage this round or not.
+  ///
+  bool contains(RoundNumber round) {
+    const auto iterator =
+        std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return value.round == round; });
 
-        ///
-        /// @brief Returns copy of meta element if this round exists at storage, otherwise returns nothing.
-        /// @param round Round number to get element from storage.
-        /// @return Returns optional parameter with T type.
-        ///
-        std::optional<T> value(RoundNumber round) const
-        {
-            const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
-                return value.round == round;
-            });
+    return iterator != m_buffer.end();
+  }
 
-            if (iterator != m_buffer.end()) {
-                return std::make_optional<T>(iterator->meta);
-            }
+  ///
+  /// @brief Returns copy of meta element if this round exists at storage, otherwise returns nothing.
+  /// @param round Round number to get element from storage.
+  /// @return Returns optional parameter with T type.
+  ///
+  std::optional<T> value(RoundNumber round) const {
+    const auto iterator =
+        std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return value.round == round; });
 
-            return std::nullopt;
-        }
+    if (iterator != m_buffer.end()) {
+      return std::make_optional<T>(iterator->meta);
+    }
 
-        ///
-        /// @brief Returns and removes meta element if it's exists at round parameter.
-        /// @param round Round number to get element from storage.
-        /// @return Returns meta element of storage if found, otherwise returns nothing.
-        ///.
-        std::optional<T> extract(RoundNumber round)
-        {
-            const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
-                return value.round == round;
-            });
+    return std::nullopt;
+  }
 
-            if (iterator == m_buffer.end()) {
-                return std::nullopt;
-            }
+  ///
+  /// @brief Returns and removes meta element if it's exists at round parameter.
+  /// @param round Round number to get element from storage.
+  /// @return Returns meta element of storage if found, otherwise returns nothing.
+  ///.
+  std::optional<T> extract(RoundNumber round) {
+    const auto iterator =
+        std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return value.round == round; });
 
-            MetaElement result = std::move(*iterator);
-            m_buffer.erase(iterator);
+    if (iterator == m_buffer.end()) {
+      return std::nullopt;
+    }
 
-            return std::make_optional<T>(std::move(result.meta));
-        }
+    MetaElement result = std::move(*iterator);
+    m_buffer.erase(iterator);
 
-        ///
-        /// @brief Returns pointer to existing element, otherwise returns nullptr.
-        /// @param round Round of searching element.
-        /// @return Reference to element.
-        /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
-        ///
-        T* get(RoundNumber round)
-        {
-            const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
-                return round == value.round;
-            });
+    return std::make_optional<T>(std::move(result.meta));
+  }
 
-            if (iterator == m_buffer.end()) {
-                return nullptr;
-            }
+  ///
+  /// @brief Returns pointer to existing element, otherwise returns nullptr.
+  /// @param round Round of searching element.
+  /// @return Reference to element.
+  /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
+  ///
+  T* get(RoundNumber round) {
+    const auto iterator =
+        std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return round == value.round; });
 
-            return &(iterator->meta);
-        }
+    if (iterator == m_buffer.end()) {
+      return nullptr;
+    }
 
-        ///
-        /// @brief Returns const begin interator of circular buffer.
-        ///
-        auto begin() const
-        {
-            return m_buffer.begin();
-        }
+    return &(iterator->meta);
+  }
 
-        ///
-        /// @brief Returns const end interator of circular buffer.
-        ///
-        auto end() const
-        {
-            return m_buffer.end();
-        }
+  ///
+  /// @brief Returns const begin interator of circular buffer.
+  ///
+  auto begin() const {
+    return m_buffer.begin();
+  }
 
-    private:
-        boost::circular_buffer<MetaElement> m_buffer;
-    };
-}
+  ///
+  /// @brief Returns const end interator of circular buffer.
+  ///
+  auto end() const {
+    return m_buffer.end();
+  }
+
+private:
+  boost::circular_buffer<MetaElement> m_buffer;
+};
+}  // namespace cs
 
 #endif  // METASTORAGE_HPP

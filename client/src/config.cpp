@@ -1,8 +1,8 @@
 /* Send blaming letters to @yrtimd */
 #include <iostream>
-#include <string>
 #include <regex>
 #include <stdexcept>
+#include <string>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -12,8 +12,8 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
-#include <lib/system/logger.hpp>
 #include <base58.h>
+#include <lib/system/logger.hpp>
 #include "config.hpp"
 
 const std::string BLOCK_NAME_PARAMS = "params";
@@ -32,8 +32,9 @@ const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
-const std::map<std::string, NodeType> NODE_TYPES_MAP = { { "client", NodeType::Client }, { "router", NodeType::Router } };
-const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = { { "signal_server", BootstrapType::SignalServer }, { "list", BootstrapType::IpList } };
+const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
+const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
+                                                                  {"list", BootstrapType::IpList}};
 
 static EndpointData readEndpoint(const boost::property_tree::ptree& config, const std::string& propName) {
   const boost::property_tree::ptree& epTree = config.get_child(propName);
@@ -81,17 +82,11 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
 }
 
 Config Config::read(po::variables_map& vm) {
-  Config result = readFromFile(vm.count("config-file") ?
-                               vm["config-file"].as<std::string>() :
-                               DEFAULT_PATH_TO_CONFIG);
+  Config result = readFromFile(vm.count("config-file") ? vm["config-file"].as<std::string>() : DEFAULT_PATH_TO_CONFIG);
 
-  result.pathToDb_ = vm.count("db-path") ?
-    vm["db-path"].as<std::string>() :
-    DEFAULT_PATH_TO_DB;
+  result.pathToDb_ = vm.count("db-path") ? vm["db-path"].as<std::string>() : DEFAULT_PATH_TO_DB;
 
-  const auto keyFile = vm.count("key-file") ?
-    vm["key-file"].as<std::string>() :
-    DEFAULT_PATH_TO_PUBLIC_KEY;
+  const auto keyFile = vm.count("key-file") ? vm["key-file"].as<std::string>() : DEFAULT_PATH_TO_PUBLIC_KEY;
   std::ifstream pub(keyFile);
 
   if (pub.is_open()) {
@@ -135,51 +130,41 @@ Config Config::readFromFile(const std::string& fileName) {
       boost::property_tree::read_ini(fileName, config);
     }
 
-    result.inputEp_ = readEndpoint(config,
-                                   BLOCK_NAME_HOST_INPUT);
+    result.inputEp_ = readEndpoint(config, BLOCK_NAME_HOST_INPUT);
 
     if (config.count(BLOCK_NAME_HOST_OUTPUT)) {
-      result.outputEp_ = readEndpoint(config,
-                                      BLOCK_NAME_HOST_OUTPUT);
+      result.outputEp_ = readEndpoint(config, BLOCK_NAME_HOST_OUTPUT);
 
-      result.twoSockets_ = true;/*(result.outputEp_.ip != result.inputEp_.ip ||
-                                  result.outputEp_.port != result.inputEp_.port);*/
+      result.twoSockets_ = true; /*(result.outputEp_.ip != result.inputEp_.ip ||
+                                   result.outputEp_.port != result.inputEp_.port);*/
     }
     else
       result.twoSockets_ = false;
 
-    const boost::property_tree::ptree& params =
-      config.get_child(BLOCK_NAME_PARAMS);
+    const boost::property_tree::ptree& params = config.get_child(BLOCK_NAME_PARAMS);
 
-    result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) &&
-                     params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
+    result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
-    result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ?
-      params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) :
-      DEFAULT_MAX_NEIGHBOURS;
+    result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS)
+                                                                    : DEFAULT_MAX_NEIGHBOURS;
 
-    result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ?
-      params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) :
-      DEFAULT_CONNECTION_BANDWIDTH;
+    result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH)
+                                      ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH)
+                                      : DEFAULT_CONNECTION_BANDWIDTH;
 
-    result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE),
-                               NODE_TYPES_MAP);
+    result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
     if (config.count(BLOCK_NAME_HOST_ADDRESS)) {
-      result.hostAddressEp_ = readEndpoint(config,
-                                           BLOCK_NAME_HOST_ADDRESS);
+      result.hostAddressEp_ = readEndpoint(config, BLOCK_NAME_HOST_ADDRESS);
       result.symmetric_ = false;
     }
     else
       result.symmetric_ = true;
 
-    result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE),
-                               BOOTSTRAP_TYPES_MAP);
+    result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE), BOOTSTRAP_TYPES_MAP);
 
-    if (result.bType_ == BootstrapType::SignalServer ||
-        result.nType_ == NodeType::Router)
-      result.signalServerEp_ = readEndpoint(config,
-                                            BLOCK_NAME_SIGNAL_SERVER);
+    if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router)
+      result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
     if (result.bType_ == BootstrapType::IpList) {
       const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
@@ -235,11 +220,11 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   }
   auto sinks = config.get_child_optional("Sinks");
   if (sinks) {
-    for (const auto& val: *sinks) {
+    for (const auto& val : *sinks) {
       settings.add_child(boost::property_tree::ptree::path_type("Sinks." + val.first, '/'), val.second);
     }
   }
-  for (const auto& item: config) {
+  for (const auto& item : config) {
     if (item.first.find("Sinks.") == 0)
       settings.add_child(boost::property_tree::ptree::path_type(item.first, '/'), item.second);
   }

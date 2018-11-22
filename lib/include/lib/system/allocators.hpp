@@ -1,6 +1,6 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __ALLOCATORS_HPP__
-#define __ALLOCATORS_HPP__
+#ifndef ALLOCATORS_HPP
+#define ALLOCATORS_HPP
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -24,22 +24,32 @@ public:
   typedef typename MemRegion::Type* PtrType;
   typedef const typename MemRegion::Type* ConstPtrType;
 
-  MemPtr() { }
-  ~MemPtr() { if (ptr_) ptr_->unuse(); }
-
-  MemPtr(const MemPtr& rhs): ptr_(rhs.ptr_) {
-    if (ptr_) ptr_->use();
+  MemPtr() {
   }
 
-  MemPtr(MemPtr&& rhs): ptr_(rhs.ptr_) {
+  ~MemPtr() {
+    if (ptr_)
+      ptr_->unuse();
+  }
+
+  MemPtr(const MemPtr& rhs)
+  : ptr_(rhs.ptr_) {
+    if (ptr_)
+      ptr_->use();
+  }
+
+  MemPtr(MemPtr&& rhs)
+  : ptr_(rhs.ptr_) {
     rhs.ptr_ = nullptr;
   }
 
   MemPtr& operator=(const MemPtr& rhs) {
     if (ptr_ != rhs.ptr_) {
-      if (ptr_) ptr_->unuse();
+      if (ptr_)
+        ptr_->unuse();
       ptr_ = rhs.ptr_;
-      if (ptr_) ptr_->use();
+      if (ptr_)
+        ptr_->use();
     }
 
     return *this;
@@ -47,7 +57,8 @@ public:
 
   MemPtr& operator=(MemPtr&& rhs) {
     if (ptr_ != rhs.ptr_) {
-      if (ptr_) ptr_->unuse();
+      if (ptr_)
+        ptr_->unuse();
       ptr_ = rhs.ptr_;
       rhs.ptr_ = nullptr;
     }
@@ -59,24 +70,41 @@ public:
     return *this;
   }
 
-  PtrType get() { return ptr_->get(); }
-  ConstPtrType get() const { return ptr_->get(); }
+  PtrType get() {
+    return ptr_->get();
+  }
+  ConstPtrType get() const {
+    return ptr_->get();
+  }
 
-  PtrType operator*() { return get(); }
-  ConstPtrType operator*() const { return get(); }
+  PtrType operator*() {
+    return get();
+  }
+  ConstPtrType operator*() const {
+    return get();
+  }
 
-  PtrType operator->() { return get(); }
-  ConstPtrType operator->() const { return get(); }
+  PtrType operator->() {
+    return get();
+  }
+  ConstPtrType operator->() const {
+    return get();
+  }
 
-  size_t size() const { return ptr_->size(); }
-  operator bool() const { return ptr_; }
+  size_t size() const {
+    return ptr_->size();
+  }
+  operator bool() const {
+    return ptr_;
+  }
 
   bool operator!=(const MemPtr& rhs) const {
     return ptr_ != rhs.ptr_;
   }
 
 private:
-  MemPtr(MemRegion* region): ptr_(region) {
+  MemPtr(MemRegion* region)
+  : ptr_(region) {
     ptr_->use();
   }
 
@@ -94,15 +122,17 @@ class RegionAllocator;
 struct RegionPage {
   RegionAllocator* allocator;
 
-  __cacheline_aligned std::atomic<RegionPage*> next = { nullptr };
-  __cacheline_aligned std::atomic<uint32_t> usedSize = { 0 };
+  __cacheline_aligned std::atomic<RegionPage*> next = {nullptr};
+  __cacheline_aligned std::atomic<uint32_t> usedSize = {0};
 
   uint8_t* regions;
 
   uint8_t* usedEnd;
   uint32_t sizeLeft;
 
-  ~RegionPage() { delete[] regions; }
+  ~RegionPage() {
+    delete[] regions;
+  }
 };
 
 class Region {
@@ -116,24 +146,30 @@ public:
 
   inline void unuse();
 
-  void* get() { return data_; }
-  const void* get() const { return data_; }
+  void* get() {
+    return data_;
+  }
+  const void* get() const {
+    return data_;
+  }
 
-  uint32_t size() const { return size_; }
+  uint32_t size() const {
+    return size_;
+  }
 
 private:
-  Region(RegionPage* page,
-         void* data,
-         const uint32_t size): page_(page),
-                               data_(data),
-                               size_(size) { }
+  Region(RegionPage* page, void* data, const uint32_t size)
+  : page_(page)
+  , data_(data)
+  , size_(size) {
+  }
 
   Region(const Region&) = delete;
   Region(Region&&) = delete;
   Region& operator=(const Region&) = delete;
   Region& operator=(Region&&) = delete;
 
-  __cacheline_aligned std::atomic<uint32_t> users_ = { 0 };
+  __cacheline_aligned std::atomic<uint32_t> users_ = {0};
   RegionPage* page_;
 
   void* data_;
@@ -154,7 +190,8 @@ class RegionAllocator {
 public:
   const uint32_t PageSize;
 
-  RegionAllocator(const uint32_t _pageSize, const uint32_t _initPages = 10): PageSize(_pageSize) {
+  RegionAllocator(const uint32_t _pageSize, const uint32_t _initPages = 10)
+  : PageSize(_pageSize) {
     activePage_ = allocatePage();
     auto lastPage = activePage_;
 
@@ -196,9 +233,7 @@ public:
     }
 
     // So there is enough left
-    lastReg_ = new(activePage_->usedEnd) Region(activePage_,
-                                                activePage_->usedEnd + sizeof(Region),
-                                                size);
+    lastReg_ = new (activePage_->usedEnd) Region(activePage_, activePage_->usedEnd + sizeof(Region), size);
     activePage_->usedEnd += regSize;
     activePage_->sizeLeft -= regSize;
 
@@ -223,7 +258,9 @@ public:
   }
 
 #ifdef TESTING
-  uint32_t getPagesNum() const { return pagesNum_; }
+  uint32_t getPagesNum() const {
+    return pagesNum_;
+  }
 #endif
 
 private:
@@ -237,7 +274,8 @@ private:
     if (page->usedSize.fetch_sub(toSub, std::memory_order_relaxed) == toSub) {
       // Since it was us who freed up all the memory, we're the only
       // ones accessing *page...
-      if (activePage_ == page) return;
+      if (activePage_ == page)
+        return;
       // ... as long as it's not active, of course
       insertAfterActive(page);
     }
@@ -260,11 +298,8 @@ private:
     auto actNext = activePage_->next.load(std::memory_order_acquire);
     do {
       page->next.store(actNext, std::memory_order_relaxed);
-    }
-    while (!activePage_->next.compare_exchange_strong(actNext,
-                                                      page,
-                                                      std::memory_order_acquire,
-                                                      std::memory_order_relaxed));
+    } while (!activePage_->next.compare_exchange_strong(actNext, page, std::memory_order_acquire,
+                                                        std::memory_order_relaxed));
   }
 
   RegionPage* activePage_;
@@ -286,8 +321,8 @@ inline void Region::unuse() {
 /* By the way, we're gonna need this soon enough */
 struct SpinLock {
 public:
-  SpinLock(std::atomic_flag& flag):
-    flag_(flag) {
+  SpinLock(std::atomic_flag& flag)
+  : flag_(flag) {
     uint32_t cnt = 0;
     while (flag_.test_and_set(std::memory_order_acquire)) {
       if (++cnt == 10) {
@@ -318,8 +353,10 @@ public:
   using Type = T;
 
   template <typename... Args>
-  TypedSlot(Allocator* allocator, Args&&... args): allocator_(allocator),
-      element_(std::forward<Args>(args)...) { }
+  TypedSlot(Allocator* allocator, Args&&... args)
+  : allocator_(allocator)
+  , element_(std::forward<Args>(args)...) {
+  }
 
   void use() {
     users_.fetch_add(1, std::memory_order_relaxed);
@@ -327,13 +364,19 @@ public:
 
   inline void unuse();
 
-  T* get() { return &element_; }
-  const T* get() const { return &element_; }
+  T* get() {
+    return &element_;
+  }
+  const T* get() const {
+    return &element_;
+  }
 
-  uint32_t size() const { return sizeof(T); }
+  uint32_t size() const {
+    return sizeof(T);
+  }
 
 private:
-  std::atomic<uint32_t> users_ = { 0 };
+  std::atomic<uint32_t> users_ = {0};
   T element_;
 
   Allocator* allocator_;
@@ -347,7 +390,8 @@ public:
   using PtrType = MemPtr<TypedSlot<T>>;
   using IntType = TypedSlot<T>;
 
-  TypedAllocator(const uint32_t _pageSize): PageSize(_pageSize) {
+  TypedAllocator(const uint32_t _pageSize)
+  : PageSize(_pageSize) {
     allocateNextPage();
   }
 
@@ -359,18 +403,15 @@ public:
         SpinLock l(allocFlag_);
 
         place = freeChunksLast_.load(std::memory_order_relaxed);
-        if (place) continue;
+        if (place)
+          continue;
 
         place = allocateNextPage();
       }
-    }
-    while (!freeChunksLast_.
-           compare_exchange_strong(place,
-                                   (place == freeChunks_ ? nullptr : (place - 1)),
-                                   std::memory_order_release,
-                                   std::memory_order_relaxed));
+    } while (!freeChunksLast_.compare_exchange_strong(place, (place == freeChunks_ ? nullptr : (place - 1)),
+                                                      std::memory_order_release, std::memory_order_relaxed));
 
-    return new(*place) IntType(this, std::forward<Args>(args)...);
+    return new (*place) IntType(this, std::forward<Args>(args)...);
   }
 
   void remove(IntType* toFree) {
@@ -383,12 +424,8 @@ public:
       do {
         nextPlace = place ? place + 1 : freeChunks_;
         *nextPlace = toFree;
-      }
-      while (!freeChunksLast_.
-             compare_exchange_strong(place,
-                                     nextPlace,
-                                     std::memory_order_release,
-                                     std::memory_order_relaxed));
+      } while (!freeChunksLast_.compare_exchange_strong(place, nextPlace, std::memory_order_release,
+                                                        std::memory_order_relaxed));
     }
   }
 
@@ -430,4 +467,4 @@ inline void TypedSlot<T>::unuse() {
   }
 }
 
-#endif  //__ALLOCATORS_HPP__
+#endif  // ALLOCATORS_HPP

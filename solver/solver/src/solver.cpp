@@ -4,20 +4,20 @@
 #include <algorithm>
 #include <boost/dynamic_bitset.hpp>
 
+#include <cassert>
 #include <chrono>
 #include <fstream>
 #include <iostream>
 #include <random>
 #include <sstream>
-#include <cassert>
 
 #include <csdb/address.h>
 #include <csdb/currency.h>
 #include <csdb/wallet.h>
 
-#include <csnode/node.hpp>
-#include <csnode/conveyer.hpp>
 #include <sys/timeb.h>
+#include <csnode/conveyer.hpp>
+#include <csnode/node.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -42,8 +42,8 @@ Solver::Solver(Node* node, csdb::Address _genesisAddress, csdb::Address _startAd
 , m_startAddress(_startAddress)
 , m_feeCounter()
 , m_writerIndex(0) {
-  m_receivedVectorFrom.reserve(cs::hashVectorCount); // TODO Maybe = 100. Is max trusted count
-  m_receivedMatrixFrom.reserve(cs::hashVectorCount); // TODO Maybe = 100. Is max trusted count
+  m_receivedVectorFrom.reserve(cs::hashVectorCount);  // TODO Maybe = 100. Is max trusted count
+  m_receivedMatrixFrom.reserve(cs::hashVectorCount);  // TODO Maybe = 100. Is max trusted count
 }
 
 Solver::~Solver() {
@@ -91,8 +91,9 @@ void Solver::gotTransaction(csdb::Transaction&& transaction) {  // reviewer: "Ne
   }
 
   if (transaction.is_valid()) {
-      m_vPool.add_transaction(transaction);
-  } else {
+    m_vPool.add_transaction(transaction);
+  }
+  else {
     csdebug() << "Invalid transaction received";
   }
 }
@@ -212,7 +213,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     LOG_WARN("Writer nodes don't get blocks");
     return;
   }
-  m_gotBigBang        = false;
+  m_gotBigBang = false;
   m_gotBlockThisRound = true;
 #ifdef MONITOR_NODE
   addTimestampToPool(block);
@@ -269,14 +270,15 @@ void Solver::rndStorageProcessing() {
     if (m_randomStorage.count(newSeq) > 0) {
       m_node->getBlockChain().onBlockReceived(m_randomStorage.at(newSeq));
       m_randomStorage.erase(newSeq);
-    } else
+    }
+    else
       loop = false;
   }
 }
 
 void Solver::tmpStorageProcessing() {
   cslog() << __func__;
-  bool   loop = true;
+  bool loop = true;
   size_t newSeq;
 
   while (loop) {
@@ -285,7 +287,8 @@ void Solver::tmpStorageProcessing() {
     if (m_temporaryStorage.count(newSeq) > 0) {
       m_node->getBlockChain().onBlockReceived(m_temporaryStorage.at(newSeq));
       m_temporaryStorage.erase(newSeq);
-    } else
+    }
+    else
       loop = false;
   }
 }
@@ -305,14 +308,14 @@ void Solver::gotBadBlockHandler(csdb::Pool&& _pool, const PublicKey& sender) {
 }
 
 // restored from cs_dev:
-uint32_t Solver::getNextMissingBlock(const uint32_t fromSeq)
-{
-    for(uint32_t b = fromSeq + 1; b < m_node->getRoundNumber(); ++b) {
-        if(m_temporaryStorage.count(b) || m_randomStorage.count(b)) continue;
-        return b;
-    }
+uint32_t Solver::getNextMissingBlock(const uint32_t fromSeq) {
+  for (uint32_t b = fromSeq + 1; b < m_node->getRoundNumber(); ++b) {
+    if (m_temporaryStorage.count(b) || m_randomStorage.count(b))
+      continue;
+    return b;
+  }
 
-    return 0;
+  return 0;
 }
 
 void Solver::gotBlockCandidate(csdb::Pool&& block) {
@@ -359,7 +362,7 @@ void Solver::gotHash(csdb::PoolHash&& hash, const PublicKey& sender) {
   }
 
   csdebug() << "Got " << m_hashesReceivedKeys.size() << " of " << min_nodes << " nodes to start new round";
-  
+
   if ((m_hashesReceivedKeys.size() == min_nodes) && (!m_roundTableSent)) {
     cslog() << "Solver -> sending NEW ROUND table";
 
@@ -426,7 +429,7 @@ void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
   if (pool.is_valid()) {
     auto prev_hash = csdb::PoolHash::from_string("");
     pool.set_previous_hash(prev_hash);
-//    m_node->sendBlockReply(pool, nodeId);
+    //    m_node->sendBlockReply(pool, nodeId);
   }
 }
 
@@ -482,8 +485,7 @@ void Solver::addTimestampToPool(csdb::Pool& pool) {
   pool.add_user_field(0, std::to_string(count));
 }
 
-bool Solver::checkTransactionSignature(const csdb::Transaction& transaction)
-{
+bool Solver::checkTransactionSignature(const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
 
   if (transaction.source().is_wallet_id()) {

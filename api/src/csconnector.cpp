@@ -1,9 +1,9 @@
 #include "stdafx.h"
 
-#include "csconnector/csconnector.h"
 #include <csdb/currency.h>
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
+#include "csconnector/csconnector.hpp"
 
 namespace csconnector {
 
@@ -14,23 +14,17 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-connector::connector(BlockChain& m_blockchain,
-                     slv2::SolverCore* solver,
-                     const Config& config)
-  : api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
-  , api_processor(api_handler)
-  , p_api_processor_factory(new api::SequentialProcessorFactory(api_processor))
+connector::connector(BlockChain& m_blockchain, slv2::SolverCore* solver, const Config& config)
+: api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
+, api_processor(api_handler)
+, p_api_processor_factory(new api::SequentialProcessorFactory(api_processor))
 #ifdef BINARY_TCP_API
-  , server(p_api_processor_factory,
-           make_shared<TServerSocket>(config.port),
-           make_shared<TBufferedTransportFactory>(),
-           make_shared<TBinaryProtocolFactory>())
+, server(p_api_processor_factory, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
+         make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-  , ajax_server(p_api_processor_factory,
-                make_shared<TServerSocket>(config.ajax_port),
-                make_shared<THttpServerTransportFactory>(),
-                make_shared<TJSONProtocolFactory>())
+, ajax_server(p_api_processor_factory, make_shared<TServerSocket>(config.ajax_port),
+              make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 {
 #ifdef BINARY_TCP_API
@@ -38,7 +32,8 @@ connector::connector(BlockChain& m_blockchain,
     try {
       // TRACE("csconnector started on port " << config.port);
       server.run();
-    } catch (...) {
+    }
+    catch (...) {
       std::cerr << "Oh no! I'm dead :'-(" << std::endl;
     }
   });
@@ -49,16 +44,15 @@ connector::connector(BlockChain& m_blockchain,
     try {
       //  TRACE("csconnector for AJAX started on port " << config.ajax_port);
       ajax_server.run();
-    } catch (...) {
+    }
+    catch (...) {
       std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
     }
   });
 #endif
 }
 
-connector::~connector()
-{
-
+connector::~connector() {
 #ifdef BINARY_TCP_API
   server.stop();
   if (thread.joinable()) {
@@ -72,7 +66,5 @@ connector::~connector()
     ajax_thread.join();
   }
 #endif
-
-  // TRACE("csconnector stopped");
 }
-}
+}  // namespace csconnector

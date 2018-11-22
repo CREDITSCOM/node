@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #ifndef PACKSTREAM_HPP
 #define PACKSTREAM_HPP
 
@@ -93,8 +92,8 @@ public:
     return *this;
   }
 
-  template<typename T, typename A>
-  IPackStream& operator>>(std::vector<T,A>& vector) {
+  template <typename T, typename A>
+  IPackStream& operator>>(std::vector<T, A>& vector) {
     std::size_t size;
     (*this) >> size;
 
@@ -133,15 +132,14 @@ public:
     return ptr_;
   }
 
-  const cs::Byte* getEndPtr() const
-  {
-      return end_;
+  const cs::Byte* getEndPtr() const {
+    return end_;
   }
 
-  size_t remainsBytes() const
-  {
-      return end_ - ptr_;
+  size_t remainsBytes() const {
+    return end_ - ptr_;
   }
+
 private:
   const cs::Byte* ptr_ = nullptr;
   const cs::Byte* end_ = nullptr;
@@ -152,7 +150,7 @@ class OPackStream {
 public:
   OPackStream(RegionAllocator* allocator, const cs::PublicKey& nodeIdKey)
   : allocator_(allocator)
-  , packets_(new Packet [Packet::MaxFragments]())
+  , packets_(new Packet[Packet::MaxFragments]())
   , packetsEnd_(packets_)
   , senderKey_(nodeIdKey) {
   }
@@ -225,8 +223,8 @@ public:
     return *this;
   }
 
-  template<typename T, typename A>
-  cs::OPackStream& operator<<(const std::vector<T,A> & vector) {
+  template <typename T, typename A>
+  cs::OPackStream& operator<<(const std::vector<T, A>& vector) {
     (*this) << vector.size();
 
     for (const auto& element : vector) {
@@ -278,7 +276,8 @@ private:
     end_ = ptr_ + packetsEnd_->size();
 
     if (packetsEnd_ != packets_) {
-      std::copy(static_cast<cs::Byte*>(packets_->data()), static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
+      std::copy(static_cast<cs::Byte*>(packets_->data()),
+                static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
       *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) +
                                    static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
 
@@ -348,8 +347,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
 }
 
 template <>
-inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool)
-{
+inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool) {
   cs::Bytes bytes;
   (*this) >> bytes;
   pool = csdb::Pool::from_binary(bytes);
@@ -523,5 +521,4 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) 
   return *this;
 }
 
-
-#endif  // __PACKSTREAM_HPP__
+#endif  // PACKSTREAM_HPP

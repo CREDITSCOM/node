@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.11)
 
-# Конечно, лучше помещать сгенерённые файлы не в ${CMAKE_CURRENT_SOURCE_DIR}, а в
-# ${CMAKE_CURRENT_BINARY_DIR}. Но если уже в ${CMAKE_CURRENT_SOURCE_DIR}, надо каталог
-# добавить в .gitignore
+# РљРѕРЅРµС‡РЅРѕ, Р»СѓС‡С€Рµ РїРѕРјРµС‰Р°С‚СЊ СЃРіРµРЅРµСЂС‘РЅРЅС‹Рµ С„Р°Р№Р»С‹ РЅРµ РІ ${CMAKE_CURRENT_SOURCE_DIR}, Р° РІ
+# ${CMAKE_CURRENT_BINARY_DIR}. РќРѕ РµСЃР»Рё СѓР¶Рµ РІ ${CMAKE_CURRENT_SOURCE_DIR}, РЅР°РґРѕ РєР°С‚Р°Р»РѕРі
+# РґРѕР±Р°РІРёС‚СЊ РІ .gitignore
 set(THRIFT_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-# Список файлов лучше задать заранее. На этапе генерайии thirft compiler ещё
-# банально может не быть собран. При изменении thrift-файла список надо будет
-# обновить вручную.
+# РЎРїРёСЃРѕРє С„Р°Р№Р»РѕРІ Р»СѓС‡С€Рµ Р·Р°РґР°С‚СЊ Р·Р°СЂР°РЅРµРµ. РќР° СЌС‚Р°РїРµ РіРµРЅРµСЂР°Р№РёРё thirft compiler РµС‰С‘
+# Р±Р°РЅР°Р»СЊРЅРѕ РјРѕР¶РµС‚ РЅРµ Р±С‹С‚СЊ СЃРѕР±СЂР°РЅ. РџСЂРё РёР·РјРµРЅРµРЅРёРё thrift-С„Р°Р№Р»Р° СЃРїРёСЃРѕРє РЅР°РґРѕ Р±СѓРґРµС‚
+# РѕР±РЅРѕРІРёС‚СЊ РІСЂСѓС‡РЅСѓСЋ.
 set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/general_constants.cpp
   ${THRIFT_GEN_DIR}/general_types.cpp
@@ -15,8 +15,8 @@ set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/general_types.h
   )
 
-# Вызов thrift compiler лучше добавлять в фазу сборки - иначе
-# в случае изменения thrift-файла он не будет перекомпилирован.
+# Р’С‹Р·РѕРІ thrift compiler Р»СѓС‡С€Рµ РґРѕР±Р°РІР»СЏС‚СЊ РІ С„Р°Р·Сѓ СЃР±РѕСЂРєРё - РёРЅР°С‡Рµ
+# РІ СЃР»СѓС‡Р°Рµ РёР·РјРµРЅРµРЅРёСЏ thrift-С„Р°Р№Р»Р° РѕРЅ РЅРµ Р±СѓРґРµС‚ РїРµСЂРµРєРѕРјРїРёР»РёСЂРѕРІР°РЅ.
 add_custom_command(
   OUTPUT ${THRIFT_GENERATED_FILES}
   COMMAND thrift-compiler -r -gen cpp:no_skeleton,pure_enums,moveable_types

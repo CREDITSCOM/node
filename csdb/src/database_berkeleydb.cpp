@@ -1,7 +1,7 @@
-#include <cstdlib>
-#include <cassert>
-#include <exception>
 #include <db_cxx.h>
+#include <cassert>
+#include <cstdlib>
+#include <exception>
 
 #include <boost/filesystem.hpp>
 
@@ -13,41 +13,35 @@
 namespace csdb {
 
 namespace {
-template<typename T>
-struct Dbt_copy: public Dbt
-{
-  Dbt_copy(const T &t) :
-    t_copy(t)
-  {
+template <typename T>
+struct Dbt_copy : public Dbt {
+  Dbt_copy(const T &t)
+  : t_copy(t) {
     init();
   }
 
-  Dbt_copy()
-  {
+  Dbt_copy() {
     init();
   }
 
-  void init()
-  {
+  void init() {
     set_data(&t_copy);
     set_size(sizeof(T));
     set_ulen(sizeof(T));
     set_flags(DB_DBT_USERMEM);
   }
 
-  operator T()
-  {
+  operator T() {
     return t_copy;
   }
+
 private:
   T t_copy;
 };
 
-template<>
-struct Dbt_copy<::csdb::internal::byte_array>: public Dbt
-{
-  Dbt_copy(const ::csdb::internal::byte_array &data)
-  {
+template <>
+struct Dbt_copy<::csdb::internal::byte_array> : public Dbt {
+  Dbt_copy(const ::csdb::internal::byte_array &data) {
     set_data(const_cast<unsigned char *>(data.data()));
     set_size(data.size());
     set_ulen(data.size());
@@ -55,32 +49,27 @@ struct Dbt_copy<::csdb::internal::byte_array>: public Dbt
   }
 };
 
-struct Dbt_safe : public Dbt
-{
-  Dbt_safe()
-  {
+struct Dbt_safe : public Dbt {
+  Dbt_safe() {
     set_data(NULL);
     set_flags(DB_DBT_MALLOC);
   }
-  ~Dbt_safe()
-  {
-    void* buf = get_data();
+  ~Dbt_safe() {
+    void *buf = get_data();
     if (buf != NULL) {
       free(buf);
     }
   }
 };
-} // namespace
+}  // namespace
 
-DatabaseBerkeleyDB::DatabaseBerkeleyDB() :
-  env_(static_cast<uint32_t>(0)),
-  db_blocks_(nullptr),
-  db_seq_no_(nullptr)
-{
+DatabaseBerkeleyDB::DatabaseBerkeleyDB()
+: env_(static_cast<uint32_t>(0))
+, db_blocks_(nullptr)
+, db_seq_no_(nullptr) {
 }
 
-DatabaseBerkeleyDB::~DatabaseBerkeleyDB()
-{
+DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
   std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
   db_blocks_->close(0);
   std::cout << "DB db_blocks_ was closed.\n" << std::flush;
@@ -89,28 +78,29 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB()
   std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
 }
 
-void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status)
-{
+void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
   Error err = UnknownError;
   if (!status) {
     err = NoError;
-  } else if (status == ENOENT) {
+  }
+  else if (status == ENOENT) {
     err = NotFound;
   }
   if (NoError == err) {
     set_last_error(err);
-  } else {
+  }
+  else {
     set_last_error(err, "LevelDB error: %d", status);
   }
 }
 
-bool DatabaseBerkeleyDB::open(const std::string& path)
-{
+bool DatabaseBerkeleyDB::open(const std::string &path) {
   boost::filesystem::path direc(path);
   if (boost::filesystem::exists(direc)) {
     if (!boost::filesystem::is_directory(direc))
       return false;
-  } else {
+  }
+  else {
     if (!boost::filesystem::create_directories(direc))
       return false;
   }
@@ -119,24 +109,21 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
   db_seq_no_.reset(nullptr);
 
   DbEnv env(static_cast<uint32_t>(0));
-  uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
+  uint32_t db_env_open_flags =
+      DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
   try {
-//    env.open(path.c_str(), db_env_open_flags, 0);
-//    env.close(0); // this recover method does not work
+    //    env.open(path.c_str(), db_env_open_flags, 0);
+    //    env.close(0); // this recover method does not work
   }
   catch (DbException &e) {
-    std::cerr << "Error opening database environment: "
-      << path
-      << " and database "
-      << "blockchain.db" << std::endl;
+    std::cerr << "Error opening database environment: " << path << " and database "
+              << "blockchain.db" << std::endl;
     std::cerr << e.what() << std::endl;
     return false;
   }
   catch (std::exception &e) {
-    std::cerr << "Error opening database environment: "
-      << path
-      << " and database "
-      << "blockchain.db" << std::endl;
+    std::cerr << "Error opening database environment: " << path << " and database "
+              << "blockchain.db" << std::endl;
     std::cerr << e.what() << std::endl;
     return false;
   }
@@ -165,13 +152,11 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
   return true;
 }
 
-bool DatabaseBerkeleyDB::is_open() const
-{
+bool DatabaseBerkeleyDB::is_open() const {
   return static_cast<bool>(db_blocks_);
 }
 
-bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_array &value)
-{
+bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_array &value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
@@ -186,7 +171,6 @@ bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_
     return false;
   }
 
-
   Dbt_copy<byte_array> db_key(key);
   status = db_seq_no_->put(nullptr, &db_key, &db_seq_no, 0);
   if (status) {
@@ -198,8 +182,7 @@ bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_
   return true;
 }
 
-bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value)
-{
+bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
@@ -209,7 +192,8 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value)
   if (value == nullptr) {
     if (db_seq_no_->exists(nullptr, &db_key, 0) == 0) {
       return true;
-    } else {
+    }
+    else {
       return false;
     }
   }
@@ -235,8 +219,7 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value)
   return true;
 }
 
-bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value)
-{
+bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
@@ -261,8 +244,7 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value)
   return true;
 }
 
-bool DatabaseBerkeleyDB::remove(const byte_array &key)
-{
+bool DatabaseBerkeleyDB::remove(const byte_array &key) {
   assert(false);
 
   if (!db_blocks_) {
@@ -274,8 +256,7 @@ bool DatabaseBerkeleyDB::remove(const byte_array &key)
   return true;
 }
 
-bool DatabaseBerkeleyDB::write_batch(const ItemList &items)
-{
+bool DatabaseBerkeleyDB::write_batch(const ItemList &items) {
   assert(false);
 
   if (!db_blocks_) {
@@ -287,31 +268,27 @@ bool DatabaseBerkeleyDB::write_batch(const ItemList &items)
   return true;
 }
 
-class DatabaseBerkeleyDB::Iterator final : public Database::Iterator
-{
+class DatabaseBerkeleyDB::Iterator final : public Database::Iterator {
 public:
-  Iterator(Dbc *it) :
-    it_(it),
-    valid_(false)
-  {
+  Iterator(Dbc *it)
+  : it_(it)
+  , valid_(false) {
     if (it != nullptr) {
       valid_ = true;
     }
   }
-  ~Iterator()
-  {
+  ~Iterator() {
     if (it_ != nullptr) {
       it_->close();
     }
   }
-  bool is_valid() const override final
-  {
+  bool is_valid() const override final {
     return valid_;
   }
 
-  void seek_to_first() override final
-  {
-    if (!it_) return;
+  void seek_to_first() override final {
+    if (!it_)
+      return;
 
     Dbt key;
     Dbt_safe value;
@@ -320,24 +297,23 @@ public:
     if (!ret) {
       set_value(value);
       valid_ = true;
-    } else {
+    }
+    else {
       valid_ = false;
     }
   }
 
-  void seek_to_last() override final
-  {
+  void seek_to_last() override final {
     assert(false);
   }
 
-  void seek(const ::csdb::internal::byte_array &key) override final
-  {
+  void seek(const ::csdb::internal::byte_array &key) override final {
     assert(false);
   }
 
-  void next() override final
-  {
-    if (!it_) return;
+  void next() override final {
+    if (!it_)
+      return;
 
     Dbt key;
     Dbt_safe value;
@@ -346,32 +322,30 @@ public:
     if (!ret) {
       set_value(value);
       valid_ = true;
-    } else {
+    }
+    else {
       valid_ = false;
     }
   }
 
-  void prev() override final
-  {
+  void prev() override final {
     assert(false);
   }
 
-  ::csdb::internal::byte_array key() const override final
-  {
+  ::csdb::internal::byte_array key() const override final {
     return ::csdb::internal::byte_array{};
   }
 
-  ::csdb::internal::byte_array value() const override final
-  {
+  ::csdb::internal::byte_array value() const override final {
     if (valid_) {
       return value_;
-    } else {
+    }
+    else {
       return ::csdb::internal::byte_array{};
     }
   }
 
 private:
-
   void set_value(Dbt &value) {
     auto begin = reinterpret_cast<uint8_t *>(value.get_data());
     value_.assign(begin, begin + value.get_size());
@@ -382,8 +356,7 @@ private:
   internal::byte_array value_;
 };
 
-DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator()
-{
+DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return nullptr;
@@ -395,4 +368,4 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator()
   return Database::IteratorPtr(new DatabaseBerkeleyDB::Iterator(cursorp));
 }
 
-} // namespace csdb
+}  // namespace csdb

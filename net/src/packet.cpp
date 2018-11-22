@@ -1,19 +1,21 @@
 /* Send blaming letters to @yrtimd */
 #include <lz4.h>
 
-#include "packet.hpp"
-#include "transport.hpp" // for NetworkCommand
 #include <lib/system/utils.hpp>
+#include "packet.hpp"
+#include "transport.hpp"  // for NetworkCommand
 
 RegionAllocator Message::allocator_(1 << 26, 4);
 
-enum Lengths {
+enum Lengths
+{
   FragmentedHeader = 36
 };
 
 const cs::Hash& Packet::getHeaderHash() const {
   if (!headerHashed_) {
-    headerHash_ = getBlake2Hash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum), Lengths::FragmentedHeader);
+    headerHash_ = getBlake2Hash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum),
+                                Lengths::FragmentedHeader);
     headerHashed_ = true;
   }
   return headerHash_;
@@ -21,10 +23,12 @@ const cs::Hash& Packet::getHeaderHash() const {
 
 bool Packet::isHeaderValid() const {
   if (isFragmented()) {
-    if (isNetwork()) return false;
+    if (isNetwork())
+      return false;
 
     auto& frNum = getFragmentsNum();
-    //LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " << size() << " vs " << getHeadersLength());
+    // LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " <<
+    // size() << " vs " << getHeadersLength());
     if (/*frNum > Packet::MaxFragments ||*/
         getFragmentId() >= frNum)
       return false;
@@ -38,21 +42,21 @@ uint32_t Packet::getHeadersLength() const {
     headersLength_ = 1;  // Flags
 
     if (isFragmented())
-      headersLength_+= 4;  // Min fragments & all fragments
+      headersLength_ += 4;  // Min fragments & all fragments
 
     if (!isNetwork()) {
-      headersLength_+= 40;  // Sender key + ID
+      headersLength_ += 40;  // Sender key + ID
       if (!isBroadcast() && !isNeighbors())
-        headersLength_+= 32; // Receiver key
+        headersLength_ += 32;  // Receiver key
     }
   }
 
   return headersLength_;
 }
 
-MessagePtr PacketCollector::getMessage(const Packet& pack,
-                                       bool& newFragmentedMsg) {
-  if (!pack.isFragmented()) return MessagePtr();
+MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
+  if (!pack.isFragmented())
+    return MessagePtr();
 
   newFragmentedMsg = false;
 
@@ -64,14 +68,15 @@ MessagePtr PacketCollector::getMessage(const Packet& pack,
     msgPtr = &map_.tryStore(pack.getHeaderHash());
   }
 
-  if (!*msgPtr) { // First time
+  if (!*msgPtr) {  // First time
     *msgPtr = msg = msgAllocator_.emplace();
     msg->packetsLeft_ = pack.getFragmentsNum();
     msg->packetsTotal_ = pack.getFragmentsNum();
     msg->headerHash_ = pack.getHeaderHash();
     newFragmentedMsg = true;
   }
-  else msg = *msgPtr;
+  else
+    msg = *msgPtr;
 
   {
     cs::SpinGuard l(msg->pLock_);
@@ -82,9 +87,9 @@ MessagePtr PacketCollector::getMessage(const Packet& pack,
       *goodPlace = pack;
     }
 
-    //if (msg->packetsLeft_ % 100 == 0)
-    //if (msg->packetsLeft_ == 0)
-    //LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
+    // if (msg->packetsLeft_ % 100 == 0)
+    // if (msg->packetsLeft_ == 0)
+    // LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
   }
 
   return msg;
@@ -99,7 +104,7 @@ void Message::composeFullData() const {
     uint32_t totalSize = headersLength;
 
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack)
-      totalSize+= (pack->size() - headersLength);
+      totalSize += (pack->size() - headersLength);
 
     fullData_ = allocator_.allocateNext(totalSize);
 
@@ -108,7 +113,7 @@ void Message::composeFullData() const {
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
       uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - (i == 0 ? 0 : headersLength);
       memcpy(data, (reinterpret_cast<const char*>(pack->data())) + (i == 0 ? 0 : headersLength), cSize);
-      data+= cSize;
+      data += cSize;
     }
   }
 }
@@ -123,102 +128,102 @@ Message::~Message() {
 
 const char* getMsgTypesString(MsgTypes messageType) {
   switch (messageType) {
-  default:
-    return "-";
-  case RoundTableSS:
-    return "RoundTableSS";
-  case Transactions:
-    return "Transactions";
-  case FirstTransaction:
-    return "FirstTransaction";
-  case TransactionList:
-    return "TransactionList";
-  case ConsVector:
-    return "ConsVector";
-  case ConsMatrix:
-    return "ConsMatrix";
-  case NewBlock:
-    return "NewBlock";
-  case BlockHash:
-    return "BlockHash";
-  case BlockRequest:
-    return "BlockRequest";
-  case RequestedBlock:
-    return "RequestedBlock";
-  case TLConfirmation:
-    return "TLConfirmation";
-  case ConsVectorRequest:
-    return "ConsVectorRequest";
-  case ConsMatrixRequest:
-    return "ConsMatrixRequest";
-  case ConsTLRequest:
-    return "ConsTLRequest";
-  case RoundTableRequest:  
-    return "RoundTableRequest";
-  case NewBadBlock:
-    return "NewBadBlock";
-  case BigBang:
-    return "BigBang";
-  case TransactionPacket:
-    return "TransactionPacket";
-  case TransactionsPacketRequest:
-    return "TransactionsPacketRequest";
-  case TransactionsPacketReply:
-    return "TransactionsPacketReply";
-  case NewCharacteristic:
-    return "NewCharacteristic";
-  case RoundTable:
-    return "RoundTable";
-  case WriterNotification:
-    return "WriterNotification";
+    default:
+      return "-";
+    case RoundTableSS:
+      return "RoundTableSS";
+    case Transactions:
+      return "Transactions";
+    case FirstTransaction:
+      return "FirstTransaction";
+    case TransactionList:
+      return "TransactionList";
+    case ConsVector:
+      return "ConsVector";
+    case ConsMatrix:
+      return "ConsMatrix";
+    case NewBlock:
+      return "NewBlock";
+    case BlockHash:
+      return "BlockHash";
+    case BlockRequest:
+      return "BlockRequest";
+    case RequestedBlock:
+      return "RequestedBlock";
+    case TLConfirmation:
+      return "TLConfirmation";
+    case ConsVectorRequest:
+      return "ConsVectorRequest";
+    case ConsMatrixRequest:
+      return "ConsMatrixRequest";
+    case ConsTLRequest:
+      return "ConsTLRequest";
+    case RoundTableRequest:
+      return "RoundTableRequest";
+    case NewBadBlock:
+      return "NewBadBlock";
+    case BigBang:
+      return "BigBang";
+    case TransactionPacket:
+      return "TransactionPacket";
+    case TransactionsPacketRequest:
+      return "TransactionsPacketRequest";
+    case TransactionsPacketReply:
+      return "TransactionsPacketReply";
+    case NewCharacteristic:
+      return "NewCharacteristic";
+    case RoundTable:
+      return "RoundTable";
+    case WriterNotification:
+      return "WriterNotification";
   }
 }
 
 const char* getNetworkCommandString(NetworkCommand command) {
   switch (command) {
-  default:
-    return "-";
-  case NetworkCommand::Registration:
-    return "Registration";
-  case NetworkCommand::ConfirmationRequest:
-    return "ConfirmationRequest";
-  case NetworkCommand::ConfirmationResponse:
-    return "ConfirmationResponse";
-  case NetworkCommand::RegistrationConfirmed:
-    return "RegistrationConfirmed";
-  case NetworkCommand::RegistrationRefused:
-    return "RegistrationRefused";
-  case NetworkCommand::Ping:
-    return "Ping";
-  case NetworkCommand::PackInform:
-    return "PackInform";
-  case NetworkCommand::PackRequest:
-    return "PackRequest";
-  case NetworkCommand::PackRenounce:
-    return "PackRenounce";
-  case NetworkCommand::BlockSyncRequest:
-    return "BlockSyncRequest";
-  case NetworkCommand::SSRegistration:
-    return "SSRegistration";
-  case NetworkCommand::SSFirstRound:
-    return "SSFirstRound";
-  case NetworkCommand::SSRegistrationRefused:
-    return "SSRegistrationRefused";
-  case NetworkCommand::SSPingWhiteNode:
-    return "SSPingWhiteNode";
-  case NetworkCommand::SSLastBlock:
-    return "SSLastBlock";
-  case NetworkCommand::SSReRegistration:
-    return "SSReRegistration";
-  case NetworkCommand::SSSpecificBlock:
-    return "SSSpecificBlock";
+    default:
+      return "-";
+    case NetworkCommand::Registration:
+      return "Registration";
+    case NetworkCommand::ConfirmationRequest:
+      return "ConfirmationRequest";
+    case NetworkCommand::ConfirmationResponse:
+      return "ConfirmationResponse";
+    case NetworkCommand::RegistrationConfirmed:
+      return "RegistrationConfirmed";
+    case NetworkCommand::RegistrationRefused:
+      return "RegistrationRefused";
+    case NetworkCommand::Ping:
+      return "Ping";
+    case NetworkCommand::PackInform:
+      return "PackInform";
+    case NetworkCommand::PackRequest:
+      return "PackRequest";
+    case NetworkCommand::PackRenounce:
+      return "PackRenounce";
+    case NetworkCommand::BlockSyncRequest:
+      return "BlockSyncRequest";
+    case NetworkCommand::SSRegistration:
+      return "SSRegistration";
+    case NetworkCommand::SSFirstRound:
+      return "SSFirstRound";
+    case NetworkCommand::SSRegistrationRefused:
+      return "SSRegistrationRefused";
+    case NetworkCommand::SSPingWhiteNode:
+      return "SSPingWhiteNode";
+    case NetworkCommand::SSLastBlock:
+      return "SSLastBlock";
+    case NetworkCommand::SSReRegistration:
+      return "SSReRegistration";
+    case NetworkCommand::SSSpecificBlock:
+      return "SSSpecificBlock";
   }
 }
 
 class PacketFlags {
 public:
   PacketFlags(const Packet& packet)
-    : packet_(packet) {
+  : packet_(packet) {
   }
 
   std::ostream& operator()(std::ostream& os) const {
@@ -241,10 +246,11 @@ public:
     }
     return os;
   }
+
 private:
   const Packet& packet_;
 };
- 
+
 std::ostream& operator<<(std::ostream& os, const PacketFlags& packetFlags) {
   return packetFlags(os);
 }
@@ -254,21 +260,24 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
     os << "Invalid packet header";
     return os;
   }
+
   if (packet.isNetwork()) {
     const uint8_t* data = packet.getMsgData();
     size_t size = packet.getMsgSize();
-    os << "Type:\t" << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << ")" << std::endl;
+    os << "Type:\t" << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << ")"
+       << std::endl;
     os << "Flags:\t" << PacketFlags(packet) << std::endl;
     os << cs::Utils::byteStreamToHex(++data, --size);
     return os;
   }
-  os
-    << "Type:\t\t" << getMsgTypesString(packet.getType()) << "(" << packet.getType() << ")" << std::endl
-    << "Round:\t\t" << packet.getRoundNum() << std::endl
-    << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size()) << std::endl
-    << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size()) << std::endl
-    << "Id:\t\t" << packet.getId() << std::endl
-    << "Flags:\t\t" << PacketFlags(packet) << std::endl
-    << cs::Utils::byteStreamToHex(packet.getMsgData(), packet.getMsgSize());
+
+  os << "Type:\t\t" << getMsgTypesString(packet.getType()) << "(" << packet.getType() << ")" << std::endl
+     << "Round:\t\t" << packet.getRoundNum() << std::endl
+     << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size()) << std::endl
+     << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size())
+     << std::endl
+     << "Id:\t\t" << packet.getId() << std::endl
+     << "Flags:\t\t" << PacketFlags(packet) << std::endl
+     << cs::Utils::byteStreamToHex(packet.getMsgData(), packet.getMsgSize());
   return os;
 }

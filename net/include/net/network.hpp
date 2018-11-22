@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __NETWORK_HPP__
-#define __NETWORK_HPP__
+#ifndef NETWORK_HPP
+#define NETWORK_HPP
+
 #include <boost/asio.hpp>
 
 #include <client/config.hpp>
@@ -15,7 +16,10 @@ public:
   Network(const Config&, Transport*);
   ~Network();
 
-  bool isGood() const { return good_; }
+  bool isGood() const {
+    return good_;
+  }
+
   ip::udp::endpoint resolve(const EndpointData&);
 
   void sendInit();
@@ -29,7 +33,8 @@ public:
   Network& operator=(const Network&) = delete;
   Network& operator=(Network&&) = delete;
 
-  enum ThreadStatus {
+  enum ThreadStatus
+  {
     NonInit,
     Failed,
     Success
@@ -40,16 +45,12 @@ private:
   void writerRoutine(const Config&);
   void processorRoutine();
 
-  ip::udp::socket* getSocketInThread(const bool,
-                                     const EndpointData&,
-                                     std::atomic<ThreadStatus>&,
-                                     const bool useIPv6);
+  ip::udp::socket* getSocketInThread(const bool, const EndpointData&, std::atomic<ThreadStatus>&, const bool useIPv6);
 
   bool good_;
   bool stopReaderRoutine = false;
   bool stopWriterRoutine = false;
   bool stopProcessorRoutine = false;
-
 
   io_context context_;
   ip::udp::resolver resolver_;
@@ -60,12 +61,12 @@ private:
   Transport* transport_;
 
   // Only needed in a one-socket configuration
-  __cacheline_aligned std::atomic<bool> singleSockOpened_ = { false };
-  __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = { nullptr };
-  std::atomic<bool> initFlag_ = { false };
+  __cacheline_aligned std::atomic<bool> singleSockOpened_ = {false};
+  __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = {nullptr};
+  std::atomic<bool> initFlag_ = {false};
 
-  __cacheline_aligned std::atomic<ThreadStatus> readerStatus_ = { NonInit };
-  __cacheline_aligned std::atomic<ThreadStatus> writerStatus_ = { NonInit };
+  __cacheline_aligned std::atomic<ThreadStatus> readerStatus_ = {NonInit};
+  __cacheline_aligned std::atomic<ThreadStatus> writerStatus_ = {NonInit};
 
   std::thread readerThread_;
   std::thread writerThread_;
@@ -74,4 +75,4 @@ private:
   PacketCollector collector_;
 };
 
-#endif // __NETWORK_HPP__
+#endif  // NETWORK_HPP

@@ -1,12 +1,13 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __NEIGHBOURHOOD_HPP__
-#define __NEIGHBOURHOOD_HPP__
+#ifndef NEIGHBOURHOOD_HPP
+#define NEIGHBOURHOOD_HPP
+
 #include <boost/asio.hpp>
 
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/common.hpp>
+#include <lib/system/keys.hpp>
 
 #include "packet.hpp"
 
@@ -23,10 +24,10 @@ const uint32_t MaxSyncAttempts = 8;
 
 struct Connection;
 struct RemoteNode {
-  __cacheline_aligned std::atomic<uint64_t> packets = { 0 };
+  __cacheline_aligned std::atomic<uint64_t> packets = {0};
 
-  __cacheline_aligned std::atomic<uint32_t> strikes = { 0 };
-  __cacheline_aligned std::atomic<bool> blackListed = { false };
+  __cacheline_aligned std::atomic<uint32_t> strikes = {0};
+  __cacheline_aligned std::atomic<bool> blackListed = {false};
 
   void addStrike() {
     strikes.fetch_add(1, std::memory_order_relaxed);
@@ -36,7 +37,7 @@ struct RemoteNode {
     return blackListed.load(std::memory_order_relaxed);
   }
 
-  __cacheline_aligned std::atomic<Connection*> connection = { nullptr };
+  __cacheline_aligned std::atomic<Connection*> connection = {nullptr};
 };
 
 typedef MemPtr<TypedSlot<RemoteNode>> RemoteNodePtr;
@@ -46,28 +47,33 @@ struct Connection {
 
   Connection() = default;
 
-  Connection(Connection&& rhs): id(rhs.id),
-                                lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed)),
-                                lastPacketsCount(rhs.lastPacketsCount),
-                                attempts(rhs.attempts),
-                                key(rhs.key),
-                                in(std::move(rhs.in)),
-                                specialOut(rhs.specialOut),
-                                out(std::move(rhs.out)),
-                                node(std::move(rhs.node)),
-                                isSignal(rhs.isSignal),
-                                connected(rhs.connected),
-                                msgRels(std::move(rhs.msgRels)) { }
+  Connection(Connection&& rhs)
+  : id(rhs.id)
+  , lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed))
+  , lastPacketsCount(rhs.lastPacketsCount)
+  , attempts(rhs.attempts)
+  , key(rhs.key)
+  , in(std::move(rhs.in))
+  , specialOut(rhs.specialOut)
+  , out(std::move(rhs.out))
+  , node(std::move(rhs.node))
+  , isSignal(rhs.isSignal)
+  , connected(rhs.connected)
+  , msgRels(std::move(rhs.msgRels)) {
+  }
 
   Connection(const Connection&) = delete;
-  ~Connection() { }
+  ~Connection() {
+  }
 
-  const ip::udp::endpoint& getOut() const { return specialOut ? out : in; }
+  const ip::udp::endpoint& getOut() const {
+    return specialOut ? out : in;
+  }
 
   Id id = 0;
 
   static const uint32_t BytesLimit = 1 << 20;
-  mutable std::atomic<uint32_t> lastBytesCount = { 0 };
+  mutable std::atomic<uint32_t> lastBytesCount = {0};
 
   uint64_t lastPacketsCount = 0;
   uint32_t attempts = 0;
@@ -98,7 +104,8 @@ struct Connection {
   uint32_t lastSeq = 0;
 
   bool operator!=(const Connection& rhs) const {
-    return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
+    return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut ||
+           (specialOut && out != rhs.out);
   }
 };
 
@@ -121,11 +128,8 @@ public:
 
   void gotRegistration(Connection&&, RemoteNodePtr);
 
-  void gotConfirmation(const Connection::Id& my,
-                       const Connection::Id& real,
-                       const ip::udp::endpoint&,
-                       const cs::PublicKey&,
-                       RemoteNodePtr);
+  void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&,
+                       const cs::PublicKey&, RemoteNodePtr);
 
   void gotRefusal(const Connection::Id&);
 
@@ -148,10 +152,7 @@ public:
 
   void pingNeighbours();
   bool isPingDone();
-  void validateConnectionId(RemoteNodePtr,
-                            const Connection::Id,
-                            const ip::udp::endpoint&,
-                            const cs::PublicKey&,
+  void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&,
                             const uint32_t lastSeq);
 
   ConnectionPtr getConnection(const RemoteNodePtr);
@@ -205,10 +206,7 @@ private:
   FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
   cs::SpinLock mLockFlag_;
-  FixedHashMap<ip::udp::endpoint,
-               ConnectionPtr,
-               uint16_t,
-               MaxConnections> connections_;
+  FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
   struct SenderInfo {
     uint32_t totalSenders = 0;
@@ -221,4 +219,4 @@ private:
   FixedHashMap<cs::Hash, DirectPackInfo, uint16_t, 10000> msgDirects_;
 };
 
-#endif // __NEIGHBOURHOOD_HPP__
+#endif  // NEIGHBOURHOOD_HPP

@@ -1,4 +1,4 @@
-#include "cscrypto/cscrypto.h"
+#include "cscrypto/cscrypto.hpp"
 
 #ifdef USE_CRYPTOPP
 #include <blake2.h>
@@ -10,80 +10,71 @@
 
 #include <mutex>
 
-namespace cscrypto
-{
-  namespace detail
-  {
-    struct Context
-    {
-      byte seed[32] = {};
+namespace cscrypto {
+namespace detail {
+struct Context {
+  byte seed[32] = {};
 
-      std::mutex mutex;
+  std::mutex mutex;
 
-      Context()
-      {
-      }
-
-      // Disallow copy and assign
-      Context(const Context&) = delete;
-      Context& operator=(const Context&) = delete;
-      Context(Context&&) = delete;
-      Context& operator=(Context&&) = delete;
-    };
-
-    static Context& getContext()
-    {
-      static Context context;
-      return context;
-    }
-
-    using ScopedLock = std::lock_guard<std::mutex>;
+  Context() {
   }
 
-  using namespace detail;
+  // Disallow copy and assign
+  Context(const Context&) = delete;
+  Context& operator=(const Context&) = delete;
+  Context(Context&&) = delete;
+  Context& operator=(Context&&) = delete;
+};
 
-  Hash blake2s(const byte* data, size_t length)
-  {
+static Context& getContext() {
+  static Context context;
+  return context;
+}
 
+using ScopedLock = std::lock_guard<std::mutex>;
+}  // namespace detail
+
+using namespace detail;
+
+Hash blake2s(const byte* data, size_t length) {
 #ifdef USE_CRYPTOPP
 
-    using namespace CryptoPP;
+  using namespace CryptoPP;
 
-    static_assert(Hash256Bit::sizeBytes == BLAKE2sp::DIGESTSIZE, "Hash256Bit size doesn't match Blake2s digest size");
+  static_assert(Hash256Bit::sizeBytes == BLAKE2sp::DIGESTSIZE, "Hash256Bit size doesn't match Blake2s digest size");
 
-    Hash256Bit result;
+  Hash256Bit result;
 
-    BLAKE2sp blake2s;
-    blake2s.Update(data, length);
-    blake2s.Final(result.data());
+  BLAKE2sp blake2s;
+  blake2s.Update(data, length);
+  blake2s.Final(result.data());
 
-    return result;
+  return result;
 
 #else
 
-    static_assert( Hash::sizeBytes == BLAKE2S_OUTBYTES, "Hash256Bit size doesn't match Blake2s digest size");
+  static_assert(Hash::sizeBytes == BLAKE2S_OUTBYTES, "Hash256Bit size doesn't match Blake2s digest size");
 
-    Hash result;
+  Hash result;
 
-    blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
+  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
 
-#endif // #ifdef USE_CRYPTOPP
+#endif  // #ifdef USE_CRYPTOPP
 
-    return result;
-  }
-
-  /// Convert the given value into h160 (160-bit unsigned integer) using the right 20 bytes.
-  using Hash160Bit = FixedArray<160>;
-  inline Hash160Bit right160(const Hash& h256)
-  {
-    Hash160Bit ret;
-    memcpy(ret.data(), h256.data() + 12, 20);
-    return ret;
-  }
-
-  Address toAddress(const PublicKey& publicKey)
-  {
-    // Ethereum does right160(sha3(public))
-    return Address{ right160(blake2s(publicKey)) };
-  }
+  return result;
 }
+
+/// Convert the given value into h160 (160-bit unsigned integer) using the right 20 bytes.
+using Hash160Bit = FixedArray<160>;
+inline Hash160Bit right160(const Hash& h256) {
+  Hash160Bit ret;
+  memcpy(ret.data(), h256.data() + 12, 20);
+  return ret;
+}
+
+Address toAddress(const PublicKey& publicKey) {
+  // Ethereum does right160(sha3(public))
+  return Address{right160(blake2s(publicKey))};
+}
+}  // namespace cscrypto
