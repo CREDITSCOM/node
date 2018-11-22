@@ -47,10 +47,10 @@ Node::Node(const Config& config)
 ,
 #endif
 #ifdef NODE_API
-    api_(bc_, solver_)
+  api_(bc_, solver_)
 ,
 #endif
-    allocator_(1 << 24, 5)
+  allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , poolSynchronizer_(new cs::PoolSynchronizer(transport_, &bc_)) {
@@ -254,10 +254,12 @@ void Node::run() {
 
 void Node::stop() {
   solver_->finish();
-  LOG_WARN("[WARNING] : [SOLVER STOPPED]");
+  cswarning() << "[SOLVER STOPPED]";
+
   auto bcStorage = bc_.getStorage();
   bcStorage.close();
-  LOG_WARN("[WARNING] : [BLOCKCHAIN STORAGE CLOSED]");
+
+  cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 }
 
 /* Requests */
@@ -359,24 +361,23 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
-bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                          const Args&... args) {
+
+bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
-    sendNeighbours(connection, msgType, round, args...);
+    sendNeighbours(connection, msgType, round, std::forward<Args>(args)...);
   }
 
   return static_cast<bool>(connection);
 }
 
 template <typename... Args>
-void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                          const Args&... args) {
+void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
-  writeDefaultStream(args...);
+  writeDefaultStream(std::forward<Args>(args)...);
 
   csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize() << ", out = " << target->out
             << ", in = " << target->in << ", specialOut = " << target->specialOut;
@@ -386,29 +387,27 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 }
 
 template <class... Args>
-void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
+void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   csdebug() << "NODE> Sending broadcast";
 
-  sendBroadcastImpl(msgType, round, args...);
+  sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
-void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                           const Args&... args) {
-  const bool success = sendNeighbours(target, msgType, round, args...);
-
+void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+  const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
-    sendBroadcast(target, msgType, round, args...);
+    sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
   }
 }
 
 template <class... Args>
-bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
+bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
-    sendNeighbours(target, msgType, round, args...);
+    sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
   }
 
   return target;
@@ -577,65 +576,6 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   cslog() << "NODE> Hashes reply got packets count: " << packetsCount;
 
   processPacketsReply(std::move(packets), round);
-}
-
-void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber round) {
-  cserror() << "NODE> starting new round via getRoundTable() is not supported, getRoundInfo() must be called";
-  return;
-#if 0
-  cslog() << "NODE> RoundTable";
-
-  istream_.init(data, size);
-
-  std::size_t confidantsCount = 0;
-  istream_ >> confidantsCount;
-
-  if (confidantsCount == 0) {
-    cserror() << "Bad confidants count in round table";
-    return;
-  }
-
-  std::size_t hashesCount = 0;
-  istream_ >> hashesCount;
-
-  cs::RoundTable roundTable;
-  roundTable.round = round;
-
-  // to node
-  roundNum_ = round;
-
-  cs::PublicKey general;
-  istream_ >> general;
-
-  cs::ConfidantsKeys confidants;
-  confidants.reserve(confidantsCount);
-
-  for (std::size_t i = 0; i < confidantsCount; ++i) {
-    cs::PublicKey key;
-    istream_ >> key;
-
-    confidants.push_back(std::move(key));
-  }
-
-  cs::Hashes hashes;
-  hashes.reserve(hashesCount);
-
-  for (std::size_t i = 0; i < hashesCount; ++i) {
-    cs::TransactionsPacketHash hash;
-    istream_ >> hash;
-
-    hashes.push_back(hash);
-  }
-
-  roundTable.general = std::move(general);
-  roundTable.confidants = std::move(confidants);
-  roundTable.hashes = std::move(hashes);
-
-  onRoundStart(roundTable);
-  onRoundStartConveyer(std::move(roundTable));
-  cslog() << "NODE> Get Round table -> got Round =" << round;
-  startConsensus();
-#endif  // 0
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
@@ -1601,9 +1541,9 @@ std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel) {
 }
 
 template <typename T, typename... Args>
-void Node::writeDefaultStream(const T& value, const Args&... args) {
+void Node::writeDefaultStream(const T& value, Args&&... args) {
   ostream_ << value;
-  writeDefaultStream(args...);
+  writeDefaultStream(std::forward<Args>(args)...);
 }
 
 template <typename T>
@@ -1613,18 +1553,18 @@ void Node::writeDefaultStream(const T& value) {
 
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                         const Args&... args) {
+                         Args&&... args) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
   csdebug() << "NODE> Sending broadcast to: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
-  sendBroadcastImpl(msgType, round, args...);
+  sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args) {
+void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_ << msgType << round;
 
-  writeDefaultStream(args...);
+  writeDefaultStream(std::forward<Args>(args)...);
 
   transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();

@@ -98,9 +98,7 @@ public:
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getRoundTable(const uint8_t*, const size_t, const cs::RoundNumber);
-  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                         const cs::PublicKey& sender);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
@@ -136,22 +134,19 @@ public:
   void sendRoundTable(const cs::RoundTable& round);
 
   template <typename... Args>
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                      const Args&... args);
+  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
-  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                      const Args&... args);
+  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                       const Args&... args);
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -245,17 +240,16 @@ private:
                                          csdb::Pool::sequence_t globalSequence);
 
   template <typename T, typename... Args>
-  void writeDefaultStream(const T& value, const Args&... args);
+  void writeDefaultStream(const T& value, Args&&... args);
 
   template <typename T>
   void writeDefaultStream(const T& value);
 
   template <typename... Args>
-  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                     const Args&... args);
+  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
-  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
