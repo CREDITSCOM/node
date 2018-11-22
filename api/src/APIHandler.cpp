@@ -95,7 +95,8 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
   //  TRACE("");
   work_queues["TransactionFlow"]; // init value with default
                                   // constructors
-                                  TRACE("");
+  TRACE("");
+
   auto lapooh = s_blockchain.getLastHash();
   trace = false;
 
@@ -103,6 +104,8 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
   while (update_smart_caches_once(lapooh, true)) {
     //      TRACE("");
   }
+
+  tm.run();  // Run this AFTER updating all the caches for maximal efficiency
 
   trace = true;
   //   TRACE("");
@@ -933,6 +936,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
     //  TRACE(std::endl << convertTransaction(tr));
     auto smart = fetch_smart(tr);
     auto address = tr.target();
+    auto state = tr.user_field(smart_state_idx).value<std::string>();
 
     if (!init) {
       auto& e = [&]() -> decltype(auto) {
@@ -951,8 +955,8 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         return (*smart_state)[address];
       }();
       e.update_state(
-        [&tr](smart_state_record& rec) {
-                  rec.state = tr.user_field(smart_state_idx).value<std::string>();
+        [&state](smart_state_record& rec) {
+                  rec.state = state;
                   rec.locker_trx = 0;
           });
     }
@@ -967,7 +971,12 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         auto deployed_by_creator = locked_ref(this->deployed_by_creator);
         (*deployed_by_creator)[tr.source()].push_back(tr.id());
       }
+
+      tm.checkNewDeploy(smart, state);
     }
+    else
+      tm.checkNewState(tr.target(), state);
+
     return true;
   }
   TRACE("");
@@ -1336,4 +1345,308 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
                                   });
   _return.pages = (total / PER_PAGE) + (int)(total % PER_PAGE != 0);
 #endif
+}
+
+// Lalala I'm a little token
+
+void
+APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return,
+                             const api::Address& address) {
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+  tm.applyToInternal([&_return, &addr](const TokensMap& tokens,
+                                       const HoldersMap& holders) {
+                       auto holderIt = holders.find(addr);
+                       if (holderIt != holders.end()) {
+                         for (const auto& tokAddr : holderIt->second) {
+                           auto tokenIt = tokens.find(tokAddr);
+                           if (tokenIt == tokens.end())
+                             continue; // This shouldn't happen
+
+                           api::TokenBalance tb;
+                           tb.token = fromByteArray(tokenIt->first.public_key());
+                           tb.code = tokenIt->second.symbol;
+
+                           auto hi = tokenIt->second.holders.find(addr);
+                           if (hi != tokenIt->second.holders.end())
+                             tb.balance = hi->second.balance;
+
+                           _return.balances.push_back(tb);
+                         }
+                       }
+                     });
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void
+APIHandler::iterateOverTokenTransactions(const csdb::Address& addr,
+                                         const std::function<bool(const csdb::Pool&,
+                                                                  const csdb::Transaction&)> func) {
+  csdb::PoolHash firstBlock;
+
+  {
+    auto smartOriginRef = locked_ref(this->smart_origin);
+    auto it = smartOriginRef->find(addr);
+    if (it != smartOriginRef->end())
+      firstBlock = it->second.pool_hash();
+  }
+
+  if (firstBlock.is_empty()) return;
+
+  auto lastHash = s_blockchain.getLastHash();
+  bool keepRunning = true;
+
+  while (!lastHash.is_empty()) {
+    auto pool = s_blockchain.loadBlock(lastHash);
+
+    for (const auto& trans : pool.transactions()) {
+      if (trans.target() == addr && is_smart(trans)) {
+        keepRunning = func(pool, trans);
+        if (!keepRunning) break;
+      }
+    }
+
+    if (!keepRunning || lastHash == firstBlock) break;
+    else lastHash = pool.previous_hash();
+  }
+}
+
+void addTokenResult(api::TokenTransfersResult& _return,
+                    const csdb::Address& token,
+                    const std::string& code,
+                    const csdb::Pool& pool,
+                    const csdb::Transaction& tr,
+                    const api::SmartContractInvocation& smart,
+                    const std::pair<csdb::Address, csdb::Address>& addrPair) {
+  api::TokenTransfer transfer;
+
+  transfer.token = fromByteArray(token.public_key());
+  transfer.code = code;
+  transfer.sender = fromByteArray(addrPair.first.public_key());
+  transfer.receiver = fromByteArray(addrPair.first.public_key());
+  transfer.amount = TokensMaster::getAmount(smart);
+  transfer.initiator = fromByteArray(tr.source().public_key());
+
+  transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+  transfer.transaction.index = tr.id().index();
+
+  transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
+
+  _return.transfers.push_back(transfer);
+}
+
+void addTokenResult(api::TokenTransactionsResult& _return,
+                    const csdb::Address& token,
+                    const std::string& code,
+                    const csdb::Pool& pool,
+                    const csdb::Transaction& tr,
+                    const api::SmartContractInvocation& smart,
+                    const std::pair<csdb::Address, csdb::Address>& addrPair) {
+  api::TokenTransaction trans;
+
+  trans.token = fromByteArray(token.public_key());
+
+  trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+  trans.transaction.index = tr.id().index();
+
+  trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
+  trans.initiator = fromByteArray(tr.source().public_key());
+  trans.method = smart.method;
+  trans.params = smart.params;
+
+  _return.transactions.push_back(trans);
+}
+
+void putTokenInfo(api::TokenInfo& ti,
+                  const api::Address& addr,
+                  const Token& token) {
+  ti.address = addr;
+  ti.code = token.symbol;
+  ti.name = token.name;
+  ti.totalSupply = token.totalSupply;
+  ti.owner = fromByteArray(token.owner.public_key());
+  ti.transfersCount = token.transfersCount;
+  ti.transactionsCount = token.transactionsCount;
+  ti.holdersCount = token.holders.size();
+}
+
+template <typename ResultType>
+bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
+  if (offset < 0 || limit <= 0 || limit > 100) {
+    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
+    return false;
+  }
+
+  return true;
+}
+
+template <typename ResultType>
+void tokenTransactionsInternal(ResultType& _return,
+                               APIHandler& handler,
+                               TokensMaster& tm,
+                               const api::Address& token,
+                               bool transfersOnly,
+                               bool filterByWallet,
+                               int64_t offset,
+                               int64_t limit,
+                               const csdb::Address& wallet = csdb::Address()) {
+  if (!validatePagination(_return, handler, offset, limit)) return;
+
+  const csdb::Address addr = BlockChain::getAddressFromKey(token);
+
+  bool tokenFound = false;
+  std::string code;
+
+  tm.applyToInternal([&addr, &tokenFound, &transfersOnly, &filterByWallet, &code, &wallet, &_return]
+                     (const TokensMap& tm, const HoldersMap&) {
+                       auto it = tm.find(addr);
+                       tokenFound = !(it == tm.end());
+                       if (tokenFound) {
+                         code = it->second.symbol;
+
+                         if (transfersOnly && !filterByWallet)
+                           _return.count = it->second.transfersCount;
+                         else if (!transfersOnly)
+                           _return.count = it->second.transactionsCount;
+                         else if (transfersOnly && !filterByWallet) {
+                           auto hIt = it->second.holders.find(wallet);
+                           if (hIt != it->second.holders.end())
+                             _return.count = hIt->second.transfersCount;
+                           else
+                             _return.count = 0;
+                         }
+                       }
+                     });
+
+  if (!tokenFound) {
+    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  handler.
+    iterateOverTokenTransactions(addr,
+                                 [&_return, &offset, &limit, &addr, &code, &transfersOnly, &filterByWallet, &wallet]
+                                 (const csdb::Pool& pool, const csdb::Transaction& tr) {
+                                   auto smart = fetch_smart(tr);
+
+                                   if (transfersOnly && !TokensMaster::isTransfer(smart)) return true;
+                                   auto addrPair = TokensMaster::getTransferData(smart);
+                                   if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet) return true;
+
+                                   if (--offset >= 0) return true;
+
+                                   addTokenResult(_return, addr, code, pool, tr, smart, addrPair);
+
+                                   return !(--limit == 0);
+                                 });
+
+  handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::SUCCESS);
+}
+
+void
+APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return,
+                              const api::Address& token,
+                              int64_t offset,
+                              int64_t limit) {
+  tokenTransactionsInternal(_return, *this, tm, token, true, false, offset, limit);
+}
+
+void
+APIHandler::TokenWalletTransfersGet(api::TokenTransfersResult& _return,
+                                    const api::Address& token,
+                                    const api::Address& address,
+                                    int64_t offset,
+                                    int64_t limit) {
+  const csdb::Address wallet = BlockChain::getAddressFromKey(address);
+  tokenTransactionsInternal(_return, *this, tm, token, true, true, offset, limit, wallet);
+}
+
+void
+APIHandler::TokenTransactionsGet(api::TokenTransactionsResult& _return,
+                                 const api::Address& token,
+                                 int64_t offset,
+                                 int64_t limit) {
+  tokenTransactionsInternal(_return, *this, tm, token, false, false, offset, limit);
+}
+
+void
+APIHandler::TokenInfoGet(api::TokenInfoResult& _return,
+                         const api::Address& token) {
+  bool found = false;
+
+  const csdb::Address addr = BlockChain::getAddressFromKey(token);
+  tm.applyToInternal([&token, &addr, &found, &_return](const TokensMap& tm, const HoldersMap&) {
+                       auto tIt = tm.find(addr);
+                       if (tIt != tm.end()) {
+                         found = true;
+                         putTokenInfo(_return.token, token, tIt->second);
+                       }
+                     });
+
+  SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
+}
+
+void
+APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return,
+                            const api::Address& token,
+                            int64_t offset,
+                            int64_t limit) {
+  if (!validatePagination(_return, *this, offset, limit)) return;
+
+  bool found = false;
+
+  const csdb::Address addr = BlockChain::getAddressFromKey(token);
+  tm.applyToInternal([&token, &addr, &found, &offset, &limit, &_return](const TokensMap& tm, const HoldersMap&) {
+                       auto tIt = tm.find(addr);
+                       if (tIt != tm.end()) {
+                         found = true;
+                         _return.count = tIt->second.holders.size();
+                         if (offset > tIt->second.holders.size()) return;
+
+                         auto hIt = tIt->second.holders.begin();
+                         std::advance(hIt, offset);
+
+                         for (; hIt != tIt->second.holders.end(); ++hIt) {
+                           api::TokenHolder th;
+
+                           th.holder = fromByteArray(hIt->first.public_key());
+                           th.token = token;
+                           th.balance = hIt->second.balance;
+                           th.transfersCount = hIt->second.transfersCount;
+
+                           _return.holders.push_back(th);
+
+                           if (--limit == 0) break;
+                         }
+                       }
+                     });
+
+  SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
+}
+
+void
+APIHandler::TokensListGet(api::TokensListResult& _return,
+                          int64_t offset,
+                          int64_t limit) {
+  if (!validatePagination(_return, *this, offset, limit)) return;
+
+  tm.applyToInternal([&offset, &limit, &_return](const TokensMap& tm, const HoldersMap&) {
+                       _return.count = tm.size();
+                       if (offset > tm.size()) return;
+
+                       auto tIt = tm.begin();
+                       std::advance(tIt, offset);
+                       for (; tIt != tm.end(); ++tIt) {
+                         api::TokenInfo tok;
+                         putTokenInfo(tok,
+                                      fromByteArray(tIt->first.public_key()),
+                                      tIt->second);
+
+                         _return.tokens.push_back(tok);
+
+                         if (--limit == 0) break;
+                       }
+                      });
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

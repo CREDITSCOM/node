@@ -114,7 +114,20 @@ void Neighbourhood::refreshLimits() {
 }
 
 void Neighbourhood::checkSilent() {
+  static uint32_t refillCount = 0;
+
   bool needRefill = true;
+
+#ifdef LOG_NEIGHBOURS
+  static uint32_t logCounter = 0;
+  static std::ofstream logFile;
+  bool needLog = (++logCounter % 10 == 0);
+  if (needLog) {
+    logFile.open("neighbours.log");
+    logFile << "== NEIGHBOURS ==" << std::endl;
+    logCounter = 0;
+  }
+#endif
 
   {
     SpinLock lm(mLockFlag_);
@@ -123,6 +136,11 @@ void Neighbourhood::checkSilent() {
     for (auto conn = neighbours_.begin();
          conn != neighbours_.end();
          ++conn) {
+#ifdef LOG_NEIGHBOURS
+      if (needLog) {
+        logFile << (*conn)->isSignal << " " << (*conn)->getOut() << " " << (*conn)->specialOut
+      }
+#endif
       if ((*conn)->isSignal)
         continue;
 
@@ -156,8 +174,15 @@ void Neighbourhood::checkSilent() {
     }
   }
 
-  //if (needRefill)
-    //transport_->refillNeighbourhood();
+  if (needRefill) {
+    ++refillCount;
+    if (refillCount >= WarnsBeforeRefill) {
+      refillCount = 0;
+      transport_->refillNeighbourhood();
+    }
+  }
+  else
+    refillCount = 0;
 }
 
 template <typename Vec>

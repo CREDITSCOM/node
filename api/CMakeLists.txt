@@ -17,6 +17,8 @@ add_library(csconnector
     src/APIHandler.cpp
     include/APIHandler.h
     include/DebugLog.h
+    include/tokens.hpp
+    src/tokens.cpp
     )
 
 target_link_libraries (csconnector PUBLIC csdb csnode csconnector_gen csconnector_executor_gen variant_gen)

@@ -21,6 +21,8 @@
 
 #include <csnode/threading.hpp>
 
+#include "tokens.hpp"
+
 class APIHandlerBase
 {
   public:
@@ -133,6 +135,43 @@ class APIHandler : public APIHandlerInterface
     void WritersGet(api::WritersGetResult& _return,
                     int32_t page) override;
 
+  // Fun with tokens
+
+  void iterateOverTokenTransactions(const csdb::Address&,
+                                    const std::function<bool(const csdb::Pool&,
+                                                             const csdb::Transaction&)>);
+
+  void TokenBalancesGet(api::TokenBalancesResult&,
+                        const api::Address&) override;
+
+  void TokenTransfersGet(api::TokenTransfersResult&,
+                         const api::Address& token,
+                         int64_t offset,
+                         int64_t limit) override;
+
+  void TokenWalletTransfersGet(api::TokenTransfersResult&,
+                               const api::Address& token,
+                               const api::Address& address,
+                               int64_t offset,
+                               int64_t limit) override;
+
+  void TokenTransactionsGet(api::TokenTransactionsResult&,
+                            const api::Address&,
+                            int64_t offset,
+                            int64_t limit) override;
+
+  void TokenInfoGet(api::TokenInfoResult&,
+                    const api::Address&) override;
+
+  void TokenHoldersGet(api::TokenHoldersResult&,
+                       const api::Address&,
+                       int64_t offset,
+                       int64_t limit) override;
+
+  void TokensListGet(api::TokensListResult&,
+                     int64_t offset,
+                     int64_t limit) override;
+
   private:
     BlockChain& s_blockchain;
 
@@ -205,6 +244,8 @@ class APIHandler : public APIHandlerInterface
                                             const ::api::Transaction&);
 
     std::map<std::string, Credits::worker_queue<std::tuple<>>> work_queues;
+
+    TokensMaster tm;
 };
 
 class SequentialProcessorFactory;
@@ -236,7 +277,7 @@ class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory
     {}
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor>
-    getProcessor(const ::apache::thrift::TConnectionInfo& ci) override
+    getProcessor(const ::apache::thrift::TConnectionInfo&) override
     {
         // TRACE("");
         processor_.ss.occupy();

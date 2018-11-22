@@ -20,6 +20,7 @@ const uint32_t MaxResendTimes = 32;
 const uint32_t MaxSyncAttempts = 8;
 
 const uint32_t BlocksToSync = 16;
+const uint32_t WarnsBeforeRefill = 8;
 
 struct Connection;
 struct RemoteNode {
