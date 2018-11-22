@@ -1,9 +1,8 @@
 /**
-  * @file transaction.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file transaction.h
+ * @author Evgeny V. Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_TRANSACTION_H_INCLUDED_
 #define _CREDITS_CSDB_TRANSACTION_H_INCLUDED_
 
@@ -14,13 +13,12 @@
 #include "csdb/internal/shared_data.h"
 #include "csdb/internal/types.h"
 
-
 namespace csdb {
 
 namespace priv {
 class obstream;
 class ibstream;
-} // namespace priv
+}  // namespace priv
 
 class Address;
 class Amount;
@@ -46,8 +44,7 @@ class Pool;
  * Единственное специфицируемая часть содержимого класса - это возможность получить
  * \ref PoolHash для пула, в который помещена транзакция.
  */
-class TransactionID
-{
+class TransactionID {
   SHARED_DATA_CLASS_DECLARE(TransactionID)
 public:
   /// \deprecated Тип будет удалён в следующих версиях.
@@ -75,9 +72,9 @@ public:
    */
   static TransactionID from_string(const ::std::string& str);
 
-  bool operator ==(const TransactionID &other) const noexcept;
-  bool operator !=(const TransactionID &other) const noexcept;
-  bool operator < (const TransactionID &other) const noexcept;
+  bool operator==(const TransactionID& other) const noexcept;
+  bool operator!=(const TransactionID& other) const noexcept;
+  bool operator<(const TransactionID& other) const noexcept;
 
 private:
   void put(::csdb::priv::obstream&) const;
@@ -88,13 +85,12 @@ private:
   friend class Pool;
 };
 
-class Transaction
-{
+class Transaction {
   SHARED_DATA_CLASS_DECLARE(Transaction)
 
 public:
   Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-	  AmountCommission max_fee, AmountCommission counted_fee, std::string signature);
+              AmountCommission max_fee, AmountCommission counted_fee, std::string signature);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -164,6 +160,6 @@ private:
   friend class Pool;
 };
 
-} // namespace csdb
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_TRANSACTION_H_INCLUDED_

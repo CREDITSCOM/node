@@ -1,19 +1,18 @@
 /**
-  * @file storage.h
-  * @author Roman Bukin, Evgeny Zalivochkin
-  */
+ * @file storage.h
+ * @author Roman Bukin, Evgeny Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_STORAGE_H_INCLUDED_
 #define _CREDITS_CSDB_STORAGE_H_INCLUDED_
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <functional>
 
-#include "csdb/transaction.h"
 #include "csdb/database.h"
+#include "csdb/transaction.h"
 
 namespace csdb {
 
@@ -42,16 +41,16 @@ class TransactionID;
  * необходимо вызывать функцию \ref ::csdb::Storage::open или создать объект с помощью функции
  * ::csdb::Storage::get.
  */
-class Storage final
-{
+class Storage final {
 private:
   class priv;
-  bool write_queue_search(const PoolHash& hash, Pool& res_pool) const;
+  bool write_queue_search(const PoolHash &hash, Pool &res_pool) const;
 
 public:
   using WeakPtr = ::std::weak_ptr<priv>;
 
-  enum Error {
+  enum Error
+  {
     NoError = 0,
     NotOpen = 1,
     DatabaseError = 2,
@@ -75,21 +74,19 @@ public:
 public:
   inline Storage(const Storage &) noexcept = default;
   inline Storage(Storage &&) noexcept = default;
-  inline Storage& operator=(const Storage &) noexcept = default;
-  inline Storage& operator=(Storage &&) noexcept = default;
+  inline Storage &operator=(const Storage &) noexcept = default;
+  inline Storage &operator=(Storage &&) noexcept = default;
 
   explicit Storage(WeakPtr ptr) noexcept;
   WeakPtr weak_ptr() const noexcept;
 
 public:
-  struct OpenOptions
-  {
+  struct OpenOptions {
     /// Экземпляр драйвера базы данных
     ::std::shared_ptr<Database> db;
   };
 
-  struct OpenProgress
-  {
+  struct OpenProgress {
     uint64_t poolsProcessed;
   };
 
@@ -97,7 +94,7 @@ public:
    * @brief Callback для операции открытия
    * @return true, если операцию необходимо прервать.
    */
-  typedef ::std::function<bool(const OpenProgress&)> OpenCallback;
+  typedef ::std::function<bool(const OpenProgress &)> OpenCallback;
 
   /**
    * @brief Открывает хранилище по набору параметров.
@@ -126,7 +123,7 @@ public:
    * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
    * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
    */
-  bool open(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
+  bool open(const ::std::string &path_to_base = ::std::string{}, OpenCallback callback = nullptr);
 
   /**
    * @brief Создание хранилища по набору параметров.
@@ -141,7 +138,7 @@ public:
    * Создаёт объект хранилища и пытается его открыть.
    * См. \ref open(const ::std::string& path_to_base, OpenCallback callback);
    */
-  static inline Storage get(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
+  static inline Storage get(const ::std::string &path_to_base = ::std::string{}, OpenCallback callback = nullptr);
 
   /**
    * @brief Проверяет, открыто ли хранилище.
@@ -189,7 +186,7 @@ public:
    */
   Pool pool_load(const PoolHash &hash) const;
   Pool pool_load(const uint32_t sequence) const;
-  Pool pool_load_meta(const PoolHash &hash, size_t& cnt) const;
+  Pool pool_load_meta(const PoolHash &hash, size_t &cnt) const;
 
   /**
    * @brief Получение транзакции по идентификатору.
@@ -200,11 +197,11 @@ public:
   Transaction transaction(const TransactionID &id) const;
 
   /**
-  * @brief Получить последнюю транзакцию по адресу источника
-  * @param[in] source Адрес источника
-  * @return Объект транзакции. Если транзакции не существует в данном пуле, возвращается
-  *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
-  */
+   * @brief Получить последнюю транзакцию по адресу источника
+   * @param[in] source Адрес источника
+   * @return Объект транзакции. Если транзакции не существует в данном пуле, возвращается
+   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+   */
   Transaction get_last_by_source(Address source) const noexcept;
 
   /**
@@ -273,6 +270,6 @@ inline Storage Storage::get(const std::string& path_to_base, OpenCallback callba
   return s;
 }
 
-} // namespace csdb
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_STORAGE_H_INCLUDED_

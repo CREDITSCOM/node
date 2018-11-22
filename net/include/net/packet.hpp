@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __PACKET_HPP__
-#define __PACKET_HPP__
+#ifndef PACKET_HPP
+#define PACKET_HPP
+
 #include <boost/asio.hpp>
 
 #include <lib/system/allocators.hpp>
@@ -18,17 +19,17 @@
 
 namespace ip = boost::asio::ip;
 
-enum BaseFlags: uint8_t {
+enum BaseFlags : uint8_t {
   NetworkMsg = 1,
   Fragmented = 1 << 1,
-  Broadcast  = 1 << 2,     // send packet to Neighbours, Neighbours can resend it to others
+  Broadcast = 1 << 2,  // send packet to Neighbours, Neighbours can resend it to others
   Compressed = 1 << 3,
-  Encrypted  = 1 << 4,
-  Signed     = 1 << 5,
-  Neighbours = 1 << 6,     // send packet to Neighbours only, Neighbours _cant_ resend it
+  Encrypted = 1 << 4,
+  Signed = 1 << 5,
+  Neighbours = 1 << 6,  // send packet to Neighbours only, Neighbours _cant_ resend it
 };
 
-enum Offsets: uint32_t {
+enum Offsets : uint32_t {
   FragmentId = 1,
   FragmentsNum = 3,
   IdWhenFragmented = 5,
@@ -39,7 +40,7 @@ enum Offsets: uint32_t {
   AddresseeWhenSingle = 41
 };
 
-enum MsgTypes: uint8_t {
+enum MsgTypes : uint8_t {
   RoundTableSS,
   Transactions,
   FirstTransaction,
@@ -85,14 +86,26 @@ public:
   static const uint32_t SmartRedirectTreshold = 100000;
 
   Packet() = default;
-  explicit Packet(RegionPtr&& data): data_(std::move(data)) { }
+  explicit Packet(RegionPtr&& data)
+  : data_(std::move(data)) {
+  }
 
-  bool isNetwork() const { return checkFlag(BaseFlags::NetworkMsg); }
-  bool isFragmented() const { return checkFlag(BaseFlags::Fragmented); }
-  bool isBroadcast() const { return checkFlag(BaseFlags::Broadcast); }
+  bool isNetwork() const {
+    return checkFlag(BaseFlags::NetworkMsg);
+  }
+  bool isFragmented() const {
+    return checkFlag(BaseFlags::Fragmented);
+  }
+  bool isBroadcast() const {
+    return checkFlag(BaseFlags::Broadcast);
+  }
 
-  bool isCompressed() const { return checkFlag(BaseFlags::Compressed); }
-  bool isNeighbors() const { return checkFlag(BaseFlags::Neighbours); }
+  bool isCompressed() const {
+    return checkFlag(BaseFlags::Compressed);
+  }
+  bool isNeighbors() const {
+    return checkFlag(BaseFlags::Neighbours);
+  }
 
   const cs::Hash& getHash() const {
     if (!hashed_) {
@@ -103,41 +116,65 @@ public:
   }
 
   bool addressedToMe(const cs::PublicKey& myKey) const {
-    return
-      isNetwork() || isNeighbors() ||
-      (isBroadcast() && !(getSender() == myKey)) ||
-      getAddressee() == myKey;
+    return isNetwork() || isNeighbors() || (isBroadcast() && !(getSender() == myKey)) || getAddressee() == myKey;
   }
 
-  const cs::PublicKey& getSender() const { return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle); }
-  const cs::PublicKey& getAddressee() const { return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented : Offsets::AddresseeWhenSingle); }
+  const cs::PublicKey& getSender() const {
+    return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle);
+  }
+  const cs::PublicKey& getAddressee() const {
+    return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented
+                                                       : Offsets::AddresseeWhenSingle);
+  }
 
-  const uint64_t& getId() const { return getWithOffset<uint64_t>(isFragmented() ? Offsets::IdWhenFragmented : Offsets::IdWhenSingle); }
+  const uint64_t& getId() const {
+    return getWithOffset<uint64_t>(isFragmented() ? Offsets::IdWhenFragmented : Offsets::IdWhenSingle);
+  }
 
   const cs::Hash& getHeaderHash() const;
   bool isHeaderValid() const;
 
-  const uint16_t& getFragmentId() const { return getWithOffset<uint16_t>(Offsets::FragmentId); }
-  const uint16_t& getFragmentsNum() const { return getWithOffset<uint16_t>(Offsets::FragmentsNum); }
+  const uint16_t& getFragmentId() const {
+    return getWithOffset<uint16_t>(Offsets::FragmentId);
+  }
+  const uint16_t& getFragmentsNum() const {
+    return getWithOffset<uint16_t>(Offsets::FragmentsNum);
+  }
 
-  MsgTypes getType() const { return getWithOffset<MsgTypes>(getHeadersLength()); }
-  cs::RoundNumber getRoundNum() const { return getWithOffset<cs::RoundNumber>(getHeadersLength() + 1); }
+  MsgTypes getType() const {
+    return getWithOffset<MsgTypes>(getHeadersLength());
+  }
+  cs::RoundNumber getRoundNum() const {
+    return getWithOffset<cs::RoundNumber>(getHeadersLength() + 1);
+  }
 
-  void* data() { return data_.get(); }
-  const void* data() const { return data_.get(); }
+  void* data() {
+    return data_.get();
+  }
+  const void* data() const {
+    return data_.get();
+  }
 
-  size_t size() const { return data_.size(); }
+  size_t size() const {
+    return data_.size();
+  }
 
-  const uint8_t* getMsgData() const { return static_cast<const uint8_t*>(data_.get()) + getHeadersLength(); }
-  size_t getMsgSize() const { return size() - getHeadersLength(); }
+  const uint8_t* getMsgData() const {
+    return static_cast<const uint8_t*>(data_.get()) + getHeadersLength();
+  }
+  size_t getMsgSize() const {
+    return size() - getHeadersLength();
+  }
 
   uint32_t getHeadersLength() const;
 
-  explicit operator bool() { return data_; }
+  explicit operator bool() {
+    return data_;
+  }
 
   boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
     if (data_.size() == 0) {
-      cswarning() << "Encoding empty packet";    
+      cswarning() << "Encoding empty packet";
       return std::move(boost::asio::buffer(data_.get(), data_.size()));
     }
     if (isCompressed()) {
@@ -150,14 +187,15 @@ public:
       char* source = static_cast<char*>(data_.get());
       char* dest = static_cast<char*>(tempBuffer.data());
 
-      *dest = *source; // copy header
+      *dest = *source;  // copy header
       size_t sourceSize = data_.size() - headerSize;
       size_t destSize = tempBuffer.size() - headerSize;
 
       auto compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
       if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
         return std::move(boost::asio::buffer(dest, compressedSize + headerSize));
-      } else {
+      }
+      else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
         *source &= ~BaseFlags::Compressed;
       }
@@ -173,7 +211,7 @@ public:
       static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
       constexpr size_t headerSize = sizeof(BaseFlags);
 
-      // It's a part of implementation magic( 
+      // It's a part of implementation magic(
       // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
       assert(data_.size() == Packet::MaxSize);
 
@@ -188,7 +226,8 @@ public:
         memcpy(source + headerSize, dest, uncompressedSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;
-      } else {
+      }
+      else {
         cserror() << "Decoding malformed packet content";
       }
     }
@@ -234,9 +273,13 @@ public:
 
   ~Message();
 
-  bool isComplete() const { return packetsLeft_ == 0; }
+  bool isComplete() const {
+    return packetsLeft_ == 0;
+  }
 
-  const Packet& getFirstPack() const { return *packets_; }
+  const Packet& getFirstPack() const {
+    return *packets_;
+  }
 
   const uint8_t* getFullData() const {
     if (!fullData_) {
@@ -247,13 +290,14 @@ public:
 
   size_t getFullSize() const {
     if (!fullData_) {
-        composeFullData();
+      composeFullData();
     }
     return fullData_.size() - packets_->getHeadersLength();
   }
 
   Packet extractData() const {
-    if (!fullData_) composeFullData();
+    if (!fullData_)
+      composeFullData();
     Packet result(std::move(fullData_));
     result.headersLength_ = packets_->getHeadersLength();
     return result;
@@ -287,8 +331,9 @@ class PacketCollector {
 public:
   static const uint32_t MaxParallelCollections = 1024;
 
-  PacketCollector():
-    msgAllocator_(MaxParallelCollections + 1) { }
+  PacketCollector()
+  : msgAllocator_(MaxParallelCollections + 1) {
+  }
 
   MessagePtr getMessage(const Packet&, bool&);
 
@@ -302,6 +347,6 @@ private:
   friend class Network;
 };
 
-std::ostream& operator<< (std::ostream& os, const Packet& packet);
+std::ostream& operator<<(std::ostream& os, const Packet& packet);
 
-#endif // __PACKET_HPP__
+#endif  // PACKET_HPP

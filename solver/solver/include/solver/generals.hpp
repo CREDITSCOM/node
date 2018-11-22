@@ -16,7 +16,7 @@
 
 #include <csnode/node.hpp>
 #include <lib/system/keys.hpp>
-#include <solver/TransactionsValidator.h>
+#include <solver/transactionsvalidator.hpp>
 
 namespace cs {
 

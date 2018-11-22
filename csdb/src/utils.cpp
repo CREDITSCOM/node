@@ -2,23 +2,21 @@
 #include <deque>
 
 #ifdef _MSC_VER
-# include <direct.h>
-# include <Shlobj.h>
+#include <Shlobj.h>
+#include <direct.h>
 #else
-#include <unistd.h>
-#include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace csdb {
 namespace internal {
 
-namespace
-{
+namespace {
 
-struct Node
-{
+struct Node {
   enum Type
   {
     File,
@@ -30,38 +28,32 @@ struct Node
 };
 using NodeList = std::deque<Node>;
 
-NodeList children(const std::string &path)
-{
+NodeList children(const std::string &path) {
   NodeList res;
 
 #if defined(_MSC_VER)
   WIN32_FIND_DATAA d;
   HANDLE h = ::FindFirstFileA((path + "\\*.*").c_str(), &d);
-  if(h != INVALID_HANDLE_VALUE)
-  {
-    do
-    {
+  if (h != INVALID_HANDLE_VALUE) {
+    do {
       const std::string name{d.cFileName};
-      if((0 != (d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) && ((name == ".") || (name == ".."))) {
+      if ((0 != (d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) && ((name == ".") || (name == ".."))) {
         continue;
       }
       res.push_back({(0 != (d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) ? Node::Dir : Node::File, name});
-    }
-    while(::FindNextFileA(h, &d));
+    } while (::FindNextFileA(h, &d));
 
     ::FindClose(h);
   }
 #else
   DIR *d = opendir(path.c_str());
-  if(d)
-  {
+  if (d) {
     struct dirent *entry;
-    while((entry = readdir(d)) != NULL)
-    {
+    while ((entry = readdir(d)) != NULL) {
       const std::string name{entry->d_name};
-      if(entry->d_type == DT_DIR && (name == "." || name == ".."))
+      if (entry->d_type == DT_DIR && (name == "." || name == ".."))
         continue;
-      res.push_back({((entry->d_type == DT_DIR)? Node::Dir : Node::File), name});
+      res.push_back({((entry->d_type == DT_DIR) ? Node::Dir : Node::File), name});
     }
     closedir(d);
   }
@@ -70,11 +62,10 @@ NodeList children(const std::string &path)
   return res;
 }
 
-}
+}  // namespace
 
-std::string path_add_separator(const std::string &path)
-{
-  if(path.empty())
+std::string path_add_separator(const std::string &path) {
+  if (path.empty())
     return path;
 
 #ifdef _MSC_VER
@@ -87,23 +78,21 @@ std::string path_add_separator(const std::string &path)
   return ((end != '\\') && (end != '/')) ? (path + sep) : path;
 }
 
-std::string app_data_path()
-{
+std::string app_data_path() {
 #ifdef _MSC_VER
   char temp_char[MAX_PATH];
   HRESULT hresult = ::SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT | KF_FLAG_CREATE, temp_char);
-  if(hresult == S_OK && temp_char[0])
+  if (hresult == S_OK && temp_char[0])
     return path_add_separator(std::string(temp_char));
 #else
   const std::string res = path_add_separator(std::string(getenv("HOME"))) + ".appdata/";
-  if(path_make(res))
+  if (path_make(res))
     return res;
 #endif
   return std::string();
 }
 
-bool dir_exists(const std::string &path)
-{
+bool dir_exists(const std::string &path) {
 #ifdef _MSC_VER
   const DWORD attr = ::GetFileAttributesA(path.c_str());
   return (INVALID_FILE_ATTRIBUTES != attr) && (0 != (attr & FILE_ATTRIBUTE_DIRECTORY));
@@ -113,13 +102,11 @@ bool dir_exists(const std::string &path)
 #endif
 }
 
-size_t file_size(const std::string &name)
-{
+size_t file_size(const std::string &name) {
 #ifdef _MSC_VER
   WIN32_FILE_ATTRIBUTE_DATA fad;
-  if ((!::GetFileAttributesExA(name.c_str(), GetFileExInfoStandard, &fad))
-       || (INVALID_FILE_ATTRIBUTES == fad.dwFileAttributes)
-       || (0 != (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))) {
+  if ((!::GetFileAttributesExA(name.c_str(), GetFileExInfoStandard, &fad)) ||
+      (INVALID_FILE_ATTRIBUTES == fad.dwFileAttributes) || (0 != (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))) {
     return static_cast<size_t>(-1);
   }
   return ((static_cast<size_t>(fad.nFileSizeHigh) << 32) | static_cast<size_t>(fad.nFileSizeLow));
@@ -132,9 +119,8 @@ size_t file_size(const std::string &name)
 #endif
 }
 
-bool dir_make(const std::string &path)
-{
-  if(dir_exists(path))
+bool dir_make(const std::string &path) {
+  if (dir_exists(path))
     return true;
 
 #ifdef _MSC_VER
@@ -144,9 +130,8 @@ bool dir_make(const std::string &path)
 #endif
 }
 
-bool dir_remove(const std::string &path)
-{
-  if(!dir_exists(path))
+bool dir_remove(const std::string &path) {
+  if (!dir_exists(path))
     return true;
 
 #ifdef _MSC_VER
@@ -156,69 +141,62 @@ bool dir_remove(const std::string &path)
 #endif
 }
 
-bool path_make(const std::string &path)
-{
-  if(dir_make(path))
+bool path_make(const std::string &path) {
+  if (dir_make(path))
     return true;
 
-  switch(errno)
-  {
-  case ENOENT:
-    {
+  switch (errno) {
+    case ENOENT: {
       std::string::size_type pos = path.find_last_of('/');
-      if(pos == std::string::npos)
+      if (pos == std::string::npos)
 #if defined(_MSC_VER)
         pos = path.find_last_of('\\');
       if (pos == std::string::npos)
 #endif
         return false;
-      if(!path_make(path.substr(0, pos)))
+      if (!path_make(path.substr(0, pos)))
         return false;
     }
-    return dir_make(path);
+      return dir_make(path);
 
-  case EEXIST:
+    case EEXIST:
       return dir_exists(path);
 
-  default:
+    default:
       return false;
   }
 }
 
-bool path_remove(const std::string &path)
-{
-  if(dir_remove(path))
+bool path_remove(const std::string &path) {
+  if (dir_remove(path))
     return true;
 
   const NodeList nodes = children(path);
-  for(const auto &it : nodes)
-  {
+  for (const auto &it : nodes) {
     const std::string cur = path_add_separator(path) + it.name;
-    switch(it.type)
-    {
+    switch (it.type) {
       case Node::Dir:
-        if(!path_remove(cur))
+        if (!path_remove(cur))
           return false;
-      break;
+        break;
 
-    case Node::File:
-      if(!file_remove(cur))
-        return false;
+      case Node::File:
+        if (!file_remove(cur))
+          return false;
     }
   }
 
   return dir_remove(path);
 }
 
-size_t path_size(const std::string &path)
-{
+size_t path_size(const std::string &path) {
   if (!dir_exists(path)) {
     return file_size(path);
   }
 
   size_t total = 0;
   ::std::string path_sep = path_add_separator(path);
-  for(const auto &it : children(path)) {
+  for (const auto &it : children(path)) {
     size_t subtotal = path_size(path_sep + it.name);
     if (static_cast<size_t>(-1) != subtotal) {
       total += subtotal;
@@ -228,8 +206,7 @@ size_t path_size(const std::string &path)
   return total;
 }
 
-bool file_remove(const std::string &path)
-{
+bool file_remove(const std::string &path) {
 #ifdef _MSC_VER
   return _unlink(path.c_str()) == 0;
 #else
@@ -237,5 +214,5 @@ bool file_remove(const std::string &path)
 #endif
 }
 
-} // namespace internal
-} // namespace csdb
+}  // namespace internal
+}  // namespace csdb

@@ -1,14 +1,11 @@
 #include "stdafx.h"
 
 #include <csdb/currency.h>
-#include <csstats.h>
 #include <algorithm>
+#include <apihandler.hpp>
 #include <cassert>
 #include <client/params.hpp>
-#include <csdb/currency.h>
-#include <csstats.h>
-
-#include <APIHandler.h>
+#include <csstats.hpp>
 
 namespace csstats {
 
@@ -50,14 +47,14 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-        if(transaction.user_field(0).is_valid())
-          ++periodStats.transactionsSmartCount; //transactionsSmartCount - amount of transactions associated with smart contracts
+        if (transaction.user_field(0).is_valid())
+          ++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
+                                                 // smart contracts
 
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
 
-        Currency currency =
-          currencies_indexed[transaction.currency().to_string()];
+        Currency currency = currencies_indexed[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -97,10 +94,8 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.transactionsCount -= lastPeriodStats.transactionsCount;
 
       for (auto& element : lastPeriodStats.balancePerCurrency) {
-        stat.balancePerCurrency[element.first].integral -=
-          element.second.integral;
-        stat.balancePerCurrency[element.first].fraction -=
-          element.second.fraction;
+        stat.balancePerCurrency[element.first].integral -= element.second.integral;
+        stat.balancePerCurrency[element.first].fraction -= element.second.fraction;
       }
 
       // add new stats
@@ -109,12 +104,11 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.transactionsCount += periodStats.transactionsCount;
 
       for (auto& element : periodStats.balancePerCurrency) {
-        stat.balancePerCurrency[element.first].integral +=
-          element.second.integral;
-        stat.balancePerCurrency[element.first].fraction +=
-          element.second.fraction;
+        stat.balancePerCurrency[element.first].integral += element.second.integral;
+        stat.balancePerCurrency[element.first].fraction += element.second.fraction;
       }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
       cslog() << e.what();
     }
   }
@@ -134,13 +128,9 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   return stats;
 }
 
-AllStats
-csstats::collectAllStats(const Periods& periods)
-{
+AllStats csstats::collectAllStats(const Periods& periods) {
   assert(
-    std::is_sorted(std::begin(periods),
-                   std::end(periods),
-                   [](const Period& l, const Period& r) { return l < r; }));
+      std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
   TRACE("Collecting All stats: started");
 
@@ -148,11 +138,9 @@ csstats::collectAllStats(const Periods& periods)
   stats.second.resize(periods.size());
 
   auto nowGlobal = std::chrono::system_clock::now();
-  auto lastTimePoint =
-    nowGlobal - std::chrono::seconds(collectionPeriods[PeriodIndex::Month]);
+  auto lastTimePoint = nowGlobal - std::chrono::seconds(collectionPeriods[PeriodIndex::Month]);
 
-  for (auto time = nowGlobal; time > lastTimePoint;
-       time -= std::chrono::seconds(updateTimeSec)) {
+  for (auto time = nowGlobal; time > lastTimePoint; time -= std::chrono::seconds(updateTimeSec)) {
     PeriodStats cut;
     cut.timeStamp = time;
 
@@ -168,9 +156,9 @@ csstats::collectAllStats(const Periods& periods)
   while (!blockHash.is_empty() && !quit) {
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
 
-    auto now        = std::chrono::system_clock::now();
+    auto now = std::chrono::system_clock::now();
     auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
-    auto poolTime   = std::chrono::system_clock::from_time_t(poolTime_t);
+    auto poolTime = std::chrono::system_clock::from_time_t(poolTime_t);
 
     using Seconds = std::chrono::seconds;
     Seconds poolAgeSec = std::chrono::duration_cast<Seconds>(now - poolTime);
@@ -189,15 +177,15 @@ csstats::collectAllStats(const Periods& periods)
           ++periodStats.smartContractsCount;
         }
 
-        Currency currency =
-          currencies_indexed[transaction.currency().to_string()];
+        Currency currency = currencies_indexed[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
         periodStats.balancePerCurrency[currency].integral += amount.integral();
         periodStats.balancePerCurrency[currency].fraction += amount.fraction();
       }
-    } else if ((currentCutIndex + 1) < stats.first.size()) {
+    }
+    else if ((currentCutIndex + 1) < stats.first.size()) {
       startCutTime = stats.first[currentCutIndex].timeStamp;
       endCutTime = stats.first[currentCutIndex + 1].timeStamp;
 
@@ -213,14 +201,12 @@ csstats::collectAllStats(const Periods& periods)
       periodStats.transactionsCount += (uint32_t)transactionsCount;
 
       for (size_t i = 0; i < transactionsCount; ++i) {
-        const auto& transaction =
-          pool.transaction(csdb::TransactionID(pool.hash(), i));
+        const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
 
-        Currency currency =
-          currencies_indexed[transaction.currency().to_string()];
+        Currency currency = currencies_indexed[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -235,8 +221,7 @@ csstats::collectAllStats(const Periods& periods)
   lastHash = blockchain.getLastWrittenHash();
 
   auto finishTime = std::chrono::system_clock::now();
-  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-    finishTime - startTime);
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);
 
   TRACE("Collecting All stats: finished (took ", milliseconds.count(), "ms)");
 
@@ -244,8 +229,7 @@ csstats::collectAllStats(const Periods& periods)
 }
 
 csstats::csstats(BlockChain& blockchain)
-  : blockchain(blockchain)
-{
+: blockchain(blockchain) {
   TRACE("csstats start ", "update interval is ", updateTimeSec, " sec");
 
 #ifndef MONITOR_NODE
@@ -294,12 +278,7 @@ csstats::csstats(BlockChain& blockchain)
           TRACE(ss.str());
 #endif
           for (auto& t : s.balancePerCurrency) {
-            TRACE("'",
-                t.first,
-                "' = ",
-                std::to_string(t.second.integral),
-                ".",
-                std::to_string(t.second.fraction));
+            TRACE("'", t.first, "' = ", std::to_string(t.second.integral), ".", std::to_string(t.second.fraction));
           }
         }
 

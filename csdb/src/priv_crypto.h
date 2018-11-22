@@ -1,9 +1,8 @@
 /**
-  * @file priv_crypto.h
-  * @author Roman Bukin
-  */
+ * @file priv_crypto.h
+ * @author Roman Bukin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_PRIVATE_CRYPTO_H_H_INCLUDED_
 #define _CREDITS_CSDB_PRIVATE_CRYPTO_H_H_INCLUDED_
 
@@ -11,14 +10,13 @@
 #include "csdb/internal/types.h"
 
 #ifndef CSDB_UNIT_TEST
-#include "cscrypto/cscrypto.h"
+#include "cscrypto/cscrypto.hpp"
 #endif
 
 namespace csdb {
 namespace priv {
 
-struct crypto
-{
+struct crypto {
 #ifndef CSDB_UNIT_TEST
   static const size_t hash_size = cscrypto::Hash::sizeBytes;
   static const size_t public_key_size = cscrypto::PublicKey::sizeBytes;
@@ -29,7 +27,7 @@ struct crypto
   static internal::byte_array calc_hash(const internal::byte_array &buffer) noexcept;
 };
 
-} // namespace priv
-} // namespace csdb
+}  // namespace priv
+}  // namespace csdb
 
-#endif // _CREDITS_CSDB_PRIVATE_CRYPTO_H_H_INCLUDED_
+#endif  // _CREDITS_CSDB_PRIVATE_CRYPTO_H_H_INCLUDED_

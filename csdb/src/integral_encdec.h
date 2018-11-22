@@ -1,10 +1,10 @@
 /**
-  * @file encdec.h
-  * @author Evgeny V. Zalivochkin
-  *
-  * Файл содержит функции для компактного кодирования целочисленных типов. Максимальный
-  * размер кодируемого типа - 8 байт.
-  */
+ * @file encdec.h
+ * @author Evgeny V. Zalivochkin
+ *
+ * Файл содержит функции для компактного кодирования целочисленных типов. Максимальный
+ * размер кодируемого типа - 8 байт.
+ */
 
 #pragma once
 #ifndef _CREDITS_CSDB_PRIVATE_INTEGRAL_ENCDEC_H_INCLUDED_
@@ -15,7 +15,8 @@
 
 namespace csdb {
 namespace priv {
-enum {
+enum
+{
   MAX_INTEGRAL_ENCODED_SIZE = sizeof(uint64_t) + 1,
 };
 
@@ -27,11 +28,10 @@ enum {
  *                    больше, чем sizeof(uint64) байт.
  * @return  Количество байт, записанное в буфер.
  */
-template<typename T>
-typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value)
-                        && (sizeof(T) <= sizeof(uint64_t)), std::size_t>::type
-encode(void *buf, T value)
-{
+template <typename T>
+typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)),
+                        std::size_t>::type
+encode(void *buf, T value) {
   return encode<uint64_t>(buf, static_cast<uint64_t>(value));
 }
 
@@ -45,11 +45,10 @@ encode(void *buf, T value)
  * @return  Количество байт, прочитынных из \ref buf. 0, если закодированные данные
  *          содержат ошибку или данных недостаточно для полного декодирования.
  */
-template<typename T>
-typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value)
-                         && (sizeof(T) <= sizeof(uint64_t)), std::size_t>::type
-decode(const void *buf, std::size_t size, T& value)
-{
+template <typename T>
+typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)),
+                        std::size_t>::type
+decode(const void *buf, std::size_t size, T &value) {
   uint64_t v;
   std::size_t res = decode<uint64_t>(buf, size, v);
   if (0 != res) {
@@ -70,7 +69,7 @@ std::size_t decode(const void *buf, std::size_t size, bool& value);
 template<>
 std::size_t decode(const void *buf, std::size_t size, uint64_t& value);
 
-} // namespace priv
-} // namespace csdb
+}  // namespace priv
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_PRIVATE_INTEGRAL_ENCDEC_H_INCLUDED_

@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __PACMANS_HPP__
-#define __PACMANS_HPP__
+#ifndef PACMANS_HPP
+#define PACMANS_HPP
+
 #include <boost/asio.hpp>
 
 #include <lib/system/queues.hpp>
@@ -12,8 +13,9 @@ namespace ip = boost::asio::ip;
 template <typename Pacman>
 class TaskPtr {
 public:
-  TaskPtr(TaskPtr&& rhs): ptr_(rhs.ptr_),
-                          owner_(rhs.owner_) {
+  TaskPtr(TaskPtr&& rhs)
+  : ptr_(rhs.ptr_)
+  , owner_(rhs.owner_) {
     rhs.ptr_ = nullptr;
   }
 
@@ -22,14 +24,20 @@ public:
   TaskPtr& operator=(TaskPtr&&) = delete;
 
   ~TaskPtr() {
-    if (ptr_) owner_->releaseTask(ptr_);
+    if (ptr_)
+      owner_->releaseTask(ptr_);
   }
 
-  typename Pacman::Task* operator->() { return &(ptr_->element); }
-  const typename Pacman::Task* operator->() const { return &(ptr_->element); }
+  typename Pacman::Task* operator->() {
+    return &(ptr_->element);
+  }
+  const typename Pacman::Task* operator->() const {
+    return &(ptr_->element);
+  }
 
 private:
-  TaskPtr() { }
+  TaskPtr() {
+  }
 
   typename Pacman::Queue::Element* ptr_;
   Pacman* owner_;
@@ -39,14 +47,17 @@ private:
 
 class IPacMan {
 public:
-  IPacMan(): allocator_(1 << 20) { }
+  IPacMan()
+  : allocator_(1 << 20) {
+  }
 
   struct Task {
     ip::udp::endpoint sender;
     size_t size;
     Packet pack;
 
-    Task() { }
+    Task() {
+    }
 
     Task(const Task&) = delete;
     Task(Task&&) = delete;
@@ -78,7 +89,8 @@ public:
     ip::udp::endpoint endpoint;
     Packet pack;
 
-    Task() { }
+    Task() {
+    }
 
     Task(const Task&) = delete;
     Task(Task&&) = delete;
@@ -98,4 +110,4 @@ private:
   Queue queue_;
 };
 
-#endif // __PACMANS_HPP__
+#endif  // PACMANS_HPP

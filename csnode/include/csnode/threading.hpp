@@ -1,17 +1,18 @@
-#pragma once
+#ifndef THREADING_HPP
+#define THREADING_HPP
 
 #include <assert.h>
+#include <client/params.hpp>
+#include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
-#include <lib/system/cache.hpp>
-#include <client/params.hpp>
 
 #define BOTTLENECKED_SMARTS
 
 #include <condition_variable>
+#include <list>
 #include <thread>
 #include <unordered_map>
-#include <list>
 
 namespace cs {
 class spinlock {
@@ -32,7 +33,6 @@ public:
 template <typename S>
 struct worker_queue {
 private:
-
 #ifdef BOTTLENECKED_SMARTS
   typedef std::list<std::tuple<>> tids_t;
   tids_t tids;
@@ -171,8 +171,7 @@ private:
 public:
   SpinLockedRef(SpinLockable<T>& l)
   : l(&l) {
-    while (this->l->af.test_and_set(std::memory_order_acquire))
-      ;
+    while (this->l->af.test_and_set(std::memory_order_acquire));
   }
   ~SpinLockedRef() {
     if (l)
@@ -204,3 +203,4 @@ SpinLockedRef<T> locked_ref(SpinLockable<T>& l) {
 }
 
 }  // namespace cs
+#endif

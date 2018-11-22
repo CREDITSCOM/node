@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #include "stdafx.h"
 
 #include <iomanip>
@@ -10,8 +9,8 @@
 #include <csignal>
 #endif
 
-#include <lib/system/logger.hpp>
 #include <csnode/node.hpp>
+#include <lib/system/logger.hpp>
 #include <net/transport.hpp>
 
 #include "config.hpp"
@@ -22,7 +21,8 @@ void sigUsr1Handler(int sig) {
   auto _mcleanup = (void (*)(void))dlsym(RTLD_DEFAULT, "_mcleanup");
   if (_mcleanup == NULL) {
     std::cerr << "Unable to find gprof exit hook\n";
-  } else {
+  }
+  else {
     _mcleanup();
   }
   _exit(0);
@@ -32,7 +32,8 @@ void sigUsr1Handler(int sig) {
 const uint32_t CLOSE_TIMEOUT_SECONDS = 10;
 
 void panic() {
-  cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS << " seconds...";
+  cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS
+            << " seconds...";
   std::this_thread::sleep_for(std::chrono::seconds(CLOSE_TIMEOUT_SECONDS));
   exit(1);
 }
@@ -50,20 +51,19 @@ inline void mouseSelectionDisable() {
 extern "C" void sigHandler(int sig) {
   gSignalStatus = 1;
   std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
-  switch (sig)
-  {
-  case SIGINT:
-    LOG_WARN("Signal SIGINT received, exiting");
-    break;
-  case SIGTERM:
-    LOG_WARN("Signal SIGTERM received, exiting");
-    break;
-  case SIGHUP:
-    LOG_WARN("Signal SIGHUP received, exiting");
-    break;
-  default:
-    LOG_WARN("Uncknown signal received!!!");
-    break;
+  switch (sig) {
+    case SIGINT:
+      LOG_WARN("Signal SIGINT received, exiting");
+      break;
+    case SIGTERM:
+      LOG_WARN("Signal SIGTERM received, exiting");
+      break;
+    case SIGHUP:
+      LOG_WARN("Signal SIGHUP received, exiting");
+      break;
+    default:
+      LOG_WARN("Uncknown signal received!!!");
+      break;
   }
 }
 
@@ -83,52 +83,48 @@ void installSignalHandler() {
   }
 }
 #else
-BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
-{
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   gSignalStatus = 1;
   std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
-  switch (fdwCtrlType)
-  {
-    // Handle the CTRL-C signal. 
-  case CTRL_C_EVENT:
-    LOG_WARN("Ctrl-C event\n\n");
-    return TRUE;
+  switch (fdwCtrlType) {
+      // Handle the CTRL-C signal.
+    case CTRL_C_EVENT:
+      LOG_WARN("Ctrl-C event\n\n");
+      return TRUE;
 
-  // CTRL-CLOSE: confirm that the user wants to exit. 
-  case CTRL_CLOSE_EVENT:
-    LOG_WARN("Ctrl-Close event\n\n");
-    return TRUE;
+    // CTRL-CLOSE: confirm that the user wants to exit.
+    case CTRL_CLOSE_EVENT:
+      LOG_WARN("Ctrl-Close event\n\n");
+      return TRUE;
 
-      // Pass other signals to the next handler. 
-  case CTRL_BREAK_EVENT:
-    LOG_WARN("Ctrl-Break event\n\n");
-    return TRUE;
+      // Pass other signals to the next handler.
+    case CTRL_BREAK_EVENT:
+      LOG_WARN("Ctrl-Break event\n\n");
+      return TRUE;
 
-  case CTRL_LOGOFF_EVENT:
-    LOG_WARN("Ctrl-Logoff event\n\n");
-    return FALSE;
+    case CTRL_LOGOFF_EVENT:
+      LOG_WARN("Ctrl-Logoff event\n\n");
+      return FALSE;
 
-  case CTRL_SHUTDOWN_EVENT:
-    LOG_WARN("Ctrl-Shutdown event\n\n");
-    return FALSE;
+    case CTRL_SHUTDOWN_EVENT:
+      LOG_WARN("Ctrl-Shutdown event\n\n");
+      return FALSE;
 
-  default:
-    return FALSE;
+    default:
+      return FALSE;
   }
 }
-#endif // !WIN32
+#endif  // !WIN32
 
 int main(int argc, char* argv[]) {
 #ifdef WIN32
-  if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
-  {
+  if (SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
     std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
     std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
     std::cout << "\n\t !!! closing the console...\n" << std::flush;
     Sleep(2000);
   }
-  else
-  {
+  else {
     std::cout << "\nERROR: Could not set control handler" << std::flush;
     return 1;
   }
@@ -138,7 +134,7 @@ int main(int argc, char* argv[]) {
   std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
   std::cout << "\n\t !!! closing the console...\n" << std::flush;
   sleep(2);
-#endif // WIN32
+#endif  // WIN32
   mouseSelectionDisable();
 #if BUILD_WITH_GPROF
   signal(SIGUSR1, sigUsr1Handler);
@@ -147,10 +143,10 @@ int main(int argc, char* argv[]) {
 
   using namespace boost::program_options;
   options_description desc("Allowed options");
-  desc.add_options()
-    ("help", "produce this message")
-    ("db-path", boost::program_options::value<std::string>(), "path to DB (default: \"test_db/\")")
-    ("config-file", boost::program_options::value<std::string>(), "path to configuration file (default: \"config.ini\"), supported formats: json, xml, ini");
+  desc.add_options()("help", "produce this message")("db-path", boost::program_options::value<std::string>(),
+                                                     "path to DB (default: \"test_db/\")")(
+      "config-file", boost::program_options::value<std::string>(),
+      "path to configuration file (default: \"config.ini\"), supported formats: json, xml, ini");
 
   variables_map vm;
 
@@ -182,7 +178,7 @@ int main(int argc, char* argv[]) {
   if (!node.isGood()) {
     panic();
   }
-    
+
   node.run();
 
   LOG_WARN("+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++");

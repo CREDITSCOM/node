@@ -1,13 +1,13 @@
 /* Send blaming letters to @yrtimd */
 #ifndef __CONFIG_HPP__
 #define __CONFIG_HPP__
-#include <string>
 #include <boost/asio.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
+#include <string>
 
-#include <lib/system/keys.hpp>
 #include <lib/system/common.hpp>
+#include <lib/system/keys.hpp>
 
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
@@ -45,34 +45,65 @@ enum BootstrapType {
 
 class Config {
 public:
-  Config() {} // necessary for testing
+  Config() {
+  }  // necessary for testing
   Config(const Config&) = default;
   Config(Config&&) = default;
 
   static Config read(po::variables_map&);
 
-  const EndpointData& getInputEndpoint() const { return inputEp_; }
-  const EndpointData& getOutputEndpoint() const { return outputEp_; }
+  const EndpointData& getInputEndpoint() const {
+    return inputEp_;
+  }
+  const EndpointData& getOutputEndpoint() const {
+    return outputEp_;
+  }
 
-  const EndpointData& getSignalServerEndpoint() const { return signalServerEp_; }
+  const EndpointData& getSignalServerEndpoint() const {
+    return signalServerEp_;
+  }
 
-  BootstrapType getBootstrapType() const { return bType_; }
-  NodeType getNodeType() const { return nType_; }
-  const std::vector<EndpointData>& getIpList() const { return bList_; }
+  BootstrapType getBootstrapType() const {
+    return bType_;
+  }
+  NodeType getNodeType() const {
+    return nType_;
+  }
+  const std::vector<EndpointData>& getIpList() const {
+    return bList_;
+  }
 
-  const cs::PublicKey& getMyPublicKey() const { return publicKey_; }
-  const std::string& getPathToDB() const { return pathToDb_; }
+  const cs::PublicKey& getMyPublicKey() const {
+    return publicKey_;
+  }
+  const std::string& getPathToDB() const {
+    return pathToDb_;
+  }
 
-  bool isGood() const { return good_; }
+  bool isGood() const {
+    return good_;
+  }
 
-  bool useIPv6() const { return ipv6_; }
-  bool hasTwoSockets() const { return twoSockets_; }
+  bool useIPv6() const {
+    return ipv6_;
+  }
+  bool hasTwoSockets() const {
+    return twoSockets_;
+  }
 
-  uint32_t getMaxNeighbours() const { return maxNeighbours_; }
-  uint64_t getConnectionBandwidth() const { return connectionBandwidth_; }
+  uint32_t getMaxNeighbours() const {
+    return maxNeighbours_;
+  }
+  uint64_t getConnectionBandwidth() const {
+    return connectionBandwidth_;
+  }
 
-  bool isSymmetric() const { return symmetric_; }
-  const EndpointData& getAddressEndpoint() const { return hostAddressEp_; }
+  bool isSymmetric() const {
+    return symmetric_;
+  }
+  const EndpointData& getAddressEndpoint() const {
+    return hostAddressEp_;
+  }
 
   const boost::log::settings& getLoggerSettings() const;
 
@@ -108,4 +139,4 @@ private:
   boost::log::settings loggerSettings_;
 };
 
-#endif // __CONFIG_HPP__
+#endif  // __CONFIG_HPP__

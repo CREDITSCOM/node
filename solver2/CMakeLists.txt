@@ -14,48 +14,48 @@ option(SLV2_BUILD_TESTS "Build unit tests" OFF)
 option(SLV2_AUTORUN_TESTS "Automatically run unit tests after build" OFF)
 	
 add_library(${PROJECT_NAME} STATIC
-	include/solver2/Consensus.h
-	include/solver2/INodeState.h
-	include/solver2/Result.h
-	include/solver2/Stage.h
-	include/solver2/SolverCore.h
-	include/solver2/SolverContext.h
-	include/solver2/CallsQueueScheduler.h
-	include/solver2/TimeoutTracking.h
+	include/solver2/consensus.hpp
+	include/solver2/inodestate.hpp
+	include/solver2/result.hpp
+	include/solver2/stage.hpp
+	include/solver2/solvercore.hpp
+	include/solver2/solvercontext.hpp
+	include/solver2/callsqueuescheduler.hpp
+	include/solver2/timeouttracking.hpp
 
-	include/solver2/states/DefaultStateBehavior.h
-	include/solver2/states/HandleBBState.h
-	include/solver2/states/HandleRTState.h
-	include/solver2/states/NormalState.h
-	include/solver2/states/NoState.h
-	include/solver2/states/SyncState.h
-	include/solver2/states/TrustedStage1State.h
-	include/solver2/states/TrustedStage2State.h
-	include/solver2/states/TrustedStage3State.h
-	include/solver2/states/TrustedPostStageState.h
-	include/solver2/states/PrimitiveWriteState.h
-	include/solver2/states/WritingState.h
-	include/solver2/states/WaitingState.h
+	include/solver2/states/defaultstatebehavior.hpp
+	include/solver2/states/handlebbstate.hpp
+	include/solver2/states/handlertstate.hpp
+	include/solver2/states/normalstate.hpp
+	include/solver2/states/nostate.hpp
+	include/solver2/states/syncstate.hpp
+	include/solver2/states/trustedstage1state.hpp
+	include/solver2/states/trustedstage2state.hpp
+	include/solver2/states/trustedstage3state.hpp
+	include/solver2/states/trustedpoststagestate.hpp
+	include/solver2/states/primitivewritestate.hpp
+	include/solver2/states/writingstate.hpp
+	include/solver2/states/waitingstate.hpp
 
-	src/SolverCore.cpp
-	src/SolverContext.cpp
-	src/SolverInterface.cpp
-	src/SolverTransitions.cpp
-	src/CallsQueueScheduler.cpp
-	src/TimeoutTracking.cpp
+	src/solvercore.cpp
+	src/solvercontext.cpp
+	src/solverinterface.cpp
+	src/solvertransitions.cpp
+	src/callsqueuescheduler.cpp
+	src/timeouttracking.cpp
 
-	src/states/DefaultStateBehavior.cpp
-	src/states/HandleBBState.cpp
-	src/states/HandleRTState.cpp
-	src/states/NormalState.cpp
-	src/states/SyncState.cpp
-	src/states/TrustedStage1State.cpp
-	src/states/TrustedStage2State.cpp
-	src/states/TrustedStage3State.cpp
-	src/states/TrustedPostStageState.cpp
-	src/states/PrimitiveWriteState.cpp
-	src/states/WritingState.cpp
-	src/states/WaitingState.cpp
+	src/states/defaultstatebehavior.cpp
+	src/states/handlebbstate.cpp
+	src/states/handlertstate.cpp
+	src/states/normalstate.cpp
+	src/states/syncstate.cpp
+	src/states/trustedstage1state.cpp
+	src/states/trustedstage2state.cpp
+	src/states/trustedstage3state.cpp
+	src/states/trustedpoststagestate.cpp
+	src/states/primitivewritestate.cpp
+	src/states/writingstate.cpp
+	src/states/waitingstate.cpp
 )
 
 target_include_directories(solver2 PUBLIC

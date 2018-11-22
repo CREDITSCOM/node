@@ -1,7 +1,7 @@
 /**
-  * @file transaction_p.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file transaction_p.h
+ * @author Evgeny V. Zalivochkin
+ */
 
 #pragma once
 #ifndef _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
@@ -21,19 +21,17 @@
 
 namespace csdb {
 
-class TransactionID::priv : public ::csdb::internal::shared_data
-{
-  inline priv() :
-    index_(0)
-  {}
+class TransactionID::priv : public ::csdb::internal::shared_data {
+  inline priv()
+  : index_(0) {
+  }
 
-  inline priv(PoolHash pool_hash, TransactionID::sequence_t index) :
-    pool_hash_(pool_hash),
-    index_(index)
-  {}
+  inline priv(PoolHash pool_hash, TransactionID::sequence_t index)
+  : pool_hash_(pool_hash)
+  , index_(index) {
+  }
 
-  inline void _update(PoolHash pool_hash, TransactionID::sequence_t index)
-  {
+  inline void _update(PoolHash pool_hash, TransactionID::sequence_t index) {
     pool_hash_ = pool_hash;
     index_ = index;
   }
@@ -45,43 +43,41 @@ class TransactionID::priv : public ::csdb::internal::shared_data
   friend class Pool;
 };
 
-class Transaction::priv : public ::csdb::internal::shared_data
-{
-  inline priv() :
-    read_only_(false),
-    amount_(0_c),
-    signature_()
-  {}
+class Transaction::priv : public ::csdb::internal::shared_data {
+  inline priv()
+  : read_only_(false)
+  , amount_(0_c)
+  , signature_() {
+  }
 
-  inline priv(const priv& other) :
-    ::csdb::internal::shared_data(),
-    read_only_(false),
-    innerID_(other.innerID_),
-    source_(other.source_),
-    target_(other.target_),
-    currency_(other.currency_),
-    amount_(other.amount_),
-    max_fee_(other.max_fee_),
-    counted_fee_(other.counted_fee_),
-    signature_(other.signature_),
-    user_fields_(other.user_fields_)
-  {}
+  inline priv(const priv& other)
+  : ::csdb::internal::shared_data()
+  , read_only_(false)
+  , innerID_(other.innerID_)
+  , source_(other.source_)
+  , target_(other.target_)
+  , currency_(other.currency_)
+  , amount_(other.amount_)
+  , max_fee_(other.max_fee_)
+  , counted_fee_(other.counted_fee_)
+  , signature_(other.signature_)
+  , user_fields_(other.user_fields_) {
+  }
 
   inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-    AmountCommission max_fee, AmountCommission counted_fee, std::string signature) :
-    read_only_(false),
-    innerID_(innerID),
-    source_(source),
-    target_(target),
-    currency_(currency),
-    amount_(amount),
-    max_fee_(max_fee),
-    counted_fee_(counted_fee),
-    signature_(signature)
-  {}
+              AmountCommission max_fee, AmountCommission counted_fee, std::string signature)
+  : read_only_(false)
+  , innerID_(innerID)
+  , source_(source)
+  , target_(target)
+  , currency_(currency)
+  , amount_(amount)
+  , max_fee_(max_fee)
+  , counted_fee_(counted_fee)
+  , signature_(signature) {
+  }
 
-  inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index)
-  {
+  inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index) {
     id_.d->_update(pool_hash, index);
     read_only_ = true;
   }
@@ -103,6 +99,6 @@ class Transaction::priv : public ::csdb::internal::shared_data
   friend class ::csdb::internal::shared_data_ptr<priv>;
 };
 
-} // namespace csdb
+}  // namespace csdb
 
-#endif // _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
+#endif  // _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_

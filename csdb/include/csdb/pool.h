@@ -1,24 +1,23 @@
 /**
-  * @file pool.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file pool.h
+ * @author Evgeny V. Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_POOL_H_INCLUDED_
 #define _CREDITS_CSDB_POOL_H_INCLUDED_
 
+#include <array>
 #include <cinttypes>
 #include <climits>
-#include <vector>
-#include <array>
 #include <string>
+#include <vector>
 
 #include "csdb/address.h"
-#include "csdb/transaction.h"
-#include "csdb/storage.h"
-#include "csdb/user_field.h"
 #include "csdb/internal/shared_data.h"
 #include "csdb/internal/types.h"
+#include "csdb/storage.h"
+#include "csdb/transaction.h"
+#include "csdb/user_field.h"
 
 #include <lib/system/common.hpp>
 
@@ -30,10 +29,9 @@ class TransactionID;
 namespace priv {
 class obstream;
 class ibstream;
-} // namespace priv
+}  // namespace priv
 
-class PoolHash
-{
+class PoolHash {
   SHARED_DATA_CLASS_DECLARE(PoolHash)
 
 public:
@@ -53,8 +51,8 @@ public:
   ::csdb::internal::byte_array to_binary() const noexcept;
   static PoolHash from_binary(const ::csdb::internal::byte_array& data);
 
-  bool operator ==(const PoolHash &other) const noexcept;
-  inline bool operator !=(const PoolHash &other) const noexcept;
+  bool operator==(const PoolHash& other) const noexcept;
+  inline bool operator!=(const PoolHash& other) const noexcept;
 
   /**
    * @brief operator <
@@ -62,7 +60,7 @@ public:
    * Оператор предназначен для возможности сортировок контейнеров класса или
    * использования класса в качестве ключа.
    */
-  bool operator < (const PoolHash &other) const noexcept;
+  bool operator<(const PoolHash& other) const noexcept;
 
   static PoolHash calc_from_data(const internal::byte_array& data);
 
@@ -74,43 +72,54 @@ private:
   friend class Storage;
 };
 
-class Pool
-{
+class Pool {
   SHARED_DATA_CLASS_DECLARE(Pool)
 public:
   using sequence_t = uint64_t;
   using Transactions = std::vector<csdb::Transaction>;
-  class NewWalletInfo
-  {
+  class NewWalletInfo {
   public:
-      using WalletId = csdb::internal::WalletId;
+    using WalletId = csdb::internal::WalletId;
 
-      enum AddressType
-      {
-          AddressIsSource,
-          AddressIsTarget
-      };
-      struct AddressId
-      {
-          size_t trxInd_ : sizeof(size_t) * CHAR_BIT - 1;
-          size_t addressType_ : 1;
+    enum AddressType {
+      AddressIsSource,
+      AddressIsTarget
+    };
 
-          bool operator==(const AddressId& rh) const { return trxInd_ == rh.trxInd_  &&  addressType_ == rh.addressType_; }
-          bool operator!=(const AddressId& rh) const { return !operator==(rh); }
-      };
+    struct AddressId {
+      size_t trxInd_ : sizeof(size_t) * CHAR_BIT - 1;
+      size_t addressType_ : 1;
+
+      bool operator==(const AddressId& rh) const {
+        return trxInd_ == rh.trxInd_ && addressType_ == rh.addressType_;
+      }
+      bool operator!=(const AddressId& rh) const {
+        return !operator==(rh);
+      }
+    };
+
   public:
-      NewWalletInfo() : addressId_(), walletId_()
-      {}
-      NewWalletInfo(AddressId addressId, csdb::internal::WalletId walletId) : addressId_(addressId), walletId_(walletId)
-      {}
-      void put(::csdb::priv::obstream&) const;
-      bool get(::csdb::priv::ibstream&);
+    NewWalletInfo()
+    : addressId_()
+    , walletId_() {
+    }
+    NewWalletInfo(AddressId addressId, csdb::internal::WalletId walletId)
+    : addressId_(addressId)
+    , walletId_(walletId) {
+    }
+    void put(::csdb::priv::obstream&) const;
+    bool get(::csdb::priv::ibstream&);
 
-      bool operator==(const NewWalletInfo& rh) const { return addressId_ == rh.addressId_  &&  walletId_ == rh.walletId_; }
-      bool operator!=(const NewWalletInfo& rh) const { return !operator==(rh); }
+    bool operator==(const NewWalletInfo& rh) const {
+      return addressId_ == rh.addressId_ && walletId_ == rh.walletId_;
+    }
+    bool operator!=(const NewWalletInfo& rh) const {
+      return !operator==(rh);
+    }
+
   public:
-      AddressId addressId_;
-      WalletId walletId_;
+    AddressId addressId_;
+    WalletId walletId_;
   };
   using NewWallets = std::vector<NewWalletInfo>;
 
@@ -127,8 +136,6 @@ public:
 
   Pool meta_from_byte_stream(const char*, size_t);
   static Pool from_lz4_byte_stream(const char*, size_t, size_t);
-
-
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -170,9 +177,10 @@ public:
    */
   bool add_transaction(Transaction transaction
 #ifdef CSDB_UNIT_TEST
-                       , bool skip_check
+                       ,
+                       bool skip_check
 #endif
-                       );
+  );
 
   /**
    * @brief Закончить формирование пула.
@@ -287,6 +295,6 @@ inline bool PoolHash::operator !=(const PoolHash &other) const noexcept
 {
   return !operator ==(other);
 }
-} // namespace csdb
+}  // namespace csdb
 
 #endif // _CREDITS_CSDB_POOL_H_INCLUDED_

@@ -1,174 +1,164 @@
 #ifndef TRANSACTIONS_PACKET_HPP
 #define TRANSACTIONS_PACKET_HPP
 
-#include <vector>
-#include <string>
 #include <csdb/transaction.h>
 #include <lib/system/common.hpp>
+#include <string>
+#include <vector>
 
-namespace cs
-{
-    ///
-    /// Wrapper of std::vector<uint8_t> to represent hash
-    ///
-    class TransactionsPacketHash
-    {
-    public: // Static interface
+namespace cs {
+///
+/// Wrapper of std::vector<uint8_t> to represent hash
+///
+class TransactionsPacketHash {
+public:  // Static interface
+  ///
+  /// @brief Gets a hash from a string representation
+  /// @param String representation of a hash
+  /// @return Hash obtained from a string representation.
+  ///         If the string representation is incorrect, an empty hash is returned.
+  ///
+  static TransactionsPacketHash fromString(const ::std::string& str);
 
-        ///
-        /// @brief Gets a hash from a string representation
-        /// @param String representation of a hash
-        /// @return Hash obtained from a string representation.
-        ///         If the string representation is incorrect, an empty hash is returned.
-        ///
-        static TransactionsPacketHash fromString(const ::std::string& str);
+  ///
+  /// @brief Gets a hash from a binary representation
+  /// @param Binary representation of a hash
+  /// @return Hash obtained from a binary representation.
+  ///         If the binary representation is incorrect, an empty hash is returned.
+  ///
+  static TransactionsPacketHash fromBinary(const cs::Bytes& data);
 
-        ///
-        /// @brief Gets a hash from a binary representation
-        /// @param Binary representation of a hash
-        /// @return Hash obtained from a binary representation.
-        ///         If the binary representation is incorrect, an empty hash is returned.
-        ///
-        static TransactionsPacketHash fromBinary(const cs::Bytes& data);
+  ///
+  /// @brief Calculates hash from binary data
+  /// @param vector of bytes
+  /// @return hash
+  ///
+  static TransactionsPacketHash calcFromData(const cs::Bytes& data);
 
-        ///
-        /// @brief Calculates hash from binary data
-        /// @param vector of bytes
-        /// @return hash
-        ///
-        static TransactionsPacketHash calcFromData(const cs::Bytes& data);
+public:  // Interface
+  ///
+  /// @brief Сhecks hash size bytes on 0
+  /// @return true if hash size == 0
+  ///
+  bool isEmpty() const noexcept;
 
-    public: // Interface
+  ///
+  /// @brief Returns hash bytes count
+  /// @return hash bytes count
+  ///
+  size_t size() const noexcept;
 
-        ///
-        /// @brief Сhecks hash size bytes on 0
-        /// @return true if hash size == 0
-        ///
-        bool isEmpty() const noexcept;
+  ///
+  /// @brief Coverts transactions packet hash to string.
+  /// @return hash bytes as string
+  ///
+  std::string toString() const noexcept;
 
-        ///
-        /// @brief Returns hash bytes count
-        /// @return hash bytes count
-        ///
-        size_t size() const noexcept;
+  ///
+  /// @brief Coverts transactions packet hash to binary.
+  /// @return vector of bytes
+  ///
+  const cs::Bytes& toBinary() const noexcept;
 
-        ///
-        /// @brief Coverts transactions packet hash to string.
-        /// @return hash bytes as string
-        ///
-        std::string toString() const noexcept;
+  bool operator==(const TransactionsPacketHash& other) const noexcept;
+  bool operator!=(const TransactionsPacketHash& other) const noexcept;
+  bool operator<(const TransactionsPacketHash& other) const noexcept;
 
-        ///
-        /// @brief Coverts transactions packet hash to binary.
-        /// @return vector of bytes
-        ///
-        const cs::Bytes& toBinary() const noexcept;
+private:  // Members
+  cs::Bytes m_bytes;
+};
 
-        bool operator == (const TransactionsPacketHash& other) const noexcept;
-        bool operator != (const TransactionsPacketHash& other) const noexcept;
-        bool operator <  (const TransactionsPacketHash& other) const noexcept;
+///
+/// Flexible strorage for transactions
+///
+class TransactionsPacket {
+public:  // Static interface
+  ///
+  /// @brief Gets a transactions packet from a binary representation.
+  /// @param Binary representation of a packet.
+  /// @return Hash obtained from a binary representation.
+  ///         If the binary representation is incorrect, an empty packet is returned.
+  ///
+  static TransactionsPacket fromBinary(const cs::Bytes& data);
 
-    private: // Members
+  ///
+  /// @brief Gets a transactions packet from a binary representation
+  /// @param Binary representation of a transactions packet
+  /// @param Binary representation size
+  /// @return Hash obtained from a binary representation.
+  ///         If the binary representation is incorrect, an empty packet is returned.
+  ///
+  static TransactionsPacket fromByteStream(const char* data, size_t size);
 
-        cs::Bytes m_bytes;
-    };
+public:  // Interface
+  TransactionsPacket() = default;
 
-    ///
-    /// Flexible strorage for transactions
-    ///
-    class TransactionsPacket
-    {
-    public: // Static interface
+  TransactionsPacket(const TransactionsPacket& packet) = default;
+  TransactionsPacket(TransactionsPacket&& packet);
 
-        ///
-        /// @brief Gets a transactions packet from a binary representation.
-        /// @param Binary representation of a packet.
-        /// @return Hash obtained from a binary representation.
-        ///         If the binary representation is incorrect, an empty packet is returned.
-		///
-        static TransactionsPacket fromBinary(const cs::Bytes& data);
+  TransactionsPacket& operator=(const TransactionsPacket& packet);
 
-        ///
-        /// @brief Gets a transactions packet from a binary representation
-        /// @param Binary representation of a transactions packet
-        /// @param Binary representation size
-        /// @return Hash obtained from a binary representation.
-        ///         If the binary representation is incorrect, an empty packet is returned.
-		///
-        static TransactionsPacket fromByteStream(const char* data, size_t size);
+  ///
+  /// @brief Coverts transactions packet to binary representation.
+  /// @return packet as binary representation
+  ///
+  cs::Bytes toBinary() const noexcept;
 
-    public: // Interface
+  ///
+  /// @brief Generates hash
+  /// @return True if hash generated successed
+  ///
+  bool makeHash();
 
-        TransactionsPacket() = default;
+  ///
+  /// @brief Checks on hash empty state
+  /// @return True if hash is empty
+  ///
+  bool isHashEmpty() const noexcept;
 
-        TransactionsPacket(const TransactionsPacket& packet) = default;
-        TransactionsPacket(TransactionsPacket&& packet);
+  ///
+  /// @brief Returns packet hash
+  /// @return Packet hash, check it on empty state
+  ///
+  const TransactionsPacketHash& hash() const noexcept;
 
-        TransactionsPacket& operator=(const TransactionsPacket& packet);
+  ///
+  /// @brief Returns transactions count
+  /// @return Size of transactions vector
+  ///
+  size_t transactionsCount() const noexcept;
 
-        ///
-        /// @brief Coverts transactions packet to binary representation.
-        /// @return packet as binary representation
-        ///
-        cs::Bytes toBinary() const noexcept;
+  ///
+  /// @brief Adds transaction to transaction vector
+  /// @param transaction Any transaction to add
+  ///
+  bool addTransaction(const csdb::Transaction& transaction);
 
-        ///
-        /// @brief Generates hash
-        /// @return True if hash generated successed
-        ///
-        bool makeHash();
+  ///
+  /// @brief Returns transactions
+  /// @return Reference to transactions vector
+  ///
+  const std::vector<csdb::Transaction>& transactions() const noexcept;
 
-        ///
-        /// @brief Checks on hash empty state
-        /// @return True if hash is empty
-        ///
-        bool isHashEmpty() const noexcept;
+  ///
+  /// @brief Returns trabsactions, non const version
+  /// @return Reference to transactions vector
+  ///
+  std::vector<csdb::Transaction>& transactions();
 
-        ///
-        /// @brief Returns packet hash
-        /// @return Packet hash, check it on empty state
-        ///
-        const TransactionsPacketHash& hash() const noexcept;
+  ///
+  /// @brief Clears transactions vector
+  ///
+  void clear() noexcept;
 
-        ///
-        /// @brief Returns transactions count
-        /// @return Size of transactions vector
-        ///
-        size_t transactionsCount() const noexcept;
+private:  // Service
+  void put(::csdb::priv::obstream& os) const;
+  bool get(::csdb::priv::ibstream& is);
 
-        ///
-        /// @brief Adds transaction to transaction vector
-        /// @param transaction Any transaction to add
-        ///
-        bool addTransaction(const csdb::Transaction& transaction);
+private:  // Members
+  TransactionsPacketHash m_hash;
+  std::vector<csdb::Transaction> m_transactions;
+};
+}  // namespace cs
 
-        ///
-        /// @brief Returns transactions
-        /// @return Reference to transactions vector
-        ///
-        const std::vector<csdb::Transaction>& transactions() const noexcept;
-
-        ///
-        /// @brief Returns trabsactions, non const version
-        /// @return Reference to transactions vector
-        ///
-        std::vector<csdb::Transaction>& transactions();
-
-        ///
-        /// @brief Clears transactions vector
-        ///
-        void clear() noexcept;
-
-    private: // Service
-
-        void put(::csdb::priv::obstream& os) const;
-        bool get(::csdb::priv::ibstream& is);
-
-    private: // Members
-
-        TransactionsPacketHash m_hash;
-        std::vector<csdb::Transaction> m_transactions;
-    };
-}
-
-#endif // TRANSACTIONS_PACKET_HPP
+#endif  // TRANSACTIONS_PACKET_HPP

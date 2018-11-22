@@ -1,7 +1,7 @@
 /**
-  * @file shared_data_ptr_implementation.h
-  * @author Evgeny V. Zalivochkin
-  */
+ * @file shared_data_ptr_implementation.h
+ * @author Evgeny V. Zalivochkin
+ */
 
 #pragma once
 #ifndef _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_
@@ -14,16 +14,19 @@
 namespace csdb {
 namespace internal {
 
-class shared_data
-{
+class shared_data {
 public:
-  inline shared_data() : ref(0) {}
-  inline shared_data(const shared_data&) : ref(0) {}
+  inline shared_data()
+  : ref(0) {
+  }
+  inline shared_data(const shared_data &)
+  : ref(0) {
+  }
 
 private:
-  shared_data(shared_data&&) = delete;
-  shared_data &operator=(const shared_data&) = delete;
-  shared_data &operator=(shared_data&&) = delete;
+  shared_data(shared_data &&) = delete;
+  shared_data &operator=(const shared_data &) = delete;
+  shared_data &operator=(shared_data &&) = delete;
 
 public:
   mutable std::atomic<std::size_t> ref;
@@ -34,9 +37,9 @@ public:
 };
 
 template <class T>
-inline shared_data_ptr<T>::shared_data_ptr(const shared_data_ptr<T> &o) noexcept : d(o.d)
-{
-  if(d) {
+inline shared_data_ptr<T>::shared_data_ptr(const shared_data_ptr<T> &o) noexcept
+: d(o.d) {
+  if (d) {
     if (1 < (++d->ref)) {
 #ifdef CSDB_UNIT_TEST
       d->copy_semantic_used_ = true;
@@ -46,8 +49,8 @@ inline shared_data_ptr<T>::shared_data_ptr(const shared_data_ptr<T> &o) noexcept
 }
 
 template <class T>
-inline shared_data_ptr<T>::shared_data_ptr(shared_data_ptr<T>&& o) noexcept : d(o.d)
-{
+inline shared_data_ptr<T>::shared_data_ptr(shared_data_ptr<T> &&o) noexcept
+: d(o.d) {
   o.d = nullptr;
 #ifdef CSDB_UNIT_TEST
   d->move_semantic_used_ = true;
@@ -55,9 +58,9 @@ inline shared_data_ptr<T>::shared_data_ptr(shared_data_ptr<T>&& o) noexcept : d(
 }
 
 template <class T>
-inline shared_data_ptr<T>::shared_data_ptr(T *data) noexcept : d(data)
-{
-  if(d) {
+inline shared_data_ptr<T>::shared_data_ptr(T *data) noexcept
+: d(data) {
+  if (d) {
     if (1 < (++d->ref)) {
 #ifdef CSDB_UNIT_TEST
       d->copy_semantic_used_ = true;
@@ -67,18 +70,16 @@ inline shared_data_ptr<T>::shared_data_ptr(T *data) noexcept : d(data)
 }
 
 template <class T>
-inline shared_data_ptr<T>::~shared_data_ptr()
-{
+inline shared_data_ptr<T>::~shared_data_ptr() {
   if (d && (0 == (--d->ref))) {
     delete d;
   }
 }
 
 template <class T>
-inline shared_data_ptr<T> & shared_data_ptr<T>::operator=(const shared_data_ptr<T> &o) noexcept
-{
-  if(o.d != d) {
-    if(o.d) {
+inline shared_data_ptr<T> &shared_data_ptr<T>::operator=(const shared_data_ptr<T> &o) noexcept {
+  if (o.d != d) {
+    if (o.d) {
       if (1 < (++o.d->ref)) {
 #ifdef CSDB_UNIT_TEST
         o.d->copy_semantic_used_ = true;
@@ -95,8 +96,7 @@ inline shared_data_ptr<T> & shared_data_ptr<T>::operator=(const shared_data_ptr<
 }
 
 template <class T>
-inline shared_data_ptr<T> & shared_data_ptr<T>::operator=(shared_data_ptr<T> &&o) noexcept
-{
+inline shared_data_ptr<T> &shared_data_ptr<T>::operator=(shared_data_ptr<T> &&o) noexcept {
   std::swap(d, o.d);
 #ifdef CSDB_UNIT_TEST
   d->move_semantic_used_ = true;
@@ -105,20 +105,19 @@ inline shared_data_ptr<T> & shared_data_ptr<T>::operator=(shared_data_ptr<T> &&o
 }
 
 template <class T>
-inline void shared_data_ptr<T>::detach()
-{
+inline void shared_data_ptr<T>::detach() {
   if (d && (d->ref != 1)) {
     T *x = new T(*d);
     ++x->ref;
-    if(0 == (--d->ref)) {
+    if (0 == (--d->ref)) {
       delete d;
     }
     d = x;
   }
 }
 
-} // namespace internal
-} // namespace csdb
+}  // namespace internal
+}  // namespace csdb
 
 #ifdef CSDB_UNIT_TEST
 # define UNIT_TEST_METHODS_IMPLEMENTATION(class_name) \

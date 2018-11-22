@@ -2,9 +2,9 @@
 #define NODE_CORE_HPP
 
 #include <csdb/pool.h>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
-#include <map>
 
 #include <boost/circular_buffer.hpp>
 
@@ -15,132 +15,121 @@
 #include <lib/system/keys.hpp>
 #include <lib/system/metastorage.hpp>
 
-// ms
+// time in ms only
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 50;
 const std::size_t ROUND_DELAY = 1000;
 const std::size_t TIME_TO_AWAIT_SS_ROUND = 7000;
 
-namespace std
-{
-    // transactions packet hash specialization
-    template<>
-    struct hash<cs::TransactionsPacketHash>
-    {
-        std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
-    };
-}
+namespace std {
+// transactions packet hash specialization
+template <>
+struct hash<cs::TransactionsPacketHash> {
+  std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+};
+}  // namespace std
 
 enum NodeLevel
 {
-    Normal,
-    Confidant,
-    Main,
-    Writer
+  Normal,
+  Confidant,
+  Main,
+  Writer
 };
 
-namespace cs
+namespace cs {
+// table for fast transactions storage
+using TransactionsPacketTable =
+    std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: chechk performance of map/unordered_map
+
+// array of packets
+using TransactionsBlock = std::vector<cs::TransactionsPacket>;
+
+// array of notifications
+using Notifications = std::vector<cs::Bytes>;
+
+// round data
+using ConfidantsKeys = std::vector<PublicKey>;
+using Hashes = std::vector<cs::TransactionsPacketHash>;
+using Packets = std::vector<cs::TransactionsPacket>;
+
+using PoolsRequestedSequences = std::vector<RoundNumber>;
+using PoolsBlock = std::vector<csdb::Pool>;
+
+enum NodeConsts : uint32_t
 {
-    // table for fast transactions storage
-    using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // TODO: chechk performance of map/unordered_map
+  PublicKeyLength = PUBLIC_KEY_LENGTH,
+  Black2HashLength = BLAKE2_HASH_LENGTH,
+  HashLength = HASH_LENGTH,
+  SignatureLength = SIGNATURE_LENGTH,
+  PrivateKeyLength = PRIVATE_KEY_LENGTH,
+  NeighboursRequestDelay = 100
+};
 
-    // array of packets
-    using TransactionsBlock = std::vector<cs::TransactionsPacket>;
+enum SolverConsts : uint32_t
+{
+  TransactionsFlushRound = 2,
+  TransactionsPacketInterval = 50,
+  MaxPacketTransactions = 500,
+};
 
-    // array of notifications
-    using Notifications = std::vector<cs::Bytes>;
+// all info about round
+struct Characteristic {
+  cs::Bytes mask;
+};
 
-    // round data
-    using ConfidantsKeys = std::vector<PublicKey>;
-    using Hashes = std::vector<cs::TransactionsPacketHash>;
-    using Packets = std::vector<cs::TransactionsPacket>;
+struct RoundTable {
+  RoundNumber round = 0;
+  PublicKey general;
+  ConfidantsKeys confidants;
+  Hashes hashes;
+  Characteristic charBytes;
+};
 
-    using PoolsRequestedSequences = std::vector<RoundNumber>;
-    using PoolsBlock = std::vector<csdb::Pool>;
+struct PoolMetaInfo {
+  std::string timestamp;
+  csdb::Pool::sequence_t sequenceNumber;
+};
 
-    enum NodeConsts : uint32_t
-    {
-        PublicKeyLength = PUBLIC_KEY_LENGTH,
-        Black2HashLength = BLAKE2_HASH_LENGTH,
-        HashLength = HASH_LENGTH,
-        SignatureLength = SIGNATURE_LENGTH,
-        PrivateKeyLength = PRIVATE_KEY_LENGTH,
-        NeighboursRequestDelay = 50 // ms
-    };
+struct HashVector {
+  uint8_t sender;
+  cs::Hash hash;
+  cs::Signature signature;
+};
 
-    enum SolverConsts : uint32_t
-    {
-        TransactionsFlushRound = 2,
-        TransactionsPacketInterval = 50,    // ms
-        MaxPacketTransactions = 500,
-    };
+constexpr std::size_t hashVectorCount = 5;
 
-    // all info about round
-    struct Characteristic
-    {
-      cs::Bytes mask;
-    };
+struct HashMatrix {
+  uint8_t sender;
+  HashVector hashVector[hashVectorCount];
+  cs::Signature signature;
+};
 
-    struct RoundTable
-    {
-        RoundNumber round = 0;
-        PublicKey general;
-        ConfidantsKeys confidants;
-        Hashes hashes;
-        Characteristic charBytes;
-    };
+// metas
+struct PoolSyncMeta {
+  csdb::Pool pool;
+  cs::Signature signature;
+  cs::PublicKey sender;
+};
 
-    struct PoolMetaInfo
-    {
-        std::string timestamp;
-        csdb::Pool::sequence_t sequenceNumber;
-    };
+using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
 
-    struct HashVector
-    {
-        uint8_t sender;
-        cs::Hash hash;
-        cs::Signature signature;
-    };
+struct ConveyerMeta {
+  cs::Characteristic characteristic;
+  cs::TransactionsPacketTable hashTable;
+  cs::Hashes neededHashes;
+  cs::RoundTable roundTable;
+  cs::Notifications notifications;
+  cs::TransactionsPacket invalidTransactions;
+};
 
-    constexpr std::size_t hashVectorCount = 5;
+struct CharacteristicMeta {
+  cs::Bytes bytes;
+  cs::PublicKey sender;
+};
 
-    struct HashMatrix
-    {
-        uint8_t sender;
-        HashVector hashVector[hashVectorCount];
-        cs::Signature signature;
-    };
+// meta storages
+using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
+using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
+}  // namespace cs
 
-    // metas
-    struct PoolSyncMeta
-    {
-        csdb::Pool pool;
-        cs::Signature signature;
-        cs::PublicKey sender;
-    };
-
-    using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
-
-    struct ConveyerMeta
-    {
-        cs::Characteristic characteristic;
-        cs::TransactionsPacketTable hashTable;
-        cs::Hashes neededHashes;
-        cs::RoundTable roundTable;
-        cs::Notifications notifications;
-        cs::TransactionsPacket invalidTransactions;
-    };
-
-    struct CharacteristicMeta
-    {
-        cs::Bytes bytes;
-        cs::PublicKey sender;
-    };
-
-    // meta storages
-    using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
-    using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
-}
-
-#endif // NODE_CORE_HPP
-
+#endif  // NODE_CORE_HPP

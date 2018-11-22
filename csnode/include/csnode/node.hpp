@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #ifndef NODE_HPP
 #define NODE_HPP
 
@@ -6,12 +5,12 @@
 #include <memory>
 #include <string>
 
-#include <csstats.h>
-#include <csconnector/csconnector.h>
+#include <csconnector/csconnector.hpp>
+#include <csstats.hpp>
 #include <client/config.hpp>
 
-#include <lib/system/keys.hpp>
 #include <csnode/conveyer.hpp>
+#include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -22,11 +21,11 @@
 class Transport;
 
 namespace slv2 {
-  class SolverCore;
+class SolverCore;
 }
 
 namespace cs {
-  class PoolSynchronizer;
+class PoolSynchronizer;
 }
 
 class Node {
@@ -41,7 +40,7 @@ public:
   void run();
   void stop();
 
-  //static void stop();
+  // static void stop();
 
   // incoming requests processing
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
@@ -50,14 +49,15 @@ public:
   void getHash(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getTransactionsPacket(const uint8_t*, const std::size_t);
 
-  //SOLVER3 methods
+  // SOLVER3 methods
   void getStageOne(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  //SOLVER3 methods
+  // SOLVER3 methods
   void sendStageOne(cs::StageOne&);
+
   // sends StageOne request to respondent about required
   void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void requestStageOne(uint8_t respondent, uint8_t required);
@@ -90,14 +90,14 @@ public:
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
-  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& respondent);
+  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
+                         const cs::PublicKey& respondent);
   bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getRoundTable(const uint8_t*, const size_t, const cs::RoundNumber);
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
@@ -109,7 +109,7 @@ public:
 
   cs::Bytes createNotification(const cs::PublicKey& writerPublicKey);
   void createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
-                                        const cs::Signature& signature, const cs::Notifications& notifications);
+                                   const cs::Signature& signature, const cs::Notifications& notifications);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -133,24 +133,24 @@ public:
   // start new round
   void sendRoundTable(const cs::RoundTable& round);
 
-  template<typename... Args>
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  template <typename... Args>
+  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
-  template<typename... Args>
-  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
-
-  template <class... Args>
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  template <typename... Args>
+  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+
+  template <class... Args>
+  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound( std::vector<cs::PublicKey>&& confidantNodes);
+  void initNextRound(std::vector<cs::PublicKey>&& confidantNodes);
   void initNextRound(const cs::RoundTable& roundTable);
   void onRoundStart(const cs::RoundTable& roundTable);
   bool isPoolsSyncroStarted();
@@ -236,19 +236,20 @@ private:
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
   // pool sync progress
-  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence, csdb::Pool::sequence_t globalSequence);
+  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence,
+                                         csdb::Pool::sequence_t globalSequence);
 
   template <typename T, typename... Args>
-  void writeDefaultStream(const T& value, const Args&... args);
+  void writeDefaultStream(const T& value, Args&&... args);
 
-  template<typename T>
+  template <typename T>
   void writeDefaultStream(const T& value);
 
-  template<typename... Args>
-  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  template <typename... Args>
+  void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
-  template<typename... Args>
-  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, const Args&... args);
+  template <typename... Args>
+  void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
@@ -297,20 +298,20 @@ private:
   cs::Timer sendingTimer_;
 
   // sync meta
-  cs::PoolMetaMap poolMetaMap_;   // active pool meta information
+  cs::PoolMetaMap poolMetaMap_;  // active pool meta information
 
   // round package sent data storage
-  struct SentRoundData
-  {
-      cs::RoundTable round_table;
-      cs::PoolMetaInfo pool_meta_info;
-      cs::Characteristic characteristic;
-      cs::Signature pool_signature;
-      cs::Notifications notifications;
+  struct SentRoundData {
+    cs::RoundTable roundTable;
+    cs::PoolMetaInfo poolMetaInfo;
+    cs::Characteristic characteristic;
+    cs::Signature poolSignature;
+    cs::Notifications notifications;
   };
-  SentRoundData last_sent_round_data;
+
+  SentRoundData lastSentRoundData_;
 };
 
-std::ostream& operator<< (std::ostream& os, NodeLevel nodeLevel);
+std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel);
 
-#endif  // __NODE_HPP__
+#endif  // NODE_HPP

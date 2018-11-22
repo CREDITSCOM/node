@@ -1,5 +1,5 @@
-#ifndef __CACHE_HPP__
-#define __CACHE_HPP__
+#ifndef CACHE_HPP
+#define CACHE_HPP
 
 constexpr unsigned cache_linesize = 64;
 
@@ -9,4 +9,4 @@ constexpr unsigned cache_linesize = 64;
 #define __cacheline_aligned alignas(cache_linesize)
 #endif
 
-#endif  //__CACHE_H__
+#endif  // CACHE_H

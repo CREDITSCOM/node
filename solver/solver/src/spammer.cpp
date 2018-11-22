@@ -1,22 +1,22 @@
 /**
-*  @file spammer.cpp
-*  @author Sergey Sychev
-*/
+ *  @file spammer.cpp
+ *  @author Sergey Sychev
+ */
 
-#include "solver/spammer.h"
+#include "solver/spammer.hpp"
 
 #include <chrono>
 #include <cstddef>
-#include <string>
 #include <cstdlib>
+#include <string>
 
 #include <base58.h>
-#include <sodium.h>
 #include <csdb/amount.h>
 #include <csdb/amount_commission.h>
 #include <csdb/currency.h>
 #include <csdb/internal/types.h>
 #include <csdb/transaction.h>
+#include <sodium.h>
 #include <csnode/node.hpp>
 
 namespace cs {
@@ -29,11 +29,12 @@ constexpr auto kTimeStartSleepSec = 5;
 constexpr auto kSpammerSleepTimeMicrosec = 70000;
 // from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
-std::string kGenesisPrivate = "3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN";
+std::string kGenesisPrivate =
+    "3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN";
 
 constexpr auto kMaxTransactionsFromOneSource = 1000;
 constexpr auto kMaxMoneyForOneSpammer = 10'000'000;
-} // namespace
+}  // namespace
 
 void Spammer::StartSpamming(Node& node) {
   GenerateMyWallets();
@@ -46,8 +47,8 @@ void Spammer::GenerateMyWallets() {
   std::array<uint8_t, csdb::internal::kPrivateKeySize> private_key;
   for (int i = 0; i < kMyWalletsNum; ++i) {
     crypto_sign_keypair(public_key.data(), private_key.data());
-    my_wallets_.push_back(std::pair<csdb::Address, std::array<uint8_t, csdb::internal::kPrivateKeySize>>
-      (csdb::Address::from_public_key(csdb::internal::byte_array(public_key.begin(), public_key.end())), private_key));
+    my_wallets_.push_back(std::pair<csdb::Address, std::array<uint8_t, csdb::internal::kPrivateKeySize>>(
+        csdb::Address::from_public_key(csdb::internal::byte_array(public_key.begin(), public_key.end())), private_key));
   }
 }
 
@@ -63,7 +64,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   size_t spammer_index = 0;
   int64_t inner_id_counter = 0;
   uint64_t round_spamming = 0;
-  
+
   while (true) {
     if (!node.isPoolsSyncroStarted()) {
       if (target_wallet_counter == spammer_index) {
@@ -130,9 +131,9 @@ void Spammer::SignTransaction(csdb::Transaction& transaction, const uint8_t* pri
   auto transaction_bytes = transaction.to_byte_stream_for_sig();
   unsigned long long signature_length = 0;
   uint8_t signature[csdb::internal::kSignatureLength];
-  crypto_sign_ed25519_detached(signature, &signature_length,
-              transaction_bytes.data(), transaction_bytes.size(), private_key);
+  crypto_sign_ed25519_detached(signature, &signature_length, transaction_bytes.data(), transaction_bytes.size(),
+                               private_key);
   transaction.set_signature(std::string(signature, signature + signature_length));
 }
- 
-} // namespace cs
+
+}  // namespace cs

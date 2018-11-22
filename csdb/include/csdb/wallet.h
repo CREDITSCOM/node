@@ -1,15 +1,14 @@
 /**
-  * @file wallet.h
-  * @author Roman Bukin
-  */
+ * @file wallet.h
+ * @author Roman Bukin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_WALLET_H_INCLUDED_
 #define _CREDITS_CSDB_WALLET_H_INCLUDED_
 
-#include "csdb/storage.h"
 #include "csdb/currency.h"
 #include "csdb/internal/shared_data.h"
+#include "csdb/storage.h"
 
 namespace csdb {
 
@@ -17,8 +16,7 @@ class Address;
 class Amount;
 class Storage;
 
-class Wallet
-{
+class Wallet {
   SHARED_DATA_CLASS_DECLARE(Wallet)
 
 public:
@@ -31,6 +29,6 @@ public:
   Amount amount(Currency currency) const noexcept;
 };
 
-} // namespace csdb
+}  // namespace csdb
 
-#endif // _CREDITS_CSDB_WALLET_H_INCLUDED_
+#endif  // _CREDITS_CSDB_WALLET_H_INCLUDED_

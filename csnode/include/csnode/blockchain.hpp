@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BLOCKCHAIN_HPP
+#define BLOCKCHAIN_HPP
 
 #include <list>
 #include <map>
@@ -19,22 +20,20 @@
 #include <csdb/storage.h>
 
 #include <csdb/internal/types.h>
+#include <csnode/walletscache.hpp>
+#include <csnode/walletsids.hpp>
+#include <csnode/walletspools.hpp>
 #include <csnode/threading.hpp>
-#include <csnode/WalletsIds.h>
-#include <csnode/WalletsCache.h>
-#include <csnode/WalletsPools.h>
 
 #include <condition_variable>
 #include <mutex>
 
-namespace cs
-{
-    class BlockHashes;
-    class WalletsIds;
-}
+namespace cs {
+class BlockHashes;
+class WalletsIds;
+}  // namespace cs
 
-class BlockChain
-{
+class BlockChain {
 public:
   using Transactions = std::vector<csdb::Transaction>;
   using WalletId = csdb::internal::WalletId;
@@ -45,7 +44,9 @@ public:
   BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
-  bool isGood() const { return good_; }
+  bool isGood() const {
+    return good_;
+  }
 
   bool finishNewBlock(csdb::Pool& pool);
   void removeWalletsInPoolFromCache(const csdb::Pool& pool);
@@ -79,46 +80,43 @@ public:
   // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
-  bool findAddrByWalletId(const WalletId id, csdb::Address &addr) const;
+  bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
   // searches for existing wallet id
   // returns true if found
   bool findWalletId(const WalletAddress& address, WalletId& id) const;
 
   // wallet transactions: pools cache + db search
-  void getTransactions(
-      Transactions& transactions,
-      csdb::Address address,
-      uint64_t offset,
-      uint64_t limit);
+  void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
   bool putBlock(csdb::Pool& pool);
-  const csdb::Storage & getStorage() const;
+  const csdb::Storage& getStorage() const;
 
   struct AddrTrnxCount {
     uint64_t sendCount;
     uint64_t recvCount;
   };
 
-  void recount_trxns(const std::optional<csdb::Pool> &new_pool);
-  const AddrTrnxCount &get_trxns_count(const csdb::Address &addr);
+  void recount_trxns(const std::optional<csdb::Pool>& new_pool);
+  const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
 
 private:
   bool writeGenesisBlock();
-  
+
   void writeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
 
-  template<typename WalletCacheProcessor>
+  template <typename WalletCacheProcessor>
   bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
   bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
   bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
   void addNewWalletsToPool(csdb::Pool& pool);
-  void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
+  void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
+                          csdb::Pool::NewWallets& newWallets);
 
   bool updateFromNextBlock(csdb::Pool& pool);
 
@@ -127,19 +125,11 @@ private:
   bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
   class TrxLoader;
-  bool findDataForTransactions(
-      csdb::Address address,
-      csdb::Address& wallPubKey,
-      WalletId& id,
-      cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+  bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
+                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
-  void getTransactions(
-      Transactions & transactions,
-      csdb::Address wallPubKey,
-      WalletId id,
-      const cs::WalletsPools::WalletData::PoolsHashes& hashesArray,
-      uint64_t offset,
-      uint64_t limit);
+  void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
+                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
 private:
   bool good_;
@@ -165,3 +155,5 @@ private:
   cs::spinlock waiters_locker;
   std::map<csdb::Address, AddrTrnxCount> m_trxns_count;
 };
+
+#endif  //  BLOCKCHAIN_HPP

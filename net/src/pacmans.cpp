@@ -8,8 +8,7 @@ IPacMan::Task& IPacMan::allocNext() {
 
     new (&lastElt_->element) Task();
 
-    lastElt_->element.pack.data_ =
-      allocator_.allocateNext(Packet::MaxSize);
+    lastElt_->element.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
   }
 
   return lastElt_->element;

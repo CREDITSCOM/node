@@ -1,23 +1,21 @@
 /**
-  * @file database.h
-  * @author Roman Bukin, Evgeny Zalivochkin
-  */
+ * @file database.h
+ * @author Roman Bukin, Evgeny Zalivochkin
+ */
 
-#pragma once
 #ifndef _CREDITS_CSDB_DATABASE_H_INCLUDED_
 #define _CREDITS_CSDB_DATABASE_H_INCLUDED_
 
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
 
 #include "csdb/internal/types.h"
 
 namespace csdb {
 
-class Database
-{
+class Database {
 public:
   enum Error {
     NoError = 0,
@@ -35,6 +33,7 @@ public:
 
 protected:
   Database();
+
 public:
   virtual ~Database();
 
@@ -48,12 +47,13 @@ public:
   using ItemList = std::vector<Item>;
   virtual bool write_batch(const ItemList &items) = 0;
 
-  class Iterator
-  {
+  class Iterator {
   protected:
     Iterator();
+
   public:
     virtual ~Iterator();
+
   public:
     virtual bool is_valid() const = 0;
     virtual void seek_to_first() = 0;
@@ -61,7 +61,7 @@ public:
     virtual void seek(const byte_array &key) = 0;
     virtual void next() = 0;
     virtual void prev() = 0;
-    virtual byte_array key() const  = 0;
+    virtual byte_array key() const = 0;
     virtual byte_array value() const = 0;
   };
   using IteratorPtr = std::shared_ptr<Iterator>;
@@ -70,11 +70,12 @@ public:
 public:
   Error last_error() const;
   std::string last_error_message() const;
+
 protected:
-  void set_last_error(Error error = NoError, const std::string& message = std::string());
-  void set_last_error(Error error, const char* message, ...);
+  void set_last_error(Error error = NoError, const std::string &message = std::string());
+  void set_last_error(Error error, const char *message, ...);
 };
 
-} // namespace csdb
+}  // namespace csdb
 
-#endif // _CREDITS_CSDB_DATABASE_H_INCLUDED_
+#endif  // _CREDITS_CSDB_DATABASE_H_INCLUDED_

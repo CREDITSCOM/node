@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __TRANSPORT_HPP__
-#define __TRANSPORT_HPP__
+#ifndef TRANSPORT_HPP
+#define TRANSPORT_HPP
+
 #include <boost/asio.hpp>
 #include <csignal>
 
@@ -8,9 +9,9 @@
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
+#include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
-#include <lib/system/cache.hpp>
 #include <net/network.hpp>
 
 #include "neighbourhood.hpp"
@@ -33,13 +34,13 @@ enum class NetworkCommand : uint8_t {
   PackRequest,
   PackRenounce,
   BlockSyncRequest,
-  SSRegistration        = 1,
-  SSFirstRound          = 31,
+  SSRegistration = 1,
+  SSFirstRound = 31,
   SSRegistrationRefused = 25,
-  SSPingWhiteNode       = 32,
-  SSLastBlock           = 34,
-  SSReRegistration      = 36,
-  SSSpecificBlock       = 37,
+  SSPingWhiteNode = 32,
+  SSLastBlock = 34,
+  SSReRegistration = 36,
+  SSSpecificBlock = 37,
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -63,7 +64,7 @@ template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
- public:
+public:
   Transport(const Config& config, Node* node)
   : config_(config)
   , remoteNodes_(MaxRemoteNodes + 1)
@@ -72,21 +73,20 @@ class Transport {
   , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
   , net_(new Network(config, this))
   , node_(node)
-  , nh_(this)
-  {
+  , nh_(this) {
     good_ = net_->isGood();
   }
 
   ~Transport();
 
-
-
-// [[noreturn]] void run();
+  // [[noreturn]] void run();
   void run();
 
   static volatile std::sig_atomic_t gSignalStatus;
 
-  static void stop() { Transport::gSignalStatus = 1; }
+  static void stop() {
+    Transport::gSignalStatus = 1;
+  }
 
   RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
@@ -100,6 +100,7 @@ class Transport {
   const cs::PublicKey& getMyPublicKey() const {
     return myPublicKey_;
   }
+
   bool isGood() const {
     return good_;
   }
@@ -140,7 +141,7 @@ class Transport {
   bool isPingDone();
   void resetNeighbours();
 
- private:
+private:
   void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
   // Dealing with network connections
@@ -172,18 +173,20 @@ class Transport {
   void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
 
   /* Actions */
-  bool   good_;
+  bool good_;
   Config config_;
 
-  static const uint32_t MaxPacksQueue  = 2048;
+  static const uint32_t MaxPacksQueue = 2048;
   static const uint32_t MaxRemoteNodes = 4096;
 
   cs::SpinLock sendPacksFlag_;
+
   struct PackSendTask {
-    Packet   pack;
+    Packet pack;
     uint32_t resendTimes = 0;
-    bool     incrementId;
+    bool incrementId;
   };
+
   FixedCircularBuffer<PackSendTask, MaxPacksQueue> sendPacks_;
 
   TypedAllocator<RemoteNode> remoteNodes_;
@@ -203,14 +206,14 @@ class Transport {
   ip::udp::endpoint ssEp_;
 
   // Registration data
-  Packet    regPack_;
+  Packet regPack_;
   uint64_t* regPackConnId_;
-  bool      acceptRegistrations_ = false;
+  bool acceptRegistrations_ = false;
 
   struct PostponedPacket {
     cs::RoundNumber round;
     MsgTypes type;
-    Packet   pack;
+    Packet pack;
 
     PostponedPacket(const cs::RoundNumber r, const MsgTypes t, const Packet& p)
     : round(r)
@@ -220,6 +223,7 @@ class Transport {
   };
 
   typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
+
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;
   PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
@@ -231,10 +235,10 @@ class Transport {
   uint32_t maxBlockCount_;
 
   Network* net_;
-  Node*    node_;
+  Node* node_;
 
   Neighbourhood nh_;
   FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, 10000> fragOnRound_;
 };
 
-#endif  // __TRANSPORT_HPP__
+#endif  // TRANSPORT_HPP
