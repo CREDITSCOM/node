@@ -168,7 +168,7 @@ TEST(IPackStream, PeekIntegerValue) {
 void displayStreamData(cs::IPackStream& stream, const size_t& size) {
   auto ptr = stream.getCurrentPtr();
 
-  for (int i = 0; i < size; i++) {
+  for (size_t i = 0; i < size; i++) {
     std::cout << "item " << i << ": " << (int)(*(ptr + i)) << std::endl;
   }
 }

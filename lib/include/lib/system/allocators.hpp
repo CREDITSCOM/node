@@ -378,9 +378,9 @@ public:
 
 private:
   std::atomic<uint32_t> users_ = {0};
+  Allocator* allocator_;
   T element_;
 
-  Allocator* allocator_;
   friend Allocator;
 };
 

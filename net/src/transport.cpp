@@ -554,7 +554,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     case MsgTypes::RoundInfoRequest:
       return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
     case MsgTypes::RoundInfoReply:
-      return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
+      return node_->getRoundInfoReply(data, size, firstPack.getSender());
     default:
       cserror() << "TRANSPORT> Unknown message type " << static_cast<int>(type) << " pack round " << rNum;
       break;
@@ -996,8 +996,8 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   cs::Hash hHash;
-  uint16_t start;
-  uint64_t req;
+  uint16_t start = 0u;
+  uint64_t req = 0u;
 
   iPackStream_ >> hHash >> start >> req;
   if (!iPackStream_.good() || !iPackStream_.end()) {
@@ -1030,7 +1030,7 @@ void Transport::sendPingPack(const Connection& conn) {
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
-  uint32_t lastSeq;
+  uint32_t lastSeq = 0u;
   cs::PublicKey pk;
 
   iPackStream_ >> id >> lastSeq >> pk;

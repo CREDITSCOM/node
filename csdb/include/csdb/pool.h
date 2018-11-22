@@ -135,7 +135,7 @@ public:
   ::csdb::internal::byte_array to_byte_stream_for_sig();
 
   Pool meta_from_byte_stream(const char*, size_t);
-  static Pool from_lz4_byte_stream(const char*, size_t, size_t);
+  static Pool from_lz4_byte_stream(size_t);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;

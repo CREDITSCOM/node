@@ -244,7 +244,7 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::remove(const byte_array &key) {
+bool DatabaseBerkeleyDB::remove(const byte_array&) {
   assert(false);
 
   if (!db_blocks_) {
@@ -256,7 +256,7 @@ bool DatabaseBerkeleyDB::remove(const byte_array &key) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::write_batch(const ItemList &items) {
+bool DatabaseBerkeleyDB::write_batch(const ItemList&) {
   assert(false);
 
   if (!db_blocks_) {
@@ -307,7 +307,7 @@ public:
     assert(false);
   }
 
-  void seek(const ::csdb::internal::byte_array &key) override final {
+  void seek(const ::csdb::internal::byte_array&) override final {
     assert(false);
   }
 

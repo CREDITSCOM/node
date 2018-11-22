@@ -100,7 +100,7 @@ private:  // Members
     csdb::Pool::sequence_t sequence = 0;  // requested sequence
     ConnectionPtr connection;             // neighbour
 
-    const bool operator<(const NeighboursSetElemet& rhs) const {
+    bool operator<(const NeighboursSetElemet& rhs) const {
       return sequence < rhs.sequence;
     }
   };

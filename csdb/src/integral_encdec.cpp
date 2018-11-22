@@ -65,7 +65,7 @@ std::size_t decode(const void *buf, std::size_t size, uint64_t &value) {
   uint8_t bytes = 0;
   for (uint8_t mask = first; 0 != (mask & 0x1); ++bytes, mask >>= 1) {
   }
-  if ((bytes + 1) > size) {
+  if ((bytes + 1u) > size) {
     return 0;
   }
 

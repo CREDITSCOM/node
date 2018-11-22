@@ -90,8 +90,9 @@ private:
   void unlock(Element* ptr, typename Element::State oldState, typename Element::State newState,
               std::atomic<Element*>& movingBar) {
     if (!ptr->lockState.compare_exchange_strong(oldState, newState, std::memory_order_release,
-                                                std::memory_order_relaxed))
-      LOG_ERROR("Unexpected element state");
+                                                std::memory_order_relaxed)) {
+      cserror() << "Unexpected element state";
+    }
 
     movingBar.compare_exchange_strong(ptr, nextPtr(ptr), std::memory_order_release, std::memory_order_relaxed);
   }

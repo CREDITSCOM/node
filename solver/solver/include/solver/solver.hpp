@@ -54,10 +54,10 @@ public:
   void gotMatrix(HashMatrix&&);
   void gotBlock(csdb::Pool&&, const cs::PublicKey&);
   void gotHash(csdb::PoolHash&&, const cs::PublicKey&);
-  void gotBlockRequest(csdb::PoolHash&&, const cs::PublicKey&);
+  void gotBlockRequest(csdb::PoolHash&&);
   void gotBlockReply(csdb::Pool&&);
   void gotBadBlockHandler(csdb::Pool&&, const cs::PublicKey&);
-  void gotIncorrectBlock(csdb::Pool&&, const cs::PublicKey&);
+  void gotIncorrectBlock(csdb::Pool&& block);
   void gotFreeSyncroBlock(csdb::Pool&&);
   void rndStorageProcessing();
   void tmpStorageProcessing();
