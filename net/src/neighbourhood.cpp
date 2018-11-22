@@ -42,8 +42,9 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
     if (!found) {
       if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundTable))
         sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
-      if (nb->isSignal)  // Assume the SS got this
-        *(bp.recEnd++) = nb->id;
+      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundTable || bp.pack.getType() == MsgTypes::BlockHash)) 
+        sent = transport_->sendDirect(&(bp.pack), **nb);
+        //*(bp.recEnd++) = nb->id;
       else
         result = true;
     }
