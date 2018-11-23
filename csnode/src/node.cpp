@@ -1226,7 +1226,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
   }
 
   if (conveyer.isSyncCompleted(round)) {
-    csdebug() << "NODE> Packets sync completed";
+    csdebug() << "NODE> Packets sync completed, round " << round;
     resetNeighbours();
     cslog() << "NODE> processPacketsReply -> got Round";
     startConsensus();

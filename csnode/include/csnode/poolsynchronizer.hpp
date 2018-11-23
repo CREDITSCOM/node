@@ -59,7 +59,7 @@ private:  // Members
   BlockChain* m_blockChain;
 
   inline static const int m_maxBlockCount = 4;
-  inline static const cs::RoundNumber s_roundDifferent = 2;
+  inline static const cs::RoundNumber s_roundDifferent = cs::values::defaultMetaStorageMaxSize;
   inline static const int m_maxWaitingTimeReply = 15;  // reply count
   inline static const int m_maxWaitingTimeRound = 4;  // round count
 
