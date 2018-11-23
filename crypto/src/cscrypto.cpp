@@ -18,6 +18,7 @@ struct Context {
   std::mutex mutex;
 
   Context() = default;
+  ~Context() = default;
 
   // Disallow copy and assign
   Context(const Context&) = delete;
@@ -52,7 +53,7 @@ Hash blake2s(const byte* data, size_t length) {
 
   Hash result;
 
-  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
+  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, nullptr, 0);
 
 #endif  // #ifdef USE_CRYPTOPP
 

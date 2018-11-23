@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
 
 #ifndef _MSC_VER
 #define sprintf_s sprintf
@@ -28,7 +29,7 @@ Amount::Amount(double value) {
     multiplier /= 10;
   }
 
-  fraction_ = static_cast<uint64_t>(frac + 0.5) * multiplier;
+  fraction_ = lround(frac + 0.5) * multiplier;
   if (fraction_ >= AMOUNT_MAX_FRACTION) {
     fraction_ -= AMOUNT_MAX_FRACTION;
     ++integral_;
@@ -45,7 +46,7 @@ Amount::Amount(double value) {
     end = sprintf_s(buf, "%d.%018" PRIu64, integral_, fraction_) + buf - 1;
   }
 
-  for (min_decimal_places = 18 - ::std::min<size_t>(min_decimal_places, 18); min_decimal_places && ('0' == (*end));
+  for (min_decimal_places = 18 - ::std::min<size_t>(min_decimal_places, 18); (min_decimal_places != 0u) && ('0' == (*end));
        --min_decimal_places, --end) {
   }
 

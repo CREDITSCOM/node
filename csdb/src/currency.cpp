@@ -6,7 +6,7 @@ namespace csdb {
 
 class Currency::priv : public ::csdb::internal::shared_data {
 public:
-  uint8_t id;
+  uint8_t id = 0;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Currency)
 
@@ -16,7 +16,7 @@ Currency::Currency(const uint8_t &id)
 }
 
 bool Currency::is_valid() const noexcept {
-  return d != 0;
+  return d != nullptr;
 }
 
 std::string Currency::to_string() const noexcept {
