@@ -3,8 +3,8 @@
 //#define MONITOR_NODE
 //#define SPAM_MAIN
 //#define STARTER
-//#define NO_CONSENSUS
-#define TOKENS_CACHE
+#define NO_CONSENSUS
+//#define TOKENS_CACHE
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE

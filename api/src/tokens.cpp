@@ -219,7 +219,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
                    for (uint32_t i = 0; i < newSymb.size(); ++i) {
                      if (i >= newSymb.size()) break;
-                     symbol.push_back(std::toupper(newSymb[i]));
+                     symbol.push_back((char)std::toupper(newSymb[i]));
                    }
                  });
 
@@ -310,7 +310,7 @@ void TokensMaster::run() {
             t.owner = dt.deployer;
 
             {
-              std::lock_guard<decltype(dataMut_)> l(dataMut_);
+              std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
               tokens_[dt.address] = t;
             }
           }
@@ -325,7 +325,7 @@ void TokensMaster::run() {
 
       for (auto& st : executes) {
         {
-          std::lock_guard<decltype(dataMut_)> l(dataMut_);
+          std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
           auto tIt = tokens_.find(st.first);
           if (tIt == tokens_.end()) continue; // Ignore if not-a-token
 
