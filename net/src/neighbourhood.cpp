@@ -227,6 +227,17 @@ uint32_t Neighbourhood::size() {
   return neighbours_.size();
 }
 
+uint32_t Neighbourhood::getNeighboursCountWithoutSS() {
+  cs::SpinGuard ln(nLockFlag_);
+  uint32_t count = 0;
+  for (auto& nb : neighbours_) {
+    if (!nb->isSignal) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in,
                                     const ip::udp::endpoint& out,
                                     RemoteNodePtr node) {

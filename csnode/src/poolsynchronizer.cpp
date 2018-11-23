@@ -390,13 +390,16 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t s
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
-  const uint32_t neighboursCount = m_transport->getNeighboursCount();
+  const uint32_t neededNeighboursCount = m_transport->getNeighboursCountWithoutSS();
+  csdebug() << "POOL SYNCHRONIZER> Neighbours count is: " << neededNeighboursCount;
 
-  if (neighboursCount == m_neighbours.size() + 1) {  // + Signal
+  if (neededNeighboursCount == m_neighbours.size()) {
     return;
   }
 
   m_neighbours.clear();
+
+  const uint32_t neighboursCount = m_transport->getNeighboursCount();
 
   for (std::size_t i = 0; i != neighboursCount; ++i) {
     ConnectionPtr target = m_transport->getNeighbourByNumber(i);
@@ -405,7 +408,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     }
   }
 
-  csdebug() << "POOL SYNCHRONIZER> Neighbours count is: " << m_neighbours.size();
+  csdebug() << "POOL SYNCHRONIZER> Neighbours saved count is: " << m_neighbours.size();
 }
 
 bool cs::PoolSynchronizer::isLastRequest() {

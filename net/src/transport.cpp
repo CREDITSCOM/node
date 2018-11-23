@@ -597,6 +597,10 @@ uint32_t Transport::getNeighboursCount() {
   return nh_.size();
 }
 
+uint32_t Transport::getNeighboursCountWithoutSS() {
+  return nh_.getNeighboursCountWithoutSS();
+}
+
 uint32_t Transport::getMaxNeighbours() const {
   return config_.getMaxNeighbours();
 }
