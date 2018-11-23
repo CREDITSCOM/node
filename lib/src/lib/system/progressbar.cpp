@@ -31,7 +31,6 @@ std::string ProgressBar::string(ProgressBar::Progress ticks) {
   std::string incompleted(barWidth - pos, incompleteSymbol);
 
   std::stringstream result;
-  result << std::endl;
   result << rang::bg::blue << rang::fg::blue << completed;
   result << rang::bg::gray << rang::fg::gray << incompleted;
   result << rang::bg::reset << rang::fg::reset << rang::style::reset;
