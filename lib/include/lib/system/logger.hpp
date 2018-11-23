@@ -1,7 +1,6 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
-#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/expressions/keyword.hpp>  // include prior trivial.hpp for "Severity" attribute support in config Filter=
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
@@ -66,8 +65,8 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
   if (!logger::useLogger<__VA_ARGS__>()) \
     ;                                    \
   else                                   \
-    BOOST_LOG_FUNCTION();                \
-  _LOG_SEV(trace, __VA_ARGS__)
+    BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) \
+      << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
 
 #define csdebug(...) _LOG_SEV(debug, __VA_ARGS__)
 
