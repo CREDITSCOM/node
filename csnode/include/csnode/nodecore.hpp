@@ -60,7 +60,7 @@ enum NodeConsts : uint32_t {
   HashLength = HASH_LENGTH,
   SignatureLength = SIGNATURE_LENGTH,
   PrivateKeyLength = PRIVATE_KEY_LENGTH,
-  NeighboursRequestDelay = 100
+  NeighboursRequestDelay = 350
 };
 
 enum SolverConsts : uint32_t {

@@ -287,6 +287,7 @@ private:
 
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
+  bool isHashesReplyReceived_ = false;
 
   // serialization/deserialization entities
   cs::IPackStream istream_;

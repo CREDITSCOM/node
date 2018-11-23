@@ -941,71 +941,63 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
 }
 
 void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round) {
-  if (myLevel_ == NodeLevel::Writer) {
-    cserror() << "Writer should has all transactions hashes";
-    return;
-  }
-
-  csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
-  sendPacketHashesRequestToRandomNeighbour(hashes, round);
-}
-
-void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     return;
   }
 
+  csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
+
+  cs::PublicKey main;
   const auto msgType = MsgTypes::TransactionsPacketRequest;
-  const auto neighboursCount = 4;  // transport_->getNeighboursCount();
-  const auto hashesCount = hashes.size();
-  const bool isHashesLess = hashesCount < neighboursCount;
-  const std::size_t remainderHashes = isHashesLess ? 0 : hashesCount % neighboursCount;
-  const std::size_t amountHashesOfRequest = isHashesLess ? hashesCount : (hashesCount / neighboursCount);
+  const auto roundTable = cs::Conveyer::instance().roundTable(round);
 
-  auto getRequestHashesClosure = [hashes](const std::size_t startHashNumber, std::size_t hashesCount) {
-    cs::Hashes hashesToSend;
+  // look at main node
+  main = (roundTable != nullptr) ? roundTable->general : cs::Conveyer::instance().currentRoundTable().general;
 
-    csdebug() << "NODE> Sending transaction packet request to Random Neighbour: hashes Count: " << hashesCount;
+  const bool sendToGeneral = sendNeighbours(main, msgType, round, hashes);
 
-    for (size_t i = 0; i < hashesCount; ++i) {
-      hashesToSend.push_back(hashes[startHashNumber + i]);
+  if (!sendToGeneral) {
+    csdebug() << "NODE> Sending packet to main node " << cs::Utils::byteStreamToHex(main.data(), main.size());
+    sendPacketHashesRequestToRandomNeighbour(hashes, round);
+  }
+
+  auto requestClosure = [round, this] {
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+    if (!conveyer.isSyncCompleted(round)) {
+      auto neededHashes = conveyer.neededHashes(round);
+      if (neededHashes) {
+        sendPacketHashesRequest(*neededHashes, round);
+      }
     }
-
-    return hashesToSend;
   };
+
+  // send request again
+  cs::Timer::singleShot(cs::NeighboursRequestDelay, requestClosure);
+}
+
+void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
+  const auto msgType = MsgTypes::TransactionsPacketRequest;
+  const auto neighboursCount = transport_->getNeighboursCount();
 
   bool successRequest = false;
 
   for (std::size_t i = 0; i < neighboursCount; ++i) {
-    const std::size_t count =
-        i == (neighboursCount - 1) ? amountHashesOfRequest + remainderHashes : amountHashesOfRequest;
+    ConnectionPtr connection = transport_->getNeighbourByNumber(i);
 
-    successRequest = sendToRandomNeighbour(msgType, round, getRequestHashesClosure(i * amountHashesOfRequest, count));
-
-    if (!successRequest) {
-      cswarning() << "NODE> Sending transaction packet request: Cannot get a connection with a random neighbour";
-      break;
-    }
-
-    if (isHashesLess) {
-      break;
+    if (connection) {
+      successRequest = true;
+      sendNeighbours(connection, msgType, round, hashes);
     }
   }
 
   if (!successRequest) {
-    sendBroadcast(msgType, round, getRequestHashesClosure(0, hashesCount));
+    csdebug() << "NODE> Send broadcast hashes request, no neigbours";
+    sendBroadcast(msgType, round, hashes);
     return;
   }
 
-  cs::Timer::singleShot(cs::NeighboursRequestDelay, [round, this] {
-    const cs::Conveyer& conveyer = cs::Conveyer::instance();
-    if (!conveyer.isSyncCompleted(round)) {
-      auto neededHashes = conveyer.neededHashes(round);
-      if (neededHashes) {
-        sendPacketHashesRequestToRandomNeighbour(*neededHashes, round);
-      }
-    };
-  });
+  csdebug() << "NODE> Send hashes request to all neigbours";
 }
 
 void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
