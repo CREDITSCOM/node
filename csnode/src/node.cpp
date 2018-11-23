@@ -614,31 +614,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
-void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence) {
-  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
-
-  if (sequence > this->getRoundNumber()) {
-    return;  // remove this line when the block candidate signing of all trusted will be implemented
-  }
-
-  this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
-
-#ifndef MONITOR_NODE
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-  }
-  else {
-    cswarning() << "NODE> Can not write block with sequence " << sequence;
-  }
-#else
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-  }
-#endif
-
-#endif  // 0
-}
-
 const cs::ConfidantsKeys& Node::confidants() const {
   return cs::Conveyer::instance().currentRoundTable().confidants;
 }
