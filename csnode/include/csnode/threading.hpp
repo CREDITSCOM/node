@@ -42,7 +42,7 @@ struct worker_queue
     std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
 #endif
     std::condition_variable_any w;
-    Credits::spinlock lock;
+    mutable Credits::spinlock lock;
     S state;
 
   public:
@@ -138,6 +138,11 @@ struct worker_queue
         //TRACE("");
         w.notify_all();
         //TRACE("");
+    }
+
+    S get_current_state() const {
+      std::lock_guard<decltype(lock)> l(lock);
+      return state;
     }
 };
 

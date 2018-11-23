@@ -13,6 +13,8 @@
 
 #include <ContractExecutor.h>
 
+namespace api { class APIHandler; }
+
 namespace std {
   template<>
   struct hash<csdb::Address> {
@@ -57,7 +59,7 @@ using HoldersMap = std::unordered_map<HolderKey, std::set<TokenId>>;
 
 class TokensMaster {
 public:
-  TokensMaster(executor::ContractExecutorConcurrentClient*);
+  TokensMaster(api::APIHandler*);
   ~TokensMaster();
 
   void run();
@@ -86,13 +88,15 @@ public:
   static std::string getAmount(const api::SmartContractInvocation&);
 
 private:
-  void refreshTokenState(const csdb::Address& token, const std::string& newState);
+  void refreshTokenState(const csdb::Address& token,
+                         const std::string& newState);
+
   void initiateHolder(Token&,
                       const csdb::Address& token,
                       const csdb::Address& holder,
                       bool increaseTransfers = false);
 
-  executor::ContractExecutorConcurrentClient* executor_;
+  api::APIHandler* api_;
 
   std::mutex cvMut_;
   std::condition_variable tokCv_;

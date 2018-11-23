@@ -83,7 +83,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
         ::apache::thrift::transport::TSocket>("localhost", 9080)))
   , executor(::apache::thrift::stdcxx::make_shared<
              ::apache::thrift::protocol::TBinaryProtocol>(executor_transport))
-  , tm(&executor)
+  , tm(this)
 {
   TRACE("");
   std::cerr << (s_blockchain.isGood() ? "Storage is opened normal"
@@ -190,7 +190,7 @@ APIHandlerBase::SetResponseStatus(APIResponse& response, bool commandWasHandled)
 void
 APIHandler::BalanceGet(BalanceGetResult& _return,
                        const Address& address,
-                       const Currency currency)
+                       const Currency)
 {
   csdb::Address addr;
   // if (address.size() != 64)
@@ -529,24 +529,9 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   TRACE("");
 
   bool present = false;
-  std::string origin_bytecode;
-  {
-
-    //   TRACE("");
-    decltype(auto) smart_origin = locked_ref(this->smart_origin);
-    //   TRACE("");
-
-    auto it = smart_origin->find(smart_addr);
-    if ((present = (it != smart_origin->end()))) {
-      origin_bytecode =
-        fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
-    }
-  }
+  std::string origin_bytecode = getSmartByteCode(smart_addr, present);
 
   if (present == deploy) {
-
-    //   TRACE("");
-
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
@@ -733,7 +718,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
 
   csdb::PoolHash hash = s_blockchain.getLastHash();
 
-  size_t lastCount = 0;
+  //size_t lastCount = 0;
   csdb::Pool pool; // = s_blockchain->loadBlock(hash/*, lastCount*/);
 
   uint64_t sequence = s_blockchain.getSize();
@@ -751,7 +736,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
         // apiPool.transactionsCount = lastCount;
         _return.pools.push_back(apiPool);
       }
-      lastCount = 0;
+      //lastCount = 0;
 
       poolCache.insert(cch, std::make_pair(hash, apiPool));
       hash = pool.previous_hash();
@@ -782,7 +767,7 @@ APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return,
 void
 APIHandler::PoolInfoGet(PoolInfoGetResult& _return,
                         const PoolHash& hash,
-                        const int64_t index)
+                        const int64_t)
 {
   // Log("PoolInfoGet");
 
@@ -857,7 +842,7 @@ APIHandler::SmartContractGet(api::SmartContractGetResult& _return,
 bool
 APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 {
-  auto trace = !init;
+  //auto trace = !init;
   //  TRACE("");
   auto pending_smart_transactions =
     locked_ref(this->pending_smart_transactions);
@@ -899,7 +884,7 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
 
   while (!new_blocks.empty()) {
     if (init) PrettyLogging::drawTickProgress(++qTick, ticks);
-    auto trace = false;
+    //auto trace = false;
 
     //   TRACE("");
     // LOG_ERROR(
@@ -1073,7 +1058,7 @@ APIHandler::PoolListGetStable(api::PoolListGetResult& _return,
 
   _return.pools.reserve(limit);
 
-  size_t lastCount = 0;
+  //size_t lastCount = 0;
   csdb::Pool pool; // = s_blockchain->loadBlock(hash/*, lastCount*/);
 
   for (size_t pools_left = limit; pools_left && !cur_hash.is_empty();
@@ -1084,7 +1069,7 @@ APIHandler::PoolListGetStable(api::PoolListGetResult& _return,
       pool = s_blockchain.loadBlock(cur_hash);
       api::Pool apiPool = convertPool(pool);
       _return.pools.push_back(apiPool);
-      lastCount = 0;
+      //lastCount = 0;
 
       poolCache.insert(cch, std::make_pair(cur_hash, apiPool));
       cur_hash = pool.previous_hash();
@@ -1219,6 +1204,18 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult &_return, 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+/////////////////////////////
+
+template <typename ResultType>
+bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
+  if (offset < 0 || limit <= 0 || limit > 100) {
+    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
+    return false;
+  }
+
+  return true;
+}
+
 typedef std::list<std::pair<const Credits::WalletsCache::WalletData::Address*,
                             const Credits::WalletsCache::WalletData*>> WCSortedList;
 template <typename T>
@@ -1276,6 +1273,8 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
                        int64_t _limit,
                        int8_t _ordCol,
                        bool _desc) {
+  if (!validatePagination(_return, *this, _offset, _limit)) return;
+
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
   WCSortedList lst;
@@ -1296,7 +1295,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
   }
 #endif
 
-  if (lst.size() < _offset) return;
+  if (lst.size() < (uint64_t)_offset) return;
 
   auto ptr = lst.begin();
   std::advance(ptr, _offset);
@@ -1314,7 +1313,6 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
     _return.wallets.push_back(wi);
   }
 }
-
 
 void
 APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
@@ -1349,6 +1347,9 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
                                     return true;
                                   });
   _return.pages = (total / PER_PAGE) + (int)(total % PER_PAGE != 0);
+#else
+  ++_page;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 #endif
 }
 
@@ -1442,11 +1443,11 @@ void addTokenResult(api::TokenTransfersResult& _return,
 
 void addTokenResult(api::TokenTransactionsResult& _return,
                     const csdb::Address& token,
-                    const std::string& code,
+                    const std::string&,
                     const csdb::Pool& pool,
                     const csdb::Transaction& tr,
                     const api::SmartContractInvocation& smart,
-                    const std::pair<csdb::Address, csdb::Address>& addrPair) {
+                    const std::pair<csdb::Address, csdb::Address>&) {
   api::TokenTransaction trans;
 
   trans.token = fromByteArray(token.public_key());
@@ -1473,16 +1474,6 @@ void putTokenInfo(api::TokenInfo& ti,
   ti.transfersCount = token.transfersCount;
   ti.transactionsCount = token.transactionsCount;
   ti.holdersCount = token.holders.size();
-}
-
-template <typename ResultType>
-bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
-  if (offset < 0 || limit <= 0 || limit > 100) {
-    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
-    return false;
-  }
-
-  return true;
 }
 
 template <typename ResultType>
@@ -1606,7 +1597,7 @@ APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return,
                        if (tIt != tm.end()) {
                          found = true;
                          _return.count = tIt->second.holders.size();
-                         if (offset > tIt->second.holders.size()) return;
+                         if ((uint64_t)offset > tIt->second.holders.size()) return;
 
                          auto hIt = tIt->second.holders.begin();
                          std::advance(hIt, offset);
@@ -1637,7 +1628,7 @@ APIHandler::TokensListGet(api::TokensListResult& _return,
 
   tm.applyToInternal([&offset, &limit, &_return](const TokensMap& tm, const HoldersMap&) {
                        _return.count = tm.size();
-                       if (offset > tm.size()) return;
+                       if ((uint64_t)offset > tm.size()) return;
 
                        auto tIt = tm.begin();
                        std::advance(tIt, offset);
@@ -1653,5 +1644,82 @@ APIHandler::TokensListGet(api::TokensListResult& _return,
                        }
                       });
 
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+  decltype(auto) smart_origin = locked_ref(this->smart_origin);
+
+  auto it = smart_origin->find(addr);
+  if ((present = (it != smart_origin->end())))
+    return fetch_smart(s_blockchain.loadTransaction(it->second)).byteCode;
+
+  return std::string();
+}
+
+void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
+                                      const api::Address& address) {
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+
+  bool present = false;
+  std::string byteCode = getSmartByteCode(addr, present);
+  std::string state;
+
+  {
+    auto smartStateRef = locked_ref(this->smart_state);
+    auto it = smartStateRef->find(addr);
+
+    if (it != smartStateRef->end()) state = it->second.get_current_state().state;
+    else present = false;
+  }
+
+  if (!present) {
+     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+     return;
+  }
+
+  executor::GetContractMethodsResult methodsResult;
+  executor.getContractMethods(methodsResult, byteCode);
+
+  if (methodsResult.status.code) {
+    _return.status.code = methodsResult.status.code;
+    _return.status.message = methodsResult.status.message;
+    return;
+  }
+
+  executor::GetContractVariablesResult variablesResult;
+  executor.getContractVariables(variablesResult, byteCode, state);
+
+  if (variablesResult.status.code) {
+    _return.status.code = variablesResult.status.code;
+    _return.status.message = variablesResult.status.message;
+    return;
+  }
+
+  for (auto& m : methodsResult.methods) {
+    api::SmartContractMethod scm;
+    scm.name = std::move(m.name);
+    scm.argTypes = std::move(m.argTypes);
+    scm.returnType = std::move(m.returnType);
+
+    _return.methods.push_back(scm);
+  }
+
+  _return.variables = variablesResult.contractVariables;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
+                                      const std::string& sourceCode) {
+  executor::CompileByteCodeResult result;
+  executor.compileBytecode(result, sourceCode);
+
+  if (result.status.code) {
+    _return.status.code = result.status.code;
+    _return.status.message = result.status.message;
+    return;
+  }
+
+  _return.byteCode = std::move(result.bytecode);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

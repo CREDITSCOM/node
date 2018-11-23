@@ -172,6 +172,12 @@ class APIHandler : public APIHandlerInterface
                      int64_t offset,
                      int64_t limit) override;
 
+  executor::ContractExecutorConcurrentClient& getExecutor() { return executor; }
+  std::string getSmartByteCode(const csdb::Address&, bool&); // No checks
+
+  void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
+  void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
+
   private:
     BlockChain& s_blockchain;
 
