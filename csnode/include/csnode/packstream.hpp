@@ -324,7 +324,7 @@ private:
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
-  std::size_t size;
+  std::size_t size = 0;
   (*this) >> size;
 
   auto nextPtr = ptr_ + size;

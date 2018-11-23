@@ -31,7 +31,7 @@ bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback = 
 /**
  * @overload
  */
-bool init(const char* path_to_bases, Storage::OpenCallback callback = nullptr);
+bool init(const char* path_to_bases, const Storage::OpenCallback& callback = nullptr);
 
 /**
  * @brief Проверка, инициализирован ли внутренний объект хранилища

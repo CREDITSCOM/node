@@ -241,7 +241,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
   }
 }
 
-void Solver::gotIncorrectBlock(csdb::Pool&& block, const PublicKey& sender) {
+void Solver::gotIncorrectBlock(csdb::Pool&& block) {
   cslog() << __func__;
 
   if (m_temporaryStorage.count(block.sequence()) == 0) {
@@ -424,7 +424,7 @@ void Solver::runSpammer() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// gotBlockRequest
-void Solver::gotBlockRequest(csdb::PoolHash&& hash, const PublicKey& nodeId) {
+void Solver::gotBlockRequest(csdb::PoolHash&& hash) {
   csdb::Pool pool = m_node->getBlockChain().loadBlock(hash);
   if (pool.is_valid()) {
     auto prev_hash = csdb::PoolHash::from_string("");

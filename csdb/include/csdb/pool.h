@@ -124,18 +124,18 @@ public:
   using NewWallets = std::vector<NewWalletInfo>;
 
 public:
-  Pool(PoolHash previous_hash, sequence_t sequence, Storage storage = Storage());
+  Pool(PoolHash previous_hash, sequence_t sequence, const Storage& storage = Storage());
 
   static Pool from_binary(const ::csdb::internal::byte_array& data);
   static Pool meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt);
-  static Pool load(PoolHash hash, Storage storage = Storage());
+  static Pool load(const PoolHash& hash, Storage storage = Storage());
 
   static Pool from_byte_stream(const char* data, size_t size);
   char* to_byte_stream(uint32_t&);
   ::csdb::internal::byte_array to_byte_stream_for_sig();
 
   Pool meta_from_byte_stream(const char*, size_t);
-  static Pool from_lz4_byte_stream(const char*, size_t, size_t);
+  static Pool from_lz4_byte_stream(size_t);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -150,7 +150,7 @@ public:
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(sequence_t sequence) noexcept;
-  void set_storage(Storage storage) noexcept;
+  void set_storage(const Storage& storage) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
   void set_signature(const std::string& signature) noexcept;
   void set_confidants(std::vector<::std::vector<uint8_t>>& confidants) noexcept;
@@ -240,7 +240,7 @@ public:
    *
    * Если поле с таким идентификатором было добавлено ранее, они замещается новым.
    */
-  bool add_user_field(user_field_id_t id, UserField field) noexcept;
+  bool add_user_field(user_field_id_t id, const UserField& field) noexcept;
 
   /**
    * @brief Возвращает дополнительное поле.
@@ -274,7 +274,7 @@ public:
   * @return Возвращает объект транзакции. Если транзакции не существует в данном пуле, возвращается
   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
   */
-  Transaction get_last_by_source(Address source) const noexcept;
+  Transaction get_last_by_source(const Address& source) const noexcept;
 
   /**
   * @brief Получить последнюю транзакцию по адресу назначения
@@ -282,7 +282,7 @@ public:
   * @return Возвращает объект транзакции. Если транзакции не существует в данном пуле, возвращается
   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
   */
-  Transaction get_last_by_target(Address target) const noexcept;
+  Transaction get_last_by_target(const Address& target) const noexcept;
 
   void sign(const cs::PrivateKey& private_key);
   bool verify_signature();

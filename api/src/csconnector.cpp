@@ -30,7 +30,6 @@ connector::connector(BlockChain& m_blockchain, slv2::SolverCore* solver, const C
 #ifdef BINARY_TCP_API
   thread = std::thread([this, config]() {
     try {
-      // TRACE("csconnector started on port " << config.port);
       server.run();
     }
     catch (...) {
@@ -42,7 +41,6 @@ connector::connector(BlockChain& m_blockchain, slv2::SolverCore* solver, const C
   ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
   ajax_thread = std::thread([this, config]() {
     try {
-      //  TRACE("csconnector for AJAX started on port " << config.ajax_port);
       ajax_server.run();
     }
     catch (...) {

@@ -21,7 +21,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   assert(
       std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
-  TRACE("Collecting stats: started");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << " Collecting stats: started";
 
   auto stats = currentStats;
   auto startTime = std::chrono::high_resolution_clock::now();
@@ -33,8 +33,9 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   {
     auto future_last_hash = blockHash;
 
-    if (blockHash.is_empty())
-      LOG_ERROR("Stats: no bricks in the wall (last hash is empty)");
+    if (blockHash.is_empty()) {
+      cserror() << "Stats: no bricks in the wall (last hash is empty)";
+    }
 
     while (blockHash != lastHash && !blockHash.is_empty()) {
       csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -122,7 +123,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   using Seconds = std::chrono::seconds;
   Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
 
-  TRACE("Collecting stats: finished (took ", (int)seconds.count(), "s)");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "Collecting stats: finished (took " << seconds.count() << "s";
   cslog() << "Stats updated";
 
   return stats;
@@ -132,7 +133,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   assert(
       std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
-  TRACE("Collecting All stats: started");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << " Collecting All stats: started";
 
   AllStats stats;
   stats.second.resize(periods.size());
@@ -223,15 +224,14 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   auto finishTime = std::chrono::system_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);
 
-  TRACE("Collecting All stats: finished (took ", milliseconds.count(), "ms)");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "Collecting All stats: finished (took " << milliseconds.count() << "ms)";
 
   return stats;
 }
 
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
-  TRACE("csstats start ", "update interval is ", updateTimeSec, " sec");
-
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats start " << "update interval is " << updateTimeSec << " sec";
 #ifndef MONITOR_NODE
   return;
 #endif
@@ -239,7 +239,7 @@ csstats::csstats(BlockChain& blockchain)
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
-    TRACE("csstats thread started");
+    csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats thread started";
 
     AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
@@ -266,19 +266,20 @@ csstats::csstats(BlockChain& blockchain)
           ss << s.poolsCount << " pools, " << s.transactionsCount;
           ss << " transactions";
 
-          TRACE(ss.str());
+          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
 #ifdef LOG_STATS_TO_FILE
-          TRACE(ss.str());
+          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
 
           ss.str(std::string());
 
           ss << "Blockchain size:";
           ss << this->blockchain.getSize();
 
-          TRACE(ss.str());
+          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
 #endif
           for (auto& t : s.balancePerCurrency) {
-            TRACE("'", t.first, "' = ", std::to_string(t.second.integral), ".", std::to_string(t.second.fraction));
+            csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "'" << t.first
+                      << "' = " << std::to_string(t.second.integral) << "." << std::to_string(t.second.fraction);
           }
         }
 
@@ -291,12 +292,12 @@ csstats::csstats(BlockChain& blockchain)
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-    TRACE("csstats thread stopped");
+      csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats thread stopped";
   });
 }
 
 csstats::~csstats() {
-  TRACE("csstats stop");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats stop";
 
   ScopedLock lock(mutex);
 

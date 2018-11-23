@@ -11,7 +11,7 @@
 Neighbourhood::Neighbourhood(Transport* net):
     transport_(net),
     connectionsAllocator_(MaxConnections + 1) {
-  sodium_init();
+  assert(sodium_init() != -1);
 }
 
 template <typename T>
@@ -21,8 +21,7 @@ T getSecureRandom() {
   return result;
 }
 
-bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
-                             bool force) {
+bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
   bool result = false;
   if (bp.sentLastTime) return true;
 
@@ -31,7 +30,6 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp,
 
   bool sent = false;
 
-  uint32_t c = 0;
   for (auto& nb : neighbours_) {
     bool found = false;
     for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
@@ -82,7 +80,7 @@ void Neighbourhood::sendByNeighbours(const Packet* pack) {
   else {
     auto& bp = msgBroads_.tryStore(pack->getHash());
     if (!bp.pack) bp.pack = *pack;
-    dispatch(bp, true);
+    dispatch(bp);
   }
 }
 
@@ -128,50 +126,36 @@ void Neighbourhood::refreshLimits() {
 }
 
 void Neighbourhood::checkSilent() {
-  bool needRefill = true;
+  cs::SpinGuard lm(mLockFlag_);
+  cs::SpinGuard ln(nLockFlag_);
 
-  {
-    cs::SpinGuard lm(mLockFlag_);
-    cs::SpinGuard ln(nLockFlag_);
+  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+    if ((*conn)->isSignal)
+      continue;
 
-    for (auto conn = neighbours_.begin();
-         conn != neighbours_.end();
-         ++conn) {
-      if ((*conn)->isSignal)
-        continue;
+    if (!(*conn)->node) {
+      ConnectionPtr tc = *conn;
+      disconnectNode(conn);
+      --conn;
+      continue;
+    }
 
-      if (!(*conn)->node) {
-        ConnectionPtr tc = *conn;
-        disconnectNode(conn);
-        --conn;
-        continue;
-      }
+    const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
 
-      const auto packetsCount = (*(*conn)->node)->packets.
-        load(std::memory_order_relaxed);
+    if (packetsCount == (*conn)->lastPacketsCount) {
+      LOG_WARN("Node " << (*conn)->in << " stopped responding");
 
-      if (packetsCount == (*conn)->lastPacketsCount) {
-        LOG_WARN("Node " << (*conn)->in << " stopped responding");
+      ConnectionPtr tc = *conn;
+      Connection* c = *tc;
+      tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
 
-        ConnectionPtr tc = *conn;
-        Connection* c = *tc;
-        tc->node->connection.compare_exchange_strong(c,
-          nullptr,
-          std::memory_order_release,
-          std::memory_order_relaxed);
-
-        disconnectNode(conn);
-        --conn;
-      }
-      else {
-        needRefill = false;
-        (*conn)->lastPacketsCount = packetsCount;
-      }
+      disconnectNode(conn);
+      --conn;
+    }
+    else {
+      (*conn)->lastPacketsCount = packetsCount;
     }
   }
-
-  //if (needRefill)
-    //transport_->refillNeighbourhood();
 }
 
 template <typename Vec>
@@ -225,6 +209,17 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
 uint32_t Neighbourhood::size() {
   cs::SpinGuard ln(nLockFlag_);
   return neighbours_.size();
+}
+
+uint32_t Neighbourhood::getNeighboursCountWithoutSS() {
+  cs::SpinGuard ln(nLockFlag_);
+  uint32_t count = 0;
+  for (auto& nb : neighbours_) {
+    if (!nb->isSignal) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in,
@@ -535,7 +530,7 @@ void Neighbourhood::resendPackets() {
   uint32_t cnt2 = 0;
   for (auto& bp : msgBroads_) {
     if (!bp.data.pack) continue;
-    if (!dispatch(bp.data, false))
+    if (!dispatch(bp.data))
       bp.data.pack = Packet();
     else
       ++cnt1;

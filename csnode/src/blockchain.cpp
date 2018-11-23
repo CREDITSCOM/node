@@ -134,8 +134,9 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
 
   cslog() << "Block " << pool.sequence() << " saved succesfully";
 
-  if (!updateFromNextBlock(pool))
+  if (!updateFromNextBlock(pool)) {
     cserror() << "Couldn't update from next block";
+  }
 
   {
     std::lock_guard<decltype(waiters_locker)> l(waiters_locker);
@@ -606,8 +607,9 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     walletsPools_->loadNextBlock(nextPool);
 
     blockHashes_->loadNextBlock(nextPool);
-    if (!blockHashes_->saveDbStructure())
+    if (!blockHashes_->saveDbStructure()) {
       cslog() << "Error writing DB structure";
+    }
   }
   catch (std::exception& e) {
     cserror() << "Exc=" << e.what();

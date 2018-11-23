@@ -149,6 +149,7 @@ public:
   void pourByNeighbours(const Packet*, const uint32_t packNum);
 
   uint32_t size();
+  uint32_t getNeighboursCountWithoutSS();
 
   void pingNeighbours();
   bool isPingDone();
@@ -188,7 +189,7 @@ private:
     uint32_t attempts = 0;
   };
 
-  bool dispatch(BroadPackInfo&, const bool force);
+  bool dispatch(BroadPackInfo&);
   bool dispatch(DirectPackInfo&);
 
   ConnectionPtr getConnection(const ip::udp::endpoint&);

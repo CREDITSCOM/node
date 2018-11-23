@@ -76,7 +76,7 @@ public:
   void gotVector(const cs::HashVector& vect);
   void gotMatrix(cs::HashMatrix&& matr);
   void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
-  void gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender);
+  void gotBlockRequest(const csdb::PoolHash& p_hash);
   void gotBlockReply(csdb::Pool& p);
   void gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender);
   // store outrunning syncro blocks

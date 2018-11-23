@@ -89,7 +89,7 @@ public:
   void sendRoundInfoRequest(uint8_t respondent);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
-  void getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
+  void getRoundInfoReply(const uint8_t* data, const size_t size,
                          const cs::PublicKey& respondent);
   bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
 
@@ -101,7 +101,6 @@ public:
 
   void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
   void applyNotifications();
-  void writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   bool isCorrectNotification(const uint8_t* data, const std::size_t size);
   void sendWriterNotification();
@@ -277,7 +276,6 @@ private:
   // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
-  cs::PoolSynchronizer* poolSynchronizer_;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;
@@ -292,10 +290,12 @@ private:
 
   size_t lastStartSequence_;
   bool blocksReceivingStarted_ = false;
+  bool isHashesReplyReceived_ = false;
 
   // serialization/deserialization entities
   cs::IPackStream istream_;
   cs::OPackStream ostream_;
+  cs::PoolSynchronizer* poolSynchronizer_;
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;

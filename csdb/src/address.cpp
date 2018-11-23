@@ -14,7 +14,7 @@ class Address::priv : public ::csdb::internal::shared_data {
   union {
     std::array<uint8_t, 32> public_key;
     WalletId wallet_id;
-  } data_;
+  } data_{};
 
   bool is_wallet_id_ = false;
 
@@ -38,75 +38,47 @@ bool Address::operator==(const Address &other) const noexcept {
   if (d == other.d) {
     return true;
   }
-  else if (is_public_key()) {
-    if (d->data_.public_key == other.d->data_.public_key) {
-      return true;
-    }
-    else {
-      return false;
-    }
+  if (is_public_key()) {
+    return d->data_.public_key == other.d->data_.public_key;
   }
-  else {
-    if (d->data_.wallet_id == other.d->data_.wallet_id) {
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
+  return d->data_.wallet_id == other.d->data_.wallet_id;
 }
 
 bool Address::operator<(const Address &other) const noexcept {
-  if (d == other.d)
+  if (d == other.d) {
     return false;
+  }
 
   if (d->is_wallet_id_ && other.d->is_wallet_id_) {
     return d->data_.wallet_id < other.d->data_.wallet_id;
   }
-  else if (!d->is_wallet_id_ && !other.d->is_wallet_id_) {
+  if (!d->is_wallet_id_ && !other.d->is_wallet_id_) {
     return d->data_.public_key < other.d->data_.public_key;
   }
-  else if (d->is_wallet_id_ && !other.d->is_wallet_id_) {
+  if (d->is_wallet_id_ && !other.d->is_wallet_id_) {
     return d->data_.public_key < other.d->data_.public_key;
   }
-  else if (!d->is_wallet_id_ && other.d->is_wallet_id_) {
+  if (!d->is_wallet_id_ && other.d->is_wallet_id_) {
     return d->data_.public_key < other.d->data_.public_key;
   }
-  else {
-    return false;
-  }
+  return false;
 }
-
-/*bool Address::operator <(const Address &other) const noexcept
-{
-  if (d == other.d)
-    return false;
-
-  if (d->is_wallet_id_ && other.d->is_wallet_id_) {
-    return d->data_.wallet_id < other.d->data_.wallet_id;
-  } else if (!d->is_wallet_id_ && !other.d->is_wallet_id_) {
-    return d->data_.public_key < other.d->data_.public_key;
-  } else {
-    return false;
-  }
-}*/
 
 size_t Address::calcHash() const noexcept {
   if (is_public_key()) {
     return boost::hash_value(d->data_.public_key);
   }
-  else {
-    return boost::hash_value(d->data_.wallet_id);
-  }
+  return boost::hash_value(d->data_.wallet_id);
 }
 
 ::std::string Address::to_string() const noexcept {
-  if (is_public_key())
+  if (is_public_key()) {
     return internal::to_hex(::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end()));
-  else if (is_wallet_id())
+  }
+  if (is_wallet_id()) {
     return std::to_string(wallet_id());
-  else
-    return std::string();
+  }
+  return std::string();
 }
 
 Address Address::from_string(const ::std::string &val) {
@@ -141,9 +113,10 @@ Address Address::from_string(const ::std::string &val) {
 }
 
 Address::WalletId Address::wallet_id() const noexcept {
-  if (is_wallet_id())
+  if (is_wallet_id()) {
     return d->data_.wallet_id;
-  return static_cast<Address::WalletId>(-1);
+  }
+return static_cast<Address::WalletId>(-1);
 }
 
 Address Address::from_public_key(const ::csdb::internal::byte_array &key) {

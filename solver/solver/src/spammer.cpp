@@ -22,18 +22,18 @@
 namespace cs {
 namespace {
 // number of wallets, which will be generated to send transactions to
-constexpr auto kMyWalletsNum = 10;
+constexpr auto kMyWalletsNum = 10u;
 // spamming starts after this timeout
-constexpr auto kTimeStartSleepSec = 5;
+constexpr auto kTimeStartSleepSec = 5u;
 // increase this value to make spammer slower, otherwise decrease
-constexpr auto kSpammerSleepTimeMicrosec = 70000;
+constexpr auto kSpammerSleepTimeMicrosec = 70000u;
 // from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
 std::string kGenesisPrivate =
     "3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN";
 
-constexpr auto kMaxTransactionsFromOneSource = 1000;
-constexpr auto kMaxMoneyForOneSpammer = 10'000'000;
+constexpr auto kMaxTransactionsFromOneSource = 1000u;
+constexpr auto kMaxMoneyForOneSpammer = 10'000'000u;
 }  // namespace
 
 void Spammer::StartSpamming(Node& node) {
@@ -45,7 +45,7 @@ void Spammer::StartSpamming(Node& node) {
 void Spammer::GenerateMyWallets() {
   std::array<uint8_t, csdb::internal::kPublicKeySize> public_key;
   std::array<uint8_t, csdb::internal::kPrivateKeySize> private_key;
-  for (int i = 0; i < kMyWalletsNum; ++i) {
+  for (auto i = 0u; i < kMyWalletsNum; ++i) {
     crypto_sign_keypair(public_key.data(), private_key.data());
     my_wallets_.push_back(std::pair<csdb::Address, std::array<uint8_t, csdb::internal::kPrivateKeySize>>(
         csdb::Address::from_public_key(csdb::internal::byte_array(public_key.begin(), public_key.end())), private_key));
@@ -84,7 +84,7 @@ void Spammer::SpamWithTransactions(Node& node) {
       if (target_wallet_counter == kMyWalletsNum) {
         target_wallet_counter = 0;
       }
-      if (inner_id_counter == (round_spamming + 1) * kMaxTransactionsFromOneSource - 1) {
+      if (cs::numeric_cast<uint64_t>(inner_id_counter) == (round_spamming + 1) * kMaxTransactionsFromOneSource - 1) {
         ++spammer_index;
         if (spammer_index == kMyWalletsNum) {
           spammer_index = 0;
@@ -103,7 +103,7 @@ void Spammer::FundMyWallets(Node& node) {
   DecodeBase58(kGenesisPublic, genesis);
   genesis_address = csdb::Address::from_public_key(genesis);
   DecodeBase58(kGenesisPrivate, genesis);
-  for (int i = 0; i < kMyWalletsNum; ++i) {
+  for (auto i = 0u; i < kMyWalletsNum; ++i) {
     csdb::Transaction transaction;
     transaction.set_source(OptimizeAddress(genesis_address, node));
     transaction.set_target(my_wallets_[i].first);

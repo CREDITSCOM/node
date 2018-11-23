@@ -15,7 +15,7 @@ namespace csdb {
 namespace {
 template <typename T>
 struct Dbt_copy : public Dbt {
-  Dbt_copy(const T &t)
+  explicit Dbt_copy(const T &t)
   : t_copy(t) {
     init();
   }
@@ -31,7 +31,7 @@ struct Dbt_copy : public Dbt {
     set_flags(DB_DBT_USERMEM);
   }
 
-  operator T() {
+  explicit operator T() {
     return t_copy;
   }
 
@@ -41,7 +41,7 @@ private:
 
 template <>
 struct Dbt_copy<::csdb::internal::byte_array> : public Dbt {
-  Dbt_copy(const ::csdb::internal::byte_array &data) {
+  explicit Dbt_copy(const ::csdb::internal::byte_array &data) {
     set_data(const_cast<unsigned char *>(data.data()));
     set_size(data.size());
     set_ulen(data.size());
@@ -51,12 +51,12 @@ struct Dbt_copy<::csdb::internal::byte_array> : public Dbt {
 
 struct Dbt_safe : public Dbt {
   Dbt_safe() {
-    set_data(NULL);
+    set_data(nullptr);
     set_flags(DB_DBT_MALLOC);
   }
   ~Dbt_safe() {
     void *buf = get_data();
-    if (buf != NULL) {
+    if (buf != nullptr) {
       free(buf);
     }
   }
@@ -80,7 +80,7 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
   Error err = UnknownError;
-  if (!status) {
+  if (status == 0) {
     err = NoError;
   }
   else if (status == ENOENT) {
@@ -97,12 +97,14 @@ void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
 bool DatabaseBerkeleyDB::open(const std::string &path) {
   boost::filesystem::path direc(path);
   if (boost::filesystem::exists(direc)) {
-    if (!boost::filesystem::is_directory(direc))
+    if (!boost::filesystem::is_directory(direc)) {
       return false;
+    }
   }
   else {
-    if (!boost::filesystem::create_directories(direc))
+    if (!boost::filesystem::create_directories(direc)) {
       return false;
+    }
   }
 
   db_blocks_.reset(nullptr);
@@ -131,22 +133,22 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_CDB | DB_THREAD;
   env_.open(path.c_str(), db_env_open_flags, 0);
 
-  auto db_blocks = new Db(&env_, 0);
-  auto db_seq_no = new Db(&env_, 0);
+  auto db_blocks = std::make_unique<Db>(&env_, 0);
+  auto db_seq_no = std::make_unique<Db>(&env_, 0);
 
-  int status = db_blocks->open(NULL, "blockchain.db", NULL, DB_RECNO, DB_CREATE, 0);
-  if (status) {
+  int status = db_blocks->open(nullptr, "blockchain.db", nullptr, DB_RECNO, DB_CREATE, 0);
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
-  db_blocks_.reset(db_blocks);
+  db_blocks_.reset(db_blocks.release());
 
-  status = db_seq_no->open(NULL, "sequence.db", NULL, DB_HASH, DB_CREATE, 0);
-  if (status) {
+  status = db_seq_no->open(nullptr, "sequence.db", nullptr, DB_HASH, DB_CREATE, 0);
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
-  db_seq_no_.reset(db_seq_no);
+  db_seq_no_.reset(db_seq_no.release());
 
   set_last_error();
   return true;
@@ -166,14 +168,14 @@ bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_
   Dbt_copy<byte_array> db_value(value);
 
   int status = db_blocks_->put(nullptr, &db_seq_no, &db_value, 0);
-  if (status) {
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
 
   Dbt_copy<byte_array> db_key(key);
   status = db_seq_no_->put(nullptr, &db_key, &db_seq_no, 0);
-  if (status) {
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
@@ -190,17 +192,12 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value) {
 
   Dbt_copy<byte_array> db_key(key);
   if (value == nullptr) {
-    if (db_seq_no_->exists(nullptr, &db_key, 0) == 0) {
-      return true;
-    }
-    else {
-      return false;
-    }
+    return db_seq_no_->exists(nullptr, &db_key, 0) == 0;
   }
 
   Dbt_copy<uint32_t> db_seq_no;
   int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, 0);
-  if (status) {
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
@@ -208,12 +205,12 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value) {
   Dbt_safe db_value;
 
   status = db_blocks_->get(nullptr, &db_seq_no, &db_value, 0);
-  if (status) {
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
 
-  auto begin = reinterpret_cast<uint8_t *>(db_value.get_data());
+  auto begin = static_cast<uint8_t *>(db_value.get_data());
   value->assign(begin, begin + db_value.get_size());
   set_last_error();
   return true;
@@ -233,18 +230,18 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
   Dbt_copy<uint32_t> db_seq_no(seq_no);
 
   int status = db_blocks_->get(nullptr, &db_seq_no, &db_value, 0);
-  if (status) {
+  if (status != 0) {
     set_last_error_from_berkeleydb(status);
     return false;
   }
 
-  auto begin = reinterpret_cast<uint8_t *>(db_value.get_data());
+  auto begin = static_cast<uint8_t *>(db_value.get_data());
   value->assign(begin, begin + db_value.get_size());
   set_last_error();
   return true;
 }
 
-bool DatabaseBerkeleyDB::remove(const byte_array &key) {
+bool DatabaseBerkeleyDB::remove(const byte_array&) {
   assert(false);
 
   if (!db_blocks_) {
@@ -256,7 +253,7 @@ bool DatabaseBerkeleyDB::remove(const byte_array &key) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::write_batch(const ItemList &items) {
+bool DatabaseBerkeleyDB::write_batch(const ItemList&) {
   assert(false);
 
   if (!db_blocks_) {
@@ -270,31 +267,32 @@ bool DatabaseBerkeleyDB::write_batch(const ItemList &items) {
 
 class DatabaseBerkeleyDB::Iterator final : public Database::Iterator {
 public:
-  Iterator(Dbc *it)
+  explicit Iterator(Dbc *it)
   : it_(it)
   , valid_(false) {
     if (it != nullptr) {
       valid_ = true;
     }
   }
-  ~Iterator() {
+  ~Iterator() final {
     if (it_ != nullptr) {
       it_->close();
     }
   }
-  bool is_valid() const override final {
+  bool is_valid() const final {
     return valid_;
   }
 
-  void seek_to_first() override final {
-    if (!it_)
+  void seek_to_first() final {
+    if (it_ == nullptr) {
       return;
+    }
 
     Dbt key;
     Dbt_safe value;
 
     int ret = it_->get(&key, &value, DB_FIRST);
-    if (!ret) {
+    if (ret == 0) {
       set_value(value);
       valid_ = true;
     }
@@ -303,23 +301,24 @@ public:
     }
   }
 
-  void seek_to_last() override final {
+  void seek_to_last() final {
     assert(false);
   }
 
-  void seek(const ::csdb::internal::byte_array &key) override final {
+  void seek(const ::csdb::internal::byte_array&) final {
     assert(false);
   }
 
   void next() override final {
-    if (!it_)
+    if (it_ == nullptr) {
       return;
+    }
 
     Dbt key;
     Dbt_safe value;
 
     int ret = it_->get(&key, &value, DB_NEXT);
-    if (!ret) {
+    if (ret == 0) {
       set_value(value);
       valid_ = true;
     }
@@ -328,26 +327,24 @@ public:
     }
   }
 
-  void prev() override final {
+  void prev() final {
     assert(false);
   }
 
-  ::csdb::internal::byte_array key() const override final {
+  ::csdb::internal::byte_array key() const final {
     return ::csdb::internal::byte_array{};
   }
 
-  ::csdb::internal::byte_array value() const override final {
+  ::csdb::internal::byte_array value() const final {
     if (valid_) {
       return value_;
     }
-    else {
-      return ::csdb::internal::byte_array{};
-    }
+    return ::csdb::internal::byte_array{};
   }
 
 private:
-  void set_value(Dbt &value) {
-    auto begin = reinterpret_cast<uint8_t *>(value.get_data());
+  void set_value(const Dbt& value) {
+    auto begin = static_cast<uint8_t *>(value.get_data());
     value_.assign(begin, begin + value.get_size());
   }
 

@@ -10,7 +10,7 @@ bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback) {
   if (instance.isOpen()) {
     return false;
   }
-  instance = ::csdb::Storage::get(options, callback);
+  instance = ::csdb::Storage::get(options, std::move(callback));
   return instance.isOpen();
 }
 
@@ -18,7 +18,7 @@ bool init(const char* path_to_bases, Storage::OpenCallback callback) {
   if (instance.isOpen()) {
     return false;
   }
-  instance = ::csdb::Storage::get(path_to_bases, callback);
+  instance = ::csdb::Storage::get(path_to_bases, std::move(callback));
   return instance.isOpen();
 }
 
