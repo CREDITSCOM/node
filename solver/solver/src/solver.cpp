@@ -229,7 +229,7 @@ void Solver::gotBlock(csdb::Pool&& block, const PublicKey& sender) {
     cslog() << "Solver -> getblock calls writeLastBlock";
     if (block.verify_signature())  // INCLUDE SIGNATURES!!!
     {
-      m_node->getBlockChain().onBlockReceived(block);
+      m_node->getBlockChain().storeBlock(block);
 #ifndef MONITOR_NODE
       if ((m_node->getNodeLevel() != NodeLevel::Writer) && (m_node->getNodeLevel() != NodeLevel::Main)) {
         auto hash = m_node->getBlockChain().getLastWrittenHash();
@@ -268,7 +268,7 @@ void Solver::rndStorageProcessing() {
     newSeq = m_node->getBlockChain().getLastWrittenSequence() + 1;
 
     if (m_randomStorage.count(newSeq) > 0) {
-      m_node->getBlockChain().onBlockReceived(m_randomStorage.at(newSeq));
+      m_node->getBlockChain().storeBlock(m_randomStorage.at(newSeq));
       m_randomStorage.erase(newSeq);
     }
     else
@@ -285,7 +285,7 @@ void Solver::tmpStorageProcessing() {
     newSeq = m_node->getBlockChain().getLastWrittenSequence() + 1;
 
     if (m_temporaryStorage.count(newSeq) > 0) {
-      m_node->getBlockChain().onBlockReceived(m_temporaryStorage.at(newSeq));
+      m_node->getBlockChain().storeBlock(m_temporaryStorage.at(newSeq));
       m_temporaryStorage.erase(newSeq);
     }
     else
@@ -439,7 +439,7 @@ void Solver::gotBlockReply(csdb::Pool&& pool) {
   cslog() << "Solver -> Got Block for my Request: " << pool.sequence();
 
   if (pool.sequence() == m_node->getBlockChain().getLastWrittenSequence() + 1)
-    m_node->getBlockChain().onBlockReceived(pool);
+    m_node->getBlockChain().storeBlock(pool);
 }
 
 void Solver::nextRound() {

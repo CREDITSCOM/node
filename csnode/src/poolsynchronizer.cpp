@@ -66,7 +66,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
       if (sequence == lastWrittenSequence + 1) {
         cslog() << "POOL SYNCHRONIZER> Block Sequence is Ok " << sequence;
 
-        m_blockChain->onBlockReceived(pool);
+        m_blockChain->storeBlock(pool);
         lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
       }
       else if (sequence > lastWrittenSequence) {
@@ -264,7 +264,7 @@ csdb::Pool::sequence_t cs::PoolSynchronizer::processingTemporaryStorage() {
     if (it != m_temporaryStorage.end()) {
       csdebug() << "POOL SYNCHRONIZER> Temporary storage contains sequence: " << neededSequence
                 << ", with transactions: " << it->second.transactions_count();
-      m_blockChain->onBlockReceived(it->second);
+      m_blockChain->storeBlock(it->second);
       m_temporaryStorage.erase(it);
       lastSequence = neededSequence;
     }

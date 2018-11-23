@@ -214,46 +214,6 @@ void Node::blockchainSync() {
   poolSynchronizer_->processingSync(roundNum_);
 }
 
-void Node::addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence) {
-  if (poolMetaMap_.count(sequence) == 0ul) {
-    poolMetaMap_.emplace(sequence, std::move(meta));
-    cslog() << "NODE> Put pool meta to temporary storage, await sync complection";
-  }
-  else {
-    cswarning() << "NODE> Can not add same pool meta sequence";
-  }
-}
-
-void Node::processMetaMap() {
-  cslog() << "NODE> Processing pool meta map, map size: " << poolMetaMap_.size();
-
-  for (auto& [sequence, meta] : poolMetaMap_) {
-    csdebug() << "NODE> Processing pool meta map, sequence: " << sequence;
-
-    if(bc_.getLastWrittenSequence() > sequence) {
-      continue;
-    }
-
-    solver_->countFeesInPool(&meta.pool);
-    meta.pool.set_previous_hash(bc_.getLastWrittenHash());
-
-    getBlockChain().finishNewBlock(meta.pool);
-
-    if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
-      csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock_V3(meta.pool, sequence);
-    }
-    else {
-      cswarning() << "NODE> RECEIVED KEY Writer verification failed";
-      cswarning() << "NODE> remove wallets from wallets cache";
-
-      getBlockChain().removeWalletsInPoolFromCache(meta.pool);
-    }
-  }
-
-  poolMetaMap_.clear();
-}
-
 void Node::run() {
   transport_->run();
 }
@@ -642,63 +602,16 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-  if (!pool) {
+  if (!pool.has_value()) {
     cserror() << "NODE> getCharacteristic(): created pool is not valid";
     return;
   }
 
-  if (isPoolsSyncroStarted()) {
-    cs::PoolSyncMeta meta;
-    meta.sender = sender;
-    meta.signature = signature;
-    meta.pool = std::move(pool).value();
-
-    addPoolMetaToMap(std::move(meta), sequence);
-
-    return;
+  if(!getBlockChain().storeBlock(pool.value(), signature)) {
+    cserror() << "NODE> failed to store block in BlockChain";
   }
 
-  solver_->countFeesInPool(&pool.value());
-  pool.value().set_previous_hash(bc_.getLastWrittenHash());
-  getBlockChain().finishNewBlock(pool.value());
-
-  if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-    cswarning() << "\tRECEIVED KEY Writer verification successfull";
-    writeBlock_V3(pool.value(), sequence);
-  }
-  else {
-    cswarning() << "\tRECEIVED KEY Writer verification failed";
-    cswarning() << "\tremove wallets from wallets cache";
-    logPool(pool.value());
-    getBlockChain().removeWalletsInPoolFromCache(pool.value());
-  }
   csdebug() << "NODE> " << __func__ << "(): done";
-}
-
-void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence) {
-  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
-
-  if (sequence > this->getRoundNumber()) {
-    return;  // remove this line when the block candidate signing of all trusted will be implemented
-  }
-
-  this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
-
-#ifndef MONITOR_NODE
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-  }
-  else {
-    cswarning() << "NODE> Can not write block with sequence " << sequence;
-  }
-#else
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-  }
-  else {
-    solver_->gotIncorrectBlock(std::move(newPool), sender);
-  }
-#endif
 }
 
 const cs::ConfidantsKeys& Node::confidants() const {
@@ -725,53 +638,9 @@ void Node::getWriterNotification(const uint8_t* data, const std::size_t size, co
   }
 }
 
-void Node::applyNotifications() {
-  csdebug() << "NODE> Apply notifications";
-
-  cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1;
-  poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
-
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, solver_->getPublicKey());
-  if (!pool) {
-    cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
-    return;
-  }
-
-  solver_->countFeesInPool(&pool.value());
-  pool.value().set_previous_hash(bc_.getLastWrittenHash());
-  getBlockChain().finishNewBlock(pool.value());
-
-// TODO: need to write confidants notifications bytes to csdb::Pool user fields
-#ifdef MONITOR_NODE
-  cs::Solver::addTimestampToPool(pool.value()));
-#endif
-
-  pool.value().sign(solver_->getPrivateKey());
-
-  // array
-  cs::Signature poolSignature;
-  const auto& signature = pool.value().signature();
-  std::copy(signature.begin(), signature.end(), poolSignature.begin());
-
-  csdebug() << "NODE> ApplyNotification "
-            << " Signature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
-
-  const bool isVerified = pool.value().verify_signature();
-  cslog() << "NODE> After sign: isVerified == " << isVerified;
-
-  const cs::Characteristic* characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
-
-  if (!characteristic) {
-    csfatal() << "NODE> Apply notifications, no characteristic in conveyer, logic error";
-    return;
-  }
-
-  cslog() << "NODE> send characteristic of size " << characteristic->mask.size();
-  createBlockValidatingPacket(poolMetaInfo, *characteristic, poolSignature, conveyer.notifications());
-
-  flushCurrentTasks();
+void Node::applyNotifications()
+{
+  cserror() << "NODE> Apply notifications is obsolete in current version";
 }
 
 bool Node::isCorrectNotification(const uint8_t* data, const std::size_t size) {
@@ -2017,21 +1886,16 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, solver_->getPublicKey());
-  if (!pool) {
+  if (!pool.has_value()) {
     cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
     return;
   }
 
-  solver_->countFeesInPool(&pool.value());
-  pool.value().set_previous_hash(bc_.getLastWrittenHash());
-  getBlockChain().finishNewBlock(pool.value());
-
-  // TODO: need to write confidants notifications bytes to csdb::Pool user fields
-#ifdef MONITOR_NODE
-  cs::Solver::addTimestampToPool(pool.value()));
-#endif
-
-  pool.value().sign(solver_->getPrivateKey());
+  pool = getBlockChain().createBlock(pool.value(), solver_->getPrivateKey());
+  if(!pool.has_value()) {
+    cserror() << "NODE> CREATE BLOCK ERROR!";
+    return;
+  }
 
   // array
   cs::Signature poolSignature;
@@ -2039,11 +1903,8 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   std::copy(signature.begin(), signature.end(), poolSignature.begin());
 
   csdebug() << "\tsignature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
+  csdebug() << "\tverify signature: " << pool.value().verify_signature();
 
-  const bool isVerified = pool.value().verify_signature();
-  cslog() << "\tafter sign: isVerified == " << isVerified;
-
-  writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber);
   logPool(pool.value());
   sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
 }
@@ -2211,30 +2072,10 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-    if (pool) {
-      if (poolSynchronizer_->isSyncroStarted()) {
-        cs::PoolSyncMeta meta;
-        meta.sender = sender;
-        meta.signature = signature;
-        meta.pool = std::move(pool).value();
+    if (pool.has_value()) {
 
-        addPoolMetaToMap(std::move(meta), sequence);
-      }
-      else {
-        solver_->countFeesInPool(&pool.value());
-        pool.value().set_previous_hash(bc_.getLastWrittenHash());
-        getBlockChain().finishNewBlock(pool.value());
-
-        if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
-          cswarning() << "\tRECEIVED KEY Writer verification successfull";
-          writeBlock_V3(pool.value(), sequence);
-        }
-        else {
-          cswarning() << "\tRECEIVED KEY Writer verification failed";
-          cswarning() << "\tRemove wallets from wallets cache";
-          logPool(pool.value());
-          getBlockChain().removeWalletsInPoolFromCache(pool.value());
-        }
+      if(!getBlockChain().storeBlock(pool.value(), signature)) {
+        cserror() << "NODE> failed to store block in BlockChain";
       }
     }
   }
