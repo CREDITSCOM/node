@@ -121,7 +121,7 @@ public:
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
   void sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round);
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
   void resetNeighbours();
@@ -286,8 +286,10 @@ private:
   RegionAllocator packStreamAllocator_;
 
   size_t lastStartSequence_;
+  uint32_t startPacketRequestPoint_ = 0;
+  inline static const uint32_t packetRequestStep_ = 100;
+
   bool blocksReceivingStarted_ = false;
-  bool isHashesReplyReceived_ = false;
 
   // serialization/deserialization entities
   cs::IPackStream istream_;

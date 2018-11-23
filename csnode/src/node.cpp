@@ -940,7 +940,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
   flushCurrentTasks();
 }
 
-void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round) {
+void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round, uint32_t requestStep) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     return;
   }
@@ -961,19 +961,19 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
     sendPacketHashesRequestToRandomNeighbour(hashes, round);
   }
 
-  auto requestClosure = [round, this] {
+  auto requestClosure = [round, requestStep, this] {
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     if (!conveyer.isSyncCompleted(round)) {
       auto neededHashes = conveyer.neededHashes(round);
       if (neededHashes) {
-        sendPacketHashesRequest(*neededHashes, round);
+        sendPacketHashesRequest(*neededHashes, round, requestStep + packetRequestStep_);
       }
     }
   };
 
   // send request again
-  cs::Timer::singleShot(cs::NeighboursRequestDelay, requestClosure);
+  cs::Timer::singleShot(cs::NeighboursRequestDelay + requestStep, requestClosure);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
@@ -1254,11 +1254,11 @@ void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
     else {
       cslog() << "NODE> All hashes in conveyer -> start consensus now";
     }
+
     startConsensus();
   }
   else {
-    // TODO: whether possible roundNum_ != rt.round at this point?
-    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_, startPacketRequestPoint_);
   }
 }
 

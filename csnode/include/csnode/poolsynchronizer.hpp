@@ -57,10 +57,10 @@ private:  // Service
   bool isLastRequest();
 
 private:  // Members
-  inline static const uint8_t s_maxBlockCount = 4;
+  inline static const uint8_t s_maxBlockCount = 1;
   inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
-  inline static const uint8_t s_roundDifferentForRepeatRequest = 4;  // round count for repeat request : 0 - every round
-  inline static const uint8_t s_packetCountForHelp = 3;              // packet Counter for connect another neighbor
+  inline static const uint8_t s_roundDifferentForRepeatRequest = 0;  // round count for repeat request : 0 - every round
+  inline static const uint8_t s_packetCountForHelp = 10;              // packet Counter for connect another neighbor
 
   Transport* m_transport;
   BlockChain* m_blockChain;

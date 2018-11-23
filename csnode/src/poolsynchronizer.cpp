@@ -87,7 +87,9 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
 
   /// or m_roundToSync > lastWrittenSequence
   if (m_roundToSync != cs::numeric_cast<cs::RoundNumber>(lastWrittenSequence)) {
-    sendBlockRequest();
+//    cs::Timer::singleShot(cs::NeighboursRequestDelay, [this] {
+//      sendBlockRequest();
+//    });
   }
   else {
     m_isSyncroStarted = false;
@@ -282,7 +284,7 @@ bool cs::PoolSynchronizer::getNeededSequences() {
   auto sequenceIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(),
                                  [](const auto& pair) { return pair.second >= s_packetCountForHelp; });
   auto neighbourIt = std::find_if(m_neighbours.begin(), m_neighbours.end(),
-                                  [](const auto& neighbour) { return neighbour.isAvailableRequest(); });
+                                  [](const auto& neighbour) { return neighbour.isAvailableRequest() && neighbour.sequence(); });
 
   if (!m_temporaryStorage.empty()) {
     std::ostringstream os;
@@ -322,6 +324,9 @@ bool cs::PoolSynchronizer::getNeededSequences() {
   else if (neighbourIt != m_neighbours.end()) {
     // if maxWaitingTimeReply <= 0
     lastSequence = cs::numeric_cast<uint32_t>(neighbourIt->sequence());
+    if (!lastSequence) {
+
+    }
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences: from neighbours: " << neighbourIt->connection()->getOut()
               << ", seq: " << lastSequence;
     isFromStorage = true;
@@ -398,15 +403,17 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     return;
   }
 
-  m_neighbours.clear();
-
   const uint32_t neighboursCount = m_transport->getNeighboursCount();
+  const auto nSize = m_neighbours.size();
 
-  for (std::size_t i = 0; i != neighboursCount; ++i) {
+  for (std::size_t i = nSize; i < neighboursCount; ++i) {
     ConnectionPtr target = m_transport->getNeighbourByNumber(i);
     if (target && !target->isSignal) {
       m_neighbours.emplace_back(NeighboursSetElemet(target));
     }
+  }
+  for (std::size_t i = neighboursCount; i < nSize; ++i) {
+    m_neighbours.pop_back();
   }
 
   csdebug() << "POOL SYNCHRONIZER> Neighbours saved count is: " << m_neighbours.size();
