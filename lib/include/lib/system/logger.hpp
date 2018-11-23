@@ -92,17 +92,6 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
 
 #define csdwarning(...) cswarning(__VA_ARGS__)
 
-// legacy support (should be replaced with csXXX macros)
-//
-extern thread_local bool trace;
-
-#define TRACE(...)                                                                                    \
-  if (!trace)                                                                                         \
-    ;                                                                                                 \
-  else {                                                                                              \
-    BOOST_LOG_TRIVIAL(trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " " << __VA_ARGS__; \
-  }
-
 #define LOG_DEBUG(TEXT) csdebug() << TEXT
 
 #define LOG_NOTICE(TEXT) csinfo() << TEXT

@@ -622,15 +622,12 @@ Pool Pool::meta_from_byte_stream(const char* data, size_t size) {
   return Pool(p);
 }
 
-Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompressedSize) {
+Pool Pool::from_lz4_byte_stream(size_t uncompressedSize) {
   priv* p = new priv();
   p->binary_representation_.resize(uncompressedSize);
 
-  auto rs = LZ4_decompress_safe(data, (char*)p->binary_representation_.data(), size, uncompressedSize);
-
   ::csdb::priv::ibstream is(p->binary_representation_.data(), p->binary_representation_.size());
 
-  size_t t;
   if (!p->get(is)) {
     delete p;
     return Pool();
@@ -748,7 +745,13 @@ bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddres
 }
 
 void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const {
-  os.put(*(size_t*)(&addressId_));
+  union {
+    Pool::NewWalletInfo::AddressId address_id;
+    size_t asSizeType;
+  } addresIdConverter;
+
+  addresIdConverter.address_id = addressId_;
+  os.put(addresIdConverter.asSizeType);
   os.put(walletId_);
 }
 

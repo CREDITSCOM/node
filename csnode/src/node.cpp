@@ -228,6 +228,12 @@ void Node::processMetaMap() {
   cslog() << "NODE> Processing pool meta map, map size: " << poolMetaMap_.size();
 
   for (auto& [sequence, meta] : poolMetaMap_) {
+    csdebug() << "NODE> Processing pool meta map, sequence: " << sequence;
+
+    if(bc_.getLastWrittenSequence() > sequence) {
+      continue;
+    }
+
     solver_->countFeesInPool(&meta.pool);
     meta.pool.set_previous_hash(bc_.getLastWrittenHash());
 
@@ -235,7 +241,7 @@ void Node::processMetaMap() {
 
     if (meta.pool.verify_signature(std::string(meta.signature.begin(), meta.signature.end()))) {
       csdebug() << "NODE> RECEIVED KEY Writer verification successfull";
-      writeBlock_V3(meta.pool, sequence, meta.sender);
+      writeBlock_V3(meta.pool, sequence);
     }
     else {
       cswarning() << "NODE> RECEIVED KEY Writer verification failed";
@@ -312,7 +318,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   // TODO: think how to improve this code
   cslog() << "NODE> Get Round table SS -> got Round = " << rNum;
 
-  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, rNum, roundTable]() mutable {
+  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
     onRoundStart_V3(roundTable);
     onRoundStartConveyer(std::move(roundTable));
   });
@@ -361,6 +367,7 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
+
 bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
@@ -378,8 +385,11 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 
   writeDefaultStream(std::forward<Args>(args)...);
 
-  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize() << ", out = " << target->out
-            << ", in = " << target->in << ", specialOut = " << target->specialOut;
+  csdebug() << "NODE> Sending Direct data: packets count = " << ostream_.getPacketsCount() << ", last size = " << (ostream_.getCurrentSize())
+    << ", out = " << target->out
+    << ", in = " << target->in
+    << ", specialOut = " << target->specialOut
+    << ", msgType: " << getMsgTypesString(msgType);
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -396,7 +406,6 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, A
 template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
-
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
   }
@@ -614,29 +623,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Signature signature;
   istream_ >> signature;
 
-  // cs::Notifications notifications;
-  // istream_ >> notifications;
-
-  // for (std::size_t i = 0; i < notifications.size(); ++i) {
-  //  conveyer.addNotification(notifications[i]);
-  //}
-  // std::vector<cs::Hash> confidantsHashes;
-  // for (const auto& notification : conveyer.notifications()) {
-  //  cs::Hash hash;
-  //  cs::DataStream notificationStream(notification.data(), notification.size());
-  //  notificationStream >> hash;
-  //  confidantsHashes.push_back(hash);
-  //}
-
-  cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
-
-  // for (const auto& hash : confidantsHashes) {
-  //  if (hash != characteristicHash) {
-  //    cserror() << "NODE> getCharacteristic(): some of confidants hashes is dirty";
-  //    return;
-  //  }
-  //}
-
   cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
   cslog() << "\tTime " << poolMetaInfo.timestamp;
 
@@ -678,7 +664,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
     cswarning() << "\tRECEIVED KEY Writer verification successfull";
-    writeBlock_V3(pool.value(), sequence, sender);
+    writeBlock_V3(pool.value(), sequence);
   }
   else {
     cswarning() << "\tRECEIVED KEY Writer verification failed";
@@ -689,47 +675,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
-void Node::writeBlock(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
-  cserror() << "NODE> method writeBlock() is obsolete, call to writeBlock_V3() instead";
-  return;
-#if 0
-  csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
-
-  if (sequence > this->getRoundNumber()) {
-    return;  // remove this line when the block candidate signing of all trusted will be implemented
-  }
-
-  this->getBlockChain().setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
-
-#ifndef MONITOR_NODE
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-
-    if ((this->getNodeLevel() != NodeLevel::Writer) && (this->getNodeLevel() != NodeLevel::Main)) {
-      auto poolHash = this->getBlockChain().getLastWrittenHash();
-      sendHash(poolHash, sender);
-
-      cslog() << "SENDING HASH to writer: " << poolHash.to_string();
-    }
-    else {
-      cslog() << "I'm node " << this->getNodeLevel() << " and do not send hash";
-    }
-  }
-  else {
-    cswarning() << "NODE> Can not write block with sequence " << sequence;
-  }
-#else
-  if (sequence == (this->getBlockChain().getLastWrittenSequence() + 1)) {
-    this->getBlockChain().putBlock(newPool);
-  } else {
-    solver_->gotIncorrectBlock(std::move(newPool), sender);
-  }
-#endif
-
-#endif  // 0
-}
-
-void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender) {
+void Node::writeBlock_V3(csdb::Pool& newPool, size_t sequence) {
   csdebug() << "GOT NEW BLOCK: global sequence = " << sequence;
 
   if (sequence > this->getRoundNumber()) {
@@ -814,8 +760,6 @@ void Node::applyNotifications() {
 
   const bool isVerified = pool.value().verify_signature();
   cslog() << "NODE> After sign: isVerified == " << isVerified;
-
-  writeBlock(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
 
   const cs::Characteristic* characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
 
@@ -1023,7 +967,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
 
     csdebug() << "NODE> Sending transaction packet request to Random Neighbour: hashes Count: " << hashesCount;
 
-    for (auto i = 0; i < hashesCount; ++i) {
+    for (size_t i = 0; i < hashesCount; ++i) {
       hashesToSend.push_back(hashes[startHashNumber + i]);
     }
 
@@ -1113,8 +1057,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packCounter = 0;
   istream_ >> packCounter;
 
-  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front()
-          << ", to: " << sequences.back() << ",   packCounter: " << packCounter;
+  cslog() << "NODE> Get block request> <<< Getting the request for block from: " << sequences.front() << ", to: " << sequences.back() << ",   packCounter: " << packCounter;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -1180,12 +1123,17 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter) {
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    csdebug() << "NODE> " << __func__
+        << "() Target out(): " << cs::Utils::byteStreamToHex(target.data(), target.size())
+        << ", packCounter: " << packCounter
+        << ", round: " << round;
+  
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock,
-                  packCounter);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, round, poolsBlock, packCounter);
 }
 
 void Node::becomeWriter() {
@@ -1344,10 +1292,16 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences,
-                            uint32_t packCounter) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences << packCounter;
+void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter) {
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    csdebug() << "NODE> " << __func__
+        << "() Target out(): " << target->getOut()
+        << ", sequence from: " << sequences.front() << ", to: " << sequences.back()
+        << ", packCounter: " << packCounter
+        << ", round: " << round;
+
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_ << MsgTypes::BlockRequest << round << sequences << packCounter;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
@@ -1566,6 +1520,10 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
   writeDefaultStream(std::forward<Args>(args)...);
 
+  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize()
+      << ", round: " << round
+      << ", msgType: " << getMsgTypesString(msgType);
+
   transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();
 }
@@ -1603,7 +1561,8 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     memcpy(ptr, stageOneInfo.candiates[i].data(), stageOneInfo.candiates[i].size());
     ptr += stageOneInfo.candiates[i].size();
   }
-  assert(ptr - rawData == msgSize);
+  assert(ptr >= rawData);
+  assert(static_cast<size_t>(ptr - rawData) == msgSize);
 
   // cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize);
 
@@ -1646,8 +1605,8 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   // cslog() << "NODE> Getting StageOne 1";
   // cslog() << "Getting Stage One Request from " << byteStreamToHex(sender.str, 32));
   istream_.init(data, size);
-  uint8_t requesterNumber;
-  uint8_t requiredNumber;
+  uint8_t requesterNumber = 0;
+  uint8_t requiredNumber = 0;
   istream_ >> requesterNumber >> requiredNumber;
 
   if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
@@ -1817,10 +1776,10 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   if (nodeIdKey_ == requester) {
     return;
   }
-  // LOG_EVENT(FILE_NAME_ << "Getting Stage Two Request from " << byteStreamToHex(sender.str, 32));
+
   istream_.init(data, size);
-  uint8_t requesterNumber;
-  uint8_t requiredNumber;
+  uint8_t requesterNumber = 0u;
+  uint8_t requiredNumber =0u;
   istream_ >> requesterNumber >> requiredNumber;
 
   cslog() << "NODE> Getting StageTwo Request from [" << (int)requesterNumber << "] ";
@@ -1835,9 +1794,7 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
 }
 
 void Node::sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester) {
-  //#ifdef MYLOG
   cslog() << "NODE> Stage Two REPLY sendiing";
-  //#endif
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     cswarning() << "Only confidant nodes can send consensus stages";
     return;
@@ -1971,14 +1928,15 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
   if (nodeIdKey_ == requester) {
     return;
   }
-  // LOG_EVENT(FILE_NAME_ << "Getting Stage Three Request from " << byteStreamToHex(sender.str, 32));
+
   istream_.init(data, size);
-  uint8_t requesterNumber;
-  uint8_t requiredNumber;
+  uint8_t requesterNumber = 0u;
+  uint8_t requiredNumber = 0u;
   istream_ >> requesterNumber >> requiredNumber;
 
-  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber))
+  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
     return;
+  }
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageThree packet format";
@@ -2093,7 +2051,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   const bool isVerified = pool.value().verify_signature();
   cslog() << "\tafter sign: isVerified == " << isVerified;
 
-  writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber, cs::PublicKey());
+  writeBlock_V3(pool.value(), poolMetaInfo.sequenceNumber);
   logPool(pool.value());
   sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
 }
@@ -2242,46 +2200,12 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Signature signature;
     istream_ >> signature;
 
-    // std::size_t notificationsSize;
-    // istream_ >> notificationsSize;
-
-    // if (notificationsSize == 0) {
-    //  cserror() << "NODE> " << __func__ << "(): notifications count is zero";
-    //}
-
-    // for (std::size_t i = 0; i < notificationsSize; ++i) {
-    //  cs::Bytes notification;
-    //  istream_ >> notification;
-
-    //  conveyer.addNotification(notification);
-    //}
-
     cs::PublicKey writerPublicKey;
     istream_ >> writerPublicKey;
 
     if (!istream_.good()) {
       cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
     }
-
-    // std::vector<cs::Hash> confidantsHashes;
-
-    // for (const auto& notification : conveyer.notifications()) {
-    //  cs::Hash hash;
-    //  cs::DataStream notificationStream(notification.data(), notification.size());
-
-    //  notificationStream >> hash;
-
-    //  confidantsHashes.push_back(hash);
-    //}
-
-    cs::Hash characteristicHash = getBlake2Hash(characteristicMask.data(), characteristicMask.size());
-
-    // for (const auto& hash : confidantsHashes) {
-    //  if (hash != characteristicHash) {
-    //    cserror() << "NODE> " << __func__ << "(): some of confidants hashes is dirty";
-    //    return;
-    //  }
-    //}
 
     cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
     csdebug() << "\ttime = " << poolMetaInfo.timestamp;
@@ -2311,7 +2235,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
 
         if (pool.value().verify_signature(std::string(signature.begin(), signature.end()))) {
           cswarning() << "\tRECEIVED KEY Writer verification successfull";
-          writeBlock_V3(pool.value(), sequence, sender);
+          writeBlock_V3(pool.value(), sequence);
         }
         else {
           cswarning() << "\tRECEIVED KEY Writer verification failed";
@@ -2459,7 +2383,7 @@ bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber r
   return true;
 }
 
-void Node::getRoundInfoReply(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
+void Node::getRoundInfoReply(const uint8_t* data, const size_t size,
                              const cs::PublicKey& respondent) {
   csdebug() << "NODE> " << __func__;
   if (myLevel_ != NodeLevel::Confidant) {
@@ -2586,8 +2510,6 @@ void Node::passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender) {
   }
 }
 //          A                                          A                                              A
-//         / \                                        / \                                            / \
- //         | |                                        | |                                            | |
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////                                              SOLVER 3 METHODS (FINISH)                                    ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

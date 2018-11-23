@@ -243,7 +243,7 @@ public:
           cs::Byte* data = static_cast<cs::Byte*>(p->data());
 
           if (!p->isFragmented()) {
-            cswarning() << "No Fragmented flag for packets";
+            csdebug() << "No Fragmented flag for packets";
             *data |= BaseFlags::Fragmented;
           }
 
@@ -324,7 +324,7 @@ private:
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
-  std::size_t size;
+  std::size_t size = 0;
   (*this) >> size;
 
   auto nextPtr = ptr_ + size;

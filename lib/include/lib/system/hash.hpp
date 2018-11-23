@@ -3,7 +3,7 @@
 #define HASH_HPP
 
 #include <lib/system/common.hpp>
-#include <lib/system/structures.hpp>
+#include "utils.hpp"
 
 extern "C" {
 int blake2sp(void* out, size_t outlen, const void* in, size_t inlen, const void* key, size_t keylen);

@@ -18,8 +18,9 @@ WalletsIds::Normal::Normal(WalletsIds& norm)
 
 bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id) {
   if (address.is_wallet_id()) {
-    if (id != address.wallet_id())
+    if (id != address.wallet_id()) {
       LOG_ERROR("Wrong address");
+    }
     return false;
   }
   else if (address.is_public_key()) {
@@ -119,8 +120,9 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
   idSpecial = noSpecial_;
 
   if (address.is_wallet_id()) {
-    if (idNormal != address.wallet_id())
-      LOG_ERROR("Wrong address");
+    if (idNormal != address.wallet_id()) {
+      cserror() << "Wrong address";
+    }
     return false;
   }
   else if (address.is_public_key()) {

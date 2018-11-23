@@ -17,8 +17,7 @@ struct Context {
 
   std::mutex mutex;
 
-  Context() {
-  }
+  Context() = default;
 
   // Disallow copy and assign
   Context(const Context&) = delete;
@@ -26,11 +25,6 @@ struct Context {
   Context(Context&&) = delete;
   Context& operator=(Context&&) = delete;
 };
-
-static Context& getContext() {
-  static Context context;
-  return context;
-}
 
 using ScopedLock = std::lock_guard<std::mutex>;
 }  // namespace detail

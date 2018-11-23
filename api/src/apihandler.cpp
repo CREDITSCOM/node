@@ -594,6 +594,7 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
 }
 
 void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, const int64_t index) {
+  csunused(index);
   const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
   csdb::Pool pool = s_blockchain.loadBlock(poolHash);
   _return.isFound = pool.is_valid();
@@ -650,7 +651,6 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ap
 }
 
 bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init) {
-  const auto trace = !init;
   auto pending_smart_transactions = locked_ref(this->pending_smart_transactions);
 
   std::vector<csdb::PoolHash> new_blocks;
@@ -697,7 +697,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     const auto smart = fetch_smart(tr);
     auto address = tr.target();
     if (!convertAddrToPublicKey(address)) {
-      LOG_ERROR("Public key of wallet not found by walletId");
+      cserror() << "Public key of wallet not found by walletId";
       return false;
     }
 
@@ -719,7 +719,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     }
 
     if (is_smart_deploy(smart)) {
-      TRACE("");
+      csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__;
       {
         auto smart_origin = locked_ref(this->smart_origin);
         (*smart_origin)[address] = tr.id();
@@ -727,7 +727,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       {
         const csdb::Address pk_addr = tr.source();
         if (!convertAddrToPublicKey(pk_addr)) {
-          LOG_ERROR("Public key of wallet not found by walletId");
+          cserror() << "Public key of wallet not found by walletId";
           return false;
         }
 
@@ -737,95 +737,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     }
     return true;
   }
-  TRACE("");
+  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__;
   return false;
 }
-
-/*bool
-APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
-{
-  auto TRACE = !init;
-  //TRACE("");
-  auto pending_smart_transactions =
-    locked_ref(this->pending_smart_transactions);
-  //TRACE("");
-
-  std::stack<csdb::PoolHash> new_blocks;
-  auto curph = start;
-  while (curph != pending_smart_transactions->last_pull_hash) {
-    // LOG_ERROR("pm.hash(): " << curph.to_string());
-    new_blocks.push(curph);
-    size_t _;
-    curph = s_blockchain.loadBlockMeta(curph, _).previous_hash();
-  }
-  pending_smart_transactions->last_pull_hash = start;
-
-  while (!new_blocks.empty()) {
-    auto TRACE = false;
-
-    //TRACE("");
-    // LOG_ERROR(
-    //  "new_blocks.top().to_string(): " << new_blocks.top().to_string());
-    auto p = s_blockchain.loadBlock(new_blocks.top());
-
-    // LOG_ERROR("p.is_valid(): " << p.is_valid());
-
-    new_blocks.pop();
-
-    //TRACE("");
-
-    auto& trs = p.transactions();
-    for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
-      //TRACE("");
-      auto& tr = *i_tr;
-      if (is_smart(tr)) {
-        //TRACE("");
-        pending_smart_transactions->queue.push(std::move(tr));
-      }
-    }
-  }
-  if (!pending_smart_transactions->queue.empty()) {
-    auto tr = std::move(pending_smart_transactions->queue.front());
-    pending_smart_transactions->queue.pop();
-    auto smart = fetch_smart(tr);
-    auto address = tr.target();
-
-    if (!init) {
-      auto& e = [&]() -> decltype(auto) {
-        auto smart_last_trxn = locked_ref(this->smart_last_trxn);
-        return (*smart_last_trxn)[address];
-      }();
-      std::unique_lock<decltype(e.lock)> l(e.lock);
-      e.trid_queue.push_back(tr.id());
-      e.new_trxn_cv.notify_all();
-    }
-    {
-
-      auto& e = [&]() -> decltype(auto) {
-        auto smart_state(locked_ref(this->smart_state));
-        //TRACE("");
-        return (*smart_state)[address];
-      }();
-      e.update_state(
-        [&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
-    }
-
-    if (is_smart_deploy(smart)) {
-      //TRACE("");
-      {
-        auto smart_origin = locked_ref(this->smart_origin);
-        (*smart_origin)[address] = tr.id();
-      }
-      {
-        auto deployed_by_creator = locked_ref(this->deployed_by_creator);
-        (*deployed_by_creator)[tr.source()].push_back(tr.id());
-      }
-    }
-    return true;
-  }
-  //TRACE("");
-  return false;
-}*/
 
 template <typename Mapper>
 void APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper,
@@ -1023,7 +937,7 @@ void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, con
   executor->getContractMethods(executor_ret, bytecode);
   _return.code = executor_ret.status.code;
   _return.message = executor_ret.status.message;
-  for (int Count = 0; Count < executor_ret.methods.size(); Count++) {
+  for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
     _return.methods[Count].name = executor_ret.methods[Count].name;
     _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
     _return.methods[Count].returnType = executor_ret.methods[Count].returnType;

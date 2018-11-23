@@ -101,9 +101,9 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
   const auto ptr = context.stage2((uint8_t)context.own_conf_number());
   if (ptr != nullptr && context.enough_stage2()) {
     LOG_NOTICE(name() << ": enough stage-2 received");
-    const auto cnt = context.cnt_trusted();
+    const size_t cnt = context.cnt_trusted();
     constexpr size_t sig_len = sizeof(st.signatures[0].size());
-    for (int i = 0; i < cnt; i++) {
+    for (size_t i = 0; i < cnt; i++) {
       // check amount of trusted node's signatures nonconformity
       // TODO: redesign required:
       if (memcmp(ptr->signatures[i].data(), st.signatures[i].data(), sig_len) != 0) {
@@ -260,13 +260,13 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   LOG_NOTICE(name() << ": candidates divided: above = " << aboveThreshold.size()
                     << ", below = " << belowThreshold.size());
   LOG_DEBUG("======================================================");
-  for (int i = 0; i < aboveThreshold.size(); i++) {
+  for (size_t i = 0; i < aboveThreshold.size(); i++) {
     const auto& tmp = aboveThreshold.at(i);
     LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - "
                 << (int)candidatesElection.at(tmp));
   }
   LOG_DEBUG("------------------------------------------------------");
-  for (int i = 0; i < belowThreshold.size(); i++) {
+  for (size_t i = 0; i < belowThreshold.size(); i++) {
     const auto& tmp = belowThreshold.at(i);
     LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - "
                 << (int)candidatesElection.at(tmp));
@@ -282,12 +282,12 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   }
   else {
     if (belowThreshold.size() >= max_conf - aboveThreshold.size()) {
-      for (int i = 0; i < aboveThreshold.size(); i++) {
+      for (size_t i = 0; i < aboveThreshold.size(); i++) {
         const auto& tmp = aboveThreshold.at(i);
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
       }
-      for (int i = 0; i < max_conf - next_round_trust.size(); i++) {
+      for (size_t i = 0; i < max_conf - next_round_trust.size(); i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));

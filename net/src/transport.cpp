@@ -148,9 +148,9 @@ void Transport::run() {
   while (Transport::gSignalStatus == 0) {
     ++ctr;
 
-    bool askMissing = true;
-    bool resendPacks = ctr % 4 == 0;
-    bool sendPing = ctr % 20 == 0;
+    bool askMissing    = true;
+    bool resendPacks   = ctr % 5 == 0;
+    bool sendPing      = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending = ctr % 100 == 0;
     bool checkSilent = ctr % 150 == 0;
@@ -191,9 +191,10 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
   uint16_t result = ep.port();
 
   if (ep.protocol() == ip::udp::v4()) {
-    uint32_t addr = ep.address().to_v4().to_uint();
-    result ^= *(reinterpret_cast<uint16_t*>(&addr));
-    result ^= *(reinterpret_cast<uint16_t*>(&addr) + 1);
+    uint32_t address  = ep.address().to_v4().to_uint();
+    uint16_t lowBits  = address;
+    uint16_t highBits = address >> (sizeof(uint16_t) * CHAR_BIT);
+    result ^= lowBits ^ highBits;
   }
   else {
     auto bytes = ep.address().to_v6().to_bytes();
@@ -504,7 +505,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
   // cut slow packs
   if ((rNum + roundDifferent) < node_->getRoundNumber()) {
-    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << " message type " << static_cast<int>(type);
+    csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << getMsgTypesString(type) << ", fragments " << firstPack.getFragmentsNum();
     return;
   }
 
@@ -516,47 +517,47 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
   // packets which transport may cut
   switch (type) {
-    case MsgTypes::RoundTableSS:
-      return node_->getRoundTableSS(data, size, rNum);
-    case MsgTypes::ConsVector:
-      return node_->getVector(data, size, firstPack.getSender());
-    case MsgTypes::ConsMatrix:
-      return node_->getMatrix(data, size, firstPack.getSender());
-    case MsgTypes::BlockHash:
-      return node_->getHash(data, size, firstPack.getSender());
-    case MsgTypes::BlockHashV3:
-      return node_->getHash_V3(data, size, rNum, firstPack.getSender());
-    case MsgTypes::TransactionPacket:
-      return node_->getTransactionsPacket(data, size);
-    case MsgTypes::TransactionsPacketRequest:
-      return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
-    case MsgTypes::TransactionsPacketReply:
-      return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
-    case MsgTypes::NewCharacteristic:
-      return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
-    case MsgTypes::WriterNotification:
-      return node_->getWriterNotification(data, size, firstPack.getSender());
-    case MsgTypes::FirstStage:
-      return node_->getStageOne(data, size, firstPack.getSender());
-    case MsgTypes::FirstStageRequest:
-      return node_->getStageOneRequest(data, size, firstPack.getSender());
-    case MsgTypes::SecondStage:
-      return node_->getStageTwo(data, size, firstPack.getSender());
-    case MsgTypes::SecondStageRequest:
-      return node_->getStageTwoRequest(data, size, firstPack.getSender());
-    case MsgTypes::ThirdStage:
-      return node_->getStageThree(data, size, firstPack.getSender());
-    case MsgTypes::ThirdStageRequest:
-      return node_->getStageTwoRequest(data, size, firstPack.getSender());
-    case MsgTypes::RoundInfo:
-      return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
-    case MsgTypes::RoundInfoRequest:
-      return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
-    case MsgTypes::RoundInfoReply:
-      return node_->getRoundInfoReply(data, size, rNum, firstPack.getSender());
-    default:
-      cserror() << "TRANSPORT> Unknown message type " << static_cast<int>(type) << " pack round " << rNum;
-      break;
+  case MsgTypes::RoundTableSS:
+    return node_->getRoundTableSS(data, size, rNum);
+  case MsgTypes::ConsVector:
+    return node_->getVector(data, size, firstPack.getSender());
+  case MsgTypes::ConsMatrix:
+    return node_->getMatrix(data, size, firstPack.getSender());
+  case MsgTypes::BlockHash:
+    return node_->getHash(data, size, firstPack.getSender());
+  case MsgTypes::BlockHashV3:
+    return node_->getHash_V3(data, size, rNum, firstPack.getSender());
+  case MsgTypes::TransactionPacket:
+    return node_->getTransactionsPacket(data, size);
+  case MsgTypes::TransactionsPacketRequest:
+    return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
+  case MsgTypes::TransactionsPacketReply:
+    return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
+  case MsgTypes::NewCharacteristic:
+    return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
+  case MsgTypes::WriterNotification:
+    return node_->getWriterNotification(data, size, firstPack.getSender());
+  case MsgTypes::FirstStage:
+    return node_->getStageOne(data, size, firstPack.getSender());
+  case MsgTypes::FirstStageRequest:
+    return node_->getStageOneRequest(data, size, firstPack.getSender());
+  case MsgTypes::SecondStage:
+    return node_->getStageTwo(data, size, firstPack.getSender());
+  case MsgTypes::SecondStageRequest:
+    return node_->getStageTwoRequest(data, size, firstPack.getSender());
+  case MsgTypes::ThirdStage:
+    return node_->getStageThree(data, size, firstPack.getSender());
+  case MsgTypes::ThirdStageRequest:
+    return node_->getStageTwoRequest(data, size, firstPack.getSender());
+  case MsgTypes::RoundInfo:
+    return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
+  case MsgTypes::RoundInfoRequest:
+    return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
+  case MsgTypes::RoundInfoReply:
+    return node_->getRoundInfoReply(data, size, firstPack.getSender());
+  default:
+    cserror() << "TRANSPORT> Unknown message type " << getMsgTypesString(type) << " pack round " << rNum;
+    break;
   }
 }
 
@@ -995,8 +996,8 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
   auto ep = conn->specialOut ? conn->out : conn->in;
 
   cs::Hash hHash;
-  uint16_t start;
-  uint64_t req;
+  uint16_t start = 0u;
+  uint64_t req = 0u;
 
   iPackStream_ >> hHash >> start >> req;
   if (!iPackStream_.good() || !iPackStream_.end()) {
@@ -1029,7 +1030,7 @@ void Transport::sendPingPack(const Connection& conn) {
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
-  uint32_t lastSeq;
+  uint32_t lastSeq = 0u;
   cs::PublicKey pk;
 
   iPackStream_ >> id >> lastSeq >> pk;

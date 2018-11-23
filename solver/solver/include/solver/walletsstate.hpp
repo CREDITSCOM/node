@@ -26,9 +26,9 @@ public:
 
 public:
   struct WalletData {
-    TransactionIndex lastTrxInd_;
-    csdb::Amount balance_;
-    TransactionsTail trxTail_;
+    TransactionIndex lastTrxInd_{};
+    csdb::Amount balance_{};
+    TransactionsTail trxTail_{};
   };
 
 public:
