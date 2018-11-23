@@ -33,8 +33,7 @@ public:  // Interface
 
   bool isSyncroStarted() const;
 
-public
-signals:  // Signals
+public signals:  // Signals
 
   PoolSynchronizerRequestSignal sendRequest;
   PoolSynchronizerSynchroFinished synchroFinished;

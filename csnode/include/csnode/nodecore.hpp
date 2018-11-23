@@ -28,8 +28,7 @@ struct hash<cs::TransactionsPacketHash> {
 };
 }  // namespace std
 
-enum NodeLevel
-{
+enum NodeLevel {
   Normal,
   Confidant,
   Main,
@@ -55,8 +54,7 @@ using Packets = std::vector<cs::TransactionsPacket>;
 using PoolsRequestedSequences = std::vector<RoundNumber>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
-enum NodeConsts : uint32_t
-{
+enum NodeConsts : uint32_t {
   PublicKeyLength = PUBLIC_KEY_LENGTH,
   Black2HashLength = BLAKE2_HASH_LENGTH,
   HashLength = HASH_LENGTH,
@@ -65,8 +63,7 @@ enum NodeConsts : uint32_t
   NeighboursRequestDelay = 100
 };
 
-enum SolverConsts : uint32_t
-{
+enum SolverConsts : uint32_t {
   TransactionsFlushRound = 2,
   TransactionsPacketInterval = 50,
   MaxPacketTransactions = 500,
