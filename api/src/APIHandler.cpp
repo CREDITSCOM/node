@@ -83,6 +83,7 @@ APIHandler::APIHandler(BlockChain& blockchain, Credits::Solver& _solver)
         ::apache::thrift::transport::TSocket>("localhost", 9080)))
   , executor(::apache::thrift::stdcxx::make_shared<
              ::apache::thrift::protocol::TBinaryProtocol>(executor_transport))
+  , tm(&executor)
 {
   TRACE("");
   std::cerr << (s_blockchain.isGood() ? "Storage is opened normal"
@@ -609,7 +610,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
           }
   });
 
-  executor::APIResponse api_resp;
+  executor::ExecuteByteCodeResult execResp;
 
   TRACE("");
 
@@ -618,26 +619,30 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   }
 
   TRACE("");
-  executor.executeByteCode(api_resp,
+  // Change this upon SC consensus
+  static const uint32_t MAX_EXECUTION_TIME = 1000;
+
+  executor.executeByteCode(execResp,
                            transaction.source,
                            bytecode,
                            contract_state_record.state,
                            input_smart.method,
-                           input_smart.params);
+                           input_smart.params,
+                           MAX_EXECUTION_TIME);
 
   TRACE("");
 
-  if (api_resp.code) {
+  if (execResp.status.code) {
     TRACE("");
-    _return.status.code = api_resp.code;
-    _return.status.message = api_resp.message;
+    _return.status.code = execResp.status.code;
+    _return.status.message = execResp.status.message;
     return;
   }
 
   if ((_return.__isset.smart_contract_result =
-         api_resp.__isset.ret_val)) { // non-bug = instead of ==
+         execResp.__isset.ret_val)) { // non-bug = instead of ==
     TRACE("");
-    _return.smart_contract_result = api_resp.ret_val;
+    _return.smart_contract_result = execResp.ret_val;
   }
 
   TRACE("");
@@ -651,12 +656,12 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
   TRACE("");
 
   send_transaction.add_user_field(0, serialize(input_smart));
-  send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+  send_transaction.add_user_field(smart_state_idx, execResp.contractState);
   solver.send_wallet_transaction(send_transaction);
 
   trxn_sent = true;
 
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
   TRACE("");
   if (deploy) {
@@ -682,7 +687,7 @@ APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return,
           });
 #else
     contract_state_entry.update_state([=](smart_state_record& contract_state) {
-                          contract_state.state = api_resp.contractState;
+                          contract_state.state = execResp.contractState;
                           contract_state.locker_trx = 0;
           });
 #endif
@@ -972,10 +977,10 @@ APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init)
         (*deployed_by_creator)[tr.source()].push_back(tr.id());
       }
 
-      tm.checkNewDeploy(smart, state);
+      tm.checkNewDeploy(tr.target(), tr.source(), smart, state);
     }
     else
-      tm.checkNewState(tr.target(), state);
+      tm.checkNewState(tr.target(), tr.source(), smart, state);
 
     return true;
   }
@@ -1529,8 +1534,8 @@ void tokenTransactionsInternal(ResultType& _return,
                                  (const csdb::Pool& pool, const csdb::Transaction& tr) {
                                    auto smart = fetch_smart(tr);
 
-                                   if (transfersOnly && !TokensMaster::isTransfer(smart)) return true;
-                                   auto addrPair = TokensMaster::getTransferData(smart);
+                                   if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) return true;
+                                   auto addrPair = TokensMaster::getTransferData(tr.source(), smart.method, smart.params);
                                    if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet) return true;
 
                                    if (--offset >= 0) return true;
