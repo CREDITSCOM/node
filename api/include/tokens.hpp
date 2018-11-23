@@ -87,6 +87,8 @@ public:
 
   static std::string getAmount(const api::SmartContractInvocation&);
 
+  static bool isZeroAmount(const std::string& str) { return str == "0"; }
+
 private:
   void refreshTokenState(const csdb::Address& token,
                          const std::string& newState);

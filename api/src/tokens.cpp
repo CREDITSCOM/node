@@ -115,19 +115,19 @@ getTokenStandart(const std::vector<executor::MethodDescription>& methods) {
   const static std::map<std::string, std::pair<std::string, std::vector<std::string>>>
     StandartMethods =
     {
-     { "getName", { "string", { } } },
-     { "getSymbol", { "string", { } } },
+     { "getName", { "java.lang.string", { } } },
+     { "getSymbol", { "java.lang.string", { } } },
      { "getDecimal", { "int", { } } },
      { "setFrozen", { "boolean", { "boolean" } } },
-     { "totalSupply", { "string", { } } },
-     { "balanceOf", { "string", { "string", "string" } } },
-     { "allowance", { "string", { "string", "string" } } },
-     { "transfer", { "boolean", { "string", "string" } } },
-     { "transferFrom", { "boolean", { "string", "string", "string" } } },
-     { "approve", { "void", { "string", "string" } } },
-     { "burn", { "boolean", { "string" } } },
+     { "totalSupply", { "java.lang.string", { } } },
+     { "balanceOf", { "java.lang.string", { "java.lang.string" } } },
+     { "allowance", { "java.lang.string", { "java.lang.string", "java.lang.string" } } },
+     { "transfer", { "boolean", { "java.lang.string", "java.lang.string" } } },
+     { "transferFrom", { "boolean", { "java.lang.string", "java.lang.string", "java.lang.string" } } },
+     { "approve", { "void", { "java.lang.string", "java.lang.string" } } },
+     { "burn", { "boolean", { "java.lang.string" } } },
      { "register", { "void", { } } },
-     { "buyTokens", { "boolean", { "string" } } }
+     { "buyTokens", { "boolean", { "java.lang.string" } } }
     };
 
   const static auto findPos = [](const std::string& key) { return std::distance(StandartMethods.begin(), StandartMethods.find(key)); };
@@ -226,11 +226,12 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
                  "totalSupply", std::vector<std::string>(), 50,
                  [&totalSupply](const std::string& newSupp) {
-                   totalSupply = tryExtractAmount(newSupp);
+                   totalSupply = tryExtractAmount('"' + newSupp + '"');
                  });
 
   std::vector<csdb::Address> holders;
 
+  csdb::Address deployer;
   {
     std::lock_guard<decltype(dataMut_)> l(dataMut_);
     auto& t = tokens_[token];
@@ -238,9 +239,14 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
     t.symbol = symbol;
     t.totalSupply = totalSupply;
 
+    deployer = t.owner;
+
     holders.reserve(t.holders.size());
     for (auto& h : t.holders) holders.push_back(h.first);
   }
+
+  const auto dp = deployer.public_key();
+  api::Address dpAddr = std::string((char*)dp.data(), dp.size());
 
   std::vector<std::vector<std::string>> holderKeysParams;
   holderKeysParams.reserve(holders.size());
@@ -249,18 +255,23 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   executor::ExecuteByteCodeMultipleResult result;
   api_->getExecutor().
-    executeByteCodeMultiple(result, addr, byteCode, newState,
+    executeByteCodeMultiple(result, dpAddr, byteCode, newState,
                             "balanceOf", holderKeysParams, 100);
 
   if (!result.status.code &&
-      (result.ret_stat.size() == result.ret_val.size() == holders.size())) {
+      (result.ret_stat.size() == result.ret_val.size()) &&
+      (result.ret_val.size() == holders.size())) {
     std::lock_guard<decltype(dataMut_)> l(dataMut_);
     auto& t = tokens_[token];
 
     for (uint32_t i = 0; i < holders.size(); ++i) {
-      if (result.ret_stat[i])
-        t.holders[holders[i]].balance =
-          tryExtractAmount(getVariantAs<std::string>(result.ret_val[i]));
+      if (result.ret_stat[i]) {
+        auto& oldBalance = t.holders[holders[i]].balance;
+        auto newBalance = tryExtractAmount('"' + getVariantAs<std::string>(result.ret_val[i]) + '"');
+        if (isZeroAmount(newBalance) && !isZeroAmount(oldBalance)) --t.realHoldersCount;
+        else if (isZeroAmount(oldBalance) && !isZeroAmount(newBalance)) ++t.realHoldersCount;
+        oldBalance = newBalance;
+      }
     }
   }
 }

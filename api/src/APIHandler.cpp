@@ -1378,7 +1378,8 @@ APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return,
                            if (hi != tokenIt->second.holders.end())
                              tb.balance = hi->second.balance;
 
-                           _return.balances.push_back(tb);
+                           if (!TokensMaster::isZeroAmount(tb.balance))
+                             _return.balances.push_back(tb);
                          }
                        }
                      });
@@ -1475,7 +1476,7 @@ void putTokenInfo(api::TokenInfo& ti,
   ti.owner = fromByteArray(token.owner.public_key());
   ti.transfersCount = token.transfersCount;
   ti.transactionsCount = token.transactionsCount;
-  ti.holdersCount = token.holders.size();
+  ti.holdersCount = token.realHoldersCount;
 }
 
 template <typename ResultType>
@@ -1598,13 +1599,12 @@ APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return,
                        auto tIt = tm.find(addr);
                        if (tIt != tm.end()) {
                          found = true;
-                         _return.count = tIt->second.holders.size();
-                         if ((uint64_t)offset > tIt->second.holders.size()) return;
+                         _return.count = tIt->second.realHoldersCount;
 
-                         auto hIt = tIt->second.holders.begin();
-                         std::advance(hIt, offset);
+                         for (auto hIt = tIt->second.holders.begin(); hIt != tIt->second.holders.end(); ++hIt) {
+                           if (TokensMaster::isZeroAmount(hIt->second.balance)) continue;
+                           if (--offset >= 0) continue;
 
-                         for (; hIt != tIt->second.holders.end(); ++hIt) {
                            api::TokenHolder th;
 
                            th.holder = fromByteArray(hIt->first.public_key());
@@ -1676,8 +1676,13 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
   }
 
   if (!present) {
-     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-     return;
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+  else if (state.empty()) {
+    _return.status.code = 666;
+    _return.status.message = "Empty contract state";
+    return;
   }
 
   executor::GetContractMethodsResult methodsResult;
