@@ -800,8 +800,9 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
   }
   // cache block for future recording
   cs::PublicKey key;
-  if(pool.writer_public_key().size() == key.size()) {
-    std::copy(pool.writer_public_key().cbegin(), pool.writer_public_key().cend(), key.begin());
+  const auto& pool_key = pool.writer_public_key();
+  if(pool_key.size() == key.size()) {
+    std::copy(pool_key.data(), pool_key.data() + pool_key.size(), key.begin());
   }
   else {
     cserror() << "BLOCKCHAIN> cached block does not contain writer key";
