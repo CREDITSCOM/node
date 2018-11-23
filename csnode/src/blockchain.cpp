@@ -811,7 +811,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
   cached_blocks.emplace(
     pool_seq,
     cs::PoolSyncMeta { std::move(pool), writer_signature.value_or(empty_signature), std::move(key) });
-  csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future";
+  csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cached_blocks.size() << " total)";
   // cache always successful
   return true;
 }
