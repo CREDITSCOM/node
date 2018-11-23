@@ -24,16 +24,20 @@
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
 #include <csnode/threading.hpp>
+#include <csnode/nodecore.hpp>
 
 #include <condition_variable>
 #include <mutex>
 
-namespace cs {
-class BlockHashes;
-class WalletsIds;
+namespace cs
+{
+  class BlockHashes;
+  class WalletsIds;
+  class Fee;
 }  // namespace cs
 
-class BlockChain {
+class BlockChain
+{
 public:
   using Transactions = std::vector<csdb::Transaction>;
   using WalletId = csdb::internal::WalletId;
@@ -44,15 +48,54 @@ public:
   BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
-  bool isGood() const {
+  bool isGood() const
+  {
     return good_;
   }
 
-  bool finishNewBlock(csdb::Pool& pool);
-  void removeWalletsInPoolFromCache(const csdb::Pool& pool);
-  bool writeNewBlock(csdb::Pool& pool);
-  bool onBlockReceived(csdb::Pool& pool);
+  /**
+   * @fn    bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature = {});
+   *
+   * @brief Stores a block
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @param pool                The pool representing block to store in blockchain. Its sequence
+   *                            number MUST be set. Its writer_public_key MUST be set. It will be
+   *                            modified.
+   * @param writer_signature    (Optional) The signature made by writer node recording to chain. If
+   *                            not set, skip block finishing and simply store block.
+   *
+   * @return    True if it succeeds, false if it fails. True DOES NOT MEAN the block recorded to
+   *            chain. It means block is correct and possibly recorded.
+   */
 
+  bool storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature = std::nullopt);
+
+  /**
+   * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key);
+   *
+   * @brief Creates a block, then signs it with private key and records to blockchain if possible
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @param pool        The pool.
+   * @param writer_key  The writer private key to sign block
+   *
+   * @return    The new block.
+   */
+
+  std::optional<csdb::Pool> createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key);
+
+private:
+  bool finishNewBlock(csdb::Pool& pool); // obsolete?
+  void removeWalletsInPoolFromCache(const csdb::Pool& pool); // obsolete?
+  bool writeNewBlock(csdb::Pool& pool); // obsolete
+  bool onBlockReceived(csdb::Pool& pool); // obsolete
+
+public:
   size_t getSize() const;
   csdb::PoolHash getLastHash() const;
 
@@ -91,10 +134,14 @@ public:
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
+private:
   bool putBlock(csdb::Pool& pool);
+
+public:
   const csdb::Storage& getStorage() const;
 
-  struct AddrTrnxCount {
+  struct AddrTrnxCount
+  {
     uint64_t sendCount;
     uint64_t recvCount;
   };
@@ -116,7 +163,7 @@ private:
 
   void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
-                          csdb::Pool::NewWallets& newWallets);
+    csdb::Pool::NewWallets& newWallets);
 
   bool updateFromNextBlock(csdb::Pool& pool);
 
@@ -126,10 +173,10 @@ private:
 
   class TrxLoader;
   bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
-                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+    cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
-                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
+    const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
 private:
   bool good_;
@@ -154,6 +201,96 @@ private:
   std::condition_variable_any new_block_cv;
   cs::spinlock waiters_locker;
   std::map<csdb::Address, AddrTrnxCount> m_trxns_count;
+
+  // block cache
+
+public:
+
+  /**
+   * @fn    csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const;
+   *
+   * @brief Gets the last cached sequence
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @return    The last cached sequence.
+   */
+
+  csdb::Pool::sequence_t getLastCachedSequence() const;
+
+  /**
+   * @fn    csdb::Pool::sequence_t BlockChain::getLastSequence() const
+   *
+   * @brief Gets the last sequence both cached & written
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @return    The last sequence.
+   */
+
+  csdb::Pool::sequence_t getLastSequence() const
+  {
+    return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t) getLastWrittenSequence());
+  }
+
+  // continuous interval from ... to
+  using SequenceInterval = std::pair<csdb::Pool::sequence_t, csdb::Pool::sequence_t>;
+
+  /**
+   * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
+   *
+   * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached ones.
+   *        Each interval means [first..second] including bounds. Last interval ends with 0 meaning "until end"
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @return    The required blocks in form vector of intervals
+   */
+
+  std::vector<SequenceInterval> getRequiredBlocks() const;
+
+  /**
+   * @fn    void BlockChain::testCachedBlocks();
+   *
+   * @brief Tests cached blocks: removes outdated, records actual until sequence interrupted
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   */
+
+  void testCachedBlocks();
+
+private:
+
+  /**
+   * @fn    std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature, std::optional<cs::PrivateKey> writer_key);
+   *
+   * @brief Finish pool, sign it or test signature, then record block to chain
+   *
+   * @author    Alexander Avramenko
+   * @date  23.11.2018
+   *
+   * @param pool                The pool to finish & record to chain
+   * @param writer_signature    (Optional) The writer signature. If set, test signature before record
+   * @param writer_key          (Optional) The writer key. If set, sign pool before record
+   *
+   * @return    A std::pair of bool (success or fail) and std::optional&lt;csdb::Pool&gt; (recorded pool)
+   */
+
+  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool,
+    std::optional<cs::Signature> writer_signature, std::optional<cs::PrivateKey> writer_key);
+
+  // to store outrunning blocks until the time to insert them comes
+  // stores pairs of <block, sender> sorted by sequence number
+  std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta> cached_blocks;
+  cs::Signature empty_signature;
+
+  // fee calculator
+  std::unique_ptr<cs::Fee> pfee;
+
 };
 
 #endif  //  BLOCKCHAIN_HPP

@@ -75,7 +75,6 @@ public:
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
   void sendHash_V3(cs::RoundNumber round);
-  void writeBlock_V3(csdb::Pool& newPool, size_t sequence, const cs::PublicKey& sender);
 
   const cs::ConfidantsKeys& confidants() const;
 
@@ -223,8 +222,12 @@ private:
   // pool sync helpers
   void blockchainSync();
 
-  void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
-  void processMetaMap();
+  //void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
+  // obsolete:
+  void processMetaMap()
+  {
+    getBlockChain().testCachedBlocks();
+  }
 
   bool readRoundData(cs::RoundTable& roundTable);
 

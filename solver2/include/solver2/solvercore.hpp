@@ -58,7 +58,7 @@ public:
 
   void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
   void runSpammer();
-  void countFeesInPool(csdb::Pool* pool);
+  //void countFeesInPool(csdb::Pool* pool);
   void gotRound(cs::RoundNumber rNum);
   void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
   const cs::PublicKey& getPublicKey() const {

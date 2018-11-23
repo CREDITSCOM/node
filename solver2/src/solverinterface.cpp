@@ -40,7 +40,7 @@ void SolverCore::runSpammer() {
     pspam->StartSpamming(*pnode);
   }
 }
-
+/*
 void SolverCore::countFeesInPool(csdb::Pool* pool) {
   if (opt_is_proxy_v1 && pslv_v1) {
     pslv_v1->countFeesInPool(pool);
@@ -48,7 +48,7 @@ void SolverCore::countFeesInPool(csdb::Pool* pool) {
   }
   this->pfee->CountFeesInPool(pnode->getBlockChain(), pool);
 }
-
+*/
 void SolverCore::gotRound(cs::RoundNumber rNum) {
   if (opt_is_proxy_v1 && pslv_v1) {
     pslv_v1->gotRound();
