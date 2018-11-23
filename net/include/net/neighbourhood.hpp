@@ -149,6 +149,7 @@ public:
   void pourByNeighbours(const Packet*, const uint32_t packNum);
 
   uint32_t size();
+  uint32_t getNeighboursCountWithoutSS();
 
   void pingNeighbours();
   bool isPingDone();
