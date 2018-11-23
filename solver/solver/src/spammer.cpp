@@ -34,6 +34,7 @@ std::string kGenesisPrivate =
 
 constexpr auto kMaxTransactionsFromOneSource = 1000u;
 constexpr auto kMaxMoneyForOneSpammer = 10'000'000u;
+constexpr auto kMaxTransactionsInOneRound = 100;
 }  // namespace
 
 void Spammer::StartSpamming(Node& node) {
@@ -64,6 +65,8 @@ void Spammer::SpamWithTransactions(Node& node) {
   size_t spammer_index = 0;
   int64_t inner_id_counter = 0;
   uint64_t round_spamming = 0;
+  uint32_t tr_gen_in_round = 0;
+  uint32_t round_number = node.getRoundNumber();;
 
   while (true) {
     if (!node.isPoolsSyncroStarted()) {
@@ -73,6 +76,7 @@ void Spammer::SpamWithTransactions(Node& node) {
           target_wallet_counter = 0;
         }
       }
+
       transaction.set_source(OptimizeAddress(my_wallets_[spammer_index].first, node));
       transaction.set_target(OptimizeAddress(my_wallets_[target_wallet_counter].first, node));
       transaction.set_innerID(inner_id_counter);
@@ -81,6 +85,7 @@ void Spammer::SpamWithTransactions(Node& node) {
 
       ++inner_id_counter;
       ++target_wallet_counter;
+      ++tr_gen_in_round;
       if (target_wallet_counter == kMyWalletsNum) {
         target_wallet_counter = 0;
       }
@@ -93,6 +98,14 @@ void Spammer::SpamWithTransactions(Node& node) {
         inner_id_counter = round_spamming * kMaxTransactionsFromOneSource;
       }
     }
+    while (tr_gen_in_round == kMaxTransactionsInOneRound && round_number == node.getRoundNumber()) {
+      std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
+    }
+    if (round_number != node.getRoundNumber()) {
+      tr_gen_in_round = 0;
+      round_number = node.getRoundNumber();
+    }
+
     std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
   }
 }
