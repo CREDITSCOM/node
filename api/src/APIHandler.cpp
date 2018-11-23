@@ -1679,7 +1679,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
   }
 
   executor::GetContractMethodsResult methodsResult;
-  executor.getContractMethods(methodsResult, byteCode);
+  getExecutor().getContractMethods(methodsResult, byteCode);
 
   if (methodsResult.status.code) {
     _return.status.code = methodsResult.status.code;
@@ -1688,7 +1688,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
   }
 
   executor::GetContractVariablesResult variablesResult;
-  executor.getContractVariables(variablesResult, byteCode, state);
+  getExecutor().getContractVariables(variablesResult, byteCode, state);
 
   if (variablesResult.status.code) {
     _return.status.code = variablesResult.status.code;
@@ -1712,7 +1712,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
                                       const std::string& sourceCode) {
   executor::CompileByteCodeResult result;
-  executor.compileBytecode(result, sourceCode);
+  getExecutor().compileBytecode(result, sourceCode);
 
   if (result.status.code) {
     _return.status.code = result.status.code;
@@ -1722,4 +1722,12 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
 
   _return.byteCode = std::move(result.bytecode);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+executor::ContractExecutorConcurrentClient& APIHandler::getExecutor() {
+  while (!executor_transport->isOpen()) {
+    executor_transport->open();
+  }
+
+  return executor;
 }
