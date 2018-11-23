@@ -2,9 +2,9 @@
 #define POOLSYNCHRONIZER_HPP
 
 #include <csdb/pool.h>
+#include <csnode/blockchain.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/packstream.hpp>
-#include <csnode/blockchain.hpp>
 
 #include <lib/system/signals.hpp>
 #include <lib/system/timer.hpp>
@@ -16,7 +16,7 @@ class Node;
 namespace cs {
 
 using PoolSynchronizerRequestSignal =
-    cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences, uint32_t packCounter)>;
+    cs::Signal<void(const ConnectionPtr& target, const PoolsRequestedSequences sequences, uint32_t packet)>;
 using PoolSynchronizerSynchroFinished = cs::Signal<void()>;
 
 class PoolSynchronizer {
@@ -26,15 +26,14 @@ public:  // Interface
   void processingSync(const cs::RoundNumber roundNum);
 
   // syncro get functions
-  void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packCounter);
+  void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packet);
 
   // syncro send functions
   void sendBlockRequest();
 
   bool isSyncroStarted() const;
 
-public
-signals:  // Signals
+public signals:  // Signals
 
   PoolSynchronizerRequestSignal sendRequest;
   PoolSynchronizerSynchroFinished synchroFinished;
@@ -43,9 +42,9 @@ private:  // Service
   // pool sync progress
   void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
-  bool checkActivity(bool isRound = true);
+  bool checkActivity();
 
-  void sendBlock(const ConnectionPtr& target, const PoolsRequestedSequences& sequences);
+  void sendBlock(const ConnectionPtr& target);
 
   void addToTemporaryStorage(const csdb::Pool& pool);
   csdb::Pool::sequence_t processingTemporaryStorage();
@@ -55,54 +54,76 @@ private:  // Service
   void checkNeighbourSequence(const csdb::Pool::sequence_t sequence);
   void refreshNeighbours();
 
+  bool isLastRequest();
+
 private:  // Members
+
+  inline static const uint8_t s_maxBlockCount = 2;
+  inline static const cs::RoundNumber s_roundDifferentForSync = 2;
+  inline static const uint8_t s_roundDifferentForRepeatRequest = 0;  // round count for repeat request : 0 - every round
+  inline static const uint8_t s_packetCountForHelp = 2;          // packet Counter for connect another neighbor
+
   Transport* m_transport;
   BlockChain* m_blockChain;
 
-  inline static const int m_maxBlockCount = 2;
-  inline static const cs::RoundNumber s_roundDifferent = 2;
-  inline static const int m_maxWaitingTimeReply = 3;  // reply count
-  inline static const int m_maxWaitingTimeRound = 1;  // round count
-
-  // syncro variables
+  // flag starting  syncronization
   bool m_isSyncroStarted = false;
-
-  // sync meta
+  // number of the last needed sequence
   cs::RoundNumber m_roundToSync = 0;
-
+  // array needed sequences for send request
+  PoolsRequestedSequences m_neededSequences;
+  // [key] = sequence,
+  // [value] =  packet counter
+  // value: increase each new round
+  std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
+  // [key] = sequence,
+  // [value] =  pool
   // to store new blocks
   std::map<csdb::Pool::sequence_t, csdb::Pool> m_temporaryStorage;
 
-  struct WaitinTimeReply {
-    explicit WaitinTimeReply(int round, int replyCount)
-    : roundCount(round)
-    , replyBlockCount(replyCount)
-    , packCounter(0) {
-    }
-
-    int roundCount = 0;
-    int replyBlockCount = 0;
-    uint32_t packCounter = 0;
-  };
-  // [key] = sequence,
-  // [value] = m_maxWaitingTimeReply
-  // value: Decreases, soon as a response is received for another requested block or init new round.
-  std::map<csdb::Pool::sequence_t, WaitinTimeReply> m_requestedSequences;
-
-  PoolsRequestedSequences m_neededSequences;
-
   struct NeighboursSetElemet {
-    NeighboursSetElemet(csdb::Pool::sequence_t seq, ConnectionPtr conn = ConnectionPtr())
-    : sequence(seq)
-    , connection(conn) {
+    explicit NeighboursSetElemet(ConnectionPtr conn, csdb::Pool::sequence_t sequence = 0)
+    : m_Connection(conn)
+    , m_Sequence(sequence)
+    , m_RoundCounter(0) {
     }
 
-    csdb::Pool::sequence_t sequence = 0;  // requested sequence
-    ConnectionPtr connection;             // neighbour
-
-    const bool operator<(const NeighboursSetElemet& rhs) const {
-      return sequence < rhs.sequence;
+    inline bool isEqual(csdb::Pool::sequence_t sequence) const {
+      return m_Sequence == sequence;
     }
+    inline bool isAvailableSequence() const {
+      return isEqual(0);
+    }
+    inline void setSequence(csdb::Pool::sequence_t sequence) {
+      m_Sequence = sequence;
+    }
+    inline void reset() {
+      m_Sequence = 0;
+      m_RoundCounter = 0;
+    }
+
+    inline const ConnectionPtr& connection() const {
+      return m_Connection;
+    }
+    inline csdb::Pool::sequence_t sequence() const {
+      return m_Sequence;
+    }
+    inline uint32_t roundCounter() const {
+      return m_RoundCounter;
+    }
+
+    inline bool isAvailableRequest() const {
+      return m_RoundCounter > s_roundDifferentForRepeatRequest;
+    }
+    inline bool increaseRoundCounter() {
+      ++m_RoundCounter;
+      return isAvailableRequest();
+    }
+
+  private:
+    ConnectionPtr m_Connection;         // neighbour
+    csdb::Pool::sequence_t m_Sequence;  // requested sequence
+    uint32_t m_RoundCounter;
   };
 
   std::vector<NeighboursSetElemet> m_neighbours;

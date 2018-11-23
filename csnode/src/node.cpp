@@ -1157,10 +1157,10 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     sequences.push_back(std::move(sequence));
   }
 
-  uint32_t packCounter = 0;
-  istream_ >> packCounter;
+  uint32_t packetNum = 0;
+  istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",   packCounter: " << packCounter;
+  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -1186,7 +1186,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     }
   }
 
-  sendBlockReply(poolsBlock, sender, packCounter);
+  sendBlockReply(poolsBlock, sender, packetNum);
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1219,18 +1219,18 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
     poolsBlock.push_back(std::move(pool));
   }
 
-  uint32_t packCounter = 0;
-  istream_ >> packCounter;
+  uint32_t packetNum = 0;
+  istream_ >> packetNum;
 
-  poolSynchronizer_->getBlockReply(std::move(poolsBlock), packCounter);
+  poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNum);
 }
 
-void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter) {
+void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock, packCounter);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -1388,9 +1388,9 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter) {
+void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences << packCounter;
+  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences << packetNum;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
