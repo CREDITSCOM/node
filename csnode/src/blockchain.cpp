@@ -740,7 +740,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   }
 
   if(writer_signature.has_value()) {
-    csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, add new wallets to poll";
+    csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, add new wallets to pool";
     if(writer_key.has_value()) {
       cswarning() << "BLOCKCHAIN> pool have just been signed. R u sure u want to test passed signature?";
     }
