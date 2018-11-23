@@ -31,6 +31,8 @@
 
 #include <csnode/wallets_cache.hpp>
 
+#define TETRIS_NODE
+
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
 using namespace api;

@@ -4,7 +4,7 @@
 //#define SPAM_MAIN
 //#define STARTER
 //#define NO_CONSENSUS
-#define TOKENS_CACHE
+//#define TOKENS_CACHE
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE
