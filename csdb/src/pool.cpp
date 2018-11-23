@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "csdb/pool.h"
 
 #include <algorithm>
@@ -82,17 +84,13 @@ bool PoolHash::get(::csdb::priv::ibstream& is) {
 }
 
 class Pool::priv : public ::csdb::internal::shared_data {
-  priv()
-  : is_valid_(false)
-  , read_only_(false)
-  , sequence_(0) {
-  }
+  priv() = default;
+
   priv(PoolHash previous_hash, Pool::sequence_t sequence, ::csdb::Storage::WeakPtr storage)
   : is_valid_(true)
-  , read_only_(false)
-  , previous_hash_(previous_hash)
+  , previous_hash_(std::move(previous_hash))
   , sequence_(sequence)
-  , storage_(storage) {
+  , storage_(std::move(storage)) {
   }
 
   void put(::csdb::priv::obstream& os) const {
@@ -155,8 +153,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    if (!is.get(sequence_))
+    if (!is.get(sequence_)) {
       return false;
+    }
 
     if (!is.get(user_fields_)) {
       return false;
@@ -177,8 +176,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
     transactions_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       Transaction tran;
-      if (!is.get(tran))
+      if (!is.get(tran)) {
         return false;
+      }
       transactions_.emplace_back(tran);
     }
     return true;
@@ -186,15 +186,17 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool getConfidants(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt))
+    if (!is.get(cnt)) {
       return false;
+    }
 
     next_confidants_.clear();
     next_confidants_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       ::std::vector<uint8_t> conf;
-      if (!is.get(conf))
+      if (!is.get(conf)) {
         return false;
+      }
       next_confidants_.emplace_back(conf);
     }
     return true;
@@ -202,8 +204,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool getSignatures(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt))
+    if (!is.get(cnt)) {
       return false;
+    }
 
     next_confidants_.clear();
     next_confidants_.reserve(cnt);
@@ -211,10 +214,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       int index;
       ::std::string sig;
 
-      if (!is.get(index))
+      if (!is.get(index)) {
         return false;
-      if (!is.get(sig))
+      }
+      if (!is.get(sig)) {
         return false;
+      }
 
       signatures_.emplace_back(make_pair(index, sig));
     }
@@ -223,15 +228,17 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool getNewWallets(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt))
+    if (!is.get(cnt)) {
       return false;
+    }
 
     newWallets_.clear();
     newWallets_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       NewWalletInfo wall;
-      if (!is.get(wall))
+      if (!is.get(wall)) {
         return false;
+      }
       newWallets_.emplace_back(wall);
     }
     return true;
@@ -239,26 +246,33 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool get(::csdb::priv::ibstream& is) {
     size_t cnt;
-    if (!get_meta(is, cnt))
+    if (!get_meta(is, cnt)) {
       return false;
+    }
 
-    if (!getTransactions(is, cnt))
+    if (!getTransactions(is, cnt)) {
       return false;
+    }
 
-    if (!getNewWallets(is))
+    if (!getNewWallets(is)) {
       return false;
+    }
 
-    if (!getConfidants(is))
+    if (!getConfidants(is)) {
       return false;
+    }
 
-    if (!getSignatures(is))
+    if (!getSignatures(is)) {
       return false;
+    }
 
-    if (!is.get(writer_public_key_))
+    if (!is.get(writer_public_key_)) {
       return false;
+    }
 
-    if (!is.get(signature_))
+    if (!is.get(signature_)) {
       return false;
+    }
 
     is_valid_ = true;
     return true;
@@ -270,10 +284,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
       hash_ = PoolHash();
       return;
     }
-
-    /*if (!binary_representation_.empty()) {
-      return;
-    }*/
 
     ::csdb::priv::obstream os;
     put(os);
@@ -303,11 +313,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
     return ::csdb::defaultStorage();
   }
 
-  bool is_valid_;
-  bool read_only_;
+  bool is_valid_ = false;
+  bool read_only_ = false;
   PoolHash hash_;
   PoolHash previous_hash_;
-  Pool::sequence_t sequence_;
+  Pool::sequence_t sequence_ {};
   ::std::vector<::std::vector<uint8_t>> next_confidants_;
   ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
@@ -322,8 +332,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Pool)
 
-Pool::Pool(PoolHash previous_hash, sequence_t sequence, Storage storage)
-: d(new priv(previous_hash, sequence, storage.weak_ptr())) {
+Pool::Pool(PoolHash previous_hash, sequence_t sequence, const Storage& storage)
+: d(new priv(std::move(previous_hash), sequence, storage.weak_ptr())) {
 }
 
 bool Pool::is_valid() const noexcept {
@@ -335,9 +345,9 @@ bool Pool::is_read_only() const noexcept {
 }
 
 PoolHash Pool::hash() const noexcept {
-  if (d->hash_.is_empty())
+  if (d->hash_.is_empty()) {
     const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(d->binary_representation_);
-
+  }
   return d->hash_;
 }
 
@@ -361,7 +371,7 @@ Transaction Pool::transaction(TransactionID id) const {
   return d->transactions_[id.d->index_];
 }
 
-Transaction Pool::get_last_by_source(Address source) const noexcept {
+Transaction Pool::get_last_by_source(const Address& source) const noexcept {
   const auto data = d.constData();
 
   if ((!data->is_valid_)) {
@@ -380,7 +390,7 @@ Transaction Pool::get_last_by_source(Address source) const noexcept {
   return Transaction{};
 }
 
-Transaction Pool::get_last_by_target(Address target) const noexcept {
+Transaction Pool::get_last_by_target(const Address& target) const noexcept {
   const auto data = d.constData();
 
   if ((!data->is_valid_)) {
@@ -471,7 +481,7 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
 
   priv* data = d.data();
   data->is_valid_ = true;
-  data->previous_hash_ = previous_hash;
+  data->previous_hash_ = std::move(previous_hash);
 }
 
 void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept {
@@ -481,7 +491,7 @@ void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcep
 
   priv* data = d.data();
   data->is_valid_ = true;
-  data->writer_public_key_ = writer_public_key;
+  data->writer_public_key_ = std::move(writer_public_key);
 }
 
 void Pool::set_signature(const std::string& signature) noexcept {
@@ -513,7 +523,7 @@ void Pool::add_signature(int index, ::std::string& signature) noexcept {
   data->signatures_.emplace_back(std::make_pair(index, signature));
 }
 
-void Pool::set_storage(Storage storage) noexcept {
+void Pool::set_storage(const Storage& storage) noexcept {
   // We can set up storage even if Pool is read-only
   priv* data = d.data();
   data->is_valid_ = true;
@@ -529,8 +539,9 @@ const Pool::Transactions& Pool::transactions() const {
 }
 
 Pool::NewWallets* Pool::newWallets() noexcept {
-  if (d.constData()->read_only_)
+  if (d.constData()->read_only_) {
     return nullptr;
+  }
   return &d->newWallets_;
 }
 
@@ -538,7 +549,7 @@ const Pool::NewWallets& Pool::newWallets() const noexcept {
   return d->newWallets_;
 }
 
-bool Pool::add_user_field(user_field_id_t id, UserField field) noexcept {
+bool Pool::add_user_field(user_field_id_t id, const UserField& field) noexcept {
   if (d.constData()->read_only_ || (!field.is_valid())) {
     return false;
   }
@@ -583,62 +594,53 @@ bool Pool::compose() {
 }
 
 Pool Pool::from_binary(const ::csdb::internal::byte_array& data) {
-  priv* p = new priv();
+    std::unique_ptr<priv> p { new priv() };
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!p->get(is)) {
-    delete p;
     return Pool();
   }
   p->binary_representation_ = data;
   p->update_transactions();
-  return Pool(p);
+  return Pool(p.release());
 }
 
 Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt) {
-  priv* p = new priv();
+  std::unique_ptr<priv> p(new priv());
   ::csdb::priv::ibstream is(data.data(), data.size());
 
   if (!p->get_meta(is, cnt)) {
-    delete p;
     return Pool();
   }
 
   p->binary_representation_ = data;
-  return Pool(p);
+  return Pool(p.release());
 }
 
 Pool Pool::meta_from_byte_stream(const char* data, size_t size) {
-  priv* p = new priv();
+  std::unique_ptr<priv> p(new priv());
   ::csdb::priv::ibstream is(data, size);
 
   size_t t;
   if (!p->get_meta(is, t)) {
-    delete p;
     return Pool();
   }
 
-  // p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
-
-  return Pool(p);
+  return Pool(p.release());
 }
 
-Pool Pool::from_lz4_byte_stream(const char* data, size_t size, size_t uncompressedSize) {
-  priv* p = new priv();
+Pool Pool::from_lz4_byte_stream(size_t uncompressedSize) {
+  std::unique_ptr<priv> p(new priv());
   p->binary_representation_.resize(uncompressedSize);
-
-  auto rs = LZ4_decompress_safe(data, (char*)p->binary_representation_.data(), size, uncompressedSize);
 
   ::csdb::priv::ibstream is(p->binary_representation_.data(), p->binary_representation_.size());
 
-  size_t t;
   if (!p->get(is)) {
-    delete p;
     return Pool();
   }
 
   p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
 
-  return Pool(p);
+  return Pool(p.release());
 }
 
 char* Pool::to_byte_stream(uint32_t& size) {
@@ -649,25 +651,22 @@ char* Pool::to_byte_stream(uint32_t& size) {
   }
 
   size = d->binary_representation_.size();
-  return (char*)(d->binary_representation_.data());
+  return reinterpret_cast<char*>(d->binary_representation_.data());
 }
 
 bool Pool::save(Storage storage) {
-  // if ((!d.constData()->is_valid_) || ((!d.constData()->read_only_))) {
-  //  return false;
-  //}
-
   if ((!d.constData()->is_valid_)) {
     return false;
   }
 
-  Storage s = d->get_storage(storage);
+  Storage s = d->get_storage(std::move(storage));
   if (!s.isOpen()) {
     return false;
   }
 
-  if (d->hash_.is_empty())
+  if (d->hash_.is_empty()) {
     d->hash_ = PoolHash::calc_from_data(d->binary_representation_);
+  }
 
   if (s.pool_save(*this)) {
     d->storage_ = s.weak_ptr();
@@ -695,21 +694,21 @@ void Pool::sign(const cs::PrivateKey& private_key) {
 
 bool Pool::verify_signature() {
   if (this->writer_public_key().size() != internal::kPublicKeySize ||
-      d->signature_.size() != internal::kSignatureLength)
+          d->signature_.size() != internal::kSignatureLength) {
     return false;
-  const auto& pool_bytes = this->to_byte_stream_for_sig();
-  if (crypto_sign_ed25519_verify_detached((const uint8_t*)d->signature_.c_str(), pool_bytes.data(), pool_bytes.size(),
-                                          this->writer_public_key().data()) == 0) {
-    return true;
   }
-  return false;
+
+  const auto& pool_bytes = this->to_byte_stream_for_sig();
+  return crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(d->signature_.c_str()), pool_bytes.data(), pool_bytes.size(),
+                                          this->writer_public_key().data()) == 0;
 }
 
 bool Pool::verify_signature(const std::string& signature) {
-  if (this->writer_public_key().size() != internal::kPublicKeySize || signature.size() != internal::kSignatureLength)
+  if (this->writer_public_key().size() != internal::kPublicKeySize || signature.size() != internal::kSignatureLength) {
     return false;
+  }
   const auto& pool_bytes = this->to_byte_stream_for_sig();
-  if (crypto_sign_ed25519_verify_detached((const uint8_t*)signature.c_str(), pool_bytes.data(), pool_bytes.size(),
+  if (crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(signature.c_str()), pool_bytes.data(), pool_bytes.size(),
                                           this->writer_public_key().data()) == 0) {
     d->signature_ = signature;
     return true;
@@ -717,7 +716,7 @@ bool Pool::verify_signature(const std::string& signature) {
   return false;
 }
 
-Pool Pool::load(PoolHash hash, Storage storage) {
+Pool Pool::load(const PoolHash& hash, Storage storage) {
   if (!storage.isOpen()) {
     storage = ::csdb::defaultStorage();
   }
@@ -748,15 +747,22 @@ bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddres
 }
 
 void Pool::NewWalletInfo::put(::csdb::priv::obstream& os) const {
-  os.put(*(size_t*)(&addressId_));
+  union {
+    Pool::NewWalletInfo::AddressId address_id;
+    size_t asSizeType;
+  } addresIdConverter{};
+
+  addresIdConverter.address_id = addressId_;
+  os.put(addresIdConverter.asSizeType);
   os.put(walletId_);
 }
 
 bool Pool::NewWalletInfo::get(::csdb::priv::ibstream& is) {
   size_t address_id;
-  if (!is.get(address_id))
+  if (!is.get(address_id)) {
     return false;
-  size_t* id = reinterpret_cast<size_t*>(&addressId_);
+  }
+  auto id = reinterpret_cast<size_t*>(&addressId_);
   *id = address_id;
   return is.get(walletId_);
 }

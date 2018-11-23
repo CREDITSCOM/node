@@ -7,7 +7,7 @@ namespace priv {
 
 void obstream::put(const void *buf, size_t size)
 {
-  const uint8_t *data = reinterpret_cast<const uint8_t*>(buf);
+  auto data = static_cast<const uint8_t*>(buf);
   buffer_.insert(buffer_.end(), data, data + size);
 }
 
@@ -29,7 +29,7 @@ bool ibstream::get(void *buf, size_t size)
     return false;
   }
 
-  const uint8_t *src = static_cast<const uint8_t*>(data_);
+  auto src = static_cast<const uint8_t*>(data_);
   std::memmove(buf, src, size);
   size_ -= size;
   data_ = static_cast<const void*>(src + size);
@@ -46,7 +46,7 @@ bool ibstream::get(std::string &value)
     return false;
   }
 
-  const char *data = static_cast<const char*>(data_);
+  auto data = static_cast<const char*>(data_);
   value.assign(data, size);
   size_ -= size;
   data_ = static_cast<const void*>(data + size);
@@ -63,7 +63,7 @@ bool ibstream::get(internal::byte_array &value)
     return false;
   }
 
-  const uint8_t *data = static_cast<const uint8_t*>(data_);
+  const auto data = static_cast<const uint8_t*>(data_);
   value.assign(data, data + size);
   size_ -= size;
   data_ = static_cast<const void*>(data + size);

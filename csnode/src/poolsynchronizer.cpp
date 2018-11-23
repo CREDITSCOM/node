@@ -17,7 +17,8 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
 
 void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
   if (m_transport->getNeighboursCount() == 0) {
-    cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum;
+    cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum
+            << ",   Requested pools block size:" << s_maxBlockCount;
     return;
   }
 

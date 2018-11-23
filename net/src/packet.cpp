@@ -26,12 +26,12 @@ bool Packet::isHeaderValid() const {
     if (isNetwork())
       return false;
 
-    auto& frNum = getFragmentsNum();
-    // LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " <<
-    // size() << " vs " << getHeadersLength());
-    if (/*frNum > Packet::MaxFragments ||*/
-        getFragmentId() >= frNum)
-      return false;
+    const auto& frNum = getFragmentsNum();
+    const auto& frId = getFragmentId();
+    //LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " << size() << " vs " << getHeadersLength());
+    if(/*frNum > Packet::MaxFragments ||*/frId >= frNum) {
+        return false;
+    }
   }
 
   return size() > getHeadersLength();
@@ -87,9 +87,16 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
       *goodPlace = pack;
     }
 
-    // if (msg->packetsLeft_ % 100 == 0)
-    // if (msg->packetsLeft_ == 0)
-    // LOG_WARN(msg->packetsLeft_ << " / " << msg->packetsTotal_);
+    //if (msg->packetsLeft_ % 100 == 0)
+    // log significantly-fragmented packets:
+    if(msg->packetsTotal_ >= 20) {
+        if(msg->packetsLeft_ != 0) {
+            csdebug() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
+        }
+        else {
+            csdebug() << "COLLECT> complete " << msg->packetsTotal_;
+        }
+    }
   }
 
   return msg;

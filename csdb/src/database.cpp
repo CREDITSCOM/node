@@ -20,14 +20,11 @@ Database::Database() {
   last_error_map(this) = last_error_struct();
 }
 
-Database::~Database() {
-}
+Database::~Database() = default;
 
-Database::Iterator::Iterator() {
-}
+Database::Iterator::Iterator() = default;
 
-Database::Iterator::~Iterator() {
-}
+Database::Iterator::~Iterator() = default;
 
 Database::Error Database::last_error() const {
   return last_error_map(this).last_error_;

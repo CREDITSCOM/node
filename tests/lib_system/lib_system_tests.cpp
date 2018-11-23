@@ -365,7 +365,7 @@ TEST(FixedHashMap, destroy) {
     FixedHashMap<uint16_t, IntWithCounter, uint8_t, 10> hm;
 
     for (uint16_t i = 0; i < 100; ++i) {
-      IntWithCounter& c = hm.tryStore(i);
+      hm.tryStore(i);
     }
 
     ASSERT_EQ(IntWithCounter::counter, 10);
@@ -398,7 +398,7 @@ TEST(FixedCircularBuffer, OverlappingWhenAddingMoreThanBufferSize) {
     for (uint32_t i = 0; i < 40; ++i) {
       buffer.emplace(i);
     }
-    uint32_t j = 32;
+
     auto iter = buffer.begin();
     for (uint32_t i = 8; i < 40; ++i) {
       ASSERT_EQ(iter->i, i);

@@ -17,8 +17,8 @@ struct Context {
 
   std::mutex mutex;
 
-  Context() {
-  }
+  Context() = default;
+  ~Context() = default;
 
   // Disallow copy and assign
   Context(const Context&) = delete;
@@ -26,11 +26,6 @@ struct Context {
   Context(Context&&) = delete;
   Context& operator=(Context&&) = delete;
 };
-
-static Context& getContext() {
-  static Context context;
-  return context;
-}
 
 using ScopedLock = std::lock_guard<std::mutex>;
 }  // namespace detail
@@ -58,7 +53,7 @@ Hash blake2s(const byte* data, size_t length) {
 
   Hash result;
 
-  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, NULL, 0);
+  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, nullptr, 0);
 
 #endif  // #ifdef USE_CRYPTOPP
 

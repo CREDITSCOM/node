@@ -20,7 +20,7 @@ template <>
 std::size_t encode(void *buf, uint64_t value) {
   value = ::csdb::internal::to_little_endian(value);
 
-  uint64_t copy = value & 0x8000000000000000 ? ~value : value;
+  uint64_t copy = (value & 0x8000000000000000) != 0u ? ~value : value;
 #ifdef _MSC_VER
   unsigned long bits;
   _BitScanReverse64(&bits, copy);
@@ -28,17 +28,18 @@ std::size_t encode(void *buf, uint64_t value) {
 #else
   uint64_t bits = (__builtin_clzl(copy) ^ 63) + 2;
 #endif
-  if (bits < 7)
+  if (bits < 7) {
     bits = 7;
+  }
 
   uint8_t bytes = 8;
   uint8_t first = '\xFF';
   if (57 > bits) {
     bytes = ((bits - 1) / 7);
-    first = static_cast<char>((value << (bytes + 1)) | ((1 << bytes) - 1));
+    first = static_cast<char>((value << (bytes + 1u)) | ((1u << bytes) - 1u));
     value >>= (7 - bytes);
   }
-  uint8_t *buffer = static_cast<uint8_t *>(buf);
+  auto buffer = static_cast<uint8_t *>(buf);
   *(buffer++) = first;
   if (0 < bytes) {
     memcpy(buffer, &value, bytes);
@@ -60,12 +61,12 @@ std::size_t decode(const void *buf, std::size_t size, uint64_t &value) {
   if (sizeof(uint8_t) > size) {
     return 0;
   }
-  const char *d = static_cast<const char *>(buf);
-  uint8_t first = static_cast<uint8_t>(*d);
+  auto d = static_cast<const char *>(buf);
+  auto first = static_cast<uint8_t>(*d);
   uint8_t bytes = 0;
-  for (uint8_t mask = first; 0 != (mask & 0x1); ++bytes, mask >>= 1) {
+  for (uint8_t mask = first; 0 != (mask & 0x1u); ++bytes, mask >>= 1) {
   }
-  if ((bytes + 1) > size) {
+  if ((bytes + 1u) > size) {
     return 0;
   }
 
@@ -75,9 +76,9 @@ std::size_t decode(const void *buf, std::size_t size, uint64_t &value) {
   }
   if (8 > bytes) {
     val <<= (7 - bytes);
-    val |= (first >> (bytes + 1));
-    if (0 != (d[bytes] & 0x80)) {
-      val |= static_cast<uint64_t>(-1) << ((bytes + 1) * 7);
+    val |= (first >> (bytes + 1u));
+    if (0u != (d[bytes] & 0x80)) {
+      val |= static_cast<uint64_t>(-1) << ((bytes + 1u) * 7);
     }
   }
   value = ::csdb::internal::from_little_endian(val);

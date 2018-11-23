@@ -188,10 +188,10 @@ void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender) {
   test_outrunning_blocks();
 }
 
-void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash, const cs::PublicKey& sender) {
+void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash) {
   if (opt_is_proxy_v1 && pslv_v1) {
     csdb::PoolHash tmp = p_hash;
-    pslv_v1->gotBlockRequest(std::move(tmp), sender);
+    pslv_v1->gotBlockRequest(std::move(tmp));
     return;
   }
 
@@ -260,7 +260,7 @@ void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
 
 void SolverCore::gotIncorrectBlock(csdb::Pool&& p, const cs::PublicKey& sender) {
   if (opt_is_proxy_v1 && pslv_v1) {
-    pslv_v1->gotIncorrectBlock(std::move(p), sender);
+    pslv_v1->gotIncorrectBlock(std::move(p));
     return;
   }
 

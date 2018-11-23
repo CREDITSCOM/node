@@ -9,6 +9,7 @@
 
 #include "cache.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 
 /* First of all, here is a base unmovable smart pointer to a memory
    region.
@@ -377,9 +378,9 @@ public:
 
 private:
   std::atomic<uint32_t> users_ = {0};
+  Allocator* allocator_;
   T element_;
 
-  Allocator* allocator_;
   friend Allocator;
 };
 
@@ -400,7 +401,7 @@ public:
     IntType** place = freeChunksLast_.load(std::memory_order_acquire);
     do {
       if (!place) {
-        SpinLock l(allocFlag_);
+        cs::SpinGuard l(allocFlag_);
 
         place = freeChunksLast_.load(std::memory_order_relaxed);
         if (place)
@@ -417,7 +418,7 @@ public:
   void remove(IntType* toFree) {
     toFree->~IntType();
     {
-      SpinLock l(freeFlag_);
+      cs::SpinGuard l(freeFlag_);
       IntType** place = freeChunksLast_.load(std::memory_order_acquire);
       IntType** nextPlace;
 
@@ -453,11 +454,11 @@ private:
   }
 
   uint32_t pages_ = 0;
-  std::atomic_flag allocFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock allocFlag_;
 
   IntType** freeChunks_ = nullptr;
   std::atomic<IntType**> freeChunksLast_;
-  std::atomic_flag freeFlag_ = ATOMIC_FLAG_INIT;
+  cs::SpinLock freeFlag_;
 };
 
 template <typename T>
