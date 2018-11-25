@@ -92,7 +92,6 @@ bool Node::init() {
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
   cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-  cs::Connector::connect(&poolSynchronizer_->synchroFinished, this, &Node::processMetaMap);
 
   return true;
 }
