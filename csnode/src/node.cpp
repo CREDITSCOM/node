@@ -258,11 +258,20 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   if(rNum > round) {
-    if(rNum - round == 1) {
-      // if we are behind exactly one round, ask for round info
-      const uint8_t cnt_trusted = (uint8_t) confidants().size();
-      for(uint8_t n = 0; n < cnt_trusted; ++n) {
-        sendRoundInfoRequest(n);
+    if(rNum - 1 == round || round == 0) {
+      // continue reading round info
+      cs::RoundTable rt;
+      if(readRoundData(rt)) {
+        // if we are behind exactly one round, ask for round info
+        roundNum_ = rNum - 1;
+        cswarning() << "NODE> request round info from trusted nodes";
+        sendRoundInfoRequest(rt.general);
+        for(const auto& t : rt.confidants) {
+          sendRoundInfoRequest(t);
+        }
+      }
+      else {
+        cswarning() << "NODE> read trusted nodes from round info failed";
       }
     }
     else {
@@ -289,6 +298,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   if(rNum == round) {
     // currently in proper round, handle BigBang
     cslog() << "NODE> resend last block hash after BigBang";
+    tryResendRoundInfo(std::nullopt, round); // only sender can do it
     sendHash_V3(round);
     solver_->gotBigBang();
     return;
@@ -323,8 +333,17 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
   transport_->clearTasks();
 
-  if (getBlockChain().getLastWrittenSequence() < roundNum_ - 1) {
+  const auto last_block = getBlockChain().getLastWrittenSequence();
+  if (last_block < roundNum_ - 1) {
     cswarning() << "NODE> Last written sequence lower than current round - 1";
+    if(last_block == roundNum_ - 2) {
+      cswarning() << "NODE> require exactly last round info and previous block, perform requests";
+      --roundNum_;
+      sendRoundInfoRequest(roundTable.general);
+      for(const auto& t : roundTable.confidants) {
+        sendRoundInfoRequest(t);
+      }
+    }
     return;
   }
 
@@ -2216,13 +2235,21 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
 }
 
 void Node::sendRoundInfoRequest(uint8_t respondent) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "NODE> only confidant nodes can request consensus stages";
+  // ask for round info from current trusted on current round
+  const auto cnt = (uint8_t) cs::Conveyer::instance().currentRoundTable().confidants.size();
+  if(respondent < cnt) {
+    sendRoundInfoRequest(cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
   }
+  else {
+    cserror() << "NODE> cannot request round info, incorrect respondent number";
+  }
+}
 
+void Node::sendRoundInfoRequest(const cs::PublicKey& respondent)
+{
   cslog() << "NODE> send request for next round info after #" << roundNum_;
 
-  ostream_.init(0 /*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
+  ostream_.init(0 /*need no flags!*/, respondent);
   ostream_ << MsgTypes::RoundInfoRequest << roundNum_ << myConfidantIndex_;
   flushCurrentTasks();
 }
