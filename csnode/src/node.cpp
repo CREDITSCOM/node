@@ -92,7 +92,6 @@ bool Node::init() {
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
   cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-  cs::Connector::connect(&poolSynchronizer_->synchroFinished, this, &Node::processMetaMap);
 
   return true;
 }
@@ -548,8 +547,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round,
-                                const cs::PublicKey& sender) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     csdebug() << "NODE> sync packets have already finished in round " << round;
     return;

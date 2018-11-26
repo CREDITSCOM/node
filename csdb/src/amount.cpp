@@ -29,7 +29,7 @@ Amount::Amount(double value) {
     multiplier /= 10;
   }
 
-  fraction_ = lround(frac + 0.5) * multiplier;
+  fraction_ = lround(frac) * multiplier;
   if (fraction_ >= AMOUNT_MAX_FRACTION) {
     fraction_ -= AMOUNT_MAX_FRACTION;
     ++integral_;

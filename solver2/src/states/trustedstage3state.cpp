@@ -1,7 +1,7 @@
 #include <solvercontext.hpp>
 #include <states/trustedstage3state.hpp>
 
-#include <math.h>
+#include <cmath>
 #include <csnode/blockchain.hpp>
 #include <lib/system/utils.hpp>
 

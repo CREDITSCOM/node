@@ -3,7 +3,6 @@
  * @author Evgeny V. Zalivochkin
  */
 
-#pragma once
 #ifndef _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_
 #define _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_
 

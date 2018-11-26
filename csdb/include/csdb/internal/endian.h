@@ -3,7 +3,6 @@
  * @author Evgeny V. Zalivochkin
  */
 
-#pragma once
 #ifndef _CREDITS_CSDB_INTERNAL_ENDIAN_H_INCLUDED_
 #define _CREDITS_CSDB_INTERNAL_ENDIAN_H_INCLUDED_
 

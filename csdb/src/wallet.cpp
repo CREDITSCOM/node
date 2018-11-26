@@ -10,9 +10,9 @@
 namespace csdb {
 
 class Wallet::priv : public ::csdb::internal::shared_data {
-  priv() {
-  }
-  priv(Address address)
+  priv() = default;
+
+  explicit priv(Address address)
   : address_(address) {
   }
 
