@@ -463,10 +463,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   std::string contract_state;
   if (!deploy) {
     contract_state_entry.wait_till_front([&](std::string& state) {
-      auto ret = !state.empty();
-      if (ret)
+      if (!state.empty()) {
         contract_state = state;
-      return ret;
+        return true;
+      } 
+      return false;
     });
   }
 
@@ -613,8 +614,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   auto curph = start;
   while (curph != pending_smart_transactions->last_pull_hash) {
     new_blocks.push_back(curph);
-    size_t _;
-    curph = s_blockchain.loadBlockMeta(curph, _).previous_hash();
+    size_t res;
+    curph = s_blockchain.loadBlockMeta(curph, res).previous_hash();
     if (curph.is_empty())
       break;
   }
@@ -628,9 +629,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         new_blocks.erase(fIt, new_blocks.end());
         break;
       }
-
-      size_t _;
-      luca = s_blockchain.loadBlockMeta(luca, _).previous_hash();
+      size_t res;
+      luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
     }
   }
 
@@ -761,15 +761,12 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const api:
 
   {
     std::unique_lock<decltype(entry.lock)> l(entry.lock);
-
     ++entry.awaiter_num;
-
     const auto checker = [&]() {
       if (!entry.trid_queue.empty()) {
         _return = convert_transaction_id(entry.trid_queue.front());
-        if (--entry.awaiter_num == 0) {
+        if (--entry.awaiter_num == 0)
           entry.trid_queue.pop_front();
-        }
         return true;
       }
       return false;
@@ -808,8 +805,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete) 
 
 bool APIHandler::convertAddrToPublicKey(const csdb::Address& addr) {
   if (addr.is_wallet_id()) {
-    const WalletId id =
-        *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
+    const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
     if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address&>(addr)))
       return false;
   }
