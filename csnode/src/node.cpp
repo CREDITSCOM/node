@@ -24,7 +24,6 @@
 #include <lz4.h>
 #include <sodium.h>
 
-#include <snappy.h>
 #include <sodium.h>
 
 #include <poolsynchronizer.hpp>
