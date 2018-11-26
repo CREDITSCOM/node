@@ -298,7 +298,10 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   if(rNum == round) {
     // currently in proper round, handle BigBang
     cslog() << "NODE> resend last block hash after BigBang";
-    tryResendRoundInfo(std::nullopt, round); // only sender can do it
+    if(tryResendRoundInfo(std::nullopt, round)) {
+      // only sender able do it
+      cswarning() << "NODE> re-send last round info to ALL";
+    }
     sendHash_V3(round);
     solver_->gotBigBang();
     return;
