@@ -27,7 +27,7 @@ static csdb::Address tryExtractPublicKey(const std::string& str) {
   csdb::Address result;
   if (!isStringParam(str)) return result;
 
-  std::string pureStr = str.substr(0, str.size() - 2);
+  std::string pureStr = str.substr(1, str.size() - 2);
   std::vector<uint8_t> vc;
 
   bool decodeSucc = DecodeBase58(pureStr, vc);
