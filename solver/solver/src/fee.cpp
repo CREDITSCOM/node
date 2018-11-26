@@ -79,14 +79,14 @@ void Fee::SetCountedFee() {
     std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
     size_t size_of_transaction;
     double counted_fee;
-    for (size_t i = 0; i < transactions.size(); ++i) {
-      size_of_transaction = transactions[i].to_byte_stream().size();
+    for (auto& transaction : transactions) {
+      size_of_transaction = transaction.to_byte_stream().size();
       counted_fee = one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
-        transactions[i].set_counted_fee(kMinFee);
+        transaction.set_counted_fee(csdb::AmountCommission(kMinFee));
       }
       else {
-        transactions[i].set_counted_fee(counted_fee);
+        transaction.set_counted_fee(csdb::AmountCommission(counted_fee));
       }
     }
   }
@@ -98,10 +98,10 @@ void Fee::SetCountedFee() {
       size_of_transaction = transactions[i].to_byte_stream().size();
       counted_fee = one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
-        transactions[i].set_counted_fee(kMinFee);
+        transactions[i].set_counted_fee(csdb::AmountCommission(kMinFee));
       }
       else {
-        transactions[i].set_counted_fee(counted_fee);
+        transactions[i].set_counted_fee(csdb::AmountCommission(counted_fee));
       }
     }
   }
@@ -117,11 +117,10 @@ void Fee::CountOneByteCost(const BlockChain& blockchain) {
     one_byte_cost_ = kFixedOneByteFee;
     return;
   }
-  else {
-    CountTotalTransactionsLength();
-    CountOneRoundCost(blockchain);
-    one_byte_cost_ = one_round_cost_ / total_transactions_length_;
-  }
+
+  CountTotalTransactionsLength();
+  CountOneRoundCost(blockchain);
+  one_byte_cost_ = one_round_cost_ / total_transactions_length_;
 }
 
 inline void Fee::CountTotalTransactionsLength() {
@@ -133,8 +132,8 @@ inline void Fee::CountTotalTransactionsLength() {
   else {
     transactions = transactions_packet_->transactions();
   }
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    total_transactions_length_ += transactions[i].to_byte_stream().size();
+  for (auto & transaction : transactions) {
+    total_transactions_length_ += transaction.to_byte_stream().size();
   }
 }
 

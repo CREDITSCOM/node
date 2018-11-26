@@ -32,7 +32,7 @@ public:
   };
 
 public:
-  WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
+  explicit WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
 
   void updateFromSource();
   WalletData& getData(const WalletAddress& address, WalletId& id);
@@ -40,8 +40,8 @@ public:
 
 private:
   class WalletsExisting {
-  public:
-    WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
+public:
+    explicit WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
     ~WalletsExisting();
 
     void updateFromSource();

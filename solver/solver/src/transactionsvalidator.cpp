@@ -24,8 +24,9 @@ void TransactionsValidator::reset(size_t transactionsNum) {
 }
 
 bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1) {
-  if (!validateTransactionAsSource(trx, trxInd, del1))
+  if (!validateTransactionAsSource(trx, trxInd, del1)) {
     return false;
+  }
   return validateTransactionAsTarget(trx);
 }
 
@@ -34,7 +35,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
 
 #ifndef WITHOUT_DELTA
-  auto newBalance = wallState.balance_ - trx.amount() - trx.counted_fee();
+  auto newBalance = wallState.balance_ - trx.amount().to_double() - trx.counted_fee().to_double();
 
 #ifdef _MSC_VER
   int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
@@ -66,8 +67,9 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 
   walletsState_.setModified(walletId);
 
-  if (wallState.balance_ < zeroBalance_)
+  if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
+  }
 
   return true;
 }
@@ -88,8 +90,9 @@ void TransactionsValidator::validateByGraph(CharacteristicMask& maskIncluded, co
     Node& currNode = *negativeNodes_.back();
     negativeNodes_.pop_back();
 
-    if (currNode.balance_ >= zeroBalance_)
+    if (currNode.balance_ >= zeroBalance_) {
       continue;
+    }
 
     removeTransactions(currNode, trxs, maskIncluded, trxsExcluded);
   }
@@ -97,14 +100,18 @@ void TransactionsValidator::validateByGraph(CharacteristicMask& maskIncluded, co
 
 void TransactionsValidator::removeTransactions(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
                                                csdb::Pool& trxsExcluded) {
-  if (removeTransactions_PositiveOne(node, trxs, maskIncluded, trxsExcluded))
+  if (removeTransactions_PositiveOne(node, trxs, maskIncluded, trxsExcluded)) {
     return;
-  if (removeTransactions_PositiveAll(node, trxs, maskIncluded, trxsExcluded))
+  }
+  if (removeTransactions_PositiveAll(node, trxs, maskIncluded, trxsExcluded)) {
     return;
-  if (removeTransactions_NegativeOne(node, trxs, maskIncluded, trxsExcluded))
+  }
+  if (removeTransactions_NegativeOne(node, trxs, maskIncluded, trxsExcluded)) {
     return;
-  if (removeTransactions_NegativeAll(node, trxs, maskIncluded, trxsExcluded))
+  }
+  if (removeTransactions_NegativeAll(node, trxs, maskIncluded, trxsExcluded)) {
     return;
+  }
 
   csdebug() << "removeTransactions: Failed to make balance non-negative ";
 }
@@ -119,7 +126,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Tra
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
-    const csdb::Amount& trxCost = trx.amount() + trx.counted_fee();
+    const csdb::Amount& trxCost = trx.amount().to_double() + trx.counted_fee().to_double();
 
     if (trxCost < absBalance) {
       prevNext = &trxList_[trxInd];
@@ -142,7 +149,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + trx.counted_fee();
+    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -181,7 +188,7 @@ bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + trx.counted_fee();
+    node.balance_ = node.balance_ + trx.amount().to_double() + trx.counted_fee().to_double();
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -189,8 +196,9 @@ bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Tra
 
     ++cntRemovedTrxs_;
 
-    if (node.balance_ >= zeroBalance_)
+    if (node.balance_ >= zeroBalance_) {
       return true;
+    }
   }
 
   return false;
@@ -206,7 +214,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Tra
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
-    const csdb::Amount& trxCost = trx.amount() + trx.counted_fee();
+    const csdb::Amount& trxCost = trx.amount().to_double() + trx.counted_fee().to_double();
 
     if (trxCost < absBalance) {
       prevNext = &trxList_[trxInd];
@@ -222,7 +230,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + trx.counted_fee();
+    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -257,7 +265,7 @@ bool TransactionsValidator::removeTransactions_NegativeAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + trx.counted_fee();
+    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];

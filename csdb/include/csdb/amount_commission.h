@@ -26,13 +26,13 @@ class ibstream;
 class AmountCommission {
 public:
   inline AmountCommission() = default;
-  AmountCommission(uint16_t value);
-  AmountCommission(double value);
+  explicit AmountCommission(uint16_t value);
+  explicit AmountCommission(double value);
 
   // Получение значений
 public:
   inline double to_double() const noexcept;
-  inline operator double() const noexcept {
+  inline explicit operator double() const noexcept {
     return to_double();
   }
   inline uint16_t get_raw() {
@@ -46,7 +46,7 @@ public:
 
 private:
   union {
-    uint16_t bits_ = 0;  // All bits
+    uint16_t bits_{};  // All bits
     struct {
 #ifdef BOOST_BIG_ENDIAN
       uint16_t sign : 1;   // sign
@@ -66,7 +66,7 @@ static_assert(std::is_trivially_copyable<AmountCommission>::value, "Invalid csdb
 
 inline double AmountCommission::to_double() const noexcept {
   const double _1_1024 = 1. / 1024;
-  return (fIEEE_.sign ? -1. : 1.) * fIEEE_.frac * _1_1024 * std::pow(10., fIEEE_.exp - 18);
+  return (fIEEE_.sign != 0u ? -1. : 1.) * fIEEE_.frac * _1_1024 * std::pow(10., fIEEE_.exp - 18);
 }
 
 }  // namespace csdb
