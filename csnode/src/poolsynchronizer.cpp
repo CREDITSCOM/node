@@ -232,9 +232,6 @@ void cs::PoolSynchronizer::sendBlock(uint8_t neighbourNum) {
 }
 
 bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
-  uint32_t lastSequence = 0;
-  bool isFromStorage = false;
-
   auto upperRequestedIt = m_requestedSequences.upper_bound(m_blockChain->getLastWrittenSequence());
   if (upperRequestedIt != m_requestedSequences.end()) {
     m_requestedSequences.erase(m_requestedSequences.begin(), upperRequestedIt);
@@ -244,17 +241,18 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
     m_temporaryStorage.erase(m_temporaryStorage.begin(), upperTempIt);
   }
 
-  auto isNeededHelpIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(),
-                                 [](const auto& pair) { return pair.second >= s_packetCountForHelp; });
-  auto& nh = m_neighbours[nieghbourNumber];
-  const bool isRepeatRequest = nh.isAvailableRequest();
-
   if (!m_temporaryStorage.empty()) {
+    if (m_blockChain->getLastWrittenSequence() > *m_temporaryStorage.rbegin()) {
+      m_temporaryStorage.clear();
+    }
+
     std::ostringstream os;
     os << "size: " << m_temporaryStorage.size() << ", el: ";
+
     for (const auto& sequence : m_temporaryStorage) {
       os << sequence << ", ";
     }
+
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences temporary storage: " << os.str();
   }
   else {
@@ -262,9 +260,14 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   }
 
   if (!m_requestedSequences.empty()) {
+    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->second) {
+      m_requestedSequences.clear();
+    }
+
     std::ostringstream os;
     os << "size: " << m_requestedSequences.size() << ", el: ";
     for (const auto& [sequence, packetCounter] : m_requestedSequences) {
+      csunused(packetCounter);
       os << sequence << ", ";
     }
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences requested storage  : " << os.str();
@@ -272,6 +275,13 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   else {
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences requested storage: size: 0";
   }
+
+  uint32_t lastSequence = 0;
+  bool isFromStorage = false;
+  auto isNeededHelpIt = std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(),
+                                 [](const auto& pair) { return pair.second >= s_packetCountForHelp; });
+  auto& nh = m_neighbours[nieghbourNumber];
+  const bool isRepeatRequest = nh.isAvailableRequest();
 
   // if storage requested sequences is impty
   if (m_requestedSequences.empty()) {
