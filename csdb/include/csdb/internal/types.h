@@ -3,7 +3,6 @@
  * @author Roman Bukin
  */
 
-#pragma once
 #ifndef _CREDITS_CSDB_TYPES_H_INCLUDED_
 #define _CREDITS_CSDB_TYPES_H_INCLUDED_
 

@@ -3,7 +3,6 @@
  * @author Vladimir Shilkin
  */
 
-#pragma once
 #ifndef _CREDITS_CSDB_AMOUNT_COMMISSION_H_INCLUDED_
 #define _CREDITS_CSDB_AMOUNT_COMMISSION_H_INCLUDED_
 

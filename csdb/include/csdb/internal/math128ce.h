@@ -4,7 +4,6 @@
  * @brief Небольшой набор constexpr-функций и классов для работы со 128-битной арифметикой.
  */
 
-#pragma once
 #ifndef _CREDITS_CSDB_INTERNAL_MATH128CE_H_INCLUDED_
 #define _CREDITS_CSDB_INTERNAL_MATH128CE_H_INCLUDED_
 

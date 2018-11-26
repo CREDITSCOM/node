@@ -13,7 +13,7 @@ struct cs::ConveyerBase::Impl {
   cs::TransactionsBlock transactionsBlock;
 
   // current round transactions packets storage
-  cs::TransactionsPacketTable hashTable;
+  cs::TransactionsPacketTable packetsTable;
 
   // main conveyer meta data
   cs::ConveyerMetaStorage metaStorage;
@@ -59,16 +59,22 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
   cs::TransactionsPacketHash hash = packet.hash();
   cs::Lock lock(m_sharedMutex);
 
-  if (pimpl->hashTable.count(hash) == 0u) {
-    pimpl->hashTable.emplace(std::move(hash), packet);
+  if (auto iterator = pimpl->packetsTable.find(hash); iterator == pimpl->packetsTable.end()) {
+    pimpl->packetsTable.emplace(std::move(hash), packet);
   }
   else {
-    cswarning() << "CONVEYER> Can not add network transactions packet";
+    cswarning() << "CONVEYER> Same hash already exists at table: " << hash.toString();
+
+    auto receivedPacketBinary = packet.toBinary();
+    auto currentPacketBinary = iterator->second.toBinary();
+
+    csdebug() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
+    csdebug() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
   }
 }
 
 const cs::TransactionsPacketTable& cs::ConveyerBase::transactionsPacketTable() const {
-  return pimpl->hashTable;
+  return pimpl->packetsTable;
 }
 
 const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const {
@@ -85,7 +91,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 
   cs::TransactionsPacket packet;
   cs::Hashes& hashes = meta->roundTable.hashes;
-  cs::TransactionsPacketTable& table = pimpl->hashTable;
+  cs::TransactionsPacketTable& table = pimpl->packetsTable;
 
   for (const auto& hash : hashes) {
     const auto iterator = table.find(hash);
@@ -121,7 +127,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   {
     cs::SharedLock lock(m_sharedMutex);
     std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes),
-                 [this](const auto& hash) { return (pimpl->hashTable.count(hash) == 0u); });
+                 [this](const auto& hash) { return (pimpl->packetsTable.count(hash) == 0u); });
   }
 
   for (const auto& hash : neededHashes) {
@@ -149,7 +155,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
     }
   }
 
-  csdebug() << "CONVEYER> Current table size " << pimpl->hashTable.size();
+  csdebug() << "CONVEYER> Current table size " << pimpl->packetsTable.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
@@ -197,7 +203,7 @@ void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPac
     return;
   }
 
-  tablePointer = (round == pimpl->currentRound) ? &pimpl->hashTable : &metaPointer->hashTable;
+  tablePointer = (round == pimpl->currentRound) ? &pimpl->packetsTable : &metaPointer->hashTable;
 
   if (tablePointer == nullptr) {
     cserror() << "CONVEYER> Can not add sync packet because table pointer do not exist";
@@ -343,7 +349,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   cs::TransactionsPacketTable hashTable;
   const cs::Hashes& localHashes = meta->roundTable.hashes;
   const cs::Characteristic& characteristic = meta->characteristic;
-  cs::TransactionsPacketTable& currentHashTable = pimpl->hashTable;
+  cs::TransactionsPacketTable& currentHashTable = pimpl->packetsTable;
 
   cslog() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
   csdebug() << "CONVEYER> ApplyCharacteristic, viewing hashes count " << localHashes.size();
@@ -420,7 +426,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::TransactionsPacketHash& hash,
                                                                    const RoundNumber round) const {
-  if (auto iterator = pimpl->hashTable.find(hash); iterator != pimpl->hashTable.end()) {
+  if (auto iterator = pimpl->packetsTable.find(hash); iterator != pimpl->packetsTable.end()) {
     return iterator->second;
   }
 
@@ -478,8 +484,8 @@ void cs::ConveyerBase::flushTransactions() {
         cserror() << "CONVEYER > Transaction packet hashing failed";
       }
 
-      if (pimpl->hashTable.count(hash) == 0u) {
-        pimpl->hashTable.emplace(std::move(hash), std::move(packet));
+      if (pimpl->packetsTable.count(hash) == 0u) {
+        pimpl->packetsTable.emplace(std::move(hash), std::move(packet));
       }
       else {
         cserror() << "CONVEYER > Logical error, adding transactions packet more than one time";
