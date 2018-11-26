@@ -7,7 +7,6 @@ endif()
 
 option(LEVELDB_BUILD_TESTS "" OFF)
 option(LEVELDB_AUTORUN_TESTS "" OFF)
-option(SNAPPY_BUILD_TESTS "" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)

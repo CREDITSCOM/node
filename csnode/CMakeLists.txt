@@ -76,6 +76,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/
-                                         ${CMAKE_BINARY_DIR}/csdb/snappy
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
