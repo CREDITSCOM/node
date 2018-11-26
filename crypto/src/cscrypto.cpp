@@ -13,6 +13,13 @@ void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key) {
   crypto_sign_keypair(public_key.data(), private_key.data());
 }
 
+bool ValidateKeyPair(const PublicKey& public_key, const PrivateKey& private_key) {
+  Signature signature;
+  uint8_t test_data[] = { 0x01, 0x02, 0xef, 0xfe };
+  GenerateSignature(signature, private_key, test_data, sizeof(test_data));
+  return VerifySignature(signature, public_key, test_data, sizeof(test_data));
+}
+
 void GenerateSignature(Signature& signature, const PrivateKey& private_key,
                        const uint8_t* data, size_t data_size) {
   unsigned long long signature_len;

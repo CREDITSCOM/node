@@ -21,6 +21,8 @@ void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size);
 
 void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key);
 
+bool ValidateKeyPair(const PublicKey& public_key, const PrivateKey& private_key);
+
 void GenerateSignature(Signature& signature, const PrivateKey& private_key,
                        const uint8_t* data, size_t data_size);
 
