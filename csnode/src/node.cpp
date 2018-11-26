@@ -9,6 +9,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/node.hpp>
 #include <csnode/nodecore.hpp>
+#include <csnode/spammer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -85,7 +86,7 @@ bool Node::init() {
   }
 
 #ifdef SPAMMER
-  solver_->runSpammer();
+  runSpammer();
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -224,6 +225,15 @@ void Node::stop() {
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+}
+
+void Node::runSpammer()
+{
+  if(!pspam) {
+    cswarning() << "SolverCore: starting transaction spammer";
+    pspam = std::make_unique<cs::Spammer>();
+    pspam->StartSpamming(*this);
+  }
 }
 
 /* Requests */

@@ -9,7 +9,7 @@
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
 
-#include <solver/fee.hpp>
+#include <csnode/fee.hpp>
 
 using namespace cs;
 
@@ -906,4 +906,15 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
   // add last interval [final + 1, end]
   vec.emplace_back(std::make_pair(final_seq + 1, 0));
   return vec;
+}
+
+void BlockChain::setTransactionsFees(TransactionsPacket& packet)
+{
+  if(!fee_) {
+    return;
+  }
+  if(packet.transactionsCount() == 0) {
+    return;
+  }
+  fee_->CountFeesInPool(*this, &packet);
 }

@@ -356,8 +356,6 @@ public:
 
   const std::vector<cs::PublicKey>& trusted() const;
 
-  void update_fees(cs::TransactionsPacket& p);
-
   /**
    * @fn  void SolverContext::store_received_block(csdb::Pool & block, bool defer_write = false)
    *

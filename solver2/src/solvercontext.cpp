@@ -168,10 +168,6 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
   core.pnode->requestStageThree(from, required);
 }
 
-void SolverContext::update_fees(cs::TransactionsPacket& p) {
-  core.pfee->CountFeesInPool(blockchain(), &p);
-}
-
 bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
   cs::Lock lock(cs::Conveyer::instance().sharedMutex());
 

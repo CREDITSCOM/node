@@ -10,14 +10,8 @@
 #include <csnode/node.hpp>
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable : 4267 4244 4100 4245)
-#include <solver/solver.hpp>
-#pragma warning(pop)
-
-#include <solver/fee.hpp>
-#include <solver/spammer.hpp>
-#include <solver/walletsstate.hpp>
+#include <csnode/spammer.hpp>
+#include <csnode/walletsstate.hpp>
 
 #pragma warning(push)
 #pragma warning(disable : 4324)
@@ -40,8 +34,6 @@ namespace slv2
   constexpr const bool TimeoutsEnabled = false;
   // To enable make a transition to the same state
   constexpr const bool RepeatStateEnabled = true;
-  // To turn on proxy mode to old solver-1 (SolverCore becomes completely "invisible")
-  constexpr const bool ProxyToOldSolver = false;
   // Special mode: uses debug transition table
   constexpr const bool DebugModeOn = false;
 
@@ -50,7 +42,6 @@ namespace slv2
     // options
     : opt_timeouts_enabled(TimeoutsEnabled)
     , opt_repeat_state_enabled(RepeatStateEnabled)
-    , opt_is_proxy_v1(ProxyToOldSolver)
     , opt_debug_mode(DebugModeOn)
     // inner data
     , pcontext(std::make_unique<SolverContext>(*this))
@@ -63,13 +54,9 @@ namespace slv2
     , total_duration_ms(0)
     // consensus data
     , cur_round(0)
-    , pfee(std::make_unique<cs::Fee>())
     // previous solver version instance
-    , pslv_v1(nullptr)
     , pnode(nullptr)
-    , pws_inst(nullptr)
     , pws(nullptr)
-    , pspam(nullptr)
   {
     if(!opt_debug_mode) {
       if(Consensus::Log) {
@@ -83,12 +70,6 @@ namespace slv2
       }
       InitDebugModeTransitions();
     }
-    if(opt_is_proxy_v1) {
-      if(Consensus::Log) {
-        LOG_NOTICE("SolverCore: serve as proxy to Solver-1");
-      }
-      InitTransitions();
-    }
   }
 
   // actual constructor
@@ -98,15 +79,7 @@ namespace slv2
     addr_genesis = GenesisAddress;
     addr_start = StartAddress;
     pnode = pNode;
-    if(opt_is_proxy_v1) {
-      pslv_v1 = std::make_unique<cs::Solver>(pNode, addr_genesis, addr_start);
-      pws = pslv_v1->m_walletsState.get();
-    }
-    else {
-      pws_inst = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
-      // temp decision until solver-1 may be instantiated:
-      pws = pws_inst.get();
-    }
+    pws = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
   }
 
   SolverCore::~SolverCore()
@@ -118,13 +91,8 @@ namespace slv2
   void SolverCore::ExecuteStart(Event start_event)
   {
     if(!is_finished()) {
-      if(Consensus::Log) {
-        LOG_NOTICE("SolverCore: cannot start again, already started");
-      }
+      cswarning() << "SolverCore: cannot start again, already started";
       return;
-    }
-    if(Consensus::Log) {
-      LOG_NOTICE("SolverCore: starting in " << (opt_is_proxy_v1 ? "proxy" : "standalone") << " mode");
     }
     req_stop = false;
     handleTransitions(start_event);
@@ -161,8 +129,8 @@ namespace slv2
       pstate->off(*pcontext);
     }
     if(Consensus::Log) {
-      LOG_NOTICE("SolverCore: switch " << (pstate ? pstate->name() : "null") << " -> "
-        << (pState ? pState->name() : "null"));
+      cslog() << "SolverCore: switch " << (pstate ? pstate->name() : "null") << " -> "
+        << (pState ? pState->name() : "null");
     }
     pstate = pState;
     if(!pstate) {
@@ -175,9 +143,7 @@ namespace slv2
       tag_state_expired =
         scheduler.InsertOnce(Consensus::DefaultStateTimeout,
           [this]() {
-        if(Consensus::Log) {
-          LOG_NOTICE("SolverCore: state " << pstate->name() << " is expired");
-        }
+        cslog() << "SolverCore: state " << pstate->name() << " is expired";
         // clear flag to know timeout expired
         tag_state_expired = CallsQueueScheduler::no_tag;
         // control state switch
@@ -185,9 +151,7 @@ namespace slv2
         pstate->expired(*pcontext);
         if(pstate == p1.lock()) {
           // expired state did not change to another one, do it now
-          if(Consensus::Log) {
-            LOG_NOTICE("SolverCore: there is no state set on expiration of " << pstate->name());
-          }
+          cslog() << "SolverCore: there is no state set on expiration of " << pstate->name();
           // setNormalState();
         }
       },
@@ -202,23 +166,17 @@ namespace slv2
       return;
     }
     if(Event::BigBang == evt) {
-      if(Consensus::Log) {
-        LOG_WARN("SolverCore: BigBang on");
-      }
+      cswarning() << "SolverCore: BigBang on";
     }
     const auto& variants = transitions[pstate];
     if(variants.empty()) {
-      if(Consensus::Log) {
-        LOG_ERROR("SolverCore: there are no transitions for " << pstate->name());
-      }
+      cserror() << "SolverCore: there are no transitions for " << pstate->name();
       return;
     }
     auto it = variants.find(evt);
     if(it == variants.cend()) {
       // such event is ignored in current state
-      if(Consensus::Log) {
-        LOG_DEBUG("SolverCore: event " << static_cast<int>(evt) << " ignored in state " << pstate->name());
-      }
+      csdebug() << "SolverCore: event " << static_cast<int>(evt) << " ignored in state " << pstate->name();
       return;
     }
     setState(it->second);
@@ -226,42 +184,30 @@ namespace slv2
 
   bool SolverCore::stateCompleted(Result res)
   {
-    if(Consensus::Log) {
-      if(Result::Failure == res) {
-        LOG_ERROR("SolverCore: error in state " << (pstate ? pstate->name() : "null"));
-      }
+    if(Result::Failure == res) {
+      cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
     }
     return (Result::Finish == res);
   }
 
   void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& trusted_nodes)
   {
-    // if(accepted_pool.to_binary().size() > 0) {
-    //    LOG_ERROR("SolverCore: accepet block is not well-formed (binary represenataion must be empty)");
-    //}
-
-    LOG_NOTICE("SolverCore: TRUSTED -> WRITER, do write & send block");
+    cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
     cs::RoundTable table;
     table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
     table.confidants = trusted_nodes;
     pnode->prepareMetaForSending(table);
-
-    // pnode->onRoundStart(conveyer.roundTable());
   }
 
   void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)
   {
-    if(Consensus::Log) {
-      LOG_NOTICE("SolverCore: store received block #" << p.sequence() << ", " << p.transactions_count()
-        << " transactions");
-    }
+    cslog() << "SolverCore: store received block #" << p.sequence()
+      << ", " << p.transactions_count() << " transactions";
 
     // see: Solver-1, method Solver::gotBlock()
     if(!pnode->getBlockChain().storeBlock(p)) {
-      if(Consensus::Log) {
-        LOG_ERROR("SolverCore: block sync required");
-      }
+      cserror() << "SolverCore: block sync required";
       return;
     }
 
@@ -291,63 +237,13 @@ namespace slv2
     }
     if(false /*pnode->getBlockChain().revertLastBlock()*/) {
       // TODO: bc.revertWalletsInPool(deferred_block);
-      if(Consensus::Log) {
-        LOG_WARN("SolverCore: deferred block dropped, wallets are reverted");
-      }
+      cswarning() << "SolverCore: deferred block dropped, wallets are reverted";
     }
     else {
-      if(Consensus::Log) {
-        LOG_ERROR("SolverCore: cannot drop deferred block");
-      }
+      cserror() << "SolverCore: cannot drop deferred block";
       total_accepted_trans += cnt_deferred_trans;
     }
     cnt_deferred_trans = 0;
-  }
-
-  void SolverCore::test_outrunning_blocks()
-  {
-    if(Consensus::Log) {
-      LOG_DEBUG("SolverCore: test_outrunning_blocks()");
-    }
-    // retrieve blocks until cache empty or block sequence is broken:
-    auto& bc = pnode->getBlockChain();
-    while(!outrunning_blocks.empty()) {
-      size_t desired_seq = bc.getLastWrittenSequence() + 1;
-      const auto oldest = outrunning_blocks.cbegin();
-      if(oldest->first < desired_seq) {
-        // clear outdated block if it is and select next one:
-        if(Consensus::Log) {
-          LOG_NOTICE("SolverCore: remove outdated block #" << oldest->first << " from cache");
-        }
-        outrunning_blocks.erase(oldest);
-      }
-      else if(oldest->first == desired_seq) {
-        if(Consensus::Log) {
-          LOG_NOTICE("SolverCore: retrieve required block #" << desired_seq << " from cache");
-        }
-        // retrieve and use block if it is exactly what we need:
-        auto& data = outrunning_blocks.at(desired_seq);
-        // if state is not set store block also:
-        if(desired_seq == cur_round && pstate) {
-          if(stateCompleted(pstate->onBlock(*pcontext, data.first, data.second))) {
-            // do not forget make proper transitions if they are set in our table
-            handleTransitions(Event::Block);
-          }
-        }
-        else {
-          // store block and remove it from cache
-          store_received_block(data.first, false);
-        }
-        outrunning_blocks.erase(desired_seq);
-      }
-      else {
-        // stop processing, we have not got required block yet
-        if(Consensus::Log) {
-          LOG_DEBUG("SolverCore: nothing to retrieve yet");
-        }
-        break;
-      }
-    }
   }
 
 }  // namespace slv2

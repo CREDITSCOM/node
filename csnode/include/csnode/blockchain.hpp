@@ -33,6 +33,7 @@ namespace cs {
 class BlockHashes;
 class WalletsIds;
 class Fee;
+class TransactionsPacket;
 }  // namespace cs
 
 class BlockChain {
@@ -130,6 +131,8 @@ public:
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
 
+  // updates fees in every transaction
+  void setTransactionsFees(cs::TransactionsPacket& packet);
 private:
   bool putBlock(csdb::Pool& pool);
 
