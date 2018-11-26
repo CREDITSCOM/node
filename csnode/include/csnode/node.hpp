@@ -291,7 +291,7 @@ private:
 
   size_t lastStartSequence_;
   uint32_t startPacketRequestPoint_ = 0;
-  inline static const uint32_t packetRequestStep_ = 100;
+  inline static const uint32_t packetRequestStep_ = 150;
 
   bool blocksReceivingStarted_ = false;
 
