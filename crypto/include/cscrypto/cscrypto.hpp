@@ -12,17 +12,10 @@ const size_t kPublicKeySize = 32;
 const size_t kPrivateKeySize = 64;
 const size_t kSignatureSize = 64;
 
-using PublicKey = std::array<uint8_t, 32>;
-using Hash = std::array<uint8_t, 32>;
+using PublicKey = std::array<uint8_t, kPublicKeySize>;
+using Hash = std::array<uint8_t, kHashSize>;
 
-Hash blake2s(const uint8_t* data, size_t length);
-
-template <class T>
-Hash blake2s(const T& msg) {
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(msg.data());
-  Hash result = blake2s(data, msg.size());
-  return result;
-}
+void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size);
 
 }  // namespace cscrypto
 

@@ -4,10 +4,8 @@
 
 namespace cscrypto {
 
-Hash blake2s(const uint8_t* data, size_t length) {
-  Hash result;
-  blake2sp(result.data(), BLAKE2S_OUTBYTES, data, length, nullptr, 0);
-  return result;
+void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size) {
+  blake2sp(hash.data(), BLAKE2S_OUTBYTES, data, data_size, 0, 0);
 }
 
 }  // namespace cscrypto
