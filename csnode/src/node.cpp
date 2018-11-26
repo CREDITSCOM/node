@@ -257,13 +257,24 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
-  if(rNum < round - 1) {
-    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
+  if(rNum > round) {
+    if(rNum - round == 1) {
+      // if we are behind exactly one round, ask for round info
+      const uint8_t cnt_trusted = (uint8_t) confidants().size();
+      for(uint8_t n = 0; n < cnt_trusted; ++n) {
+        sendRoundInfoRequest(n);
+      }
+    }
+    else {
+      // otherwise 
+      cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
+      poolSynchronizer_->processingSync(rNum, true /*is bigbang*/);
+    }
     return;
   }
 
-  if(rNum > round) {
-    cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
+  if(rNum < round - 1) {
+    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
     return;
   }
 

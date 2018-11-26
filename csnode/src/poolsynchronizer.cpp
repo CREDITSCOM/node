@@ -8,14 +8,15 @@
 
 cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockChain)
 : m_transport(transport)
-, m_blockChain(blockChain) {
+, m_blockChain(blockChain)
+, m_isBigBand(false) {
   m_neededSequences.reserve(s_maxBlockCount);
   m_neighbours.reserve(m_transport->getMaxNeighbours());
 
   refreshNeighbours();
 }
 
-void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
+void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool isBigBand) {
   if (m_transport->getNeighboursCount() == 0) {
     cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum
             << ",   Requested pools block size:" << s_maxBlockCount;
@@ -30,6 +31,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
     synchroFinished();
     return;
   }
+
+  m_isBigBand = isBigBand;
 
   if (!m_isSyncroStarted) {
     if (roundNum >= lastWrittenSequence + s_roundDifferentForSync) {
@@ -98,9 +101,11 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
 
   /// or m_roundToSync > lastWrittenSequence
   if (m_roundToSync > cs::numeric_cast<cs::RoundNumber>(lastWrittenSequence)) {
-//    cs::Timer::singleShot(cs::NeighboursRequestDelay, [this] {
-//      sendBlockRequest();
-//    });
+    if(m_isBigBand) {
+      cs::Timer::singleShot(cs::NeighboursRequestDelay, [this] {
+        sendBlockRequest();
+      });
+    }
   }
   else {
     synchroFinished();
@@ -260,7 +265,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   }
 
   if (!m_requestedSequences.empty()) {
-    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->second) {
+    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->first) {
       m_requestedSequences.clear();
     }
 
