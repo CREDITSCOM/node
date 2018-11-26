@@ -101,6 +101,7 @@ public:
   csdb::Pool loadBlock(const uint32_t sequence) const;
   csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
   csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
+  void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
 
