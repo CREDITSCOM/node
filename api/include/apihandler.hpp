@@ -32,9 +32,6 @@ public:
 };
 
 struct APIHandlerInterface : public api::APINull, public APIHandlerBase {};
-namespace cs {
-class Solver;
-}
 namespace slv2 {
 class SolverCore;
 }
@@ -48,7 +45,7 @@ class APIProcessor;
 }
 class APIFaker : public APINull {
 public:
-  APIFaker(BlockChain&, cs::Solver&) {
+  APIFaker(BlockChain&, slv2::SolverCore&) {
   }
 };
 

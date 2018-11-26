@@ -30,7 +30,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
                                       ${CMAKE_BINARY_DIR}/third-party/thrift
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
                                       ${CMAKE_BINARY_DIR}/third-party/libsodium/include
-                                      ${CMAKE_CURRENT_SOURCE_DIR}/../solver/solver/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../solver2/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
 

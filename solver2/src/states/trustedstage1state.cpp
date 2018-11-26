@@ -74,7 +74,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         // pool = filter_test_signatures(context, pool);
 
         // see Solver::runCinsensus()
-        context.update_fees(pack);
+        context.blockchain().setTransactionsFees(pack);
         stage.hash = build_vector(context, pack);
         transactions_checked = true;
 

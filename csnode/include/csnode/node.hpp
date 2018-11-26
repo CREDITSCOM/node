@@ -26,6 +26,7 @@ class SolverCore;
 
 namespace cs {
 class PoolSynchronizer;
+class Spammer;
 }
 
 class Node {
@@ -39,6 +40,7 @@ public:
 
   void run();
   void stop();
+  void runSpammer();
 
   // static void stop();
 
@@ -277,6 +279,7 @@ private:
   // appidional dependencies
   slv2::SolverCore* solver_;
   Transport* transport_;
+  std::unique_ptr<cs::Spammer> pspam;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;

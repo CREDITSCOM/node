@@ -65,7 +65,6 @@ target_include_directories(solver2 PUBLIC
 
 target_link_libraries (
 	solver2
-	solver
 	csnode
 	libsodium
 )
