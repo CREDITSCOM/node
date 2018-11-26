@@ -97,21 +97,21 @@ Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, 
 Result DefaultStateBehavior::onHash(SolverContext& /*context*/, const csdb::PoolHash& /*pool_hash*/,
                                     const cs::PublicKey& /*sender*/) {
   if (Consensus::Log) {
-    LOG_DEBUG(name() << ": hash ignored in this state");
+    LOG_DEBUG(name() << ": block hash ignored in this state");
   }
   return Result::Ignore;
 }
 
 Result DefaultStateBehavior::onTransaction(SolverContext& /*context*/, const csdb::Transaction& /*trans*/) {
   if (Consensus::Log) {
-    LOG_DEBUG(name() << ": transaction ignored in this state");
+    LOG_DEBUG(name() << ": nothing to do with transaction in this state");
   }
   return Result::Ignore;
 }
 
 Result DefaultStateBehavior::onSyncTransactions(SolverContext& /*context*/, cs::RoundNumber /*round*/) {
   if (Consensus::Log) {
-    LOG_DEBUG(name() << ": transactions packet ignored in this state");
+    LOG_DEBUG(name() << ": nothing to do with transactions packet in this state");
   }
   return Result::Ignore;
 }

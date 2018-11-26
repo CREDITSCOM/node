@@ -98,19 +98,41 @@ void SolverCore::addInitialBalance() {
   }
 }
 
-void SolverCore::setBigBangStatus(bool status) {
+void SolverCore::gotBigBang() {
   if (opt_is_proxy_v1 && pslv_v1) {
-    pslv_v1->setBigBangStatus(status);
+    pslv_v1->setBigBangStatus(true);
     return;
   }
-
-  is_bigbang = status;
 
   if (!pstate) {
     return;
   }
-  if (status) {
-    handleTransitions(Event::BigBang);
+  // in case of bigbang resend all info we have got
+  // assume normal (ordinary) nodes does not store stages
+  const auto own_num = pnode->getConfidantNumber();
+  const auto pstage1 = find_stage1(own_num);
+  if(pstage1 != nullptr) {
+    cslog() << "SolverCore: resend stage-1 after BigBang";
+    pnode->sendStageOne(*pstage1);
+  }
+  else {
+    cslog() << "SolverCore: cannot resend stage-1 after BigBang";
+  }
+  const auto pstage2 = find_stage2(own_num);
+  if(pstage2 != nullptr) {
+    cslog() << "SolverCore: resend stage-2 after BigBang";
+    pnode->sendStageTwo(*pstage2);
+  }
+  else {
+    cslog() << "SolverCore: cannot resend stage-2 after BigBang";
+  }
+  const auto pstage3 = find_stage3(own_num);
+  if(pstage3 != nullptr) {
+    cslog() << "SolverCore: resend stage-3 after BigBang";
+    pnode->sendStageThree(*pstage3);
+  }
+  else {
+    cslog() << "SolverCore: cannot resend stage-3 after BigBang";
   }
 }
 
@@ -164,9 +186,6 @@ void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender) {
     pslv_v1->gotBlock(std::move(tmp), sender);
     return;
   }
-
-  // solver-1 logic: clear bigbang status upon block receive
-  is_bigbang = false;
 
   // solver-1: caching, actually duplicates caching implemented in Node::getBlock()
   csdb::Pool::sequence_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
@@ -326,7 +345,7 @@ void SolverCore::beforeNextRound() {
   if (!pstate) {
     return;
   }
-  pstate->onRoundEnd(*pcontext, is_bigbang);
+  pstate->onRoundEnd(*pcontext, false /*is_bigbang*/);
 }
 
 void SolverCore::nextRound() {
@@ -385,7 +404,7 @@ void SolverCore::nextRound() {
 
   // as store result of current round:
   if (Consensus::Log) {
-    LOG_DEBUG("SolverCore: clear all stored senders (vectors, matrices, hashes)");
+    LOG_DEBUG("SolverCore: clear all stored round data (block hashes, stages-1..3)");
   }
 
   recv_hash.clear();
@@ -598,7 +617,8 @@ void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey&
                        [this, stored_round]() {
                          if (stored_round == cur_round) {
                            // still did not receive next round info - become writer
-                           handleTransitions(SolverCore::Event::SetWriter);
+                           cserror() << "SolverCore: re-assign writer node is not completely implemented yet, cancel";
+                           //handleTransitions(SolverCore::Event::SetWriter);
                          }
                        },
                        true);
