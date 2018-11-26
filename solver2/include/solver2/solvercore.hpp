@@ -71,7 +71,7 @@ public:
   const cs::PublicKey& getWriterPublicKey() const;
 
   void addInitialBalance();
-  void setBigBangStatus(bool status);
+  void gotBigBang();
   void gotTransaction(const csdb::Transaction& trans);
   void gotVector(const cs::HashVector& vect);
   void gotMatrix(cs::HashMatrix&& matr);
@@ -210,8 +210,6 @@ private:
   // to store outrunning blocks until the time to insert them comes
   // stores pairs of <block, sender> sorted by sequence number
   std::map<csdb::Pool::sequence_t, std::pair<csdb::Pool, cs::PublicKey>> outrunning_blocks;
-  // store BB status to reproduce solver-1 logic
-  bool is_bigbang;
 
   // previous solver version instance
 

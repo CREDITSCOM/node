@@ -239,6 +239,42 @@ bool monitorNode = true;
 bool monitorNode = false;
 #endif
 
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type)
+{
+  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence() << ", current #" << roundNum_;
+  istream_.init(data, size);
+  cs::Hash h;
+  istream_ >> h;
+
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+
+  if(rNum < round - 1) {
+    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
+    return;
+  }
+
+  if(rNum > round) {
+    cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
+    return;
+  }
+
+  if(rNum == round - 1) {
+    // revert last block & start previous round
+    cserror() << "NODE> require unimplemented revert last written block, cannot handle BigBang properly";
+    cslog() << "NODE> re-send last round info may help others to go to next round";
+    tryResendRoundInfo(std::nullopt, round); // broadcast round info
+    return;
+  }
+
+  if(rNum == round) {
+    // currently in proper round, handle BigBang
+    cslog() << "NODE> resend last block hash after BigBang";
+    sendHash_V3(round);
+    solver_->gotBigBang();
+    return;
+  }
+}
+
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
 
@@ -1224,7 +1260,8 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence()) {
+  // BigBang: only current or previous round may be handled:
+  if (type == MsgTypes::BigBang && rNum >= roundNum_ - 1) {
     return MessageActions::Process;
   }
 
@@ -1962,7 +1999,8 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
 void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
                         const cs::PublicKey& sender) {
-  cslog() << "\nNODE> " << __func__ << "():";
+  csdebug() << "\n";
+  cslog() << "NODE> " << __func__ << "():";
 
   if (myLevel_ == NodeLevel::Writer) {
     cswarning() << "\tWriters don't need ROUNDINFO";
@@ -2121,15 +2159,14 @@ void Node::logPool(csdb::Pool& pool) {
   csdebug() << "===============================";
 }
 
-void Node::sendHash_V3(cs::RoundNumber round) {
-  /* if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
-     cserror() <<"Writer and Main node shouldn't send hashes";
-     return;
-   }*/
+void Node::sendHash_V3(cs::RoundNumber round)
+{
+  if(getBlockChain().getLastWrittenSequence() != round - 1) {
+    // should not send hash until have got proper block sequence
+    return;
+  }
 
   const auto& tmp = getBlockChain().getLastWrittenHash();
-  // cs::Hash testHash;
-  // std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
 
   cswarning() << "Sending hash " << tmp.to_string() << " to ALL";
   ostream_.init(BaseFlags::Broadcast);
@@ -2201,16 +2238,17 @@ void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_in
   flushCurrentTasks();
 }
 
-bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum) {
+bool Node::tryResendRoundInfo(std::optional<const cs::PublicKey> /*respondent*/, cs::RoundNumber rNum) {
   if (lastSentRoundData_.roundTable.round != rNum) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
   }
+  //TODO: use respondent.value() to send info directly, otherwise broadcast info
   createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo, lastSentRoundData_.characteristic,
                      lastSentRoundData_.poolSignature /*, last_sent_round_data.notifications*/);
   flushCurrentTasks();
-  cslog() << "NODE> re-send last round info #" << rNum << " to "
-          << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+  cslog() << "NODE> re-send last round info #" << rNum << " to ALL";
+          //<< cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
   return true;
 }
 

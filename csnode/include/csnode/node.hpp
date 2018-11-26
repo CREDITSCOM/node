@@ -43,6 +43,7 @@ public:
   // static void stop();
 
   // incoming requests processing
+  void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
   void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -91,7 +92,7 @@ public:
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundInfoReply(const uint8_t* data, const size_t size,
                          const cs::PublicKey& respondent);
-  bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
+  bool tryResendRoundInfo(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);

@@ -64,7 +64,6 @@ namespace slv2
     // consensus data
     , cur_round(0)
     , pfee(std::make_unique<cs::Fee>())
-    , is_bigbang(false)
     // previous solver version instance
     , pslv_v1(nullptr)
     , pnode(nullptr)
