@@ -18,8 +18,8 @@ namespace priv {
 
 struct crypto {
 #ifndef CSDB_UNIT_TEST
-  static const size_t hash_size = cscrypto::Hash::sizeBytes;
-  static const size_t public_key_size = cscrypto::PublicKey::sizeBytes;
+  static const size_t hash_size = cscrypto::kHashSize;
+  static const size_t public_key_size = cscrypto::kPublicKeySize;
 #else
   static const size_t hash_size = sizeof(size_t);
   static const size_t public_key_size = 20;
