@@ -17,19 +17,4 @@ target_link_libraries (${PROJECT_NAME} blake2)
 target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/blake2/ref
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/ed25519/src )
-
-# add_subdirectory(dynamic)
-
-# add_subdirectory(tests)
-
-if ( USE_SWIG )
-    add_subdirectory(swig)
-endif()
-
-option(BUILD_BENCHMARKS "Build benchmarks" OFF)
-
-if ( BUILD_BENCHMARKS )
-    add_subdirectory(benchmarks)
-endif()
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/blake2/ref)
