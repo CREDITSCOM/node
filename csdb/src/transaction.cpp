@@ -89,6 +89,13 @@ TransactionID::operator<(const TransactionID& other) const noexcept
     return pool_hash() < other.pool_hash();
 }
 
+::csdb::internal::byte_array
+TransactionID::to_byte_stream() const noexcept {
+  ::csdb::priv::obstream os;
+  put(os);
+  return os.buffer();
+}
+
 void
 TransactionID::put(::csdb::priv::obstream& os) const
 {

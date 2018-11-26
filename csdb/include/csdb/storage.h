@@ -215,6 +215,10 @@ public:
   */
   Transaction get_last_by_target(Address target) const noexcept;
 
+  // And now for something completely different
+  std::pair<TransactionID, TransactionID> get_previous_transaction_ids(const TransactionID&);
+  void set_previous_transaction_ids(const TransactionID&, const TransactionID& lastForSource, const TransactionID& lastForTarget);
+
   /**
    * @brief size возвращает количество пулов в хранилище
    * @return количество блоков в хранилище

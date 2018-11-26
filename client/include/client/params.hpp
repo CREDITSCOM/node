@@ -5,6 +5,7 @@
 //#define STARTER
 //#define NO_CONSENSUS
 //#define TOKENS_CACHE
+//#define TRANSACTIONS_INDEX
 #define AJAX_IFACE
 #define CUSTOMER_NODE
 //#define FOREVER_ALONE

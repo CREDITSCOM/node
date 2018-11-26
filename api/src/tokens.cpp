@@ -218,7 +218,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                    symbol.clear();
 
                    for (uint32_t i = 0; i < newSymb.size(); ++i) {
-                     if (i >= newSymb.size()) break;
+                     if (i >= 4) break;
                      symbol.push_back((char)std::toupper(newSymb[i]));
                    }
                  });

@@ -52,8 +52,8 @@ public:
 
   void getTransactions(Transactions &transactions,
                        csdb::Address &address,
-                       int64_t offset,
-                       const int64_t limit) const;
+                       uint64_t offset,
+                       uint64_t limit);
 
   bool isGood() const { return good_; }
 
@@ -79,6 +79,11 @@ public:
   void iterateOverWriters(const std::function<bool(const Credits::WalletsCache::WalletData::Address&, const Credits::WalletsCache::WriterData&)>);
 #endif
 
+#ifdef TRANSACTIONS_INDEX
+  csdb::TransactionID getLastTransaction(const csdb::Address&);
+  std::pair<csdb::TransactionID, csdb::TransactionID> getPreviousTransactions(const csdb::TransactionID&);
+#endif
+
 private:
   Headtag ht;
 
@@ -87,6 +92,10 @@ private:
   bool writeBlock(csdb::Pool& pool);
   void onBlockReceived(csdb::Pool& pool);
   void writeGenesisBlock();
+
+#ifdef TRANSACTIONS_INDEX
+  void createTransactionsIndex(csdb::Pool&);
+#endif
 
 private:
   bool good_ = false;
@@ -106,4 +115,28 @@ private:
 
   std::condition_variable_any new_block_cv;
   Credits::spinlock waiters_locker;
+};
+
+class TransactionsIterator {
+public:
+  TransactionsIterator(BlockChain&, const csdb::Address&);
+
+  void next();
+  bool isValid() const;
+
+  const csdb::Pool& getPool() const { return lapoo_; }
+
+  const csdb::Transaction& operator*() const { return *it_; }
+  auto operator->() const { return it_; }
+
+private:
+#ifdef TRANSACTIONS_INDEX
+  void setFromTransId(const csdb::TransactionID&);
+#endif
+
+  BlockChain& bc_;
+
+  csdb::Address addr_;
+  csdb::Pool lapoo_;
+  std::vector<csdb::Transaction>::const_reverse_iterator it_;
 };

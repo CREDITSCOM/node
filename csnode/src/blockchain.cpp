@@ -28,6 +28,14 @@ BlockChain::BlockChain(const char* path) {
   blockHashes_.reserve(1000000);
   blockRequestIsNeeded = false;
 
+#ifdef TRANSACTIONS_INDEX
+  bool recreateIndex;
+  {
+    std::ifstream inf(std::string(path) + "/index.db");
+    recreateIndex = !inf.good();
+  }
+#endif
+
   const bool dbOpened = storage_.open(path);
   PrettyLogging::finish();
 
@@ -118,6 +126,9 @@ BlockChain::BlockChain(const char* path) {
         {
           PrettyLogging::drawTickProgress(++j, tempHashes.size());
           auto p = loadBlock(*iter);
+#ifdef TRANSACTIONS_INDEX
+          if (recreateIndex) createTransactionsIndex(p);
+#endif
           updateCache(p);
           blockHashes_.push_back(*iter);
         }
@@ -138,6 +149,7 @@ BlockChain::BlockChain(const char* path) {
     LOG_ERROR("Couldn't open database at " << path);
     good_ = false;
   }
+
   return;
 }
 
@@ -147,6 +159,36 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 #endif
   onBlockReceived(pool);
 }
+
+
+#ifdef TRANSACTIONS_INDEX
+void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
+  // Update
+  std::map<csdb::Address, csdb::TransactionID> lastTranses;
+  auto lbd = [&lastTranses, this](const csdb::Address& addr) {
+               auto it = lastTranses.find(addr);
+
+               if (it == lastTranses.end()) {
+                 std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+                 auto wd = walletsCache_->findWallet(addr.public_key());
+                 it = lastTranses.insert(it,
+                                         std::make_pair(addr,
+                                                        wd ? wd->lastTransaction_ : csdb::TransactionID()));
+               }
+
+               return it;
+             };
+
+  for (auto& tr : pool.transactions()) {
+    auto sIt = lbd(tr.source());
+    auto tIt = lbd(tr.target());
+    storage_.set_previous_transaction_ids(tr.id(), sIt->second, tIt->second);
+
+    sIt->second = tr.id();
+    tIt->second = tr.id();
+  }
+}
+#endif
 
 
 bool BlockChain::writeBlock(csdb::Pool& pool) {
@@ -172,6 +214,10 @@ bool BlockChain::writeBlock(csdb::Pool& pool) {
   }
 
   std::cout << "Block " << pool.sequence() << " saved succesfully" << std::endl;
+
+#ifdef TRANSACTIONS_INDEX
+  createTransactionsIndex(pool);
+#endif
 
   lastHash_ = pool.hash();
   blockHashes_.push_back(lastHash_);
@@ -608,50 +654,21 @@ namespace
 void
 BlockChain::getTransactions(Transactions &transactions,
                             csdb::Address &address,
-                            int64_t offset,
-                            const int64_t limit) const
+                            uint64_t offset,
+                            uint64_t limit)
 {
-    TrxLoader trxLoader(address, *this, transactions);
-
-    WalletsCache::WalletData::PoolsHashes hashesArray;
-    {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        const WalletsCache::WalletData* walData =
-          walletsCache_->findWallet(address.public_key());
-        if (walData) {
-            hashesArray = walData->poolsHashes_;
-        }
+  for (auto trIt = TransactionsIterator(*this, address);
+       trIt.isValid();
+       trIt.next()) {
+    if (offset > 0) {
+      --offset;
+      continue;
     }
 
-    csdb::PoolHash prevHash = getLastHash();
-    if (!hashesArray.empty()) {
-        for (size_t i = hashesArray.size() - 1;
-             i != std::numeric_limits<decltype(i)>::max();
-             --i) {
-            const auto& poolHashData = hashesArray[i];
+    transactions.push_back(*trIt);
 
-            if (poolHashData.trxNum <
-                  WalletsCache::WalletData::PoolHashData::maxTrxNum &&
-                poolHashData.trxNum <= offset) {
-                offset -= poolHashData.trxNum;
-                continue;
-            }
-
-            csdb::PoolHash currHash;
-            WalletsCache::convert(poolHashData.poolHash, currHash);
-
-            if (!trxLoader.load(currHash, offset, limit, prevHash))
-                return;
-            if (transactions.size() >= size_t(limit))
-                return;
-        }
-    }
-
-    while (true) {
-        csdb::PoolHash currHash = prevHash;
-        if (!trxLoader.load(currHash, offset, limit, prevHash))
-            break;
-    }
+    if (--limit == 0) break;
+  }
 }
 
 /* Private under lock */
@@ -676,3 +693,60 @@ void BlockChain::revertLastBlock() {
   storage_.set_last_hash(lastHash_);
   storage_.set_size(last_written_sequence + 1);
 }
+
+#ifdef TRANSACTIONS_INDEX
+csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  auto wd = walletsCache_->findWallet(addr.public_key());
+
+  if (!wd) {
+    std::cout << "WD not found" << std::endl;
+    return csdb::TransactionID();
+  }
+
+  return wd->lastTransaction_;
+}
+
+std::pair<csdb::TransactionID, csdb::TransactionID> BlockChain::getPreviousTransactions(const csdb::TransactionID& trId) {
+  std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+  return storage_.get_previous_transaction_ids(trId);
+}
+
+TransactionsIterator::TransactionsIterator(BlockChain& bc,
+                                           const csdb::Address& addr): bc_(bc),
+                                                                       addr_(addr) {
+  setFromTransId(bc_.getLastTransaction(addr));
+}
+
+void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
+  if (lTrans.is_valid()) {
+    lapoo_ = bc_.loadBlock(lTrans.pool_hash());
+    it_ = lapoo_.transactions().rbegin() + (lapoo_.transactions().size() - lTrans.index() - 1);
+  }
+  else {
+    lapoo_ = csdb::Pool{};
+    std::cout << "Trans not valid" << std::endl;
+  }
+}
+
+bool TransactionsIterator::isValid() const {
+  return lapoo_.is_valid();
+}
+
+void TransactionsIterator::next() {
+  const csdb::TransactionID trId = it_->id();
+  const bool source = (addr_ == it_->source());
+
+  while (++it_ != lapoo_.transactions().rend()) {
+    if (it_->source() == addr_ || it_->target() == addr_)
+      break;
+  }
+
+  // Oops, no more in this block
+  if (it_ == lapoo_.transactions().rend()) {
+    auto ptPair = bc_.getPreviousTransactions(trId);
+    setFromTransId(source ? ptPair.first : ptPair.second);
+  }
+}
+
+#endif

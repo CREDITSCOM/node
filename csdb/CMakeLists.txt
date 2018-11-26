@@ -60,6 +60,7 @@ target_include_directories(
   ${PROJECT_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
 )
 target_link_libraries(

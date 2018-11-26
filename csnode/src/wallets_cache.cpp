@@ -135,6 +135,9 @@ void WalletsCache::loadTrxForSource(csdb::Transaction& tr, Mode mode, const Pool
 #ifdef MONITOR_NODE
     ++walData.transNum_;
 #endif
+#ifdef TRANSACTIONS_INDEX
+    walData.lastTransaction_ = tr.id();
+#endif
     addPoolHash(walData, mode, poolHash);
 }
 
@@ -149,6 +152,9 @@ void WalletsCache::loadTrxForTarget(csdb::Transaction& tr, Mode mode, const Pool
     walData.balance_ += tr.amount();
 #ifdef MONITOR_NODE
     ++walData.transNum_;
+#endif
+#ifdef TRANSACTIONS_INDEX
+    walData.lastTransaction_ = tr.id();
 #endif
     addPoolHash(walData, mode, poolHash);
 }

@@ -12,6 +12,8 @@
 #include <vector>
 #include <string>
 
+#include <client/params.hpp>
+
 #include "csdb/internal/types.h"
 
 namespace csdb {
@@ -46,6 +48,11 @@ public:
   using Item = std::pair<byte_array, byte_array>;
   using ItemList = std::vector<Item>;
   virtual bool write_batch(const ItemList &items) = 0;
+
+#ifdef TRANSACTIONS_INDEX
+  virtual bool putToTransIndex(const byte_array &key, const byte_array &value) = 0;
+  virtual bool getFromTransIndex(const byte_array &key, byte_array *value) = 0;
+#endif
 
   class Iterator
   {

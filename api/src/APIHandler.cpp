@@ -31,8 +31,6 @@
 
 #include <csnode/wallets_cache.hpp>
 
-#define TETRIS_NODE
-
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 
 using namespace api;
@@ -1391,7 +1389,14 @@ void
 APIHandler::iterateOverTokenTransactions(const csdb::Address& addr,
                                          const std::function<bool(const csdb::Pool&,
                                                                   const csdb::Transaction&)> func) {
-  csdb::PoolHash firstBlock;
+  for (auto trIt = TransactionsIterator(s_blockchain, addr);
+       trIt.isValid();
+       trIt.next()) {
+    if (is_smart(*trIt))
+      if (!func(trIt.getPool(), *trIt)) break;
+  }
+
+  /*csdb::PoolHash firstBlock;
 
   {
     auto smartOriginRef = locked_ref(this->smart_origin);
@@ -1417,7 +1422,7 @@ APIHandler::iterateOverTokenTransactions(const csdb::Address& addr,
 
     if (!keepRunning || lastHash == firstBlock) break;
     else lastHash = pool.previous_hash();
-  }
+    }*/
 }
 
 void addTokenResult(api::TokenTransfersResult& _return,
@@ -1677,11 +1682,6 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return,
 
   if (!present) {
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    return;
-  }
-  else if (state.empty()) {
-    _return.status.code = 666;
-    _return.status.message = "Empty contract state";
     return;
   }
 

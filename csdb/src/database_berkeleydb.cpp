@@ -84,6 +84,9 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB()
 {
   db_blocks_->close(0);
   db_seq_no_->close(0);
+#ifdef TRANSACTIONS_INDEX
+  db_trans_idx_->close(0);
+#endif
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status)
@@ -114,12 +117,18 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
 
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
+#ifdef TRANSACTIONS_INDEX
+  db_trans_idx_.reset(nullptr);
+#endif
 
   uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL | DB_INIT_CDB | DB_THREAD;
   env_.open(path.c_str(), db_env_open_flags, 0);
 
   auto db_blocks = new Db(&env_, 0);
   auto db_seq_no = new Db(&env_, 0);
+#ifdef TRANSACTIONS_INDEX
+  auto db_trans_idx = new Db(&env_, 0);
+#endif
 
   int status = db_blocks->open(NULL, "blockchain.db", NULL, DB_RECNO, DB_CREATE, 0);
   if (status) {
@@ -134,6 +143,15 @@ bool DatabaseBerkeleyDB::open(const std::string& path)
     return false;
   }
   db_seq_no_.reset(db_seq_no);
+
+#ifdef TRANSACTIONS_INDEX
+  status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+  db_trans_idx_.reset(db_trans_idx);
+#endif
 
   set_last_error();
   return true;
@@ -208,6 +226,48 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value)
   set_last_error();
   return true;
 }
+
+#ifdef TRANSACTIONS_INDEX
+bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array &value) {
+  if (!db_trans_idx_) {
+    set_last_error(NotOpen);
+    return false;
+  }
+
+  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<byte_array> db_value(value);
+
+  int status = db_trans_idx_->put(nullptr, &db_key, &db_value, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  set_last_error();
+  return true;
+}
+
+bool DatabaseBerkeleyDB::getFromTransIndex(const byte_array &key, byte_array *value) {
+  if (!db_trans_idx_) {
+    set_last_error(NotOpen);
+    return false;
+  }
+
+  Dbt_copy<byte_array> db_key(key);
+  Dbt_safe db_value;
+
+  int status = db_trans_idx_->get(nullptr, &db_key, &db_value, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  auto begin = reinterpret_cast<uint8_t *>(db_value.get_data());
+  value->assign(begin, begin + db_value.get_size());
+  set_last_error();
+  return true;
+}
+#endif
 
 bool DatabaseBerkeleyDB::remove(const byte_array &key)
 {

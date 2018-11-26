@@ -37,6 +37,11 @@ private:
   bool write_batch(const ItemList &items) override final;
   IteratorPtr new_iterator() override final;
 
+#ifdef TRANSACTIONS_INDEX
+  bool putToTransIndex(const byte_array &key, const byte_array &value) override final;
+  bool getFromTransIndex(const byte_array &key, byte_array *value) override final;
+#endif
+
 private:
   class Iterator;
 
@@ -47,6 +52,9 @@ private:
   DbEnv env_;
   std::unique_ptr<Db> db_blocks_;
   std::unique_ptr<Db> db_seq_no_;
+#ifdef TRANSACTIONS_INDEX
+  std::unique_ptr<Db> db_trans_idx_;
+#endif
 };
 
 } // namespace csdb

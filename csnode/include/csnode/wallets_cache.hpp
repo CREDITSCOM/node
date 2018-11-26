@@ -74,6 +74,9 @@ namespace Credits
             uint64_t createTime_ = 0;
             uint64_t transNum_ = 0;
 #endif
+#ifdef TRANSACTIONS_INDEX
+          csdb::TransactionID lastTransaction_;
+#endif
         };
 
         struct WriterData {

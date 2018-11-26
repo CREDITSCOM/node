@@ -18,6 +18,7 @@
 #include "csdb/internal/utils.h"
 #include "binary_streams.h"
 
+#include <client/params.hpp>
 #include <lib/system/logger.hpp>
 
 namespace {
@@ -690,5 +691,29 @@ Transaction Storage::get_last_by_target(Address target) const noexcept
 
   return Transaction{};
 }
+
+#ifdef TRANSACTIONS_INDEX
+std::pair<TransactionID, TransactionID> Storage::get_previous_transaction_ids(const TransactionID& trId) {
+  std::pair<TransactionID, TransactionID> result;
+
+  ::csdb::internal::byte_array data;
+  if (d->db->getFromTransIndex(trId.to_byte_stream(), &data)) {
+    ::csdb::priv::ibstream is(data.data(), data.size());
+    result.first.get(is);
+    result.second.get(is);
+  }
+
+  return result;
+}
+
+void Storage::set_previous_transaction_ids(const TransactionID& trId, const TransactionID& lastForSource, const TransactionID& lastForTarget) {
+  ::csdb::priv::obstream os;
+
+  lastForSource.put(os);
+  lastForTarget.put(os);
+
+  d->db->putToTransIndex(trId.to_byte_stream(), os.buffer());
+}
+#endif
 
 }
