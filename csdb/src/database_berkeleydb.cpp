@@ -5,10 +5,10 @@
 
 #include <boost/filesystem.hpp>
 
-#include "csdb/database_berkeleydb.h"
-#include "csdb/pool.h"
+#include "csdb/database_berkeleydb.hpp"
+#include "csdb/pool.hpp"
 
-#include "priv_crypto.h"
+#include "priv_crypto.hpp"
 
 namespace csdb {
 

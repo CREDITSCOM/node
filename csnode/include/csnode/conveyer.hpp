@@ -176,7 +176,7 @@ public:
   const cs::Characteristic* characteristic(cs::RoundNumber round) const;
 
   ///
-  /// @brief Returns calcualted characteristic hash by blake2.
+  /// @brief Returns calcualted characteristic hash.
   ///
   cs::Hash characteristicHash(cs::RoundNumber round) const;
 
@@ -186,8 +186,7 @@ public:
   /// @param sender Sender public key.
   /// @return pool Returns created csdb::Pool, otherwise returns nothing.
   ///
-  std::optional<csdb::Pool> applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo,
-                                                const cs::PublicKey& sender = cs::PublicKey());
+  std::optional<csdb::Pool> applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender = cs::PublicKey());
 
   // hash table storage
 
@@ -197,8 +196,7 @@ public:
   /// @return Returns transactions packet if its found, otherwise returns nothing.
   /// @warning No thread safe.
   ///
-  std::optional<cs::TransactionsPacket> findPacket(const cs::TransactionsPacketHash& hash,
-                                                   const cs::RoundNumber round) const;
+  std::optional<cs::TransactionsPacket> findPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
 
   ///
   /// @brief Returns existing of invalid transaction in meta storage.

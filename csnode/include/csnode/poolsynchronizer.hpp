@@ -1,7 +1,7 @@
 #ifndef POOLSYNCHRONIZER_HPP
 #define POOLSYNCHRONIZER_HPP
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/packstream.hpp>

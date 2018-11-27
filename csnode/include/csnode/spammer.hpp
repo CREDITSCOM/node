@@ -10,7 +10,7 @@
 #include <thread>
 #include <vector>
 
-#include <csdb/address.h>
+#include <csdb/address.hpp>
 #include <cscrypto/cscrypto.hpp>
 
 class Node;

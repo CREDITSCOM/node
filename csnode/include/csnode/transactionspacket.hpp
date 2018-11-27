@@ -1,7 +1,7 @@
 #ifndef TRANSACTIONS_PACKET_HPP
 #define TRANSACTIONS_PACKET_HPP
 
-#include <csdb/transaction.h>
+#include <csdb/transaction.hpp>
 #include <lib/system/common.hpp>
 #include <string>
 #include <vector>

@@ -6,13 +6,13 @@
 
 #include <boost/io/ios_state.hpp>
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/currency.h>
-#include <csdb/pool.h>
-#include <csdb/storage.h>
-#include <csdb/transaction.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
+#include <csdb/pool.hpp>
+#include <csdb/storage.hpp>
+#include <csdb/transaction.hpp>
 
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -23,7 +23,7 @@
 
 #include <iomanip>
 #include <scope_guard.h>
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 #include <ContractExecutor.h>
 
 #endif //STDAFX_H

@@ -2,7 +2,7 @@
 #include <intrin.h>
 #endif
 
-#include <csdb/amount_commission.h>
+#include <csdb/amount_commission.hpp>
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/transactionsvalidator.hpp>

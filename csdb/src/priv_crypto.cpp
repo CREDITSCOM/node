@@ -1,4 +1,4 @@
-#include "priv_crypto.h"
+#include "priv_crypto.hpp"
 
 #ifdef CSDB_UNIT_TEST
 #include <functional>

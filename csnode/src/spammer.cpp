@@ -11,11 +11,11 @@
 #include <string>
 
 #include <base58.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/currency.h>
-#include <csdb/internal/types.h>
-#include <csdb/transaction.h>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
+#include <csdb/internal/types.hpp>
+#include <csdb/transaction.hpp>
 #include <csnode/node.hpp>
 
 namespace cs {

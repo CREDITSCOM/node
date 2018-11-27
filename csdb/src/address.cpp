@@ -1,12 +1,12 @@
-#include "csdb/address.h"
+#include "csdb/address.hpp"
 #include <array>
 #include <boost/functional/hash.hpp>
-#include "binary_streams.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/internal/types.h"
-#include "csdb/internal/utils.h"
+#include "binary_streams.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
+#include "csdb/internal/types.hpp"
+#include "csdb/internal/utils.hpp"
 
-#include "priv_crypto.h"
+#include "priv_crypto.hpp"
 
 namespace csdb {
 

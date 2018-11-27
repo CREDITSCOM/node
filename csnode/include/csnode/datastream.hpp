@@ -7,7 +7,7 @@
 #include <string>
 #include <type_traits>
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <boost/asio/ip/udp.hpp>
 
 #include <lib/system/common.hpp>

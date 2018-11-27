@@ -1,8 +1,8 @@
 #include <cmath>
 
-#include <csdb/amount_commission.h>
+#include <csdb/amount_commission.hpp>
 
-#include "binary_streams.h"
+#include "binary_streams.hpp"
 
 namespace csdb {
 

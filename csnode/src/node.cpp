@@ -3,7 +3,7 @@
 #include <numeric>
 #include <sstream>
 
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
@@ -23,8 +23,7 @@
 
 #include <lz4.h>
 #include <sodium.h>
-
-#include <sodium.h>
+#include <cscrypto/cscrypto.hpp>
 
 #include <poolsynchronizer.hpp>
 
@@ -39,7 +38,7 @@ const csdb::Address Node::startAddress_ =
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
-, solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_))
+, solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
@@ -156,45 +155,26 @@ bool Node::checkKeysFile() {
 }
 
 std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
-  cs::Bytes publicKey;
-  cs::Bytes privateKey;
-
-  publicKey.resize(PUBLIC_KEY_LENGTH);
-  privateKey.resize(PRIVATE_KEY_LENGTH);
-
-  crypto_sign_keypair(publicKey.data(), privateKey.data());
+  cs::PublicKey fixedPublicKey;
+  cs::PrivateKey fixedPrivateKey;
+  cscrypto::GenerateKeyPair(fixedPublicKey, fixedPrivateKey);
 
   std::ofstream f_pub(publicKeyFileName_);
-  f_pub << EncodeBase58(publicKey);
+  f_pub << EncodeBase58(cs::Bytes(fixedPublicKey.begin(), fixedPublicKey.end()));
   f_pub.close();
 
   std::ofstream f_priv(privateKeyFileName_);
-  f_priv << EncodeBase58(privateKey);
+  f_priv << EncodeBase58(cs::Bytes(fixedPrivateKey.begin(), fixedPrivateKey.end()));
   f_priv.close();
-
-  cs::PublicKey fixedPublicKey;
-  cs::PrivateKey fixedPrivateKey;
-
-  std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
-  std::copy(privateKey.begin(), privateKey.end(), fixedPrivateKey.begin());
 
   return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
 }
 
 bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
-  const uint8_t msg[] = {255, 0, 0, 0, 255};
-  cs::Signature signature;
-
-  unsigned long long sig_size;
-  crypto_sign_detached(signature.data(), &sig_size, msg, 5, privateKey.data());
-
-  int ver_ok = crypto_sign_verify_detached(signature.data(), msg, 5, publicKey.data());
-
-  if (ver_ok == 0) {
+  if (cscrypto::ValidateKeyPair(publicKey, privateKey)) {
     solver_->setKeysPair(publicKey, privateKey);
     return true;
   }
-
   cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
   char gen_flag = 'a';
@@ -229,10 +209,10 @@ void Node::stop() {
 
 void Node::runSpammer()
 {
-  if(!pspam) {
+  if(!spammer_) {
     cswarning() << "SolverCore: starting transaction spammer";
-    pspam = std::make_unique<cs::Spammer>();
-    pspam->StartSpamming(*this);
+    spammer_ = std::make_unique<cs::Spammer>();
+    spammer_->StartSpamming(*this);
   }
 }
 

@@ -21,7 +21,7 @@
 
 class Transport;
 
-namespace slv2 {
+namespace cs {
 class SolverCore;
 }
 
@@ -189,11 +189,11 @@ public:
     return bc_;
   }
 
-  slv2::SolverCore* getSolver() {
+  cs::SolverCore* getSolver() {
     return solver_;
   }
 
-  const slv2::SolverCore* getSolver() const {
+  const cs::SolverCore* getSolver() const {
     return solver_;
   }
 
@@ -230,15 +230,7 @@ private:
   // pool sync helpers
   void blockchainSync();
 
-  //void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
-  // obsolete:
-  void processMetaMap()
-  {
-    getBlockChain().testCachedBlocks();
-  }
-
   bool readRoundData(cs::RoundTable& roundTable);
-
   void onRoundStartConveyer(cs::RoundTable&& roundTable);
 
   // conveyer
@@ -283,9 +275,9 @@ private:
   BlockChain bc_;
 
   // appidional dependencies
-  slv2::SolverCore* solver_;
+  cs::SolverCore* solver_;
   Transport* transport_;
-  std::unique_ptr<cs::Spammer> pspam;
+  std::unique_ptr<cs::Spammer> spammer_;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;

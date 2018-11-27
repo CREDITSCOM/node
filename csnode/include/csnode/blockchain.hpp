@@ -13,13 +13,13 @@
 
 #include <boost/dynamic_bitset.hpp>
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/pool.h>
-#include <csdb/storage.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/pool.hpp>
+#include <csdb/storage.hpp>
 
-#include <csdb/internal/types.h>
+#include <csdb/internal/types.hpp>
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>

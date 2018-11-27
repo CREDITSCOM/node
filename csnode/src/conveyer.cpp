@@ -1,6 +1,6 @@
 #include "csnode/conveyer.hpp"
 
-#include <csdb/transaction.h>
+#include <csdb/transaction.hpp>
 
 #include <exception>
 #include <iomanip>
@@ -337,7 +337,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
     return cs::Hash();
   }
 
-  return getBlake2Hash(pointer->mask.data(), pointer->mask.size());
+  return generateHash(pointer->mask.data(), pointer->mask.size());
 }
 
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo,

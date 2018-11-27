@@ -1,9 +1,9 @@
 #ifndef WALLETS_STATE_HPP
 #define WALLETS_STATE_HPP
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/internal/types.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/internal/types.hpp>
 #include <boost/dynamic_bitset.hpp>
 #include <csnode/transactionstail.hpp>
 #include <unordered_map>

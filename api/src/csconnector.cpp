@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
 #include "csconnector/csconnector.hpp"
@@ -14,7 +14,7 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-connector::connector(BlockChain& m_blockchain, slv2::SolverCore* solver, const Config& config)
+connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
 : api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
 , api_processor(api_handler)
 , p_api_processor_factory(new api::SequentialProcessorFactory(api_processor))

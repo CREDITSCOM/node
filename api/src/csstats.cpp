@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <algorithm>
 #include <apihandler.hpp>
 #include <cassert>

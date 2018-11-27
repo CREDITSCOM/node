@@ -15,41 +15,41 @@ add_library(${PROJECT_NAME} STATIC
   src/amount.cpp
   src/amount_commission.cpp
   src/transaction.cpp
-  src/transaction_p.h
+  src/transaction_p.hpp
   src/pool.cpp
   src/address.cpp
   src/currency.cpp
   src/wallet.cpp
   src/storage.cpp
   src/binary_streams.cpp
-  src/binary_streams.h
+  src/binary_streams.hpp
   src/utils.cpp
   src/integral_encdec.cpp
-  src/integral_encdec.h
+  src/integral_encdec.hpp
   src/priv_crypto.cpp
-  src/priv_crypto.h
+  src/priv_crypto.hpp
   src/database.cpp
   src/database_berkeleydb.cpp
   src/user_field.cpp
-  include/csdb/internal/shared_data.h
-  include/csdb/internal/shared_data_ptr_implementation.h
-  include/csdb/internal/math128ce.h
-  include/csdb/internal/sorted_array_set.h
-  include/csdb/internal/types.h
-  include/csdb/internal/utils.h
-  include/csdb/internal/endian.h
-  include/csdb/csdb.h
-  include/csdb/amount.h
-  include/csdb/amount_commission.h
-  include/csdb/transaction.h
-  include/csdb/pool.h
-  include/csdb/address.h
-  include/csdb/currency.h
-  include/csdb/wallet.h
-  include/csdb/storage.h
-  include/csdb/database.h
-  include/csdb/database_berkeleydb.h
-  include/csdb/user_field.h
+  include/csdb/internal/shared_data.hpp
+  include/csdb/internal/shared_data_ptr_implementation.hpp
+  include/csdb/internal/math128ce.hpp
+  include/csdb/internal/sorted_array_set.hpp
+  include/csdb/internal/types.hpp
+  include/csdb/internal/utils.hpp
+  include/csdb/internal/endian.hpp
+  include/csdb/csdb.hpp
+  include/csdb/amount.hpp
+  include/csdb/amount_commission.hpp
+  include/csdb/transaction.hpp
+  include/csdb/pool.hpp
+  include/csdb/address.hpp
+  include/csdb/currency.hpp
+  include/csdb/wallet.hpp
+  include/csdb/storage.hpp
+  include/csdb/database.hpp
+  include/csdb/database_berkeleydb.hpp
+  include/csdb/user_field.hpp
   )
 
 set (Boost_USE_MULTITHREADED ON)
