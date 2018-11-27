@@ -35,7 +35,7 @@ namespace cs
       std::ostringstream os;
       constexpr size_t in_minutes = 5 * 60 * 1000;
       constexpr size_t in_seconds = 10 * 1000;
-      os << "NODE> last round ";
+      os << " last round ";
       if(last_round_ms > in_minutes) {
         os << "> " << last_round_ms / 60000 << "min";
       }
