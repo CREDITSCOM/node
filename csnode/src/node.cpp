@@ -53,7 +53,7 @@ Node::Node(const Config& config)
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(transport_, &bc_)) {
+, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &bc_)) {
   good_ = init();
 }
 

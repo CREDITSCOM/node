@@ -11,6 +11,8 @@
 
 #include <net/neighbourhood.hpp>
 
+#include <client/config.hpp>
+
 class Node;
 
 namespace cs {
@@ -20,7 +22,7 @@ using PoolSynchronizerRequestSignal =
 
 class PoolSynchronizer {
 public:  // Interface
-  explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
+  explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
 
   void processingSync(const cs::RoundNumber roundNum);
 
@@ -37,6 +39,8 @@ public signals:  // Signals
   PoolSynchronizerRequestSignal sendRequest;
 
 private:  // Service
+  class NeighboursSetElemet;
+
   // pool sync progress
   void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
@@ -51,13 +55,16 @@ private:  // Service
 
   bool isLastRequest();
 
+  bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
+
   void synchroFinished();
 
 private:  // Members
-  inline static const uint8_t s_maxBlockCount = 6;
   inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
-  inline static const uint8_t s_roundDifferentForRepeatRequest = 0;  // round count for repeat request : 0 - every round
-  inline static const uint8_t s_packetCountForHelp = 10;             // packet Counter for connect another neighbor
+
+  const uint8_t m_maxBlockPoolsCount;       // cannot be 0
+  const uint8_t m_requestRepeatRoundCount;  // round  count for repeat request : 0 - never
+  const uint8_t m_neighbourPacketsCount;    // packet count for connect another neighbor : 0 - never
 
   Transport* m_transport;
   BlockChain* m_blockChain;
@@ -71,7 +78,8 @@ private:  // Members
   // value: increase each new round
   std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
 
-  struct NeighboursSetElemet {
+  class NeighboursSetElemet {
+  public:
     explicit NeighboursSetElemet(uint8_t neighbourNum, csdb::Pool::sequence_t sequence = 0)
     : m_neighbourNum(neighbourNum)
     , m_sequence(sequence)
@@ -105,12 +113,10 @@ private:  // Members
       return m_roundCounter;
     }
 
-    inline bool isAvailableRequest() const {
-      return m_roundCounter > s_roundDifferentForRepeatRequest;
-    }
-    inline bool increaseRoundCounter() {
-      ++m_roundCounter;
-      return isAvailableRequest();
+    inline void increaseRoundCounter() {
+      if (m_sequence) {
+        ++m_roundCounter;
+      }
     }
 
   private:
