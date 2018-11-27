@@ -54,27 +54,22 @@ private:  // Service
   void synchroFinished();
 
 private:  // Members
-  inline static const uint8_t s_maxBlockCount = 1;
+  inline static const uint8_t s_maxBlockCount = 6;
   inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
-  inline static const uint8_t s_roundDifferentForRepeatRequest = 1;  // round count for repeat request : 0 - every round
-  inline static const uint8_t s_packetCountForHelp = 10;              // packet Counter for connect another neighbor
+  inline static const uint8_t s_roundDifferentForRepeatRequest = 0;  // round count for repeat request : 0 - every round
+  inline static const uint8_t s_packetCountForHelp = 10;             // packet Counter for connect another neighbor
 
   Transport* m_transport;
   BlockChain* m_blockChain;
 
   // flag starting  syncronization
   bool m_isSyncroStarted = false;
-  // number of the last needed sequence
-  cs::RoundNumber m_roundToSync = 0;
   // array needed sequences for send request
   PoolsRequestedSequences m_neededSequences;
   // [key] = sequence,
   // [value] =  packet counter
   // value: increase each new round
   std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
-  // [key] = sequence
-  // to store reply sequences
-  std::set<csdb::Pool::sequence_t> m_temporaryStorage;
 
   struct NeighboursSetElemet {
     explicit NeighboursSetElemet(uint8_t neighbourNum, csdb::Pool::sequence_t sequence = 0)
@@ -119,7 +114,7 @@ private:  // Members
     }
 
   private:
-    uint8_t m_neighbourNum;         // neighbour number
+    uint8_t m_neighbourNum;             // neighbour number
     csdb::Pool::sequence_t m_sequence;  // requested sequence
     uint32_t m_roundCounter;
   };

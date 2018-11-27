@@ -235,6 +235,8 @@ public:
     return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t) getLastWrittenSequence());
   }
 
+  std::size_t getCachedBlocksSize() const;
+
   // continuous interval from ... to
   using SequenceInterval = std::pair<csdb::Pool::sequence_t, csdb::Pool::sequence_t>;
 

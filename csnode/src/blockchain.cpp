@@ -878,6 +878,10 @@ csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const
   return seq;
 }
 
+std::size_t BlockChain::getCachedBlocksSize() const {
+  return cached_blocks.size();
+}
+
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
