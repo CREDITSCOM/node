@@ -39,7 +39,7 @@ const csdb::Address Node::startAddress_ =
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
-, solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_))
+, solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
@@ -229,10 +229,10 @@ void Node::stop() {
 
 void Node::runSpammer()
 {
-  if(!pspam) {
+  if(!spammer_) {
     cswarning() << "SolverCore: starting transaction spammer";
-    pspam = std::make_unique<cs::Spammer>();
-    pspam->StartSpamming(*this);
+    spammer_ = std::make_unique<cs::Spammer>();
+    spammer_->StartSpamming(*this);
   }
 }
 

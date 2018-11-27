@@ -21,7 +21,7 @@ bool operator==(const std::pair<csdb::Pool, cs::PublicKey>& lhs, uint64_t rhs) {
 }
 }  // namespace std
 
-namespace slv2 {
+namespace cs {
 
 void DefaultStateBehavior::onRoundEnd(SolverContext& context, bool /*is_bigbang*/) {
   // such functionality is implemented in Node::getBigBang() method, avoid duplicated actions:

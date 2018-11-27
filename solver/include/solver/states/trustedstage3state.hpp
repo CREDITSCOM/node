@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace slv2 {
+namespace cs {
 /**
  * @class   TrustedStage3State
  *

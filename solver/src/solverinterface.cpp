@@ -12,7 +12,7 @@
 
 #include <chrono>
 
-namespace slv2
+namespace cs
 {
 
   void SolverCore::setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv)

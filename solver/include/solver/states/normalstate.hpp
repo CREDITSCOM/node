@@ -5,7 +5,7 @@
 #include <vector>
 #include "defaultstatebehavior.hpp"
 
-namespace slv2 {
+namespace cs {
 /**
  * @class   NormalState
  *

@@ -25,7 +25,7 @@
 #include <sstream>
 #include <string>
 
-namespace slv2
+namespace cs
 {
 
   // initial values for SolverCore options

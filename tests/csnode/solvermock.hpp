@@ -8,7 +8,7 @@
 #include <gmock/gmock.h>
 #include <solver/solvercore.hpp>
 
-class SolverMock : public slv2::SolverCore {
+class SolverMock : public cs::SolverCore {
 public:
   MOCK_CONST_METHOD0(getMyPublicKey, cs::PublicKey());
   MOCK_CONST_METHOD0(getPathToDB, std::string());

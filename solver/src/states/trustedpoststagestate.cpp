@@ -2,7 +2,7 @@
 #include <states/trustedpoststagestate.hpp>
 #include <lib/system/logger.hpp>
 
-namespace slv2 {
+namespace cs {
 void TrustedPostStageState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 

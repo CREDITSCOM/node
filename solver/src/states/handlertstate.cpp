@@ -3,7 +3,7 @@
 #include <states/handlertstate.hpp>
 #include <lib/system/logger.hpp>
 
-namespace slv2 {
+namespace cs {
 void HandleRTState::on(SolverContext& context) {
   auto role = context.role();
   switch (role) {

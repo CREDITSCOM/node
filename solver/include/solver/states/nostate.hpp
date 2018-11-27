@@ -1,7 +1,7 @@
 #pragma once
 #include "inodestate.hpp"
 
-namespace slv2 {
+namespace cs {
 /**
  * @class   NoState
  *

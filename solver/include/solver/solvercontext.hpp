@@ -13,7 +13,7 @@ namespace cs {
 class TransactionsPacket;
 }
 
-namespace slv2 {
+namespace cs {
 
 class SolverCore;
 using KeyType = csdb::internal::byte_array;

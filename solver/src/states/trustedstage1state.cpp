@@ -11,7 +11,7 @@
 #include <blake2.h>
 #include <sstream>
 
-namespace slv2 {
+namespace cs {
 void TrustedStage1State::on(SolverContext& context) {
   if (!ptransval) {
     ptransval = std::make_unique<cs::TransactionsValidator>(context.wallets(), cs::TransactionsValidator::Config{});

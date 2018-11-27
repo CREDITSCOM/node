@@ -5,7 +5,7 @@
 #include <csnode/blockchain.hpp>
 #include <lib/system/utils.hpp>
 
-namespace slv2 {
+namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 

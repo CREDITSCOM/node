@@ -2,7 +2,7 @@
 
 #include <callsqueuescheduler.hpp>
 
-namespace slv2 {
+namespace cs {
 
 class TimeoutTracking {
 public:

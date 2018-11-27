@@ -27,7 +27,7 @@ class WalletsState;
 // TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by
 // SolverCore
 
-namespace slv2 {
+namespace cs {
 
 class SolverCore {
 public:

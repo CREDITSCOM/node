@@ -1,6 +1,6 @@
 #pragma once
 
-namespace slv2 {
+namespace cs {
 /**
  * @enum    Result
  *

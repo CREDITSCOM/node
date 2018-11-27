@@ -18,7 +18,7 @@
 #include <sodium.h>
 #pragma warning(pop)
 
-namespace slv2 {
+namespace cs {
 
 void NormalState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);

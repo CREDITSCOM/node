@@ -3,7 +3,7 @@
 #include <states/trustedstage2state.hpp>
 #include <lib/system/logger.hpp>
 
-namespace slv2 {
+namespace cs {
 void TrustedStage2State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 

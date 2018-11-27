@@ -2,7 +2,7 @@
 #include <states/handlebbstate.hpp>
 #include <lib/system/logger.hpp>
 
-namespace slv2 {
+namespace cs {
 
 void HandleBBState::on(SolverContext& context) {
   if (context.is_block_deferred()) {

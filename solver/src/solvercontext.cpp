@@ -9,7 +9,7 @@
 
 #include <lib/system/logger.hpp>
 
-namespace slv2 {
+namespace cs {
 BlockChain& SolverContext::blockchain() const {
   return core.pnode->getBlockChain();
 }

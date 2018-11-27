@@ -13,7 +13,7 @@ class TransactionsPacket;
 class TransactionsValidator;
 }  // namespace cs
 
-namespace slv2 {
+namespace cs {
 /**
  * @class   TrustedStage1State
  *

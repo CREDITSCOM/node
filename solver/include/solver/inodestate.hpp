@@ -18,7 +18,7 @@ struct StageTwo;
 struct StageThree;
 }  // namespace cs
 
-namespace slv2 {
+namespace cs {
 class SolverContext;
 
 /**

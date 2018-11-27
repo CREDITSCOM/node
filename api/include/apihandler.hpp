@@ -32,7 +32,7 @@ public:
 };
 
 struct APIHandlerInterface : public api::APINull, public APIHandlerBase {};
-namespace slv2 {
+namespace cs {
 class SolverCore;
 }
 namespace executor {
@@ -45,13 +45,13 @@ class APIProcessor;
 }
 class APIFaker : public APINull {
 public:
-  APIFaker(BlockChain&, slv2::SolverCore&) {
+  APIFaker(BlockChain&, cs::SolverCore&) {
   }
 };
 
 class APIHandler : public APIHandlerInterface {
 public:
-  APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver);
+  APIHandler(BlockChain& blockchain, cs::SolverCore& _solver);
   ~APIHandler() override;
 
   APIHandler(const APIHandler&) = delete;
@@ -116,7 +116,7 @@ private:
   using client_type = executor::ContractExecutorConcurrentClient;
 
   BlockChain& s_blockchain;
-  slv2::SolverCore& solver;
+  cs::SolverCore& solver;
   csstats::csstats stats;
   ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executor_transport;
   std::unique_ptr<client_type> executor;

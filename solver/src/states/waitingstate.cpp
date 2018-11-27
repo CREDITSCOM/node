@@ -3,7 +3,7 @@
 #include <solvercontext.hpp>
 #include <sstream>
 
-namespace slv2
+namespace cs
 {
 
   void WaitingState::on(SolverContext &context)

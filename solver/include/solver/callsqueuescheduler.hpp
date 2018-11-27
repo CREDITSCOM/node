@@ -267,11 +267,12 @@ private:
   std::condition_variable _signal;
   // need by _signal
   std::mutex _mtx_signal;
+
   // avoids "false" signals
-  bool _flag{false};
+  bool _flag = { false };
 
   // flag to stop _worker thread
-  std::atomic_bool _stop{false};
+  std::atomic_bool _stop = { false };
 
   // statistics
   uint32_t _cnt_total{0};
@@ -284,6 +285,7 @@ private:
     uint32_t queued;
     uint32_t done;
   };
+
   std::map<CallTag, ExeSync> _exe_sync;
 
   // thread procedure

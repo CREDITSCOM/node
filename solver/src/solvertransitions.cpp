@@ -12,7 +12,7 @@
 #include <states/waitingstate.hpp>
 #include <states/writingstate.hpp>
 
-namespace slv2 {
+namespace cs {
 
 void SolverCore::InitTransitions() {
   StatePtr pNormal = std::make_shared<NormalState>();

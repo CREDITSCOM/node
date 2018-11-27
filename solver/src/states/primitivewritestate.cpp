@@ -3,7 +3,7 @@
 #include <consensus.hpp>
 #include <lib/system/logger.hpp>
 
-namespace slv2
+namespace cs
 {
     void PrimitiveWriteState::on(SolverContext& context)
     {
