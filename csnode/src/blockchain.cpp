@@ -245,6 +245,12 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
   return storage_.transaction(transId);
 }
 
+void BlockChain::removeLastBlock() {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  auto pool = storage_.pool_remove_last();
+  removeWalletsInPoolFromCache(pool);
+}
+
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
   std::unique_lock<decltype(dbLock_)> l(dbLock_);
   csdb::PoolHash res;

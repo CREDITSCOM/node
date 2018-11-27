@@ -241,11 +241,29 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::remove(const byte_array&) {
-  assert(false);
-
+bool DatabaseBerkeleyDB::remove(const byte_array& key) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
+    return false;
+  }
+
+  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<uint32_t> db_seq_no;
+  int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, 0);
+  if (status != 0) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  status = db_seq_no_->del(nullptr, &db_key, 0);
+  if (status != 0) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  status = db_blocks_->del(nullptr, &db_seq_no, 0);
+  if (status != 0) {
+    set_last_error_from_berkeleydb(status);
     return false;
   }
 

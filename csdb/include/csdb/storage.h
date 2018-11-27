@@ -45,6 +45,7 @@ class Storage final {
 private:
   class priv;
   bool write_queue_search(const PoolHash &hash, Pool &res_pool) const;
+  bool write_queue_pop(Pool &res_pool);
 
 public:
   using WeakPtr = ::std::weak_ptr<priv>;
@@ -189,6 +190,8 @@ public:
   Pool pool_load(const PoolHash &hash) const;
   Pool pool_load(const uint32_t sequence) const;
   Pool pool_load_meta(const PoolHash &hash, size_t &cnt) const;
+
+  Pool pool_remove_last();
 
   /**
    * @brief Получение транзакции по идентификатору.
