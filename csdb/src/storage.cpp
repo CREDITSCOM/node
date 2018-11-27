@@ -693,26 +693,34 @@ Transaction Storage::get_last_by_target(Address target) const noexcept
 }
 
 #ifdef TRANSACTIONS_INDEX
-std::pair<TransactionID, TransactionID> Storage::get_previous_transaction_ids(const TransactionID& trId) {
-  std::pair<TransactionID, TransactionID> result;
+::csdb::internal::byte_array Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) {
+  ::csdb::priv::obstream os;
+  addr.put(os);
+  ph.put(os);
+  return os.buffer();
+}
 
+PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) {
+  PoolHash result;
+
+  const auto key = get_trans_index_key(addr, ph);
   ::csdb::internal::byte_array data;
-  if (d->db->getFromTransIndex(trId.to_byte_stream(), &data)) {
+
+  if (d->db->getFromTransIndex(key, &data)) {
     ::csdb::priv::ibstream is(data.data(), data.size());
-    result.first.get(is);
-    result.second.get(is);
+    result.get(is);
   }
 
   return result;
 }
 
-void Storage::set_previous_transaction_ids(const TransactionID& trId, const TransactionID& lastForSource, const TransactionID& lastForTarget) {
+void Storage::set_previous_transaction_block(const Address& addr, const PoolHash& currTransBlock, const PoolHash& prevTransBlock) {
+  const auto key = get_trans_index_key(addr, currTransBlock);
+
   ::csdb::priv::obstream os;
+  prevTransBlock.put(os);
 
-  lastForSource.put(os);
-  lastForTarget.put(os);
-
-  d->db->putToTransIndex(trId.to_byte_stream(), os.buffer());
+  d->db->putToTransIndex(key, os.buffer());
 }
 #endif
 

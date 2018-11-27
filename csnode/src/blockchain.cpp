@@ -164,28 +164,25 @@ void BlockChain::putBlock(csdb::Pool& pool) {
 #ifdef TRANSACTIONS_INDEX
 void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
   // Update
-  std::map<csdb::Address, csdb::TransactionID> lastTranses;
-  auto lbd = [&lastTranses, this](const csdb::Address& addr) {
-               auto it = lastTranses.find(addr);
+  std::set<csdb::Address> indexedAddrs;
 
-               if (it == lastTranses.end()) {
-                 std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-                 auto wd = walletsCache_->findWallet(addr.public_key());
-                 it = lastTranses.insert(it,
-                                         std::make_pair(addr,
-                                                        wd ? wd->lastTransaction_ : csdb::TransactionID()));
+  auto lbd = [&indexedAddrs, &pool, this] (const csdb::Address& addr) {
+               if (indexedAddrs.insert(addr).second) {
+                 csdb::PoolHash lapoo;
+
+                 {
+                   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+                   auto wd = walletsCache_->findWallet(addr.public_key());
+                   if (wd) lapoo = wd->lastTransaction_.pool_hash();
+                 }
+
+                 storage_.set_previous_transaction_block(addr, pool.hash(), lapoo);
                }
-
-               return it;
              };
 
   for (auto& tr : pool.transactions()) {
-    auto sIt = lbd(tr.source());
-    auto tIt = lbd(tr.target());
-    storage_.set_previous_transaction_ids(tr.id(), sIt->second, tIt->second);
-
-    sIt->second = tr.id();
-    tIt->second = tr.id();
+    lbd(tr.source());
+    lbd(tr.target());
   }
 }
 #endif
@@ -699,17 +696,14 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   auto wd = walletsCache_->findWallet(addr.public_key());
 
-  if (!wd) {
-    std::cout << "WD not found" << std::endl;
-    return csdb::TransactionID();
-  }
+  if (!wd) return csdb::TransactionID();
 
   return wd->lastTransaction_;
 }
 
-std::pair<csdb::TransactionID, csdb::TransactionID> BlockChain::getPreviousTransactions(const csdb::TransactionID& trId) {
+csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
   std::lock_guard<decltype(dbLock_)> lock(dbLock_);
-  return storage_.get_previous_transaction_ids(trId);
+  return storage_.get_previous_transaction_block(addr, ph);
 }
 
 TransactionsIterator::TransactionsIterator(BlockChain& bc,
@@ -723,10 +717,7 @@ void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
     lapoo_ = bc_.loadBlock(lTrans.pool_hash());
     it_ = lapoo_.transactions().rbegin() + (lapoo_.transactions().size() - lTrans.index() - 1);
   }
-  else {
-    lapoo_ = csdb::Pool{};
-    std::cout << "Trans not valid" << std::endl;
-  }
+  else lapoo_ = csdb::Pool{};
 }
 
 bool TransactionsIterator::isValid() const {
@@ -734,9 +725,6 @@ bool TransactionsIterator::isValid() const {
 }
 
 void TransactionsIterator::next() {
-  const csdb::TransactionID trId = it_->id();
-  const bool source = (addr_ == it_->source());
-
   while (++it_ != lapoo_.transactions().rend()) {
     if (it_->source() == addr_ || it_->target() == addr_)
       break;
@@ -744,9 +732,62 @@ void TransactionsIterator::next() {
 
   // Oops, no more in this block
   if (it_ == lapoo_.transactions().rend()) {
-    auto ptPair = bc_.getPreviousTransactions(trId);
-    setFromTransId(source ? ptPair.first : ptPair.second);
+    auto ph = bc_.getPreviousPoolHash(addr_, lapoo_.hash());
+    lapoo_ = bc_.loadBlock(ph);
+
+    if (lapoo_.is_valid()) {
+      it_ = lapoo_.transactions().rbegin();
+      // transactions() cannot be empty
+      if (it_->source() != addr_ && it_->target() != addr_)
+        next();  // next should be executed only once
+    }
   }
+}
+
+#else
+
+void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
+  auto hash = ph;
+  bool found = false;
+
+  while (!found) {
+    lapoo_ = bc_.loadBlock(hash);
+    if (!lapoo_.is_valid()) break;
+
+    for (it_ = lapoo_.transactions().rbegin();
+         it_ != lapoo_.transactions().rend();
+         ++it_) {
+      if (it_->source() == addr_ || it_->target() == addr_) {
+        found = true;
+        break;
+      }
+    }
+
+    hash = lapoo_.previous_hash();
+  }
+}
+
+TransactionsIterator::TransactionsIterator(BlockChain& bc,
+                                           const csdb::Address& addr): bc_(bc),
+                                                                       addr_(addr) {
+  setFromHash(bc_.getLastHash());
+}
+
+bool TransactionsIterator::isValid() const {
+  return lapoo_.is_valid();
+}
+
+void TransactionsIterator::next() {
+  bool found = false;
+
+  while (++it_ != lapoo_.transactions().rend()) {
+    if (it_->source() == addr_ || it_->target() == addr_) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) setFromHash(lapoo_.previous_hash());
 }
 
 #endif

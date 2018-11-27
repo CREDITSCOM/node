@@ -81,7 +81,7 @@ public:
 
 #ifdef TRANSACTIONS_INDEX
   csdb::TransactionID getLastTransaction(const csdb::Address&);
-  std::pair<csdb::TransactionID, csdb::TransactionID> getPreviousTransactions(const csdb::TransactionID&);
+  csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 #endif
 
 private:
@@ -132,6 +132,8 @@ public:
 private:
 #ifdef TRANSACTIONS_INDEX
   void setFromTransId(const csdb::TransactionID&);
+#else
+  void setFromHash(const csdb::PoolHash&);
 #endif
 
   BlockChain& bc_;
