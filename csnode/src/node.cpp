@@ -2414,6 +2414,9 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable) {
     i++;
   }
   cslog() << line2.str();
+  stat_.onRoundStart(roundNum_);
+  cslog() << line2.str();
+
   solver_->nextRound();
 
   if (!sendingTimer_.isRunning()) {

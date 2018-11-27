@@ -17,6 +17,7 @@
 
 #include "blockchain.hpp"
 #include "packstream.hpp"
+#include "roundstat.hpp"
 
 class Transport;
 
@@ -324,6 +325,9 @@ private:
   };
 
   SentRoundData lastSentRoundData_;
+
+  // round stat
+  cs::RoundStat stat_;
 };
 
 std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel);
