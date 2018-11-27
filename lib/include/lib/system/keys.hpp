@@ -5,12 +5,11 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/structures.hpp>
 
-inline cs::PublicKey getHashedPublicKey(const char* str) {
-  cs::PublicKey result;
+inline cs::Hash getHashedPublicKey(const char* str) {
+  cs::Hash hash;
+  cscrypto::CalculateHash(hash, reinterpret_cast<const uint8_t*>(str), PUBLIC_KEY_LENGTH);
 
-  blake2sp(result.data(), BLAKE2_HASH_LENGTH, str, PUBLIC_KEY_LENGTH, nullptr, 0);
-
-  return result;
+  return hash;
 }
 
 #endif  // KEYS_HPP

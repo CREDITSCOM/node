@@ -9,17 +9,12 @@
 
 #include <boost/smart_ptr/detail/spinlock.hpp>
 
-#define STL_STRUCTURES
+#include <cscrypto/cscrypto.hpp>
 
-#ifndef STL_STRUCTURES
-#include <lib/system/structures.hpp>
-#endif
-
-constexpr std::size_t HASH_LENGTH = 32;
-constexpr std::size_t BLAKE2_HASH_LENGTH = 32;
-constexpr std::size_t PUBLIC_KEY_LENGTH = 32;
-constexpr std::size_t PRIVATE_KEY_LENGTH = 64;
-constexpr std::size_t SIGNATURE_LENGTH = 64;
+constexpr std::size_t HASH_LENGTH = cscrypto::kHashSize;
+constexpr std::size_t PUBLIC_KEY_LENGTH = cscrypto::kPublicKeySize;
+constexpr std::size_t PRIVATE_KEY_LENGTH = cscrypto::kPrivateKeySize;
+constexpr std::size_t SIGNATURE_LENGTH = cscrypto::kSignatureSize;
 
 namespace cs {
 using Vector = std::string;
@@ -37,19 +32,11 @@ template <std::size_t size>
 using ByteArray = std::array<Byte, size>;
 
 // common data structures
-#ifdef STL_STRUCTURES
-using PublicKey = ByteArray<PUBLIC_KEY_LENGTH>;
-using Signature = ByteArray<SIGNATURE_LENGTH>;
-using Hash = ByteArray<HASH_LENGTH>;
-using Blacke2Hash = ByteArray<BLAKE2_HASH_LENGTH>;
-using PrivateKey = ByteArray<PRIVATE_KEY_LENGTH>;
-#else
-using PublicKey = FixedString<PUBLIC_KEY_LENGTH>;
-using Signature = FixedString<SIGNATURE_LENGTH>;
-using Hash = FixedString<HASH_LENGTH>;
-using Blacke2Hash = FixedString<BLAKE2_HASH_LENGTH>;
-using PrivateKey = FixedString<PRIVATE_KEY_LENGTH>;
-#endif
+using PublicKey = cscrypto::PublicKey;
+using Signature = cscrypto::Signature;
+using Hash = cscrypto::Hash;
+using PrivateKey = cscrypto::PrivateKey;
+
 // sync types
 using SharedMutex = std::shared_mutex;
 using SpinLock = boost::detail::spinlock;
