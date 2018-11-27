@@ -6,7 +6,7 @@
 #include <iterator>
 #include <sstream>
 
-#include <sodium.h>
+#include <cscrypto/cscrypto.hpp>
 #include "binary_streams.h"
 #include "csdb/address.h"
 #include "csdb/amount.h"
@@ -257,11 +257,9 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
 }
 
 bool Transaction::verify_signature(const internal::byte_array& public_key) const {
-  // if crypto_sign_ed25519_verify_detached(...) returns 0 - succeeded, 1 - failed
-  auto res = crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(this->signature().data()),
-                                                 this->to_byte_stream_for_sig().data(),
-                                                 this->to_byte_stream_for_sig().size(), public_key.data());
-  return !res;
+  return cscrypto::VerifySignature(reinterpret_cast<const uint8_t*>(this->signature().data()),
+    public_key.data(), this->to_byte_stream_for_sig().data(),
+    this->to_byte_stream_for_sig().size());
 }
 
 std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const {

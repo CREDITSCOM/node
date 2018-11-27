@@ -8,7 +8,6 @@
 #include <sstream>
 
 #include <lz4.h>
-#include <sodium.h>
 
 #include "csdb/csdb.h"
 
@@ -683,24 +682,24 @@ bool Pool::save(Storage storage) {
   return result;
 }
 
-void Pool::sign(const cs::PrivateKey& private_key) {
-  cs::Signature signature;
+void Pool::sign(const cscrypto::PrivateKey& private_key) {
+  cscrypto::Signature signature;
   auto pool_bytes = this->to_byte_stream_for_sig();
-  uint64_t sig_len;
-  crypto_sign_ed25519_detached(signature.data(), reinterpret_cast<unsigned long long*>(&sig_len), pool_bytes.data(),
-                               pool_bytes.size(), private_key.data());
+  cscrypto::GenerateSignature(signature, private_key, pool_bytes.data(), pool_bytes.size());
   d->signature_ = std::string(signature.begin(), signature.end());
 }
 
 bool Pool::verify_signature() {
-  if (this->writer_public_key().size() != internal::kPublicKeySize ||
-          d->signature_.size() != internal::kSignatureLength) {
+  if (this->writer_public_key().size() != cscrypto::kPublicKeySize ||
+      d->signature_.size() != cscrypto::kSignatureSize) {
     return false;
   }
 
   const auto& pool_bytes = this->to_byte_stream_for_sig();
-  return crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(d->signature_.c_str()), pool_bytes.data(), pool_bytes.size(),
-                                          this->writer_public_key().data()) == 0;
+  cscrypto::Signature signature;
+  memcpy(signature.data(), this->signature().data(), cscrypto::kSignatureSize);
+  return cscrypto::VerifySignature(signature.data(), this->writer_public_key().data(),
+    pool_bytes.data(), pool_bytes.size());
 }
 
 bool Pool::verify_signature(const std::string& signature) {
@@ -708,8 +707,10 @@ bool Pool::verify_signature(const std::string& signature) {
     return false;
   }
   const auto& pool_bytes = this->to_byte_stream_for_sig();
-  if (crypto_sign_ed25519_verify_detached(reinterpret_cast<const uint8_t*>(signature.c_str()), pool_bytes.data(), pool_bytes.size(),
-                                          this->writer_public_key().data()) == 0) {
+  cscrypto::Signature sig;
+  memcpy(sig.data(), signature.data(), cscrypto::kSignatureSize);
+  if (cscrypto::VerifySignature(sig.data(),
+      this->writer_public_key().data(), pool_bytes.data(), pool_bytes.size())) {
     d->signature_ = signature;
     return true;
   }
