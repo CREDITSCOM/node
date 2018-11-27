@@ -31,4 +31,9 @@ bool VerifySignature(const Signature& signature, const PublicKey& public_key,
   return !crypto_sign_ed25519_verify_detached(signature.data(), data, data_size, public_key.data());
 }
 
+bool VerifySignature(const uint8_t* signature, const uint8_t* public_key,
+  const uint8_t* data, size_t data_size) {
+  return !crypto_sign_ed25519_verify_detached(signature, data, data_size, public_key);
+}
+
 }  // namespace cscrypto

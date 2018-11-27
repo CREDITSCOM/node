@@ -29,6 +29,9 @@ void GenerateSignature(Signature& signature, const PrivateKey& private_key,
 bool VerifySignature(const Signature& signature, const PublicKey& public_key,
                      const uint8_t* data, size_t data_size);
 
+bool VerifySignature(const uint8_t* signature, const uint8_t* public_key,
+  const uint8_t* data, size_t data_size);
+
 }  // namespace cscrypto
 
 #endif  // CSCRYPTO_HPP
