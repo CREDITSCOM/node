@@ -8,8 +8,7 @@
 #include <gmock/gmock.h>
 #include "transport.hpp"
 
-class TransportMock : public Transport
-{
+class TransportMock : public Transport {
 public:
   MOCK_METHOD0(run, void());
 
@@ -53,7 +52,8 @@ public:
   // Dealing with network connections
   MOCK_METHOD1(parseSSSignal, bool(const TaskPtr<IPacMan>&));
 
-  MOCK_METHOD5(dispatchNodeMessage, void(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t));
+  MOCK_METHOD5(dispatchNodeMessage,
+               void(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t));
 
   /* Network packages processing */
   MOCK_METHOD2(gotRegistrationRequest, bool(const TaskPtr<IPacMan>&, RemoteNodePtr&));
@@ -78,4 +78,4 @@ public:
   MOCK_METHOD3(requestMissing, void(const cs::Hash&, const uint16_t, const uint64_t));
 };
 
-#endif //PROJECT_TRANSPORTMOCK_HPP
+#endif  // PROJECT_TRANSPORTMOCK_HPP

@@ -6,8 +6,8 @@
 #define PROJECT_MOCKCLIENTCONFIG_HPP
 
 #include <gmock/gmock.h>
-#include <vector>
 #include <string>
+#include <vector>
 #include "config.hpp"
 
 class MockConfig : public Config {
@@ -31,8 +31,6 @@ public:
 
   MOCK_CONST_METHOD0(isSymmetric, bool());
   MOCK_CONST_METHOD0(getAddressEndpoint, const EndpointData&());
-
-
 };
 
-#endif //PROJECT_MOCKCLIENTCONFIG_HPP
+#endif  // PROJECT_MOCKCLIENTCONFIG_HPP

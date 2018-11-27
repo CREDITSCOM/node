@@ -27,4 +27,4 @@ public:
   MOCK_METHOD4(getSocketInThread, ip::udp::socket*(const bool, const EndpointData&, std::atomic<ThreadStatus>&, const bool useIPv6));
 };
 
-#endif //PROJECT_NETWORKMOCK_HPP
+#endif  // PROJECT_NETWORKMOCK_HPP

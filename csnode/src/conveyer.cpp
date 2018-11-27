@@ -68,8 +68,15 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
     auto receivedPacketBinary = packet.toBinary();
     auto currentPacketBinary = iterator->second.toBinary();
 
-    csdebug() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
-    csdebug() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
+    if (std::equal(receivedPacketBinary.begin(), receivedPacketBinary.end(), currentPacketBinary.begin(), currentPacketBinary.end())) {
+      cslog() << "CONVEYER> Same hashes, binaries are equal";
+    }
+    else {
+      cswarning() << "CONVEYER> Same hashes look at binaries";
+
+      csdebug() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
+      csdebug() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
+    }
   }
 }
 
