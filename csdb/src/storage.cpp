@@ -526,8 +526,7 @@ Wallet Storage::wallet(const Address &addr) const {
   return Wallet::get(addr);
 }
 
-bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/,
-                                  Transaction &trx /*output*/) const {
+bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const {
   Pool curPool;
   TransactionID::sequence_t curIdx = InnerId;
   bool is_in_blockchain = false;
