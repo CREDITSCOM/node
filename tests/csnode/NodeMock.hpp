@@ -6,11 +6,10 @@
 #define PROJECT_NODEMOCK_HPP
 
 #include <gmock/gmock.h>
-#include "csnode/nodecore.hpp"
 #include "csnode/node.hpp"
+#include "csnode/nodecore.hpp"
 
-class NodeMock : public Node
-{
+class NodeMock : public Node {
 public:
   MOCK_CONST_METHOD0(isGood, bool());
   MOCK_METHOD1(run, void(const Config&));
@@ -56,9 +55,11 @@ public:
   MOCK_METHOD1(sendTransactionsPacket, void(const cs::TransactionsPacket& packet));
   MOCK_METHOD2(sendPacketHashesRequest, void(const cs::Hashes& hashes, const cs::RoundNumber round));
   MOCK_METHOD2(sendPacketHashesRequestToRandomNeighbour, void(const cs::Hashes& hashes, const cs::RoundNumber round));
-  MOCK_METHOD3(sendPacketHashesReply, void(const cs::Packets& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
+  MOCK_METHOD3(sendPacketHashesReply,
+               void(const cs::Packets& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
 
-  MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount, const std::vector<uint8_t>& characteristic));
+  MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount,
+                                        const std::vector<uint8_t>& characteristic));
 
   /*syncro send functions*/
   MOCK_METHOD1(sendBlockRequest, void(uint32_t seq));
@@ -102,4 +103,4 @@ public:
   MOCK_METHOD2(composeMessageWithBlock, void(const csdb::Pool&, const MsgTypes));
 };
 
-#endif //PROJECT_NODEMOCK_HPP
+#endif  // PROJECT_NODEMOCK_HPP
