@@ -2,9 +2,12 @@
 
 #include <lib/system/common.hpp>
 #include <chrono>
+#include <set>
 
 namespace cs
 {
+
+  constexpr size_t MaxStoredDurations = 1000;
 
   class RoundStat
   {
@@ -23,6 +26,9 @@ namespace cs
       size_t cnt_deferred_trans;
       std::chrono::steady_clock::time_point t_start_ms;
       size_t total_duration_ms;
+
+      std::multiset<size_t> shortest_rounds;
+      std::multiset<size_t> longest_rounds;
   };
 
 } // cs

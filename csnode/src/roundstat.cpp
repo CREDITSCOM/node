@@ -28,6 +28,9 @@ namespace cs
       total_duration_ms = new_duration_ms;
       auto ave_round_ms = total_duration_ms / round;
 
+      //shortest_rounds.insert(last_round_ms);
+      //longest_rounds.insert(last_round_ms);
+
       // TODO: use more intelligent output formatting
       std::ostringstream os;
       constexpr size_t in_minutes = 5 * 60 * 1000;

@@ -666,6 +666,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   characteristic.mask = std::move(characteristicMask);
   conveyer.setCharacteristic(std::move(characteristic), round);
 
+  stat_.total_recv_trans += characteristic.mask.size();
+
   assert(sequence <= this->getRoundNumber());
 
   cs::PublicKey writerPublicKey;
@@ -685,6 +687,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   if(!getBlockChain().storeBlock(pool.value(), signature)) {
     cserror() << "NODE> failed to store block in BlockChain";
+  }
+  else {
+    stat_.total_accepted_trans += pool.value().transactions_count();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -1974,6 +1979,8 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
     return;
   }
 
+  stat_.total_accepted_trans += pool.value().transactions_count();
+
   // array
   cs::Signature poolSignature;
   const auto& signature = pool.value().signature();
@@ -2005,6 +2012,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
     cserror() << "Send round info characteristic not found, logic error";
     return;
   }
+  stat_.total_recv_trans += block_characteristic->mask.size();
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
@@ -2144,6 +2152,8 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Characteristic characteristic;
     characteristic.mask = std::move(characteristicMask);
 
+    stat_.total_recv_trans += characteristic.mask.size();
+
     assert(sequence <= this->getRoundNumber());
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2154,6 +2164,9 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
 
       if(!getBlockChain().storeBlock(pool.value(), signature)) {
         cserror() << "NODE> failed to store block in BlockChain";
+      }
+      else {
+        stat_.total_accepted_trans += pool.value().transactions_count();
       }
     }
   }
