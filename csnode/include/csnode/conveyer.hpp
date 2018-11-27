@@ -176,7 +176,7 @@ public:
   const cs::Characteristic* characteristic(cs::RoundNumber round) const;
 
   ///
-  /// @brief Returns calcualted characteristic hash by blake2.
+  /// @brief Returns calcualted characteristic hash.
   ///
   cs::Hash characteristicHash(cs::RoundNumber round) const;
 
