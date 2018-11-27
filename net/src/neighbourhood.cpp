@@ -144,6 +144,7 @@ void Neighbourhood::checkSilent() {
       --conn;
     }
     else {
+      needRefill = false;
       (*conn)->lastPacketsCount = packetsCount;
     }
 
@@ -368,7 +369,6 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 
     (*realPtr)->lastSeq = lastSeq;
     (*realPtr)->key = pk;
-    (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
     transport_->sendRegistrationRequest(***realPtr);
   }

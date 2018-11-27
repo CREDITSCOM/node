@@ -237,19 +237,8 @@ void cs::PoolSynchronizer::sendBlock(uint8_t neighbourNum) {
 }
 
 bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
-  auto upperRequestedIt = m_requestedSequences.upper_bound(m_blockChain->getLastWrittenSequence());
-  if (upperRequestedIt != m_requestedSequences.end()) {
-    m_requestedSequences.erase(m_requestedSequences.begin(), upperRequestedIt);
-  }
-  auto upperTempIt = m_temporaryStorage.upper_bound(m_blockChain->getLastWrittenSequence());
-  if (upperTempIt != m_temporaryStorage.end()) {
-    m_temporaryStorage.erase(m_temporaryStorage.begin(), upperTempIt);
-  }
-
   if (!m_temporaryStorage.empty()) {
-    if (m_blockChain->getLastWrittenSequence() > *m_temporaryStorage.rbegin()) {
-      m_temporaryStorage.clear();
-    }
+    m_temporaryStorage.erase(m_temporaryStorage.begin(), m_temporaryStorage.upper_bound(m_blockChain->getLastWrittenSequence()));
 
     std::ostringstream os;
     os << "size: " << m_temporaryStorage.size() << ", el: ";
@@ -265,9 +254,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   }
 
   if (!m_requestedSequences.empty()) {
-    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->first) {
-      m_requestedSequences.clear();
-    }
+    m_requestedSequences.erase(m_requestedSequences.begin(), m_requestedSequences.upper_bound(m_blockChain->getLastWrittenSequence()));
 
     std::ostringstream os;
     os << "size: " << m_requestedSequences.size() << ", el: ";
