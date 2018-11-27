@@ -329,13 +329,16 @@ void Transaction::put(::csdb::priv::obstream& os) const {
   os.put(data->amount_);
   os.put(data->max_fee_);
   os.put(data->currency_);
+
   {
-    uint8_t size = data->user_fields_.size();
+    uint8_t size = static_cast<uint8_t>(data->user_fields_.size());
     os.put(size);
+
     if (size) {
       os.put(data->user_fields_);
-    }
+    }   
   }
+
   os.put(data->signature_);
   os.put(data->counted_fee_);
 }
@@ -345,66 +348,92 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
   bool res;
 
   {
-    uint16_t lo;
-    uint32_t hi;
+    uint16_t lo = 0;
+    uint32_t hi = 0;
     res = is.get(lo) && is.get(hi);
-    if (!res)
+
+    if (!res) {
       return res;
+    }
+
     data->innerID_ = (((uint64_t)hi & 0x3fffffff) << 16) | lo;
+
     if (hi & 0x80000000) {
       internal::WalletId id;
       res = is.get(id);
-      if (!res)
+
+      if (!res) {
         return res;
+      }
+
       data->source_ = Address::from_wallet_id(id);
     }
+
     else {
       char key[::csdb::priv::crypto::public_key_size];
       res = is.get(key, ::csdb::priv::crypto::public_key_size);
-      if (!res)
+
+      if (!res) {
         return res;
+      }
+
       data->source_ = Address::from_public_key(key);
     }
 
     if (hi & 0x40000000) {
       internal::WalletId id;
       res = is.get(id);
-      if (!res)
+
+      if (!res) {
         return res;
+      }
+
       data->target_ = Address::from_wallet_id(id);
     }
     else {
       char key[::csdb::priv::crypto::public_key_size];
       res = is.get(key, ::csdb::priv::crypto::public_key_size);
-      if (!res)
+
+      if (!res) {
         return res;
+      }
+
       data->target_ = Address::from_public_key(key);
     }
   }
 
   res = is.get(data->amount_);
-  if (!res)
+
+  if (!res) {
     return res;
+  }
 
   res = is.get(data->max_fee_);
-  if (!res)
+
+  if (!res) {
     return res;
+  }
 
-  uint8_t d;
-  res = is.get(d);
-  if (!res)
+  uint8_t parse;
+  res = is.get(parse);
+
+  if (!res) {
     return res;
+  }
 
-  data->currency_ = d;
+  data->currency_ = parse;
+  res = is.get(parse);
 
-  res = is.get(d);
-  if (!res)
+  if (!res) {
     return res;
+  }
 
-  if (d) {
+  if (parse) {
     res = is.get(data->user_fields_);
-    if (!res)
+
+    if (!res) {
       return res;
+    }
   }
 
   return is.get(data->signature_) && is.get(data->counted_fee_);

@@ -1,5 +1,3 @@
-
-
 #include <csdb/amount_commission.h>
 #include <csdb/currency.h>
 #include <gtest/gtest.h>
