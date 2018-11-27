@@ -1,6 +1,6 @@
 #include <utility>
 
-#include "csdb/pool.h"
+#include "csdb/pool.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -9,13 +9,13 @@
 
 #include <lz4.h>
 
-#include "csdb/csdb.h"
+#include "csdb/csdb.hpp"
 
-#include "binary_streams.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/internal/utils.h"
-#include "priv_crypto.h"
-#include "transaction_p.h"
+#include "binary_streams.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
+#include "csdb/internal/utils.hpp"
+#include "priv_crypto.hpp"
+#include "transaction_p.hpp"
 
 namespace csdb {
 

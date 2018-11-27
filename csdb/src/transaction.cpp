@@ -1,5 +1,5 @@
-#include "csdb/transaction.h"
-#include "transaction_p.h"
+#include "csdb/transaction.hpp"
+#include "transaction_p.hpp"
 
 #include <cinttypes>
 #include <iomanip>
@@ -7,14 +7,14 @@
 #include <sstream>
 
 #include <cscrypto/cscrypto.hpp>
-#include "binary_streams.h"
-#include "csdb/address.h"
-#include "csdb/amount.h"
-#include "csdb/currency.h"
-#include "csdb/internal/types.h"
-#include "csdb/pool.h"
+#include "binary_streams.hpp"
+#include "csdb/address.hpp"
+#include "csdb/amount.hpp"
+#include "csdb/currency.hpp"
+#include "csdb/internal/types.hpp"
+#include "csdb/pool.hpp"
 
-#include "priv_crypto.h"
+#include "priv_crypto.hpp"
 
 namespace csdb {
 

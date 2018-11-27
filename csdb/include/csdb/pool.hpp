@@ -12,12 +12,12 @@
 #include <string>
 #include <vector>
 
-#include "csdb/address.h"
-#include "csdb/internal/shared_data.h"
-#include "csdb/internal/types.h"
-#include "csdb/storage.h"
-#include "csdb/transaction.h"
-#include "csdb/user_field.h"
+#include "csdb/address.hpp"
+#include "csdb/internal/shared_data.hpp"
+#include "csdb/internal/types.hpp"
+#include "csdb/storage.hpp"
+#include "csdb/transaction.hpp"
+#include "csdb/user_field.hpp"
 
 #include <cscrypto/cscrypto.hpp>
 

@@ -6,7 +6,7 @@
 #ifndef _CREDITS_CSDB_UTILS_H_INCLUDED_
 #define _CREDITS_CSDB_UTILS_H_INCLUDED_
 
-#include "csdb/internal/types.h"
+#include "csdb/internal/types.hpp"
 
 namespace csdb {
 namespace internal {

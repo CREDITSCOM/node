@@ -8,7 +8,7 @@
 
 #include <string>
 #include <vector>
-#include "csdb/internal/shared_data.h"
+#include "csdb/internal/shared_data.hpp"
 
 namespace csdb {
 

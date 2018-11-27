@@ -1,7 +1,7 @@
 #ifndef BLOCKHASHES_HPP
 #define BLOCKHASHES_HPP
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <vector>
 
 namespace cs {

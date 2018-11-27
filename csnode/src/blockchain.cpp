@@ -1,5 +1,5 @@
 #include <base58.h>
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>

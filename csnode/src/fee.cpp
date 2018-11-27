@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include <csdb/amount_commission.h>
-#include <csdb/pool.h>
-#include <csdb/transaction.h>
+#include <csdb/amount_commission.hpp>
+#include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
 #include <transactionspacket.hpp>

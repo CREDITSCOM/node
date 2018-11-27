@@ -1,7 +1,7 @@
 #ifndef NODE_CORE_HPP
 #define NODE_CORE_HPP
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>

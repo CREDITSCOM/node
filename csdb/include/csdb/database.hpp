@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "csdb/internal/types.h"
+#include "csdb/internal/types.hpp"
 
 namespace csdb {
 

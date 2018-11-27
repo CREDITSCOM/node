@@ -12,9 +12,9 @@
 #include <type_traits>
 #include <utility>
 #include <map>
-#include "csdb/internal/types.h"
+#include "csdb/internal/types.hpp"
 
-#include "integral_encdec.h"
+#include "integral_encdec.hpp"
 
 namespace csdb {
 namespace priv {

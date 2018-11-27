@@ -6,7 +6,7 @@
 #include <csnode/node.hpp>
 #pragma warning(pop)
 
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/fee.hpp>
 

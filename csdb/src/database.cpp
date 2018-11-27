@@ -1,4 +1,4 @@
-#include "csdb/database.h"
+#include "csdb/database.hpp"
 
 #include <cstdarg>
 #include <cstdio>

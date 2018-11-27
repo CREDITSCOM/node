@@ -1,7 +1,7 @@
 #pragma once
 
 #include <callsqueuescheduler.hpp>
-#include <csdb/address.h>
+#include <csdb/address.hpp>
 #include <vector>
 #include "defaultstatebehavior.hpp"
 

@@ -1,8 +1,8 @@
 #ifndef TRANSACTIONS_VALIDATOR_HPP
 #define TRANSACTIONS_VALIDATOR_HPP
 
-#include <csdb/pool.h>
-#include <csdb/transaction.h>
+#include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
 #include <lib/system/common.hpp>
 #include <limits>
 #include <csnode/walletsstate.hpp>

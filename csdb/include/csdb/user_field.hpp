@@ -11,8 +11,8 @@
 #include <type_traits>
 #include <vector>
 
-#include "csdb/amount.h"
-#include "csdb/internal/shared_data.h"
+#include "csdb/amount.hpp"
+#include "csdb/internal/shared_data.hpp"
 
 namespace csdb {
 

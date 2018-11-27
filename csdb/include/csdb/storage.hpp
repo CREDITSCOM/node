@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "csdb/database.h"
-#include "csdb/transaction.h"
+#include "csdb/database.hpp"
+#include "csdb/transaction.hpp"
 
 namespace csdb {
 

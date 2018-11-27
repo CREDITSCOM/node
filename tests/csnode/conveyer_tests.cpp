@@ -1,5 +1,5 @@
-#include <csdb/amount_commission.h>
-#include <csdb/currency.h>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
 #include <gtest/gtest.h>
 #include <csnode/conveyer.hpp>
 #include <iostream>

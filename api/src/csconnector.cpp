@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
 #include "csconnector/csconnector.hpp"

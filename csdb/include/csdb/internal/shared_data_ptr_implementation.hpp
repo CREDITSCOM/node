@@ -6,7 +6,7 @@
 #ifndef _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_
 #define _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_
 
-#include "shared_data.h"
+#include "shared_data.hpp"
 
 #include <utility>
 

@@ -1,4 +1,4 @@
-#include "csdb/storage.h"
+#include "csdb/storage.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -10,14 +10,14 @@
 #include <stdexcept>
 #include <thread>
 
-#include "binary_streams.h"
-#include "csdb/address.h"
-#include "csdb/database.h"
-#include "csdb/database_berkeleydb.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/internal/utils.h"
-#include "csdb/pool.h"
-#include "csdb/wallet.h"
+#include "binary_streams.hpp"
+#include "csdb/address.hpp"
+#include "csdb/database.hpp"
+#include "csdb/database_berkeleydb.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
+#include "csdb/internal/utils.hpp"
+#include "csdb/pool.hpp"
+#include "csdb/wallet.hpp"
 
 namespace {
 struct last_error_struct {

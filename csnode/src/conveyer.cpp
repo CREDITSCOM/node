@@ -1,6 +1,6 @@
 #include "csnode/conveyer.hpp"
 
-#include <csdb/transaction.h>
+#include <csdb/transaction.hpp>
 
 #include <exception>
 #include <iomanip>

@@ -8,10 +8,10 @@
 
 #include <set>
 
-#include "csdb/user_field.h"
+#include "csdb/user_field.hpp"
 
-#include "csdb/internal/shared_data.h"
-#include "csdb/internal/types.h"
+#include "csdb/internal/shared_data.hpp"
+#include "csdb/internal/types.hpp"
 
 namespace csdb {
 

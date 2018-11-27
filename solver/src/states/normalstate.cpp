@@ -7,10 +7,10 @@
 #include <csnode/blockchain.hpp>
 #pragma warning(pop)
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/currency.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
 #include <lib/system/logger.hpp>
 
 #pragma warning(push)

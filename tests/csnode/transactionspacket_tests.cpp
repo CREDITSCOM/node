@@ -6,9 +6,9 @@
 
 #include "transactionspacket.hpp"
 
-#include <csdb/transaction.h>
-#include <csdb/address.h>
-#include <csdb/currency.h>
+#include <csdb/transaction.hpp>
+#include <csdb/address.hpp>
+#include <csdb/currency.hpp>
 #include <sodium.h>
 
 #include <lib/system/utils.hpp>

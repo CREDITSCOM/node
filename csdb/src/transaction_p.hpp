@@ -9,15 +9,15 @@
 
 #include <map>
 
-#include "csdb/internal/shared_data_ptr_implementation.h"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
 
-#include "csdb/transaction.h"
+#include "csdb/transaction.hpp"
 
-#include "csdb/address.h"
-#include "csdb/amount.h"
-#include "csdb/amount_commission.h"
-#include "csdb/currency.h"
-#include "csdb/pool.h"
+#include "csdb/address.hpp"
+#include "csdb/amount.hpp"
+#include "csdb/amount_commission.hpp"
+#include "csdb/currency.hpp"
+#include "csdb/pool.hpp"
 
 namespace csdb {
 

@@ -6,7 +6,7 @@
 #include "inodestate.hpp"
 #include "stage.hpp"
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <algorithm>
 #include <array>
 #include <chrono>

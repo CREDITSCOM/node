@@ -6,7 +6,7 @@
 #ifndef _CREDITS_CSDB_H_INCLUDED_
 #define _CREDITS_CSDB_H_INCLUDED_
 
-#include "csdb/storage.h"
+#include "csdb/storage.hpp"
 
 namespace csdb {
 /* Набор глобальныйх функций предназначен во-первых, для совместимости с предыдущей версией csdb,

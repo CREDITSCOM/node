@@ -7,7 +7,7 @@
 #include <csnode/blockchain.hpp>
 #pragma warning(pop)
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>

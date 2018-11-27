@@ -1,11 +1,11 @@
-#include "integral_encdec.h"
+#include "integral_encdec.hpp"
 
 #include <cstring>
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
 
-#include "csdb/internal/endian.h"
+#include "csdb/internal/endian.hpp"
 
 namespace csdb {
 namespace priv {

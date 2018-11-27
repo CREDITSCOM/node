@@ -9,7 +9,7 @@
 #include <db_cxx.h>
 #include <memory>
 
-#include "csdb/database.h"
+#include "csdb/database.hpp"
 
 namespace berkeleydb {
 class DB;

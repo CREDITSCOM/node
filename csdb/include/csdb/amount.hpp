@@ -13,7 +13,7 @@
 #include <string>
 #include <type_traits>
 
-#include "internal/math128ce.h"
+#include "internal/math128ce.hpp"
 
 namespace csdb {
 /** @brief Класс для хранения количества валюты.

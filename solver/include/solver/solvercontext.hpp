@@ -3,7 +3,7 @@
 #include "inodestate.hpp"
 #include "solvercore.hpp"
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 
 class CallsQueueScheduler;
 class Node;

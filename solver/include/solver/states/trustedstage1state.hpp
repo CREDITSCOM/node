@@ -3,7 +3,7 @@
 #include <stage.hpp>
 #include "defaultstatebehavior.hpp"
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <csnode/transactionsvalidator.hpp>
 
 #include <memory>
