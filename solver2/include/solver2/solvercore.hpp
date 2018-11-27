@@ -186,12 +186,6 @@ private:
   cs::PrivateKey private_key;
   // senders of hashes received this round
   std::vector<std::pair<csdb::PoolHash, cs::PublicKey>> recv_hash;
-  // pool for storing individual transactions from wallets and candidates for transaction list,
-  // good transactions storage, serve as source for new block
-  csdb::Pool accepted_pool{};
-  // to store outrunning blocks until the time to insert them comes
-
-  // previous solver version instance
 
   Node* pnode;
   std::unique_ptr<cs::WalletsState> pws;

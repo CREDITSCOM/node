@@ -261,23 +261,6 @@ public:
     return 0;
   }
 
-  // size_t cnt_untrusted() const
-  //{
-  //    size_t cnt = 0;
-  //    for(size_t i = 0; i < Consensus::MaxTrustedNodes; ++i) {
-  //        if(core.markUntrusted[i] > 0) {
-  //            ++cnt;
-  //        }
-  //    }
-  //    return cnt;
-  //}
-
-  void accept_transactions(const csdb::Pool& pool) {
-    core.accepted_pool = pool;
-    // any way processed transactions
-    core.total_recv_trans += core.accepted_pool.transactions_count();
-  }
-
   /**
    * @fn  uint32_t SolverContext::round() const;
    *
