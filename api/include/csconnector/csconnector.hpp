@@ -9,7 +9,7 @@
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
 
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 
 #include <client/params.hpp>
 

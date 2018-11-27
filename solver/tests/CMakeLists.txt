@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(solver2_tests)
+project(solver_tests)
 
 enable_testing()
 
@@ -25,37 +25,37 @@ include_directories(${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS})
 ExternalProject_Get_Property(googletest BINARY_DIR)
 set(GTEST_LIBS_DIR ${BINARY_DIR}/lib)
 
-set(SLV2_INCLUDE_DIR ../include/solver2)
-set(SLV2_STATES_HEADERS_DIR ${SLV2_INCLUDE_DIR}/states)
-set(SLV2_SOURCE_DIR ../src)
-set(SLV2_STATES_SOURCE_DIR ${SLV2_SOURCE_DIR}/states)
+set(SLV_INCLUDE_DIR ../include/solver)
+set(SLV_STATES_HEADERS_DIR ${SLV2_INCLUDE_DIR}/states)
+set(SLV_SOURCE_DIR ../src)
+set(SLV_STATES_SOURCE_DIR ${SLV2_SOURCE_DIR}/states)
 
 add_executable(${PROJECT_NAME}
-  mock/MockData.h
-  mock/CallsQueueScheduler.h
-  mock/TimeoutTracking.h
-  mock/SolverContext.h
-  mock/sodium.h
-  mock/blake2.h
-  mock/csdb/pool.h
+  mock/mockdata.hpp
+  mock/callsqueuescheduler.hpp
+  mock/timeouttracking.hpp
+  mock/solvercontext.hpp
+  mock/sodium.hpp
+  mock/blake2.hpp
+  mock/csdb/pool.hpp
   mock/csnode/blockchain.hpp
-  mock/csnode/csnode.h
+  mock/csnode/csnode.hpp
   mock/csnode/conveyer.hpp
-  mock/csnode/WalletsCache.h
-  mock/csnode/transactionspacket.h
-  mock/Solver/Solver.hpp
-  mock/Solver/WalletsState.h
-  mock/Solver/TransactionsValidator.h
-  ${SLV2_STATES_HEADERS_DIR}/DefaultStateBehavior.h
-  ${SLV2_STATES_HEADERS_DIR}/TrustedStage1State.h
-  ${SLV2_STATES_HEADERS_DIR}/TrustedStage2State.h
+  mock/csnode/walletscache.hpp
+  mock/csnode/transactionspacket.hpp
+  mock/Solver/solver.hpp
+  mock/Solver/walletsstate.hpp
+  mock/Solver/transactionsvalidator.hpp
+  ${SLV2_STATES_HEADERS_DIR}/defaultstatebehavior.hpp
+  ${SLV2_STATES_HEADERS_DIR}/trustedstage1state.hpp
+  ${SLV2_STATES_HEADERS_DIR}/trustedstage2state.hpp
 
   tests_main.cpp
   test_trustedstage1state.cpp
   test_trustedstage2state.cpp
-  ${SLV2_STATES_SOURCE_DIR}/DefaultStateBehavior.cpp
-  ${SLV2_STATES_SOURCE_DIR}/TrustedStage1State.cpp
-  ${SLV2_STATES_SOURCE_DIR}/TrustedStage2State.cpp
+  ${SLV2_STATES_SOURCE_DIR}/defaultstatebehavior.cpp
+  ${SLV2_STATES_SOURCE_DIR}/trustedstage1state.cpp
+  ${SLV2_STATES_SOURCE_DIR}/trustedstage2state.cpp
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -82,7 +82,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 # target_link_libraries(${PROJECT_NAME} leveldb)
 target_link_libraries (${PROJECT_NAME}
-#	solver2
+#	solver
 	lib
 #	thrift_static
 #	csdb
@@ -103,6 +103,6 @@ if(UNIX)
 endif()
 
 add_test(${PROJECT_NAME} ${PROJECT_NAME})
-if (SLV2_AUTORUN_UNITTESTS)
+if (SLV_AUTORUN_UNITTESTS)
   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND ${PROJECT_NAME})
-endif(SLV2_AUTORUN_UNITTESTS)
+endif(SLV_AUTORUN_UNITTESTS)

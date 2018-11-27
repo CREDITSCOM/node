@@ -6,7 +6,7 @@
 #define PROJECT_SOLVERMOCK_HPP
 
 #include <gmock/gmock.h>
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 
 class SolverMock : public slv2::SolverCore {
 public:

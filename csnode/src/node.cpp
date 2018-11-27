@@ -3,7 +3,7 @@
 #include <numeric>
 #include <sstream>
 
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>

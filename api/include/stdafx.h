@@ -23,7 +23,7 @@
 
 #include <iomanip>
 #include <scope_guard.h>
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 #include <ContractExecutor.h>
 
 #endif //STDAFX_H

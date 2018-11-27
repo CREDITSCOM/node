@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(solver2)
+project(solver)
 
 # turn off optimization for this project in RelWithDebInfo only
 if (MSVC)
@@ -9,33 +9,33 @@ endif()
 
 add_definitions(-D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 
-# set next option to ON to create solver2_tests project (also install googletest, not tested outside Windows platform yet)
+# set next option to ON to create solver_tests project (also install googletest, not tested outside Windows platform yet)
 option(SLV2_BUILD_TESTS "Build unit tests" OFF)
 option(SLV2_AUTORUN_TESTS "Automatically run unit tests after build" OFF)
 	
 add_library(${PROJECT_NAME} STATIC
-	include/solver2/consensus.hpp
-	include/solver2/inodestate.hpp
-	include/solver2/result.hpp
-	include/solver2/stage.hpp
-	include/solver2/solvercore.hpp
-	include/solver2/solvercontext.hpp
-	include/solver2/callsqueuescheduler.hpp
-	include/solver2/timeouttracking.hpp
+	include/solver/consensus.hpp
+	include/solver/inodestate.hpp
+	include/solver/result.hpp
+	include/solver/stage.hpp
+	include/solver/solvercore.hpp
+	include/solver/solvercontext.hpp
+	include/solver/callsqueuescheduler.hpp
+	include/solver/timeouttracking.hpp
 
-	include/solver2/states/defaultstatebehavior.hpp
-	include/solver2/states/handlebbstate.hpp
-	include/solver2/states/handlertstate.hpp
-	include/solver2/states/normalstate.hpp
-	include/solver2/states/nostate.hpp
-	include/solver2/states/syncstate.hpp
-	include/solver2/states/trustedstage1state.hpp
-	include/solver2/states/trustedstage2state.hpp
-	include/solver2/states/trustedstage3state.hpp
-	include/solver2/states/trustedpoststagestate.hpp
-	include/solver2/states/primitivewritestate.hpp
-	include/solver2/states/writingstate.hpp
-	include/solver2/states/waitingstate.hpp
+	include/solver/states/defaultstatebehavior.hpp
+	include/solver/states/handlebbstate.hpp
+	include/solver/states/handlertstate.hpp
+	include/solver/states/normalstate.hpp
+	include/solver/states/nostate.hpp
+	include/solver/states/syncstate.hpp
+	include/solver/states/trustedstage1state.hpp
+	include/solver/states/trustedstage2state.hpp
+	include/solver/states/trustedstage3state.hpp
+	include/solver/states/trustedpoststagestate.hpp
+	include/solver/states/primitivewritestate.hpp
+	include/solver/states/writingstate.hpp
+	include/solver/states/waitingstate.hpp
 
 	src/solvercore.cpp
 	src/solvercontext.cpp
@@ -58,13 +58,13 @@ add_library(${PROJECT_NAME} STATIC
 	src/states/waitingstate.cpp
 )
 
-target_include_directories(solver2 PUBLIC
-	include/solver2
-	include/solver2/states
+target_include_directories(solver PUBLIC
+	include/solver
+	include/solver/states
 )
 
 target_link_libraries (
-	solver2
+	solver
 	csnode
 	libsodium
 )
