@@ -56,18 +56,17 @@ bool operator==(const cs::Characteristic& left,
 
 namespace csdb {
 bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
-  bool ok = true;
-  ok = ok && left.id() == right.id() && left.innerID() == right.innerID();
-  ok = ok && left.source() == right.source() && left.target() == right.target();
-  ok = ok && left.currency() == right.currency();
-  ok = ok && (std::abs(left.max_fee().to_double() - right.max_fee().to_double()) <
-              std::abs(std::min(left.max_fee().to_double(), right.max_fee().to_double())) *
-                  std::numeric_limits<double>::epsilon());
-  ok = ok && (std::abs(left.counted_fee().to_double() - right.counted_fee().to_double()) <
-              std::abs(std::min(left.counted_fee().to_double(), right.counted_fee().to_double())) *
-                  std::numeric_limits<double>::epsilon());
-  ok = ok && left.signature() == right.signature();
-  return ok;
+  auto innerIdResult = left.innerID() == right.innerID();
+  auto idResult = left.id() == right.id();
+  auto signatureResult = left.signature() == right.signature();
+  auto sourceResult = left.source() == right.source();
+  auto currencyResult = left.currency() == right.currency();
+  auto targetResult = left.target() == right.target();
+  auto feeResult = left.max_fee().to_double() == right.max_fee().to_double();
+  auto countedFeeResult = left.counted_fee().to_double() == right.counted_fee().to_double();
+
+  return innerIdResult && idResult && signatureResult && sourceResult &&
+         currencyResult && targetResult && feeResult & countedFeeResult;
 }
 }  // namespace csdb
 
