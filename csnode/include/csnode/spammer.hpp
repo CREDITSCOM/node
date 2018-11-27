@@ -6,13 +6,12 @@
 #ifndef SOLVER_SPAMMER_HPP
 #define SOLVER_SPAMMER_HPP
 
-#include <array>
 #include <cstdint>
 #include <thread>
 #include <vector>
 
 #include <csdb/address.h>
-#include <csdb/internal/types.h>
+#include <cscrypto/cscrypto.hpp>
 
 class Node;
 namespace csdb {
@@ -48,9 +47,10 @@ private:
   void FundMyWallets(Node&);
   csdb::Address OptimizeAddress(const csdb::Address&, Node&);
   void SignTransaction(csdb::Transaction&, const uint8_t* private_key);
+  void SignTransaction(csdb::Transaction&, const cscrypto::PrivateKey& private_key);
 
   // wallets to which spammer sends transactions
-  std::vector<std::pair<csdb::Address, std::array<uint8_t, csdb::internal::kPrivateKeySize>>> my_wallets_;
+  std::vector<std::pair<csdb::Address, cscrypto::PrivateKey>> my_wallets_;
   // thread for: void SpamWithTransactions(Node&)
   std::thread spam_thread_;
 };

@@ -69,7 +69,6 @@ include_directories(${Boost_INCLUDE_DIR})
 target_link_libraries(
   ${PROJECT_NAME}
   cscrypto
-  libsodium
   Boost::system
   Boost::filesystem
   Boost::disable_autolinking
