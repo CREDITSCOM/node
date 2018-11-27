@@ -1,6 +1,7 @@
 #pragma once
 
 #include "callsqueuescheduler.hpp"
+#include "timeouttracking.hpp"
 #include "consensus.hpp"
 #include "inodestate.hpp"
 #include "stage.hpp"
@@ -295,6 +296,9 @@ namespace slv2
 
     // stores candidates for next round
     std::vector<cs::PublicKey> trusted_candidates;
+
+    // tracks round info missing ("last hope" tool)
+    TimeoutTracking track_next_round;
   };
 
 }  // namespace slv2

@@ -89,7 +89,11 @@ public:
   void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable);
 
+  // broadcast request for next round, to call after long timeout
+  void sendNextRoundRequest();
+  // send request for next round info from trusted node specified by index in list
   void sendRoundInfoRequest(uint8_t respondent);
+  // send request for next round info from node specified node
   void sendRoundInfoRequest(const cs::PublicKey& respondent);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);

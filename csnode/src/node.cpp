@@ -2248,12 +2248,23 @@ void Node::sendRoundInfoRequest(uint8_t respondent) {
   }
 }
 
+constexpr const uint8_t InvalidTrustedIndex = (uint8_t) -1;
+
+void Node::sendNextRoundRequest()
+{
+  ostream_.init(0 /*need no flags!*/);
+  // 0xFF means we ask for last writer node simply to repeat round info
+  ostream_ << MsgTypes::RoundInfoRequest << InvalidTrustedIndex;
+  flushCurrentTasks();
+}
+
 void Node::sendRoundInfoRequest(const cs::PublicKey& respondent)
 {
   cslog() << "NODE> send request for next round info after #" << roundNum_;
 
   ostream_.init(0 /*need no flags!*/, respondent);
-  ostream_ << MsgTypes::RoundInfoRequest << roundNum_ << myConfidantIndex_;
+  // ask for next round info:
+  ostream_ << MsgTypes::RoundInfoRequest << roundNum_ + 1 << myConfidantIndex_;
   flushCurrentTasks();
 }
 
@@ -2272,6 +2283,22 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
     cserror() << "NODE> bad RoundInfo request packet format";
     return;
   }
+
+  // special request to re-send again handling
+  if(requesterNumber == InvalidTrustedIndex) {
+    csdebug() << "NODE> som enode asks for last round info to repeat";
+    if(lastSentRoundData_.roundTable.round == rNum) {
+      if(tryResendRoundInfo(requester, rNum)) {
+        cslog() << "NODE> round info #" << rNum << " has sent again";
+      }
+      else {
+        cslog() << "NODE> unable to send round info #" << rNum << " again";
+      }
+    }
+    return;
+  }
+
+  // default request from other trusted node handling
   cslog() << "NODE> get request for next round info after #" << rNum << " from [" << (int)requesterNumber << "]";
   solver_->gotRoundInfoRequest(requester, rNum);
 }
