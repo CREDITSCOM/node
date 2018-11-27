@@ -165,6 +165,8 @@ public:
    * Если хранилище пустое, или не содержит законченной цепочки, возвращается пустой хэш.
    */
   PoolHash last_hash() const noexcept;
+  void set_last_hash(const PoolHash&) noexcept;
+  void set_size(const size_t) noexcept;
 
   /**
    * @brief Записавает пул в хранилище
@@ -212,6 +214,10 @@ public:
   */
   Transaction get_last_by_target(Address target) const noexcept;
 
+  // And now for something completely different
+  PoolHash get_previous_transaction_block(const Address&, const PoolHash&);
+  void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
+
   /**
    * @brief size возвращает количество пулов в хранилище
    * @return количество блоков в хранилище
@@ -253,6 +259,9 @@ public:
   bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const;
 
 private:
+  static internal::byte_array get_trans_index_key(const Address&, const PoolHash&);
+  Pool pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const;
+
   ::std::shared_ptr<priv> d;
 };
 

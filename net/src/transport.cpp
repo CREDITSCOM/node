@@ -292,23 +292,15 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      try {
-        gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash());
-      }
-      catch (std::out_of_range) {
-      }
+      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash());
       break;
     case NetworkCommand::SSSpecificBlock: {
-      uint32_t round;
-      iPackStream_ >> round;
-
       try {
+        uint32_t round;
+        iPackStream_ >> round;
         gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
       }
-      catch (const std::out_of_range&) {
-        cswarning() << "VERY BIG HARD ROUND: " << round;
-      }
-
+      catch (std::out_of_range) {}
       break;
     }
     case NetworkCommand::PackInform:
@@ -1037,12 +1029,19 @@ void Transport::sendPingPack(const Connection& conn) {
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
   uint32_t lastSeq = 0u;
-  cs::PublicKey pk;
 
+  cs::PublicKey pk;
   iPackStream_ >> id >> lastSeq >> pk;
 
   if (!iPackStream_.good() || !iPackStream_.end()) {
     return false;
+  }
+
+  nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
+
+  if (lastSeq > maxBlock_) {
+    maxBlock_ = lastSeq;
+    maxBlockCount_ = 1;
   }
 
   nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);

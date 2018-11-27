@@ -14,6 +14,9 @@
 
 #include <csnode/cyclic_buffer.hpp>
 
+#include <client/params.hpp>
+#include <map>
+
 namespace std
 {
     template<typename T>
@@ -49,6 +52,8 @@ namespace cs
         using PoolHash = std::array<uint8_t, 32>;
         friend std::ostream& operator<<(std::ostream& os, const PoolHash& poolHash);
 
+        void unUpdateFrom(csdb::Pool&);
+
     public:
         struct WalletData
         {
@@ -64,6 +69,19 @@ namespace cs
 
             PoolsHashes poolsHashes_;
             csdb::Amount balance_;
+
+#ifdef MONITOR_NODE
+            uint64_t createTime_ = 0;
+            uint64_t transNum_ = 0;
+#endif
+#ifdef TRANSACTIONS_INDEX
+          csdb::TransactionID lastTransaction_;
+#endif
+        };
+
+        struct WriterData {
+          uint64_t times = 0;
+          csdb::Amount totalFee;
         };
 
     public:
@@ -77,6 +95,11 @@ namespace cs
         void updateFrom(csdb::Pool& curr);
 
         const WalletData* findWallet(const csdb::internal::byte_array&& dbAddress) const;
+        void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
+
+#ifdef MONITOR_NODE
+        void iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)>);
+#endif
 
     private:
         enum class Mode : uint8_t
@@ -87,10 +110,10 @@ namespace cs
         friend std::ostream& operator<<(std::ostream& os, Mode mode);
 
         void load(csdb::Pool& curr, Mode mode);
-        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
-        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter);
-        void loadTrxForTarget(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash);
-        WalletData* getWalletData(const WalletData::Address&& address);
+        void load(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter, const uint64_t timeStamp);
+        void loadTrxForSource(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, WalletsCache::WalletData& walWriter, const uint64_t timeStamp);
+        void loadTrxForTarget(csdb::Transaction& tr, Mode mode, const PoolHash& poolHash, const uint64_t timeStamp);
+        WalletData* getWalletData(const WalletData::Address&& address, const uint64_t timeStamp);
 
         void addPoolHash(WalletData& walData, Mode mode, const PoolHash& poolHash);
         void addPoolHashAsLoad(WalletData& walData, Mode mode, const PoolHash& poolHash);
@@ -102,6 +125,9 @@ namespace cs
 
         using Data = std::unordered_map<WalletData::Address, WalletData>;
         Data data_;
+#ifdef MONITOR_NODE
+        std::map<WalletData::Address, WriterData> writers_;
+#endif
     };
 
 } // namespace cs

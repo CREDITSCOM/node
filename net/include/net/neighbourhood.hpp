@@ -22,6 +22,9 @@ const uint32_t MaxMessagesToKeep = 128;
 const uint32_t MaxResendTimes = 32;
 const uint32_t MaxSyncAttempts = 8;
 
+const uint32_t BlocksToSync = 16;
+const uint32_t WarnsBeforeRefill = 8;
+
 struct Connection;
 struct RemoteNode {
   __cacheline_aligned std::atomic<uint64_t> packets = {0};
@@ -98,8 +101,8 @@ struct Connection {
   };
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  uint32_t syncSeq = 0;
-  uint32_t syncSeqRetries = 0;
+  uint32_t syncSeqs[BlocksToSync];
+  uint32_t syncSeqsRetries[BlocksToSync];
 
   uint32_t lastSeq = 0;
 
@@ -119,7 +122,7 @@ public:
 
   const static uint32_t MaxConnectAttempts = 64;
 
-  Neighbourhood(Transport*);
+  explicit Neighbourhood(Transport*);
 
   void sendByNeighbours(const Packet*);
 
@@ -153,8 +156,7 @@ public:
 
   void pingNeighbours();
   bool isPingDone();
-  void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&,
-                            const uint32_t lastSeq);
+  void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const uint32_t);
 
   ConnectionPtr getConnection(const RemoteNodePtr);
 

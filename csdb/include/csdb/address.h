@@ -56,6 +56,7 @@ private:
   bool get(::csdb::priv::ibstream &);
   friend class ::csdb::priv::obstream;
   friend class ::csdb::priv::ibstream;
+  friend class Storage;
 };
 
 inline bool Address::operator!=(const Address &other) const noexcept {
