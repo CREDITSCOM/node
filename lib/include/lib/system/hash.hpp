@@ -5,13 +5,9 @@
 #include <lib/system/common.hpp>
 #include "utils.hpp"
 
-extern "C" {
-int blake2sp(void* out, size_t outlen, const void* in, size_t inlen, const void* key, size_t keylen);
-}
-
-inline cs::Hash getBlake2Hash(const void* data, size_t length) {
+inline cs::Hash generateHash(const void* data, size_t length) {
   cs::Hash result;
-  blake2sp(result.data(), result.size(), data, length, nullptr, 0);
+  cscrypto::CalculateHash(result, reinterpret_cast<const uint8_t*>(data), length);
   return result;
 }
 
