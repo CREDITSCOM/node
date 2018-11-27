@@ -90,6 +90,7 @@ public:
   void prepareMetaForSending(cs::RoundTable& roundTable);
 
   void sendRoundInfoRequest(uint8_t respondent);
+  void sendRoundInfoRequest(const cs::PublicKey& respondent);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundInfoReply(const uint8_t* data, const size_t size,

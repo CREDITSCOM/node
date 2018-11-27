@@ -22,7 +22,7 @@ class PoolSynchronizer {
 public:  // Interface
   explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
-  void processingSync(const cs::RoundNumber roundNum);
+  void processingSync(const cs::RoundNumber roundNum, bool isBigBand = false);
 
   // syncro get functions
   void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packet);
@@ -75,6 +75,7 @@ private:  // Members
   // [key] = sequence
   // to store reply sequences
   std::set<csdb::Pool::sequence_t> m_temporaryStorage;
+  bool m_isBigBand;
 
   struct NeighboursSetElemet {
     explicit NeighboursSetElemet(uint8_t neighbourNum, csdb::Pool::sequence_t sequence = 0)
