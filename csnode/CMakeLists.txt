@@ -73,7 +73,7 @@ add_library(csnode
   src/walletsstate.cpp
 )
 
-target_link_libraries (csnode net csdb solver2 lib csconnector base58 lz4 Boost::thread)
+target_link_libraries (csnode net csdb solver2 lib csconnector cscrypto base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include

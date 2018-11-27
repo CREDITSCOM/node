@@ -45,6 +45,7 @@ class Storage final {
 private:
   class priv;
   bool write_queue_search(const PoolHash &hash, Pool &res_pool) const;
+  bool write_queue_pop(Pool &res_pool);
 
 public:
   using WeakPtr = ::std::weak_ptr<priv>;
@@ -165,6 +166,8 @@ public:
    * Если хранилище пустое, или не содержит законченной цепочки, возвращается пустой хэш.
    */
   PoolHash last_hash() const noexcept;
+  void set_last_hash(const PoolHash&) noexcept;
+  void set_size(const size_t) noexcept;
 
   /**
    * @brief Записавает пул в хранилище
@@ -187,6 +190,8 @@ public:
   Pool pool_load(const PoolHash &hash) const;
   Pool pool_load(const uint32_t sequence) const;
   Pool pool_load_meta(const PoolHash &hash, size_t &cnt) const;
+
+  Pool pool_remove_last();
 
   /**
    * @brief Получение транзакции по идентификатору.
@@ -211,6 +216,10 @@ public:
   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
   */
   Transaction get_last_by_target(Address target) const noexcept;
+
+  // And now for something completely different
+  PoolHash get_previous_transaction_block(const Address&, const PoolHash&);
+  void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
 
   /**
    * @brief size возвращает количество пулов в хранилище
@@ -253,6 +262,9 @@ public:
   bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const;
 
 private:
+  static internal::byte_array get_trans_index_key(const Address&, const PoolHash&);
+  Pool pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const;
+
   ::std::shared_ptr<priv> d;
 };
 

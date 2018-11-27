@@ -60,6 +60,7 @@ public:
   sequence_t index() const noexcept;
 
   std::string to_string() const noexcept;
+  ::csdb::internal::byte_array to_byte_stream() const noexcept;
 
   /**
    * @brief Получение идентификатора транзакции из строкового представления
@@ -83,6 +84,7 @@ private:
   friend class ::csdb::priv::ibstream;
   friend class Transaction;
   friend class Pool;
+  friend class Storage;
 };
 
 class Transaction {

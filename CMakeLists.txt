@@ -104,7 +104,6 @@ add_subdirectory(csnode)
 add_subdirectory(crypto)
 add_subdirectory(csdb)
 add_subdirectory(solver2)
-
 add_subdirectory(client)
 
 enable_testing()

@@ -31,7 +31,7 @@ endif(MSVC)
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
     )
 
-target_link_libraries(lib rang)
+target_link_libraries(lib rang cscrypto)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
@@ -43,7 +43,6 @@ find_package (Boost REQUIRED COMPONENTS log)
 target_link_libraries (Boost::log INTERFACE Boost::log_setup)
 target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
-                       libsodium
                        Boost::log
                        Boost::disable_autolinking)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)

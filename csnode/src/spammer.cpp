@@ -16,7 +16,6 @@
 #include <csdb/currency.h>
 #include <csdb/internal/types.h>
 #include <csdb/transaction.h>
-#include <sodium.h>
 #include <csnode/node.hpp>
 
 namespace cs {
@@ -44,11 +43,11 @@ void Spammer::StartSpamming(Node& node) {
 }
 
 void Spammer::GenerateMyWallets() {
-  std::array<uint8_t, csdb::internal::kPublicKeySize> public_key;
-  std::array<uint8_t, csdb::internal::kPrivateKeySize> private_key;
+  cscrypto::PublicKey public_key;
+  cscrypto::PrivateKey private_key;
   for (auto i = 0u; i < kMyWalletsNum; ++i) {
-    crypto_sign_keypair(public_key.data(), private_key.data());
-    my_wallets_.push_back(std::pair<csdb::Address, std::array<uint8_t, csdb::internal::kPrivateKeySize>>(
+    cscrypto::GenerateKeyPair(public_key, private_key);
+    my_wallets_.push_back(std::pair<csdb::Address, cscrypto::PrivateKey>(
         csdb::Address::from_public_key(csdb::internal::byte_array(public_key.begin(), public_key.end())), private_key));
   }
 }
@@ -80,7 +79,7 @@ void Spammer::SpamWithTransactions(Node& node) {
       transaction.set_source(OptimizeAddress(my_wallets_[spammer_index].first, node));
       transaction.set_target(OptimizeAddress(my_wallets_[target_wallet_counter].first, node));
       transaction.set_innerID(inner_id_counter);
-      SignTransaction(transaction, my_wallets_[spammer_index].second.data());
+      SignTransaction(transaction, my_wallets_[spammer_index].second);
       node.getSolver()->send_wallet_transaction(transaction);
 
       ++inner_id_counter;
@@ -142,11 +141,18 @@ csdb::Address Spammer::OptimizeAddress(const csdb::Address& address, Node& node)
 
 void Spammer::SignTransaction(csdb::Transaction& transaction, const uint8_t* private_key) {
   auto transaction_bytes = transaction.to_byte_stream_for_sig();
-  unsigned long long signature_length = 0;
-  uint8_t signature[csdb::internal::kSignatureLength];
-  crypto_sign_ed25519_detached(signature, &signature_length, transaction_bytes.data(), transaction_bytes.size(),
-                               private_key);
-  transaction.set_signature(std::string(signature, signature + signature_length));
+  cscrypto::Signature signature;
+  cscrypto::PrivateKey priv;
+  memcpy(priv.data(), private_key, cscrypto::kPrivateKeySize);
+  cscrypto::GenerateSignature(signature, priv, transaction_bytes.data(), transaction_bytes.size());
+  transaction.set_signature(std::string(signature.begin(), signature.end()));
+}
+
+void Spammer::SignTransaction(csdb::Transaction& transaction, const cscrypto::PrivateKey& private_key) {
+  auto transaction_bytes = transaction.to_byte_stream_for_sig();
+  cscrypto::Signature signature;
+  cscrypto::GenerateSignature(signature, private_key, transaction_bytes.data(), transaction_bytes.size());
+  transaction.set_signature(std::string(signature.begin(), signature.end()));
 }
 
 }  // namespace cs

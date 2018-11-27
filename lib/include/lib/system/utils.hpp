@@ -88,8 +88,7 @@ struct is_vector<std::vector<T, A>> : public std::true_type {};
 ///
 class Utils {
 public:
-  enum Values
-  {
+  enum Values {
     MinHashValue = std::numeric_limits<int>::min(),
     MaxHashValue = std::numeric_limits<int>::max(),
   };

@@ -19,7 +19,7 @@
 #include "csdb/transaction.h"
 #include "csdb/user_field.h"
 
-#include <lib/system/common.hpp>
+#include <cscrypto/cscrypto.hpp>
 
 namespace csdb {
 
@@ -284,7 +284,7 @@ public:
   */
   Transaction get_last_by_target(const Address& target) const noexcept;
 
-  void sign(const cs::PrivateKey& private_key);
+  void sign(const cscrypto::PrivateKey& private_key);
   bool verify_signature();
   bool verify_signature(const std::string& signature);
 
