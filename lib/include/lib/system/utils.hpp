@@ -412,6 +412,17 @@ inline auto numeric_cast(Source arg) {
 #endif
 }
 
+template<typename T>
+constexpr T getMax(const T& t) {
+  csunused(t);
+  return std::numeric_limits<T>::max();
+}
+template<typename T>
+constexpr T getMin(const T& t) {
+  csunused(t);
+  return std::numeric_limits<T>::min();
+}
+
 template <typename T>
 constexpr bool isVector() {
   return cs::is_vector<T>::value;

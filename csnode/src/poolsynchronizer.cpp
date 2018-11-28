@@ -140,7 +140,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     const auto firstNeededSequence = m_neededSequences.front();
 
     if (isLastReq) {
-      csdebug() << "POOL SYNCHRONIZER> Is last neeed sequnces from: " << firstNeededSequence << ", to"
+      csdebug() << "POOL SYNCHRONIZER> Is last neeed sequnces from: " << firstNeededSequence << ", to "
                 << m_neededSequences.back();
     }
 
@@ -303,6 +303,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   else if (isRepeatRequest) {
     // if maxWaitingTimeReply <= 0
     sequence = std::max(nh.sequence(), lastWrittenSequence);
+    nh.reset();
     isNeededHelpIt = m_requestedSequences.find(sequence);
     isFromStorage = isNeededHelpIt != m_requestedSequences.end();
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences: From neighbours: "

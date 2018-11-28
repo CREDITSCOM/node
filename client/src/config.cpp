@@ -136,7 +136,6 @@ Config Config::readFromFile(const std::string& fileName) {
     }
 
     result.inputEp_ = readEndpoint(config, BLOCK_NAME_HOST_INPUT);
-    result.readPoolSynchronizerData(config);
 
     if (config.count(BLOCK_NAME_HOST_OUTPUT)) {
       result.outputEp_ = readEndpoint(config, BLOCK_NAME_HOST_OUTPUT);
@@ -190,6 +189,7 @@ Config Config::readFromFile(const std::string& fileName) {
     }
 
     result.setLoggerSettings(config);
+    result.readPoolSynchronizerData(config);
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
@@ -254,15 +254,28 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
 
   const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_POOL_SYNC);
 
-  if (data.count(PARAM_NAME_POOL_SYNC_POOLS_COUNT)) {
-    poolSyncData_.blockPoolsCount = data.get<uint8_t>(PARAM_NAME_POOL_SYNC_POOLS_COUNT);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
+}
+
+template <typename T>
+bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
+  if (data.count(param)) {
+    const int readValue = data.get<int>(param);
+    const auto max = cs::getMax(value);
+    const auto min = cs::getMin(value);
+
+    if (readValue > max || readValue < min) {
+      std::cout << "[warning] Config.ini> Please, check the block: " << block << ", so that param: " << param
+                << ",  will be: [" << cs::numeric_cast<int>(min) << ", " << cs::numeric_cast<int>(max) << "]"
+                << std::endl;
+      return false;
+    }
+
+    value = cs::numeric_cast<T>(readValue);
+    return true;
   }
 
-  if (data.count(PARAM_NAME_POOL_SYNC_ROUND_COUNT)) {
-    poolSyncData_.requestRepeatRoundCount = data.get<uint8_t>(PARAM_NAME_POOL_SYNC_ROUND_COUNT);
-  }
-
-  if (data.count(PARAM_NAME_POOL_SYNC_PACKET_COUNT)) {
-    poolSyncData_.neighbourPacketsCount = data.get<uint8_t>(PARAM_NAME_POOL_SYNC_PACKET_COUNT);
-  }
+  return false;
 }

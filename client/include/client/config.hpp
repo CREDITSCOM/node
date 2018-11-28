@@ -120,6 +120,9 @@ private:
   void setLoggerSettings(const boost::property_tree::ptree& config);
   void readPoolSynchronizerData(const boost::property_tree::ptree& config);
 
+  template<typename T>
+  bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
+
   bool good_ = false;
 
   EndpointData inputEp_;

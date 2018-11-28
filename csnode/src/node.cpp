@@ -1286,8 +1286,12 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
+  if (type == MsgTypes::BigBang) {
+    csdebug() << "NODE> Choose BigBang Action: rNum = " << rNum << ", roundNum = " << roundNum_;
+  }
+
   // BigBang: only current or previous round may be handled:
-  if (type == MsgTypes::BigBang && rNum >= roundNum_ - 1) {
+  if (type == MsgTypes::BigBang && (rNum >= roundNum_ - 1 || roundNum_ == 0 )) {
     return MessageActions::Process;
   }
 
