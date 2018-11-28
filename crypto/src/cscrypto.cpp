@@ -5,7 +5,7 @@
 
 namespace cscrypto {
 
-void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size) {
+void CalculateHash(Hash& hash, const Byte* data, size_t data_size) {
   blake2sp(hash.data(), BLAKE2S_OUTBYTES, data, data_size, 0, 0);
 }
 
@@ -21,18 +21,18 @@ bool ValidateKeyPair(const PublicKey& public_key, const PrivateKey& private_key)
 }
 
 void GenerateSignature(Signature& signature, const PrivateKey& private_key,
-                       const uint8_t* data, size_t data_size) {
+                       const Byte* data, size_t data_size) {
   unsigned long long signature_len;
   crypto_sign_ed25519_detached(signature.data(), &signature_len, data, data_size, private_key.data());
 }
 
 bool VerifySignature(const Signature& signature, const PublicKey& public_key,
-                     const uint8_t* data, size_t data_size) {
+                     const Byte* data, size_t data_size) {
   return !crypto_sign_ed25519_verify_detached(signature.data(), data, data_size, public_key.data());
 }
 
-bool VerifySignature(const uint8_t* signature, const uint8_t* public_key,
-  const uint8_t* data, size_t data_size) {
+bool VerifySignature(const Byte* signature, const Byte* public_key,
+  const Byte* data, size_t data_size) {
   return !crypto_sign_ed25519_verify_detached(signature, data, data_size, public_key);
 }
 
