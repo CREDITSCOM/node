@@ -22,7 +22,6 @@
 #include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
-#include <sodium.h>
 #include <cscrypto/cscrypto.hpp>
 
 #include <poolsynchronizer.hpp>
@@ -1489,8 +1488,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   // cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize);
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageOneInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
   // cslog() << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64);
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::FirstStage << roundNum_ << msgSize << stageOneInfo.sig;
@@ -1613,9 +1611,8 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   // cslog() << "Received message: "<< byteStreamToHex((const char*)stagePtr , msgSize);
 
   stage.sender = *rawData;
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1635,7 +1632,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   solver_->gotStageOne(std::move(stage));
 }
 
-void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo) {
+void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 #ifdef MYLOG
   cslog() << "NODE> +++++++++++++++++++++++ Stage TWO sending +++++++++++++++++++++++++++";
 #endif
@@ -1656,9 +1653,7 @@ void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo) {
   }
   // cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize;
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageTwoInfo.sig.data(), &sig_size, rawData, msgSize,
-                               solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageTwoInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::SecondStage << roundNum_ << msgSize << stageTwoInfo.sig;
@@ -1776,9 +1771,8 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   stage.sender = *rawData;
   // cslog() << "Received message: "<< byteStreamToHex((const char*)stagePtr, msgSize);
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cslog() << "NODE> Stage Two from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1795,7 +1789,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   solver_->gotStageTwo(std::move(stage));
 }
 
-void Node::sendStageThree(const cs::StageThree& stageThreeInfo) {
+void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   LOG_DEBUG(__func__);
 #ifdef MYLOG
   cslog() << "NODE> Stage THREE sending";
@@ -1814,9 +1808,7 @@ void Node::sendStageThree(const cs::StageThree& stageThreeInfo) {
   memcpy(rawData + 2, stageThreeInfo.hashBlock.data(), 32);
   memcpy(rawData + 34, stageThreeInfo.hashCandidatesList.data(), 32);
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageThreeInfo.sig.data(), &sig_size, rawData, msgSize,
-                               solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageThreeInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::ThirdStage << roundNum_ << msgSize << stageThreeInfo.sig;
@@ -1924,9 +1916,8 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   stage.sender = *rawData;
 
   // cslog() << "Received message: "<< byteStreamToHex((const char*)rawData, msgSize);
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cslog() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
