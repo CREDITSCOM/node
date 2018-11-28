@@ -32,6 +32,8 @@ bool VerifySignature(const Signature& signature, const PublicKey& public_key,
 bool VerifySignature(const uint8_t* signature, const uint8_t* public_key,
   const uint8_t* data, size_t data_size);
 
+void FillBufWithRandomBytes(void* buf, size_t buf_size);
+
 }  // namespace cscrypto
 
 #endif  // CSCRYPTO_HPP
