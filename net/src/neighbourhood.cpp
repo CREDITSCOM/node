@@ -8,9 +8,9 @@
 
 #include <lib/system/utils.hpp>
 
-Neighbourhood::Neighbourhood(Transport* net):
-    transport_(net),
-    connectionsAllocator_(MaxConnections + 1) {
+Neighbourhood::Neighbourhood(Transport* net)
+: transport_(net)
+, connectionsAllocator_(MaxConnections + 1) {
   assert(sodium_init() != -1);
 }
 

@@ -205,11 +205,13 @@ void Node::stop() {
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+  transport_->stop();
+  cswarning() << "[TRANSPORT STOPPED]";
 }
 
-void Node::runSpammer()
-{
-  if(!spammer_) {
+void Node::runSpammer() {
+  if (!spammer_) {
     cswarning() << "SolverCore: starting transaction spammer";
     spammer_ = std::make_unique<cs::Spammer>();
     spammer_->StartSpamming(*this);
@@ -228,25 +230,25 @@ bool monitorNode = true;
 bool monitorNode = false;
 #endif
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type)
-{
-  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence() << ", current #" << roundNum_;
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
+  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
+              << ", current #" << roundNum_;
   istream_.init(data, size);
   cs::Hash h;
   istream_ >> h;
 
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
-  if(rNum > round) {
-    if(rNum - 1 == round || round == 0) {
+  if (rNum > round) {
+    if (rNum - 1 == round || round == 0) {
       // continue reading round info
       cs::RoundTable rt;
-      if(readRoundData(rt)) {
+      if (readRoundData(rt)) {
         // if we are behind exactly one round, ask for round info
         roundNum_ = rNum - 1;
         cswarning() << "NODE> request round info from trusted nodes";
         sendRoundInfoRequest(rt.general);
-        for(const auto& t : rt.confidants) {
+        for (const auto& t : rt.confidants) {
           sendRoundInfoRequest(t);
         }
       }
@@ -255,30 +257,30 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
       }
     }
     else {
-      // otherwise 
+      // otherwise
       cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
       poolSynchronizer_->processingSync(rNum, true /*is bigbang*/);
     }
     return;
   }
 
-  if(rNum < round - 1) {
+  if (rNum < round - 1) {
     cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
     return;
   }
 
-  if(rNum == round - 1) {
+  if (rNum == round - 1) {
     // revert last block & start previous round
     cserror() << "NODE> require unimplemented revert last written block, cannot handle BigBang properly";
     cslog() << "NODE> re-send last round info may help others to go to next round";
-    tryResendRoundInfo(std::nullopt, round); // broadcast round info
+    tryResendRoundInfo(std::nullopt, round);  // broadcast round info
     return;
   }
 
-  if(rNum == round) {
+  if (rNum == round) {
     // currently in proper round, handle BigBang
     cslog() << "NODE> resend last block hash after BigBang";
-    if(tryResendRoundInfo(std::nullopt, round)) {
+    if (tryResendRoundInfo(std::nullopt, round)) {
       // only sender able do it
       cswarning() << "NODE> re-send last round info to ALL";
     }
@@ -540,8 +542,32 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   processTransactionsPacket(std::move(packet));
 }
 
-void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round,
-                                  const cs::PublicKey& sender) {
+void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
+  istream_.init(data, size);
+
+  uint16_t version = 0;
+  istream_ >> version;
+
+  if (!istream_.good()) {
+    cswarning() << "NODE> Get stop request parsing failed";
+    return;
+  }
+
+  cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
+
+  if (NODE_VERSION >= version) {
+    cswarning() << "NODE> Get stop request, node version is okay, continue working";
+    return;
+  }
+
+  cswarning() << "NODE> Get stop request, node will be closed...";
+
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
+    stop();
+  });
+}
+
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
   std::size_t hashesCount = 0;
@@ -603,8 +629,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   processPacketsReply(std::move(packets), round);
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cslog() << "NODE> " << __func__ << "():";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -646,7 +671,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   characteristic.mask = std::move(characteristicMask);
   conveyer.setCharacteristic(std::move(characteristic), round);
 
-  stat_.total_recv_trans += characteristic.mask.size();
+  stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
   assert(sequence <= this->getRoundNumber());
 
@@ -669,7 +694,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     cserror() << "NODE> failed to store block in BlockChain";
   }
   else {
-    stat_.total_accepted_trans += pool.value().transactions_count();
+    stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -1318,16 +1343,24 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     if (rNum < roundNum_) {
       return MessageActions::Drop;
     }
+
     if (rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
       return MessageActions::Process;
     }
+
     if (rNum != roundNum_) {
       cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
     }
+
     else {
       cslog() << "NODE> block hash is postponed until conveyer sync is completed";
     }
+
     return MessageActions::Postpone;
+  }
+
+  if (type == MsgTypes::NodeStopRequest) {
+    return MessageActions::Process;
   }
 
   if (rNum < roundNum_) {
@@ -1959,7 +1992,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
     return;
   }
 
-  stat_.total_accepted_trans += pool.value().transactions_count();
+  stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
 
   // array
   cs::Signature poolSignature;
@@ -1992,7 +2025,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
     cserror() << "Send round info characteristic not found, logic error";
     return;
   }
-  stat_.total_recv_trans += block_characteristic->mask.size();
+  stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
@@ -2132,7 +2165,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Characteristic characteristic;
     characteristic.mask = std::move(characteristicMask);
 
-    stat_.total_recv_trans += characteristic.mask.size();
+    stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
     assert(sequence <= this->getRoundNumber());
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2146,7 +2179,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         cserror() << "NODE> failed to store block in BlockChain";
       }
       else {
-        stat_.total_accepted_trans += pool.value().transactions_count();
+        stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       }
     }
   }

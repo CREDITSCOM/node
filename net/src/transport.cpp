@@ -473,8 +473,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
   csdebug() << "TRANSPORT> POSTPHONED finish";
 }
 
-void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack,
-                                    const uint8_t* data, size_t size) {
+void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack, const uint8_t* data, size_t size) {
   if (size == 0) {
     cserror() << "Bad packet size, why is it zero?";
     return;
@@ -488,6 +487,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
       return node_->getBlockRequest(data, size, firstPack.getSender());
     case MsgTypes::RequestedBlock:
       return node_->getBlockReply(data, size, firstPack.getSender());
+    case MsgTypes::NodeStopRequest:
+      return node_->getNodeStopRequest(data, size);
     default:
       break;
   }
