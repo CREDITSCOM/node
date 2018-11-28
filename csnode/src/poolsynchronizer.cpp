@@ -43,6 +43,9 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
 
   m_isBigBand = isBigBand;
 
+  const auto last = cs::numeric_cast<uint32_t>(lastWrittenSequence + m_blockChain->getCachedBlocksSize());
+  cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << roundToSync - last;
+
   if (!m_isSyncroStarted) {
     if (roundNum >= lastWrittenSequence + s_roundDifferentForSync) {
       cslog() << "POOL SYNCHRONIZER> Processing Pools Sync Start. Needed sequence: " << roundNum;
@@ -176,8 +179,11 @@ void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
   const float maxValue = 100.0f;
   const uint32_t syncStatus = cs::numeric_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
 
+  const uint32_t remaining = cs::numeric_cast<uint32_t>(global - last);
+
   ProgressBar bar;
-  cslog() << "SYNC: " << bar.string(syncStatus);
+  cslog() << "SYNC: Blocks remaining: " << remaining << "\n\n";
+  cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
 }
 
 bool cs::PoolSynchronizer::checkActivity() {
