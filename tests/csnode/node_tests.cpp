@@ -9,11 +9,11 @@
 
 #include "gtest/gtest.h"
 #include <csnode/node.hpp>
-#include "ClientConfigMock.hpp"
-#include "NodeMock.hpp"
-#include "SolverMock.hpp"
-#include "TransportMock.hpp"
-#include "NetworkMock.hpp"
+#include "clientconfigmock.hpp"
+#include "nodemock.hpp"
+#include "solvermock.hpp"
+#include "transportmock.hpp"
+#include "networkmock.hpp"
 
 TEST(NodeTest, connection)
 {

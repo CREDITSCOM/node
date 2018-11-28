@@ -17,6 +17,8 @@ using PublicKey = std::array<uint8_t, kPublicKeySize>;
 using PrivateKey = std::array<uint8_t, kPrivateKeySize>;
 using Signature = std::array<uint8_t, kSignatureSize>;
 
+bool CryptoInit();
+
 void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size);
 
 void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key);
@@ -31,6 +33,8 @@ bool VerifySignature(const Signature& signature, const PublicKey& public_key,
 
 bool VerifySignature(const uint8_t* signature, const uint8_t* public_key,
   const uint8_t* data, size_t data_size);
+
+void FillBufWithRandomBytes(void* buf, size_t buf_size);
 
 }  // namespace cscrypto
 
