@@ -5,10 +5,12 @@
 #include <csnode/blockchain.hpp>
 #include <cscrypto/cscrypto.hpp>
 #include <lib/system/utils.hpp>
+#include <sodium.h>
 
 Neighbourhood::Neighbourhood(Transport* net)
 : transport_(net)
-, connectionsAllocator_(MaxConnections + 1) {
+, connectionsAllocator_(MaxConnections + 1)
+, nLockFlag_(), mLockFlag_() {
   assert(sodium_init() != -1);
 }
 
