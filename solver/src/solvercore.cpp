@@ -48,10 +48,6 @@ namespace cs
     , tag_state_expired(CallsQueueScheduler::no_tag)
     , req_stop(true)
     , cnt_trusted_desired(Consensus::MinTrustedNodes)
-    , total_recv_trans(0)
-    , total_accepted_trans(0)
-    , cnt_deferred_trans(0)
-    , total_duration_ms(0)
     // consensus data
     , cur_round(0)
     // previous solver version instance
@@ -210,8 +206,6 @@ namespace cs
       cserror() << "SolverCore: block sync required";
       return;
     }
-
-    total_accepted_trans += p.transactions_count();
   }
 
   bool SolverCore::is_block_deferred() const
@@ -226,8 +220,6 @@ namespace cs
       return;
     }
     // pnode->getBlockChain().writeDeferredBlock();
-    total_accepted_trans += cnt_deferred_trans;
-    cnt_deferred_trans = 0;
   }
 
   void SolverCore::drop_deferred_block()
@@ -241,9 +233,7 @@ namespace cs
     }
     else {
       cserror() << "SolverCore: cannot drop deferred block";
-      total_accepted_trans += cnt_deferred_trans;
     }
-    cnt_deferred_trans = 0;
   }
 
 }  // namespace slv2

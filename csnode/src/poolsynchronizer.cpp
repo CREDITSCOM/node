@@ -249,9 +249,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
     // remove unnecessary sequnces
     m_requestedSequences.erase(m_requestedSequences.begin(), m_requestedSequences.upper_bound(lastWrittenSequence));
 
-    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->first) {
-      m_requestedSequences.clear();
-    }
+    m_requestedSequences.erase(m_requestedSequences.begin(), m_requestedSequences.upper_bound(m_blockChain->getLastWrittenSequence()));
 
     std::ostringstream os;
     os << "size: " << m_requestedSequences.size() << ", el: ";

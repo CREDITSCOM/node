@@ -17,6 +17,7 @@
 
 #include "blockchain.hpp"
 #include "packstream.hpp"
+#include "roundstat.hpp"
 
 class Transport;
 
@@ -67,12 +68,12 @@ public:
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
 
-  void sendStageTwo(const cs::StageTwo&);
+  void sendStageTwo(cs::StageTwo&);
   void requestStageTwo(uint8_t respondent, uint8_t required);
   void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester);
 
-  void sendStageThree(const cs::StageThree&);
+  void sendStageThree(cs::StageThree&);
   void requestStageThree(uint8_t respondent, uint8_t required);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
@@ -316,6 +317,9 @@ private:
   };
 
   SentRoundData lastSentRoundData_;
+
+  // round stat
+  cs::RoundStat stat_;
 };
 
 std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel);
