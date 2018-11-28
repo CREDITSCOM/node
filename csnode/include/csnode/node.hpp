@@ -90,6 +90,9 @@ public:
   void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable);
 
+  // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
+  void handleRoundMismatch(const cs::RoundTable& global_table);
+
   // broadcast request for next round, to call after long timeout
   void sendNextRoundRequest();
   // send request for next round info from trusted node specified by index in list

@@ -232,113 +232,95 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 {
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence() << ", current #" << roundNum_;
   istream_.init(data, size);
-  cs::Hash h;
-  istream_ >> h;
-
-  const auto round = cs::Conveyer::instance().currentRoundNumber();
-
-  if(rNum > round) {
-    if(rNum - 1 == round || round == 0) {
-      // continue reading round info
-      cs::RoundTable rt;
-      if(readRoundData(rt)) {
-        // if we are behind exactly one round, ask for round info
-        roundNum_ = rNum - 1;
-        cswarning() << "NODE> request round info from trusted nodes";
-        sendRoundInfoRequest(rt.general);
-        for(const auto& t : rt.confidants) {
-          sendRoundInfoRequest(t);
-        }
-      }
-      else {
-        cswarning() << "NODE> read trusted nodes from round info failed";
-      }
-    }
-    else {
-      // otherwise 
-      cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
-      poolSynchronizer_->processingSync(rNum, true /*is bigbang*/);
-    }
-    return;
+  cs::Hash last_block_hash;
+  istream_ >> last_block_hash;
+  cs::RoundTable global_table;
+  global_table.round = rNum;
+  if(!readRoundData(global_table)) {
+    cserror() << "NODE> read round data from SS failed, continue without round table";
   }
 
-  if(rNum < round - 1) {
-    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
-    return;
-  }
+  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
 
-  if(rNum == round - 1) {
-    // revert last block & start previous round
-    cserror() << "NODE> require unimplemented revert last written block, cannot handle BigBang properly";
-    cslog() << "NODE> re-send last round info may help others to go to next round";
-    tryResendRoundInfo(std::nullopt, round); // broadcast round info
-    return;
-  }
-
-  if(rNum == round) {
-    // currently in proper round, handle BigBang
+  // currently in global round
+  if(global_table.round == local_table.round) {
+    // resend all this round data available
     cslog() << "NODE> resend last block hash after BigBang";
-    if(tryResendRoundInfo(std::nullopt, round)) {
+    if(tryResendRoundInfo(std::nullopt, local_table.round)) {
       // only sender able do it
       cswarning() << "NODE> re-send last round info to ALL";
     }
-    sendHash_V3(round);
+    sendHash_V3(local_table.round);
     solver_->gotBigBang();
     return;
   }
+
+  // global round is other then local one
+  handleRoundMismatch(global_table);
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
-
-  cslog() << "NODE> Get Round Table";
-
-  if (roundNum_ < rNum || type == MsgTypes::BigBang) {
-    roundNum_ = rNum;
+  cslog() << "NODE> get SS Round Table #" << rNum;
+  cs::RoundTable global_table;
+  if (!readRoundData(global_table)) {
+    cserror() << "NODE> read round data from SS failed, continue without round table";
   }
-  else {
-    cswarning() << "Bad round number, ignoring";
+  global_table.round = rNum;
+  //TODO: what this call was intended for? transport_->clearTasks();
+
+  // "normal" start
+  if(global_table.round == 1) {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, global_table]() mutable {
+      onRoundStart_V3(global_table);
+      onRoundStartConveyer(std::move(global_table));
+    });
     return;
   }
 
-  cs::RoundTable roundTable;
+  // "hot" start
+  handleRoundMismatch(global_table);
+}
 
-  if (!readRoundData(roundTable)) {
+// handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
+void Node::handleRoundMismatch(const cs::RoundTable& global_table)
+{
+  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
+  if(local_table.round == global_table.round) {
+    // mismatch not confirmed
     return;
   }
 
-  if (myLevel_ == NodeLevel::Main) {
-    if (!istream_.good()) {
-      cswarning() << "Bad round table format, ignoring";
-      return;
+  // global round is behind local one
+  if(local_table.round > global_table.round) {
+    if(local_table.round - global_table.round == 1) {
+      cslog() << "NODE> re-send last round info may help others to go to round #" << local_table.round;
+      tryResendRoundInfo(std::nullopt, local_table.round); // broadcast round info
     }
-  }
-
-  transport_->clearTasks();
-
-  const auto last_block = getBlockChain().getLastWrittenSequence();
-  if (last_block < roundNum_ - 1) {
-    cswarning() << "NODE> Last written sequence lower than current round - 1";
-    if(last_block == roundNum_ - 2) {
-      cswarning() << "NODE> require exactly last round info and previous block, perform requests";
-      --roundNum_;
-      sendRoundInfoRequest(roundTable.general);
-      for(const auto& t : roundTable.confidants) {
-        sendRoundInfoRequest(t);
-      }
+    else {
+      //TODO: rollback to global round
+      cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
     }
     return;
   }
 
-  // start round on node
-
-  // TODO: think how to improve this code
-  cslog() << "NODE> Get Round table SS -> got Round = " << rNum;
-
-  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
-    onRoundStart_V3(roundTable);
-    onRoundStartConveyer(std::move(roundTable));
-  });
+  // local round is behind global one
+  const auto last_block = getBlockChain().getLastSequence();
+  if(last_block + cs::Conveyer::HashTablesStorageCapacity < global_table.round) {
+    // activate pool synchronizer
+    poolSynchronizer_->processingSync(global_table.round);
+    // no return, ask for next round info
+  }
+  // broadcast request round info
+  cswarning() << "NODE> broadcast request round info";
+  sendNextRoundRequest();
+  //// directly request from trusted
+  //cswarning() << "NODE> request round info from trusted nodes";
+  //sendRoundInfoRequest(table.general);
+  //for(const auto& trusted : table.confidants) {
+  //  sendRoundInfoRequest(trusted);
+  //}
+  return;
 }
 
 void Node::sendRoundTable(const cs::RoundTable& roundTable) {
@@ -1263,7 +1245,47 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
-  if (type == MsgTypes::NewCharacteristic && rNum <= roundNum_) {
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+
+  // starts next round, otherwise
+  if(type == MsgTypes::RoundInfo) {
+    if(rNum > round) {
+      return MessageActions::Process;
+    }
+    //TODO: detect absence of proper current round info (round may be set by SS or BB)
+    return MessageActions::Drop;
+  }
+
+  // BB: every round (for now) may be handled:
+  if(type == MsgTypes::BigBang) {
+    return MessageActions::Process;
+  }
+
+  if(type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
+    // which round would not be on the remote we may require the requested block or get block request
+    return MessageActions::Process;
+  }
+
+  // outrunning packets of other types talk about round lag
+  if(rNum > round) {
+    if(rNum - round == 1) {
+      // wait for next round
+      return MessageActions::Postpone;
+    }
+    else {
+      // more then 1 round lag, request round info
+      if(cs::Conveyer::instance().currentRoundNumber() > 1) {
+        // not on the very start
+        cswarning() << "NODE> detect round lag, request round info";
+        cs::RoundTable empty_table;
+        empty_table.round = rNum;
+        handleRoundMismatch(empty_table);
+      }
+      return MessageActions::Drop;
+    }
+  }
+
+  if (type == MsgTypes::NewCharacteristic) {
     return MessageActions::Process;
   }
 
@@ -1280,48 +1302,33 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if (type == MsgTypes::RoundTable) {
-    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::RoundInfo) {
-    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  // BigBang: only current or previous round may be handled:
-  if (type == MsgTypes::BigBang && rNum >= roundNum_ - 1) {
-    return MessageActions::Process;
+    // obsolete message
+    cswarning() << "NODE> drop obsolete MsgTypes::RoundTable";
+    return MessageActions::Drop;
   }
 
   if (type == MsgTypes::RoundTableRequest) {
-    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::RoundTableRequest) {
-    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    // obsolete message
+    cswarning() << "NODE> drop obsolete MsgTypes::RoundTableRequest";
+    return MessageActions::Drop;
   }
 
   if (type == MsgTypes::RoundInfoRequest) {
-    return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    return (rNum <= round ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::RoundInfoReply) {
-    return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
-    // which round would not be on the remote we may require the requested block
-    return MessageActions::Process;
-    // return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    return (rNum >= round ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BlockHashV3) {
-    if (rNum < roundNum_) {
+    if (rNum < round) {
       return MessageActions::Drop;
     }
-    if (rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
+    if (rNum == round && cs::Conveyer::instance().isSyncCompleted()) {
       return MessageActions::Process;
     }
-    if (rNum != roundNum_) {
+    if (rNum != round) {
       cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
     }
     else {
@@ -1330,11 +1337,11 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Postpone;
   }
 
-  if (rNum < roundNum_) {
+  if (rNum < round) {
     return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   }
 
-  return (rNum == roundNum_ ? MessageActions::Process : MessageActions::Postpone);
+  return (rNum == round ? MessageActions::Process : MessageActions::Postpone);
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable) {
@@ -1372,11 +1379,8 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
     return false;
   }
 
-  cslog() << "NODE> RoundNumber: " << roundNum_;
-
   roundTable.confidants = std::move(confidants);
   roundTable.general = mainNode;
-  roundTable.round = roundNum_;
   roundTable.hashes.clear();
 
   return true;

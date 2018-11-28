@@ -491,6 +491,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
       return node_->getBlockRequest(data, size, firstPack.getSender());
     case MsgTypes::RequestedBlock:
       return node_->getBlockReply(data, size, firstPack.getSender());
+    case MsgTypes::BigBang: // any round (in theory) may be set
+      return node_->getBigBang(data, size, rNum, type);
+    case MsgTypes::RoundInfoRequest: // old-round node may ask for round info
+      return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
     default:
       break;
   }
@@ -543,12 +547,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getStageTwoRequest(data, size, firstPack.getSender());
   case MsgTypes::RoundInfo:
     return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
-  case MsgTypes::RoundInfoRequest:
-    return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundInfoReply:
     return node_->getRoundInfoReply(data, size, firstPack.getSender());
-  case MsgTypes::BigBang:
-    return node_->getBigBang(data, size, rNum, type);
   default:
     cserror() << "TRANSPORT> Unknown message type " << getMsgTypesString(type) << " pack round " << rNum;
     break;
