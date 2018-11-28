@@ -883,6 +883,11 @@ csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const {
   return seq;
 }
 
+csdb::Pool::sequence_t BlockChain::getLastSequence() const
+{
+  return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t)getLastWrittenSequence());
+}
+
 std::size_t BlockChain::getCachedBlocksSize() const {
   return cachedBlocks_.size();
 }
