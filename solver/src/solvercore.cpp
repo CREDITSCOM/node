@@ -13,11 +13,6 @@
 #include <csnode/spammer.hpp>
 #include <csnode/walletsstate.hpp>
 
-#pragma warning(push)
-#pragma warning(disable : 4324)
-#include <sodium.h>
-#pragma warning(pop)
-
 #include <lib/system/logger.hpp>
 
 #include <functional>

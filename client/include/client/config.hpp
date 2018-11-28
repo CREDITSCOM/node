@@ -43,6 +43,12 @@ enum BootstrapType {
   IpList
 };
 
+struct PoolSyncData {
+  uint8_t blockPoolsCount = 1;          // max block count in one request: cannot be 0
+  uint8_t requestRepeatRoundCount = 1;  // round count for repeat request : 0 - never
+  uint8_t neighbourPacketsCount = 10;   // packet count for connect another neighbor : 0 - never
+};
+
 class Config {
 public:
   Config() {
@@ -107,9 +113,15 @@ public:
 
   const boost::log::settings& getLoggerSettings() const;
 
+  const PoolSyncData& getPoolSyncSettings() const;
+
 private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
+  void readPoolSynchronizerData(const boost::property_tree::ptree& config);
+
+  template<typename T>
+  bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
 
   bool good_ = false;
 
@@ -137,6 +149,8 @@ private:
   cs::PublicKey publicKey_;
 
   boost::log::settings loggerSettings_;
+
+  PoolSyncData poolSyncData_;
 };
 
 #endif  // __CONFIG_HPP__

@@ -8,6 +8,7 @@
 
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
+#include <csnode/conveyer.hpp>
 
 #include <csnode/fee.hpp>
 
@@ -885,35 +886,43 @@ csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const {
   return seq;
 }
 
-csdb::Pool::sequence_t BlockChain::getLastSequence() const {
-  return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t)getLastWrittenSequence());
+std::size_t BlockChain::getCachedBlocksSize() const {
+  return cachedBlocks_.size();
 }
 
-std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
+std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
+{
+  const auto firstSequence = getLastWrittenSequence() + 1;
+  const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
+  const auto roundNumber = currentRoundNumber ? currentRoundNumber - 1 : 0;
+
   // return at least [next..0]:
-  std::vector<SequenceInterval> vec{std::make_pair(getLastWrittenSequence() + 1, 0)};
-  if (cachedBlocks_.empty()) {
-    return vec;
-  }
+  std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };
+
   // always point to last interval
-  auto it_last_interval = vec.rbegin();
-  csdb::Pool::sequence_t final_seq = (cachedBlocks_.crbegin())->first;
-  for (auto seq = it_last_interval->first; seq < final_seq; ++seq) {
-    if (cachedBlocks_.count(seq) > 0) {
-      // finish last interval and start next one
-      it_last_interval->second = seq - 1;
-      // lookup next absent sequence and start next interval
-      for (; seq < final_seq; ++seq) {
-        if (cachedBlocks_.count(seq) == 0) {
-          vec.emplace_back(std::make_pair(seq, 0));
-          it_last_interval = vec.rbegin();
-          break;
-        }
+  auto firstUpper = cachedBlocks_.upper_bound(firstSequence);
+
+  if (firstUpper != cachedBlocks_.end()) {
+    auto sequence = firstUpper->first;
+    vec[0].second = sequence - 1;
+
+    while ((++firstUpper) != cachedBlocks_.end()) {
+      ++sequence;
+      if (firstUpper->first != sequence) {
+        vec.emplace_back(std::make_pair(sequence, firstUpper->first - 1));
+        sequence = firstUpper->first;
       }
     }
   }
+
   // add last interval [final + 1, end]
-  vec.emplace_back(std::make_pair(final_seq + 1, 0));
+  if (!cachedBlocks_.empty()) {
+    const auto lastCahedBlock = cachedBlocks_.crbegin()->first;
+    if (roundNumber > lastCahedBlock) {
+      vec.emplace_back(std::make_pair(lastCahedBlock, roundNumber));
+    }
+  }
+
   return vec;
 }
 

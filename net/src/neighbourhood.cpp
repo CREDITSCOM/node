@@ -1,23 +1,21 @@
 /* Send blaming letters to @yrtimd */
-#include <sodium.h>
-
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
 #include <csnode/blockchain.hpp>
-
+#include <cscrypto/cscrypto.hpp>
 #include <lib/system/utils.hpp>
 
-Neighbourhood::Neighbourhood(Transport* net):
-    transport_(net),
-    connectionsAllocator_(MaxConnections + 1) {
+Neighbourhood::Neighbourhood(Transport* net)
+: transport_(net)
+, connectionsAllocator_(MaxConnections + 1) {
   assert(sodium_init() != -1);
 }
 
 template <typename T>
 T getSecureRandom() {
   T result;
-  randombytes_buf(static_cast<void*>(&result), sizeof(T));
+  cscrypto::FillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
   return result;
 }
 
