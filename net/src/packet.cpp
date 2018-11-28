@@ -91,10 +91,10 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     // log significantly-fragmented packets:
     if(msg->packetsTotal_ >= 20) {
         if(msg->packetsLeft_ != 0) {
-            csdebug() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
+            csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
         }
         else {
-            csdebug() << "COLLECT> complete " << msg->packetsTotal_;
+            csdetails() << "COLLECT> complete " << msg->packetsTotal_;
         }
     }
   }

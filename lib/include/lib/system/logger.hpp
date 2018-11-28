@@ -68,6 +68,8 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
     BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) \
       << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
 
+#define csdetails(...) _LOG_SEV(trace, __VA_ARGS__)
+
 #define csdebug(...) _LOG_SEV(debug, __VA_ARGS__)
 
 #define csinfo(...) _LOG_SEV(info, __VA_ARGS__)
