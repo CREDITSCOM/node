@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "csdb/address.h"
+#include "csdb/address.hpp"
 #include "packstream.hpp"
 
 const cs::PublicKey kPublicKey = {

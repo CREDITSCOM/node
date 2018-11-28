@@ -11,9 +11,10 @@
 using io_context = boost::asio::io_context;
 
 class Transport;
+
 class Network {
 public:
-  Network(const Config&, Transport*);
+  explicit Network(const Config&, Transport*);
   ~Network();
 
   bool isGood() const {
@@ -33,8 +34,7 @@ public:
   Network& operator=(const Network&) = delete;
   Network& operator=(Network&&) = delete;
 
-  enum ThreadStatus
-  {
+  enum ThreadStatus {
     NonInit,
     Failed,
     Success
@@ -63,7 +63,7 @@ private:
   // Only needed in a one-socket configuration
   __cacheline_aligned std::atomic<bool> singleSockOpened_ = {false};
   __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = {nullptr};
-  std::atomic<bool> initFlag_ = {false};
+  std::atomic<bool> initFlag_ = { false };
 
   __cacheline_aligned std::atomic<ThreadStatus> readerStatus_ = {NonInit};
   __cacheline_aligned std::atomic<ThreadStatus> writerStatus_ = {NonInit};

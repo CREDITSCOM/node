@@ -13,7 +13,8 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
 , m_requestRepeatRoundCount(data.requestRepeatRoundCount)
 , m_neighbourPacketsCount(data.neighbourPacketsCount)
 , m_transport(transport)
-, m_blockChain(blockChain) {
+, m_blockChain(blockChain)
+, m_isBigBand(false) {
   m_neededSequences.reserve(m_maxBlockPoolsCount);
   m_neighbours.reserve(m_transport->getMaxNeighbours());
 
@@ -24,7 +25,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
           << ", Neighbour packets: " << cs::numeric_cast<int>(m_neighbourPacketsCount);
 }
 
-void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
+void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool isBigBand) {
   if (m_transport->getNeighboursCount() == 0) {
     cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum
             << ",   Requested pools block size:" << m_maxBlockPoolsCount;
@@ -39,6 +40,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum) {
     synchroFinished();
     return;
   }
+
+  m_isBigBand = isBigBand;
 
   if (!m_isSyncroStarted) {
     if (roundNum >= lastWrittenSequence + s_roundDifferentForSync) {
@@ -95,10 +98,13 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
     return;
   }
 
+  /// or m_roundToSync > lastWrittenSequence
   if (cs::Conveyer::instance().currentRoundNumber() > cs::numeric_cast<cs::RoundNumber>(lastWrittenSequence) + 1) {
-    //    cs::Timer::singleShot(cs::NeighboursRequestDelay, [this] {
-    //      sendBlockRequest();
-    //    });
+    if(m_isBigBand) {
+      cs::Timer::singleShot(cs::NeighboursRequestDelay, [this] {
+        sendBlockRequest();
+      });
+    }
   }
   else {
     synchroFinished();
@@ -243,9 +249,14 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
     // remove unnecessary sequnces
     m_requestedSequences.erase(m_requestedSequences.begin(), m_requestedSequences.upper_bound(lastWrittenSequence));
 
+    if (m_blockChain->getLastWrittenSequence() > m_requestedSequences.rbegin()->first) {
+      m_requestedSequences.clear();
+    }
+
     std::ostringstream os;
     os << "size: " << m_requestedSequences.size() << ", el: ";
     for (const auto& [sequence, packetCounter] : m_requestedSequences) {
+      csunused(packetCounter);
       os << sequence << ", ";
     }
     csdebug() << "POOL SYNCHRONIZER> Get needed sequences: Requested storage : " << os.str();
@@ -458,6 +469,7 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 
 void cs::PoolSynchronizer::synchroFinished() {
   m_isSyncroStarted = false;
+  m_isBigBand = false;
   m_requestedSequences.clear();
   m_neededSequences.clear();
   m_neighbours.clear();

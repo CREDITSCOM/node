@@ -8,14 +8,13 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/transactionspacket.hpp>
 
-#include <csdb/pool.h>
-#include <csdb/transaction.h>
+#include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
 
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 
 #include <net/packet.hpp>
-#include "solver/solver.hpp"
 
 namespace cs {
 class IPackStream {

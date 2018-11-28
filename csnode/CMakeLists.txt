@@ -51,6 +51,10 @@ add_library(csnode
   include/csnode/walletspools.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
+  include/csnode/fee.hpp
+  include/csnode/spammer.hpp
+  include/csnode/transactionsvalidator.hpp
+  include/csnode/walletsstate.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -63,19 +67,22 @@ add_library(csnode
   src/walletspools.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
+  src/fee.cpp
+  src/spammer.cpp
+  src/transactionsvalidator.cpp
+  src/walletsstate.cpp
 )
 
-target_link_libraries (csnode net csdb solver2 lib base58 lz4 Boost::thread)
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include/csnode
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../api/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver2/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../solver/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/
-                                         ${CMAKE_BINARY_DIR}/csdb/snappy
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)

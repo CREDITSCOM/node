@@ -1,18 +1,18 @@
-#include "csdb/wallet.h"
+#include "csdb/wallet.hpp"
 #include <map>
 
-#include "csdb/address.h"
-#include "csdb/amount.h"
-#include "csdb/csdb.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/pool.h"
+#include "csdb/address.hpp"
+#include "csdb/amount.hpp"
+#include "csdb/csdb.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
+#include "csdb/pool.hpp"
 
 namespace csdb {
 
 class Wallet::priv : public ::csdb::internal::shared_data {
-  priv() {
-  }
-  priv(Address address)
+  priv() = default;
+
+  explicit priv(Address address)
   : address_(address) {
   }
 

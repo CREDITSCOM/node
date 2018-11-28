@@ -1,4 +1,4 @@
-#include "csdb/storage.h"
+#include "csdb/storage.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -10,14 +10,14 @@
 #include <stdexcept>
 #include <thread>
 
-#include "binary_streams.h"
-#include "csdb/address.h"
-#include "csdb/database.h"
-#include "csdb/database_berkeleydb.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
-#include "csdb/internal/utils.h"
-#include "csdb/pool.h"
-#include "csdb/wallet.h"
+#include "binary_streams.hpp"
+#include "csdb/address.hpp"
+#include "csdb/database.hpp"
+#include "csdb/database_berkeleydb.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
+#include "csdb/internal/utils.hpp"
+#include "csdb/pool.hpp"
+#include "csdb/wallet.hpp"
 
 namespace {
 struct last_error_struct {
@@ -427,6 +427,17 @@ bool Storage::write_queue_search(const PoolHash &hash, Pool &res_pool) const {
   return false;
 }
 
+bool Storage::write_queue_pop(Pool &res_pool) {
+  std::unique_lock<std::mutex> lock(d->write_lock);
+
+  if (!d->write_queue.empty()) {
+    res_pool = d->write_queue.back();
+    d->write_queue.pop_back();
+    return true;
+  }
+  return false;
+}
+
 Pool Storage::pool_load(const PoolHash &hash) const {
   Pool empty_Pool{};
 
@@ -522,12 +533,48 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t &cnt) const {
   return res;
 }
 
+Pool Storage::pool_remove_last() {
+  Pool empty_Pool{};
+
+  if (!isOpen()) {
+    d->set_last_error(NotOpen);
+    return Pool{};
+  }
+
+  if (last_hash().is_empty()) {
+    d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
+    return Pool{};
+  }
+
+  Pool res{};
+  bool found = write_queue_pop(res);
+  if (found) {
+    return res;
+  }
+
+  ::csdb::internal::byte_array data;
+  if (!d->db->get(last_hash().to_binary(), &data)) {
+    d->set_last_error(DatabaseError);
+    return Pool{};
+  }
+  res = Pool::from_binary(data);
+  if (!res.is_valid()) {
+    d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, last_hash().to_string().c_str());
+  }
+  else {
+    d->set_last_error();
+  }
+
+  d->db->remove(last_hash().to_binary());
+
+  return res;
+}
+
 Wallet Storage::wallet(const Address &addr) const {
   return Wallet::get(addr);
 }
 
-bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/,
-                                  Transaction &trx /*output*/) const {
+bool Storage::get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const {
   Pool curPool;
   TransactionID::sequence_t curIdx = InnerId;
   bool is_in_blockchain = false;

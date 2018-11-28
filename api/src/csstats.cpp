@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include <csdb/currency.h>
+#include <csdb/currency.hpp>
 #include <algorithm>
 #include <apihandler.hpp>
 #include <cassert>
@@ -12,8 +12,9 @@ namespace csstats {
 template <class F>
 void csstats::matchPeriod(const Periods& periods, period_t period, F func) {
   for (size_t i = 0; i < periods.size(); ++i) {
-    if (period < periods[i])
+    if (period < periods[i]) {
       func(i);
+    }
   }
 }
 
@@ -21,7 +22,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   assert(
       std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << " Collecting stats: started";
+  cstrace() << " Collecting stats: started";
 
   auto stats = currentStats;
   auto startTime = std::chrono::high_resolution_clock::now();
@@ -48,12 +49,13 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-        if (transaction.user_field(0).is_valid())
+        if (transaction.user_field(0).is_valid()) {
           ++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
-                                                 // smart contracts
+        }                                        // smart contracts
 
-        if (is_deploy_transaction(transaction))
+        if (is_deploy_transaction(transaction)) {
           ++periodStats.smartContractsCount;
+        }
 
         Currency currency = currencies_indexed[transaction.currency().to_string()];
 
@@ -123,7 +125,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   using Seconds = std::chrono::seconds;
   Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
 
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "Collecting stats: finished (took " << seconds.count() << "s";
+  cstrace() << "Collecting stats: finished (took " << seconds.count() << "s";
   cslog() << "Stats updated";
 
   return stats;
@@ -133,7 +135,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   assert(
       std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << " Collecting All stats: started";
+  cstrace() << " Collecting All stats: started";
 
   AllStats stats;
   stats.second.resize(periods.size());
@@ -224,14 +226,14 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   auto finishTime = std::chrono::system_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);
 
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "Collecting All stats: finished (took " << milliseconds.count() << "ms)";
+  cstrace() << "Collecting All stats: finished (took " << milliseconds.count() << "ms)";
 
   return stats;
 }
 
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats start " << "update interval is " << updateTimeSec << " sec";
+  cstrace() << "csstats start " << "update interval is " << updateTimeSec << " sec";
 #ifndef MONITOR_NODE
   return;
 #endif
@@ -239,7 +241,7 @@ csstats::csstats(BlockChain& blockchain)
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
-    csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats thread started";
+    cstrace() << "csstats thread started";
 
     AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
@@ -266,19 +268,19 @@ csstats::csstats(BlockChain& blockchain)
           ss << s.poolsCount << " pools, " << s.transactionsCount;
           ss << " transactions";
 
-          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
+          cstrace() << ss.str();
 #ifdef LOG_STATS_TO_FILE
-          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
+          cstrace() << ss.str();
 
           ss.str(std::string());
 
           ss << "Blockchain size:";
           ss << this->blockchain.getSize();
 
-          csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << ss.str();
+          cstrace() << ss.str();
 #endif
           for (auto& t : s.balancePerCurrency) {
-            csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "'" << t.first
+            cstrace() << "'" << t.first
                       << "' = " << std::to_string(t.second.integral) << "." << std::to_string(t.second.fraction);
           }
         }
@@ -292,19 +294,20 @@ csstats::csstats(BlockChain& blockchain)
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-      csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats thread stopped";
+      cstrace() << "csstats thread stopped";
   });
 }
 
 csstats::~csstats() {
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__ << "csstats stop";
+  cstrace() << "csstats stop";
 
   ScopedLock lock(mutex);
 
   quit = true;
 
-  if (thread.joinable())
+  if (thread.joinable()) {
     thread.join();
+  }
 }
 
 StatsPerPeriod csstats::getStats() {

@@ -1,10 +1,10 @@
 #ifndef WALLETS_POOLS_HPP
 #define WALLETS_POOLS_HPP
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/internal/types.h>
-#include <csdb/pool.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/internal/types.hpp>
+#include <csdb/pool.hpp>
 #include <array>
 #include <csnode/cyclicbuffer.hpp>
 #include <limits>

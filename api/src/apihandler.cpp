@@ -33,7 +33,7 @@ bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* i
   return res;
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, slv2::SolverCore& _solver)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver)
 : s_blockchain(blockchain)
 , solver(_solver)
 , stats(blockchain)
@@ -62,9 +62,8 @@ void APIHandler::state_updater_work_function() {
   try {
     auto lasthash = s_blockchain.getLastHash();
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
-      if (!update_smart_caches_once(lasthash)) {
+      if (!update_smart_caches_once(lasthash))
         lasthash = s_blockchain.wait_for_block(lasthash);
-      }
     }
   }
   catch (std::exception& ex) {
@@ -425,10 +424,10 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-  auto input_smart = transaction.smartContract;
+  auto input_smart      = transaction.smartContract;
   auto send_transaction = make_transaction(transaction);
   const auto smart_addr = send_transaction.target();
-  const bool deploy = is_smart_deploy(input_smart);
+  const bool deploy     = is_smart_deploy(input_smart);
 
   if (!convertAddrToPublicKey(smart_addr)) {
     LOG_ERROR("Public key of wallet not found by walletId");
@@ -463,10 +462,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   std::string contract_state;
   if (!deploy) {
     contract_state_entry.wait_till_front([&](std::string& state) {
-      auto ret = !state.empty();
-      if (ret)
+      if (!state.empty()) {
         contract_state = state;
-      return ret;
+        return true;
+      } 
+      return false;
     });
   }
 
@@ -481,8 +481,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.status.code) {
-    _return.status.code = api_resp.status.code;
-    _return.status.message = api_resp.status.message;
+    _return.status.code     = api_resp.status.code;
+    _return.status.message  = api_resp.status.message;
     contract_state_entry.update_state([&]() -> decltype(auto) { return std::move(contract_state); });
     return;
   }
@@ -519,9 +519,9 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
   _return.pools.reserve(const_limit);
 
   csdb::Pool pool;
-  csdb::PoolHash hash = s_blockchain.getLastHash();
+  csdb::PoolHash hash     = s_blockchain.getLastHash();
   const uint64_t sequence = s_blockchain.getSize();
-  const uint64_t lower = sequence - std::min(sequence, (uint64_t)(offset + const_limit));
+  const uint64_t lower    = sequence - std::min(sequence, (uint64_t)(offset + const_limit));
   for (uint64_t it = sequence; it > lower; --it) {
     auto cch = poolCache.find(hash);
     if (cch == poolCache.end()) {
@@ -602,8 +602,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ap
   auto smart_state(locked_ref(this->smart_state));
   _return.smartContract.objectState = (*smart_state)[adrs].get_state();
 
-  SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS
-                                                                           : APIRequestStatusType::FAILURE);
+  SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
   return;
 }
 
@@ -613,8 +612,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   auto curph = start;
   while (curph != pending_smart_transactions->last_pull_hash) {
     new_blocks.push_back(curph);
-    size_t _;
-    curph = s_blockchain.loadBlockMeta(curph, _).previous_hash();
+    size_t res;
+    curph = s_blockchain.loadBlockMeta(curph, res).previous_hash();
     if (curph.is_empty())
       break;
   }
@@ -628,9 +627,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         new_blocks.erase(fIt, new_blocks.end());
         break;
       }
-
-      size_t _;
-      luca = s_blockchain.loadBlockMeta(luca, _).previous_hash();
+      size_t res;
+      luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
     }
   }
 
@@ -761,15 +759,12 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const api:
 
   {
     std::unique_lock<decltype(entry.lock)> l(entry.lock);
-
     ++entry.awaiter_num;
-
     const auto checker = [&]() {
       if (!entry.trid_queue.empty()) {
         _return = convert_transaction_id(entry.trid_queue.front());
-        if (--entry.awaiter_num == 0) {
+        if (--entry.awaiter_num == 0)
           entry.trid_queue.pop_front();
-        }
         return true;
       }
       return false;
@@ -778,10 +773,9 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const api:
   }
 }
 
-void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, const int64_t _offset,
-                                          const int64_t _limit) {
-  int64_t offset = _offset;
-  int64_t limit = _limit;
+void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, const int64_t _offset, const int64_t _limit) {
+  int64_t offset  = _offset;
+  int64_t limit   = _limit;
 
   auto smart_origin = locked_ref(this->smart_origin);
 
@@ -808,8 +802,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete) 
 
 bool APIHandler::convertAddrToPublicKey(const csdb::Address& addr) {
   if (addr.is_wallet_id()) {
-    const WalletId id =
-        *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
+    const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
     if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address&>(addr)))
       return false;
   }
@@ -857,9 +850,8 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
-      if (!finish_for_idx) {                              // if hash table doesn't contain trx
-        if (conveyer.isMetaTransactionInvalid(inner_id))  // return true if in last 5 rounds trx is invalid (time
-                                                          // between del from hash table and add to blockchain)
+      if (!finish_for_idx) {                              // if hash table doesn't contain trx return true if in last 5 rounds
+        if (conveyer.isMetaTransactionInvalid(inner_id))  // trx is invalid (time between del from hash table and add to blockchain)
           _return.states[inner_id] = INVALID;
         else
           _return.states[inner_id] = VALID;

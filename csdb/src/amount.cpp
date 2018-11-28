@@ -1,4 +1,4 @@
-#include "csdb/amount.h"
+#include "csdb/amount.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -8,7 +8,7 @@
 #define sprintf_s sprintf
 #endif
 
-#include "binary_streams.h"
+#include "binary_streams.hpp"
 
 namespace csdb {
 Amount::Amount(double value) {
@@ -29,7 +29,7 @@ Amount::Amount(double value) {
     multiplier /= 10;
   }
 
-  fraction_ = lround(frac + 0.5) * multiplier;
+  fraction_ = lround(frac) * multiplier;
   if (fraction_ >= AMOUNT_MAX_FRACTION) {
     fraction_ -= AMOUNT_MAX_FRACTION;
     ++integral_;

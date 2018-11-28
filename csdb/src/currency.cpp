@@ -1,6 +1,6 @@
-#include "csdb/currency.h"
-#include "binary_streams.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
+#include "csdb/currency.hpp"
+#include "binary_streams.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
 
 namespace csdb {
 

@@ -1,7 +1,7 @@
 #ifndef NODE_CORE_HPP
 #define NODE_CORE_HPP
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
@@ -56,7 +56,6 @@ using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
   PublicKeyLength = PUBLIC_KEY_LENGTH,
-  Black2HashLength = BLAKE2_HASH_LENGTH,
   HashLength = HASH_LENGTH,
   SignatureLength = SIGNATURE_LENGTH,
   PrivateKeyLength = PRIVATE_KEY_LENGTH,

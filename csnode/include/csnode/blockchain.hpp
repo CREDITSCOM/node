@@ -13,13 +13,13 @@
 
 #include <boost/dynamic_bitset.hpp>
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/amount_commission.h>
-#include <csdb/pool.h>
-#include <csdb/storage.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/pool.hpp>
+#include <csdb/storage.hpp>
 
-#include <csdb/internal/types.h>
+#include <csdb/internal/types.hpp>
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
@@ -29,15 +29,14 @@
 #include <condition_variable>
 #include <mutex>
 
-namespace cs
-{
-  class BlockHashes;
-  class WalletsIds;
-  class Fee;
+namespace cs {
+class BlockHashes;
+class WalletsIds;
+class Fee;
+class TransactionsPacket;
 }  // namespace cs
 
-class BlockChain
-{
+class BlockChain {
 public:
   using Transactions = std::vector<csdb::Transaction>;
   using WalletId = csdb::internal::WalletId;
@@ -45,13 +44,10 @@ public:
   using WalletData = cs::WalletsCache::WalletData;
   using Mask = boost::dynamic_bitset<uint64_t>;
 
-  BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
+  explicit BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
-  bool isGood() const
-  {
-    return good_;
-  }
+  bool isGood() const;
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature = {});
@@ -90,10 +86,10 @@ public:
   std::optional<csdb::Pool> createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key);
 
 private:
-  bool finishNewBlock(csdb::Pool& pool); // obsolete?
-  void removeWalletsInPoolFromCache(const csdb::Pool& pool); // obsolete?
-  bool writeNewBlock(csdb::Pool& pool); // obsolete
-  bool onBlockReceived(csdb::Pool& pool); // obsolete
+  bool finishNewBlock(csdb::Pool& pool);                      // obsolete?
+  void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
+  bool writeNewBlock(csdb::Pool& pool);                       // obsolete
+  bool onBlockReceived(csdb::Pool& pool);                     // obsolete
 
 public:
   size_t getSize() const;
@@ -105,6 +101,7 @@ public:
   csdb::Pool loadBlock(const uint32_t sequence) const;
   csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
   csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
+  void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
 
@@ -134,14 +131,16 @@ public:
 
   // wallets modified by last new block
   bool getModifiedWallets(Mask& dest) const;
+
+  // updates fees in every transaction
+  void setTransactionsFees(cs::TransactionsPacket& packet);
 private:
   bool putBlock(csdb::Pool& pool);
 
 public:
   const csdb::Storage& getStorage() const;
 
-  struct AddrTrnxCount
-  {
+  struct AddrTrnxCount {
     uint64_t sendCount;
     uint64_t recvCount;
   };
@@ -163,7 +162,7 @@ private:
 
   void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
-    csdb::Pool::NewWallets& newWallets);
+                          csdb::Pool::NewWallets& newWallets);
 
   bool updateFromNextBlock(csdb::Pool& pool);
 
@@ -171,12 +170,13 @@ private:
   bool getWalletId(const WalletAddress& address, WalletId& id);
   bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
-  class TrxLoader;
+  class TransactionsLoader;
+
   bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
-    cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
-    const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
+                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
 private:
   bool good_;
@@ -185,8 +185,8 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  csdb::Pool::sequence_t global_sequence;
-  bool blockRequestIsNeeded;
+  csdb::Pool::sequence_t globalSequence_;
+  bool blockRequestIsNeeded_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
 
@@ -198,14 +198,13 @@ private:
   std::unique_ptr<cs::WalletsPools> walletsPools_;
   mutable cs::spinlock cacheMutex_;
 
-  std::condition_variable_any new_block_cv;
-  cs::spinlock waiters_locker;
-  std::map<csdb::Address, AddrTrnxCount> m_trxns_count;
+  std::condition_variable_any newBlockCv_;
+  cs::spinlock waitersLocker_;
+  std::map<csdb::Address, AddrTrnxCount> transactionsCount_;
 
   // block cache
 
 public:
-
   /**
    * @fn    csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const;
    *
@@ -230,10 +229,7 @@ public:
    * @return    The last sequence.
    */
 
-  csdb::Pool::sequence_t getLastSequence() const
-  {
-    return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t) getLastWrittenSequence());
-  }
+  csdb::Pool::sequence_t getLastSequence() const;
 
   std::size_t getCachedBlocksSize() const;
 
@@ -243,8 +239,8 @@ public:
   /**
    * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
    *
-   * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached ones.
-   *        Each interval means [first..second] including bounds. Last interval ends with 0 meaning "until end"
+   * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached
+   * ones. Each interval means [first..second] including bounds. Last interval ends with 0 meaning "until end"
    *
    * @author    Alexander Avramenko
    * @date  23.11.2018
@@ -266,9 +262,9 @@ public:
   void testCachedBlocks();
 
 private:
-
   /**
-   * @fn    std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature, std::optional<cs::PrivateKey> writer_key);
+   * @fn    std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool,
+   * std::optional<cs::Signature> writer_signature, std::optional<cs::PrivateKey> writer_key);
    *
    * @brief Finish pool, sign it or test signature, then record block to chain
    *
@@ -282,17 +278,16 @@ private:
    * @return    A std::pair of bool (success or fail) and std::optional&lt;csdb::Pool&gt; (recorded pool)
    */
 
-  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool,
-    std::optional<cs::Signature> writer_signature, std::optional<cs::PrivateKey> writer_key);
+  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature,
+                                                         std::optional<cs::PrivateKey> writer_key);
 
   // to store outrunning blocks until the time to insert them comes
   // stores pairs of <block, sender> sorted by sequence number
-  std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta> cached_blocks;
-  cs::Signature empty_signature;
+  std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta> cachedBlocks_;
+  cs::Signature emptySignature_;
 
   // fee calculator
-  std::unique_ptr<cs::Fee> pfee;
-
+  std::unique_ptr<cs::Fee> fee_;
 };
 
 #endif  //  BLOCKCHAIN_HPP

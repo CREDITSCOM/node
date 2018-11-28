@@ -109,7 +109,7 @@ public:
 
   const cs::Hash& getHash() const {
     if (!hashed_) {
-      hash_ = getBlake2Hash(data_.get(), data_.size());
+      hash_ = generateHash(data_.get(), data_.size());
       hashed_ = true;
     }
     return hash_;

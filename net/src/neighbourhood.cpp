@@ -42,7 +42,7 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     if (!found) {
       if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundInfo))
         sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
-      if (nb->isSignal && bp.pack.getType() == MsgTypes::RoundInfo) // Assume the SS got this
+      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundInfo || bp.pack.getType() == MsgTypes::BlockHash)) 
         sent = transport_->sendDirect(&(bp.pack), **nb);
         //*(bp.recEnd++) = nb->id;
       else
@@ -91,59 +91,50 @@ bool Neighbourhood::canHaveNewConnection() {
 
 void Neighbourhood::checkPending(const uint32_t) {
   cs::SpinGuard l(mLockFlag_);
-  //LOG_DEBUG("CONNECTIONS: ");
-  // If the connection cannot be established, retry it
-  for (auto conn = connections_.begin();
-       conn != connections_.end();
-       ++conn) {
+  for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
     // Attempt to reconnect if the connection hasn't been established yet
-    if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts)
+    if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
       transport_->sendRegistrationRequest(****conn);
-
+    }
   }
-  /*for (auto conn = connections_.begin();
-       conn != connections_.end();
-       ++conn) {
-    LOG_DEBUG((conn->data)->id << ". " << (conn->data).get() << ": " << (conn->data)->in << " : " << (conn->data)->out << " ~ " << (conn->data)->specialOut << " ~ " << (conn->data)->connected << " ~ " << (conn->data)->node.get());
-  }*/
-
-  /*cs::SpinGuard l2(nLockFlag_);
-  LOG_DEBUG("NEIGHBOURS: ");
-  for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn)
-    LOG_DEBUG(conn->get() << " : " << (*conn)->in << " : " << (*conn)->getOut() << " : " << (*conn)->id << " ~ " << (bool)(*conn)->node);
-*/
 }
 
 void Neighbourhood::refreshLimits() {
   cs::SpinGuard l(nLockFlag_);
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-    if (++((*conn)->syncSeqRetries) >= MaxSyncAttempts) {
-      (*conn)->syncSeqRetries = 0;
-      (*conn)->syncSeq = 0;
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
+        (*conn)->syncSeqs[i] = 0;
+        (*conn)->syncSeqsRetries[i] = 0;
+      }
     }
     (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
   }
 }
 
 void Neighbourhood::checkSilent() {
-  cs::SpinGuard lm(mLockFlag_);
-  cs::SpinGuard ln(nLockFlag_);
+  static uint32_t refillCount = 0;
+
+  bool needRefill = true;
+  std::scoped_lock lock(mLockFlag_, nLockFlag_);
 
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-    if ((*conn)->isSignal)
-      continue;
-
     if (!(*conn)->node) {
       ConnectionPtr tc = *conn;
+      csunused(tc);
       disconnectNode(conn);
       --conn;
+      continue;
+    }
+
+    if ((*conn)->isSignal) {
       continue;
     }
 
     const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
 
     if (packetsCount == (*conn)->lastPacketsCount) {
-      LOG_WARN("Node " << (*conn)->in << " stopped responding");
+      cswarning() << "Node " << (*conn)->in << " stopped responding";
 
       ConnectionPtr tc = *conn;
       Connection* c = *tc;
@@ -154,6 +145,17 @@ void Neighbourhood::checkSilent() {
     }
     else {
       (*conn)->lastPacketsCount = packetsCount;
+    }
+
+    if (needRefill) {
+      ++refillCount;
+      if (refillCount >= WarnsBeforeRefill) {
+        refillCount = 0;
+        transport_->refillNeighbourhood();
+      }
+    }
+    else {
+      refillCount = 0;
     }
   }
 }
@@ -341,16 +343,13 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
 
   if (!realPtr) {
     if (nConn) {
-      nConn->id = id;
-      if (!nConn->specialOut && nConn->in != ep) {
-        nConn->specialOut = true;
-        nConn->out = nConn->in;
-        nConn->in = ep;
-        nConn->key = pk;
-        nConn->lastSeq = lastSeq;
-      }
+      cswarning() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut();
+      transport_->sendRegistrationRequest(*nConn);
+      nConn->lastSeq = lastSeq;
     }
     else {
+      cswarning() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
+
       Connection conn;
       conn.id = id;
       conn.in = ep;
@@ -359,14 +358,19 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
     }
   }
   else if (realPtr->get() != nConn) {
-    if (!(*realPtr)->specialOut && (*realPtr)->in != ep) {
-      (*realPtr)->specialOut = true;
-      (*realPtr)->out = (*realPtr)->in;
+    if (nConn) {
+      cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " but the remote node is bound to " << nConn->getOut();
+      transport_->sendRegistrationRequest(*nConn);
     }
-    (*realPtr)->in = ep;
+    else {
+      cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " and there is no bindings, sending reg";
+    }
+
+    (*realPtr)->lastSeq = lastSeq;
     (*realPtr)->key = pk;
     (*realPtr)->lastSeq = lastSeq;
     connectNode(node, *realPtr);
+    transport_->sendRegistrationRequest(***realPtr);
   }
   else {
     (*realPtr)->lastSeq = lastSeq;
@@ -587,23 +591,36 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   alreadyRequested = false;
   ConnectionPtr candidate;
   for (auto& nb : neighbours_) {
-    if (nb->isSignal || nb->lastSeq < seq) continue;
-    if (nb->syncSeq == seq) {
-      if (nb->syncSeqRetries < MaxSyncAttempts) {
-        alreadyRequested = true;
-        return nb;
-      }
-
-      nb->syncSeq = 0;
-      nb->syncSeqRetries = 0;
+    if (nb->isSignal || nb->lastSeq < seq) {
+      continue;
     }
-    if (!candidate && !nb->syncSeq)
-      candidate = nb;
+
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (nb->syncSeqs[i] == seq) {
+        if (nb->syncSeqsRetries[i] < MaxSyncAttempts) {
+          alreadyRequested = true;
+          return nb;
+        }
+
+        nb->syncSeqs[i] = 0;
+        nb->syncSeqsRetries[i] = 0;
+        break;
+      }
+      else if (!candidate && !nb->syncSeqs[i]) {
+        candidate = nb;
+        break;
+      }
+    }
   }
 
   if (candidate) {
-    candidate->syncSeq = seq;
-    candidate->syncSeqRetries = rand() % (MaxSyncAttempts / 2);
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (!candidate->syncSeqs[i]) {
+        candidate->syncSeqs[i] = seq;
+        candidate->syncSeqsRetries[i] = rand() % (MaxSyncAttempts / 2);
+        break;
+      }
+    }
   }
 
   return candidate;
@@ -680,16 +697,19 @@ void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
   cs::SpinGuard n(nLockFlag_);
 
   for (auto& nb : neighbours_) {
-    if (nb->syncSeq == seq) {
-      nb->syncSeq = 0;
-      nb->syncSeqRetries = 0;
+    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+      if (nb->syncSeqs[i] == seq) {
+        nb->syncSeqs[i] = 0;
+        nb->syncSeqsRetries[i] = 0;
+        break;
+      }
     }
   }
 }
 
 int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) {
   if (neighbours_.size() == 0) {
-    cslog() << "No neighbours!!!";
+    cslog() << "Neighbourhood, no neighbours";
     return -1;
   }
 
@@ -708,7 +728,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     return -1;
   }
 
-  const int randomNumber = cs::Utils::generateRandomValue(0, neighbourCount);
+  const int randomNumber = cs::Utils::generateRandomValue(0, static_cast<int>(neighbourCount));
   const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
 
   if (!nb) {

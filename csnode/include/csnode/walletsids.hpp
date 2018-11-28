@@ -1,11 +1,11 @@
 #ifndef WALLET_IDS_HPP
 #define WALLET_IDS_HPP
 
-#include <csdb/address.h>
+#include <csdb/address.hpp>
 #include <memory>
 #include <type_traits>
 #include <unordered_map>
-#include "csdb/internal/types.h"
+#include "csdb/internal/types.hpp"
 
 namespace cs {
 

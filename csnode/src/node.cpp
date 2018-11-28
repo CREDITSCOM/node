@@ -3,12 +3,13 @@
 #include <numeric>
 #include <sstream>
 
-#include <solver2/solvercore.hpp>
+#include <solver/solvercore.hpp>
 
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/node.hpp>
 #include <csnode/nodecore.hpp>
+#include <csnode/spammer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -22,9 +23,7 @@
 
 #include <lz4.h>
 #include <sodium.h>
-
-#include <snappy.h>
-#include <sodium.h>
+#include <cscrypto/cscrypto.hpp>
 
 #include <poolsynchronizer.hpp>
 
@@ -39,7 +38,7 @@ const csdb::Address Node::startAddress_ =
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
-, solver_(new slv2::SolverCore(this, genesisAddress_, startAddress_))
+, solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
@@ -86,7 +85,7 @@ bool Node::init() {
   }
 
 #ifdef SPAMMER
-  solver_->runSpammer();
+  runSpammer();
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -156,45 +155,26 @@ bool Node::checkKeysFile() {
 }
 
 std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
-  cs::Bytes publicKey;
-  cs::Bytes privateKey;
-
-  publicKey.resize(PUBLIC_KEY_LENGTH);
-  privateKey.resize(PRIVATE_KEY_LENGTH);
-
-  crypto_sign_keypair(publicKey.data(), privateKey.data());
+  cs::PublicKey fixedPublicKey;
+  cs::PrivateKey fixedPrivateKey;
+  cscrypto::GenerateKeyPair(fixedPublicKey, fixedPrivateKey);
 
   std::ofstream f_pub(publicKeyFileName_);
-  f_pub << EncodeBase58(publicKey);
+  f_pub << EncodeBase58(cs::Bytes(fixedPublicKey.begin(), fixedPublicKey.end()));
   f_pub.close();
 
   std::ofstream f_priv(privateKeyFileName_);
-  f_priv << EncodeBase58(privateKey);
+  f_priv << EncodeBase58(cs::Bytes(fixedPrivateKey.begin(), fixedPrivateKey.end()));
   f_priv.close();
-
-  cs::PublicKey fixedPublicKey;
-  cs::PrivateKey fixedPrivateKey;
-
-  std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
-  std::copy(privateKey.begin(), privateKey.end(), fixedPrivateKey.begin());
 
   return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
 }
 
 bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
-  const uint8_t msg[] = {255, 0, 0, 0, 255};
-  cs::Signature signature;
-
-  unsigned long long sig_size;
-  crypto_sign_detached(signature.data(), &sig_size, msg, 5, privateKey.data());
-
-  int ver_ok = crypto_sign_verify_detached(signature.data(), msg, 5, publicKey.data());
-
-  if (ver_ok == 0) {
+  if (cscrypto::ValidateKeyPair(publicKey, privateKey)) {
     solver_->setKeysPair(publicKey, privateKey);
     return true;
   }
-
   cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
   char gen_flag = 'a';
@@ -227,6 +207,15 @@ void Node::stop() {
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 }
 
+void Node::runSpammer()
+{
+  if(!spammer_) {
+    cswarning() << "SolverCore: starting transaction spammer";
+    spammer_ = std::make_unique<cs::Spammer>();
+    spammer_->StartSpamming(*this);
+  }
+}
+
 /* Requests */
 void Node::flushCurrentTasks() {
   transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
@@ -238,6 +227,66 @@ bool monitorNode = true;
 #else
 bool monitorNode = false;
 #endif
+
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type)
+{
+  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence() << ", current #" << roundNum_;
+  istream_.init(data, size);
+  cs::Hash h;
+  istream_ >> h;
+
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+
+  if(rNum > round) {
+    if(rNum - 1 == round || round == 0) {
+      // continue reading round info
+      cs::RoundTable rt;
+      if(readRoundData(rt)) {
+        // if we are behind exactly one round, ask for round info
+        roundNum_ = rNum - 1;
+        cswarning() << "NODE> request round info from trusted nodes";
+        sendRoundInfoRequest(rt.general);
+        for(const auto& t : rt.confidants) {
+          sendRoundInfoRequest(t);
+        }
+      }
+      else {
+        cswarning() << "NODE> read trusted nodes from round info failed";
+      }
+    }
+    else {
+      // otherwise 
+      cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
+      poolSynchronizer_->processingSync(rNum, true /*is bigbang*/);
+    }
+    return;
+  }
+
+  if(rNum < round - 1) {
+    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
+    return;
+  }
+
+  if(rNum == round - 1) {
+    // revert last block & start previous round
+    cserror() << "NODE> require unimplemented revert last written block, cannot handle BigBang properly";
+    cslog() << "NODE> re-send last round info may help others to go to next round";
+    tryResendRoundInfo(std::nullopt, round); // broadcast round info
+    return;
+  }
+
+  if(rNum == round) {
+    // currently in proper round, handle BigBang
+    cslog() << "NODE> resend last block hash after BigBang";
+    if(tryResendRoundInfo(std::nullopt, round)) {
+      // only sender able do it
+      cswarning() << "NODE> re-send last round info to ALL";
+    }
+    sendHash_V3(round);
+    solver_->gotBigBang();
+    return;
+  }
+}
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
@@ -267,8 +316,17 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
   transport_->clearTasks();
 
-  if (getBlockChain().getLastWrittenSequence() < roundNum_ - 1) {
+  const auto last_block = getBlockChain().getLastWrittenSequence();
+  if (last_block < roundNum_ - 1) {
     cswarning() << "NODE> Last written sequence lower than current round - 1";
+    if(last_block == roundNum_ - 2) {
+      cswarning() << "NODE> require exactly last round info and previous block, perform requests";
+      --roundNum_;
+      sendRoundInfoRequest(roundTable.general);
+      for(const auto& t : roundTable.confidants) {
+        sendRoundInfoRequest(t);
+      }
+    }
     return;
   }
 
@@ -511,8 +569,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   processPacketsRequest(std::move(hashes), round, sender);
 }
 
-void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round,
-                                const cs::PublicKey& sender) {
+void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     csdebug() << "NODE> sync packets have already finished in round " << round;
     return;
@@ -1225,7 +1282,8 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if (type == MsgTypes::BigBang && rNum > getBlockChain().getLastWrittenSequence()) {
+  // BigBang: only current or previous round may be handled:
+  if (type == MsgTypes::BigBang && rNum >= roundNum_ - 1) {
     return MessageActions::Process;
   }
 
@@ -1963,7 +2021,8 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
 
 void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
                         const cs::PublicKey& sender) {
-  cslog() << "\nNODE> " << __func__ << "():";
+  csdebug() << "\n";
+  cslog() << "NODE> " << __func__ << "():";
 
   if (myLevel_ == NodeLevel::Writer) {
     cswarning() << "\tWriters don't need ROUNDINFO";
@@ -2122,15 +2181,14 @@ void Node::logPool(csdb::Pool& pool) {
   csdebug() << "===============================";
 }
 
-void Node::sendHash_V3(cs::RoundNumber round) {
-  /* if (myLevel_ == NodeLevel::Writer || myLevel_ == NodeLevel::Main) {
-     cserror() <<"Writer and Main node shouldn't send hashes";
-     return;
-   }*/
+void Node::sendHash_V3(cs::RoundNumber round)
+{
+  if(getBlockChain().getLastWrittenSequence() != round - 1) {
+    // should not send hash until have got proper block sequence
+    return;
+  }
 
   const auto& tmp = getBlockChain().getLastWrittenHash();
-  // cs::Hash testHash;
-  // std::copy(tmp.cbegin(), tmp.cend(), testHash.begin());
 
   cswarning() << "Sending hash " << tmp.to_string() << " to ALL";
   ostream_.init(BaseFlags::Broadcast);
@@ -2160,14 +2218,33 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
 }
 
 void Node::sendRoundInfoRequest(uint8_t respondent) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "NODE> only confidant nodes can request consensus stages";
+  // ask for round info from current trusted on current round
+  const auto cnt = (uint8_t) cs::Conveyer::instance().currentRoundTable().confidants.size();
+  if(respondent < cnt) {
+    sendRoundInfoRequest(cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
   }
+  else {
+    cserror() << "NODE> cannot request round info, incorrect respondent number";
+  }
+}
 
+constexpr const uint8_t InvalidTrustedIndex = (uint8_t) -1;
+
+void Node::sendNextRoundRequest()
+{
+  ostream_.init(0 /*need no flags!*/);
+  // 0xFF means we ask for last writer node simply to repeat round info
+  ostream_ << MsgTypes::RoundInfoRequest << InvalidTrustedIndex;
+  flushCurrentTasks();
+}
+
+void Node::sendRoundInfoRequest(const cs::PublicKey& respondent)
+{
   cslog() << "NODE> send request for next round info after #" << roundNum_;
 
-  ostream_.init(0 /*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
-  ostream_ << MsgTypes::RoundInfoRequest << roundNum_ << myConfidantIndex_;
+  ostream_.init(0 /*need no flags!*/, respondent);
+  // ask for next round info:
+  ostream_ << MsgTypes::RoundInfoRequest << roundNum_ + 1 << myConfidantIndex_;
   flushCurrentTasks();
 }
 
@@ -2186,6 +2263,22 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
     cserror() << "NODE> bad RoundInfo request packet format";
     return;
   }
+
+  // special request to re-send again handling
+  if(requesterNumber == InvalidTrustedIndex) {
+    csdebug() << "NODE> som enode asks for last round info to repeat";
+    if(lastSentRoundData_.roundTable.round == rNum) {
+      if(tryResendRoundInfo(requester, rNum)) {
+        cslog() << "NODE> round info #" << rNum << " has sent again";
+      }
+      else {
+        cslog() << "NODE> unable to send round info #" << rNum << " again";
+      }
+    }
+    return;
+  }
+
+  // default request from other trusted node handling
   cslog() << "NODE> get request for next round info after #" << rNum << " from [" << (int)requesterNumber << "]";
   solver_->gotRoundInfoRequest(requester, rNum);
 }
@@ -2202,16 +2295,17 @@ void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_in
   flushCurrentTasks();
 }
 
-bool Node::tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum) {
+bool Node::tryResendRoundInfo(std::optional<const cs::PublicKey> /*respondent*/, cs::RoundNumber rNum) {
   if (lastSentRoundData_.roundTable.round != rNum) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
   }
+  //TODO: use respondent.value() to send info directly, otherwise broadcast info
   createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo, lastSentRoundData_.characteristic,
                      lastSentRoundData_.poolSignature /*, last_sent_round_data.notifications*/);
   flushCurrentTasks();
-  cslog() << "NODE> re-send last round info #" << rNum << " to "
-          << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+  cslog() << "NODE> re-send last round info #" << rNum << " to ALL";
+          //<< cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
   return true;
 }
 

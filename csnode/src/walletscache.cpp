@@ -1,4 +1,4 @@
-#include <csdb/amount_commission.h>
+#include <csdb/amount_commission.hpp>
 #include <algorithm>
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>

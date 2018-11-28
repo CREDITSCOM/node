@@ -1,8 +1,8 @@
 #include <cmath>
 
-#include <csdb/amount_commission.h>
+#include <csdb/amount_commission.hpp>
 
-#include "binary_streams.h"
+#include "binary_streams.hpp"
 
 namespace csdb {
 
@@ -21,7 +21,7 @@ AmountCommission::AmountCommission(double value) {
     ++expi;
   }
   fIEEE_.exp = expi + 18;
-  fIEEE_.frac = value * 1024 + 0.5;
+  fIEEE_.frac = lround(value * 1024);
 }
 
 void AmountCommission::put(priv::obstream& os) const {

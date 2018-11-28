@@ -1,7 +1,7 @@
-#include "csdb/user_field.h"
+#include "csdb/user_field.hpp"
 
-#include "binary_streams.h"
-#include "csdb/internal/shared_data_ptr_implementation.h"
+#include "binary_streams.hpp"
+#include "csdb/internal/shared_data_ptr_implementation.hpp"
 
 namespace csdb {
 

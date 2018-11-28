@@ -20,12 +20,13 @@
 
 class Transport;
 
-namespace slv2 {
+namespace cs {
 class SolverCore;
 }
 
 namespace cs {
 class PoolSynchronizer;
+class Spammer;
 }
 
 class Node {
@@ -39,10 +40,12 @@ public:
 
   void run();
   void stop();
+  void runSpammer();
 
   // static void stop();
 
   // incoming requests processing
+  void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
   void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
   void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -86,12 +89,17 @@ public:
   void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable);
 
+  // broadcast request for next round, to call after long timeout
+  void sendNextRoundRequest();
+  // send request for next round info from trusted node specified by index in list
   void sendRoundInfoRequest(uint8_t respondent);
+  // send request for next round info from node specified node
+  void sendRoundInfoRequest(const cs::PublicKey& respondent);
   void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundInfoReply(const uint8_t* data, const size_t size,
                          const cs::PublicKey& respondent);
-  bool tryResendRoundInfo(const cs::PublicKey& respondent, cs::RoundNumber rNum);
+  bool tryResendRoundInfo(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -180,11 +188,11 @@ public:
     return bc_;
   }
 
-  slv2::SolverCore* getSolver() {
+  cs::SolverCore* getSolver() {
     return solver_;
   }
 
-  const slv2::SolverCore* getSolver() const {
+  const cs::SolverCore* getSolver() const {
     return solver_;
   }
 
@@ -221,15 +229,7 @@ private:
   // pool sync helpers
   void blockchainSync();
 
-  //void addPoolMetaToMap(cs::PoolSyncMeta&& meta, csdb::Pool::sequence_t sequence);
-  // obsolete:
-  void processMetaMap()
-  {
-    getBlockChain().testCachedBlocks();
-  }
-
   bool readRoundData(cs::RoundTable& roundTable);
-
   void onRoundStartConveyer(cs::RoundTable&& roundTable);
 
   // conveyer
@@ -274,8 +274,9 @@ private:
   BlockChain bc_;
 
   // appidional dependencies
-  slv2::SolverCore* solver_;
+  cs::SolverCore* solver_;
   Transport* transport_;
+  std::unique_ptr<cs::Spammer> spammer_;
 
 #ifdef MONITOR_NODE
   csstats::csstats stats_;
@@ -290,7 +291,7 @@ private:
 
   size_t lastStartSequence_;
   uint32_t startPacketRequestPoint_ = 0;
-  inline static const uint32_t packetRequestStep_ = 100;
+  inline static const uint32_t packetRequestStep_ = 150;
 
   bool blocksReceivingStarted_ = false;
 

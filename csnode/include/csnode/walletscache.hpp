@@ -1,10 +1,10 @@
 #ifndef WALLETS_CACHE_HPP
 #define WALLETS_CACHE_HPP
 
-#include <csdb/address.h>
-#include <csdb/amount.h>
-#include <csdb/pool.h>
-#include <csdb/transaction.h>
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
 #include <boost/dynamic_bitset.hpp>
 #include <csnode/transactionstail.hpp>
 #include <memory>

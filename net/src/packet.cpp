@@ -14,7 +14,7 @@ enum Lengths
 
 const cs::Hash& Packet::getHeaderHash() const {
   if (!headerHashed_) {
-    headerHash_ = getBlake2Hash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum),
+    headerHash_ = generateHash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum),
                                 Lengths::FragmentedHeader);
     headerHashed_ = true;
   }

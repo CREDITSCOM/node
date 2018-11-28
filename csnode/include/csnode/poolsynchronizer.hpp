@@ -1,7 +1,7 @@
 #ifndef POOLSYNCHRONIZER_HPP
 #define POOLSYNCHRONIZER_HPP
 
-#include <csdb/pool.h>
+#include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/packstream.hpp>
@@ -24,7 +24,7 @@ class PoolSynchronizer {
 public:  // Interface
   explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
 
-  void processingSync(const cs::RoundNumber roundNum);
+  void processingSync(const cs::RoundNumber roundNum, bool isBigBand = false);
 
   // syncro get functions
   void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packet);
@@ -77,6 +77,7 @@ private:  // Members
   // [value] =  packet counter
   // value: increase each new round
   std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
+  bool m_isBigBand;
 
   class NeighboursSetElemet {
   public:

@@ -1,7 +1,5 @@
-
-
-#include <csdb/amount_commission.h>
-#include <csdb/currency.h>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
 #include <gtest/gtest.h>
 #include <csnode/conveyer.hpp>
 #include <iostream>
@@ -58,12 +56,17 @@ bool operator==(const cs::Characteristic& left,
 
 namespace csdb {
 bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
-  return left.id() == right.id() && left.innerID() == right.innerID() &&
-         left.source() == right.source() && left.target() == right.target() &&
-         left.currency() == right.currency() &&
-         left.max_fee() == right.max_fee() &&
-         left.counted_fee() == right.counted_fee() &&
-         left.signature() == right.signature();
+  auto innerIdResult = left.innerID() == right.innerID();
+  auto idResult = left.id() == right.id();
+  auto signatureResult = left.signature() == right.signature();
+  auto sourceResult = left.source() == right.source();
+  auto currencyResult = left.currency() == right.currency();
+  auto targetResult = left.target() == right.target();
+  auto feeResult = left.max_fee().to_double() == right.max_fee().to_double();
+  auto countedFeeResult = left.counted_fee().to_double() == right.counted_fee().to_double();
+
+  return innerIdResult && idResult && signatureResult && sourceResult &&
+         currencyResult && targetResult && feeResult & countedFeeResult;
 }
 }  // namespace csdb
 
