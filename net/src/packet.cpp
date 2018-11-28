@@ -183,6 +183,8 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "RoundTable";
     case WriterNotification:
       return "WriterNotification";
+    case NodeStopRequest:
+      return "NodeStopRequest";
   }
 }
 

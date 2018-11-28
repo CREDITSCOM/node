@@ -1,11 +1,9 @@
 #ifndef COMMON_HPP
 #define COMMON_HPP
 
-#include <array>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
-#include <vector>
 
 #include <boost/smart_ptr/detail/spinlock.hpp>
 
@@ -17,19 +15,17 @@ constexpr std::size_t PRIVATE_KEY_LENGTH = cscrypto::kPrivateKeySize;
 constexpr std::size_t SIGNATURE_LENGTH = cscrypto::kSignatureSize;
 
 namespace cs {
-using Vector = std::string;
-using Matrix = std::string;
-
+// key node type
 using RoundNumber = uint32_t;
 
-using Byte = uint8_t;
+using Byte = cscrypto::Byte;
 
 // dynamic vector of bytes
-using Bytes = std::vector<Byte>;
+using Bytes = cscrypto::Bytes;
 
 // static byte array
 template <std::size_t size>
-using ByteArray = std::array<Byte, size>;
+using ByteArray = cscrypto::ByteArray<size>;
 
 // common data structures
 using PublicKey = cscrypto::PublicKey;

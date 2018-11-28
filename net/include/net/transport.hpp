@@ -223,7 +223,8 @@ private:
     }
   };
 
-  typedef FixedCircularBuffer<PostponedPacket, 1024> PPBuf;
+  inline static constexpr uint32_t posponedBufferSize_ = 1024;
+  typedef FixedCircularBuffer<PostponedPacket, posponedBufferSize_> PPBuf;
 
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;

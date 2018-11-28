@@ -47,17 +47,18 @@ public:
 
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
-  void getRoundTableSS(const uint8_t*, const size_t, const cs::RoundNumber, uint8_t type = 0);
-  void getVector(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getMatrix(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getHash(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getTransactionsPacket(const uint8_t*, const std::size_t);
+  void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber, uint8_t type = 0);
+  void getVector(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getMatrix(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getTransactionsPacket(const uint8_t* data, const std::size_t size);
+  void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
   // SOLVER3 methods
-  void getStageOne(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getStageTwo(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getStageThree(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getRoundInfo(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+  void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
   // SOLVER3 methods
   void sendStageOne(cs::StageOne&);
@@ -292,7 +293,7 @@ private:
 
   size_t lastStartSequence_;
   uint32_t startPacketRequestPoint_ = 0;
-  inline static const uint32_t packetRequestStep_ = 150;
+  inline static const uint32_t packetRequestStep_ = 250;
 
   bool blocksReceivingStarted_ = false;
 

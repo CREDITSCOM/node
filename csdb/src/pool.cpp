@@ -440,7 +440,7 @@ size_t Pool::transactions_count() const noexcept {
 }
 
 void Pool::recount() noexcept {
-  d->transactionsCount_ = d->transactions_.size();
+  d->transactionsCount_ = static_cast<uint32_t>(d->transactions_.size());
 }
 
 Pool::sequence_t Pool::sequence() const noexcept {

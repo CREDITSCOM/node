@@ -26,7 +26,6 @@ void poll_signal_flag() {
       stopNode();
     }
     catch (...) {
-      // Handle error
       cserror() << "Poll signal error!";
       std::raise(SIGABRT);
     }
@@ -36,15 +35,13 @@ void poll_signal_flag() {
 // Extern function dfined in main.cpp to poll and handle signal status.
 extern void poll_signal_flag();
 
-enum RegFlags : uint8_t
-{
+enum RegFlags : uint8_t {
   UsingIPv6 = 1,
   RedirectIP = 1 << 1,
   RedirectPort = 1 << 2
 };
 
-enum Platform : uint8_t
-{
+enum Platform : uint8_t {
   Linux,
   MacOS,
   Windows
@@ -148,9 +145,9 @@ void Transport::run() {
   while (Transport::gSignalStatus == 0) {
     ++ctr;
 
-    bool askMissing    = true;
-    bool resendPacks   = ctr % 5 == 0;
-    bool sendPing      = ctr % 20 == 0;
+    bool askMissing = true;
+    bool resendPacks = ctr % 5 == 0;
+    bool sendPing = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending = ctr % 100 == 0;
     bool checkSilent = ctr % 150 == 0;
@@ -476,8 +473,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
   csdebug() << "TRANSPORT> POSTPHONED finish";
 }
 
-void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack,
-                                    const uint8_t* data, size_t size) {
+void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack, const uint8_t* data, size_t size) {
   if (size == 0) {
     cserror() << "Bad packet size, why is it zero?";
     return;
@@ -491,6 +487,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
       return node_->getBlockRequest(data, size, firstPack.getSender());
     case MsgTypes::RequestedBlock:
       return node_->getBlockReply(data, size, firstPack.getSender());
+    case MsgTypes::NodeStopRequest:
+      return node_->getNodeStopRequest(data, size);
     default:
       break;
   }
