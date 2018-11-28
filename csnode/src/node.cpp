@@ -2153,24 +2153,27 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
     csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
-    cs::Characteristic characteristic;
-    characteristic.mask = std::move(characteristicMask);
+    if(getBlockChain().getLastWrittenSequence() < sequence) {
+      // otherwise senseless, this block is already in chain
+      cs::Characteristic characteristic;
+      characteristic.mask = std::move(characteristicMask);
 
-    stat_.totalReceivedTransactions_ += characteristic.mask.size();
+      stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
-    assert(sequence <= this->getRoundNumber());
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
+      assert(sequence <= this->getRoundNumber());
+      ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
+      conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
+      std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, writerPublicKey);
 
-    if (pool.has_value()) {
+      if(pool.has_value()) {
 
-      if(!getBlockChain().storeBlock(pool.value(), signature)) {
-        cserror() << "NODE> failed to store block in BlockChain";
-      }
-      else {
-        stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+        if(!getBlockChain().storeBlock(pool.value(), signature)) {
+          cserror() << "NODE> failed to store block in BlockChain";
+        }
+        else {
+          stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+        }
       }
     }
   }
