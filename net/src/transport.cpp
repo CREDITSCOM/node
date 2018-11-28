@@ -830,6 +830,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash& lastHash) {
+  cslog() << "TRANSPORT> Got SS Last Block: " << lastBlock;
 #ifdef MONITOR_NODE
   return true;
 #endif
