@@ -1,11 +1,9 @@
 /* Send blaming letters to @yrtimd */
-#include <sodium.h>
-
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
 #include <csnode/blockchain.hpp>
-
+#include <cscrypto/cscrypto.hpp>
 #include <lib/system/utils.hpp>
 
 Neighbourhood::Neighbourhood(Transport* net)
@@ -17,7 +15,7 @@ Neighbourhood::Neighbourhood(Transport* net)
 template <typename T>
 T getSecureRandom() {
   T result;
-  randombytes_buf(static_cast<void*>(&result), sizeof(T));
+  cscrypto::FillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
   return result;
 }
 

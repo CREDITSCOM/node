@@ -66,7 +66,7 @@ target_include_directories(solver PUBLIC
 target_link_libraries (
 	solver
 	csnode
-	libsodium
+	cscrypto
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)

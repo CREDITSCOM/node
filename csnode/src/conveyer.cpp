@@ -138,7 +138,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   }
 
   for (const auto& hash : neededHashes) {
-    csdebug() << "CONVEYER> Need hash > " << hash.toString();
+    csdetails() << "CONVEYER> Need hash > " << hash.toString();
   }
 
   {

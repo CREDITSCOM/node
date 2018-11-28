@@ -24,6 +24,8 @@ using PublicKey = cscrypto::ByteArray<kPublicKeySize>;
 using PrivateKey = cscrypto::ByteArray<kPrivateKeySize>;
 using Signature = cscrypto::ByteArray<kSignatureSize>;
 
+bool CryptoInit();
+
 void CalculateHash(Hash& hash, const Byte* data, size_t data_size);
 
 void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key);
@@ -38,6 +40,8 @@ bool VerifySignature(const Signature& signature, const PublicKey& public_key,
 
 bool VerifySignature(const Byte* signature, const Byte* public_key,
   const Byte* data, size_t data_size);
+
+void FillBufWithRandomBytes(void* buf, size_t buf_size);
 
 }  // namespace cscrypto
 

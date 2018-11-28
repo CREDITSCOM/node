@@ -13,11 +13,6 @@
 #include <csdb/currency.hpp>
 #include <lib/system/logger.hpp>
 
-#pragma warning(push)
-#pragma warning(disable : 4324)
-#include <sodium.h>
-#pragma warning(pop)
-
 namespace cs {
 
 void NormalState::on(SolverContext& context) {

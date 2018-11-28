@@ -8,7 +8,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <blake2.h>
+#include <cscrypto/cscrypto.hpp>
 #include <sstream>
 
 namespace cs {
@@ -211,7 +211,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   }
 
   cs::Hash hash;
-  blake2s(hash.data(), hash.size(), characteristic.mask.data(), characteristic.mask.size(), nullptr, 0u);
+  cscrypto::CalculateHash(hash, characteristic.mask.data(), characteristic.mask.size());
   csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
   return hash;
