@@ -20,7 +20,8 @@ namespace cs
                     LOG_NOTICE(name() << ": it is time to spawn first round");
                 }
                 trusted_candidates.assign(Consensus::MinTrustedNodes, pctx->public_key());
-                    pctx->next_trusted_candidates(trusted_candidates);
+                std::vector <cs::TransactionsPacketHash> hashes_candidates;
+                pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
                 trusted_candidates.clear();
                 pctx->spawn_first_round();
             }, true);
@@ -41,7 +42,8 @@ namespace cs
                     trusted_candidates.emplace_back(pctx->public_key());
                 }
             }
-            pctx->next_trusted_candidates(trusted_candidates);
+            std::vector <cs::TransactionsPacketHash> hashes_candidates;
+            pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
             trusted_candidates.clear();
             pctx->spawn_next_round();
         });

@@ -9,7 +9,7 @@ namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
-  memset(&stage, 0, sizeof(stage));
+  stage.realTrustedMask.clear();
   stage.sender = (uint8_t)context.own_conf_number();
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
@@ -128,7 +128,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
     // all trusted nodes must send stage3 data
     LOG_NOTICE(name() << ": --> stage-3 [" << (int)stage.sender << "]");
     context.add_stage3(stage);  //, stage.writer != stage.sender);
-    context.next_trusted_candidates(next_round_trust);
+    context.next_trusted_candidates(next_round_trust, next_round_hashes);
     // if(stage.writer == stage.sender) {
     //    // we are selected to write & send block
     //    LOG_NOTICE(name() << ": spawn next round");
@@ -213,9 +213,16 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   if (!next_round_trust.empty()) {
     next_round_trust.clear();
   }
+  if (!next_round_hashes.empty()) {
+    next_round_hashes.clear();
+  }
   std::array<uint8_t, Consensus::MaxTrustedNodes> trustedMask;
   trustedMask.fill(0);
   std::map<cs::PublicKey, uint8_t> candidatesElection;
+  size_t myPacks = 0;
+  std::vector < cs::TransactionsPacketHash> myHashes;
+  std::map <cs::TransactionsPacketHash, uint8_t> hashesElection;
+  std::vector < cs::TransactionsPacketHash> myRejectedHashes;
   const uint8_t cnt_trusted = std::min((uint8_t)context.cnt_trusted(), (uint8_t)Consensus::MaxTrustedNodes);
   uint8_t cr = cnt_trusted / 2;
   std::vector<cs::PublicKey> aboveThreshold;
@@ -226,17 +233,40 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) <= cr);
     if (trustedMask[i]) {
+      stage.realTrustedMask.push_back(1);
       const auto& stage_i = *(context.stage1_data().cbegin() + i);
-      uint8_t candidates_amount = stage_i.candidatesAmount;
+      uint8_t candidates_amount = stage_i.trustedCandidates.size();
+      cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
       for (uint8_t j = 0; j < candidates_amount; j++) {
-        // cslog() << (int) i << "." << (int) j << " " << byteStreamToHex(stageOneStorage.at(i).candiates[j].str, 32);
-        if (candidatesElection.count(stage_i.candiates[j]) > 0) {
-          candidatesElection.at(stage_i.candiates[j]) += 1;
+        cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
+        if (candidatesElection.count(stage_i.trustedCandidates.at(j)) > 0) {
+          candidatesElection.at(stage_i.trustedCandidates.at(j)) += 1;
         }
         else {
-          candidatesElection.emplace(stage_i.candiates[j], (uint8_t)1);
+          candidatesElection.emplace(stage_i.trustedCandidates.at(j), (uint8_t)1);
         }
       }
+      size_t hashes_amount = stage_i.hashesCandidates.size();
+      cslog() << "My conf number = " << context.own_conf_number();
+      if (stage_i.sender == (uint8_t)context.own_conf_number()) {
+        myHashes = stage_i.hashesCandidates;
+        myPacks = stage_i.hashesCandidates.size();
+      }
+
+
+      cslog() << "Hashes amount of " << (int)i << " : " << (int)hashes_amount;
+      for (int j = 0; j < hashes_amount; j++) {
+        // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
+        if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
+          hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
+        }
+        else {
+          hashesElection.emplace(stage_i.hashesCandidates.at(j), 1);
+        }
+      }
+    }
+    else {
+      stage.realTrustedMask.push_back(0);
     }
   }
 

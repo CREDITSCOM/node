@@ -6,10 +6,14 @@
 namespace cs {
 void TrustedStage2State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
-
-  memset(&stage, 0, sizeof(stage));
   stage.sender = (uint8_t)context.own_conf_number();
-  stage.trustedAmount = (uint8_t)context.cnt_trusted();
+  cs::Signature zeroSig;
+  cs::Hash zeroHash;
+  size_t cnt_trusted = context.cnt_trusted();
+  memset(zeroSig.data(), 0, zeroSig.size());
+  memset(zeroHash.data(), 0, zeroHash.size());
+  stage.signatures.resize(cnt_trusted, zeroSig);
+  stage.hashes.resize(cnt_trusted, zeroHash);
   const auto ptr = context.stage1(stage.sender);
   if (ptr == nullptr) {
     if (Consensus::Log) {
@@ -18,6 +22,7 @@ void TrustedStage2State::on(SolverContext& context) {
   }
   else {
     stage.signatures[ptr->sender] = ptr->sig;
+    stage.hashes[ptr->sender] = ptr->msgHash;
   }
   // if have already received stage-1, make possible to go further (to stage-3)
   if (!context.stage1_data().empty()) {

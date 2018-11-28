@@ -93,6 +93,18 @@ void SolverContext::spawn_next_round() {
     cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
     ++i;
   }
+
+  cslog() << "SolverCore: new hashes: " << core.hashes_candidates.size();
+  i = 0;
+  //for (auto& it : core.hashes_candidates) {
+  //  cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
+  //  ++i;
+  //}
+
+  std::string tStamp;
+
+  tStamp = stage1(stage3(own_conf_number())->writer)->roundTimeStamp;
+
   // uint8_t own_num = (uint8_t) own_conf_number();
   // const auto ptr = stage3(own_num);
   // if(ptr != nullptr && ptr->writer == own_num) {
@@ -103,7 +115,7 @@ void SolverContext::spawn_next_round() {
   //            return;
   //    }
   //}
-  core.spawn_next_round(core.trusted_candidates);
+  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, tStamp);
 }
 
 void SolverContext::spawn_first_round() {

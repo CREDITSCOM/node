@@ -45,6 +45,7 @@ protected:
 
   cs::StageThree stage;
   std::vector<cs::PublicKey> next_round_trust;
+  std::vector<cs::TransactionsPacketHash> next_round_hashes;
 
   void trusted_election(SolverContext& context);
   bool pool_solution_analysis(SolverContext& context);

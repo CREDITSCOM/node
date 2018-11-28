@@ -191,7 +191,8 @@ private:
   void handleTransitions(Event evt);
   bool stateCompleted(Result result);
 
-  void spawn_next_round(const std::vector<cs::PublicKey>& nodes);
+  void spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string currentTimeStamp);
+
   void store_received_block(csdb::Pool& p, bool defer_write);
   bool is_block_deferred() const;
   void flush_deferred_block();
@@ -268,9 +269,11 @@ private:
   std::vector<cs::StageOne> stageOneStorage;
   std::vector<cs::StageTwo> stageTwoStorage;
   std::vector<cs::StageThree> stageThreeStorage;
+  std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;
+  std::vector <cs::TransactionsPacketHash> hashes_candidates;
 
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;

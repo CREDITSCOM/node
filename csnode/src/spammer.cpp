@@ -25,7 +25,7 @@ constexpr auto kMyWalletsNum = 10u;
 // spamming starts after this timeout
 constexpr auto kTimeStartSleepSec = 5u;
 // increase this value to make spammer slower, otherwise decrease
-constexpr auto kSpammerSleepTimeMicrosec = 70000u;
+constexpr auto kSpammerSleepTimeMicrosec = 350000u;
 // from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
 std::string kGenesisPrivate =

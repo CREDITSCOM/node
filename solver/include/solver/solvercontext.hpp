@@ -119,9 +119,12 @@ public:
 
   void spawn_first_round();
 
-  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes) {
+  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes)
+  {
     std::vector<cs::PublicKey> tmp(nodes);
+    std::vector<cs::TransactionsPacketHash> tmpHashes(hashes);
     std::swap(core.trusted_candidates, tmp);
+    std::swap(core.hashes_candidates, tmpHashes);
   }
 
   // Fast access methods, may be removed at the end

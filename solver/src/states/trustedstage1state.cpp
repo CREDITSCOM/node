@@ -76,6 +76,21 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         // see Solver::runCinsensus()
         context.blockchain().setTransactionsFees(pack);
         stage.hash = build_vector(context, pack);
+
+        {
+          bool found = false;
+          cs::SharedLock lock(conveyer.sharedMutex());
+          for (const auto& element : conveyer.transactionsPacketTable()) {
+            found = false;
+            for (const auto& it : conveyer.roundTable(context.round())->hashes) {
+              if (memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
+                found = true;
+              }
+            }
+            if (!found) stage.hashesCandidates.push_back(element.first);
+          }
+        }
+
         transactions_checked = true;
 
         return (enough_hashes ? Result::Finish : Result::Ignore);
@@ -99,20 +114,19 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
   cslog() << name() << ": <-- hash from " << sender_status << " ("
           << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
   const auto& lwh = context.blockchain().getLastWrittenHash();
-  if (stage.candidatesAmount < Consensus::MinTrustedNodes) {
+  if (stage.trustedCandidates.size() < Consensus::MinTrustedNodes) {
     if (pool_hash == lwh) {
       cslog() << name() << ": hash is OK";
 
       bool keyFound = false;
-      for (uint8_t i = 0; i < stage.candidatesAmount; i++) {
-        if (stage.candiates[i] == sender) {
+      for (auto& it : stage.trustedCandidates) {
+        if (it == sender) {
           keyFound = true;
           break;
         }
       }
       if (!keyFound) {
-        stage.candiates[stage.candidatesAmount] = sender;
-        stage.candidatesAmount += 1;
+        stage.trustedCandidates.push_back(sender);
       }
     }
     else {
@@ -123,7 +137,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
       return Result::Ignore;
     }
   }
-  if (stage.candidatesAmount >= Consensus::MinTrustedNodes) {
+  if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
     // enough hashes
     // flush deferred block to blockchain if any
     if (context.is_block_deferred()) {

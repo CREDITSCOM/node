@@ -186,14 +186,21 @@ namespace cs
     return (Result::Finish == res);
   }
 
-  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& trusted_nodes)
+  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string currentTimeStamp)
   {
     cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
     cs::RoundTable table;
     table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
-    table.confidants = trusted_nodes;
-    pnode->prepareMetaForSending(table);
+    table.confidants = nodes;
+    table.hashes = hashes;
+
+    cslog() << "Applying next hashes to ROUND Table (" << hashes.size() << "):";
+    for (std::size_t i = 0; i < hashes.size(); ++i) {
+      csdebug() << i << ". " << hashes[i].toString();
+    }
+
+    pnode->prepareMetaForSending(table, currentTimeStamp);
   }
 
   void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)

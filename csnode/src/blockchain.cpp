@@ -304,7 +304,7 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
   cslog() << " sequence " << pool.sequence() << ", transactions count " << pool.transactions_count();
 
   csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
-  csdebug() << " last hash: " << lastHash_.to_string();
+  csdebug() << " previous hash: " << lastHash_.to_string();
   csdebug() << " last storage size: " << storage_.size();
 
   bool result = false;
@@ -314,6 +314,9 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
     pool.set_previous_hash(lastHash_);
     writeBlock(pool);
     lastHash_ = pool.hash();
+    csdebug() << " last hash: " << lastHash_.to_string();
+    csdebug() << " signature: " << cs::Utils::byteStreamToHex(pool.signature().data(), 32);
+
     if (globalSequence_ == getLastWrittenSequence()) {
       blockRequestIsNeeded_ = false;
     }

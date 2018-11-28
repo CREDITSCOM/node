@@ -88,7 +88,7 @@ public:
   void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
 
   void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
-  void prepareMetaForSending(cs::RoundTable& roundTable);
+  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   // broadcast request for next round, to call after long timeout
   void sendNextRoundRequest();
@@ -315,6 +315,13 @@ private:
     cs::Signature poolSignature;
     cs::Notifications notifications;
   };
+
+  std::string pStageOneMessage;
+  size_t pStageOneMsgSize;
+  std::string pStageTwoMessage;
+  size_t pStageTwoMsgSize;
+  std::string pStageThreeMessage;
+  size_t pStageThreeMsgSize;
 
   SentRoundData lastSentRoundData_;
 
