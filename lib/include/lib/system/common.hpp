@@ -41,6 +41,14 @@ using SpinLock = boost::detail::spinlock;
 using Lock = std::lock_guard<cs::SharedMutex>;
 using SharedLock = std::shared_lock<cs::SharedMutex>;
 using SpinGuard = std::lock_guard<SpinLock>;
-}  // namespace cs
 
+// aliasing, C++ 17 scoped lock, C++ 17 constructor template parameters deduction
+template<typename... T>
+class ScopedLock {
+public:
+  explicit ScopedLock(T&... locks): lock(locks...) {}
+private:
+  std::scoped_lock<T...> lock;
+};
+}  // namespace cs
 #endif  // COMMON_HPP
