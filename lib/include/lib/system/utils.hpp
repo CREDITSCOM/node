@@ -25,7 +25,6 @@
     disable : 4324)  // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
 #endif
 
-#include <sodium.h>
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
@@ -334,13 +333,7 @@ public:
   static cs::Signature sign(const cs::Byte* byte, std::size_t size, const cs::PrivateKey& securityKey) {
     cs::Signature signature;
     std::fill(signature.begin(), signature.end(), (cs::Byte)0);
-
-    unsigned long long signLength = 0;
-
-    crypto_sign_detached(signature.data(), &signLength, byte, size, securityKey.data());
-
-    assert(signature.size() == signLength);
-
+    cscrypto::GenerateSignature(signature, securityKey, byte, size);
     return signature;
   }
 
@@ -364,8 +357,7 @@ public:
   ///
   static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message,
                               std::size_t messageSize) {
-    const int error = crypto_sign_verify_detached(signature.data(), message, messageSize, publicKey.data());
-    return !error;
+    return cscrypto::VerifySignature(signature, publicKey, message, messageSize);
   }
 
   ///
@@ -410,6 +402,17 @@ inline auto numeric_cast(Source arg) {
 #else
   return static_cast<Target>(arg);
 #endif
+}
+
+template<typename T>
+constexpr T getMax(const T& t) {
+  csunused(t);
+  return std::numeric_limits<T>::max();
+}
+template<typename T>
+constexpr T getMin(const T& t) {
+  csunused(t);
+  return std::numeric_limits<T>::min();
 }
 
 template <typename T>

@@ -22,7 +22,6 @@
 #include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
-#include <sodium.h>
 #include <cscrypto/cscrypto.hpp>
 
 #include <poolsynchronizer.hpp>
@@ -52,7 +51,7 @@ Node::Node(const Config& config)
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(transport_, &bc_)) {
+, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &bc_)) {
   good_ = init();
 }
 
@@ -65,6 +64,10 @@ Node::~Node() {
 }
 
 bool Node::init() {
+  if (!cscrypto::CryptoInit()) {
+    return false;
+  }
+
   if (!transport_->isGood()) {
     return false;
   }
@@ -205,11 +208,13 @@ void Node::stop() {
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+  transport_->stop();
+  cswarning() << "[TRANSPORT STOPPED]";
 }
 
-void Node::runSpammer()
-{
-  if(!spammer_) {
+void Node::runSpammer() {
+  if (!spammer_) {
     cswarning() << "SolverCore: starting transaction spammer";
     spammer_ = std::make_unique<cs::Spammer>();
     spammer_->StartSpamming(*this);
@@ -228,9 +233,9 @@ bool monitorNode = true;
 bool monitorNode = false;
 #endif
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type)
-{
-  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence() << ", current #" << roundNum_;
+void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
+  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
+              << ", current #" << roundNum_;
   istream_.init(data, size);
   cs::Hash last_block_hash;
   istream_ >> last_block_hash;
@@ -522,8 +527,32 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   processTransactionsPacket(std::move(packet));
 }
 
-void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round,
-                                  const cs::PublicKey& sender) {
+void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
+  istream_.init(data, size);
+
+  uint16_t version = 0;
+  istream_ >> version;
+
+  if (!istream_.good()) {
+    cswarning() << "NODE> Get stop request parsing failed";
+    return;
+  }
+
+  cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
+
+  if (NODE_VERSION >= version) {
+    cswarning() << "NODE> Get stop request, node version is okay, continue working";
+    return;
+  }
+
+  cswarning() << "NODE> Get stop request, node will be closed...";
+
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
+    stop();
+  });
+}
+
+void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   istream_.init(data, size);
 
   std::size_t hashesCount = 0;
@@ -585,8 +614,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   processPacketsReply(std::move(packets), round);
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   cslog() << "NODE> " << __func__ << "():";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -628,7 +656,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   characteristic.mask = std::move(characteristicMask);
   conveyer.setCharacteristic(std::move(characteristic), round);
 
-  stat_.total_recv_trans += characteristic.mask.size();
+  stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
   assert(sequence <= this->getRoundNumber());
 
@@ -651,7 +679,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     cserror() << "NODE> failed to store block in BlockChain";
   }
   else {
-    stat_.total_accepted_trans += pool.value().transactions_count();
+    stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -1493,8 +1521,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   // cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize);
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, msgSize, solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageOneInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
   // cslog() << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64);
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::FirstStage << roundNum_ << msgSize << stageOneInfo.sig;
@@ -1617,9 +1644,8 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   // cslog() << "Received message: "<< byteStreamToHex((const char*)stagePtr , msgSize);
 
   stage.sender = *rawData;
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1639,7 +1665,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   solver_->gotStageOne(std::move(stage));
 }
 
-void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo) {
+void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 #ifdef MYLOG
   cslog() << "NODE> +++++++++++++++++++++++ Stage TWO sending +++++++++++++++++++++++++++";
 #endif
@@ -1660,9 +1686,7 @@ void Node::sendStageTwo(const cs::StageTwo& stageTwoInfo) {
   }
   // cslog() << "Sent message: (" << msgSize << ") : " << byteStreamToHex((const char*)rawData, msgSize;
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageTwoInfo.sig.data(), &sig_size, rawData, msgSize,
-                               solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageTwoInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::SecondStage << roundNum_ << msgSize << stageTwoInfo.sig;
@@ -1780,9 +1804,8 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   stage.sender = *rawData;
   // cslog() << "Received message: "<< byteStreamToHex((const char*)stagePtr, msgSize);
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cslog() << "NODE> Stage Two from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1799,7 +1822,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   solver_->gotStageTwo(std::move(stage));
 }
 
-void Node::sendStageThree(const cs::StageThree& stageThreeInfo) {
+void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   LOG_DEBUG(__func__);
 #ifdef MYLOG
   cslog() << "NODE> Stage THREE sending";
@@ -1818,9 +1841,7 @@ void Node::sendStageThree(const cs::StageThree& stageThreeInfo) {
   memcpy(rawData + 2, stageThreeInfo.hashBlock.data(), 32);
   memcpy(rawData + 34, stageThreeInfo.hashCandidatesList.data(), 32);
 
-  unsigned long long sig_size;
-  crypto_sign_ed25519_detached((unsigned char*)stageThreeInfo.sig.data(), &sig_size, rawData, msgSize,
-                               solver_->getPrivateKey().data());
+  cscrypto::GenerateSignature(stageThreeInfo.sig, solver_->getPrivateKey(), rawData, msgSize);
 
   ostream_.init(BaseFlags::Broadcast);
   ostream_ << MsgTypes::ThirdStage << roundNum_ << msgSize << stageThreeInfo.sig;
@@ -1928,9 +1949,8 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   stage.sender = *rawData;
 
   // cslog() << "Received message: "<< byteStreamToHex((const char*)rawData, msgSize);
-  if (crypto_sign_ed25519_verify_detached(
-          stage.sig.data(), rawData, msgSize,
-          (const unsigned char*)cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender).data())) {
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().currentRoundTable().confidants.at(stage.sender),
+      rawData, msgSize)) {
     cslog() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1963,7 +1983,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
     return;
   }
 
-  stat_.total_accepted_trans += pool.value().transactions_count();
+  stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
 
   // array
   cs::Signature poolSignature;
@@ -1996,7 +2016,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
     cserror() << "Send round info characteristic not found, logic error";
     return;
   }
-  stat_.total_recv_trans += block_characteristic->mask.size();
+  stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
@@ -2136,7 +2156,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cs::Characteristic characteristic;
     characteristic.mask = std::move(characteristicMask);
 
-    stat_.total_recv_trans += characteristic.mask.size();
+    stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
     assert(sequence <= this->getRoundNumber());
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2150,7 +2170,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         cserror() << "NODE> failed to store block in BlockChain";
       }
       else {
-        stat_.total_accepted_trans += pool.value().transactions_count();
+        stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       }
     }
   }

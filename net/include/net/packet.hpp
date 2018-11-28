@@ -73,7 +73,8 @@ enum MsgTypes : uint8_t {
   NewCharacteristic,
   RoundTable,
   WriterNotification,
-  BlockHashV3
+  BlockHashV3,
+  NodeStopRequest = 255
 };
 
 const char* getMsgTypesString(MsgTypes messageType);

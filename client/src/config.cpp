@@ -21,6 +21,7 @@ const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
 const std::string BLOCK_NAME_HOST_OUTPUT = "host_output";
 const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
+const std::string BLOCK_NAME_POOL_SYNC = "pool_sync";
 
 const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
@@ -31,6 +32,10 @@ const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
+
+const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
+const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
+const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
@@ -184,6 +189,7 @@ Config Config::readFromFile(const std::string& fileName) {
     }
 
     result.setLoggerSettings(config);
+    result.readPoolSynchronizerData(config);
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
@@ -235,4 +241,41 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
 
 const boost::log::settings& Config::getLoggerSettings() const {
   return loggerSettings_;
+}
+
+const PoolSyncData& Config::getPoolSyncSettings() const {
+  return poolSyncData_;
+}
+
+void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config) {
+  if (!config.count(BLOCK_NAME_POOL_SYNC)) {
+    return;
+  }
+
+  const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_POOL_SYNC);
+
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
+}
+
+template <typename T>
+bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
+  if (data.count(param)) {
+    const int readValue = data.get<int>(param);
+    const auto max = cs::getMax(value);
+    const auto min = cs::getMin(value);
+
+    if (readValue > max || readValue < min) {
+      std::cout << "[warning] Config.ini> Please, check the block: " << block << ", so that param: " << param
+                << ",  will be: [" << cs::numeric_cast<int>(min) << ", " << cs::numeric_cast<int>(max) << "]"
+                << std::endl;
+      return false;
+    }
+
+    value = cs::numeric_cast<T>(readValue);
+    return true;
+  }
+
+  return false;
 }
