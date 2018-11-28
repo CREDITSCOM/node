@@ -17,6 +17,8 @@ using PublicKey = std::array<uint8_t, kPublicKeySize>;
 using PrivateKey = std::array<uint8_t, kPrivateKeySize>;
 using Signature = std::array<uint8_t, kSignatureSize>;
 
+bool CryptoInit();
+
 void CalculateHash(Hash& hash, const uint8_t* data, size_t data_size);
 
 void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key);
