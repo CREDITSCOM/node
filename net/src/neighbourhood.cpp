@@ -147,17 +147,17 @@ void Neighbourhood::checkSilent() {
       needRefill = false;
       (*conn)->lastPacketsCount = packetsCount;
     }
+  }
 
-    if (needRefill) {
-      ++refillCount;
-      if (refillCount >= WarnsBeforeRefill) {
-        refillCount = 0;
-        transport_->refillNeighbourhood();
-      }
-    }
-    else {
+  if (needRefill) {
+    ++refillCount;
+    if (refillCount >= WarnsBeforeRefill) {
       refillCount = 0;
+      transport_->refillNeighbourhood();
     }
+  }
+  else {
+    refillCount = 0;
   }
 }
 
