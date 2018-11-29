@@ -205,6 +205,12 @@ public:
   ///
   bool isMetaTransactionInvalid(int64_t id);
 
+  ///
+  /// @brief Returns summary block (first stage) transactions count that
+  /// does not flushed to network. Thread safe method.
+  ///
+  size_t blockTransactionsCount() const;
+
   // sync, try do not use it :]
 
   ///

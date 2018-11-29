@@ -471,6 +471,17 @@ bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id) {
   return false;
 }
 
+size_t cs::ConveyerBase::blockTransactionsCount() const {
+  cs::SharedLock lock(sharedMutex_);
+  size_t count = 0;
+
+  std::for_each(pimpl_->transactionsBlock.begin(), pimpl_->transactionsBlock.end(), [&](const auto& block) {
+    count += block.transactionsCount();
+  });
+
+  return count;
+}
+
 cs::SharedMutex& cs::ConveyerBase::sharedMutex() const {
   return sharedMutex_;
 }
