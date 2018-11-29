@@ -21,8 +21,7 @@ using TimeOutSignal = cs::Signal<TimerCallback>;
 ///
 class Timer {
 public:
-  enum : unsigned int
-  {
+  enum : unsigned int {
     RangeDeltaInPercents = 10
   };
 

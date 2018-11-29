@@ -176,8 +176,9 @@ public:
   boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
     if (data_.size() == 0) {
       cswarning() << "Encoding empty packet";
-      return std::move(boost::asio::buffer(data_.get(), data_.size()));
+      return boost::asio::buffer(data_.get(), data_.size());
     }
+
     if (isCompressed()) {
       static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
       constexpr size_t headerSize = sizeof(BaseFlags);
@@ -189,25 +190,29 @@ public:
       char* dest = static_cast<char*>(tempBuffer.data());
 
       *dest = *source;  // copy header
-      size_t sourceSize = data_.size() - headerSize;
-      size_t destSize = tempBuffer.size() - headerSize;
+
+      int sourceSize = static_cast<int>(data_.size() - headerSize);
+      int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
       auto compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
+
       if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
-        return std::move(boost::asio::buffer(dest, compressedSize + headerSize));
+        return boost::asio::buffer(dest, compressedSize + headerSize);
       }
       else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
         *source &= ~BaseFlags::Compressed;
       }
     }
-    return std::move(boost::asio::buffer(data_.get(), data_.size()));
+
+    return boost::asio::buffer(data_.get(), data_.size());
   }
 
   size_t decode(size_t packetSize = 0) {
     if (packetSize == 0) {
       return 0;
     }
+
     if (isCompressed()) {
       static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
       constexpr size_t headerSize = sizeof(BaseFlags);
@@ -219,12 +224,13 @@ public:
       char* source = static_cast<char*>(data_.get());
       char dest[Packet::MaxSize];
 
-      size_t sourceSize = packetSize - headerSize;
-      size_t destSize = sizeof(dest) - headerSize;
+      int sourceSize = static_cast<int>(packetSize - headerSize);
+      int destSize = static_cast<int>(sizeof(dest) - headerSize);
 
       auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
+
       if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
-        memcpy(source + headerSize, dest, uncompressedSize);
+        std::copy(dest, dest + uncompressedSize, source + headerSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;
       }
@@ -232,6 +238,7 @@ public:
         cserror() << "Decoding malformed packet content";
       }
     }
+
     return packetSize;
   }
 

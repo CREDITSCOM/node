@@ -51,7 +51,7 @@ public:
 
   // default initialization
   inline MetaStorage() noexcept
-  : m_buffer(cs::values::defaultMetaStorageMaxSize) {
+  : buffer_(cs::values::defaultMetaStorageMaxSize) {
   }
 
   // storage interface
@@ -60,14 +60,14 @@ public:
   /// @brief Resizes circular storage buffer.
   ///
   void resize(std::size_t size) {
-    m_buffer.resize(size);
+    buffer_.resize(size);
   }
 
   ///
   /// @brief Returns current circular buffer size
   ///
   std::size_t size() const {
-    return m_buffer.size();
+    return buffer_.size();
   }
 
   ///
@@ -76,11 +76,11 @@ public:
   /// @return Returns true if append is success, otherwise returns false.
   ///
   bool append(MetaElement&& value) {
-    const auto iterator = std::find(m_buffer.begin(), m_buffer.end(), value);
-    const auto result = (iterator == m_buffer.end());
+    const auto iterator = std::find(buffer_.begin(), buffer_.end(), value);
+    const auto result = (iterator == buffer_.end());
 
     if (result) {
-      m_buffer.push_back(std::move(value));
+      buffer_.push_back(std::move(value));
     }
 
     return result;
@@ -117,11 +117,11 @@ public:
   /// @brief Returns contains meta storage this round or not.
   ///
   bool contains(RoundNumber round) {
-    const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) {
       return value.round == round;
     });
 
-    return iterator != m_buffer.end();
+    return iterator != buffer_.end();
   }
 
   ///
@@ -130,11 +130,11 @@ public:
   /// @return Returns optional parameter with T type.
   ///
   std::optional<T> value(RoundNumber round) const {
-    const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) {
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) {
       return value.round == round;
     });
 
-    if (iterator != m_buffer.end()) {
+    if (iterator != buffer_.end()) {
       return std::make_optional<T>(iterator->meta);
     }
 
@@ -147,14 +147,14 @@ public:
   /// @return Returns meta element of storage if found, otherwise returns nothing.
   ///.
   std::optional<T> extract(RoundNumber round) {
-    const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return value.round == round; });
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) { return value.round == round; });
 
-    if (iterator == m_buffer.end()) {
+    if (iterator == buffer_.end()) {
       return std::nullopt;
     }
 
     MetaElement result = std::move(*iterator);
-    m_buffer.erase(iterator);
+    buffer_.erase(iterator);
 
     return std::make_optional<T>(std::move(result.meta));
   }
@@ -166,9 +166,9 @@ public:
   /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
   ///
   T* get(RoundNumber round) {
-    const auto iterator = std::find_if(m_buffer.begin(), m_buffer.end(), [=](const MetaElement& value) { return round == value.round; });
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) { return round == value.round; });
 
-    if (iterator == m_buffer.end()) {
+    if (iterator == buffer_.end()) {
       return nullptr;
     }
 
@@ -179,18 +179,18 @@ public:
   /// @brief Returns const begin interator of circular buffer.
   ///
   auto begin() const {
-    return m_buffer.begin();
+    return buffer_.begin();
   }
 
   ///
   /// @brief Returns const end interator of circular buffer.
   ///
   auto end() const {
-    return m_buffer.end();
+    return buffer_.end();
   }
 
 private:
-  boost::circular_buffer<MetaElement> m_buffer;
+  boost::circular_buffer<MetaElement> buffer_;
 };
 }  // namespace cs
 

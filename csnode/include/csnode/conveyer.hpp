@@ -205,6 +205,12 @@ public:
   ///
   bool isMetaTransactionInvalid(int64_t id);
 
+  ///
+  /// @brief Returns summary block (first stage) transactions count that
+  /// does not flushed to network. Thread safe method.
+  ///
+  size_t blockTransactionsCount() const;
+
   // sync, try do not use it :]
 
   ///
@@ -220,9 +226,9 @@ public slots:
 private:
   /// pointer implementation
   struct Impl;
-  std::unique_ptr<Impl> pimpl;
+  std::unique_ptr<Impl> pimpl_;
 
-  mutable cs::SharedMutex m_sharedMutex;
+  mutable cs::SharedMutex sharedMutex_;
 };
 
 class Conveyer : public ConveyerBase {

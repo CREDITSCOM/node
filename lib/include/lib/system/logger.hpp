@@ -105,7 +105,4 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
 #define LOG_IN_PACK(DATA, SIZE) csdebug() << "-!> " << logging::dump((const char*)(DATA), (SIZE))
 #define LOG_OUT_PACK(DATA, SIZE) csdebug() << "<!- " << logging::dump((const char*)(DATA), (SIZE))
 
-#define LOG_NODESBUF_PUSH(ENDPOINT) csdebug() << "[+] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port()
-#define LOG_NODESBUF_POP(ENDPOINT) csdebug() << "[-] " << (ENDPOINT).address().to_string() << ":" << (ENDPOINT).port()
-
 #endif  // LOGGER_HPP

@@ -36,7 +36,7 @@ const csdb::Address Node::startAddress_ =
 
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
-, bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
+, blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , transport_(new Transport(config, this))
 ,
@@ -45,13 +45,13 @@ Node::Node(const Config& config)
 ,
 #endif
 #ifdef NODE_API
-  api_(bc_, solver_)
+  api_(blockChain_, solver_)
 ,
 #endif
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &bc_)) {
+, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_)) {
   good_ = init();
 }
 
@@ -72,7 +72,7 @@ bool Node::init() {
     return false;
   }
 
-  if (!bc_.isGood()) {
+  if (!blockChain_.isGood()) {
     return false;
   }
 
@@ -204,7 +204,7 @@ void Node::stop() {
   solver_->finish();
   cswarning() << "[SOLVER STOPPED]";
 
-  auto bcStorage = bc_.getStorage();
+  auto bcStorage = blockChain_.getStorage();
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
@@ -227,11 +227,14 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+namespace
+{
 #ifdef MONITOR_NODE
-bool monitorNode = true;
+  bool monitorNode = true;
 #else
-bool monitorNode = false;
+  bool monitorNode = false;
 #endif
+}
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
@@ -996,7 +999,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     return;
   }
 
-  if (sequences.front() > bc_.getLastWrittenSequence()) {
+  if (sequences.front() > blockChain_.getLastWrittenSequence()) {
     cslog() << "NODE> Get block request> The requested block: " << sequences.front() << " is BEYOND my CHAIN";
     return;
   }
@@ -1005,7 +1008,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   poolsBlock.reserve(sequencesCount);
 
   for (auto& sequence : sequences) {
-    csdb::Pool pool = bc_.loadBlock(bc_.getHashBySequence(sequence));
+    csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
 
     if (pool.is_valid()) {
       auto prev_hash = csdb::PoolHash::from_string("");
@@ -1948,7 +1951,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable) {
   csdebug() << "NODE> " << __func__ << "():";
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1;  // change for roundNumber
+  poolMetaInfo.sequenceNumber = blockChain_.getLastWrittenSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = cs::Utils::currentTimestamp();
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
@@ -2206,6 +2209,11 @@ void Node::logPool(csdb::Pool& pool) {
 
 void Node::sendHash_V3(cs::RoundNumber round)
 {
+  if(monitorNode) {
+    // to block request trusted status
+    return;
+  }
+
   if(getBlockChain().getLastWrittenSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
