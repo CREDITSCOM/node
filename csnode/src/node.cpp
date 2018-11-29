@@ -41,7 +41,7 @@ Node::Node(const Config& config)
 , transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
-    stats_(bc_)
+    stats_(blockChain_)
 ,
 #endif
 #ifdef NODE_API

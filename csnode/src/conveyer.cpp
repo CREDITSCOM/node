@@ -129,8 +129,8 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table)
   }
 
   {
-    cs::Lock lock(m_sharedMutex);
-    cs::ConveyerMeta* meta = pimpl->metaStorage.get(table.round);
+    cs::Lock lock(sharedMutex_);
+    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(table.round);
     if(nullptr == meta) {
       cserror() << "CONVEYER> Update round table in conveyer failed: round table not found, call to setRound()";
       return;
