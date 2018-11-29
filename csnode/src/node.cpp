@@ -1281,6 +1281,10 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+  if(type == MsgTypes::NodeStopRequest) {
+    return MessageActions::Process;
+  }
+
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   // starts next round, otherwise
