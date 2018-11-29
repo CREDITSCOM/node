@@ -304,9 +304,8 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 
 bool BlockChain::putBlock(csdb::Pool& pool) {
   // Put on top
-  cslog() << "----------------------------- Write New Block ------------------------------";
-  cslog() << " sequence " << pool.sequence() << ", transactions count " << pool.transactions_count();
-
+  cslog() << "----------------------------- Write Block #" << pool.sequence() << "----------------------------";
+  cslog() << " transactions count " << pool.transactions_count();
   csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   csdebug() << " last hash: " << lastHash_.to_string();
   csdebug() << " last storage size: " << storage_.size();
@@ -330,7 +329,7 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
     blockRequestIsNeeded_ = true;
     result = false;
   }
-  cslog() << "----------------------------------------------------------------------------";
+  cslog() << "--------------------------------------------------------------------------------";
   return result;
 }
 
@@ -800,7 +799,8 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
     // write immediately
     if (recordBlock(pool, writer_signature, std::nullopt).first) {
       csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
-      testCachedBlocks();
+      // unable to call because stack overflow in case of huge written blocks amount possible:
+      //testCachedBlocks();
       return true;
     }
     csdebug() << "BLOCKCHAIN> failed to block #" << pool_seq << " to chain";
@@ -857,7 +857,7 @@ void BlockChain::testCachedBlocks() {
       auto& data = cachedBlocks_.at(desired_seq);
       bool ok = false;
       if (std::equal(data.signature.cbegin(), data.signature.cend(), emptySignature_.cbegin())) {
-        ok = storeBlock(data.pool);
+        ok =  storeBlock(data.pool);
       }
       else {
         ok = storeBlock(data.pool, data.signature);
@@ -872,23 +872,6 @@ void BlockChain::testCachedBlocks() {
       break;
     }
   }
-}
-
-csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const {
-  csdb::Pool::sequence_t seq = 0;
-  if (cachedBlocks_.empty()) {
-    return seq;
-  }
-  seq = cachedBlocks_.cbegin()->first;
-  while (cachedBlocks_.count(seq + 1) > 0) {
-    ++seq;
-  }
-  return seq;
-}
-
-csdb::Pool::sequence_t BlockChain::getLastSequence() const
-{
-  return std::max(getLastCachedSequence(), (csdb::Pool::sequence_t)getLastWrittenSequence());
 }
 
 std::size_t BlockChain::getCachedBlocksSize() const {

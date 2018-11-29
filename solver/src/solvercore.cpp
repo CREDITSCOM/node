@@ -201,6 +201,9 @@ namespace cs
       cserror() << "SolverCore: block sync required";
       return;
     }
+    else {
+      pnode->getBlockChain().testCachedBlocks();
+    }
   }
 
   bool SolverCore::is_block_deferred() const

@@ -67,7 +67,7 @@ public:
    *            chain. It means block is correct and possibly recorded.
    */
 
-  bool storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature = std::nullopt);
+  bool  storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature = std::nullopt);
 
   /**
    * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key);
@@ -205,31 +205,6 @@ private:
   // block cache
 
 public:
-  /**
-   * @fn    csdb::Pool::sequence_t BlockChain::getLastCachedSequence() const;
-   *
-   * @brief Gets the last cached sequence
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @return    The last cached sequence.
-   */
-
-  csdb::Pool::sequence_t getLastCachedSequence() const;
-
-  /**
-   * @fn    csdb::Pool::sequence_t BlockChain::getLastSequence() const
-   *
-   * @brief Gets the last sequence both cached & written
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @return    The last sequence.
-   */
-
-  csdb::Pool::sequence_t getLastSequence() const;
 
   std::size_t getCachedBlocksSize() const;
 
