@@ -73,9 +73,13 @@ public:
   , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
   , net_(new Network(config, this))
   , node_(node)
-  , nh_(this) {
+  , nh_(this)
+  , sendPacksFlag_()
+  , oLock_()
+  , uLock_() {
     good_ = net_->isGood();
   }
+
 
   ~Transport();
 
