@@ -36,6 +36,7 @@ const std::string PARAM_NAME_PORT = "port";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
 const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
+const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_frequency";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
@@ -257,6 +258,7 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
 }
 
 template <typename T>
@@ -267,8 +269,8 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
     const auto min = cs::getMin(value);
 
     if (readValue > max || readValue < min) {
-      std::cout << "[warning] Config.ini> Please, check the block: " << block << ", so that param: " << param
-                << ",  will be: [" << cs::numeric_cast<int>(min) << ", " << cs::numeric_cast<int>(max) << "]"
+      std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param
+                << "],  will be: [" << cs::numeric_cast<int>(min) << ", " << cs::numeric_cast<int>(max) << "]"
                 << std::endl;
       return false;
     }

@@ -9,26 +9,35 @@
 #include <net/transport.hpp>
 
 cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain)
-: m_maxBlockPoolsCount(data.blockPoolsCount)
-, m_requestRepeatRoundCount(data.requestRepeatRoundCount)
-, m_neighbourPacketsCount(data.neighbourPacketsCount)
+: m_syncData(data)
 , m_transport(transport)
 , m_blockChain(blockChain)
 , m_isBigBand(false) {
-  m_neededSequences.reserve(m_maxBlockPoolsCount);
+  m_neededSequences.reserve(m_syncData.blockPoolsCount);
   m_neighbours.reserve(m_transport->getMaxNeighbours());
 
   refreshNeighbours();
 
-  cslog() << "POOL SYNCHRONIZER> Pool sync data : Block pools: " << cs::numeric_cast<int>(m_maxBlockPoolsCount)
-          << ", Request round: " << cs::numeric_cast<int>(m_requestRepeatRoundCount)
-          << ", Neighbour packets: " << cs::numeric_cast<int>(m_neighbourPacketsCount);
+  cs::Connector::connect(&m_timer.timeOut, this, &cs::PoolSynchronizer::onTimeOut);
+
+
+  // Print Pool Sync Data Info
+  const uint8_t hl = 25;
+  const uint8_t vl = 6;
+  cslog() << "POOL SYNCHRONIZER> Pool sync data : \n"
+          << std::setw(hl) << "Block pools:      " << std::setw(vl)
+          << cs::numeric_cast<int>(m_syncData.blockPoolsCount) << "\n"
+          << std::setw(hl) << "Request round:    " << std::setw(vl)
+          << cs::numeric_cast<int>(m_syncData.requestRepeatRoundCount) << "\n"
+          << std::setw(hl) << "Neighbour packets:" << std::setw(vl)
+          << cs::numeric_cast<int>(m_syncData.neighbourPacketsCount) << "\n"
+          << std::setw(hl) << "Polling frequency:" << std::setw(vl) << m_syncData.sequencesVerificationFrequency;
 }
 
 void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool isBigBand) {
   if (m_transport->getNeighboursCount() == 0) {
     cslog() << "POOL SYNCHRONIZER> Cannot start sync (no neighbours). Needed sequence: " << roundNum
-            << ",   Requested pools block size:" << m_maxBlockPoolsCount;
+            << ",   Requested pools block size:" << m_syncData.blockPoolsCount;
     return;
   }
 
@@ -52,10 +61,23 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
       m_isSyncroStarted = true;
 
       sendBlockRequest();
+
+      if (m_syncData.sequencesVerificationFrequency > 1) {
+        m_timer.start(cs::numeric_cast<int>(m_syncData.sequencesVerificationFrequency));
+      }
     }
   }
-  else if (m_requestRepeatRoundCount > 0) {
-    checkActivity();
+  else if (m_syncData.requestRepeatRoundCount > 0) {
+    const bool isNeedRequest = checkActivity(CounterType::ROUND);
+    bool isAvailable = false;
+
+    if (m_syncData.sequencesVerificationFrequency == 1) {
+      isAvailable = checkActivity(CounterType::TIMER);
+    }
+
+    if (isNeedRequest || isAvailable) {
+      sendBlockRequest();
+    }
   }
 }
 
@@ -186,27 +208,31 @@ void cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
   cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
 }
 
-bool cs::PoolSynchronizer::checkActivity() {
-  csdebug() << "POOL SYNCHRONIZER> Check activity";
+bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
+  csdebug() << "POOL SYNCHRONIZER> Check activity: " << counterType;
 
   bool isNeedRequest = false;
   refreshNeighbours();
 
   for (auto& neighbour : m_neighbours) {
-    neighbour.increaseRoundCounter();
-    if (neighbour.isAvailableSequence() || isAvailableRequest(neighbour)) {
-      isNeedRequest = true;
+    if (counterType == CounterType::ROUND) {
+      neighbour.increaseRoundCounter();
+      if (!isNeedRequest && isAvailableRequest(neighbour)) {
+        isNeedRequest = true;
+      }
     }
+    else {
+      if (!isNeedRequest && neighbour.isAvailableSequence()) {
+        isNeedRequest = true;
+      }
+    }
+
     ConnectionPtr target = m_transport->getNeighbourByNumber(neighbour.neighbourNum());
     csdebug() << "POOL SYNCHRONIZER> Check activity neighbour nh: " << target->getOut()
               << ", num: " << cs::numeric_cast<int>(neighbour.neighbourNum()) << ", seq: " << neighbour.sequence()
               << ", round counter: " << neighbour.roundCounter();
   }
-  csdebug() << "POOL SYNCHRONIZER> Check activity, repeat request: " << isNeedRequest;
-
-  if (isNeedRequest) {
-    sendBlockRequest();
-  }
+  csdebug() << "POOL SYNCHRONIZER> Check activity: Repeat request: " << isNeedRequest;
 
   return isNeedRequest;
 }
@@ -273,7 +299,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   bool isFromStorage = false;
   auto isNeededHelpIt =
       std::find_if(m_requestedSequences.begin(), m_requestedSequences.end(), [this](const auto& pair) {
-        return ((m_neighbourPacketsCount > 0) ? (pair.second >= m_neighbourPacketsCount) : false);
+        return ((m_syncData.neighbourPacketsCount > 0) ? (pair.second >= m_syncData.neighbourPacketsCount) : false);
       });
   auto& nh = m_neighbours[nieghbourNumber];
   const bool isRepeatRequest = isAvailableRequest(nh);
@@ -294,7 +320,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
 
     if (nh.sequence() != sequence) {
       auto oldSeqIt = m_requestedSequences.find(nh.sequence());
-      for (std::size_t i = 0; i < m_maxBlockPoolsCount; ++i) {
+      for (std::size_t i = 0; i < m_syncData.blockPoolsCount; ++i) {
         if (oldSeqIt != m_requestedSequences.end()) {
           csdebug() << "POOL SYNCHRONIZER> Get needed sequences: Remove exta seq: " << oldSeqIt->first;
           oldSeqIt = m_requestedSequences.erase(oldSeqIt);
@@ -329,7 +355,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
 
   m_neededSequences.clear();
 
-  for (std::size_t i = 0; i < m_maxBlockPoolsCount; ++i) {
+  for (std::size_t i = 0; i < m_syncData.blockPoolsCount; ++i) {
     if (!isFromStorage) {
       ++sequence;
       csdebug() << "POOL SYNCHRONIZER> Get needed sequences: Getting new equence: " << sequence;
@@ -447,7 +473,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
   for (std::size_t i = neededNeighboursCount; i < nSize; ++i) {
     auto it = m_requestedSequences.find(m_neighbours.back().sequence());
     if (it != m_requestedSequences.end()) {
-      it->second = m_neighbourPacketsCount;
+      it->second = m_syncData.neighbourPacketsCount;
     }
     m_neighbours.pop_back();
   }
@@ -465,14 +491,26 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 bool cs::PoolSynchronizer::isLastRequest() {
   auto sum = cs::Conveyer::instance().currentRoundNumber() - m_blockChain->getLastWrittenSequence() -
              cs::numeric_cast<uint32_t>(m_blockChain->getCachedBlocksSize());
-  return sum <= m_maxBlockPoolsCount;
+  return sum <= m_syncData.blockPoolsCount;
 }
 
 bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const {
-  return nh.roundCounter() >= m_requestRepeatRoundCount;
+  return nh.roundCounter() >= m_syncData.requestRepeatRoundCount;
+}
+
+void cs::PoolSynchronizer::onTimeOut() {
+  csdebug() << "POOL SYNCHRONIZER> On Time Out: " << m_syncData.sequencesVerificationFrequency;
+  const bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+
+  if (isAvailable) {
+    sendBlockRequest();
+  }
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
+  if (m_timer.isRunning()) {
+    m_timer.stop();
+  }
   m_isSyncroStarted = false;
   m_isBigBand = false;
   m_requestedSequences.clear();
