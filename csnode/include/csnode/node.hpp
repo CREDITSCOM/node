@@ -186,11 +186,11 @@ public:
   uint8_t getConfidantNumber();
 
   BlockChain& getBlockChain() {
-    return bc_;
+    return blockChain_;
   }
 
   const BlockChain& getBlockChain() const {
-    return bc_;
+    return blockChain_;
   }
 
   cs::SolverCore* getSolver() {
@@ -272,7 +272,7 @@ private:
   cs::Byte myConfidantIndex_;
 
   // main cs storage
-  BlockChain bc_;
+  BlockChain blockChain_;
 
   // appidional dependencies
   cs::SolverCore* solver_;
