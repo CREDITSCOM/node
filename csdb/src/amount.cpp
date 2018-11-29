@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <cmath>
 
 #ifndef _MSC_VER
 #define sprintf_s sprintf
@@ -29,7 +28,7 @@ Amount::Amount(double value) {
     multiplier /= 10;
   }
 
-  fraction_ = lround(frac) * multiplier;
+  fraction_ = static_cast<uint64_t>(frac + 0.5) * multiplier;
   if (fraction_ >= AMOUNT_MAX_FRACTION) {
     fraction_ -= AMOUNT_MAX_FRACTION;
     ++integral_;
