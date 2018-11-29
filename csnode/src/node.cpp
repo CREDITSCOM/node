@@ -227,11 +227,14 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+namespace
+{
 #ifdef MONITOR_NODE
-bool monitorNode = true;
+  bool monitorNode = true;
 #else
-bool monitorNode = false;
+  bool monitorNode = false;
 #endif
+}
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
@@ -2212,6 +2215,11 @@ void Node::logPool(csdb::Pool& pool) {
 
 void Node::sendHash_V3(cs::RoundNumber round)
 {
+  if(monitorNode) {
+    // to block request trusted status
+    return;
+  }
+
   if(getBlockChain().getLastWrittenSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;

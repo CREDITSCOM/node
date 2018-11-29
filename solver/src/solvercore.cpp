@@ -31,13 +31,20 @@ namespace cs
   constexpr const bool RepeatStateEnabled = true;
   // Special mode: uses debug transition table
   constexpr const bool DebugModeOn = false;
+  // Special mode: uses monitor mode transition table
+  constexpr const bool MonitorModeOn =
+#if defined(MONITOR_NODE)
+    true;
+#else
+    false;
+#endif // MONITOR_NODE
 
   // default (test intended) constructor
   SolverCore::SolverCore()
     // options
     : opt_timeouts_enabled(TimeoutsEnabled)
     , opt_repeat_state_enabled(RepeatStateEnabled)
-    , opt_debug_mode(DebugModeOn)
+    , opt_mode(Mode::Default)
     // inner data
     , pcontext(std::make_unique<SolverContext>(*this))
     , tag_state_expired(CallsQueueScheduler::no_tag)
@@ -49,17 +56,17 @@ namespace cs
     , pnode(nullptr)
     , pws(nullptr)
   {
-    if(!opt_debug_mode) {
-      if(Consensus::Log) {
-        LOG_NOTICE("SolverCore: use default transition table");
-      }
-      InitTransitions();
+    if constexpr(MonitorModeOn) {
+      cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
+      InitMonitorModeTransitions();
     }
-    else {
-      if(Consensus::Log) {
-        LOG_WARN("SolverCore: opt_debug_mode is on, so use special transition table");
-      }
+    else if constexpr(DebugModeOn) {
+      cslog() << "SolverCore: opt_debug_mode is on, so use special transition table";
       InitDebugModeTransitions();
+    }
+    else if constexpr(true) {
+      cslog() << "SolverCore: use default transition table";
+      InitTransitions();
     }
   }
 

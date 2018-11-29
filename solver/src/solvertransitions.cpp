@@ -12,29 +12,33 @@
 #include <states/waitingstate.hpp>
 #include <states/writingstate.hpp>
 
-namespace cs {
+namespace cs
+{
 
-void SolverCore::InitTransitions() {
-  StatePtr pNormal = std::make_shared<NormalState>();
-  StatePtr pSync = std::make_shared<SyncState>();
-  StatePtr pTrusted1 = std::make_shared<TrustedStage1State>();
-  StatePtr pTrusted2 = std::make_shared<TrustedStage2State>();
-  StatePtr pTrusted3 = std::make_shared<TrustedStage3State>();
-  StatePtr pTrustedPost = std::make_shared<TrustedPostStageState>();
-  StatePtr pRTH = std::make_shared<HandleRTState>();
-  StatePtr pBB = std::make_shared<HandleBBState>();
-  StatePtr pNone = std::make_shared<NoState>();
-  StatePtr pWriting = std::make_shared<WritingState>();
-  StatePtr pWaiting = std::make_shared<WaitingState>();
+  void SolverCore::InitTransitions()
+  {
+    opt_mode = Mode::Default;
 
-  StatePtr pWrite = std::make_shared<PrimitiveWriteState>();
-  // start with that:
-  pstate = pNone;
+    StatePtr pNormal = std::make_shared<NormalState>();
+    StatePtr pSync = std::make_shared<SyncState>();
+    StatePtr pTrusted1 = std::make_shared<TrustedStage1State>();
+    StatePtr pTrusted2 = std::make_shared<TrustedStage2State>();
+    StatePtr pTrusted3 = std::make_shared<TrustedStage3State>();
+    StatePtr pTrustedPost = std::make_shared<TrustedPostStageState>();
+    StatePtr pRTH = std::make_shared<HandleRTState>();
+    StatePtr pBB = std::make_shared<HandleBBState>();
+    StatePtr pNone = std::make_shared<NoState>();
+    StatePtr pWriting = std::make_shared<WritingState>();
+    StatePtr pWaiting = std::make_shared<WaitingState>();
 
-  std::pair<Event, StatePtr> defaultRT{Event::RoundTable, pRTH};
-  std::pair<Event, StatePtr> defaultBB{Event::BigBang, pBB};
+    StatePtr pWrite = std::make_shared<PrimitiveWriteState>();
+    // start with that:
+    pstate = pNone;
 
-  transitions = {
+    std::pair<Event, StatePtr> defaultRT { Event::RoundTable, pRTH };
+    std::pair<Event, StatePtr> defaultBB { Event::BigBang, pBB };
+
+    transitions = {
 
       // transition NoState -> Start on the first round
       {pNone, {{Event::Start, pNormal}, {Event::SetTrusted, pWrite}, defaultRT}},
@@ -65,34 +69,49 @@ void SolverCore::InitTransitions() {
       {pRTH, {{Event::SetNormal, pNormal}, {Event::SetTrusted, pTrusted1}}},
 
       // BigBang handler, not useful for now due to Node implements BigBang handling
-      {pBB,
-       {// only option to activate BB is from Write, so we will act almost as Write and finishing round upon receive
-        // hashes
-        defaultRT}},
+      {pBB, { defaultRT}},
 
-      // transition PermanentWrite -> PermanentWrite on the first round
+      // post-writing transition upon RoundTable && BigBang
       {pWriting, {defaultRT, defaultBB}}
+    };
+  }
 
-  };
-}
+  void SolverCore::InitDebugModeTransitions()
+  {
+    opt_mode = Mode::Debug;
 
-void SolverCore::InitDebugModeTransitions() {
-  StatePtr pNormal = std::make_shared<NormalState>();
-  StatePtr pWrite = std::make_shared<PrimitiveWriteState>();
-  StatePtr pNone = std::make_shared<NoState>();
-  // start with that:
-  pstate = pNone;
+    StatePtr pNormal = std::make_shared<NormalState>();
+    StatePtr pWrite = std::make_shared<PrimitiveWriteState>();
+    StatePtr pNone = std::make_shared<NoState>();
+    // start with that:
+    pstate = pNone;
 
-  transitions = {
+    transitions = {
 
+      // transition on the first round
       {pNone, {{Event::SetTrusted, pWrite}, {Event::SetNormal, pNormal}}},
 
-      // transition Normal -> Normal on the first round
+      // transition Normal -> Write every round
       {pNormal, {{Event::RoundTable, pWrite}}},
 
-      // transition PermanentWrite -> PermanentWrite on the first round
+      // transition Write -> Normal every round
       {pWrite, {{Event::RoundTable, pNormal}}},
 
-  };
-}
-}  // namespace slv2
+    };
+  }
+
+  void SolverCore::InitMonitorModeTransitions()
+  {
+    opt_mode = Mode::Monitor;
+
+    StatePtr pNormal = std::make_shared<NormalState>();
+    StatePtr pNone = std::make_shared<NoState>();
+    // start with that:
+    pstate = pNone;
+
+    transitions = {
+      // transition on the first round
+      {pNone, {{Event::Start, pNormal}}}
+    };
+  }
+} // namespace slv2
