@@ -114,7 +114,9 @@ public:
 
   const boost::log::settings& getLoggerSettings() const;
 
-  const PoolSyncData& getPoolSyncSettings() const;
+  const PoolSyncData& getPoolSyncSettings() const {
+    return poolSyncData_;
+  }
 
 private:
   static Config readFromFile(const std::string& fileName);

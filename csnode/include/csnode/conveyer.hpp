@@ -93,7 +93,7 @@ public:
 
   ///
   /// @brief Returns current round number.
-  /// Locks mutex and returns safe round number.
+  /// Returns copy of atomic round number.
   ///
   cs::RoundNumber currentRoundNumber() const;
 

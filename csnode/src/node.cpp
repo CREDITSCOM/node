@@ -310,7 +310,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
   }
 
   // local round is behind global one
-  const auto last_block = getBlockChain().getLastSequence();
+  const auto last_block = getBlockChain().getLastWrittenSequence();
   if(last_block + cs::Conveyer::HashTablesStorageCapacity < global_table.round) {
     // activate pool synchronizer
     poolSynchronizer_->processingSync(global_table.round);
@@ -371,8 +371,7 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
-
-bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
@@ -383,7 +382,7 @@ bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, 
 }
 
 template <typename... Args>
-void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -400,7 +399,7 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 }
 
 template <class... Args>
-void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   csdebug() << "NODE> Sending broadcast";
 
@@ -408,7 +407,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, A
 }
 
 template <class... Args>
-void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
@@ -416,7 +415,7 @@ void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType,
 }
 
 template <class... Args>
-bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
@@ -680,6 +679,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+    getBlockChain().testCachedBlocks();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -1185,20 +1185,20 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
-  const auto& rt = conveyer.currentRoundTable();
+  const auto& table = conveyer.currentRoundTable();
 
-  if (rt.hashes.empty() || conveyer.isSyncCompleted()) {
-    if (rt.hashes.empty()) {
-      cslog() << "NODE> No hashes in round table - > start consensus now";
+  if (table.hashes.empty() || conveyer.isSyncCompleted()) {
+    if (table.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table, start consensus now";
     }
     else {
-      cslog() << "NODE> All hashes in conveyer -> start consensus now";
+      cslog() << "NODE> All hashes in conveyer, start consensus now";
     }
 
     startConsensus();
   }
   else {
-    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_, startPacketRequestPoint_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
   }
 }
 
@@ -1224,13 +1224,11 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
-    const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csdebug() << "NODE> " << __func__
-        << "() Target out(): " << target->getOut()
-        << ", sequence from: " << sequences.front() << ", to: " << sequences.back()
-        << ", packet: " << packetNum
-        << ", round: " << round;
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+  csdebug() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
+            << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
+            << ", round: " << round;
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
@@ -1351,18 +1349,23 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
   if (type == MsgTypes::BlockHashV3) {
     if (rNum < round) {
+      // outdated
       return MessageActions::Drop;
     }
-    if (rNum == round && cs::Conveyer::instance().isSyncCompleted()) {
-      return MessageActions::Process;
+    if(rNum > getBlockChain().getLastWrittenSequence() + cs::Conveyer::HashTablesStorageCapacity) {
+      // too many rounds behind the global round
+      return MessageActions::Drop;
     }
-    if (rNum != round) {
+    if(rNum > round) {
       cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
+      return MessageActions::Postpone;
     }
-    else {
+    if(!cs::Conveyer::instance().isSyncCompleted()) {
       cslog() << "NODE> block hash is postponed until conveyer sync is completed";
+      return MessageActions::Postpone;
     }
-    return MessageActions::Postpone;
+    // in time
+    return MessageActions::Process;
   }
 
   if (rNum < round) {
@@ -1412,21 +1415,6 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
   roundTable.hashes.clear();
 
   return true;
-}
-
-void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence,
-                                      csdb::Pool::sequence_t globalSequence) {
-  if (globalSequence == 0) {
-    return;
-  }
-  auto last = float(lastWrittenSequence);
-  auto global = float(globalSequence);
-  const float maxValue = 100.0f;
-  const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
-  if (syncStatus <= maxValue) {
-    ProgressBar bar;
-    cslog() << "SYNC: " << bar.string(syncStatus);
-  }
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {
@@ -2173,6 +2161,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         }
         else {
           stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+          getBlockChain().testCachedBlocks();
         }
       }
     }

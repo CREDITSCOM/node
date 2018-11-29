@@ -19,13 +19,13 @@ set(Boost_USE_STATIC_RUNTIME ON)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-if(NOT MSVC)
+if(NOT MSVC AND NOT APPLE)
     # some way to resolve cyclic dependencies
-    set(LINKER_START_GROUP "-Wl,--start-group")
-    set(LINKER_END_GROUP "-Wl,--end-group")
+  set(LINKER_START_GROUP "-Wl,--start-group")
+  set(LINKER_END_GROUP "-Wl,--end-group")
 endif()
 
-target_link_libraries(${TEST_NAME} ${LINKER_START_GROUP} net csnode csconnector gtest gmock ${LINKER_END_GROUP}
+target_link_libraries(${TEST_NAME} ${LINKER_START_GROUP} csdb csconnector solver csnode net gtest gmock ${LINKER_END_GROUP}
         Boost::program_options
         )
 

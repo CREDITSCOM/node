@@ -768,7 +768,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
   if (ssStatus_ != SSBootstrapStatus::Requested) {
-    cswarning() << "Unexpected Signal Server response";
+    cswarning() << "Unexpected Signal Server response " << (int) ssStatus_ << " instead of Requested";
     return false;
   }
 
@@ -801,7 +801,7 @@ bool Transport::gotSSReRegistration() {
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-    cswarning() << "Unexpected Signal Server response";
+    cswarning() << "Unexpected Signal Server response " << (int)ssStatus_ << " instead of RegisteredWait";
   }
 
   if (!parseSSSignal(task)) {

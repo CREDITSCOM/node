@@ -227,12 +227,17 @@ private:
     }
   };
 
-  /*inline*/ static constexpr uint32_t posponedBufferSize_ = 1024;
-  typedef FixedCircularBuffer<PostponedPacket, posponedBufferSize_> PPBuf;
+  static constexpr uint32_t posponedBufferSize_ = 1024;
+  using PPBuf = FixedCircularBuffer<PostponedPacket, posponedBufferSize_>;
 
   PPBuf postponedPacketsFirst_;
   PPBuf postponedPacketsSecond_;
-  PPBuf* postponed_[2] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
+
+  static constexpr uint32_t posponedPointerBufferSize_ = 2;
+  PPBuf* postponed_[posponedPointerBufferSize_] = {
+    &postponedPacketsFirst_,
+    &postponedPacketsSecond_
+  };
 
   cs::SpinLock uLock_;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
@@ -244,7 +249,9 @@ private:
   Node* node_;
 
   Neighbourhood nh_;
-  FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, 10000> fragOnRound_;
+
+  static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
+  FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 };
 
 #endif  // TRANSPORT_HPP

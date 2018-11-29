@@ -133,9 +133,12 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
 
   {
     cs::SharedLock lock(m_sharedMutex);
-    std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes),
-                 [this](const auto& hash) { return (pimpl->packetsTable.count(hash) == 0u); });
+    std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) {
+      return (pimpl->packetsTable.count(hash) == 0u);
+    });
   }
+
+  csdebug() << "CONVEYER> Needed round hashes count " << neededHashes.size();
 
   for (const auto& hash : neededHashes) {
     csdetails() << "CONVEYER> Need hash > " << hash.toString();

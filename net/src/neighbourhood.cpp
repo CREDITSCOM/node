@@ -112,7 +112,8 @@ void Neighbourhood::refreshLimits() {
   }
 }
 
-void Neighbourhood::checkSilent() {
+void Neighbourhood::checkSilent()
+{
   static uint32_t refillCount = 0;
 
   bool needRefill = true;
