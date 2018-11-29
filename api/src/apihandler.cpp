@@ -439,7 +439,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     input_smart.smartContractDeploy.byteCode.clear();
     input_smart.smartContractDeploy.sourceCode.clear();
 
-    decltype(auto) smart_origin = locked_ref(this->smart_origin);
+    decltype(auto) smart_origin = lockedReference(this->smart_origin);
     auto it = smart_origin->find(smart_addr);
     if (it != smart_origin->end())
       origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
@@ -450,7 +450,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   }
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
-    auto smart_state(locked_ref(this->smart_state));
+    auto smart_state(lockedReference(this->smart_state));
     return (*smart_state)[smart_addr];
   }();
 
@@ -589,7 +589,7 @@ void APIHandler::StatsGet(api::StatsGetResult& _return) {
 
 void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const api::Address& address) {
   auto smartrid = [&]() -> decltype(auto) {
-    auto smart_origin = locked_ref(this->smart_origin);
+    auto smart_origin = lockedReference(this->smart_origin);
     auto it = smart_origin->find(BlockChain::getAddressFromKey(address));
     return it == smart_origin->end() ? csdb::TransactionID() : it->second;
   }();
@@ -599,7 +599,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ap
   }
   _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
   const csdb::Address adrs = BlockChain::getAddressFromKey(address);
-  auto smart_state(locked_ref(this->smart_state));
+  auto smart_state(lockedReference(this->smart_state));
   _return.smartContract.objectState = (*smart_state)[adrs].get_state();
 
   SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
@@ -607,7 +607,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ap
 }
 
 bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init) {
-  auto pending_smart_transactions = locked_ref(this->pending_smart_transactions);
+  auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
   std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
   while (curph != pending_smart_transactions->last_pull_hash) {
@@ -657,7 +657,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
     if (!init) {
       auto& e = [&]() -> decltype(auto) {
-        auto smart_last_trxn = locked_ref(this->smart_last_trxn);
+        auto smart_last_trxn = lockedReference(this->smart_last_trxn);
         return (*smart_last_trxn)[address];
       }();
       std::unique_lock<decltype(e.lock)> l(e.lock);
@@ -666,7 +666,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     }
     {
       auto& e = [&]() -> decltype(auto) {
-        auto smart_state(locked_ref(this->smart_state));
+        auto smart_state(lockedReference(this->smart_state));
         return (*smart_state)[address];
       }();
       e.update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
@@ -675,7 +675,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     if (is_smart_deploy(smart)) {
       csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__;
       {
-        auto smart_origin = locked_ref(this->smart_origin);
+        auto smart_origin = lockedReference(this->smart_origin);
         (*smart_origin)[address] = tr.id();
       }
       {
@@ -685,7 +685,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
           return false;
         }
 
-        auto deployed_by_creator = locked_ref(this->deployed_by_creator);
+        auto deployed_by_creator = lockedReference(this->deployed_by_creator);
         (*deployed_by_creator)[pk_addr].push_back(tr.id());
       }
     }
@@ -697,7 +697,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
 template <typename Mapper>
 void APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
-  auto deployed_by_creator = locked_ref(this->deployed_by_creator);
+  auto deployed_by_creator = lockedReference(this->deployed_by_creator);
   for (auto& trid : (*deployed_by_creator)[deployer]) {
     auto tr = s_blockchain.loadTransaction(trid);
     auto smart = fetch_smart_body(tr);
@@ -751,7 +751,7 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const api:
   csdb::Address key = BlockChain::getAddressFromKey(smart_public);
   decltype(smart_last_trxn)::LockedType::iterator it;
   auto& entry = [&]() -> decltype(auto) {
-    auto smart_last_trxn = locked_ref(this->smart_last_trxn);
+    auto smart_last_trxn = lockedReference(this->smart_last_trxn);
     std::tie(it, std::ignore) =
         smart_last_trxn->emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple());
     return std::ref(it->second).get();
@@ -777,7 +777,7 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
   int64_t offset  = _offset;
   int64_t limit   = _limit;
 
-  auto smart_origin = locked_ref(this->smart_origin);
+  auto smart_origin = lockedReference(this->smart_origin);
 
   for (auto p : *smart_origin) {
     if (offset) {

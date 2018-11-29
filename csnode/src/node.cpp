@@ -1184,20 +1184,20 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
-  const auto& rt = conveyer.currentRoundTable();
+  const auto& table = conveyer.currentRoundTable();
 
-  if (rt.hashes.empty() || conveyer.isSyncCompleted()) {
-    if (rt.hashes.empty()) {
-      cslog() << "NODE> No hashes in round table - > start consensus now";
+  if (table.hashes.empty() || conveyer.isSyncCompleted()) {
+    if (table.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table, start consensus now";
     }
     else {
-      cslog() << "NODE> All hashes in conveyer -> start consensus now";
+      cslog() << "NODE> All hashes in conveyer, start consensus now";
     }
 
     startConsensus();
   }
   else {
-    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_, startPacketRequestPoint_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
   }
 }
 

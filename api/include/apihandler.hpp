@@ -32,13 +32,16 @@ public:
 };
 
 struct APIHandlerInterface : public api::APINull, public APIHandlerBase {};
+
 namespace cs {
 class SolverCore;
 }
+
 namespace executor {
 class APIResponse;
 class ContractExecutorConcurrentClient;
 }  // namespace executor
+
 namespace api {
 namespace custom {
 class APIProcessor;
@@ -108,11 +111,13 @@ private:
     size_t awaiter_num{0};
     std::deque<csdb::TransactionID> trid_queue{};
   };
+
   struct PendingSmartTransactions {
     std::queue<csdb::Transaction> queue;
     csdb::PoolHash last_pull_hash{};
   };
-  using smart_state_entry = cs::worker_queue<std::string>;
+
+  using smart_state_entry = cs::WorkerQueue<std::string>;
   using client_type = executor::ContractExecutorConcurrentClient;
 
   BlockChain& s_blockchain;
@@ -129,7 +134,7 @@ private:
   std::map<csdb::PoolHash, api::Pool> poolCache;
   std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
   std::thread state_updater;
-  std::map<std::string, cs::worker_queue<std::tuple<>>> work_queues;
+  std::map<std::string, cs::WorkerQueue<std::tuple<>>> work_queues;
 
 private:
   void state_updater_work_function();
@@ -168,7 +173,7 @@ namespace custom {
 class APIProcessor : public api::APIProcessor {
 public:
   APIProcessor(::apache::thrift::stdcxx::shared_ptr<APIHandler> iface);
-  cs::sweet_spot ss;
+  cs::SweetSpot ss;
 
 protected:
   bool dispatchCall(::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot,
