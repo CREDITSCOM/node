@@ -29,14 +29,14 @@ public signals:
 };
 
 cs::ConveyerBase::ConveyerBase() {
-  pimpl = std::make_unique<cs::ConveyerBase::Impl>();
-  pimpl->metaStorage.append(cs::ConveyerMetaStorage::Element());
+  pimpl_ = std::make_unique<cs::ConveyerBase::Impl>();
+  pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 }
 
 cs::ConveyerBase::~ConveyerBase() = default;
 
 cs::PacketFlushSignal& cs::ConveyerBase::flushSignal() {
-  return pimpl->flushPacket;
+  return pimpl_->flushPacket;
 }
 
 void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
@@ -45,22 +45,22 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     return;
   }
 
-  cs::Lock lock(m_sharedMutex);
+  cs::Lock lock(sharedMutex_);
 
-  if (pimpl->transactionsBlock.empty() ||
-      (pimpl->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
-    pimpl->transactionsBlock.push_back(cs::TransactionsPacket());
+  if (pimpl_->transactionsBlock.empty() ||
+      (pimpl_->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
+    pimpl_->transactionsBlock.push_back(cs::TransactionsPacket());
   }
 
-  pimpl->transactionsBlock.back().addTransaction(transaction);
+  pimpl_->transactionsBlock.back().addTransaction(transaction);
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
   cs::TransactionsPacketHash hash = packet.hash();
-  cs::Lock lock(m_sharedMutex);
+  cs::Lock lock(sharedMutex_);
 
-  if (auto iterator = pimpl->packetsTable.find(hash); iterator == pimpl->packetsTable.end()) {
-    pimpl->packetsTable.emplace(std::move(hash), packet);
+  if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+    pimpl_->packetsTable.emplace(std::move(hash), packet);
   }
   else {
     cswarning() << "CONVEYER> Same hash already exists at table: " << hash.toString();
@@ -81,15 +81,15 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
 }
 
 const cs::TransactionsPacketTable& cs::ConveyerBase::transactionsPacketTable() const {
-  return pimpl->packetsTable;
+  return pimpl_->packetsTable;
 }
 
 const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const {
-  return pimpl->transactionsBlock;
+  return pimpl_->transactionsBlock;
 }
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (!meta) {
     cserror() << "CONVEYER> Can not create transactions packet";
@@ -98,7 +98,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 
   cs::TransactionsPacket packet;
   cs::Hashes& hashes = meta->roundTable.hashes;
-  cs::TransactionsPacketTable& table = pimpl->packetsTable;
+  cs::TransactionsPacketTable& table = pimpl_->packetsTable;
 
   for (const auto& hash : hashes) {
     const auto iterator = table.find(hash);
@@ -132,9 +132,9 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   cs::Hashes neededHashes;
 
   {
-    cs::SharedLock lock(m_sharedMutex);
+    cs::SharedLock lock(sharedMutex_);
     std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) {
-      return (pimpl->packetsTable.count(hash) == 0u);
+      return (pimpl_->packetsTable.count(hash) == 0u);
     });
   }
 
@@ -145,8 +145,8 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   }
 
   {
-    cs::Lock lock(m_sharedMutex);
-    pimpl->currentRound = table.round;
+    cs::Lock lock(sharedMutex_);
+    pimpl_->currentRound = table.round;
   }
 
   cs::ConveyerMetaStorage::Element element;
@@ -155,26 +155,26 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   element.meta.roundTable = std::move(table);
 
   {
-    cs::Lock lock(m_sharedMutex);
+    cs::Lock lock(sharedMutex_);
 
-    if (!pimpl->metaStorage.contains(pimpl->currentRound)) {
-      pimpl->metaStorage.append(std::move(element));
+    if (!pimpl_->metaStorage.contains(pimpl_->currentRound)) {
+      pimpl_->metaStorage.append(std::move(element));
     }
     else {
       csfatal() << "CONVEYER> Meta round currently in conveyer";
     }
   }
 
-  csdebug() << "CONVEYER> Current table size " << pimpl->packetsTable.size();
+  csdebug() << "CONVEYER> Current table size " << pimpl_->packetsTable.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(pimpl_->currentRound);
   return meta->roundTable;
 }
 
 const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     return nullptr;
@@ -184,7 +184,7 @@ const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const 
 }
 
 cs::RoundNumber cs::ConveyerBase::currentRoundNumber() const {
-  return pimpl->currentRound;
+  return pimpl_->currentRound;
 }
 
 const cs::Hashes& cs::ConveyerBase::currentNeededHashes() const {
@@ -192,7 +192,7 @@ const cs::Hashes& cs::ConveyerBase::currentNeededHashes() const {
 }
 
 const cs::Hashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     cserror() << "CONVEYER: Bad needed hashes, check node logic";
@@ -203,9 +203,9 @@ const cs::Hashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
 }
 
 void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPacket&& packet) {
-  cs::Lock lock(m_sharedMutex);
+  cs::Lock lock(sharedMutex_);
 
-  cs::ConveyerMeta* metaPointer = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* metaPointer = pimpl_->metaStorage.get(round);
   cs::TransactionsPacketTable* tablePointer = nullptr;
 
   if (metaPointer == nullptr) {
@@ -213,7 +213,7 @@ void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPac
     return;
   }
 
-  tablePointer = (round == pimpl->currentRound) ? &pimpl->packetsTable : &metaPointer->hashTable;
+  tablePointer = (round == pimpl_->currentRound) ? &pimpl_->packetsTable : &metaPointer->hashTable;
 
   if (tablePointer == nullptr) {
     cserror() << "CONVEYER> Can not add sync packet because table pointer do not exist";
@@ -237,7 +237,7 @@ bool cs::ConveyerBase::isSyncCompleted() const {
 }
 
 bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     cserror() << "CONVEYER> Needed hashes of " << round << " round not found";
@@ -248,12 +248,12 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
 }
 
 const cs::Notifications& cs::ConveyerBase::notifications() const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
   return meta->notifications;
 }
 
 void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(currentRoundNumber());
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (meta) {
     csdebug() << "CONVEYER> Writer notification added";
@@ -262,7 +262,7 @@ void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
 }
 
 std::size_t cs::ConveyerBase::neededNotificationsCount() const {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(pimpl->currentRound);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(pimpl_->currentRound);
 
   // TODO: check if +1 is correct
   if (meta) {
@@ -274,7 +274,7 @@ std::size_t cs::ConveyerBase::neededNotificationsCount() const {
 }
 
 bool cs::ConveyerBase::isEnoughNotifications(cs::ConveyerBase::NotificationState state) const {
-  cs::SharedLock lock(m_sharedMutex);
+  cs::SharedLock lock(sharedMutex_);
 
   const std::size_t neededConfidantsCount = neededNotificationsCount();
   const std::size_t notificationsCount = notifications().size();
@@ -290,12 +290,12 @@ bool cs::ConveyerBase::isEnoughNotifications(cs::ConveyerBase::NotificationState
 }
 
 void cs::ConveyerBase::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&& characteristic) {
-  if (!pimpl->characteristicMetas.contains(round)) {
+  if (!pimpl_->characteristicMetas.contains(round)) {
     cs::CharacteristicMetaStorage::Element metaElement;
     metaElement.meta = std::move(characteristic);
     metaElement.round = round;
 
-    pimpl->characteristicMetas.append(std::move(metaElement));
+    pimpl_->characteristicMetas.append(std::move(metaElement));
   }
   else {
     csdebug() << "CONVEYER> Received meta is currently in meta stack";
@@ -303,17 +303,17 @@ void cs::ConveyerBase::addCharacteristicMeta(RoundNumber round, CharacteristicMe
 }
 
 std::optional<cs::CharacteristicMeta> cs::ConveyerBase::characteristicMeta(const cs::RoundNumber round) {
-  if (!pimpl->characteristicMetas.contains(round)) {
+  if (!pimpl_->characteristicMetas.contains(round)) {
     csdebug() << "CONVEYER> Characteristic meta not received";
     return std::nullopt;
   }
 
-  auto meta = pimpl->characteristicMetas.extract(round);
+  auto meta = pimpl_->characteristicMetas.extract(round);
   return std::make_optional<cs::CharacteristicMeta>(std::move(meta).value());
 }
 
 void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round) {
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (meta) {
     csdebug() << "CONVEYER> Characteristic set to conveyer";
@@ -322,7 +322,7 @@ void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, c
 }
 
 const cs::Characteristic* cs::ConveyerBase::characteristic(cs::RoundNumber round) const {
-  auto meta = pimpl->metaStorage.get(round);
+  auto meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     cserror() << "CONVEYER> Get characteristic, logic error, can not find characteristic, #" << round;
@@ -348,8 +348,8 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
   cslog() << "CONVEYER> " << __func__ << "(), round " << round << ":";
 
-  cs::Lock lock(m_sharedMutex);
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::Lock lock(sharedMutex_);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     cserror() << "CONVEYER> Apply characteristic failed, no meta in meta storage";
@@ -359,7 +359,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   cs::TransactionsPacketTable hashTable;
   const cs::Hashes& localHashes = meta->roundTable.hashes;
   const cs::Characteristic& characteristic = meta->characteristic;
-  cs::TransactionsPacketTable& currentHashTable = pimpl->packetsTable;
+  cs::TransactionsPacketTable& currentHashTable = pimpl_->packetsTable;
 
   cslog() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
   csdebug() << "CONVEYER> ApplyCharacteristic, viewing hashes count " << localHashes.size();
@@ -436,11 +436,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::TransactionsPacketHash& hash,
                                                                    const RoundNumber round) const {
-  if (auto iterator = pimpl->packetsTable.find(hash); iterator != pimpl->packetsTable.end()) {
+  if (auto iterator = pimpl_->packetsTable.find(hash); iterator != pimpl_->packetsTable.end()) {
     return iterator->second;
   }
 
-  cs::ConveyerMeta* meta = pimpl->metaStorage.get(round);
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
     return std::nullopt;
@@ -456,9 +456,9 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::Tra
 }
 
 bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id) {
-  cs::SharedLock lock(m_sharedMutex);
+  cs::SharedLock lock(sharedMutex_);
 
-  for (const cs::ConveyerMetaStorage::Element& element : pimpl->metaStorage) {
+  for (const cs::ConveyerMetaStorage::Element& element : pimpl_->metaStorage) {
     const auto& invalidTransactions = element.meta.invalidTransactions.transactions();
     const auto iterator = std::find_if(invalidTransactions.begin(), invalidTransactions.end(),
                                        [=](const auto& transaction) { return transaction.innerID() == id; });
@@ -472,21 +472,21 @@ bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id) {
 }
 
 cs::SharedMutex& cs::ConveyerBase::sharedMutex() const {
-  return m_sharedMutex;
+  return sharedMutex_;
 }
 
 void cs::ConveyerBase::flushTransactions() {
-  cs::Lock lock(m_sharedMutex);
+  cs::Lock lock(sharedMutex_);
   std::size_t allTransactionsCount = 0;
 
-  for (auto& packet : pimpl->transactionsBlock) {
+  for (auto& packet : pimpl_->transactionsBlock) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     if ((transactionsCount != 0u) && packet.isHashEmpty()) {
       packet.makeHash();
 
       // try to send save in node
-      pimpl->flushPacket(packet);
+      pimpl_->flushPacket(packet);
 
       auto hash = packet.hash();
 
@@ -494,8 +494,8 @@ void cs::ConveyerBase::flushTransactions() {
         cserror() << "CONVEYER > Transaction packet hashing failed";
       }
 
-      if (pimpl->packetsTable.count(hash) == 0u) {
-        pimpl->packetsTable.emplace(std::move(hash), std::move(packet));
+      if (pimpl_->packetsTable.count(hash) == 0u) {
+        pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
       }
       else {
         cserror() << "CONVEYER > Logical error, adding transactions packet more than one time";
@@ -505,8 +505,8 @@ void cs::ConveyerBase::flushTransactions() {
     }
   }
 
-  if (!pimpl->transactionsBlock.empty()) {
-    pimpl->transactionsBlock.clear();
+  if (!pimpl_->transactionsBlock.empty()) {
+    pimpl_->transactionsBlock.clear();
   }
 }
 

@@ -220,9 +220,9 @@ public slots:
 private:
   /// pointer implementation
   struct Impl;
-  std::unique_ptr<Impl> pimpl;
+  std::unique_ptr<Impl> pimpl_;
 
-  mutable cs::SharedMutex m_sharedMutex;
+  mutable cs::SharedMutex sharedMutex_;
 };
 
 class Conveyer : public ConveyerBase {

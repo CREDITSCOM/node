@@ -37,8 +37,7 @@ enum NodeLevel {
 
 namespace cs {
 // table for fast transactions storage
-using TransactionsPacketTable =
-    std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: chechk performance of map/unordered_map
+using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: check performance of map/unordered_map
 
 // array of packets
 using TransactionsBlock = std::vector<cs::TransactionsPacket>;
@@ -87,7 +86,7 @@ struct PoolMetaInfo {
 };
 
 struct HashVector {
-  uint8_t sender;
+  cs::Byte sender;
   cs::Hash hash;
   cs::Signature signature;
 };
@@ -95,8 +94,8 @@ struct HashVector {
 constexpr std::size_t hashVectorCount = 5;
 
 struct HashMatrix {
-  uint8_t sender;
-  HashVector hashVector[hashVectorCount];
+  cs::Byte sender;
+  cs::HashVector hashVector[hashVectorCount];
   cs::Signature signature;
 };
 
