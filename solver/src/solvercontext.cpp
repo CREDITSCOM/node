@@ -22,6 +22,7 @@ void SolverContext::add_stage1(cs::StageOne& stage, bool send) {
   /*the order is important! the signature is created in node
   before sending stage and then is inserted in the field .sig
   now we can add it to stages storage*/
+  cslog() << "TimeStamp(" << stage.roundTimeStamp.size() << ") = " << stage.roundTimeStamp;
   core.gotStageOne(stage);
 }
 
@@ -105,6 +106,11 @@ void SolverContext::spawn_next_round() {
 
   tStamp = stage1(stage3(own_conf_number())->writer)->roundTimeStamp;
 
+  for(uint8_t i=0; i< cnt_trusted(); ++i) {
+         tStamp = stage1(i)->roundTimeStamp;
+         cslog() << "TimeStamp(" << tStamp.size() << ") = " << tStamp;
+       }
+  /*cslog() << "RoundTimeStamp: " << tStamp;*/
   // uint8_t own_num = (uint8_t) own_conf_number();
   // const auto ptr = stage3(own_num);
   // if(ptr != nullptr && ptr->writer == own_num) {

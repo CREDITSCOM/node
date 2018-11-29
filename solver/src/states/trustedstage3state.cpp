@@ -247,16 +247,16 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         }
       }
       size_t hashes_amount = stage_i.hashesCandidates.size();
-      cslog() << "My conf number = " << context.own_conf_number();
+      //cslog() << "My conf number = " << context.own_conf_number();
       if (stage_i.sender == (uint8_t)context.own_conf_number()) {
         myHashes = stage_i.hashesCandidates;
         myPacks = stage_i.hashesCandidates.size();
       }
 
 
-      cslog() << "Hashes amount of " << (int)i << " : " << (int)hashes_amount;
+      cslog() << "Hashes amount of [" << (int)i << "]: " << (int)hashes_amount;
       for (int j = 0; j < hashes_amount; j++) {
-        // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
+         cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
         if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
         }
@@ -286,6 +286,41 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       belowThreshold.push_back(it.first);
     }
   }
+
+  LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
+  for (auto& it : hashesElection) {
+    cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), 32) << " - " << (int)it.second;
+    if (it.second > cr) {
+      next_round_hashes.push_back(it.first);
+    }
+  }
+  size_t acceptedPacks = 0;
+  bool rejectedFound;
+  cslog() << "Accepted hashes from THIS NODE: ";
+  for (auto& itt : myHashes) {
+    rejectedFound = true;
+    //cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
+    for (auto& it : next_round_hashes) {
+      if (memcmp(it.toBinary().data(), itt.toBinary().data(), 32)) {}
+      else {
+        ++acceptedPacks;
+        rejectedFound = false;
+        cslog() << "    + (" << acceptedPacks << ") " << cs::Utils::byteStreamToHex(itt.toBinary().data(), itt.size());
+      }
+    }
+    if (rejectedFound) {
+      myRejectedHashes.push_back(itt);
+    }
+  }
+  cslog() << "Rejected hashes from THIS NODE: ";
+  size_t rejectedPacks = 0;
+  for (auto& it : myRejectedHashes) {
+    ++rejectedPacks;
+    cslog() << "    - (" << rejectedPacks << ") " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
+  }
+
+  cslog() << name() << ": initial amount: " << myPacks << ", next round hashes: " << next_round_hashes.size() << ", accepted: " << acceptedPacks;
+
 
   LOG_NOTICE(name() << ": candidates divided: above = " << aboveThreshold.size()
                     << ", below = " << belowThreshold.size());

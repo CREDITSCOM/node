@@ -81,6 +81,7 @@ void TrustedStage2State::off(SolverContext& /*context*/) {
 
 Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& st) {
   stage.signatures[st.sender] = st.sig;
+  stage.hashes[st.sender] = st.msgHash;
   if (context.enough_stage1()) {
     LOG_NOTICE(name() << ": enough stage-1 received");
     /*signing of the second stage should be placed here*/

@@ -751,7 +751,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   if (writer_key.has_value()) {
     csdebug() << "BLOCKCHAIN> signing block #" << pool_seq;
     addNewWalletsToPool(pool);
-    pool.sign(writer_key.value());
+    //pool.sign(writer_key.value());
   }
 
   if (writer_signature.has_value()) {
@@ -764,16 +764,16 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
     // new block require finishing
     const auto& sig = writer_signature.value();
-    if (pool.verify_signature(std::string(sig.begin(), sig.end()))) {
+    //if (pool.verify_signature(std::string(sig.begin(), sig.end()))) {
       csdebug() << "BLOCKCHAIN> writer signature is verified, record block to chain";
       putBlock(pool);
-    }
-    else {
-      cswarning() << "BLOCKCHAIN> writer signature verification failed, drop block out";
-      removeWalletsInPoolFromCache(pool);
+   // }
+   // else {
+   //   cswarning() << "BLOCKCHAIN> writer signature verification failed, drop block out";
+   //   removeWalletsInPoolFromCache(pool);
       // caller code may handle the situation
-      return std::make_pair(false, pool);
-    }
+    //  return std::make_pair(false, pool);
+   // }
   }
   else {
     // ready-to-record block does not require anything
