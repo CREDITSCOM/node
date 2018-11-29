@@ -42,10 +42,11 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     else {
       sock.bind(ip::udp::endpoint(ipv6 ? ip::udp::v6() : ip::udp::v4(), data.port));
     }
+
     return sock;
   }
   catch (boost::system::system_error& e) {
-    LOG_ERROR("Cannot bind socket on " << e.what());
+    cserror() << "Cannot bind socket on " << e.what();
     return ip::udp::socket(context);
   }
 } //  bindSocket
@@ -62,7 +63,10 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn,
 
   if (openOwn) {
     result = new ip::udp::socket(bindSocket(context_, this, epd, ipv6));
-    if (!result->is_open()) result = nullptr;
+
+    if (!result->is_open()) {
+      result = nullptr;
+    }
   }
   else {
     while (!singleSockOpened_.load());
@@ -75,10 +79,12 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn,
 } //resolve
 
 void Network::readerRoutine(const Config& config) {
-  ip::udp::socket* sock =
-      getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
+  ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
 
-  if (!sock) return;
+  if (!sock) {
+    return;
+  }
+
   while (!initFlag_.load());
 
   boost::system::error_code lastError;
@@ -88,12 +94,15 @@ void Network::readerRoutine(const Config& config) {
 
     size_t packetSize = 0;
     uint32_t cnt = 0;
+
     do {
       if (stopReaderRoutine) {
         return;
       }
+
       packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
       task.size = task.pack.decode(packetSize);
+
       if (++cnt == 10) {
         cnt = 0;
         std::this_thread::yield();
@@ -105,7 +114,7 @@ void Network::readerRoutine(const Config& config) {
       csdebug(logger::Net) << "Received packet" << std::endl << task.pack;
     }
     else {
-      LOG_ERROR("Cannot receive packet. Error " << lastError);
+      cserror() << "Cannot receive packet. Error " << lastError;
     }
 
     csdebug(logger::Net)
@@ -114,7 +123,8 @@ void Network::readerRoutine(const Config& config) {
       << "Read " << packetSize << std::endl
       << "Returned " << lastError;
   }
-  LOG_WARN("readerRoutine STOPPED!!!\n");
+
+  cswarning() << "readerRoutine STOPPED!!!\n";
 }
 
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
@@ -184,7 +194,10 @@ void Network::processorRoutine() {
     }
 
     if (!(task->pack.isHeaderValid())) {
-      cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), 100);
+      static constexpr size_t limit = 100;
+      auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+
+      cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
       remoteSender->addStrike();
       continue;
     }

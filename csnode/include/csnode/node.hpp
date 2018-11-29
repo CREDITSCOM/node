@@ -293,7 +293,8 @@ private:
   size_t lastStartSequence_;
   uint32_t startPacketRequestPoint_ = 0;
 
-  inline static const uint32_t packetRequestStep_ = 250;
+  // ms timeout
+  inline static const uint32_t packetRequestStep_ = 450;
   inline static const size_t maxPacketRequestSize_ = 1000;
 
   bool blocksReceivingStarted_ = false;
@@ -301,6 +302,7 @@ private:
   // serialization/deserialization entities
   cs::IPackStream istream_;
   cs::OPackStream ostream_;
+
   cs::PoolSynchronizer* poolSynchronizer_;
 
   // sends transactions blocks to network

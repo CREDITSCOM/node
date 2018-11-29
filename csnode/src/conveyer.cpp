@@ -72,10 +72,9 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
       cslog() << "CONVEYER> Same hashes, binaries are equal";
     }
     else {
-      cswarning() << "CONVEYER> Same hashes look at binaries";
-
-      csdebug() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
-      csdebug() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
+      cswarning() << "CONVEYER> Same hashes, binaries are different";
+      csdetails() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
+      csdetails() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
     }
   }
 }
