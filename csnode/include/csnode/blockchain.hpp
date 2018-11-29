@@ -181,7 +181,7 @@ private:
 private:
   bool good_;
 
-  mutable cs::spinlock dbLock_;
+  mutable cs::SpinLock dbLock_;
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
@@ -196,10 +196,10 @@ private:
   std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
   std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
   std::unique_ptr<cs::WalletsPools> walletsPools_;
-  mutable cs::spinlock cacheMutex_;
+  mutable cs::SpinLock cacheMutex_;
 
   std::condition_variable_any newBlockCv_;
-  cs::spinlock waitersLocker_;
+  cs::SpinLock waitersLocker_;
   std::map<csdb::Address, AddrTrnxCount> transactionsCount_;
 
   // block cache

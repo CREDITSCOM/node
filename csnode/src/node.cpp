@@ -371,8 +371,7 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
-
-bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
@@ -383,7 +382,7 @@ bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, 
 }
 
 template <typename... Args>
-void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -400,7 +399,7 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 }
 
 template <class... Args>
-void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   csdebug() << "NODE> Sending broadcast";
 
@@ -408,7 +407,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, A
 }
 
 template <class... Args>
-void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
@@ -416,7 +415,7 @@ void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType,
 }
 
 template <class... Args>
-bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
@@ -1224,13 +1223,11 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
-    const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csdebug() << "NODE> " << __func__
-        << "() Target out(): " << target->getOut()
-        << ", sequence from: " << sequences.front() << ", to: " << sequences.back()
-        << ", packet: " << packetNum
-        << ", round: " << round;
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+  csdebug() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
+            << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
+            << ", round: " << round;
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
@@ -1412,21 +1409,6 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
   roundTable.hashes.clear();
 
   return true;
-}
-
-void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence,
-                                      csdb::Pool::sequence_t globalSequence) {
-  if (globalSequence == 0) {
-    return;
-  }
-  auto last = float(lastWrittenSequence);
-  auto global = float(globalSequence);
-  const float maxValue = 100.0f;
-  const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
-  if (syncStatus <= maxValue) {
-    ProgressBar bar;
-    cslog() << "SYNC: " << bar.string(syncStatus);
-  }
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {

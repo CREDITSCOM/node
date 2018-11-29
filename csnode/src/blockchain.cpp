@@ -16,6 +16,9 @@ using namespace cs;
 
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
+, dbLock_()
+, waitersLocker_()
+, cacheMutex_()
 , globalSequence_(static_cast<decltype(globalSequence_)>(-1))
 , blockRequestIsNeeded_(false)
 , genesisAddress_(genesisAddress)

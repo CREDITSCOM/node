@@ -145,19 +145,19 @@ public:
   void sendRoundTable(const cs::RoundTable& round);
 
   template <typename... Args>
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
-  void sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+  void sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+  void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  bool sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+  bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -210,7 +210,7 @@ public:
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-  void sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter);
+  void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packCounter);
 
 private:
   bool init();
@@ -241,10 +241,6 @@ private:
   void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
-
-  // pool sync progress
-  static void showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence,
-                                         csdb::Pool::sequence_t globalSequence);
 
   template <typename T, typename... Args>
   void writeDefaultStream(const T& value, Args&&... args);

@@ -15,21 +15,6 @@
 #include <unordered_map>
 
 namespace cs {
-class spinlock {
-  __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
-
-public:
-  void lock() {
-    while (af.test_and_set(std::memory_order_acquire)) {
-      std::this_thread::yield();
-    }
-  }
-
-  void unlock() {
-    af.clear(std::memory_order_release);
-  }
-};
-
 template <typename S>
 struct worker_queue {
 private:
@@ -39,10 +24,12 @@ private:
   std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
 #endif
   std::condition_variable_any w;
-  cs::spinlock lock;
+  cs::SpinLock lock;
   S state;
 
 public:
+  inline worker_queue() noexcept : lock() {}
+
   S get_state() const {
     return state;
   }
@@ -120,11 +107,13 @@ struct sweet_spot {
 #ifdef BOTTLENECKED_SMARTS
 private:
   std::condition_variable_any cv;
-  cs::spinlock lock;
+  cs::SpinLock lock;
   bool occupied = false;
 #endif
 
 public:
+  inline sweet_spot() noexcept : lock() {}
+
   void occupy() {
 #ifdef BOTTLENECKED_SMARTS
     std::unique_lock<decltype(lock)> l(lock);

@@ -103,7 +103,7 @@ public:
 
 private:
   struct smart_trxns_queue {
-    cs::spinlock lock;
+    cs::SpinLock lock;
     std::condition_variable_any new_trxn_cv{};
     size_t awaiter_num{0};
     std::deque<csdb::TransactionID> trid_queue{};
