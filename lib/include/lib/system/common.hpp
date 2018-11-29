@@ -46,9 +46,9 @@ using SpinGuard = std::lock_guard<SpinLock>;
 template<typename... T>
 class ScopedLock {
 public:
-  explicit ScopedLock(T&... locks): lock(locks...) {}
+  explicit inline ScopedLock(T&... locables) noexcept : lock_(locables...) {}
 private:
-  std::scoped_lock<T...> lock;
+  std::scoped_lock<T...> lock_;
 };
 }  // namespace cs
 #endif  // COMMON_HPP
