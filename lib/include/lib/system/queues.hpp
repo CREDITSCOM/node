@@ -14,8 +14,7 @@ template <typename T, std::size_t MaxSize, uint32_t BackOffTreshold = 1000>
 class FUQueue {
 public:
   struct Element {
-    enum class State : uint8_t
-    {
+    enum class State : uint8_t {
       Empty,
       New,
       Read,
@@ -56,8 +55,9 @@ public:
 
 private:
   Element* nextPtr(Element* ptr) {
-    if (++ptr == end)
+    if (++ptr == end) {
       ptr = elements;
+    }
 
     return ptr;
   }
