@@ -101,6 +101,9 @@ void Spammer::SpamWithTransactions(Node& node) {
     while (tr_gen_in_round == kMaxTransactionsInOneRound && round_number == cs::Conveyer::instance().currentRoundNumber()) {
       std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
     }
+    while (kMaxTransactionsInOneRound <= cs::Conveyer::instance().blockTransactionsCount()) {
+      std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
+    }
     if (round_number != cs::Conveyer::instance().currentRoundNumber()) {
       tr_gen_in_round = 0;
       round_number = cs::Conveyer::instance().currentRoundNumber();
