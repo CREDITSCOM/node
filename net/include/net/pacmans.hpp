@@ -24,8 +24,9 @@ public:
   TaskPtr& operator=(TaskPtr&&) = delete;
 
   ~TaskPtr() {
-    if (ptr_)
+    if (ptr_) {
       owner_->releaseTask(ptr_);
+    }
   }
 
   typename Pacman::Task* operator->() {

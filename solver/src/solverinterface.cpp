@@ -64,7 +64,7 @@ namespace cs
       pnode->sendStageOne(*pstage1);
     }
     else {
-      cslog() << "SolverCore: cannot resend stage-1 after BigBang";
+      cslog() << "SolverCore: stage-1 not ready to re-send after BigBang";
     }
     const auto pstage2 = find_stage2(own_num);
     if(pstage2 != nullptr) {
@@ -72,7 +72,7 @@ namespace cs
       pnode->sendStageTwo(*pstage2);
     }
     else {
-      cslog() << "SolverCore: cannot resend stage-2 after BigBang";
+      cslog() << "SolverCore: stage-2 not ready to re-send after BigBang";
     }
     const auto pstage3 = find_stage3(own_num);
     if(pstage3 != nullptr) {
@@ -80,7 +80,7 @@ namespace cs
       pnode->sendStageThree(*pstage3);
     }
     else {
-      cslog() << "SolverCore: cannot resend stage-3 after BigBang";
+      cslog() << "SolverCore: stage-3 not ready yet to re-send after BigBang";
     }
   }
 

@@ -23,7 +23,7 @@ public:
   virtual const char* what() const noexcept override;
 
 private:
-  const std::string m_message;
+  const std::string message_;
 };
 
 ///
@@ -82,8 +82,8 @@ public:
     if (!isAvailable(sizeof(T)))
       return T();
 
-    T field = getFromArray<T>(m_data, m_index);
-    m_index += sizeof(T);
+    T field = getFromArray<T>(data_, index_);
+    index_ += sizeof(T);
 
     return field;
   }
@@ -95,11 +95,11 @@ public:
   ///
   template <typename T>
   inline void setStreamField(const T& streamField) {
-    if (m_bytes) {
+    if (bytes_) {
       const char* ptr = reinterpret_cast<const char*>(&streamField);
 
       for (std::size_t i = 0; i < sizeof(T); ++i) {
-        m_bytes->push_back(*(ptr + i));
+        bytes_->push_back(*(ptr + i));
       }
     }
   }
@@ -119,10 +119,10 @@ public:
     }
 
     for (std::size_t i = 0; i < size; ++i) {
-      array[i] = m_data[i + m_index];
+      array[i] = data_[i + index_];
     }
 
-    m_index += size;
+    index_ += size;
 
     return array;
   }
@@ -134,8 +134,8 @@ public:
   ///
   template <std::size_t size>
   inline void setStreamArray(const std::array<char, size>& array) {
-    if (m_bytes) {
-      m_bytes->insert(m_bytes->end(), array.begin(), array.end());
+    if (bytes_) {
+      bytes_->insert(bytes_->end(), array.begin(), array.end());
     }
   }
 
@@ -146,8 +146,8 @@ public:
   ///
   template <std::size_t size>
   inline void setByteArray(const ByteArray<size>& array) {
-    if (m_bytes) {
-      m_bytes->insert(m_bytes->end(), array.begin(), array.end());
+    if (bytes_) {
+      bytes_->insert(bytes_->end(), array.begin(), array.end());
     }
   }
 
@@ -166,10 +166,10 @@ public:
     }
 
     for (std::size_t i = 0; i < size; ++i) {
-      result[i] = static_cast<unsigned char>(m_data[i + m_index]);
+      result[i] = static_cast<unsigned char>(data_[i + index_]);
     }
 
-    m_index += size;
+    index_ += size;
     return result;
   }
 
@@ -180,8 +180,8 @@ public:
   ///
   template <std::size_t size>
   inline void setFixedString(const FixedString<size>& fixedString) {
-    if (m_bytes) {
-      m_bytes->insert(m_bytes->end(), fixedString.begin(), fixedString.end());
+    if (bytes_) {
+      bytes_->insert(bytes_->end(), fixedString.begin(), fixedString.end());
     }
   }
 
@@ -200,10 +200,10 @@ public:
     }
 
     for (std::size_t i = 0; i < size; ++i) {
-      str[i] = m_data[i + m_index];
+      str[i] = data_[i + index_];
     }
 
-    m_index += size;
+    index_ += size;
 
     return str;
   }
@@ -233,7 +233,7 @@ public:
       return;
     }
 
-    m_index += size;
+    index_ += size;
   }
 
   ///
@@ -326,18 +326,18 @@ public:
   ///
   template <typename T>
   inline const T& peek() const {
-    return *(reinterpret_cast<T*>(m_data + m_index));
+    return *(reinterpret_cast<T*>(data_ + index_));
   }
 
 private:
   // attributes
-  char* m_data = nullptr;
-  char* m_head = nullptr;
+  char* data_ = nullptr;
+  char* head_ = nullptr;
 
-  std::size_t m_index = 0;
-  std::size_t m_dataSize = 0;
+  std::size_t index_ = 0;
+  std::size_t dataSize_ = 0;
 
-  cs::Bytes* m_bytes = nullptr;
+  cs::Bytes* bytes_ = nullptr;
 
   // creates template address
   template <typename T>

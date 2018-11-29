@@ -140,7 +140,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   } while (lastError == boost::asio::error::would_block);
 
   if (lastError || size < encodedSize) {
-    LOG_ERROR("Cannot send packet. Error " << lastError);
+    cserror() << "Cannot send packet. Error " << lastError;
   }
 
   csdebug(logger::Net)
@@ -151,8 +151,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 }
 
 void Network::writerRoutine(const Config& config) {
-  ip::udp::socket* sock =
-      getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
+  ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
 
   if (!sock) {
     return;
@@ -163,7 +162,8 @@ void Network::writerRoutine(const Config& config) {
     csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
     sendPack(*sock, task, task->endpoint);
   }
-  LOG_WARN("writerRoutine STOPPED!!!\n");
+
+  cswarning() << "writerRoutine STOPPED!!!\n";
 }
 
 // Processors
@@ -176,16 +176,15 @@ void Network::processorRoutine() {
     externals.callAll();
 
     auto task = iPacMan_.getNextTask();
-    //LOG_IN_PACK(task->pack.data(), task->pack.size());
-
     auto remoteSender = transport_->getPackSenderEntry(task->sender);
+
     if (remoteSender->isBlackListed()) {
-      LOG_WARN("Blacklisted");
+      cswarning() << "Blacklisted";
       continue;
     }
 
     if (!(task->pack.isHeaderValid())) {
-      LOG_WARN("Header is not valid: " << cs::Utils::byteStreamToHex((const char*)task->pack.data(), 100));
+      cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), 100);
       remoteSender->addStrike();
       continue;
     }

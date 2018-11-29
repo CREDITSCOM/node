@@ -51,8 +51,8 @@ public:
   const char* end() const;
 
 private:
-  char* m_array = nullptr;
-  std::size_t m_size = 0;
+  char* array_ = nullptr;
+  std::size_t size_ = 0;
 
   friend void swap(DynamicBuffer&, DynamicBuffer&);
 };

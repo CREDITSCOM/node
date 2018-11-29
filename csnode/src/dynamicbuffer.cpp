@@ -2,15 +2,15 @@
 #include <algorithm>
 
 cs::DynamicBuffer::DynamicBuffer(size_t size)
-: m_size(size) {
-  m_array = new char[size];
+: size_(size) {
+  array_ = new char[size];
 }
 
 cs::DynamicBuffer::DynamicBuffer(const char* data, std::size_t size)
-: m_size(size) {
-  m_array = new char[size];
+: size_(size) {
+  array_ = new char[size];
 
-  std::copy(data, data + size, m_array);
+  std::copy(data, data + size, array_);
 }
 
 cs::DynamicBuffer::DynamicBuffer(const unsigned char* data, std::size_t size)
@@ -18,29 +18,29 @@ cs::DynamicBuffer::DynamicBuffer(const unsigned char* data, std::size_t size)
 }
 
 cs::DynamicBuffer::DynamicBuffer(const cs::DynamicBuffer& buffer)
-: m_size(buffer.m_size) {
-  m_array = new char[m_size];
+: size_(buffer.size_) {
+  array_ = new char[size_];
 
-  std::copy(buffer.m_array, buffer.m_array + buffer.m_size, m_array);
+  std::copy(buffer.array_, buffer.array_ + buffer.size_, array_);
 }
 
 cs::DynamicBuffer::DynamicBuffer(cs::DynamicBuffer&& buffer)
-: m_array(buffer.m_array)
-, m_size(buffer.m_size) {
-  buffer.m_array = nullptr;
-  buffer.m_size = 0;
+: array_(buffer.array_)
+, size_(buffer.size_) {
+  buffer.array_ = nullptr;
+  buffer.size_ = 0;
 }
 
 cs::DynamicBuffer& cs::DynamicBuffer::operator=(const cs::DynamicBuffer& buffer) {
   if (this != &buffer) {
-    if (m_array) {
-      delete[] m_array;
+    if (array_) {
+      delete[] array_;
     }
 
-    m_size = buffer.m_size;
-    m_array = new char[m_size];
+    size_ = buffer.size_;
+    array_ = new char[size_];
 
-    std::copy(buffer.m_array, buffer.m_array + buffer.m_size, m_array);
+    std::copy(buffer.array_, buffer.array_ + buffer.size_, array_);
   }
 
   return *this;
@@ -48,26 +48,26 @@ cs::DynamicBuffer& cs::DynamicBuffer::operator=(const cs::DynamicBuffer& buffer)
 
 cs::DynamicBuffer& cs::DynamicBuffer::operator=(cs::DynamicBuffer&& buffer) {
   if (this != &buffer) {
-    if (m_array) {
-      delete[] m_array;
+    if (array_) {
+      delete[] array_;
     }
 
-    m_size = buffer.m_size;
-    m_array = buffer.m_array;
+    size_ = buffer.size_;
+    array_ = buffer.array_;
 
-    buffer.m_size = 0;
-    buffer.m_array = nullptr;
+    buffer.size_ = 0;
+    buffer.array_ = nullptr;
   }
 
   return *this;
 }
 
 cs::DynamicBuffer::~DynamicBuffer() {
-  if (m_array) {
-    delete[] m_array;
+  if (array_) {
+    delete[] array_;
 
-    m_array = nullptr;
-    m_size = 0;
+    array_ = nullptr;
+    size_ = 0;
   }
 }
 
@@ -76,11 +76,11 @@ char& cs::DynamicBuffer::operator[](std::size_t index) {
 }
 
 const char& cs::DynamicBuffer::operator[](std::size_t index) const {
-  return *(m_array + index);
+  return *(array_ + index);
 }
 
 char* cs::DynamicBuffer::get() const {
-  return m_array;
+  return array_;
 }
 
 char* cs::DynamicBuffer::operator*() const {
@@ -88,23 +88,23 @@ char* cs::DynamicBuffer::operator*() const {
 }
 
 size_t cs::DynamicBuffer::size() const {
-  return m_size;
+  return size_;
 }
 
 char* cs::DynamicBuffer::begin() {
-  return m_array;
+  return array_;
 }
 
 char* cs::DynamicBuffer::end() {
-  return m_array + m_size;
+  return array_ + size_;
 }
 
 const char* cs::DynamicBuffer::begin() const {
-  return m_array;
+  return array_;
 }
 
 const char* cs::DynamicBuffer::end() const {
-  return m_array + m_size;
+  return array_ + size_;
 }
 
 bool cs::operator==(const cs::DynamicBuffer& lhs, const cs::DynamicBuffer& rhs) {
@@ -127,7 +127,7 @@ bool cs::operator!=(const cs::DynamicBuffer& lhs, const cs::DynamicBuffer& rhs) 
 
 void cs::swap(cs::DynamicBuffer& lhs, cs::DynamicBuffer& rhs) {
   if (&lhs != &rhs) {
-    std::swap(lhs.m_size, rhs.m_size);
-    std::swap(lhs.m_array, rhs.m_array);
+    std::swap(lhs.size_, rhs.size_);
+    std::swap(lhs.array_, rhs.array_);
   }
 }

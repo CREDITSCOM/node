@@ -12,6 +12,9 @@ enum Lengths
   FragmentedHeader = 36
 };
 
+// see implementation below:
+const char* getMsgTypesString(MsgTypes messageType);
+
 const cs::Hash& Packet::getHeaderHash() const {
   if (!headerHashed_) {
     headerHash_ = generateHash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum),
@@ -23,14 +26,17 @@ const cs::Hash& Packet::getHeaderHash() const {
 
 bool Packet::isHeaderValid() const {
   if (isFragmented()) {
-    if (isNetwork())
+    if(isNetwork()) {
+      cserror() << "Network packet is fragmented";
       return false;
+    }
 
     const auto& frNum = getFragmentsNum();
     const auto& frId = getFragmentId();
     //LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " << size() << " vs " << getHeadersLength());
     if(/*frNum > Packet::MaxFragments ||*/frId >= frNum) {
-        return false;
+      cserror() << "Packet " << getMsgTypesString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
+      return false;
     }
   }
 

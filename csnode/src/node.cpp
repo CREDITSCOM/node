@@ -227,123 +227,108 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
+namespace
+{
 #ifdef MONITOR_NODE
-bool monitorNode = true;
+  bool monitorNode = true;
 #else
-bool monitorNode = false;
+  bool monitorNode = false;
 #endif
+}
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
               << ", current #" << roundNum_;
   istream_.init(data, size);
-  cs::Hash h;
-  istream_ >> h;
-
-  const auto round = cs::Conveyer::instance().currentRoundNumber();
-
-  if (rNum > round) {
-    if (rNum - 1 == round || round == 0) {
-      // continue reading round info
-      cs::RoundTable rt;
-      if (readRoundData(rt)) {
-        // if we are behind exactly one round, ask for round info
-        roundNum_ = rNum - 1;
-        cswarning() << "NODE> request round info from trusted nodes";
-        sendRoundInfoRequest(rt.general);
-        for (const auto& t : rt.confidants) {
-          sendRoundInfoRequest(t);
-        }
-      }
-      else {
-        cswarning() << "NODE> read trusted nodes from round info failed";
-      }
-    }
-    else {
-      // otherwise
-      cswarning() << "NODE> cannot handle outrunning round properly, wait until poolsynchronizer to start";
-      poolSynchronizer_->processingSync(rNum, true /*is bigbang*/);
-    }
-    return;
+  cs::Hash last_block_hash;
+  istream_ >> last_block_hash;
+  cs::RoundTable global_table;
+  global_table.round = rNum;
+  if(!readRoundData(global_table)) {
+    cserror() << "NODE> read round data from SS failed, continue without round table";
   }
 
-  if (rNum < round - 1) {
-    cserror() << "NODE> cannot revert more then one last written block, cannot handle BigBang properly";
-    return;
-  }
+  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
 
-  if (rNum == round - 1) {
-    // revert last block & start previous round
-    cserror() << "NODE> require unimplemented revert last written block, cannot handle BigBang properly";
-    cslog() << "NODE> re-send last round info may help others to go to next round";
-    tryResendRoundInfo(std::nullopt, round);  // broadcast round info
-    return;
-  }
-
-  if (rNum == round) {
-    // currently in proper round, handle BigBang
+  // currently in global round
+  if(global_table.round == local_table.round) {
+    // resend all this round data available
     cslog() << "NODE> resend last block hash after BigBang";
-    if (tryResendRoundInfo(std::nullopt, round)) {
+    if(tryResendRoundInfo(std::nullopt, local_table.round)) {
       // only sender able do it
       cswarning() << "NODE> re-send last round info to ALL";
     }
-    sendHash_V3(round);
+    sendHash_V3(local_table.round);
     solver_->gotBigBang();
     return;
   }
+
+  // global round is other then local one
+  handleRoundMismatch(global_table);
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   istream_.init(data, size);
-
-  cslog() << "NODE> Get Round Table";
-
-  if (roundNum_ < rNum || type == MsgTypes::BigBang) {
-    roundNum_ = rNum;
+  cslog() << "NODE> get SS Round Table #" << rNum;
+  cs::RoundTable global_table;
+  if (!readRoundData(global_table)) {
+    cserror() << "NODE> read round data from SS failed, continue without round table";
   }
-  else {
-    cswarning() << "Bad round number, ignoring";
+  global_table.round = rNum;
+  //TODO: what this call was intended for? transport_->clearTasks();
+
+  // "normal" start
+  if(global_table.round == 1) {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, global_table]() mutable {
+      onRoundStart_V3(global_table);
+      onRoundStartConveyer(std::move(global_table));
+    });
     return;
   }
 
-  cs::RoundTable roundTable;
+  // "hot" start
+  handleRoundMismatch(global_table);
+}
 
-  if (!readRoundData(roundTable)) {
+// handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
+void Node::handleRoundMismatch(const cs::RoundTable& global_table)
+{
+  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
+  if(local_table.round == global_table.round) {
+    // mismatch not confirmed
     return;
   }
 
-  if (myLevel_ == NodeLevel::Main) {
-    if (!istream_.good()) {
-      cswarning() << "Bad round table format, ignoring";
-      return;
+  // global round is behind local one
+  if(local_table.round > global_table.round) {
+    if(local_table.round - global_table.round == 1) {
+      cslog() << "NODE> re-send last round info may help others to go to round #" << local_table.round;
+      tryResendRoundInfo(std::nullopt, local_table.round); // broadcast round info
     }
+    else {
+      //TODO: rollback to global round
+      cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
+    }
+    return;
   }
 
-  transport_->clearTasks();
-
+  // local round is behind global one
   const auto last_block = getBlockChain().getLastWrittenSequence();
-  if (last_block < roundNum_ - 1) {
-    cswarning() << "NODE> Last written sequence lower than current round - 1";
-    if(last_block == roundNum_ - 2) {
-      cswarning() << "NODE> require exactly last round info and previous block, perform requests";
-      --roundNum_;
-      sendRoundInfoRequest(roundTable.general);
-      for(const auto& t : roundTable.confidants) {
-        sendRoundInfoRequest(t);
-      }
-    }
-    return;
+  if(last_block + cs::Conveyer::HashTablesStorageCapacity < global_table.round) {
+    // activate pool synchronizer
+    poolSynchronizer_->processingSync(global_table.round);
+    // no return, ask for next round info
   }
-
-  // start round on node
-
-  // TODO: think how to improve this code
-  cslog() << "NODE> Get Round table SS -> got Round = " << rNum;
-
-  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
-    onRoundStart_V3(roundTable);
-    onRoundStartConveyer(std::move(roundTable));
-  });
+  // broadcast request round info
+  cswarning() << "NODE> broadcast request round info";
+  sendNextRoundRequest();
+  //// directly request from trusted
+  //cswarning() << "NODE> request round info from trusted nodes";
+  //sendRoundInfoRequest(table.general);
+  //for(const auto& trusted : table.confidants) {
+  //  sendRoundInfoRequest(trusted);
+  //}
+  return;
 }
 
 void Node::sendRoundTable(const cs::RoundTable& roundTable) {
@@ -389,8 +374,7 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
-
-bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
@@ -401,7 +385,7 @@ bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes& msgType, 
 }
 
 template <typename... Args>
-void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -418,7 +402,7 @@ void Node::sendNeighbours(const ConnectionPtr& target, const MsgTypes& msgType, 
 }
 
 template <class... Args>
-void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   csdebug() << "NODE> Sending broadcast";
 
@@ -426,7 +410,7 @@ void Node::sendBroadcast(const MsgTypes& msgType, const cs::RoundNumber round, A
 }
 
 template <class... Args>
-void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
@@ -434,7 +418,7 @@ void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes& msgType,
 }
 
 template <class... Args>
-bool Node::sendToRandomNeighbour(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
@@ -698,6 +682,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+    getBlockChain().testCachedBlocks();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -1203,20 +1188,20 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 void Node::onRoundStartConveyer(cs::RoundTable&& roundTable) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setRound(std::move(roundTable));
-  const auto& rt = conveyer.currentRoundTable();
+  const auto& table = conveyer.currentRoundTable();
 
-  if (rt.hashes.empty() || conveyer.isSyncCompleted()) {
-    if (rt.hashes.empty()) {
-      cslog() << "NODE> No hashes in round table - > start consensus now";
+  if (table.hashes.empty() || conveyer.isSyncCompleted()) {
+    if (table.hashes.empty()) {
+      cslog() << "NODE> No hashes in round table, start consensus now";
     }
     else {
-      cslog() << "NODE> All hashes in conveyer -> start consensus now";
+      cslog() << "NODE> All hashes in conveyer, start consensus now";
     }
 
     startConsensus();
   }
   else {
-    sendPacketHashesRequest(conveyer.currentNeededHashes(), roundNum_, startPacketRequestPoint_);
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
   }
 }
 
@@ -1242,13 +1227,11 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr& target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
-    const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csdebug() << "NODE> " << __func__
-        << "() Target out(): " << target->getOut()
-        << ", sequence from: " << sequences.front() << ", to: " << sequences.back()
-        << ", packet: " << packetNum
-        << ", round: " << round;
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+  csdebug() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
+            << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
+            << ", round: " << round;
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
@@ -1291,7 +1274,47 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
-  if (type == MsgTypes::NewCharacteristic && rNum <= roundNum_) {
+  const auto round = cs::Conveyer::instance().currentRoundNumber();
+
+  // starts next round, otherwise
+  if(type == MsgTypes::RoundInfo) {
+    if(rNum > round) {
+      return MessageActions::Process;
+    }
+    //TODO: detect absence of proper current round info (round may be set by SS or BB)
+    return MessageActions::Drop;
+  }
+
+  // BB: every round (for now) may be handled:
+  if(type == MsgTypes::BigBang) {
+    return MessageActions::Process;
+  }
+
+  if(type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
+    // which round would not be on the remote we may require the requested block or get block request
+    return MessageActions::Process;
+  }
+
+  // outrunning packets of other types talk about round lag
+  if(rNum > round) {
+    if(rNum - round == 1) {
+      // wait for next round
+      return MessageActions::Postpone;
+    }
+    else {
+      // more then 1 round lag, request round info
+      if(cs::Conveyer::instance().currentRoundNumber() > 1) {
+        // not on the very start
+        cswarning() << "NODE> detect round lag, request round info";
+        cs::RoundTable empty_table;
+        empty_table.round = rNum;
+        handleRoundMismatch(empty_table);
+      }
+      return MessageActions::Drop;
+    }
+  }
+
+  if (type == MsgTypes::NewCharacteristic) {
     return MessageActions::Process;
   }
 
@@ -1308,73 +1331,51 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if (type == MsgTypes::RoundTable) {
-    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::RoundInfo) {
-    return (rNum > roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::BigBang) {
-    csdebug() << "NODE> Choose BigBang Action: rNum = " << rNum << ", roundNum = " << roundNum_;
-  }
-
-  // BigBang: only current or previous round may be handled:
-  if (type == MsgTypes::BigBang && (rNum >= roundNum_ - 1 || roundNum_ == 0 )) {
-    return MessageActions::Process;
+    // obsolete message
+    cswarning() << "NODE> drop obsolete MsgTypes::RoundTable";
+    return MessageActions::Drop;
   }
 
   if (type == MsgTypes::RoundTableRequest) {
-    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::RoundTableRequest) {
-    return (rNum < roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    // obsolete message
+    cswarning() << "NODE> drop obsolete MsgTypes::RoundTableRequest";
+    return MessageActions::Drop;
   }
 
   if (type == MsgTypes::RoundInfoRequest) {
-    return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    return (rNum <= round ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::RoundInfoReply) {
-    return (rNum >= roundNum_ ? MessageActions::Process : MessageActions::Drop);
-  }
-
-  if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
-    // which round would not be on the remote we may require the requested block
-    return MessageActions::Process;
-    // return (rNum <= roundNum_ ? MessageActions::Process : MessageActions::Drop);
+    return (rNum >= round ? MessageActions::Process : MessageActions::Drop);
   }
 
   if (type == MsgTypes::BlockHashV3) {
-    if (rNum < roundNum_) {
+    if (rNum < round) {
+      // outdated
       return MessageActions::Drop;
     }
-
-    if (rNum == roundNum_ && cs::Conveyer::instance().isSyncCompleted()) {
-      return MessageActions::Process;
+    if(rNum > getBlockChain().getLastWrittenSequence() + cs::Conveyer::HashTablesStorageCapacity) {
+      // too many rounds behind the global round
+      return MessageActions::Drop;
     }
-
-    if (rNum != roundNum_) {
+    if(rNum > round) {
       cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
+      return MessageActions::Postpone;
     }
-
-    else {
+    if(!cs::Conveyer::instance().isSyncCompleted()) {
       cslog() << "NODE> block hash is postponed until conveyer sync is completed";
+      return MessageActions::Postpone;
     }
-
-    return MessageActions::Postpone;
-  }
-
-  if (type == MsgTypes::NodeStopRequest) {
+    // in time
     return MessageActions::Process;
   }
 
-  if (rNum < roundNum_) {
+  if (rNum < round) {
     return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   }
 
-  return (rNum == roundNum_ ? MessageActions::Process : MessageActions::Postpone);
+  return (rNum == round ? MessageActions::Process : MessageActions::Postpone);
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable) {
@@ -1412,29 +1413,11 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
     return false;
   }
 
-  cslog() << "NODE> RoundNumber: " << roundNum_;
-
   roundTable.confidants = std::move(confidants);
   roundTable.general = mainNode;
-  roundTable.round = roundNum_;
   roundTable.hashes.clear();
 
   return true;
-}
-
-void Node::showSyncronizationProgress(csdb::Pool::sequence_t lastWrittenSequence,
-                                      csdb::Pool::sequence_t globalSequence) {
-  if (globalSequence == 0) {
-    return;
-  }
-  auto last = float(lastWrittenSequence);
-  auto global = float(globalSequence);
-  const float maxValue = 100.0f;
-  const uint32_t syncStatus = cs::numeric_cast<uint32_t>((1.0f - (global - last) / global) * maxValue);
-  if (syncStatus <= maxValue) {
-    ProgressBar bar;
-    cslog() << "SYNC: " << bar.string(syncStatus);
-  }
 }
 
 static const char* nodeLevelToString(NodeLevel nodeLevel) {
@@ -2289,20 +2272,22 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
     csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
-    cs::Characteristic characteristic;
-    characteristic.mask = std::move(characteristicMask);
+    if(getBlockChain().getLastWrittenSequence() < sequence) {
+      // otherwise senseless, this block is already in chain
+      cs::Characteristic characteristic;
+      characteristic.mask = std::move(characteristicMask);
 
-    stat_.totalReceivedTransactions_ += characteristic.mask.size();
+      stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
-    assert(sequence <= this->getRoundNumber());
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
+      assert(sequence <= this->getRoundNumber());
+      ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
     cs::PublicKey pk;
     memset(pk.data(), 0, 32);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);// writerPublicKey);
 
-    if (pool.has_value()) {
+      if(pool.has_value()) {
 
       if(!getBlockChain().storeBlock(pool.value(), signature)) {
         cserror() << "NODE> failed to store block in BlockChain";
@@ -2369,6 +2354,11 @@ void Node::logPool(csdb::Pool& pool) {
 
 void Node::sendHash_V3(cs::RoundNumber round)
 {
+  if(monitorNode) {
+    // to block request trusted status
+    return;
+  }
+
   if(getBlockChain().getLastWrittenSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;

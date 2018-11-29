@@ -40,8 +40,7 @@
 #define csunused(x) (void)(x)
 
 namespace cs {
-enum class Direction : uint8_t
-{
+enum class Direction : uint8_t {
   PrevBlock,
   NextBlock
 };
@@ -332,7 +331,7 @@ public:
   ///
   static cs::Signature sign(const cs::Byte* byte, std::size_t size, const cs::PrivateKey& securityKey) {
     cs::Signature signature;
-    std::fill(signature.begin(), signature.end(), (cs::Byte)0);
+    std::fill(signature.begin(), signature.end(), cs::Byte(0));
     cscrypto::GenerateSignature(signature, securityKey, byte, size);
     return signature;
   }
@@ -405,13 +404,12 @@ inline auto numeric_cast(Source arg) {
 }
 
 template<typename T>
-constexpr T getMax(const T& t) {
-  csunused(t);
+constexpr T getMax(const T&) {
   return std::numeric_limits<T>::max();
 }
+
 template<typename T>
-constexpr T getMin(const T& t) {
-  csunused(t);
+constexpr T getMin(const T&) {
   return std::numeric_limits<T>::min();
 }
 
