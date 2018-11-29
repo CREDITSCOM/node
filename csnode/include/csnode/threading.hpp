@@ -15,68 +15,54 @@
 #include <unordered_map>
 
 namespace cs {
-class spinlock {
-  __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
-
-public:
-  void lock() {
-    while (af.test_and_set(std::memory_order_acquire)) {
-      std::this_thread::yield();
-    }
-  }
-
-  void unlock() {
-    af.clear(std::memory_order_release);
-  }
-};
-
 template <typename S>
-struct worker_queue {
+struct WorkerQueue {
 private:
 #ifdef BOTTLENECKED_SMARTS
-  typedef std::list<std::tuple<>> tids_t;
-  tids_t tids;
-  std::unordered_map<std::thread::id, typename tids_t::iterator> tid_map;
+  using tids_t = std::list<std::tuple<>>;
+  tids_t tids_;
+  std::unordered_map<std::thread::id, typename tids_t::iterator> tidMap_;
 #endif
-  std::condition_variable_any w;
-  cs::spinlock lock;
-  S state;
+  std::condition_variable_any conditionalVariable_;
+  cs::SpinLock lock_;
+  S state_;
 
 public:
+  inline WorkerQueue() noexcept : lock_() {}
+
   S get_state() const {
-    return state;
+    return state_;
   }
 
   void get_position() {
 #ifdef BOTTLENECKED_SMARTS
 
-    std::lock_guard<decltype(lock)> l(lock);
+    std::lock_guard<decltype(lock_)> l(lock_);
     auto tid = std::this_thread::get_id();
-    tid_map[tid] = tids.insert(tids.end(), std::make_tuple());
-
+    tidMap_[tid] = tids_.insert(tids_.end(), std::make_tuple());
 #endif
   }
 
   template <typename J>
   void wait_till_front(const J& j) {
-    std::unique_lock<decltype(lock)> l(lock);
+    std::unique_lock<decltype(lock_)> l(lock_);
 #ifdef BOTTLENECKED_SMARTS
 
     auto tid = std::this_thread::get_id();
-    auto tit = tid_map.find(tid);
-    assert(tit != tid_map.end());
+    auto tit = tidMap_.find(tid);
+    assert(tit != tidMap_.end());
 
 #endif
-    w.wait(l, [&]() {
+    conditionalVariable_.wait(l, [&]() {
       if (
 #ifdef BOTTLENECKED_SMARTS
-          tit->second == tids.begin() &&
+          tit->second == tids_.begin() &&
 #endif
-          j(state)) {
+          j(state_)) {
 #ifdef BOTTLENECKED_SMARTS
-        tids.pop_front();
-        tid_map.erase(tit);
-        w.notify_all();
+        tids_.pop_front();
+        tidMap_.erase(tit);
+        conditionalVariable_.notify_all();
 
 #endif
         return true;
@@ -89,20 +75,20 @@ public:
   void yield() {
 #ifdef BOTTLENECKED_SMARTS
 
-    std::unique_lock<decltype(lock)> l(lock);
+    std::unique_lock<decltype(lock_)> l(lock_);
     auto tid = std::this_thread::get_id();
-    auto tit = tid_map.find(tid);
-    if (tit == tid_map.end()) {
+    auto tit = tidMap_.find(tid);
+    if (tit == tidMap_.end()) {
       return;
     }
 
-    bool needNotifyAll = tit->second == tids.begin();
-    tids.erase(tit->second);
+    bool needNotifyAll = tit->second == tids_.begin();
+    tids_.erase(tit->second);
 
-    tid_map.erase(tit);
+    tidMap_.erase(tit);
 
     if (needNotifyAll) {
-      w.notify_all();
+      conditionalVariable_.notify_all();
     }
 
 #endif
@@ -110,36 +96,39 @@ public:
 
   template <typename J>
   void update_state(const J& j) {
-    std::lock_guard<decltype(lock)> l(lock);
-    state = j();
-    w.notify_all();
+    std::lock_guard<decltype(lock_)> l(lock_);
+    state_ = j();
+    conditionalVariable_.notify_all();
   }
 };
 
-struct sweet_spot {
+// what is sweet spot?
+struct SweetSpot {
 #ifdef BOTTLENECKED_SMARTS
 private:
-  std::condition_variable_any cv;
-  cs::spinlock lock;
-  bool occupied = false;
+  std::condition_variable_any conditionalVariable_;
+  cs::SpinLock lock_;
+  bool occupied_ = false;
 #endif
 
 public:
+  inline SweetSpot() noexcept : lock_() {}
+
   void occupy() {
 #ifdef BOTTLENECKED_SMARTS
-    std::unique_lock<decltype(lock)> l(lock);
-    cv.wait(l, [this]() {
-      auto res = !occupied;
-      occupied = true;
+    std::unique_lock<decltype(lock_)> l(lock_);
+    conditionalVariable_.wait(l, [this]() {
+      auto res = !occupied_;
+      occupied_ = true;
       return res;
     });
 #endif
   }
   void leave() {
 #ifdef BOTTLENECKED_SMARTS
-    std::lock_guard<decltype(lock)> l(lock);
-    occupied = false;
-    cv.notify_one();
+    std::lock_guard<decltype(lock_)> l(lock_);
+    occupied_ = false;
+    conditionalVariable_.notify_one();
 #endif
   }
 };
@@ -166,26 +155,28 @@ private:
 template <typename T>
 struct SpinLockedRef {
 private:
-  SpinLockable<T>* l;
+  SpinLockable<T>* lockable_;
 
 public:
-  SpinLockedRef(SpinLockable<T>& l)
-  : l(&l) {
-    while (this->l->af.test_and_set(std::memory_order_acquire));
+  SpinLockedRef(SpinLockable<T>& lockable)
+  : lockable_(&lockable) {
+    while (this->lockable_->af.test_and_set(std::memory_order_acquire));
   }
+
   ~SpinLockedRef() {
-    if (l)
-      l->af.clear(std::memory_order_release);
+    if (lockable_) {
+      lockable_->af.clear(std::memory_order_release);
+    }
   }
 
   SpinLockedRef(const SpinLockedRef&) = delete;
   SpinLockedRef(SpinLockedRef&& other)
-  : l(other.l) {
-    other.l = nullptr;
+  : lockable_(other.lockable_) {
+    other.lockable_ = nullptr;
   }
 
   operator T*() {
-    return &(l->t);
+    return &(lockable_->t);
   }
 
   T* operator->() {
@@ -193,13 +184,13 @@ public:
   }
 
   T& operator*() {
-    return l->t;
+    return lockable_->t;
   }
 };
 
 template <typename T>
-SpinLockedRef<T> locked_ref(SpinLockable<T>& l) {
-  return SpinLockedRef<T>(l);
+SpinLockedRef<T> lockedReference(SpinLockable<T>& lockable) {
+  return SpinLockedRef<T>(lockable);
 }
 
 }  // namespace cs
