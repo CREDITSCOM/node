@@ -2280,6 +2280,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
       stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
       assert(sequence <= this->getRoundNumber());
+    
       ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
@@ -2306,6 +2307,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
 
         stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       }
+    }
     }
   }
 
