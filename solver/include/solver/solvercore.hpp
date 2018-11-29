@@ -39,7 +39,7 @@ public:
   ~SolverCore();
 
   void startDefault() {
-    opt_debug_mode ? ExecuteStart(Event::SetNormal) : ExecuteStart(Event::Start);
+    opt_mode == Mode::Debug ? ExecuteStart(Event::SetNormal) : ExecuteStart(Event::Start);
   }
 
   void startAsMain() {
@@ -128,6 +128,12 @@ private:
   // to use private data while serve for states as SolverCore context:
   friend class SolverContext;
 
+  enum class Mode {
+    Default,
+    Debug,
+    Monitor
+  };
+
   enum class Event {
     Start,
     BigBang,
@@ -156,8 +162,8 @@ private:
   /** @brief   True to enable, false to disable the option repeat the same state */
   bool opt_repeat_state_enabled;
 
-  /** @brief   True if option is permanent node roles is on */
-  bool opt_debug_mode;
+  /** @brief The option mode */
+  Mode opt_mode;
 
   // inner data
 
@@ -186,6 +192,7 @@ private:
 
   void InitTransitions();
   void InitDebugModeTransitions();
+  void InitMonitorModeTransitions();
   void setState(const StatePtr& pState);
 
   void handleTransitions(Event evt);
