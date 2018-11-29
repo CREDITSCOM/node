@@ -68,7 +68,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 }
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
-  cs::SpinGuard l(nLockFlag_);
+  cs::SpinGuard lock(nLockFlag_);
   if (pack->isNeighbors()) {
     for (auto& nb : neighbours_) {
       auto& bp = msgDirects_.tryStore(pack->getHash());
@@ -117,7 +117,7 @@ void Neighbourhood::checkSilent()
   static uint32_t refillCount = 0;
 
   bool needRefill = true;
-  std::scoped_lock lock(mLockFlag_, nLockFlag_);
+  cs::ScopedLock lock(mLockFlag_, nLockFlag_);
 
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
     if (!(*conn)->node) {

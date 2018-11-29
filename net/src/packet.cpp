@@ -26,15 +26,15 @@ const cs::Hash& Packet::getHeaderHash() const {
 
 bool Packet::isHeaderValid() const {
   if (isFragmented()) {
-    if(isNetwork()) {
+    if (isNetwork()) {
       cserror() << "Network packet is fragmented";
       return false;
     }
 
     const auto& frNum = getFragmentsNum();
     const auto& frId = getFragmentId();
-    //LOG_WARN("FR: " << frNum << " vs " << getFragmentId() << " and " << PacketCollector::MaxFragments << ", then " << size() << " vs " << getHeadersLength());
-    if(/*frNum > Packet::MaxFragments ||*/frId >= frNum) {
+
+    if (frId >= frNum) {
       cserror() << "Packet " << getMsgTypesString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
       return false;
     }
@@ -47,13 +47,16 @@ uint32_t Packet::getHeadersLength() const {
   if (!headersLength_) {
     headersLength_ = 1;  // Flags
 
-    if (isFragmented())
+    if (isFragmented()) {
       headersLength_ += 4;  // Min fragments & all fragments
+    }
 
     if (!isNetwork()) {
       headersLength_ += 40;  // Sender key + ID
-      if (!isBroadcast() && !isNeighbors())
+
+      if (!isBroadcast() && !isNeighbors()) {
         headersLength_ += 32;  // Receiver key
+      }
     }
   }
 
@@ -61,8 +64,9 @@ uint32_t Packet::getHeadersLength() const {
 }
 
 MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
-  if (!pack.isFragmented())
+  if (!pack.isFragmented()) {
     return MessagePtr();
+  }
 
   newFragmentedMsg = false;
 
@@ -81,27 +85,27 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     msg->headerHash_ = pack.getHeaderHash();
     newFragmentedMsg = true;
   }
-  else
+  else {
     msg = *msgPtr;
+  }
 
   {
-    cs::SpinGuard l(msg->pLock_);
+    cs::SpinGuard lock(msg->pLock_);
     auto goodPlace = msg->packets_ + pack.getFragmentId();
+
     if (!*goodPlace) {
       msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
       --msg->packetsLeft_;
       *goodPlace = pack;
     }
 
-    //if (msg->packetsLeft_ % 100 == 0)
-    // log significantly-fragmented packets:
-    if(msg->packetsTotal_ >= 20) {
-        if(msg->packetsLeft_ != 0) {
-            csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
-        }
-        else {
-            csdetails() << "COLLECT> complete " << msg->packetsTotal_;
-        }
+    if (msg->packetsTotal_ >= 20) {
+      if (msg->packetsLeft_ != 0) {
+        csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
+      }
+      else {
+        csdetails() << "COLLECT> complete " << msg->packetsTotal_;
+      }
     }
   }
 
@@ -113,19 +117,24 @@ void Message::composeFullData() const {
   if (getFirstPack().isFragmented()) {
     const Packet* pack = packets_;
     uint32_t headersLength = pack->getHeadersLength();
-
     uint32_t totalSize = headersLength;
 
-    for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack)
-      totalSize += (pack->size() - headersLength);
+    for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
+      totalSize += static_cast<uint32_t>((pack->size() - headersLength));
+    }
 
     fullData_ = allocator_.allocateNext(totalSize);
 
     uint8_t* data = static_cast<uint8_t*>(fullData_.get());
     pack = packets_;
+
     for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-      uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - (i == 0 ? 0 : headersLength);
-      memcpy(data, (reinterpret_cast<const char*>(pack->data())) + (i == 0 ? 0 : headersLength), cSize);
+      uint32_t headerSize = static_cast<uint32_t>((i == 0) ? 0 : headersLength);
+
+      uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - headerSize;
+      auto source = (reinterpret_cast<const char*>(pack->data())) + headerSize;
+
+      std::copy(source, source + cSize, data);
       data += cSize;
     }
   }
@@ -243,22 +252,27 @@ public:
 
   std::ostream& operator()(std::ostream& os) const {
     uint8_t n = 0;
+
     if (packet_.isNetwork()) {
       os << "net";
       ++n;
     }
+
     if (packet_.isFragmented()) {
       os << (n ? "," : "") << "fragmented";
       ++n;
     }
+
     if (packet_.isCompressed()) {
       os << (n ? "," : "") << "compressed";
       ++n;
     }
+
     if (packet_.isNeighbors()) {
       os << (n ? "," : "") << "neighbors";
       ++n;
     }
+
     return os;
   }
 
