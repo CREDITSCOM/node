@@ -310,7 +310,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
   }
 
   // local round is behind global one
-  const auto last_block = getBlockChain().getLastSequence();
+  const auto last_block = getBlockChain().getLastWrittenSequence();
   if(last_block + cs::Conveyer::HashTablesStorageCapacity < global_table.round) {
     // activate pool synchronizer
     poolSynchronizer_->processingSync(global_table.round);
@@ -680,6 +680,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+    getBlockChain().testCachedBlocks();
   }
 
   csdebug() << "NODE> " << __func__ << "(): done";
@@ -2173,6 +2174,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
         }
         else {
           stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+          getBlockChain().testCachedBlocks();
         }
       }
     }
