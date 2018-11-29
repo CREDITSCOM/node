@@ -143,7 +143,6 @@ private:  // Members
   // [value] =  packet counter
   // value: increase each new round
   std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
-  bool m_isBigBand;
 
   std::vector<NeighboursSetElemet> m_neighbours;
 

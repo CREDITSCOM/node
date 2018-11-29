@@ -989,7 +989,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packetNum = 0;
   istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -1055,17 +1055,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
-    const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csdebug() << "NODE> " << __func__
-        << "() Target out(): " << cs::Utils::byteStreamToHex(target.data(), target.size())
-        << ", packet: " << packetNum
-        << ", round: " << round;
-  
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, round, poolsBlock, packetNum);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock, packetNum);
 }
 
 void Node::becomeWriter() {
