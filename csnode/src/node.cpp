@@ -1349,18 +1349,23 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
   if (type == MsgTypes::BlockHashV3) {
     if (rNum < round) {
+      // outdated
       return MessageActions::Drop;
     }
-    if (rNum == round && cs::Conveyer::instance().isSyncCompleted()) {
-      return MessageActions::Process;
+    if(rNum > getBlockChain().getLastWrittenSequence() + cs::Conveyer::HashTablesStorageCapacity) {
+      // too many rounds behind the global round
+      return MessageActions::Drop;
     }
-    if (rNum != round) {
+    if(rNum > round) {
       cslog() << "NODE> outrunning block hash (#" << rNum << ") is postponed until get round info";
+      return MessageActions::Postpone;
     }
-    else {
+    if(!cs::Conveyer::instance().isSyncCompleted()) {
       cslog() << "NODE> block hash is postponed until conveyer sync is completed";
+      return MessageActions::Postpone;
     }
-    return MessageActions::Postpone;
+    // in time
+    return MessageActions::Process;
   }
 
   if (rNum < round) {

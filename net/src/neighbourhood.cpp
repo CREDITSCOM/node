@@ -112,7 +112,8 @@ void Neighbourhood::refreshLimits() {
   }
 }
 
-void Neighbourhood::checkSilent() {
+void Neighbourhood::checkSilent()
+{
   static uint32_t refillCount = 0;
 
   bool needRefill = true;
@@ -147,17 +148,17 @@ void Neighbourhood::checkSilent() {
       needRefill = false;
       (*conn)->lastPacketsCount = packetsCount;
     }
+  }
 
-    if (needRefill) {
-      ++refillCount;
-      if (refillCount >= WarnsBeforeRefill) {
-        refillCount = 0;
-        transport_->refillNeighbourhood();
-      }
-    }
-    else {
+  if (needRefill) {
+    ++refillCount;
+    if (refillCount >= WarnsBeforeRefill) {
       refillCount = 0;
+      transport_->refillNeighbourhood();
     }
+  }
+  else {
+    refillCount = 0;
   }
 }
 
