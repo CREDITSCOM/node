@@ -80,6 +80,19 @@ public:
   ///
   void setRound(cs::RoundTable&& table);
 
+  /**
+   * @fn    void ConveyerBase::updateRoundTable(cs::RoundTable&& table);
+   *
+   * @brief Updates the round table described by table
+   *
+   * @author    Alexander Avramenko
+   * @date  29.11.2018
+   *
+   * @param [in,out]    table   The new round table contains trusted nodes and round number.
+   */
+
+  void updateRoundTable(cs::RoundTable&& table);
+
   ///
   /// @brief Returns current blockchain round table.
   ///

@@ -254,12 +254,20 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   if(global_table.round == local_table.round) {
     // resend all this round data available
     cslog() << "NODE> resend last block hash after BigBang";
-    if(tryResendRoundInfo(std::nullopt, local_table.round)) {
-      // only sender able do it
-      cswarning() << "NODE> re-send last round info to ALL";
+    // update round table
+    onRoundStart_V3(global_table);
+
+    // do almost the same as onRoundStartConveyer(std::move(global_table)), only difference is call to conveyer.updateRoundTable()
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    conveyer.updateRoundTable(std::move(global_table));
+    const auto& updated_table = conveyer.currentRoundTable();
+    if(updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+      startConsensus();
     }
-    sendHash_V3(local_table.round);
-    solver_->gotBigBang();
+    else {
+      sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
+    }
+
     return;
   }
 
@@ -301,12 +309,17 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
 
   // global round is behind local one
   if(local_table.round > global_table.round) {
+
+    //TODO: in case of bigbang, rollback round(s), then accept global_table, then start round again
+    
     if(local_table.round - global_table.round == 1) {
       cslog() << "NODE> re-send last round info may help others to go to round #" << local_table.round;
       tryResendRoundInfo(std::nullopt, local_table.round); // broadcast round info
     }
     else {
-      //TODO: rollback to global round
+
+      //TODO: rollback local round to global one
+      
       cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
     }
     return;
