@@ -238,7 +238,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       uint8_t candidates_amount = stage_i.trustedCandidates.size();
       cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
       for (uint8_t j = 0; j < candidates_amount; j++) {
-        cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
+      //  cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
         if (candidatesElection.count(stage_i.trustedCandidates.at(j)) > 0) {
           candidatesElection.at(stage_i.trustedCandidates.at(j)) += 1;
         }
@@ -256,7 +256,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
       cslog() << "Hashes amount of [" << (int)i << "]: " << (int)hashes_amount;
       for (int j = 0; j < hashes_amount; j++) {
-         cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
+         // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
         if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
         }
@@ -287,16 +287,16 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
   }
 
-  LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
+  //LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
   for (auto& it : hashesElection) {
-    cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), 32) << " - " << (int)it.second;
+  //  cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), 32) << " - " << (int)it.second;
     if (it.second > cr) {
       next_round_hashes.push_back(it.first);
     }
   }
   size_t acceptedPacks = 0;
   bool rejectedFound;
-  cslog() << "Accepted hashes from THIS NODE: ";
+  //cslog() << "Accepted hashes from THIS NODE: ";
   for (auto& itt : myHashes) {
     rejectedFound = true;
     //cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
@@ -305,18 +305,18 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       else {
         ++acceptedPacks;
         rejectedFound = false;
-        cslog() << "    + (" << acceptedPacks << ") " << cs::Utils::byteStreamToHex(itt.toBinary().data(), itt.size());
+      //  cslog() << "    + (" << acceptedPacks << ") " << cs::Utils::byteStreamToHex(itt.toBinary().data(), itt.size());
       }
     }
     if (rejectedFound) {
       myRejectedHashes.push_back(itt);
     }
   }
-  cslog() << "Rejected hashes from THIS NODE: ";
+  //cslog() << "Rejected hashes from THIS NODE: ";
   size_t rejectedPacks = 0;
   for (auto& it : myRejectedHashes) {
     ++rejectedPacks;
-    cslog() << "    - (" << rejectedPacks << ") " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
+   // cslog() << "    - (" << rejectedPacks << ") " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
   }
 
   cslog() << name() << ": initial amount: " << myPacks << ", next round hashes: " << next_round_hashes.size() << ", accepted: " << acceptedPacks;

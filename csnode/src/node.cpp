@@ -1522,7 +1522,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cslog() << "Sending TRUSTED Candidates (" << (int)tc << "):";
   for (auto& it : stageOneInfo.trustedCandidates) {
     memcpy(ptr, it.data(), sizeof(cs::PublicKey));
-    cslog() << "    " << cs::Utils::byteStreamToHex(it.data(),it.size());
+ //   cslog() << "    " << cs::Utils::byteStreamToHex(it.data(),it.size());
     ptr += sizeof(cs::PublicKey);
   }
   size_t hashesCandidatesAmount = stageOneInfo.hashesCandidates.size();
@@ -1533,7 +1533,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     cslog() << "Sending HASHES Candidates (" << (int)hashesCandidatesAmount << "):";
     for (auto& it : stageOneInfo.hashesCandidates) {
       memcpy(ptr, it.toBinary().data(), sizeof(cs::Hash));
-      cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
+   //   cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
       ptr += sizeof(cs::Hash);
     }
   }
@@ -1544,7 +1544,6 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   //assert(ptr - rawData == msgSize);
 
   //swap(stageOneInfo.roundTimeStamp,curTimeStamp);
-  cslog() << "TimeStamps: " << stageOneInfo.roundTimeStamp;
 
   cscrypto::CalculateHash(stageOneInfo.msgHash, rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash), pStageOneMsgSize);
   memcpy(rawData + sizeof(cs::RoundNumber), stageOneInfo.msgHash.data(), sizeof(cs::Hash));
@@ -1638,7 +1637,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     csdebug() << __func__ << "(): returned from function -> nodeIdKey == sender";
     return;
   }
-
+  csdebug() << __func__;
   cs::Hash msgHash;
   istream_.init(data, size);
   size_t msgSize;
@@ -1667,16 +1666,16 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   uint8_t* ptr = rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash);
   stage.sender = *ptr;
 
-  cslog() << __func__ <<  "(): Sender: " << (int)stage.sender << ", sender key: "
-    << cs::Utils::byteStreamToHex((const char*)cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender).data(), 32);
-  cslog() << "Message hash: " << cs::Utils::byteStreamToHex((const char*)stage.msgHash.data(),32);
+  //cslog() << __func__ <<  "(): Sender: " << (int)stage.sender << ", sender key: "
+  //  << cs::Utils::byteStreamToHex((const char*)cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender).data(), 32);
+ // cslog() << "Message hash: " << cs::Utils::byteStreamToHex((const char*)stage.msgHash.data(),32);
   if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender), 
     rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash))) {
     cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
   else {
-    cslog() << "Signature is OK";
+    //cslog() << "Signature is OK";
   }
   ptr += sizeof(uint8_t);
   memcpy(stage.hash.data(), ptr, stage.hash.size());
@@ -1690,7 +1689,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     memcpy(tempKey.data(), ptr, 32);
     stage.trustedCandidates.push_back(tempKey);
     ptr += tempKey.size();
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.trustedCandidates.at(i).data(), stage.trustedCandidates.at(i).size());
+   // csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.trustedCandidates.at(i).data(), stage.trustedCandidates.at(i).size());
 }
 
   size_t hashesCandAmount = (size_t)*ptr;
@@ -1704,20 +1703,20 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     cs::Bytes byteHash(ptr, ptr + sizeof(cs::Hash));
     stage.hashesCandidates.push_back(cs::TransactionsPacketHash::fromBinary(byteHash));
     ptr += sizeof(cs::Hash);
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.hashesCandidates[i].toBinary().data(), stage.hashesCandidates[i].size());
+  //  csdebug() << i << ". " << cs::Utils::byteStreamToHex(stage.hashesCandidates[i].toBinary().data(), stage.hashesCandidates[i].size());
   }
   size_t tSize = (uint8_t)*ptr;
   ptr += sizeof(uint8_t);
   std::string currentTimeStamp((const char*)ptr, tSize);
   stage.roundTimeStamp = currentTimeStamp;
-  cslog() << "TimeStamp(" << currentTimeStamp.size() << ") = " << currentTimeStamp;
+  //cslog() << "TimeStamp(" << currentTimeStamp.size() << ") = " << currentTimeStamp;
 
   allocator_.shrinkLast(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash));
   //csdebug() << "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
   //  << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
   //  << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
   //  << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size());
-
+  cslog() << "NODE> Stage One from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageOne(std::move(stage));
 }
 
@@ -1763,13 +1762,13 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
     << stageTwoInfo.sig
     << pStageTwoMessage;
   // cslog() << "Sending message [" << pStageTwoMsgSize << "] :" << cs::Utils::byteStreamToHex((const char*)pStageTwoMessage.data(), pStageTwoMsgSize);
-  cslog() << "NODE> Sending StageTwo:";
+  //cslog() << "NODE> Sending StageTwo:";
   int sigAmount = stageTwoInfo.signatures.size();
   for (int i = 0; i < sigAmount; i++) {
-    cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.signatures.at(i).data(), stageTwoInfo.signatures.at(i).size());
-    cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.hashes.at(i).data(), stageTwoInfo.hashes.at(i).size());
+ //   cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.signatures.at(i).data(), stageTwoInfo.signatures.at(i).size());
+ //   cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.hashes.at(i).data(), stageTwoInfo.hashes.at(i).size());
   }
-  cslog() << "Signature       :" << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.sig.data(), 64);
+  //cslog() << "Signature       :" << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.sig.data(), 64);
 
   allocator_.shrinkLast(pStageTwoMsgSize + sizeof(cs::RoundNumber));
   LOG_DEBUG("done");
@@ -1872,7 +1871,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   cslog() << __func__  << "(): Sender             :" << cs::Utils::byteStreamToHex(sender.data(), 32);
   //cslog() << "Sender from trusted:" << cs::Utils::byteStreamToHex(cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data(),32); 
-  cslog() << "Signature          :" << cs::Utils::byteStreamToHex((const char*)stage.sig.data(), 64);
+  //cslog() << "Signature          :" << cs::Utils::byteStreamToHex((const char*)stage.sig.data(), 64);
   
   if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender), 
       rawData, msgSize + sizeof(cs::RoundNumber)))
@@ -1889,15 +1888,15 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     memcpy(tempSig.data(), rawData, tempSig.size());
     stage.signatures.push_back(tempSig);
     rawData += sizeof(cs::Signature);
-    cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stage.signatures.at(i).data(), stage.signatures.at(i).size());
+   // cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stage.signatures.at(i).data(), stage.signatures.at(i).size());
     memcpy(tempHash.data(), rawData, tempHash.size());
     stage.hashes.push_back(tempHash);
     rawData += sizeof(cs::Hash);
-    cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stage.hashes.at(i).data(), stage.hashes.at(i).size());
+   // cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stage.hashes.at(i).data(), stage.hashes.at(i).size());
   }
 
   allocator_.shrinkLast(msgSize + sizeof(cs::RoundNumber));
-  cslog() << "   Get Stage Two succeeded";
+  cslog() << "NODE> Stage Two from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageTwo(std::move(stage));
 }
 
@@ -2047,7 +2046,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     cslog() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
-  //cslog() << "NODE> Signature is OK!";
+  
   rawData += (sizeof(cs::RoundNumber) + sizeof(uint8_t));
   stage.writer = *rawData;
   rawData += sizeof(uint8_t);
@@ -2063,6 +2062,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   std::string realTrustedMask((const char*)rawData, mSize);
   memcpy(stage.realTrustedMask.data(), realTrustedMask.data(), mSize);
   allocator_.shrinkLast(msgSize);
+  cslog() << "NODE> Stage Three from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageThree(std::move(stage));
 }
 
