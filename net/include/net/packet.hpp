@@ -194,7 +194,7 @@ public:
       int sourceSize = static_cast<int>(data_.size() - headerSize);
       int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
-      auto compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
+      size_t compressedSize = static_cast<size_t>(LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize));
 
       if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
         return boost::asio::buffer(dest, compressedSize + headerSize);
@@ -227,7 +227,7 @@ public:
       int sourceSize = static_cast<int>(packetSize - headerSize);
       int destSize = static_cast<int>(sizeof(dest) - headerSize);
 
-      auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
+      auto uncompressedSize = static_cast<size_t>(LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize));
 
       if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
         std::copy(dest, dest + uncompressedSize, source + headerSize);
@@ -267,7 +267,7 @@ private:
   friend class Message;
 };
 
-typedef Packet* PacketPtr;
+using PacketPtr = Packet*;
 
 class Message {
 public:

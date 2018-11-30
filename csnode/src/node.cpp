@@ -201,6 +201,12 @@ void Node::run() {
 }
 
 void Node::stop() {
+
+  good_ = false;
+
+  transport_->stop();
+  cswarning() << "[TRANSPORT STOPPED]";
+
   solver_->finish();
   cswarning() << "[SOLVER STOPPED]";
 
@@ -208,9 +214,6 @@ void Node::stop() {
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
-
-  transport_->stop();
-  cswarning() << "[TRANSPORT STOPPED]";
 }
 
 void Node::runSpammer() {
@@ -244,6 +247,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   istream_ >> last_block_hash;
   cs::RoundTable global_table;
   global_table.round = rNum;
+
   if(!readRoundData(global_table)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
@@ -929,7 +933,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   };
 
   // send request again
-  cs::Timer::singleShot(cs::NeighboursRequestDelay + requestStep, requestClosure);
+  cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), requestClosure);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
@@ -1281,6 +1285,10 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+  if(!good_) {
+    return MessageActions::Drop;
+  }
+
   if(type == MsgTypes::NodeStopRequest) {
     return MessageActions::Process;
   }

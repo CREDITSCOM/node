@@ -91,15 +91,38 @@ public:
     MaxHashValue = std::numeric_limits<int>::max(),
   };
 
-  ///
-  /// Generates random value from random generator [min, max]
-  ///
-  inline static int generateRandomValue(int min, int max) {
+private:
+  // random value generation helper
+  template<typename R, typename T>
+  static R randomValueImpl(T min, T max) {
     std::random_device randomDevice;
     std::mt19937 generator(randomDevice());
-    std::uniform_int_distribution<> dist(min, max);
 
-    return dist(generator);
+    if constexpr (std::is_integral_v<T>) {
+      std::uniform_int_distribution<> dist(min, max);
+      return static_cast<R>(dist(generator));
+    }
+    else {
+      std::uniform_real_distribution<> distribution(min, max);
+      return static_cast<R>(distribution(generator));
+    }
+  }
+
+public:
+  ///
+  /// Generates random value from random generator [min, max] for integer type
+  ///
+  template<typename R>
+  inline static R generateRandomValue(int min, int max) {
+    return randomValueImpl<R, decltype(min)>(min, max);
+  }
+
+  ///
+  /// Generates random value from random generator [min, max] for floating point type
+  ///
+  template<typename R>
+  inline static R generateRandomValue(double min, double max) {
+    return randomValueImpl<R, decltype(min)>(min, max);
   }
 
   ///
@@ -392,7 +415,7 @@ public:
 };
 
 ///
-/// Сonversion between numeric types with checks based on boost::numeric_cast in DEBUG build
+/// Conversion between numeric types with checks based on boost::numeric_cast in DEBUG build
 ///
 template <typename Target, typename Source>
 inline auto numeric_cast(Source arg) {
