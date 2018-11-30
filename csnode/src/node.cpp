@@ -201,6 +201,12 @@ void Node::run() {
 }
 
 void Node::stop() {
+
+  good_ = false;
+
+  transport_->stop();
+  cswarning() << "[TRANSPORT STOPPED]";
+
   solver_->finish();
   cswarning() << "[SOLVER STOPPED]";
 
@@ -208,9 +214,6 @@ void Node::stop() {
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
-
-  transport_->stop();
-  cswarning() << "[TRANSPORT STOPPED]";
 }
 
 void Node::runSpammer() {
@@ -1282,6 +1285,10 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+  if(!good_) {
+    return MessageActions::Drop;
+  }
+
   if(type == MsgTypes::NodeStopRequest) {
     return MessageActions::Process;
   }
