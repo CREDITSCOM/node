@@ -99,6 +99,7 @@ struct Connection {
     uint32_t acceptOrder = 0;
     bool needSend = true;
   };
+
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
   uint32_t syncSeqs[BlocksToSync];
