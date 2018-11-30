@@ -38,6 +38,9 @@ public signals:  // Signals
 
   PoolSynchronizerRequestSignal sendRequest;
 
+private slots:
+  void onTimeOut();
+
 private:  // Service
   enum class CounterType;
   class NeighboursSetElemet;
@@ -57,8 +60,6 @@ private:  // Service
   bool isLastRequest();
 
   bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
-
-  void onTimeOut();
 
   void synchroFinished();
 
@@ -141,11 +142,14 @@ private:  // Members
 };
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType& type) {
-  if (type == PoolSynchronizer::CounterType::ROUND) {
-    os << "ROUND";
-  }
-  else {
-    os << "TIMER";
+  switch (type) {
+    case PoolSynchronizer::CounterType::ROUND :
+      os << "ROUND";
+      break;
+    case PoolSynchronizer::CounterType::TIMER :
+      os << "TIMER";
+      break;
+    default: break;
   }
 
   return os;
