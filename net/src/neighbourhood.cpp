@@ -40,13 +40,16 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     }
 
     if (!found) {
-      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundInfo))
+      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundInfo)) {
         sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
-      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundInfo || bp.pack.getType() == MsgTypes::BlockHash)) 
+      }
+
+      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundInfo || bp.pack.getType() == MsgTypes::BlockHash))  {
         sent = transport_->sendDirect(&(bp.pack), **nb);
-        //*(bp.recEnd++) = nb->id;
-      else
+      }
+      else {
         result = true;
+      }
     }
   }
 
@@ -59,10 +62,13 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
 }
 
 bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
-  if (dp.received || dp.attempts > MaxResendTimes) return false;
+  if (dp.received || dp.attempts > MaxResendTimes) {
+    return false;
+  }
 
-  if (transport_->sendDirect(&(dp.pack), **dp.receiver))
+  if (transport_->sendDirect(&(dp.pack), **dp.receiver)) {
     ++dp.attempts;
+  }
 
   return true;
 }
@@ -164,30 +170,36 @@ void Neighbourhood::checkSilent()
 
 template <typename Vec>
 static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
-  for (auto it = vec.begin(); it != vec.end(); ++it)
-    if ((*it)->id == id)
+  for (auto it = vec.begin(); it != vec.end(); ++it) {
+    if ((*it)->id == id) {
       return it;
+    }
+  }
 
   return nullptr;
 }
 
 template <typename Vec>
 static ConnectionPtr* findInMap(const Connection::Id& id, Vec& vec) {
-  for (auto it = vec.begin(); it != vec.end(); ++it)
-    if (it->data->id == id)
+  for (auto it = vec.begin(); it != vec.end(); ++it) {
+    if (it->data->id == id) {
       return &(it->data);
+    }
+  }
 
   return nullptr;
 }
 
 static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
-  if (ep.address().is_v6()) return ep;
-  return ip::udp::endpoint(ip::make_address_v6(ip::v4_mapped, ep.address().to_v4()),
-                           ep.port());
+  if (ep.address().is_v6()) {
+    return ep;
+  }
+
+  return ip::udp::endpoint(ip::make_address_v6(ip::v4_mapped, ep.address().to_v4()), ep.port());
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-  LOG_WARN("Getting connection");
+  cswarning() << "Getting connection";
   auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
   if (!conn) {
@@ -199,23 +211,26 @@ ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
-  LOG_WARN("Establishing connection to " << ep);
+  cswarning() << "Establishing connection to " << ep;
+
   cs::SpinGuard lp(mLockFlag_);
-
   auto conn = getConnection(ep);
-  if (!conn->id)
-    conn->id = getSecureRandom<Connection::Id>();
 
-  if (!conn->connected)
+  if (!conn->id) {
+    conn->id = getSecureRandom<Connection::Id>();
+  }
+
+  if (!conn->connected) {
     transport_->sendRegistrationRequest(**conn);
+  }
 }
 
-uint32_t Neighbourhood::size() {
+uint32_t Neighbourhood::size() const {
   cs::SpinGuard lock(nLockFlag_);
   return neighbours_.size();
 }
 
-uint32_t Neighbourhood::getNeighboursCountWithoutSS() {
+uint32_t Neighbourhood::getNeighboursCountWithoutSS() const {
   cs::SpinGuard lock(nLockFlag_);
   uint32_t count = 0;
 
@@ -226,6 +241,29 @@ uint32_t Neighbourhood::getNeighboursCountWithoutSS() {
   }
 
   return count;
+}
+
+Connections Neighbourhood::getNeigbours() const {
+  cs::SpinGuard lock(nLockFlag_);
+
+  Connections connections;
+  connections.reserve(neighbours_.size());
+
+  std::copy(std::begin(neighbours_), std::end(neighbours_), std::back_inserter(connections));
+  return connections;
+}
+
+Connections Neighbourhood::getNeighboursWithoutSS() const {
+  cs::SpinGuard lock(nLockFlag_);
+
+  Connections connections;
+  connections.reserve(neighbours_.size());
+
+  std::copy_if(std::begin(neighbours_), std::end(neighbours_), std::back_inserter(connections), [&](const ConnectionPtr neighbour) {
+    return (!neighbour->isSignal);
+  });
+
+  return connections;
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
