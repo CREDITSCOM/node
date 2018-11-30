@@ -321,6 +321,8 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
     }
     else {
 
+      //TODO: Test if we are in proper blockchain
+
       //TODO: rollback local round to global one
       
       cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
