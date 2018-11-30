@@ -69,17 +69,6 @@ private:  // struct
     TIMER
   };
 
-  friend std::ostream& operator<<(std::ostream& os, const CounterType& сounterType) {
-    if (сounterType == CounterType::ROUND){
-      os << "ROUND";
-    }
-    else {
-      os << "TIMER";
-    }
-
-    return os;
-  }
-
   class NeighboursSetElemet {
   public:
     explicit NeighboursSetElemet(uint8_t neighbourNum)
@@ -147,8 +136,20 @@ private:  // Members
   std::vector<NeighboursSetElemet> m_neighbours;
 
   cs::Timer m_timer;
+
+  friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType&);
 };
 
+inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType& type) {
+  if (type == PoolSynchronizer::CounterType::ROUND) {
+    os << "ROUND";
+  }
+  else {
+    os << "TIMER";
+  }
+
+  return os;
+}
 }  // namespace cs
 
 #endif  // POOLSYNCHRONIZER_HPP
