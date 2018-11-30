@@ -36,8 +36,8 @@ TEST(TransactionsPacket, addTransactions)
     transaction.set_currency(1);
     transaction.set_amount(csdb::Amount(10000, 0));
 
-    const std::size_t randomTransactionsCount = cs::Utils::generateRandomValue(3, 30);
-    const std::size_t startInnerID = cs::Utils::generateRandomValue(1, 2789);
+    const size_t randomTransactionsCount = cs::Utils::generateRandomValue<size_t>(3, 30);
+    const size_t startInnerID = cs::Utils::generateRandomValue<size_t>(1, 2789);
 
     const auto oldtransactionsCount = packet.transactionsCount();
 
