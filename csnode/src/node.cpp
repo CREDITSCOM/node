@@ -38,7 +38,6 @@ Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
-, transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
     stats_(blockChain_)
@@ -50,8 +49,9 @@ Node::Node(const Config& config)
 #endif
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
-, ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_)) {
+, ostream_(&packStreamAllocator_, nodeIdKey_) {
+  transport_ = new Transport(config, this);
+  poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   good_ = init();
 }
 
