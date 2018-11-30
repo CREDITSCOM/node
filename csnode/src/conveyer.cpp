@@ -72,10 +72,9 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
       cslog() << "CONVEYER> Same hashes, binaries are equal";
     }
     else {
-      cswarning() << "CONVEYER> Same hashes look at binaries";
-
-      csdebug() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
-      csdebug() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
+      cswarning() << "CONVEYER> Same hashes, binaries are different";
+      csdetails() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
+      csdetails() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
     }
   }
 }
@@ -118,6 +117,27 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
   }
 
   return std::make_optional<cs::TransactionsPacket>(std::move(packet));
+}
+
+void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table)
+{
+  cslog() << "CONVEYER> updateRoundTable";
+
+  if(table.round != currentRoundNumber()) {
+    cserror() << "CONVEYER> Update round table in conveyer failed: round mismatch";
+    return;
+  }
+
+  {
+    cs::Lock lock(sharedMutex_);
+    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(table.round);
+    if(nullptr == meta) {
+      cserror() << "CONVEYER> Update round table in conveyer failed: round table not found, call to setRound()";
+      return;
+    }
+    meta->roundTable.general = std::move(table.general);
+    meta->roundTable.confidants = std::move(table.confidants);
+  }
 }
 
 void cs::ConveyerBase::setRound(cs::RoundTable&& table) {

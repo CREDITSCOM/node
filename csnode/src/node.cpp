@@ -36,22 +36,22 @@ const csdb::Address Node::startAddress_ =
 
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
-, bc_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
+, blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
-    stats_(bc_)
+    stats_(blockChain_)
 ,
 #endif
 #ifdef NODE_API
-  api_(bc_, solver_)
+  api_(blockChain_, solver_)
 ,
 #endif
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &bc_)) {
+, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_)) {
   good_ = init();
 }
 
@@ -72,7 +72,7 @@ bool Node::init() {
     return false;
   }
 
-  if (!bc_.isGood()) {
+  if (!blockChain_.isGood()) {
     return false;
   }
 
@@ -204,7 +204,7 @@ void Node::stop() {
   solver_->finish();
   cswarning() << "[SOLVER STOPPED]";
 
-  auto bcStorage = bc_.getStorage();
+  auto bcStorage = blockChain_.getStorage();
   bcStorage.close();
 
   cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
@@ -254,12 +254,20 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   if(global_table.round == local_table.round) {
     // resend all this round data available
     cslog() << "NODE> resend last block hash after BigBang";
-    if(tryResendRoundInfo(std::nullopt, local_table.round)) {
-      // only sender able do it
-      cswarning() << "NODE> re-send last round info to ALL";
+    // update round table
+    onRoundStart_V3(global_table);
+
+    // do almost the same as onRoundStartConveyer(std::move(global_table)), only difference is call to conveyer.updateRoundTable()
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    conveyer.updateRoundTable(std::move(global_table));
+    const auto& updated_table = conveyer.currentRoundTable();
+    if(updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+      startConsensus();
     }
-    sendHash_V3(local_table.round);
-    solver_->gotBigBang();
+    else {
+      sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
+    }
+
     return;
   }
 
@@ -301,12 +309,17 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
 
   // global round is behind local one
   if(local_table.round > global_table.round) {
+
+    //TODO: in case of bigbang, rollback round(s), then accept global_table, then start round again
+    
     if(local_table.round - global_table.round == 1) {
       cslog() << "NODE> re-send last round info may help others to go to round #" << local_table.round;
       tryResendRoundInfo(std::nullopt, local_table.round); // broadcast round info
     }
     else {
-      //TODO: rollback to global round
+
+      //TODO: rollback local round to global one
+      
       cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
     }
     return;
@@ -992,14 +1005,14 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packetNum = 0;
   istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> <<< Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
     return;
   }
 
-  if (sequences.front() > bc_.getLastWrittenSequence()) {
+  if (sequences.front() > blockChain_.getLastWrittenSequence()) {
     cslog() << "NODE> Get block request> The requested block: " << sequences.front() << " is BEYOND my CHAIN";
     return;
   }
@@ -1008,7 +1021,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   poolsBlock.reserve(sequencesCount);
 
   for (auto& sequence : sequences) {
-    csdb::Pool pool = bc_.loadBlock(bc_.getHashBySequence(sequence));
+    csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
 
     if (pool.is_valid()) {
       auto prev_hash = csdb::PoolHash::from_string("");
@@ -1058,17 +1071,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
-    const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csdebug() << "NODE> " << __func__
-        << "() Target out(): " << cs::Utils::byteStreamToHex(target.data(), target.size())
-        << ", packet: " << packetNum
-        << ", round: " << round;
-  
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, round, poolsBlock, packetNum);
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -1274,6 +1281,10 @@ void Node::initNextRound(const cs::RoundTable& roundTable) {
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+  if(type == MsgTypes::NodeStopRequest) {
+    return MessageActions::Process;
+  }
+
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   // starts next round, otherwise
@@ -1547,14 +1558,14 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   cscrypto::CalculateHash(stageOneInfo.msgHash, rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash), pStageOneMsgSize);
   memcpy(rawData + sizeof(cs::RoundNumber), stageOneInfo.msgHash.data(), sizeof(cs::Hash));
-  cslog() << "MsgHash: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.msgHash.data(), 32);
-    cslog() << "Sending message ("<< pStageOneMsgSize << "): "<< cs::Utils::byteStreamToHex((const char*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash)), pStageOneMsgSize);
+ // cslog() << "MsgHash: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.msgHash.data(), 32);
+  //  cslog() << "Sending message ("<< pStageOneMsgSize << "): "<< cs::Utils::byteStreamToHex((const char*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash)), pStageOneMsgSize);
   cscrypto::GenerateSignature(stageOneInfo.sig, solver_->getPrivateKey(), rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash));
   // cslog() << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64);
   //crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash), solver_->getPrivateKey().data());
-  cslog() << "Signature done";
+ // cslog() << "Signature done";
   pStageOneMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash))), pStageOneMsgSize);
-  cslog() << " Sig: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.sig.data(), 64);
+ // cslog() << " Sig: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.sig.data(), 64);
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
   ostream_ << MsgTypes::FirstStage
     << roundNum_
@@ -1563,6 +1574,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     << pStageOneMessage;
 
   allocator_.shrinkLast(hashedMsgSize);
+  cslog() << "        _________________________________|" ;
   flushCurrentTasks();
 }
 
@@ -1637,12 +1649,13 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     csdebug() << __func__ << "(): returned from function -> nodeIdKey == sender";
     return;
   }
-  csdebug() << __func__;
+  csdebug() << __func__ ;
   cs::Hash msgHash;
+  csdebug() << __func__ << "-01";
   istream_.init(data, size);
   size_t msgSize;
   std::string raw_bytes;
-
+  csdebug() << __func__ << "-02";
   cs::StageOne stage;
   istream_ >> msgSize
     >> stage.sig
@@ -1653,21 +1666,28 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   }
 
   const uint8_t* stagePtr = (const uint8_t*)raw_bytes.data();
-
+  csdebug() << __func__ << "-03";
   auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash));
+  csdebug() << __func__ << "-03.01";
+
   uint8_t* rawData = (uint8_t*)memPtr.get();
+  csdebug() << __func__ << "-03.02";
   memcpy(rawData, &roundNum_, sizeof(cs::RoundNumber));
+  csdebug() << __func__ << "-03.03";
+  cslog() << "Received message ["<< msgSize << "] :" << cs::Utils::byteStreamToHex((const char*)stagePtr , msgSize);
   memcpy(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash), stagePtr, msgSize);
 
-  // cslog() << "Received message ["<< msgSize << "] :" << cs::Utils::byteStreamToHex((const char*)stagePtr , msgSize);
-
+  
+  csdebug() << __func__ << "-03.04";
   cscrypto::CalculateHash(stage.msgHash, stagePtr, msgSize);
+  csdebug() << __func__ << "-03.05";
   memcpy(rawData + sizeof(cs::RoundNumber), stage.msgHash.data(), stage.msgHash.size());
+  csdebug() << __func__ << "-03.06";
   uint8_t* ptr = rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash);
   stage.sender = *ptr;
 
-  //cslog() << __func__ <<  "(): Sender: " << (int)stage.sender << ", sender key: "
-  //  << cs::Utils::byteStreamToHex((const char*)cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender).data(), 32);
+  cslog() << __func__ <<  "(): Sender: " << (int)stage.sender << ", sender key: "
+    << cs::Utils::byteStreamToHex((const char*)cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender).data(), 32);
  // cslog() << "Message hash: " << cs::Utils::byteStreamToHex((const char*)stage.msgHash.data(),32);
   if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender), 
     rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash))) {
@@ -2070,7 +2090,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   csdebug() << "NODE> " << __func__ << "():" << " timestamp = " << timeStamp;
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = bc_.getLastWrittenSequence() + 1;  // change for roundNumber
+  poolMetaInfo.sequenceNumber = blockChain_.getLastWrittenSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = timeStamp;
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info

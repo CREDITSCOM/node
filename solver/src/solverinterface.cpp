@@ -185,7 +185,7 @@ namespace cs
     if(pnode != nullptr) {
       auto tmp = pnode->getRoundNumber();
       if(cur_round == tmp) {
-        return;
+        cswarning() << "SolverCore: current round #" << tmp << " restarted (BigBang?)";
       }
       cur_round = tmp;
     }

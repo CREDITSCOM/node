@@ -39,12 +39,13 @@ public signals:  // Signals
   PoolSynchronizerRequestSignal sendRequest;
 
 private:  // Service
+  enum class CounterType;
   class NeighboursSetElemet;
 
   // pool sync progress
   void showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence);
 
-  bool checkActivity();
+  bool checkActivity(const CounterType& counterType);
 
   void sendBlock(uint8_t neighbourNum);
 
@@ -57,33 +58,22 @@ private:  // Service
 
   bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
 
+  void onTimeOut();
+
   void synchroFinished();
 
-private:  // Members
-  inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
+private:  // struct
 
-  const uint8_t m_maxBlockPoolsCount;       // cannot be 0
-  const uint8_t m_requestRepeatRoundCount;  // round  count for repeat request : 0 - never
-  const uint8_t m_neighbourPacketsCount;    // packet count for connect another neighbor : 0 - never
-
-  Transport* m_transport;
-  BlockChain* m_blockChain;
-
-  // flag starting  syncronization
-  bool m_isSyncroStarted = false;
-  // array needed sequences for send request
-  PoolsRequestedSequences m_neededSequences;
-  // [key] = sequence,
-  // [value] =  packet counter
-  // value: increase each new round
-  std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
-  bool m_isBigBand;
+  enum class CounterType {
+    ROUND,
+    TIMER
+  };
 
   class NeighboursSetElemet {
   public:
-    explicit NeighboursSetElemet(uint8_t neighbourNum, csdb::Pool::sequence_t sequence = 0)
+    explicit NeighboursSetElemet(uint8_t neighbourNum)
     : m_neighbourNum(neighbourNum)
-    , m_sequence(sequence)
+    , m_sequence(0)
     , m_roundCounter(0) {
     }
 
@@ -126,9 +116,40 @@ private:  // Members
     uint32_t m_roundCounter;
   };
 
+private:  // Members
+  inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
+
+  const PoolSyncData m_syncData;
+
+  Transport* m_transport;
+  BlockChain* m_blockChain;
+
+  // flag starting  syncronization
+  bool m_isSyncroStarted = false;
+  // array needed sequences for send request
+  PoolsRequestedSequences m_neededSequences;
+  // [key] = sequence,
+  // [value] =  packet counter
+  // value: increase each new round
+  std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
+
   std::vector<NeighboursSetElemet> m_neighbours;
+
+  cs::Timer m_timer;
+
+  friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType&);
 };
 
+inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType& type) {
+  if (type == PoolSynchronizer::CounterType::ROUND) {
+    os << "ROUND";
+  }
+  else {
+    os << "TIMER";
+  }
+
+  return os;
+}
 }  // namespace cs
 
 #endif  // POOLSYNCHRONIZER_HPP
