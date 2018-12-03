@@ -1561,15 +1561,13 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
  // cslog() << "MsgHash: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.msgHash.data(), 32);
   //  cslog() << "Sending message ("<< pStageOneMsgSize << "): "<< cs::Utils::byteStreamToHex((const char*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash)), pStageOneMsgSize);
   cscrypto::GenerateSignature(stageOneInfo.sig, solver_->getPrivateKey(), rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash));
-  // cslog() << " Sig: " << byteStreamToHex((const char*)stageOneInfo.sig.val, 64);
   //crypto_sign_ed25519_detached(stageOneInfo.sig.data(), &sig_size, rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash), solver_->getPrivateKey().data());
  // cslog() << "Signature done";
   pStageOneMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash))), pStageOneMsgSize);
  // cslog() << " Sig: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.sig.data(), 64);
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
+  ostream_.init(BaseFlags::Fragmented);
   ostream_ << MsgTypes::FirstStage
     << roundNum_
-    << pStageOneMsgSize
     << stageOneInfo.sig
     << pStageOneMessage;
 
@@ -1633,10 +1631,11 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
 
   ostream_ << MsgTypes::FirstStage
     << roundNum_
-    << pStageOneMsgSize
     << stageOneInfo.sig
     << pStageOneMessage;
+  //cslog() << " MsgSize: " << pStageOneMsgSize;
   flushCurrentTasks();
+
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
@@ -1651,38 +1650,28 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   }
   csdebug() << __func__ ;
   cs::Hash msgHash;
-  csdebug() << __func__ << "-01";
   istream_.init(data, size);
   size_t msgSize;
   std::string raw_bytes;
-  csdebug() << __func__ << "-02";
   cs::StageOne stage;
-  istream_ >> msgSize
-    >> stage.sig
+  istream_ >> stage.sig
     >> raw_bytes;
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageOne packet format";
     return;
   }
-
+  msgSize = raw_bytes.size();
   const uint8_t* stagePtr = (const uint8_t*)raw_bytes.data();
-  csdebug() << __func__ << "-03";
   auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash));
-  csdebug() << __func__ << "-03.01";
-
   uint8_t* rawData = (uint8_t*)memPtr.get();
-  csdebug() << __func__ << "-03.02";
   memcpy(rawData, &roundNum_, sizeof(cs::RoundNumber));
-  csdebug() << __func__ << "-03.03";
-  cslog() << "Received message ["<< msgSize << "] :" << cs::Utils::byteStreamToHex((const char*)stagePtr , msgSize);
+  //cslog() << cs::Utils::byteStreamToHex((const char*)data, size);
+  //cslog() << "Received message ["<< msgSize << "] :";
+  //cslog() << cs::Utils::byteStreamToHex((const char*)stagePtr , msgSize);
   memcpy(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash), stagePtr, msgSize);
 
-  
-  csdebug() << __func__ << "-03.04";
   cscrypto::CalculateHash(stage.msgHash, stagePtr, msgSize);
-  csdebug() << __func__ << "-03.05";
   memcpy(rawData + sizeof(cs::RoundNumber), stage.msgHash.data(), stage.msgHash.size());
-  csdebug() << __func__ << "-03.06";
   uint8_t* ptr = rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash);
   stage.sender = *ptr;
 
@@ -1734,7 +1723,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   allocator_.shrinkLast(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash));
   //csdebug() << "Size: " << msgSize << "  Sender: " << (int)stage.sender << std::endl
   //  << " Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) 
-  //  << " Cand Amount: " << (int)stage.candidatesAmount << std::endl
+  //  << " Cand Amount: " << (int)stage.trustedCandidates.size() << std::endl
   //  << " Sig: " << cs::Utils::byteStreamToHex(stage.sig.data(), stage.sig.size());
   cslog() << "NODE> Stage One from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageOne(std::move(stage));
@@ -2387,6 +2376,7 @@ void Node::sendHash_V3(cs::RoundNumber round)
   }
 
   const auto& tmp = getBlockChain().getLastWrittenHash();
+  // = personallyDamagedHash();
 
   cswarning() << "Sending hash " << tmp.to_string() << " to ALL";
   ostream_.init(BaseFlags::Broadcast);

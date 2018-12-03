@@ -25,7 +25,7 @@ namespace cs
     }
 
     // TODO: value = (Consensus::PostConsensusTimeout * "own number in "writing" queue")
-    uint32_t value = 6000 * writing_queue_num;
+    uint32_t value = 0 * writing_queue_num;
 
     if(Consensus::Log) {
       cslog() << name() << ": start wait " << value / 1000 << " sec until new round";
