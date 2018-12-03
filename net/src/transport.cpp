@@ -622,6 +622,14 @@ ConnectionPtr Transport::getRandomNeighbour() {
   return nh_.getRandomSyncNeighbour();
 }
 
+const Connections Transport::getNeighbours() const {
+  return nh_.getNeigbours();
+}
+
+const Connections Transport::getNeighboursWithoutSS() const {
+  return nh_.getNeighboursWithoutSS();
+}
+
 void Transport::syncReplied(const uint32_t seq) {
   return nh_.releaseSyncRequestee(seq);
 }

@@ -40,7 +40,14 @@ bool Packet::isHeaderValid() const {
     }
   }
 
-  return size() > getHeadersLength();
+  if(size() <= getHeadersLength()) {
+    cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")"
+      << (this->isNetwork() ? ", network" : "")
+      << (this->isFragmented() ? ", fragmeted" : "")
+      <<  ", type " << (int) this->getType();
+    return false;
+  }
+  return true;
 }
 
 uint32_t Packet::getHeadersLength() const {

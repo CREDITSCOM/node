@@ -113,14 +113,14 @@ struct Connection {
   }
 };
 
-typedef MemPtr<TypedSlot<Connection>> ConnectionPtr;
+using ConnectionPtr = MemPtr<TypedSlot<Connection>>;
+using Connections = std::vector<ConnectionPtr>;
 
 class Neighbourhood {
 public:
   const static uint32_t MinConnections = 1;
   const static uint32_t MaxConnections = 1024;
   const static uint32_t MaxNeighbours = 32;
-
   const static uint32_t MaxConnectAttempts = 64;
 
   explicit Neighbourhood(Transport*);
@@ -131,10 +131,7 @@ public:
   void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
 
   void gotRegistration(Connection&&, RemoteNodePtr);
-
-  void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&,
-                       const cs::PublicKey&, RemoteNodePtr);
-
+  void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&, const cs::PublicKey&, RemoteNodePtr);
   void gotRefusal(const Connection::Id&);
 
   void resendPackets();
@@ -152,24 +149,25 @@ public:
   void redirectByNeighbours(const Packet*);
   void pourByNeighbours(const Packet*, const uint32_t packNum);
 
-  uint32_t size();
-  uint32_t getNeighboursCountWithoutSS();
+  uint32_t size() const;
+  uint32_t getNeighboursCountWithoutSS() const;
+
+  Connections getNeigbours() const;
+  Connections getNeighboursWithoutSS() const;
 
   void pingNeighbours();
   bool isPingDone();
   void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const uint32_t);
 
   ConnectionPtr getConnection(const RemoteNodePtr);
-
   ConnectionPtr getNextRequestee(const cs::Hash&);
   ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
   ConnectionPtr getNeighbour(const std::size_t number);
   ConnectionPtr getRandomSyncNeighbour();
   ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
+
   void resetSyncNeighbours();
-
   void releaseSyncRequestee(const uint32_t seq);
-
   void registerDirect(const Packet*, ConnectionPtr);
 
 private:
@@ -206,10 +204,10 @@ private:
 
   TypedAllocator<Connection> connectionsAllocator_;
 
-  cs::SpinLock nLockFlag_;
+  mutable cs::SpinLock nLockFlag_;
   FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
-  cs::SpinLock mLockFlag_;
+  mutable cs::SpinLock mLockFlag_;
   FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
   struct SenderInfo {

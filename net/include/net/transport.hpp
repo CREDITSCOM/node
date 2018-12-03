@@ -141,6 +141,10 @@ public:
   ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
   ConnectionPtr getNeighbourByNumber(const std::size_t number);
   ConnectionPtr getRandomNeighbour();
+
+  const Connections getNeighbours() const;
+  const Connections getNeighboursWithoutSS() const;
+
   void syncReplied(const uint32_t seq);
   bool isPingDone();
   void resetNeighbours();

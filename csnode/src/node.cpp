@@ -38,7 +38,6 @@ Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
-, transport_(new Transport(config, this))
 ,
 #ifdef MONITOR_NODE
     stats_(blockChain_)
@@ -50,8 +49,9 @@ Node::Node(const Config& config)
 #endif
   allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
-, ostream_(&packStreamAllocator_, nodeIdKey_)
-, poolSynchronizer_(new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_)) {
+, ostream_(&packStreamAllocator_, nodeIdKey_) {
+  transport_ = new Transport(config, this);
+  poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   good_ = init();
 }
 
@@ -322,6 +322,8 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
     }
     else {
 
+      //TODO: Test if we are in proper blockchain
+
       //TODO: rollback local round to global one
       
       cserror() << "NODE> round rollback (from #" << local_table.round << " to #" << global_table.round << " not implemented yet";
@@ -391,18 +393,18 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
 }
 
 template <typename... Args>
-bool Node::sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
-    sendNeighbours(connection, msgType, round, std::forward<Args>(args)...);
+    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
   }
 
   return static_cast<bool>(connection);
 }
 
 template <typename... Args>
-void Node::sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -428,7 +430,7 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 
 template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  const bool success = sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
+  const bool success = sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
   }
@@ -439,7 +441,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
-    sendNeighbours(target, msgType, round, std::forward<Args>(args)...);
+    sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
   }
 
   return target;
@@ -914,7 +916,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   // look at main node
   main = (roundTable != nullptr) ? roundTable->general : cs::Conveyer::instance().currentRoundTable().general;
 
-  const bool sendToGeneral = sendNeighbours(main, msgType, round, hashes);
+  const bool sendToGeneral = sendNeighbour(main, msgType, round, hashes);
 
   if (!sendToGeneral) {
     csdebug() << "NODE> Sending packet to main node " << cs::Utils::byteStreamToHex(main.data(), main.size());
@@ -947,7 +949,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, co
 
     if (connection) {
       successRequest = true;
-      sendNeighbours(connection, msgType, round, hashes);
+      sendNeighbour(connection, msgType, round, hashes);
     }
   }
 
@@ -968,7 +970,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
-  const bool success = sendNeighbours(target, msgType, round, packets);
+  const bool success = sendNeighbour(target, msgType, round, packets);
 
   if (!success) {
     csdebug() << "NODE> Reply transaction packets: failed send to "
