@@ -145,10 +145,10 @@ public:
   void sendRoundTable(const cs::RoundTable& round);
 
   template <typename... Args>
-  bool sendNeighbours(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  bool sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
-  void sendNeighbours(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  void sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
   void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);

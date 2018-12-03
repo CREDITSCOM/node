@@ -780,7 +780,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   else {
     // ready-to-record block does not require anything
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq
-              << " to chain, skip signature verification, update wallets ids";
+              << " to chain, no further verificaton need, update wallets ids";
 
     updateWalletIds(pool, *walletsCacheUpdater_);
     putBlock(pool);
@@ -806,7 +806,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
       //testCachedBlocks();
       return true;
     }
-    csdebug() << "BLOCKCHAIN> failed to block #" << pool_seq << " to chain";
+    csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
     return false;
   }
   if (cachedBlocks_.count(pool_seq) > 0) {

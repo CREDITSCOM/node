@@ -580,18 +580,12 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
   }
 }
 
-void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend, bool sendToNeighbours) {
-  if (sendToNeighbours) {
-    nh_.pourByNeighbours(pack, packNum);
-  }
-
+void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
+  nh_.pourByNeighbours(pack, packNum);
   if (packNum > 1) {
     net_->registerMessage(pack, packNum);
-    registerTask(pack, 1, incrementWhenResend);
   }
-  else if (sendToNeighbours) {
-    registerTask(pack, packNum, incrementWhenResend);
-  }
+  registerTask(pack, 1, incrementWhenResend);
 }
 
 void Transport::clearTasks() {
@@ -626,6 +620,14 @@ ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number) {
 ConnectionPtr Transport::getRandomNeighbour() {
   csdebug() << "Transport> Get random neighbour for Sync";
   return nh_.getRandomSyncNeighbour();
+}
+
+const Connections Transport::getNeighbours() const {
+  return nh_.getNeigbours();
+}
+
+const Connections Transport::getNeighboursWithoutSS() const {
+  return nh_.getNeighboursWithoutSS();
 }
 
 void Transport::syncReplied(const uint32_t seq) {
