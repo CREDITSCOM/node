@@ -673,7 +673,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     }
 
     if (is_smart_deploy(smart)) {
-      csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__;
+
       {
         auto smart_origin = lockedReference(this->smart_origin);
         (*smart_origin)[address] = tr.id();
@@ -691,7 +691,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     }
     return true;
   }
-  csdebug() << __FILE__ << ":" << __func__ << ":" << __LINE__;
+
   return false;
 }
 
