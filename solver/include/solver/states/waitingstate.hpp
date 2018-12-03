@@ -1,4 +1,6 @@
-#pragma once
+#ifndef WAITING_STAGE_HPP
+#define WAITING_STAGE_HPP
+
 #include <timeouttracking.hpp>
 #include <string>
 #include "defaultstatebehavior.hpp"
@@ -24,16 +26,20 @@ public:
   void off(SolverContext& context) override;
 
   const char* name() const override {
-    return my_name.c_str();
+    return myName_.c_str();
   }
 
 private:
-  constexpr static const char* prefix = "Waiting";
-  uint8_t writing_queue_num{0};
-  std::string my_name{prefix};
+  constexpr static const char* prefix_ = "Waiting";
+  const static uint32_t sendRoundTableDelayMs_ = 6000;
 
-  TimeoutTracking timeout_round;
+  uint8_t writingQueueNumber_ = { 0 };
+  std::string myName_ = { prefix_ };
+
+  TimeoutTracking roundTimeout_;
 
   void activate_new_round(SolverContext& context);
 };
 }  // namespace slv2
+
+#endif // WAITING_STAGE_HPP
