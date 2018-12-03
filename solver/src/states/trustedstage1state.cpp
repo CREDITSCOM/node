@@ -211,9 +211,16 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   }
 
   cs::Hash hash;
-  cscrypto::CalculateHash(hash, characteristic.mask.data(), characteristic.mask.size());
-  csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
 
+  if (characteristic.mask.empty()) {
+    auto round = cs::Conveyer::instance().currentRoundNumber();
+    cscrypto::CalculateHash(hash, reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
+  }
+  else {
+    cscrypto::CalculateHash(hash, characteristic.mask.data(), characteristic.mask.size());
+  }
+
+  csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
   return hash;
 }
 
