@@ -113,13 +113,13 @@ public:
   ///
   /// @brief Returns current round needed hashes.
   ///
-  const cs::Hashes& currentNeededHashes() const;
+  const cs::PacketsHashes& currentNeededHashes() const;
 
   ///
   /// @brief Returns round needed hashes.
   /// @return returns cs::Hashes. If no hashes found returns nullptr.
   ///
-  const cs::Hashes* neededHashes(cs::RoundNumber round) const;
+  const cs::PacketsHashes* neededHashes(cs::RoundNumber round) const;
 
   ///
   /// @brief Adds synced packet to conveyer.

@@ -382,7 +382,7 @@ void Node::sendRoundTable(const cs::RoundTable& roundTable) {
     }
   }
 
-  const cs::Hashes& hashes = roundTable.hashes;
+  const cs::PacketsHashes& hashes = roundTable.hashes;
   cslog() << "Hashes count: " << hashes.size();
 
   for (std::size_t i = 0; i < hashes.size(); ++i) {
@@ -581,7 +581,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
 
   csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  cs::Hashes hashes;
+  cs::PacketsHashes hashes;
   hashes.reserve(hashesCount);
 
   for (std::size_t i = 0; i < hashesCount; ++i) {
@@ -902,7 +902,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
   flushCurrentTasks();
 }
 
-void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round, uint32_t requestStep) {
+void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep) {
   if (cs::Conveyer::instance().isSyncCompleted(round)) {
     return;
   }
@@ -938,7 +938,7 @@ void Node::sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumb
   cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), requestClosure);
 }
 
-void Node::sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round) {
+void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
   const auto msgType = MsgTypes::TransactionsPacketRequest;
   const auto neighboursCount = transport_->getNeighboursCount();
 
@@ -1123,7 +1123,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
   }
 
-  const cs::Hashes& hashes = roundTable.hashes;
+  const cs::PacketsHashes& hashes = roundTable.hashes;
 
   cslog() << "Transaction packets hashes count: " << hashes.size();
 
@@ -1147,7 +1147,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   transport_->processPostponed(roundNum_);
 }
 
-void Node::processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
+void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
 
   cs::Packets packets;
@@ -1257,7 +1257,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
 void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes) {
   cslog() << "Node: init next round1";
   // copied from Solver::gotHash():
-  cs::Hashes hashes;
+  cs::PacketsHashes hashes;
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::RoundNumber round = conveyer.currentRoundNumber();
 
@@ -1588,33 +1588,34 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
 // sends StageOne request to respondent about required
 void Node::requestStageOne(uint8_t respondent, uint8_t required) {
-#ifdef MYLOG
-  cslog() << "NODE> Stage ONE requesting ... ";
-#endif
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "Only confidant nodes can request consensus stages";
-    // return;
   }
 
-  ostream_.init(0 /*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
+  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
+
+  if (respondent >= confidants.size()) {
+    cserror() << __func__ << " respondent index is out of confidants"
+              << ", index " << respondent << ", confidants size " << confidants.size();
+    return;
+  }
+
+  ostream_.init(0 /*need no flags!*/, confidants[respondent]);
   ostream_ << MsgTypes::FirstStageRequest << roundNum_ << myConfidantIndex_ << required;
+
   flushCurrentTasks();
-  LOG_DEBUG("done");
+  csdebug() << __func__ << " done";
 }
 
 void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  LOG_DEBUG(__func__);
-  // cslog() << "NODE> Getting StageOne Request";
+  csdebug() << __func__;
+
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
-  // cslog() << "NODE> Getting StageOne 0";
-  if (nodeIdKey_ == requester) {
-    return;
-  }
-  // cslog() << "NODE> Getting StageOne 1";
-  // cslog() << "Getting Stage One Request from " << byteStreamToHex(sender.str, 32));
+
   istream_.init(data, size);
+
   uint8_t requesterNumber = 0;
   uint8_t requiredNumber = 0;
   istream_ >> requesterNumber >> requiredNumber;
@@ -1622,10 +1623,12 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
     return;
   }
+
   if (!istream_.good() || !istream_.end()) {
     cslog() << "Bad StageOne packet format";
     return;
   }
+
   solver_->gotStageOneRequest(requesterNumber, requiredNumber);
 }
 
@@ -2176,7 +2179,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
   //  }
   //}
 
-  const cs::Hashes& hashes = table.hashes;
+  const cs::PacketsHashes& hashes = table.hashes;
   cslog() << "Hashes count: " << hashes.size();
 
   // for (std::size_t i = 0; i < hashes.size(); ++i) {
@@ -2227,7 +2230,7 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
     confidants.push_back(std::move(key));
   }
 
-  cs::Hashes hashes;
+  cs::PacketsHashes hashes;
   hashes.reserve(hashesCount);
 
   for (std::size_t i = 0; i < hashesCount; ++i) {

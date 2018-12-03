@@ -96,7 +96,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
   }
 
   cs::TransactionsPacket packet;
-  cs::Hashes& hashes = meta->roundTable.hashes;
+  cs::PacketsHashes& hashes = meta->roundTable.hashes;
   cs::TransactionsPacketTable& table = pimpl_->packetsTable;
 
   for (const auto& hash : hashes) {
@@ -148,8 +148,8 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
     return;
   }
 
-  const cs::Hashes& hashes = table.hashes;
-  cs::Hashes neededHashes;
+  const cs::PacketsHashes& hashes = table.hashes;
+  cs::PacketsHashes neededHashes;
 
   {
     cs::SharedLock lock(sharedMutex_);
@@ -207,11 +207,11 @@ cs::RoundNumber cs::ConveyerBase::currentRoundNumber() const {
   return pimpl_->currentRound;
 }
 
-const cs::Hashes& cs::ConveyerBase::currentNeededHashes() const {
+const cs::PacketsHashes& cs::ConveyerBase::currentNeededHashes() const {
   return *(neededHashes(currentRoundNumber()));
 }
 
-const cs::Hashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
+const cs::PacketsHashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
@@ -240,7 +240,7 @@ void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPac
     return;
   }
 
-  cs::Hashes& hashes = metaPointer->neededHashes;
+  cs::PacketsHashes& hashes = metaPointer->neededHashes;
 
   if (auto iterator = std::find(hashes.begin(), hashes.end(), packet.hash()); iterator != hashes.end()) {
     csdebug() << "CONVEYER> Adding synced packet";
@@ -377,7 +377,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   }
 
   cs::TransactionsPacketTable hashTable;
-  const cs::Hashes& localHashes = meta->roundTable.hashes;
+  const cs::PacketsHashes& localHashes = meta->roundTable.hashes;
   const cs::Characteristic& characteristic = meta->characteristic;
   cs::TransactionsPacketTable& currentHashTable = pimpl_->packetsTable;
 

@@ -133,8 +133,8 @@ public:
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
-  void sendPacketHashesRequest(const cs::Hashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
-  void sendPacketHashesRequestToRandomNeighbour(const cs::Hashes& hashes, const cs::RoundNumber round);
+  void sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
+  void sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round);
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
   void resetNeighbours();
 
@@ -238,7 +238,7 @@ private:
   void onRoundStartConveyer(cs::RoundTable&& roundTable);
 
   // conveyer
-  void processPacketsRequest(cs::Hashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 

@@ -46,9 +46,14 @@ using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 using Notifications = std::vector<cs::Bytes>;
 
 // round data
-using ConfidantsKeys = std::vector<PublicKey>;
-using Hashes = std::vector<cs::TransactionsPacketHash>;
+using PublicKeys = std::vector<PublicKey>;
+using PrivateKeys = std::vector<PrivateKey>;
+
+using ConfidantsKeys = PublicKeys;
+using PacketsHashes = std::vector<cs::TransactionsPacketHash>;
 using Packets = std::vector<cs::TransactionsPacket>;
+using Signatures = std::vector<cs::Signature>;
+using Hashes = std::vector<cs::Hash>;
 
 using PoolsRequestedSequences = std::vector<RoundNumber>;
 using PoolsBlock = std::vector<csdb::Pool>;
@@ -76,7 +81,7 @@ struct RoundTable {
   RoundNumber round = 0;
   PublicKey general;
   ConfidantsKeys confidants;
-  Hashes hashes;
+  PacketsHashes hashes;
   Characteristic charBytes;
 };
 
@@ -111,7 +116,7 @@ using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
 struct ConveyerMeta {
   cs::Characteristic characteristic;
   cs::TransactionsPacketTable hashTable;
-  cs::Hashes neededHashes;
+  cs::PacketsHashes neededHashes;
   cs::RoundTable roundTable;
   cs::Notifications notifications;
   cs::TransactionsPacket invalidTransactions;

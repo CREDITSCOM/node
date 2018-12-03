@@ -53,8 +53,8 @@ public:
 
   // transaction's pack syncro
   MOCK_METHOD1(sendTransactionsPacket, void(const cs::TransactionsPacket& packet));
-  MOCK_METHOD2(sendPacketHashesRequest, void(const cs::Hashes& hashes, const cs::RoundNumber round));
-  MOCK_METHOD2(sendPacketHashesRequestToRandomNeighbour, void(const cs::Hashes& hashes, const cs::RoundNumber round));
+  MOCK_METHOD2(sendPacketHashesRequest, void(const cs::PacketsHashes& hashes, const cs::RoundNumber round));
+  MOCK_METHOD2(sendPacketHashesRequestToRandomNeighbour, void(const cs::PacketsHashes& hashes, const cs::RoundNumber round));
   MOCK_METHOD3(sendPacketHashesReply,
                void(const cs::Packets& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
 

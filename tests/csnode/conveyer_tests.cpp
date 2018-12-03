@@ -101,7 +101,7 @@ auto CreateTestPacket(const size_t number_of_transactions) {
   return packet;
 }
 
-auto CreateTestRoundTable(const cs::Hashes& hashes) {
+auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
   return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes,
                         kCharacteristic};
 }
