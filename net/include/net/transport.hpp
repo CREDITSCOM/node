@@ -98,7 +98,7 @@ public:
   void processNodeMessage(const Message&);
   void processNodeMessage(const Packet&);
 
-  void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false, bool sendToNeighbours = true);
+  void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false);
   void clearTasks();
 
   const cs::PublicKey& getMyPublicKey() const {
@@ -133,7 +133,6 @@ public:
   void sendPingPack(const Connection&);
 
   void registerMessage(MessagePtr);
-  void registerTask(Packet* pack, const uint32_t packNum, const bool);
 
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
@@ -147,6 +146,7 @@ public:
   void resetNeighbours();
 
 private:
+	void registerTask(Packet* pack, const uint32_t packNum, const bool);
   void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
   // Dealing with network connections
