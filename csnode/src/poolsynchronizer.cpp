@@ -40,7 +40,12 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
   }
 
   const auto lastWrittenSequence = m_blockChain->getLastWrittenSequence();
-  const auto roundToSync = m_isSyncroStarted ? cs::Conveyer::instance().currentRoundNumber() - 1 : roundNum;
+  
+  // TODO: review
+  auto roundToSync = roundNum;
+  if(m_isSyncroStarted && roundNum > 0) {
+    --roundToSync;
+  }
 
   if (lastWrittenSequence >= roundToSync) {
     showSyncronizationProgress(cs::numeric_cast<csdb::Pool::sequence_t>(lastWrittenSequence));

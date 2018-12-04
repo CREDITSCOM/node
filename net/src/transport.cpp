@@ -528,12 +528,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   switch (type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
-  case MsgTypes::ConsVector:
-    return node_->getVector(data, size, firstPack.getSender());
-  case MsgTypes::ConsMatrix:
-    return node_->getMatrix(data, size, firstPack.getSender());
-  case MsgTypes::BlockHash:
-    return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockHashV3:
     return node_->getHash_V3(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionPacket:
@@ -544,8 +538,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
   case MsgTypes::NewCharacteristic:
     return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
-  case MsgTypes::WriterNotification:
-    return node_->getWriterNotification(data, size, firstPack.getSender());
   case MsgTypes::FirstStage:
     return node_->getStageOne(data, size, firstPack.getSender());
   case MsgTypes::FirstStageRequest:

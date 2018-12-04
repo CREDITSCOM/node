@@ -235,7 +235,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     if (trustedMask[i]) {
       stage.realTrustedMask.push_back(1);
       const auto& stage_i = *(context.stage1_data().cbegin() + i);
-      uint8_t candidates_amount = stage_i.trustedCandidates.size();
+      uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
       cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
       for (uint8_t j = 0; j < candidates_amount; j++) {
       //  cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
@@ -261,7 +261,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
         }
         else {
-          hashesElection.emplace(stage_i.hashesCandidates.at(j), 1);
+          hashesElection.emplace(stage_i.hashesCandidates.at(j), (uint8_t)1u);
         }
       }
     }
@@ -312,29 +312,18 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       myRejectedHashes.push_back(itt);
     }
   }
-  //cslog() << "Rejected hashes from THIS NODE: ";
-  size_t rejectedPacks = 0;
-  for (auto& it : myRejectedHashes) {
-    ++rejectedPacks;
-   // cslog() << "    - (" << rejectedPacks << ") " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
-  }
 
   cslog() << name() << ": initial amount: " << myPacks << ", next round hashes: " << next_round_hashes.size() << ", accepted: " << acceptedPacks;
-
-
-  LOG_NOTICE(name() << ": candidates divided: above = " << aboveThreshold.size()
-                    << ", below = " << belowThreshold.size());
-  LOG_DEBUG("======================================================");
+  cslog() << name() << ": candidates divided: above = " << aboveThreshold.size() << ", below = " << belowThreshold.size();
+  csdebug() << "======================================================";
   for (size_t i = 0; i < aboveThreshold.size(); i++) {
     const auto& tmp = aboveThreshold.at(i);
-    LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - "
-                << (int)candidatesElection.at(tmp));
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << (int)candidatesElection.at(tmp);
   }
-  LOG_DEBUG("------------------------------------------------------");
+  csdebug() << "------------------------------------------------------";
   for (size_t i = 0; i < belowThreshold.size(); i++) {
     const auto& tmp = belowThreshold.at(i);
-    LOG_DEBUG(i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - "
-                << (int)candidatesElection.at(tmp));
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << (int)candidatesElection.at(tmp);
   }
   cslog() << name() << ": final list of next round trusted:";
 

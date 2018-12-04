@@ -48,9 +48,6 @@ public:
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
   void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber, uint8_t type = 0);
-  void getVector(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  void getMatrix(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  void getHash(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
@@ -86,8 +83,6 @@ public:
   void onRoundStart_V3(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void passBlockToSolver(csdb::Pool& pool, const cs::PublicKey& sender);
-
   void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
@@ -113,24 +108,9 @@ public:
 
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
 
-  void getWriterNotification(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
-  void applyNotifications();
-
-  bool isCorrectNotification(const uint8_t* data, const std::size_t size);
-  void sendWriterNotification();
-
-  cs::Bytes createNotification(const cs::PublicKey& writerPublicKey);
-  void createBlockValidatingPacket(const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
-                                   const cs::Signature& signature, const cs::Notifications& notifications);
-
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
-
-  // outcoming requests forming
-  void sendVector(const cs::HashVector&);
-  void sendMatrix(const cs::HashMatrix&);
-  void sendHash(const csdb::PoolHash&, const cs::PublicKey&);
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
@@ -142,16 +122,8 @@ public:
   // syncro send functions
   void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
-  // start new round
-  void sendRoundTable(const cs::RoundTable& round);
-
   void flushCurrentTasks();
   void becomeWriter();
-
-  // rounds initializers
-  void initNextRound(cs::ConfidantsKeys&& confidantNodes);
-  void initNextRound(const cs::RoundTable& roundTable);
-  void onRoundStart(const cs::RoundTable& roundTable);
 
   bool isPoolsSyncroStarted();
 

@@ -117,7 +117,10 @@ public:
 
   void spawn_next_round();
 
-  void spawn_first_round();
+  void spawn_first_round()
+  {
+    //TODO: implement method
+  }
 
   void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes)
   {
