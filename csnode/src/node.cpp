@@ -240,32 +240,37 @@ namespace
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
+  csunused(type);
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
               << ", current #" << roundNum_;
+
   istream_.init(data, size);
+
   cs::Hash last_block_hash;
   istream_ >> last_block_hash;
+
   cs::RoundTable global_table;
   global_table.round = rNum;
 
-  if(!readRoundData(global_table)) {
+  if (!readRoundData(global_table)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
 
   const auto& local_table = cs::Conveyer::instance().currentRoundTable();
 
   // currently in global round
-  if(global_table.round == local_table.round) {
+  if (global_table.round == local_table.round) {
     // resend all this round data available
     cslog() << "NODE> resend last block hash after BigBang";
     // update round table
     onRoundStart_V3(global_table);
 
-    // do almost the same as onRoundStartConveyer(std::move(global_table)), only difference is call to conveyer.updateRoundTable()
+    // do almost the same as onRoundStartConveyer(std::move(global_table)), only difference is call to
+    // conveyer.updateRoundTable()
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     conveyer.updateRoundTable(std::move(global_table));
     const auto& updated_table = conveyer.currentRoundTable();
-    if(updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+    if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
       startConsensus();
     }
     else {
@@ -280,21 +285,26 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
+  csunused(type);
+
   istream_.init(data, size);
   cslog() << "NODE> get SS Round Table #" << rNum;
   cs::RoundTable global_table;
+
   if (!readRoundData(global_table)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
+
   global_table.round = rNum;
-  //TODO: what this call was intended for? transport_->clearTasks();
+  // TODO: what this call was intended for? transport_->clearTasks();
 
   // "normal" start
-  if(global_table.round == 1) {
+  if (global_table.round == 1) {
     cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, global_table]() mutable {
       onRoundStart_V3(global_table);
       onRoundStartConveyer(std::move(global_table));
     });
+
     return;
   }
 

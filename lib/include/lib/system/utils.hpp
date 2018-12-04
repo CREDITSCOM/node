@@ -332,9 +332,8 @@ public:
   }
 
 private:
-  static void runAfterHelper(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
-    const auto tp = std::chrono::system_clock::now() + ms;
-    std::this_thread::sleep_until(tp);
+  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, const std::function<void()>& callBack) {
+    std::this_thread::sleep_until(timePoint);
 
     // TODO: call callback without Queue
     CallsQueue::instance().insert(callBack);
@@ -346,7 +345,13 @@ public:
   ///
   static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
     static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
-    boost::asio::post(threadPool, boost::bind(&cs::Utils::runAfterHelper, ms, callBack));
+
+    auto timePoint = std::chrono::steady_clock::now() + ms;
+    auto closure = [=] {
+      cs::Utils::runAfterHelper(timePoint, callBack);
+    };
+
+    boost::asio::post(threadPool, closure);
   }
 
   ///
