@@ -21,7 +21,7 @@ namespace cs
     private_key = priv;
   }
 
-  void SolverCore::gotRound(cs::RoundNumber rNum)
+  void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
     // previous solver implementation calls to runConsensus method() here
     // perform similar actions, but only in proper state (TrustedStage1State for now)

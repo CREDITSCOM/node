@@ -2283,7 +2283,7 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable) {
 
 void Node::startConsensus() {
   cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
-  solver_->gotRound(rnum);
+  solver_->gotConveyerSync(rnum);
   transport_->processPostponed(rnum);
   auto lws = getBlockChain().getLastWrittenSequence();
   // claim the trusted role only if have got proper blockchain:
