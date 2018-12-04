@@ -2,10 +2,10 @@
 #include <lib/system/utils.hpp>
 
 cs::Timer::Timer()
-: m_isRunning(false)
-, m_isRehabilitation(true)
-, m_interruption(false)
-, m_msec(std::chrono::milliseconds(0)) {
+: isRunning_(false)
+, isRehabilitation_(true)
+, interruption_(false)
+, ms_(std::chrono::milliseconds(0)) {
 }
 
 cs::Timer::~Timer() {
@@ -15,25 +15,25 @@ cs::Timer::~Timer() {
 }
 
 void cs::Timer::start(int msec) {
-  m_interruption = false;
-  m_isRunning = true;
-  m_msec = std::chrono::milliseconds(msec);
-  m_thread = std::thread(&Timer::loop, this);
-  m_realMsec = m_msec;
-  m_allowableDifference = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
+  interruption_ = false;
+  isRunning_ = true;
+  ms_ = std::chrono::milliseconds(msec);
+  timerThread_ = std::thread(&Timer::loop, this);
+  realMs_ = ms_;
+  allowDifference_ = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
 }
 
 void cs::Timer::stop() {
-  m_interruption = true;
+  interruption_ = true;
 
-  if (m_thread.joinable()) {
-    m_thread.join();
-    m_isRunning = false;
+  if (timerThread_.joinable()) {
+    timerThread_.join();
+    isRunning_ = false;
   }
 }
 
 bool cs::Timer::isRunning() {
-  return m_isRunning;
+  return isRunning_;
 }
 
 void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback) {
@@ -41,13 +41,13 @@ void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback) {
 }
 
 void cs::Timer::loop() {
-  while (!m_interruption) {
-    if (m_isRehabilitation) {
-      m_isRehabilitation = false;
-      m_rehabilitationStartValue = std::chrono::system_clock::now();
+  while (!interruption_) {
+    if (isRehabilitation_) {
+      isRehabilitation_ = false;
+      rehabilitationStartValue_ = std::chrono::system_clock::now();
     }
 
-    std::this_thread::sleep_for(m_msec);
+    std::this_thread::sleep_for(ms_);
 
     rehabilitation();
 
@@ -56,22 +56,22 @@ void cs::Timer::loop() {
 }
 
 void cs::Timer::rehabilitation() {
-  m_isRehabilitation = true;
+  isRehabilitation_ = true;
 
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
-                                                                        m_rehabilitationStartValue);
-  auto difference = duration - m_realMsec;
+                                                                        rehabilitationStartValue_);
+  auto difference = duration - realMs_;
 
-  if (difference >= m_realMsec) {
-    m_msec = std::chrono::milliseconds(0);
+  if (difference >= realMs_) {
+    ms_ = std::chrono::milliseconds(0);
   }
   else {
-    if (difference.count() > m_allowableDifference) {
-      m_msec = m_realMsec - (difference % m_realMsec);
+    if (difference.count() > allowDifference_) {
+      ms_ = realMs_ - (difference % realMs_);
     }
     else {
-      if (m_msec != m_realMsec) {
-        m_msec = m_realMsec;
+      if (ms_ != realMs_) {
+        ms_ = realMs_;
       }
     }
   }

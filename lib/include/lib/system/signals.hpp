@@ -33,7 +33,7 @@ public:
   ///
   template <typename... Args>
   inline void operator()(Args&&... args) const {
-    for (auto& elem : m_slots) {
+    for (auto& elem : slots_) {
       elem(std::forward<Args>(args)...);
     }
   }
@@ -43,13 +43,13 @@ public:
   Signal& operator=(const Signal&) = delete;
 
   Signal(Signal&& signal) noexcept
-  : m_slots(std::move(signal.m_slots)) {
-    signal.m_slots.clear();
+  : slots_(std::move(signal.slots_)) {
+    signal.slots_.clear();
   }
 
   Signal& operator=(Signal&& signal) noexcept {
-    m_slots = std::move(signal.m_slots);
-    signal.m_slots.clear();
+    slots_ = std::move(signal.slots_);
+    signal.slots_.clear();
 
     return *this;
   }
@@ -68,14 +68,14 @@ private:
       return *this;
     }
 
-    m_slots.push_back(arg);
+    slots_.push_back(arg);
     return *this;
   }
 
   // clears all signal slots
   auto& operator=(void* ptr) {
     if (ptr == nullptr) {
-      m_slots.clear();
+      slots_.clear();
     }
 
     return *this;
@@ -83,11 +83,11 @@ private:
 
   // returns size of slots
   std::size_t size() const noexcept {
-    return m_slots.size();
+    return slots_.size();
   }
 
   // all connected slots
-  Slots m_slots;
+  Slots slots_;
 
   friend class Connector;
 
@@ -111,7 +111,7 @@ public:
   ///
   template <typename... Args>
   inline void operator()(Args&&... args) const {
-    m_signal(std::forward<Args>(args)...);
+    signal_(std::forward<Args>(args)...);
   }
 
   // creation
@@ -120,11 +120,11 @@ public:
   Signal& operator=(const Signal&) = delete;
 
   Signal(Signal&& signal) noexcept
-  : m_signal(std::move(signal.m_signal)) {
+  : signal_(std::move(signal.signal_)) {
   }
 
   Signal& operator=(Signal&& signal) noexcept {
-    m_signal = std::move(signal.m_signal);
+    signal_ = std::move(signal.signal_);
     return *this;
   }
 
@@ -136,22 +136,22 @@ private:
   // adds slot to signal
   template <typename U>
   inline auto& add(U&& s) {
-    m_signal.add(std::forward<U>(s));
+    signal_.add(std::forward<U>(s));
     return *this;
   }
 
   // clears all slots
   inline auto& operator=(void* ptr) {
-    m_signal = ptr;
+    signal_ = ptr;
     return *this;
   }
 
   // returns size of signal slots
   inline std::size_t size() const noexcept {
-    return m_signal.size();
+    return signal_.size();
   }
 
-  Signal<Signature> m_signal;
+  Signal<Signature> signal_;
   friend class Connector;
 };
 

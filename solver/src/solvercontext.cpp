@@ -166,9 +166,9 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
   cslog() << "SolverCore: ask [" << (int)respondent1 << "] for RoundInfo";
-  core.pnode->sendRoundInfoRequest(respondent1);
+  core.pnode->sendRoundTableRequest(respondent1);
   cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundInfo";
-  core.pnode->sendRoundInfoRequest(respondent2);
+  core.pnode->sendRoundTableRequest(respondent2);
 }
 
 }  // namespace slv2

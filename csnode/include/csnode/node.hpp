@@ -55,7 +55,7 @@ public:
   void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  void getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
+  void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
   // SOLVER3 methods
   void sendStageOne(cs::StageOne&);
@@ -83,7 +83,7 @@ public:
   void onRoundStart_V3(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
+  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -91,15 +91,16 @@ public:
 
   // broadcast request for next round, to call after long timeout
   void sendNextRoundRequest();
+
   // send request for next round info from trusted node specified by index in list
-  void sendRoundInfoRequest(uint8_t respondent);
+  void sendRoundTableRequest(uint8_t respondent);
+
   // send request for next round info from node specified node
-  void sendRoundInfoRequest(const cs::PublicKey& respondent);
-  void getRoundInfoRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
-  void sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info);
-  void getRoundInfoReply(const uint8_t* data, const size_t size,
-                         const cs::PublicKey& respondent);
-  bool tryResendRoundInfo(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
+  void sendRoundTableRequest(const cs::PublicKey& respondent);
+  void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
+  void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
+  void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
+  bool tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -121,23 +122,9 @@ public:
   // syncro send functions
   void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
-  template <typename... Args>
-  bool sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-  template <typename... Args>
-  void sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-  template <class... Args>
-  void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-  template <class... Args>
-  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-  template <class... Args>
-  bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
   void flushCurrentTasks();
   void becomeWriter();
+
   bool isPoolsSyncroStarted();
 
   enum MessageActions {
@@ -216,17 +203,45 @@ private:
   void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
   void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
-  template <typename T, typename... Args>
-  void writeDefaultStream(const T& value, Args&&... args);
+  /// sending interace methods
 
-  template <typename T>
-  void writeDefaultStream(const T& value);
+  // default methods without flags
+  template<typename... Args>
+  void sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  // to neighbour
+  template <typename... Args>
+  bool sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  template <typename... Args>
+  void sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  template <class... Args>
+  void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  template <class... Args>
+  bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  // to neighbours
+  template<typename... Args>
+  bool sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  // broadcast
+  template <class... Args>
+  void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
   void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+
+  // write values to stream
+  template <typename T, typename... Args>
+  void writeDefaultStream(const T& value, Args&&... args);
+
+  template <typename T>
+  void writeDefaultStream(const T& value);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
@@ -240,7 +255,7 @@ private:
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
   // current round state
-  cs::RoundNumber roundNum_ = 0;
+  cs::RoundNumber roundNumber_ = 0;
   NodeLevel myLevel_;
 
   cs::Byte myConfidantIndex_;
