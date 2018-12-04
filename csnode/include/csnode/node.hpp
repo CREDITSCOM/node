@@ -233,6 +233,10 @@ private:
 
   /// sending interace methods
 
+  // default methods without flags
+  template<typename... Args>
+  void sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
   // to neighbour
   template <typename... Args>
   bool sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
@@ -279,7 +283,7 @@ private:
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
   // current round state
-  cs::RoundNumber roundNum_ = 0;
+  cs::RoundNumber roundNumber_ = 0;
   NodeLevel myLevel_;
 
   cs::Byte myConfidantIndex_;
