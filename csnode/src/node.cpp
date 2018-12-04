@@ -1306,12 +1306,10 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   sendConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage);
 
-  allocator_.shrinkLast(cs::numeric_cast<uint32_t>(hashedMsgSize));
-  csdebug() << __func__ << ", done";
-  flushCurrentTasks();
+  //allocator_.shrinkLast(cs::numeric_cast<uint32_t>(hashedMsgSize));
+  csdebug() << __func__ << "(): done";
+  //flushCurrentTasks();
 }
-
-  csdebug() << "NODE> " << __func__ << "(): done";}
 
 // sends StageOne request to respondent about required
 void Node::requestStageOne(uint8_t respondent, uint8_t required) {
