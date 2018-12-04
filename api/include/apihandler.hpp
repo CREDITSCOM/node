@@ -16,6 +16,8 @@
 
 #include <csnode/threading.hpp>
 
+#include "tokens.hpp"
+
 class APIHandlerBase {
 public:
   enum class APIRequestStatusType : uint8_t {
@@ -103,6 +105,17 @@ public:
   void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
 
   void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) override;
+
+  //void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
+
+  //void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
+
+  ////////new
+  std::string getSmartByteCode(const csdb::Address&, bool&);
+  void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
+  void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
+  ::executor::ContractExecutorConcurrentClient& getExecutor();
+  ////////new
 
 private:
   struct smart_trxns_queue {

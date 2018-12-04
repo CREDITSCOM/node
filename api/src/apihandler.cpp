@@ -393,7 +393,9 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   while (!transport->isOpen()) {
     transport->open();
   }
-  executor->executeByteCode(resp, address, code, state, method, params);
+
+  int64_t execution_time = 0;
+  executor->executeByteCode(resp, address, code, state, method, params, execution_time);
 }
 void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) {
   const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
@@ -420,7 +422,7 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return,
   execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getSymbol", std::vector<::general::Variant>());
   _return.symbol = api_resp.ret_val.v_string;
   // owner
-  _return.owner = api_resp.contractVariables["owner"].v_string;
+  //_return.owner = api_resp.contractVariables["owner"].v_string;
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -881,7 +883,117 @@ void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, con
   _return.message = executor_ret.status.message;
   for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
     _return.methods[Count].name = executor_ret.methods[Count].name;
-    _return.methods[Count].argTypes = executor_ret.methods[Count].argTypes;
+    for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
+      _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
+      _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
+    }
     _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
   }
 }
+
+////////new
+std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+  decltype(auto) smart_origin = lockedReference(this->smart_origin);
+
+  auto it = smart_origin->find(addr);
+  if ((present = (it != smart_origin->end())))
+    return fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
+
+  return std::string();
+}
+
+void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
+  const std::string& sourceCode) {
+  executor::CompileByteCodeResult result;
+  getExecutor().compileBytecode(result, sourceCode);
+
+  if (result.status.code) {
+    _return.status.code = result.status.code;
+    _return.status.message = result.status.message;
+    return;
+  }
+
+  executor::GetContractMethodsResult methodsResult;
+  getExecutor().getContractMethods(methodsResult, result.bytecode);
+
+  if (methodsResult.status.code) {
+    _return.status.code = methodsResult.status.code;
+    _return.status.message = methodsResult.status.message;
+    return;
+  }
+
+  _return.ts = (api::TokenStandart)(uint32_t)TokensMaster::getTokenStandart(methodsResult.methods);
+  _return.byteCode = std::move(result.bytecode);
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, const api::Address& address) {
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+
+  bool present = false;
+  std::string byteCode = getSmartByteCode(addr, present);
+  std::string state;
+
+  {
+    auto smartStateRef = lockedReference(this->smart_state);
+    auto it = smartStateRef->find(addr);
+
+    //if (it != smartStateRef->end()) state = it->second.get_current_state().state;
+    //else present = false;
+
+    if (it != smartStateRef->end()) state = (*smartStateRef)[addr].get_state();
+    else present = false;
+  }
+
+  if (!present) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  executor::GetContractMethodsResult methodsResult;
+  getExecutor().getContractMethods(methodsResult, byteCode);
+
+  if (methodsResult.status.code) {
+    _return.status.code = methodsResult.status.code;
+    _return.status.message = methodsResult.status.message;
+    return;
+  }
+
+  executor::GetContractVariablesResult variablesResult;
+  getExecutor().getContractVariables(variablesResult, byteCode, state);
+
+  if (variablesResult.status.code) {
+    _return.status.code = variablesResult.status.code;
+    _return.status.message = variablesResult.status.message;
+    return;
+  }
+
+  for (auto& m : methodsResult.methods) {
+    api::SmartContractMethod scm;
+    scm.returnType = std::move(m.returnType);
+    scm.name = std::move(m.name);
+    for (auto& at : m.arguments) {
+      api::SmartContractMethodArgument scma;
+
+      scma.type = at.type;
+      scma.name = at.name;
+
+      scm.arguments.push_back(scma);
+    }
+
+    _return.methods.push_back(scm);
+  }
+
+  _return.variables = variablesResult.contractVariables;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+executor::ContractExecutorConcurrentClient& APIHandler::getExecutor() {
+  while (!executor_transport->isOpen()) {
+    executor_transport->open();
+  }
+
+  return *executor;
+}
+////////new
