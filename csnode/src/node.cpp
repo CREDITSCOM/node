@@ -919,7 +919,6 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
   const bool sendToGeneral = sendNeighbour(main, msgType, round, hashes);
 
   if (!sendToGeneral) {
-    csdebug() << "NODE> Sending packet to main node " << cs::Utils::byteStreamToHex(main.data(), main.size());
     sendPacketHashesRequestToRandomNeighbour(hashes, round);
   }
 
@@ -947,7 +946,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
   for (std::size_t i = 0; i < neighboursCount; ++i) {
     ConnectionPtr connection = transport_->getNeighbourByNumber(i);
 
-    if (connection) {
+    if (connection && !connection->isSignal) {
       successRequest = true;
       sendNeighbour(connection, msgType, round, hashes);
     }
@@ -1034,10 +1033,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
       pool.set_previous_hash(prev_hash);
 
       poolsBlock.push_back(std::move(pool));
+
+      sendBlockReply(poolsBlock, sender, packetNum);
+      poolsBlock.clear();
     }
   }
 
-  sendBlockReply(poolsBlock, sender, packetNum);
+//  sendBlockReply(poolsBlock, sender, packetNum);
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1595,8 +1597,8 @@ void Node::requestStageOne(uint8_t respondent, uint8_t required) {
   const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
 
   if (respondent >= confidants.size()) {
-    cserror() << __func__ << " respondent index is out of confidants"
-              << ", index " << respondent << ", confidants size " << confidants.size();
+    cserror() << __func__ << " respondent index is out of confidants, index"
+              << static_cast<int>(respondent) << ", confidants size " << confidants.size();
     return;
   }
 
@@ -1820,9 +1822,6 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     return;
   }
-  if (nodeIdKey_ == requester) {
-    return;
-  }
 
   istream_.init(data, size);
   uint8_t requesterNumber = 0u;
@@ -1830,13 +1829,15 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   istream_ >> requesterNumber >> requiredNumber;
 
   cslog() << "NODE> Getting StageTwo Request from [" << (int)requesterNumber << "] ";
-  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber))
+  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
     return;
+  }
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageTwo packet format";
     return;
   }
+
   solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
 }
 
@@ -1892,15 +1893,26 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   // cslog() << "Received message (" << msgSize << ") from [" << (int)stage.sender  << "] :" << cs::Utils::byteStreamToHex((const char*)rawData, msgSize +4);
 
   cslog() << __func__  << "(): Sender             :" << cs::Utils::byteStreamToHex(sender.data(), 32);
-  //cslog() << "Sender from trusted:" << cs::Utils::byteStreamToHex(cs::Conveyer::instance().roundTable().confidants.at(stage.sender).data(),32); 
-  //cslog() << "Signature          :" << cs::Utils::byteStreamToHex((const char*)stage.sig.data(), 64);
-  
-  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(stage.sender), 
-      rawData, msgSize + sizeof(cs::RoundNumber)))
-  {
-    cslog() << "Stage Two from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
+  const cs::RoundTable* table = cs::Conveyer::instance().roundTable(roundNum_);
+
+  if (table == nullptr) {
+    cserror() << __func__ << ", round table is nullptr";
     return;
   }
+
+  if (table->confidants.size() <= stage.sender) {
+    cserror() << __func__ << ", sender index is out of range confidants, "
+              << "index " << static_cast<int>(stage.sender) << ", size " << table->confidants.size();
+    return;
+  }
+  
+  if (!cscrypto::VerifySignature(stage.sig, table->confidants[stage.sender],
+      rawData, msgSize + sizeof(cs::RoundNumber)))
+  {
+    cslog() << "Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    return;
+  }
+
   rawData += (sizeof(uint8_t) + sizeof(cs::RoundNumber));
   uint8_t trustedAmount = *rawData;
   rawData += sizeof(uint8_t);;

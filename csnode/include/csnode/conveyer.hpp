@@ -99,6 +99,11 @@ public:
   const cs::RoundTable& currentRoundTable() const;
 
   ///
+  /// @brief Returns current round table confidants keys.
+  ///
+  const cs::ConfidantsKeys& confidants() const;
+
+  ///
   /// @brief Returns blockchain round table of Round key.
   /// @warning If round table does not exist in meta, returns nullptr.
   ///
