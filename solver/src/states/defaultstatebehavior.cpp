@@ -137,14 +137,4 @@ Result DefaultStateBehavior::onStage3(SolverContext& /*context*/, const cs::Stag
   return Result::Ignore;
 }
 
-void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target) {
-  const auto& tmp = context.last_block_hash();
-  cs::Hash hash_val;
-  std::copy(tmp.cbegin(), tmp.cend(), hash_val.begin());
-  if (Consensus::Log) {
-    LOG_NOTICE(name() << ": --> hash = " << cs::Utils::byteStreamToHex(hash_val.data(), hash_val.size()));
-  }
-  context.send_hash(hash_val, target);
-}
-
 }  // namespace slv2

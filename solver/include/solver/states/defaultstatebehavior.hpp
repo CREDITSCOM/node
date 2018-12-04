@@ -146,19 +146,6 @@ public:
   Result onStage3(SolverContext& context, const cs::StageThree& stage) override;
 
 protected:
-  /**
-   * @fn  void DefaultStateBehavior::sendLastWrittenHash(SolverContext& context, const cs::PublicKey& sender);
-   *
-   * @brief   Sends a last written hash to
-   *
-   * @author  Alexander Avramenko
-   * @date    10.10.2018
-   *
-   * @param [in,out]  context The context.
-   * @param           target  The target receiver of hash sent.
-   */
-
-  void sendLastWrittenHash(SolverContext& context, const cs::PublicKey& target);
 };
 
 }  // namespace slv2

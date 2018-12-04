@@ -72,27 +72,9 @@ public:
 
   void gotBigBang();
   void gotTransaction(const csdb::Transaction& trans);
-  // obsolete:
-  void gotVector(const cs::HashVector&) {
-  }
-  // obsolete:
-  void gotMatrix(cs::HashMatrix&&) {
-  }
   void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
   void gotBlockRequest(const csdb::PoolHash& p_hash);
   void gotBlockReply(csdb::Pool& p);
-  // obsolete:
-  void gotIncorrectBlock(csdb::Pool&&, const cs::PublicKey&) {
-  }
-  // obsolete:
-  void gotFreeSyncroBlock(csdb::Pool&&) {
-  }
-  // obsolete:
-  void rndStorageProcessing() {
-  }
-  // obsolete:
-  void tmpStorageProcessing() {
-  }
   void beforeNextRound();
   void nextRound();
   void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);

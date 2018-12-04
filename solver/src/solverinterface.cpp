@@ -98,13 +98,6 @@ namespace cs
 
   void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
   {
-    // solver-1: caching, actually duplicates caching implemented in Node::getBlock()
-    csdb::Pool::sequence_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
-    if(p.sequence() != desired_seq) {
-      gotIncorrectBlock(std::move(p), sender);
-      return;
-    }
-
     if(!pstate) {
       return;
     }

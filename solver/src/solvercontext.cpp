@@ -118,11 +118,6 @@ csdb::Address SolverContext::optimize(const csdb::Address& address) const {
   return address;
 }
 
-void SolverContext::send_hash(const cs::Hash& hash, const cs::PublicKey& target) {
-  csdb::internal::byte_array bytes(hash.cbegin(), hash.cend());
-  core.pnode->sendHash(csdb::PoolHash::from_binary(bytes), target);
-}
-
 bool SolverContext::test_trusted_idx(uint8_t idx, const cs::PublicKey& sender) {
   // vector<Hash> confidantNodes_ in Node actually stores PublicKey items :-)
   const auto& trusted = this->trusted();
