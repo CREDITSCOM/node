@@ -2113,15 +2113,22 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
 
   stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
 
-  ::std::vector <uint8_t> tmp;
-  std::vector <::std::vector<uint8_t>> confs;
-  for (auto& it : roundTable.confidants) {
-    tmp.clear();
-    for (int itt = 0; itt < 32; itt++) {
-      tmp.push_back(it[itt]);
-    }
-    confs.push_back(tmp);
+  std::vector<std::vector<uint8_t>> confs;
+  for(const auto& src: roundTable.confidants) {
+    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+    std::copy(src.cbegin(), src.cend(), tmp.begin());
   }
+
+  //::std::vector <uint8_t> tmp;
+  //std::vector <::std::vector<uint8_t>> confs;
+  //for (auto& it : roundTable.confidants) {
+  //  tmp.clear();
+  //  for (int itt = 0; itt < 32; itt++) {
+  //    tmp.push_back(it[itt]);
+  //  }
+  //  confs.push_back(tmp);
+  //}
+
   pool.value().set_confidants(confs);
   //for(auto& it : stageThreeStorage)
   //pool.value().add_signature()
@@ -2130,9 +2137,6 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   cs::Signature poolSignature;
   const auto& signature = pool.value().signature();
   std::copy(signature.begin(), signature.end(), poolSignature.begin());
-
-  csdebug() << "\tsignature: " << cs::Utils::byteStreamToHex(poolSignature.data(), poolSignature.size());
-  csdebug() << "\tverify signature: " << pool.value().verify_signature();
 
   logPool(pool.value());
   sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
