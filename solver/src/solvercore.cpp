@@ -188,7 +188,7 @@ namespace cs
     return (Result::Finish == res);
   }
 
-  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string currentTimeStamp)
+  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp)
   {
     cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 

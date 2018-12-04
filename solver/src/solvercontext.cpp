@@ -103,25 +103,11 @@ void SolverContext::spawn_next_round() {
   //}
 
   std::string tStamp;
-
-  tStamp = stage1(stage3(own_conf_number())->writer)->roundTimeStamp;
-
-  //for(uint8_t i=0; i< cnt_trusted(); ++i) {
-  //       tStamp = stage1(i)->roundTimeStamp;
-  //       cslog() << "TimeStamp(" << tStamp.size() << ") = " << tStamp;
-  //     }
-  /*cslog() << "RoundTimeStamp: " << tStamp;*/
-   //uint8_t own_num = (uint8_t) own_conf_number();
-   //const auto ptr = stage3(own_num);
-   //if(ptr != nullptr && ptr->writer == own_num) {
-  //    switch(round()) {
-  //        case 10:
-  //        case 20:
-  //        case 30:
-      //        return;
-      //}
-  //}
-  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, tStamp);
+  const auto own_stage3 = stage3((uint8_t) own_conf_number());
+  if(own_stage3 != nullptr) {
+    tStamp = stage1(own_stage3->writer)->roundTimeStamp;
+  }
+  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
 }
 
 void SolverContext::spawn_first_round() {
