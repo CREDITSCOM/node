@@ -110,34 +110,12 @@ void SolverContext::spawn_next_round() {
   core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
 }
 
-void SolverContext::spawn_first_round() {
-  if (core.trusted_candidates.empty()) {
-    if (Consensus::Log) {
-      LOG_ERROR("SolverCore: trusted candidates must be " << Consensus::MinTrustedNodes
-                                                          << " or greater to spawn first round");
-    }
-    return;
-  }
-  int i = 0;
-  for (auto& it : core.trusted_candidates) {
-    std::cout << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size()) << std::endl;
-    ++i;
-  }
-
-  core.pnode->initNextRound(std::move(core.trusted_candidates));
-}
-
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {
   csdb::internal::WalletId id;
   if (core.pnode->getBlockChain().findWalletId(address, id)) {
     return csdb::Address::from_wallet_id(id);
   }
   return address;
-}
-
-void SolverContext::send_hash(const cs::Hash& hash, const cs::PublicKey& target) {
-  csdb::internal::byte_array bytes(hash.cbegin(), hash.cend());
-  core.pnode->sendHash(csdb::PoolHash::from_binary(bytes), target);
 }
 
 bool SolverContext::test_trusted_idx(uint8_t idx, const cs::PublicKey& sender) {
@@ -188,9 +166,9 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
   cslog() << "SolverCore: ask [" << (int)respondent1 << "] for RoundInfo";
-  core.pnode->sendRoundInfoRequest(respondent1);
+  core.pnode->sendRoundTableRequest(respondent1);
   cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundInfo";
-  core.pnode->sendRoundInfoRequest(respondent2);
+  core.pnode->sendRoundTableRequest(respondent2);
 }
 
 }  // namespace slv2

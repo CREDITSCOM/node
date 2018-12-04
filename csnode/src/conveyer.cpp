@@ -198,6 +198,26 @@ const cs::ConfidantsKeys& cs::ConveyerBase::confidants() const {
   return currentRoundTable().confidants;
 }
 
+size_t cs::ConveyerBase::confidantsCount() const {
+    return confidants().size();
+}
+
+bool cs::ConveyerBase::isConfidantExists(size_t index) const {
+  const cs::ConfidantsKeys& confidantsReference = confidants();
+
+  if (confidantsReference.size() <= index) {
+    cserror() << __func__ << ", index " << index << "out of range , confidants count " << confidantsReference.size()
+              << ", on round " << pimpl_->currentRound;
+    return false;
+  }
+
+  return true;
+}
+
+const cs::PublicKey& cs::ConveyerBase::confidantByIndex(size_t index) const {
+  return confidants()[index];
+}
+
 const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 

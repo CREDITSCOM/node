@@ -504,8 +504,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
       return node_->getBlockReply(data, size, firstPack.getSender());
     case MsgTypes::BigBang: // any round (in theory) may be set
       return node_->getBigBang(data, size, rNum, type);
-    case MsgTypes::RoundInfoRequest: // old-round node may ask for round info
-      return node_->getRoundInfoRequest(data, size, rNum, firstPack.getSender());
+    case MsgTypes::RoundTableRequest: // old-round node may ask for round info
+      return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
     case MsgTypes::NodeStopRequest:
       return node_->getNodeStopRequest(data, size);
     default:
@@ -528,12 +528,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   switch (type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
-  case MsgTypes::ConsVector:
-    return node_->getVector(data, size, firstPack.getSender());
-  case MsgTypes::ConsMatrix:
-    return node_->getMatrix(data, size, firstPack.getSender());
-  case MsgTypes::BlockHash:
-    return node_->getHash(data, size, firstPack.getSender());
   case MsgTypes::BlockHashV3:
     return node_->getHash_V3(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionPacket:
@@ -544,8 +538,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
   case MsgTypes::NewCharacteristic:
     return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
-  case MsgTypes::WriterNotification:
-    return node_->getWriterNotification(data, size, firstPack.getSender());
   case MsgTypes::FirstStage:
     return node_->getStageOne(data, size, firstPack.getSender());
   case MsgTypes::FirstStageRequest:
@@ -558,10 +550,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getStageThree(data, size, firstPack.getSender());
   case MsgTypes::ThirdStageRequest:
     return node_->getStageThreeRequest(data, size, firstPack.getSender());
-  case MsgTypes::RoundInfo:
-    return node_->getRoundInfo(data, size, rNum, firstPack.getSender());
-  case MsgTypes::RoundInfoReply:
-    return node_->getRoundInfoReply(data, size, firstPack.getSender());
+  case MsgTypes::RoundTable:
+    return node_->getRoundTable(data, size, rNum, firstPack.getSender());
+  case MsgTypes::RoundTableReply:
+    return node_->getRoundTableReply(data, size, firstPack.getSender());
   default:
     cserror() << "TRANSPORT> Unknown message type " << getMsgTypesString(type) << " pack round " << rNum;
     break;

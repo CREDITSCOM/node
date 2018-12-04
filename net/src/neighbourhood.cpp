@@ -40,11 +40,11 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     }
 
     if (!found) {
-      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundInfo)) {
+      if (!nb->isSignal || (!bp.pack.isNetwork() && bp.pack.getType() == MsgTypes::RoundTable)) {
         sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
       }
 
-      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundInfo || bp.pack.getType() == MsgTypes::BlockHash))  {
+      if (nb->isSignal && (bp.pack.getType() == MsgTypes::RoundTable || bp.pack.getType() == MsgTypes::BlockHash))  {
         sent = transport_->sendDirect(&(bp.pack), **nb);
       }
       else {
