@@ -71,7 +71,6 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
   }
 
-  std::fill(emptySignature_.begin(), emptySignature_.end(), 0u);
   good_ = true;
 }
 
@@ -305,6 +304,11 @@ bool BlockChain::onBlockReceived(csdb::Pool& pool) {
 bool BlockChain::putBlock(csdb::Pool& pool) {
   // Put on top
   cslog() << "----------------------------- Write Block #" << pool.sequence() << "----------------------------";
+  const auto& trusted = pool.confidants();
+  cslog() << " trusted count " << trusted.size();
+  for(const auto& t : trusted) {
+    csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
+  }
   cslog() << " transactions count " << pool.transactions_count();
   csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   csdebug() << " previous hash: " << lastHash_.to_string();
@@ -318,7 +322,6 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
     writeBlock(pool);
     lastHash_ = pool.hash();
     csdebug() << " last hash: " << lastHash_.to_string();
-    csdebug() << " signature: " << cs::Utils::byteStreamToHex(pool.signature().data(), 32);
 
     if (globalSequence_ == getLastWrittenSequence()) {
       blockRequestIsNeeded_ = false;
@@ -618,6 +621,9 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
   try {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
 
+    csdb::Pool pool = this->loadBlock(nextPool.previous_hash());
+    const auto& currentRoundConfidants = pool.confidants();
+
     walletsCacheUpdater_->loadNextBlock(nextPool);
     walletsPools_->loadNextBlock(nextPool);
 
@@ -736,9 +742,7 @@ const BlockChain::AddrTrnxCount& BlockChain::get_trxns_count(const csdb::Address
   return transactionsCount_[addr];
 }
 
-std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool,
-                                                                   std::optional<cs::Signature> writer_signature,
-                                                                   std::optional<cs::PrivateKey> writer_key) {
+std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets) {
   const auto last_seq = getLastWrittenSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
@@ -750,46 +754,21 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   fee_->CountFeesInPool(*this, &pool);
   pool.set_previous_hash(getLastWrittenHash());
 
-  if (writer_key.has_value()) {
-    csdebug() << "BLOCKCHAIN> signing block #" << pool_seq;
-    addNewWalletsToPool(pool);
-    //pool.sign(writer_key.value());
-  }
-
-  if (writer_signature.has_value()) {
+  if (requireAddWallets) {
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, add new wallets to pool";
-    if (writer_key.has_value()) {
-      cswarning() << "BLOCKCHAIN> pool have just been signed. R u sure u want to test passed signature?";
-    }
-
     addNewWalletsToPool(pool);
-
-    // new block require finishing
-    const auto& sig = writer_signature.value();
-    //if (pool.verify_signature(std::string(sig.begin(), sig.end()))) {
-      csdebug() << "BLOCKCHAIN> writer signature is verified, record block to chain";
-      putBlock(pool);
-   // }
-   // else {
-   //   cswarning() << "BLOCKCHAIN> writer signature verification failed, drop block out";
-   //   removeWalletsInPoolFromCache(pool);
-      // caller code may handle the situation
-    //  return std::make_pair(false, pool);
-   // }
   }
   else {
     // ready-to-record block does not require anything
-    csdebug() << "BLOCKCHAIN> record block #" << pool_seq
-              << " to chain, no further verificaton need, update wallets ids";
-
+    csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, update wallets ids";
     updateWalletIds(pool, *walletsCacheUpdater_);
-    putBlock(pool);
   }
+  putBlock(pool);
   setGlobalSequence(getLastWrittenSequence());
   return std::make_pair(true, pool);
 }
 
-bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer_signature /*= {}*/) {
+bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   const auto last_seq = getLastWrittenSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq <= last_seq) {
@@ -800,7 +779,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
   }
   if (pool_seq == last_seq + 1) {
     // write immediately
-    if (recordBlock(pool, writer_signature, std::nullopt).first) {
+    if (recordBlock(pool, !by_sync).first) {
       csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
       // unable to call because stack overflow in case of huge written blocks amount possible:
       //testCachedBlocks();
@@ -815,29 +794,19 @@ bool BlockChain::storeBlock(csdb::Pool pool, std::optional<cs::Signature> writer
     return true;
   }
   // cache block for future recording
-  cs::PublicKey key;
-  const auto& pool_key = pool.writer_public_key();
-  if (pool_key.size() == key.size()) {
-    std::copy(pool_key.data(), pool_key.data() + pool_key.size(), key.begin());
-  }
-  else {
-    cserror() << "BLOCKCHAIN> cached block does not contain writer key";
-    std::fill(key.begin(), key.end(), 0);
-  }
-  cachedBlocks_.emplace(pool_seq,
-                        cs::PoolSyncMeta{std::move(pool), writer_signature.value_or(emptySignature_), std::move(key)});
+  cachedBlocks_.emplace(pool_seq, BlockMeta{std::move(pool), by_sync});
   csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
   // cache always successful
   return true;
 }
 
-std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key) {
+std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool) {
   const auto last_seq = getLastWrittenSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq != last_seq + 1) {
     return std::nullopt;
   }
-  return recordBlock(pool, std::nullopt, writer_key).second;
+  return recordBlock(pool, true).second;
 }
 
 void BlockChain::testCachedBlocks() {
@@ -858,13 +827,7 @@ void BlockChain::testCachedBlocks() {
       csdebug() << "BLOCKCHAIN> retrieve required block #" << desired_seq << " from cache";
       // retrieve and use block if it is exactly what we need:
       auto& data = cachedBlocks_.at(desired_seq);
-      bool ok = false;
-      if (std::equal(data.signature.cbegin(), data.signature.cend(), emptySignature_.cbegin())) {
-        ok =  storeBlock(data.pool);
-      }
-      else {
-        ok = storeBlock(data.pool, data.signature);
-      }
+      bool ok = storeBlock(data.pool, data.by_sync);
       if (!ok) {
         cserror() << "BLOCKCHAIN> failed to record cached block to chain, drop it & wait to request again";
       }

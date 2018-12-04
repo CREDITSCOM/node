@@ -36,20 +36,6 @@ public:
 
   void off(SolverContext& context) override;
 
-  /**
-   * @fn  void TrustedStage1State::onRoundEnd(SolverContext& context, bool is_bigbang) override;
-   *
-   * @brief   Drops or flushes deferred block depending on big bang
-   *
-   * @author  Alexander Avramenko
-   * @date    26.10.2018
-   *
-   * @param [in,out]  context     The context.
-   * @param           is_bigbang  True if is bigbang, false if not.
-   */
-
-  void onRoundEnd(SolverContext& context, bool is_bigbang) override;
-
   Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
   Result onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) override;

@@ -361,7 +361,7 @@ void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, c
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (meta) {
-    csdebug() << "CONVEYER> Characteristic set to conveyer";
+    csdebug() << "CONVEYER> Characteristic set to conveyer, #" << round;
     meta->characteristic = characteristic;
   }
 }
@@ -381,7 +381,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   const Characteristic* pointer = characteristic(round);
 
   if (!pointer) {
-    cserror() << "CONVEYER> Null pointer of characteristic, return empty Hash, round " << round;
+    cserror() << "CONVEYER> Null pointer of characteristic, return empty Hash, #" << round;
     return cs::Hash();
   }
 
@@ -391,7 +391,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo,
                                                                 const cs::PublicKey& sender) {
   cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
-  cslog() << "CONVEYER> " << __func__ << "(), round " << round << ":";
+  cslog() << "CONVEYER> " << __func__ << "(), #" << round << ":";
 
   cs::Lock lock(sharedMutex_);
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);

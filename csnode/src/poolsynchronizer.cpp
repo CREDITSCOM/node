@@ -131,7 +131,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
       m_blockChain->setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
     }
 
-    if (m_blockChain->storeBlock(pool)) {
+    if (m_blockChain->storeBlock(pool, true /*by_sync*/)) {
       m_blockChain->testCachedBlocks();
     }
     lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());

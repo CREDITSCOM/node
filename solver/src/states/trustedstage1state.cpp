@@ -19,11 +19,6 @@ void TrustedStage1State::on(SolverContext& context) {
 
   DefaultStateBehavior::on(context);
 
-  // if we were Writer un the previous round, we have a deferred block, flush it:
-  if (context.is_block_deferred()) {
-    context.flush_deferred_block();
-  }
-
   memset(&stage, 0, sizeof(stage));
   stage.sender = (uint8_t)context.own_conf_number();
   enough_hashes = false;
@@ -33,18 +28,6 @@ void TrustedStage1State::on(SolverContext& context) {
 void TrustedStage1State::off(SolverContext& context) {
   cslog() << name() << ": --> stage-1 [" << (int)stage.sender << "]";
   context.add_stage1(stage, true);
-}
-
-void TrustedStage1State::onRoundEnd(SolverContext& context, bool is_bigbang) {
-  // in this stage we got round end only having troubles
-  if (context.is_block_deferred()) {
-    if (is_bigbang) {
-      context.drop_deferred_block();
-    }
-    else {
-      context.flush_deferred_block();
-    }
-  }
 }
 
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {
@@ -140,9 +123,6 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
   if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
     // enough hashes
     // flush deferred block to blockchain if any
-    if (context.is_block_deferred()) {
-      context.flush_deferred_block();
-    }
     enough_hashes = true;
     return (transactions_checked ? Result::Finish : Result::Ignore);
   }
