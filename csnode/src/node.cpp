@@ -1043,10 +1043,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
       pool.set_previous_hash(prev_hash);
 
       poolsBlock.push_back(std::move(pool));
+
+      sendBlockReply(poolsBlock, sender, packetNum);
+      poolsBlock.clear();
     }
   }
 
-  sendBlockReply(poolsBlock, sender, packetNum);
+//  sendBlockReply(poolsBlock, sender, packetNum);
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
