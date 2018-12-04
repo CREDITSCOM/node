@@ -76,6 +76,8 @@ public:
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
+  void requestStageConsensus(MsgTypes msgType, uint8_t respondent, uint8_t required);
+
   void sendHash_V3(cs::RoundNumber round);
 
   const cs::ConfidantsKeys& confidants() const;
@@ -220,6 +222,9 @@ private:
 
   template <class... Args>
   bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+  template <class... Args>
+  void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   // to neighbours
   template<typename... Args>
