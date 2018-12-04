@@ -29,29 +29,24 @@ public:
   ~Timer();
 
   ///
-  /// Starts timer with milliseconds period.
-  ///
+  /// @brief Starts timer with milliseconds period.
   /// @param msec is time in msec to tick.
   ///
   void start(int msec);
 
   ///
-  /// Stops timer.
-  ///
+  /// @brief Stops timer.
   /// @brief Timer would not stop immediatly, only after thread joining.
   ///
   void stop();
 
   ///
-  /// Returns timer status.
-  ///
-  /// @return Returns timer running state.
+  /// @brief Returns timer status.
   ///
   bool isRunning();
 
   ///
-  /// Calls callback once in another thread after msec time.
-  ///
+  /// @brief Calls callback once in another thread after msec time.
   /// @param msec is time in msec to tick.
   /// @param callback is any functor, lambda, closure, function object.
   ///
@@ -70,17 +65,17 @@ protected:
   void rehabilitation();
 
 private:
-  bool m_isRunning;
-  bool m_isRehabilitation;
+  bool isRunning_;
+  bool isRehabilitation_;
 
-  std::atomic<bool> m_interruption;
-  std::thread m_thread;
-  std::vector<TimerCallback> m_callbacks;
+  std::atomic<bool> interruption_;
+  std::thread timerThread_;
+  std::vector<TimerCallback> callbacks_;
 
-  unsigned int m_allowableDifference;
-  std::chrono::milliseconds m_msec;
-  std::chrono::milliseconds m_realMsec;
-  std::chrono::time_point<std::chrono::system_clock> m_rehabilitationStartValue;
+  unsigned int allowDifference_;
+  std::chrono::milliseconds ms_;
+  std::chrono::milliseconds realMs_;
+  std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;
 };
 }  // namespace cs
 
