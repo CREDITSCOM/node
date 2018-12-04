@@ -78,6 +78,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
   if (!m_isSyncroStarted) {
     m_isSyncroStarted = true;
 
+    csdebug() << "POOL SYNCHRONIZER> Synchro started";
+
     refreshNeighbours();
     sendBlockRequest();
 
@@ -421,6 +423,10 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t s
 void cs::PoolSynchronizer::refreshNeighbours() {
   const uint32_t neededNeighboursCount = m_transport->getNeighboursCountWithoutSS();
   auto nSize = m_neighbours.size();
+
+  if (neededNeighboursCount == 0) {
+    csdebug() << "POOL SYNCHRONIZER> Neighbours count without ss is: 0";
+  }
 
   if (nSize == neededNeighboursCount) {
     return;

@@ -290,8 +290,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   //TODO: what this call was intended for? transport_->clearTasks();
 
   // "normal" start
-  if(global_table.round == 1) {
+  if (global_table.round == 1) {
     cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, global_table]() mutable {
+      if (global_table.round != 1) {
+        return;
+      }
+
       onRoundStart_V3(global_table);
       onRoundStartConveyer(std::move(global_table));
     });
@@ -445,6 +449,14 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
   }
 
   return target;
+}
+
+template <class... Args>
+void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+  const auto& confidants = cs::Conveyer::instance().confidants();
+  for (const auto& confidant : confidants) {
+    sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
+  }
 }
 
 void Node::getVector(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1478,7 +1490,7 @@ template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
                          Args&&... args) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
-  csdebug() << "NODE> Sending broadcast to: " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  csdebug() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
@@ -1489,7 +1501,7 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
   writeDefaultStream(std::forward<Args>(args)...);
 
-  csdebug() << "NODE> Sending Direct data: size = " << ostream_.getCurrentSize()
+  csdebug() << "NODE> Sending broadcast data: size = " << ostream_.getCurrentSize()
       << ", round: " << round
       << ", msgType: " << getMsgTypesString(msgType);
 
@@ -1506,12 +1518,12 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can send consensus stages";
+    cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
   }
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
   
-  csdebug() << __func__ << "(): Round = " << roundNum_ << ", Sender: " << (int)stageOneInfo.sender
+  csdebug() << "NODE> " << __func__ << "(): Round = " << roundNum_ << ", Sender: " << (int)stageOneInfo.sender
     << ", Cand Amount: " << (int)stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << (int)stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp << std::endl
@@ -1542,7 +1554,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   uint8_t tc = *ptr;
   ptr += sizeof(uint8_t);
 
-  cslog() << "Sending TRUSTED Candidates (" << (int)tc << "):";
+  cslog() << "NODE> Sending TRUSTED Candidates (" << (int)tc << "):";
   for (auto& it : stageOneInfo.trustedCandidates) {
     memcpy(ptr, it.data(), sizeof(cs::PublicKey));
  //   cslog() << "    " << cs::Utils::byteStreamToHex(it.data(),it.size());
@@ -1553,7 +1565,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   ptr += sizeof(size_t);
   if (hashesCandidatesAmount > 0) {
-    cslog() << "Sending HASHES Candidates (" << (int)hashesCandidatesAmount << "):";
+    cslog() << "NODE> Sending HASHES Candidates (" << (int)hashesCandidatesAmount << "):";
     for (auto& it : stageOneInfo.hashesCandidates) {
       memcpy(ptr, it.toBinary().data(), sizeof(cs::Hash));
    //   cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
@@ -1577,40 +1589,30 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
  // cslog() << "Signature done";
   pStageOneMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash))), pStageOneMsgSize);
  // cslog() << " Sig: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.sig.data(), 64);
-  ostream_.init(BaseFlags::Fragmented);
-  ostream_ << MsgTypes::FirstStage
-    << roundNum_
-    << stageOneInfo.sig
-    << pStageOneMessage;
 
-  allocator_.shrinkLast(hashedMsgSize);
-  cslog() << "        _________________________________|" ;
-  flushCurrentTasks();
+  sendConfidants(MsgTypes::FirstStage, roundNum_, stageOneInfo.sig, pStageOneMessage);
+
+  allocator_.shrinkLast(cs::numeric_cast<uint32_t>(hashedMsgSize));
+
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 // sends StageOne request to respondent about required
 void Node::requestStageOne(uint8_t respondent, uint8_t required) {
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can request consensus stages";
-  }
+  csdebug() << "NODE> " << __func__ << "()";
+  const auto confidantsSize = cs::Conveyer::instance().confidants().size();
 
-  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().currentRoundTable().confidants;
-
-  if (respondent >= confidants.size()) {
-    cserror() << __func__ << " respondent index is out of confidants, index"
-              << static_cast<int>(respondent) << ", confidants size " << confidants.size();
+  if (respondent >= confidantsSize) {
+    cserror() << "NODE> " << __func__ << "(): respondent index is out of confidants, index"
+              << static_cast<int>(respondent) << ", confidants size " << confidantsSize;
     return;
   }
 
-  ostream_.init(0 /*need no flags!*/, confidants[respondent]);
-  ostream_ << MsgTypes::FirstStageRequest << roundNum_ << myConfidantIndex_ << required;
-
-  flushCurrentTasks();
-  csdebug() << __func__ << " done";
+  requestStageConsensus(MsgTypes::FirstStageRequest, respondent, required);
 }
 
 void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  csdebug() << __func__;
+  csdebug() << "NODE> " << __func__ << "()";
 
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -1622,12 +1624,12 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   uint8_t requiredNumber = 0;
   istream_ >> requesterNumber >> requiredNumber;
 
-  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
+  if (requester != cs::Conveyer::instance().confidants().at(requesterNumber)) {
     return;
   }
 
   if (!istream_.good() || !istream_.end()) {
-    cslog() << "Bad StageOne packet format";
+    cslog() << "NODE> Bad StageOne packet format";
     return;
   }
 
@@ -1635,21 +1637,15 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
 }
 
 void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester) {
-  csdebug() << __func__;
+  csdebug() << "NODE> " << __func__ << "()";
 
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can send consensus stages";
+    cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
-}
+  }
 
-  ostream_.init(BaseFlags::Fragmented, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(requester));
-
-  ostream_ << MsgTypes::FirstStage
-    << roundNum_
-    << stageOneInfo.sig
-    << pStageOneMessage;
-  //cslog() << " MsgSize: " << pStageOneMsgSize;
-  flushCurrentTasks();
+  const auto& confidants = cs::Conveyer::instance().roundTable(roundNum_)->confidants;
+  sendBroadcast(confidants.at(requester), MsgTypes::FirstStage, roundNum_, stageOneInfo.sig, pStageOneMessage);
 
   csdebug() << "NODE> " << __func__ << "(): done";
 }
@@ -1771,45 +1767,29 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
     ptr += sizeof(cs::Hash);
   }
 
-
-  unsigned long long sig_size;
   cscrypto::GenerateSignature(stageTwoInfo.sig, solver_->getPrivateKey(), rawData, pStageTwoMsgSize + sizeof(cs::RoundNumber));
 
   pStageTwoMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber))), pStageTwoMsgSize);
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::SecondStage
-    << roundNum_
-    << pStageTwoMsgSize
-    << stageTwoInfo.sig
-    << pStageTwoMessage;
+
+  sendConfidants(MsgTypes::SecondStage, roundNum_, pStageTwoMsgSize, stageTwoInfo.sig, pStageTwoMessage);
+
   // cslog() << "Sending message [" << pStageTwoMsgSize << "] :" << cs::Utils::byteStreamToHex((const char*)pStageTwoMessage.data(), pStageTwoMsgSize);
-  //cslog() << "NODE> Sending StageTwo:";
-  int sigAmount = stageTwoInfo.signatures.size();
-  for (int i = 0; i < sigAmount; i++) {
- //   cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.signatures.at(i).data(), stageTwoInfo.signatures.at(i).size());
- //   cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.hashes.at(i).data(), stageTwoInfo.hashes.at(i).size());
-  }
-  //cslog() << "Signature       :" << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.sig.data(), 64);
+  // cslog() << "NODE> Sending StageTwo:";
+  // int sigAmount = stageTwoInfo.signatures.size();
+  // for (int i = 0; i < sigAmount; i++) {
+  //   cslog() << " Sig [" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.signatures.at(i).data(), stageTwoInfo.signatures.at(i).size());
+  //   cslog() << " Hash[" << i << "]: " << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.hashes.at(i).data(), stageTwoInfo.hashes.at(i).size());
+  // }
+  // cslog() << "Signature       :" << cs::Utils::byteStreamToHex((const char*)stageTwoInfo.sig.data(), 64);
 
   allocator_.shrinkLast(pStageTwoMsgSize + sizeof(cs::RoundNumber));
-  LOG_DEBUG("done");
-  flushCurrentTasks();
+
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::requestStageTwo(uint8_t respondent, uint8_t required) {
-  if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
-    cswarning() << "Only confidant nodes can request consensus stages";
-    return;
-  }
-
-  csdebug() << "==============================";
-  csdebug() << "NODE> Stage TWO requesting ...";
-  csdebug() << "==============================";
-
-  ostream_.init(0 /*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
-
-  ostream_ << MsgTypes::SecondStageRequest << roundNum_ << myConfidantIndex_ << required;
-  flushCurrentTasks();
+  csdebug() << "NODE> " << __func__ << "()";
+  requestStageConsensus(MsgTypes::SecondStageRequest, respondent, required);
 }
 
 void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
@@ -1825,7 +1805,7 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   istream_ >> requesterNumber >> requiredNumber;
 
   cslog() << "NODE> Getting StageTwo Request from [" << (int)requesterNumber << "] ";
-  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
+  if (requester != cs::Conveyer::instance().confidants().at(requesterNumber)) {
     return;
   }
 
@@ -1843,15 +1823,12 @@ void Node::sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t req
     cswarning() << "Only confidant nodes can send consensus stages";
     return;
   }
-  ostream_.init(BaseFlags::Fragmented, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(requester));
 
-  ostream_ << MsgTypes::SecondStage
-    << roundNum_
-    << pStageTwoMsgSize
-    << stageTwoInfo.sig
-    << pStageTwoMessage;
-  LOG_DEBUG("done");
-  flushCurrentTasks();
+  const auto& confidants = cs::Conveyer::instance().roundTable(roundNum_)->confidants;
+  sendBroadcast(confidants.at(requester), MsgTypes::SecondStage, roundNum_, pStageTwoMsgSize, stageTwoInfo.sig,
+                pStageTwoMessage);
+
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1929,12 +1906,12 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
-  LOG_DEBUG(__func__);
+  csdebug() << "NODE> " << __func__ << "()";
 #ifdef MYLOG
   cslog() << "NODE> Stage THREE sending";
 #endif
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can send consensus stages";
+    cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
   }
 
@@ -1962,38 +1939,23 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   rawData += sizeof(uint8_t);
   memcpy(rawData, stageThreeInfo.realTrustedMask.data(), stageThreeInfo.realTrustedMask.size());
 
-  unsigned long long sig_size;
   cscrypto::GenerateSignature(stageThreeInfo.sig,solver_->getPrivateKey(), msgPtr,pStageThreeMsgSize + sizeof(cs::RoundNumber));
   pStageThreeMessage = std::string(cs::numeric_cast<const char*>((void*)(msgPtr + sizeof(cs::RoundNumber))), pStageThreeMsgSize);
-  ostream_.init(BaseFlags::Broadcast);
-  ostream_ << MsgTypes::ThirdStage
-    << roundNum_
-    << pStageThreeMsgSize
-    << stageThreeInfo.sig
-    << pStageThreeMessage;
+
+  sendConfidants(MsgTypes::ThirdStage, roundNum_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
+
   allocator_.shrinkLast(pStageThreeMsgSize + sizeof(cs::RoundNumber));
-  LOG_DEBUG("done");
-  flushCurrentTasks();
+
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::requestStageThree(uint8_t respondent, uint8_t required) {
-#ifdef MYLOG
-  cslog() << "NODE> Stage THREE requesting ... ";
-#endif
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can request consensus stages";
-    // return;
-  }
-
-  ostream_.init(0 /*need no flags!*/, cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
-
-  ostream_ << MsgTypes::ThirdStageRequest << roundNum_ << myConfidantIndex_ << required;
-  flushCurrentTasks();
-  LOG_DEBUG("done");
+  csdebug() << "NODE> " << __func__ << "()";
+  requestStageConsensus(MsgTypes::ThirdStageRequest, respondent, required);
 }
 
 void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  LOG_DEBUG(__func__);
+  csdebug() << "NODE> " << __func__ << "()";
   // cslog() << "NODE> Getting StageThree Request";
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -2007,7 +1969,7 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
   uint8_t requiredNumber = 0u;
   istream_ >> requesterNumber >> requiredNumber;
 
-  if (requester != cs::Conveyer::instance().currentRoundTable().confidants.at(requesterNumber)) {
+  if (requester != cs::Conveyer::instance().confidants().at(requesterNumber)) {
     return;
   }
 
@@ -2019,24 +1981,19 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
 }
 
 void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester) {
-  LOG_DEBUG(__func__);
+  csdebug() << "NODE> " << __func__;
 #ifdef MYLOG
   cslog() << "NODE> Stage THREE Reply sending";
 #endif
   if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "Only confidant nodes can send consensus stages";
+    cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
   }
 
-  ostream_.init(0/*need no flags!*/, cs::Conveyer::instance().roundTable(roundNum_)->confidants.at(requester));
+  const auto& confidants = cs::Conveyer::instance().roundTable(roundNum_)->confidants;
+  sendBroadcast(confidants.at(requester), MsgTypes::ThirdStage, roundNum_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
 
-  ostream_ << MsgTypes::ThirdStage
-    << roundNum_
-    << pStageThreeMsgSize
-    << stageThreeInfo.sig
-    << pStageThreeMessage;
-  LOG_DEBUG("done");
-  flushCurrentTasks();
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -2059,7 +2016,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   memcpy(rawData, &roundNum_, sizeof(cs::RoundNumber));
   memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, msgSize);
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageTwo packet format";
+    cserror() << "NODE> Bad StageTwo packet format";
     return;
   }
   //rawData += sizeof(cs::RoundNumber);
@@ -2089,6 +2046,20 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   allocator_.shrinkLast(msgSize);
   cslog() << "NODE> Stage Three from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageThree(std::move(stage));
+}
+
+void Node::requestStageConsensus(MsgTypes msgType, uint8_t respondent, uint8_t required) {
+  if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
+    cswarning() << "NODE> Only confidant nodes can request consensus stages";
+    return;
+  }
+
+  const auto& confidants = cs::Conveyer::instance().confidants();
+
+  // TODO: Maybe needed no flags!
+  sendBroadcast(confidants.at(respondent), msgType, roundNum_, myConfidantIndex_, required);
+
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp) {
@@ -2427,9 +2398,10 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
 
 void Node::sendRoundInfoRequest(uint8_t respondent) {
   // ask for round info from current trusted on current round
-  const auto cnt = (uint8_t) cs::Conveyer::instance().currentRoundTable().confidants.size();
-  if(respondent < cnt) {
-    sendRoundInfoRequest(cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
+  const auto& confidants = cs::Conveyer::instance().confidants();
+  const auto cnt = cs::numeric_cast<uint8_t>(confidants.size());
+  if (respondent < cnt) {
+    sendRoundInfoRequest(confidants.at(respondent));
   }
   else {
     cserror() << "NODE> cannot request round info, incorrect respondent number";
