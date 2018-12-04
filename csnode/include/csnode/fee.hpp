@@ -29,11 +29,10 @@ class TransactionsPacket;
 class Fee {
 public:
   /** @brief Counts fee for each transaction in pool.
-   *
-   *  @param node - is needed to have an access to blockchain.
-   *  @param pool - counted fee will be set for each transaction
-   *                in this pool.
-   */
+  *
+  *  @param pool/packet - counted fee will be set for each transaction
+  *                       in this pool/packet.
+  */
   void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
   void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
 
@@ -68,11 +67,11 @@ private:
    */
   void CountRoundsFrequency(const BlockChain& blockchain);
   double CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain);
-  inline void CountTotalTransactionsLength();
+  void CountTotalTransactionsLength();
+  size_t EstimateNumOfNodesInNetwork(const BlockChain& blockchain);
   inline void Init(const BlockChain& blockchain, csdb::Pool* pool);
   inline void Init(const BlockChain&, TransactionsPacket* packet);
 
-  size_t num_of_nodes_;
   size_t num_of_last_block_;
   size_t total_transactions_length_;
   double one_byte_cost_;

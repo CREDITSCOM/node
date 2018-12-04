@@ -5,15 +5,15 @@
 
 #include "csnode/fee.hpp"
 
-#include <cstdint>
+#include <cinttypes>
 #include <string>
 #include <vector>
+#include <set>
 
 #include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
 #include <csnode/blockchain.hpp>
-#include <csnode/conveyer.hpp>
 #include <transactionspacket.hpp>
 
 namespace cs {
@@ -25,18 +25,17 @@ constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTrans
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
 constexpr double kMinFee = 0.0001428;
+constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
 }  // namespace
 
 Fee::Fee()
-: num_of_nodes_(0)
-, num_of_last_block_(0)
-, total_transactions_length_(0)
-, one_byte_cost_(0)
-, one_round_cost_(0)
-, rounds_frequency_(0)
-, current_pool_(nullptr)
-, transactions_packet_(nullptr) {
-}
+    : num_of_last_block_(0),
+    total_transactions_length_(0),
+    one_byte_cost_(0),
+    one_round_cost_(0),
+    rounds_frequency_(0),
+    current_pool_(nullptr),
+    transactions_packet_(nullptr) {}
 
 void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   if (pool->transactions().size() < 1) {
@@ -60,18 +59,12 @@ inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
   current_pool_ = pool;
   transactions_packet_ = nullptr;
   num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
-  // Now we don't have tools to estimate number of all nodes in the network.
-  // So we use number of trusted. In fact it is a constant. Will be fixed soon.
-  num_of_nodes_ = cs::Conveyer::instance().currentRoundTable().confidants.size();
 }
 
 inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) {
   transactions_packet_ = packet;
   current_pool_ = nullptr;
   num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
-  // Now we don't have tools to estimate number of all nodes in the network.
-  // So we use number of trusted. In fact it is a constant. Will be fixed soon.
-  num_of_nodes_ = cs::Conveyer::instance().currentRoundTable().confidants.size();
 }
 
 void Fee::SetCountedFee() {
@@ -123,7 +116,7 @@ void Fee::CountOneByteCost(const BlockChain& blockchain) {
   one_byte_cost_ = one_round_cost_ / total_transactions_length_;
 }
 
-inline void Fee::CountTotalTransactionsLength() {
+void Fee::CountTotalTransactionsLength() {
   total_transactions_length_ = 0;
   std::vector<csdb::Transaction> transactions;
   if (current_pool_ != nullptr) {
@@ -139,11 +132,36 @@ inline void Fee::CountTotalTransactionsLength() {
 
 void Fee::CountOneRoundCost(const BlockChain& blockchain) {
   CountRoundsFrequency(blockchain);
-  double num_of_rounds_per_day = 60 * 60 * 24 * rounds_frequency_;
+  double num_of_rounds_per_day = 60 * 60 * 24 / rounds_frequency_;
   if (num_of_rounds_per_day < 1) {
     num_of_rounds_per_day = 1;
   }
-  one_round_cost_ = (kNodeRentalCostPerDay * num_of_nodes_) / num_of_rounds_per_day;
+  one_round_cost_ = (kNodeRentalCostPerDay * EstimateNumOfNodesInNetwork(blockchain)) / num_of_rounds_per_day;
+}
+
+size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
+  csdb::Pool pool = blockchain.loadBlock(blockchain.getLastWrittenHash());
+  std::set<std::vector<uint8_t>> unique_trusted_;
+  if (blockchain.getLastWrittenSequence() < kBlocksNumForNodesQtyEstimation) {
+    while (pool.is_valid()) {
+      for (int i = 0; i < pool.confidants().size(); ++i) {
+        unique_trusted_.insert(pool.confidants()[i]);
+      }
+      pool = blockchain.loadBlock(pool.previous_hash());
+    }
+    return unique_trusted_.size();
+  }
+  else {
+    size_t i = kBlocksNumForNodesQtyEstimation;
+    while (pool.is_valid() && i != 0) {
+      for (int j = 0; j < pool.confidants().size(); ++j) {
+        unique_trusted_.insert(pool.confidants()[j]);
+      }
+      pool = blockchain.loadBlock(pool.previous_hash());
+      --i;
+    }
+    return unique_trusted_.size();
+  }
 }
 
 void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
