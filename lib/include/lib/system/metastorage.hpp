@@ -147,7 +147,9 @@ public:
   /// @return Returns meta element of storage if found, otherwise returns nothing.
   ///.
   std::optional<T> extract(RoundNumber round) {
-    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) { return value.round == round; });
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) {
+      return value.round == round;
+    });
 
     if (iterator == buffer_.end()) {
       return std::nullopt;
@@ -166,7 +168,9 @@ public:
   /// @warning Before using this methods use contains(round) to check element existing, or check pointer on nullptr.
   ///
   T* get(RoundNumber round) {
-    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) { return round == value.round; });
+    const auto iterator = std::find_if(buffer_.begin(), buffer_.end(), [=](const MetaElement& value) {
+      return round == value.round;
+    });
 
     if (iterator == buffer_.end()) {
       return nullptr;
