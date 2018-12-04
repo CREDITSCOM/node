@@ -1095,60 +1095,6 @@ void Node::becomeWriter() {
   //}
 }
 
-void Node::onRoundStart(const cs::RoundTable& roundTable) {
-  cslog() << "======================================== ROUND " << roundTable.round
-          << " ========================================";
-  cslog() << "Node PK = " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
-
-  const cs::ConfidantsKeys& confidants = roundTable.confidants;
-
-  if (roundTable.general == nodeIdKey_) {
-    myLevel_ = NodeLevel::Main;
-  }
-  else {
-    const auto iter = std::find(confidants.begin(), confidants.end(), nodeIdKey_);
-
-    if (iter != confidants.end()) {
-      myLevel_ = NodeLevel::Confidant;
-      myConfidantIndex_ = cs::numeric_cast<uint8_t>(std::distance(confidants.begin(), iter));
-    }
-    else {
-      myLevel_ = NodeLevel::Normal;
-    }
-  }
-
-  // Pretty printing...
-  cslog() << "Round " << roundTable.round << " started. Mynode_type := " << myLevel_ << " Confidants: ";
-
-  for (std::size_t i = 0; i < confidants.size(); ++i) {
-    const auto& confidant = confidants[i];
-    cslog() << i << ". " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
-  }
-
-  const cs::PacketsHashes& hashes = roundTable.hashes;
-
-  cslog() << "Transaction packets hashes count: " << hashes.size();
-
-  for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csdebug() << i << ". " << hashes[i].toString();
-  }
-
-#ifdef SYNCRO
-  blockchainSync();
-#endif
-
-  if (!sendingTimer_.isRunning()) {
-    cslog() << "NODE> Transaction timer started";
-    sendingTimer_.start(cs::TransactionsPacketInterval);
-  }
-
-  // TODO: think now to improve this code
-  solver_->nextRound();
-
-  // TODO: check if this removes current tasks? if true - thats bad
-  transport_->processPostponed(roundNum_);
-}
-
 void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
   csdebug() << "NODE> Processing packets sync request";
 
@@ -1254,38 +1200,6 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
   ostream_.clear();
-}
-
-void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes) {
-  cslog() << "Node: init next round1";
-  // copied from Solver::gotHash():
-  cs::PacketsHashes hashes;
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
-  cs::RoundNumber round = conveyer.currentRoundNumber();
-
-  {
-    cs::SharedLock lock(conveyer.sharedMutex());
-    for (const auto& element : conveyer.transactionsPacketTable()) {
-      hashes.push_back(element.first);
-    }
-  }
-
-  cs::RoundTable table;
-  table.round = ++round;
-  table.confidants = std::move(confidantNodes);
-  // table.general = mainNode;
-
-  table.hashes = std::move(hashes);
-  conveyer.setRound(std::move(table));
-
-  initNextRound(conveyer.currentRoundTable());
-}
-
-void Node::initNextRound(const cs::RoundTable& roundTable) {
-  roundNum_ = roundTable.round;
-  sendRoundTable(roundTable);
-  cslog() << "NODE> RoundNumber :" << roundNum_;
-  onRoundStart(roundTable);
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {

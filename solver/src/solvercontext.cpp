@@ -110,23 +110,6 @@ void SolverContext::spawn_next_round() {
   core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
 }
 
-void SolverContext::spawn_first_round() {
-  if (core.trusted_candidates.empty()) {
-    if (Consensus::Log) {
-      LOG_ERROR("SolverCore: trusted candidates must be " << Consensus::MinTrustedNodes
-                                                          << " or greater to spawn first round");
-    }
-    return;
-  }
-  int i = 0;
-  for (auto& it : core.trusted_candidates) {
-    std::cout << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size()) << std::endl;
-    ++i;
-  }
-
-  core.pnode->initNextRound(std::move(core.trusted_candidates));
-}
-
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {
   csdb::internal::WalletId id;
   if (core.pnode->getBlockChain().findWalletId(address, id)) {

@@ -161,9 +161,6 @@ public:
 
   void flushCurrentTasks();
   void becomeWriter();
-  void initNextRound(std::vector<cs::PublicKey>&& confidantNodes);
-  void initNextRound(const cs::RoundTable& roundTable);
-  void onRoundStart(const cs::RoundTable& roundTable);
   bool isPoolsSyncroStarted();
 
   enum MessageActions {
