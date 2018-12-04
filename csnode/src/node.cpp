@@ -573,6 +573,19 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
+  const auto ptable = conveyer.roundTable(poolMetaInfo.sequenceNumber);
+  if(nullptr == ptable) {
+    cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
+  }
+  else {
+    std::vector<std::vector<uint8_t>> confs;
+    for(const auto& src : ptable->confidants) {
+      auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+      std::copy(src.cbegin(), src.cend(), tmp.begin());
+    }
+    pool.value().set_confidants(confs);
+  }
+
   if(!getBlockChain().storeBlock(pool.value(), signature)) {
     cserror() << "NODE> failed to store block in BlockChain";
   }
@@ -1765,40 +1778,27 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::PublicKey pk;
-  memset(pk.data(), 0, 32);
+  std::fill(pk.begin(), pk.end(), 0);
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);// solver_->getPublicKey());
   if (!pool.has_value()) {
-    cserror() << "NODE> APPLY CHARACTERISTIC ERROR!";
+    cserror() << "NODE> applyCharacteristic() failed to create block";
     return;
   }
 
+  std::vector<std::vector<uint8_t>> confs;
+  for(const auto& src : roundTable.confidants) {
+    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+    std::copy(src.cbegin(), src.cend(), tmp.begin());
+  }
+  pool.value().set_confidants(confs);
+
   pool = getBlockChain().createBlock(pool.value(), solver_->getPrivateKey());
   if(!pool.has_value()) {
-    cserror() << "NODE> CREATE BLOCK ERROR!";
+    cserror() << "NODE> blockchain failed to write new block";
     return;
   }
 
   stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
-
-  std::vector<std::vector<uint8_t>> confs;
-  for(const auto& src: roundTable.confidants) {
-    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
-    std::copy(src.cbegin(), src.cend(), tmp.begin());
-  }
-
-  //::std::vector <uint8_t> tmp;
-  //std::vector <::std::vector<uint8_t>> confs;
-  //for (auto& it : roundTable.confidants) {
-  //  tmp.clear();
-  //  for (int itt = 0; itt < 32; itt++) {
-  //    tmp.push_back(it[itt]);
-  //  }
-  //  confs.push_back(tmp);
-  //}
-
-  pool.value().set_confidants(confs);
-  //for(auto& it : stageThreeStorage)
-  //pool.value().add_signature()
 
   // array
   cs::Signature poolSignature;
@@ -1973,34 +1973,30 @@ void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundN
       stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
       assert(sequence <= this->getRoundNumber());
-    
+
       ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
-    cs::PublicKey pk;
-    memset(pk.data(), 0, 32);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);// writerPublicKey);
+      conveyer.setCharacteristic(characteristic, cs::numeric_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
+      cs::PublicKey pk;
+      std::fill(pk.begin(), pk.end(), 0);
+      std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);// writerPublicKey);
 
       if(pool.has_value()) {
 
-      if(!getBlockChain().storeBlock(pool.value(), signature)) {
-        cserror() << "NODE> failed to store block in BlockChain";
-      }
-      else {
-        ::std::vector <uint8_t> tmp;
-        std::vector <::std::vector<uint8_t>> confs;
-        for (auto& it : roundTable.confidants) {
-          tmp.clear();
-          for (int itt = 0; itt < 32; itt++) {
-            tmp.push_back(it[itt]);
-          }
-          confs.push_back(tmp);
+        std::vector<std::vector<uint8_t>> confs;
+        for(const auto& src : roundTable.confidants) {
+          auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+          std::copy(src.cbegin(), src.cend(), tmp.begin());
         }
         pool.value().set_confidants(confs);
 
-        stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+        if(!getBlockChain().storeBlock(pool.value(), signature)) {
+          cserror() << "NODE> failed to store block in BlockChain";
+        }
+        else {
+          stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
+        }
       }
-    }
     }
   }
 
