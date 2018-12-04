@@ -286,30 +286,30 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   csunused(type);
-
   istream_.init(data, size);
-  cslog() << "NODE> get SS Round Table #" << rNum;
-  cs::RoundTable global_table;
 
-  if (!readRoundData(global_table)) {
+  cslog() << "NODE> get SS Round Table #" << rNum;
+  cs::RoundTable roundTable;
+
+  if (!readRoundData(roundTable)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
 
-  global_table.round = rNum;
+  roundTable.round = rNum;
   // TODO: what this call was intended for? transport_->clearTasks();
 
   // "normal" start
-  if (global_table.round == 1) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, global_table]() mutable {
-      onRoundStart_V3(global_table);
-      onRoundStartConveyer(std::move(global_table));
+  if (roundTable.round == 1) {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
+      onRoundStart_V3(roundTable);
+      onRoundStartConveyer(std::move(roundTable));
     });
 
     return;
   }
 
   // "hot" start
-  handleRoundMismatch(global_table);
+  handleRoundMismatch(roundTable);
 }
 
 // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -328,7 +328,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table)
     
     if(local_table.round - global_table.round == 1) {
       cslog() << "NODE> re-send last round info may help others to go to round #" << local_table.round;
-      tryResendRoundInfo(std::nullopt, local_table.round); // broadcast round info
+      tryResendRoundTable(std::nullopt, local_table.round); // broadcast round info
     }
     else {
 
@@ -810,7 +810,7 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable,
   const cs::Signature& signature/*,
   const cs::Notifications& notifications*/) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::RoundInfo << roundNum_;
+  ostream_ << MsgTypes::RoundTable << roundNum_;
   ostream_ << roundTable.confidants.size();
   ostream_ << roundTable.hashes.size();
   for (const auto& confidant : roundTable.confidants) {
@@ -1266,7 +1266,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
   ostream_.clear();
 }
 
-void Node::initNextRound(std::vector<cs::PublicKey>&& confidantNodes) {
+void Node::initNextRound(cs::ConfidantsKeys&& confidantNodes) {
   cslog() << "Node: init next round1";
   // copied from Solver::gotHash():
   cs::PacketsHashes hashes;
@@ -1310,7 +1310,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
   // starts next round, otherwise
-  if(type == MsgTypes::RoundInfo) {
+  if(type == MsgTypes::RoundTable) {
     if(rNum > round) {
       return MessageActions::Process;
     }
@@ -1375,11 +1375,11 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Drop;
   }
 
-  if (type == MsgTypes::RoundInfoRequest) {
+  if (type == MsgTypes::RoundTableRequest) {
     return (rNum <= round ? MessageActions::Process : MessageActions::Drop);
   }
 
-  if (type == MsgTypes::RoundInfoReply) {
+  if (type == MsgTypes::RoundTableReply) {
     return (rNum >= round ? MessageActions::Process : MessageActions::Drop);
   }
 
@@ -1484,6 +1484,19 @@ void Node::writeDefaultStream(const T& value) {
   ostream_ << value;
 }
 
+template<typename... Args>
+bool Node::sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+  Connections connections = transport_->getNeighboursWithoutSS();
+
+  if (connections.empty()) {
+    return false;
+  }
+
+  for (auto connection : connections) {
+    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+  }
+}
+
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
                          Args&&... args) {
@@ -1545,8 +1558,8 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   ptr += sizeof(cs::RoundNumber);
   ptr += sizeof(cs::Hash);
   *ptr = stageOneInfo.sender;
-  ptr += 1;
-  memcpy(ptr, stageOneInfo.hash.data(), 32);
+  ++ptr;
+  memcpy(ptr, stageOneInfo.hash.data(), stageOneInfo.hash.size());
   ptr += sizeof(cs::Hash);
   *ptr = (uint8_t)stageOneInfo.trustedCandidates.size();
   uint8_t tc = *ptr;
@@ -2157,10 +2170,10 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   csdebug() << "\tverify signature: " << pool.value().verify_signature();
 
   logPool(pool.value());
-  sendRoundInfo(roundTable, poolMetaInfo, poolSignature);
+  sendRoundTable(roundTable, poolMetaInfo, poolSignature);
 }
 
-void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature) {
+void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNum_ = roundTable.round;
   // update hashes in round table here, they are free of stored packets' hashes
@@ -2214,7 +2227,7 @@ void Node::sendRoundInfo(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaIn
   startConsensus();
 }
 
-void Node::getRoundInfo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
+void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
                         const cs::PublicKey& sender) {
   csdebug() << "\n";
   cslog() << "NODE> " << __func__ << "():";
@@ -2440,11 +2453,11 @@ void Node::getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rN
   solver_->gotHash(std::move(tmp), sender);
 }
 
-void Node::sendRoundInfoRequest(uint8_t respondent) {
+void Node::sendRoundTableRequest(uint8_t respondent) {
   // ask for round info from current trusted on current round
   const auto cnt = (uint8_t) cs::Conveyer::instance().currentRoundTable().confidants.size();
   if(respondent < cnt) {
-    sendRoundInfoRequest(cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
+    sendRoundTableRequest(cs::Conveyer::instance().currentRoundTable().confidants.at(respondent));
   }
   else {
     cserror() << "NODE> cannot request round info, incorrect respondent number";
@@ -2457,21 +2470,21 @@ void Node::sendNextRoundRequest()
 {
   ostream_.init(0 /*need no flags!*/);
   // 0xFF means we ask for last writer node simply to repeat round info
-  ostream_ << MsgTypes::RoundInfoRequest << InvalidTrustedIndex;
+  ostream_ << MsgTypes::RoundTableRequest << InvalidTrustedIndex;
   flushCurrentTasks();
 }
 
-void Node::sendRoundInfoRequest(const cs::PublicKey& respondent)
+void Node::sendRoundTableRequest(const cs::PublicKey& respondent)
 {
   cslog() << "NODE> send request for next round info after #" << roundNum_;
 
   ostream_.init(0 /*need no flags!*/, respondent);
   // ask for next round info:
-  ostream_ << MsgTypes::RoundInfoRequest << roundNum_ + 1 << myConfidantIndex_;
+  ostream_ << MsgTypes::RoundTableRequest << roundNum_ + 1 << myConfidantIndex_;
   flushCurrentTasks();
 }
 
-void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
+void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,
                                const cs::PublicKey& requester) {
   csdebug() << "NODE> " << __func__;
   if (nodeIdKey_ == requester) {
@@ -2491,7 +2504,7 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
   if(requesterNumber == InvalidTrustedIndex) {
     csdebug() << "NODE> som enode asks for last round info to repeat";
     if(lastSentRoundData_.roundTable.round == rNum) {
-      if(tryResendRoundInfo(requester, rNum)) {
+      if(tryResendRoundTable(requester, rNum)) {
         cslog() << "NODE> round info #" << rNum << " has sent again";
       }
       else {
@@ -2506,7 +2519,7 @@ void Node::getRoundInfoRequest(const uint8_t* data, const size_t size, const cs:
   solver_->gotRoundInfoRequest(requester, rNum);
 }
 
-void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_info) {
+void Node::sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info) {
   cslog() << "NODE> send RoundInfo reply to " << cs::Utils::byteStreamToHex(target.data(), target.size());
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "Only confidant nodes can reply consensus stages";
@@ -2514,11 +2527,11 @@ void Node::sendRoundInfoReply(const cs::PublicKey& target, bool has_requested_in
   }
 
   ostream_.init(0 /*need no flags!*/, target);
-  ostream_ << MsgTypes::RoundInfoReply << roundNum_ << (has_requested_info ? (uint8_t)1 : (uint8_t)0);
+  ostream_ << MsgTypes::RoundTableReply << roundNum_ << (has_requested_info ? (uint8_t)1 : (uint8_t)0);
   flushCurrentTasks();
 }
 
-bool Node::tryResendRoundInfo(std::optional<const cs::PublicKey> /*respondent*/, cs::RoundNumber rNum) {
+bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> /*respondent*/, cs::RoundNumber rNum) {
   if (lastSentRoundData_.roundTable.round != rNum) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
@@ -2532,7 +2545,7 @@ bool Node::tryResendRoundInfo(std::optional<const cs::PublicKey> /*respondent*/,
   return true;
 }
 
-void Node::getRoundInfoReply(const uint8_t* data, const size_t size,
+void Node::getRoundTableReply(const uint8_t* data, const size_t size,
                              const cs::PublicKey& respondent) {
   csdebug() << "NODE> " << __func__;
   if (myLevel_ != NodeLevel::Confidant) {
