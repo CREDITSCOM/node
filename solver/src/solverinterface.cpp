@@ -21,7 +21,7 @@ namespace cs
     private_key = priv;
   }
 
-  void SolverCore::gotRound(cs::RoundNumber rNum)
+  void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
     // previous solver implementation calls to runConsensus method() here
     // perform similar actions, but only in proper state (TrustedStage1State for now)
@@ -98,13 +98,6 @@ namespace cs
 
   void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
   {
-    // solver-1: caching, actually duplicates caching implemented in Node::getBlock()
-    csdb::Pool::sequence_t desired_seq = pnode->getBlockChain().getLastWrittenSequence() + 1;
-    if(p.sequence() != desired_seq) {
-      gotIncorrectBlock(std::move(p), sender);
-      return;
-    }
-
     if(!pstate) {
       return;
     }
@@ -328,19 +321,19 @@ namespace cs
       const auto ptr = /*cur_round == 10 ? nullptr :*/ find_stage3(pnode->getConfidantNumber());
       if(ptr != nullptr) {
         if(ptr->sender == ptr->writer) {
-          if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
             cslog() << "SolverCore: re-send full round info #" << cur_round << " completed";
             return;
           }
         }
       }
       cslog() << "SolverCore: also on the same round, inform cannot help with";
-      pnode->sendRoundInfoReply(requester, false);
+      pnode->sendRoundTableReply(requester, false);
     }
     else if(requester_round < cur_round) {
       for(const auto& node : pnode->confidants()) {
         if(requester == node) {
-          if(pnode->tryResendRoundInfo(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
             cslog() << "SolverCore: requester is trusted next round, supply it with round info";
             return;
           }
@@ -349,7 +342,7 @@ namespace cs
         }
       }
       cslog() << "SolverCore: inform requester next round has come";
-      pnode->sendRoundInfoReply(requester, true);
+      pnode->sendRoundTableReply(requester, true);
     }
     else {
       // requester_round > cur_round, cannot help with!

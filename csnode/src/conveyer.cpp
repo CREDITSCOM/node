@@ -198,6 +198,26 @@ const cs::ConfidantsKeys& cs::ConveyerBase::confidants() const {
   return currentRoundTable().confidants;
 }
 
+size_t cs::ConveyerBase::confidantsCount() const {
+    return confidants().size();
+}
+
+bool cs::ConveyerBase::isConfidantExists(size_t index) const {
+  const cs::ConfidantsKeys& confidantsReference = confidants();
+
+  if (confidantsReference.size() <= index) {
+    cserror() << __func__ << ", index " << index << "out of range , confidants count " << confidantsReference.size()
+              << ", on round " << pimpl_->currentRound;
+    return false;
+  }
+
+  return true;
+}
+
+const cs::PublicKey& cs::ConveyerBase::confidantByIndex(size_t index) const {
+  return confidants()[index];
+}
+
 const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
@@ -341,7 +361,7 @@ void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, c
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (meta) {
-    csdebug() << "CONVEYER> Characteristic set to conveyer";
+    csdebug() << "CONVEYER> Characteristic set to conveyer, #" << round;
     meta->characteristic = characteristic;
   }
 }
@@ -361,7 +381,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   const Characteristic* pointer = characteristic(round);
 
   if (!pointer) {
-    cserror() << "CONVEYER> Null pointer of characteristic, return empty Hash, round " << round;
+    cserror() << "CONVEYER> Null pointer of characteristic, return empty Hash, #" << round;
     return cs::Hash();
   }
 
@@ -371,7 +391,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo,
                                                                 const cs::PublicKey& sender) {
   cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
-  cslog() << "CONVEYER> " << __func__ << "(), round " << round << ":";
+  cslog() << "CONVEYER> " << __func__ << "(), #" << round << ":";
 
   cs::Lock lock(sharedMutex_);
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);

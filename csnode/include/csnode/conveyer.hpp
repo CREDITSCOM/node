@@ -90,7 +90,6 @@ public:
    *
    * @param [in,out]    table   The new round table contains trusted nodes and round number.
    */
-
   void updateRoundTable(cs::RoundTable&& table);
 
   ///
@@ -98,10 +97,28 @@ public:
   ///
   const cs::RoundTable& currentRoundTable() const;
 
+  // confidants helpers
+
   ///
-  /// @brief Returns current round table confidants keys.
+  /// @brief Returns current round confidants keys.
   ///
   const cs::ConfidantsKeys& confidants() const;
+
+  ///
+  /// @brief Returns current round confidants keys count.
+  ///
+  size_t confidantsCount() const;
+
+  ///
+  /// @brief Returns existing state of confidant by index at current round.
+  ///
+  bool isConfidantExists(size_t index) const;
+
+  ///
+  /// @brief Returns confidant key at current round table by index.
+  /// @warning call isConfidantExits before using this method
+  ///
+  const cs::PublicKey& confidantByIndex(size_t index) const;
 
   ///
   /// @brief Returns blockchain round table of Round key.

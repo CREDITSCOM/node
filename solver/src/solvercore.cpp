@@ -188,7 +188,7 @@ namespace cs
     return (Result::Finish == res);
   }
 
-  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string currentTimeStamp)
+  void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp)
   {
     cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
@@ -203,49 +203,6 @@ namespace cs
     }
 
     pnode->prepareMetaForSending(table, currentTimeStamp);
-  }
-
-  void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)
-  {
-    cslog() << "SolverCore: store received block #" << p.sequence()
-      << ", " << p.transactions_count() << " transactions";
-
-    // see: Solver-1, method Solver::gotBlock()
-    if(!pnode->getBlockChain().storeBlock(p)) {
-      cserror() << "SolverCore: block sync required";
-      return;
-    }
-    else {
-      pnode->getBlockChain().testCachedBlocks();
-    }
-  }
-
-  bool SolverCore::is_block_deferred() const
-  {
-    return false;  // pnode->getBlockChain().isLastBlockDeferred();
-  }
-
-  void SolverCore::flush_deferred_block()
-  {
-    // if nothing to save deferred_block has zero sequence number
-    if(!is_block_deferred()) {
-      return;
-    }
-    // pnode->getBlockChain().writeDeferredBlock();
-  }
-
-  void SolverCore::drop_deferred_block()
-  {
-    if(!is_block_deferred()) {
-      return;
-    }
-    if(false /*pnode->getBlockChain().revertLastBlock()*/) {
-      // TODO: bc.revertWalletsInPool(deferred_block);
-      cswarning() << "SolverCore: deferred block dropped, wallets are reverted";
-    }
-    else {
-      cserror() << "SolverCore: cannot drop deferred block";
-    }
   }
 
 }  // namespace slv2

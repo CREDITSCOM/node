@@ -40,7 +40,12 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
   }
 
   const auto lastWrittenSequence = m_blockChain->getLastWrittenSequence();
-  const auto roundToSync = m_isSyncroStarted ? cs::Conveyer::instance().currentRoundNumber() - 1 : roundNum;
+  
+  // TODO: review
+  auto roundToSync = roundNum;
+  if(m_isSyncroStarted && roundNum > 0) {
+    --roundToSync;
+  }
 
   if (lastWrittenSequence >= roundToSync) {
     showSyncronizationProgress(cs::numeric_cast<csdb::Pool::sequence_t>(lastWrittenSequence));
@@ -72,6 +77,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
 
   if (!m_isSyncroStarted) {
     m_isSyncroStarted = true;
+
+    csdebug() << "POOL SYNCHRONIZER> Synchro started";
 
     refreshNeighbours();
     sendBlockRequest();
@@ -126,7 +133,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
       m_blockChain->setGlobalSequence(cs::numeric_cast<uint32_t>(sequence));
     }
 
-    if (m_blockChain->storeBlock(pool)) {
+    if (m_blockChain->storeBlock(pool, true /*by_sync*/)) {
       m_blockChain->testCachedBlocks();
     }
     lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(m_blockChain->getLastWrittenSequence());
@@ -416,6 +423,10 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t s
 void cs::PoolSynchronizer::refreshNeighbours() {
   const uint32_t neededNeighboursCount = m_transport->getNeighboursCountWithoutSS();
   auto nSize = m_neighbours.size();
+
+  if (neededNeighboursCount == 0) {
+    csdebug() << "POOL SYNCHRONIZER> Neighbours count without ss is: 0";
+  }
 
   if (nSize == neededNeighboursCount) {
     return;
