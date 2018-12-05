@@ -71,10 +71,7 @@ public:
   const cs::PublicKey& getWriterPublicKey() const;
 
   void gotBigBang();
-  void gotTransaction(const csdb::Transaction& trans);
-  void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
-  void gotBlockRequest(const csdb::PoolHash& p_hash);
-  void gotBlockReply(csdb::Pool& p);
+
   void beforeNextRound();
   void nextRound();
   void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);
@@ -121,12 +118,12 @@ private:
     BigBang,
     RoundTable,
     Transactions,
-    Block,
     Hashes,
     Stage1Enough,
     Stage2Enough,
     Stage3Enough,
-    SyncData,
+    SmartDeploy,
+    SmartResult,
     Expired,
     SetNormal,
     SetTrusted,
