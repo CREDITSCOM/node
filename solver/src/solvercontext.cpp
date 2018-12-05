@@ -22,7 +22,6 @@ void SolverContext::add_stage1(cs::StageOne& stage, bool send) {
   /*the order is important! the signature is created in node
   before sending stage and then is inserted in the field .sig
   now we can add it to stages storage*/
-  cslog() << "!!!";
   core.gotStageOne(stage);
 }
 

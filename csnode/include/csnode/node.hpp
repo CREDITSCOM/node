@@ -313,12 +313,9 @@ private:
     cs::Notifications notifications;
   };
 
-  std::string pStageOneMessage;
-  size_t pStageOneMsgSize;
-  std::string pStageTwoMessage;
-  size_t pStageTwoMsgSize;
-  std::string pStageThreeMessage;
-  size_t pStageThreeMsgSize;
+  std::vector <std::string> pStageOneMessage;
+  std::vector <std::string> pStageTwoMessage;
+  std::vector <std::string> pStageThreeMessage;
 
   SentRoundData lastSentRoundData_;
 
