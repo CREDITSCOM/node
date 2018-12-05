@@ -186,7 +186,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]");
     const auto ptr = find_stage1(required);
     if(ptr != nullptr) {
-      pnode->sendStageOneReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender,ptr->sig, MsgTypes::FirstStage , requester);     
     }
   }
 
@@ -195,7 +195,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]");
     const auto ptr = find_stage2(required);
     if(ptr != nullptr) {
-      pnode->sendStageTwoReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender, ptr->sig, MsgTypes::SecondStage, requester);
     }
   }
 
@@ -204,7 +204,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]");
     const auto ptr = find_stage3(required);
     if(ptr != nullptr) {
-      pnode->sendStageThreeReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender, ptr->sig, MsgTypes::ThirdStage, requester);
     }
   }
 

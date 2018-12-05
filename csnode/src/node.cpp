@@ -1337,8 +1337,8 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   solver_->gotStageOneRequest(requesterNumber, requiredNumber);
 }
 
-void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester) {
-  csdebug() << "NODE> " << __func__ << "()";
+void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature signature, const MsgTypes msgType, const uint8_t requester) {
+  csprint() << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1351,9 +1351,27 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
     return;
   }
 
-  sendDefault(conveyer.confidantByIndex(requester), MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, stageOneMessage_[stageOneInfo.sender]);
-  csdebug() << "NODE> " << __func__ << "(): done";
+  const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
+  std::string message;
+
+  switch (msgType) {
+    case MsgTypes::FirstStage:
+      message = stageOneMessage_[sender];
+      break;
+
+    case MsgTypes::SecondStage:
+      message = stageTwoMessage_[sender];
+      break;
+
+    case MsgTypes::ThirdStage:
+      message = stageThreeMessage_[sender];
+      break;
+  }
+
+  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  csprint() << "done";
 }
+
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   csprint() << "started";
@@ -1522,23 +1540,6 @@ void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::
   solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
 }
 
-void Node::sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester) {
-  csprint() << "started";
-
-  if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
-    cswarning() << "Only confidant nodes can send consensus stages";
-    return;
-  }
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (!conveyer.isConfidantExists(requester)) {
-    return;
-  }
-
-  sendDefault(conveyer.confidantByIndex(requester), MsgTypes::SecondStage, roundNumber_, stageTwoInfo.sig, stageTwoMessage_[stageTwoInfo.sender]);
-  csprint() << "done";
-}
-
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   csdetails() << "NODE> " << __func__ << "()";
 
@@ -1671,18 +1672,6 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
   }
 
   solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
-}
-
-void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester) {
-  csdebug() << "NODE> " << __func__;
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "NODE> Only confidant nodes can send consensus stages";
-    return;
-  }
-
-  const auto& confidants = cs::Conveyer::instance().roundTable(roundNumber_)->confidants;
-  sendDefault(confidants.at(requester), MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.sig, stageThreeMessage_[stageThreeInfo.sender]);
-  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {

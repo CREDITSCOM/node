@@ -55,21 +55,19 @@ public:
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
+  void sendStageReply(const uint8_t sender, const cscrypto::Signature sig, const MsgTypes msgType, const uint8_t requester);
   // SOLVER3 methods
   void sendStageOne(cs::StageOne&);
 
   // sends StageOne request to respondent about required
   void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
    
   void sendStageTwo(cs::StageTwo&);
   void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester);
 
   void sendStageThree(cs::StageThree&);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
   void requestStageConsensus(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void sendHash(cs::RoundNumber round);
