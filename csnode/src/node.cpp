@@ -1981,37 +1981,39 @@ void Node::sendRoundTableReply(const cs::PublicKey& target, bool has_requested_i
   sendDefault(target, MsgTypes::RoundTableReply, roundNumber_, request);
 }
 
-bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> /*respondent*/, cs::RoundNumber rNum) {
+bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum) {
+  csunused(respondent);
+
   if (lastSentRoundData_.roundTable.round != rNum) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
   }
+
   //TODO: use respondent.value() to send info directly, otherwise broadcast info
-  createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo, lastSentRoundData_.characteristic,
-                     lastSentRoundData_.poolSignature /*, last_sent_round_data.notifications*/);
+  createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo, lastSentRoundData_.characteristic, lastSentRoundData_.poolSignature);
   flushCurrentTasks();
+
   cslog() << "NODE> re-send last round info #" << rNum << " to ALL";
-          //<< cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
   return true;
 }
 
-void Node::getRoundTableReply(const uint8_t* data, const size_t size,
-                             const cs::PublicKey& respondent) {
-  csdebug() << "NODE> " << __func__;
+void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent) {
+  csprint();
+
   if (myLevel_ != NodeLevel::Confidant) {
     return;
   }
-  if (nodeIdKey_ == respondent) {
-    return;
-  }
+
   istream_.init(data, size);
 
   uint8_t reply;
   istream_ >> reply;
+
   if (!istream_.good() || !istream_.end()) {
     cserror() << "NODE> bad RoundInfo reply packet format";
     return;
   }
+
   solver_->gotRoundInfoReply(reply != 0, respondent);
 }
 
@@ -2104,8 +2106,8 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
   cslog() << " Hashes: " << roundTable.hashes.size();
 
-  for (size_t i = 0; i< roundTable.hashes.size(); ++i) {
-    csdetails() << "[" << i << "] " << cs::Utils::byteStreamToHex(roundTable.hashes.at(i).toBinary().data(), roundTable.hashes.at(i).size());
+  for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
+    csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes.at(j).toBinary().data(), roundTable.hashes.at(j).size());
   }
 
   cslog() << line2.str();
