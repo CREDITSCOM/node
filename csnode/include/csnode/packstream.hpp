@@ -131,9 +131,9 @@ public:
     return ptr_;
   }
 
-  //const cs::Byte* getEndPtr() const {
-  //  return end_;
-  //}
+  const cs::Byte* getEndPtr() const {
+    return end_;
+  }
 
   size_t remainsBytes() const {
     return end_ - ptr_;
@@ -297,10 +297,8 @@ private:
     end_ = ptr_ + packetsEnd_->size();
 
     if (packetsEnd_ != packets_) {
-      std::copy(static_cast<cs::Byte*>(packets_->data()),
-                static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
-      *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) +
-                                   static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
+      std::copy(static_cast<cs::Byte*>(packets_->data()), static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
+      *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) + static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
 
       ptr_ += packets_->getHeadersLength();
 

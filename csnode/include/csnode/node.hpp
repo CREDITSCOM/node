@@ -43,8 +43,6 @@ public:
   void stop();
   void runSpammer();
 
-  // static void stop();
-
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
   void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber, uint8_t type = 0);
@@ -57,32 +55,28 @@ public:
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  // SOLVER3 methods
+  void sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
   void sendStageOne(cs::StageOne&);
 
   // sends StageOne request to respondent about required
-  void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+  void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
    
   void sendStageTwo(cs::StageTwo&);
   void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester);
 
   void sendStageThree(cs::StageThree&);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
   void requestStageConsensus(MsgTypes msgType, uint8_t respondent, uint8_t required);
-
-  void sendHash_V3(cs::RoundNumber round);
+  void sendHash(cs::RoundNumber round);
 
   const cs::ConfidantsKeys& confidants() const;
 
-  void onRoundStart_V3(const cs::RoundTable& roundTable);
+  void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
+  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   //smart-contracts consensus stages sending and getting 
@@ -176,16 +170,11 @@ public slots:
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTable,
-    const cs::PoolMetaInfo& poolMetaInfo,
-    const cs::Characteristic& characteristic,
-    const cs::Signature& signature/*,
-    const cs::Notifications& notifications*/);
-  void storeRoundPackageData(const cs::RoundTable& roundTable,
-      const cs::PoolMetaInfo& poolMetaInfo,
-      const cs::Characteristic& characteristic,
-      const cs::Signature& signature/*,
-      const cs::Notifications& notifications*/);
+  void createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                          const cs::Characteristic& characteristic, const cs::Signature& signature);
+
+  void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                             const cs::Characteristic& characteristic, const cs::Signature& signature);
 
   // signature verification
   bool checkKeysFile();
@@ -312,13 +301,13 @@ private:
     cs::Notifications notifications;
   };
 
-  std::vector <std::string> pStageOneMessage_;
-  std::vector <std::string> pStageTwoMessage_;
-  std::vector <std::string> pStageThreeMessage_;
+  std::vector<std::string> stageOneMessage_;
+  std::vector<std::string> stageTwoMessage_;
+  std::vector<std::string> stageThreeMessage_;
 
-  std::vector <std::string> pStageOneSmartsMessage_;
-  std::vector <std::string> pStageTwoSmartsMessage_;
-  std::vector <std::string> pStageThreeSmartsMessage_;
+  std::vector<std::string> stageOneSmartsMessage_;
+  std::vector<std::string> stageTwoSmartsMessage_;
+  std::vector<std::string> stageThreeSmartsMessage_;
 
   SentRoundData lastSentRoundData_;
 
