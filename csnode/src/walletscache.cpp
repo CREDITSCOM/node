@@ -68,7 +68,9 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::
     totalAmountOfCountedFee += load(*itTrx);
   }
   cslog() << "WALLETS CACHE>> total amount of counted fee in pool: " << totalAmountOfCountedFee;
-  fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
+  if (totalAmountOfCountedFee > 0) {
+    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
+  }
 }
 
 void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants) {
