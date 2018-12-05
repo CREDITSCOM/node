@@ -115,6 +115,11 @@ public:
   bool isConfidantExists(size_t index) const;
 
   ///
+  /// @brief Returns existing state of confidant by his public key.
+  ///
+  bool isConfidantExists(const cs::PublicKey& confidant) const;
+
+  ///
   /// @brief Returns confidant key at current round table by index.
   /// @warning call isConfidantExits before using this method.
   ///

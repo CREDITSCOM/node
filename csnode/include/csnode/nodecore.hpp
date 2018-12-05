@@ -68,7 +68,7 @@ enum NodeConsts : uint32_t {
 
 enum SolverConsts : uint32_t {
   TransactionsFlushRound = 2,
-  TransactionsPacketInterval = 50,
+  TransactionsPacketInterval = 100,
   MaxPacketTransactions = 500,
 };
 

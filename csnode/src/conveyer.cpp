@@ -214,6 +214,12 @@ bool cs::ConveyerBase::isConfidantExists(size_t index) const {
   return true;
 }
 
+bool cs::ConveyerBase::isConfidantExists(const cs::PublicKey& confidant) const {
+  const cs::ConfidantsKeys& keys = confidants();
+  auto iterator = std::find(keys.begin(), keys.end(), confidant);
+  return iterator != keys.end();
+}
+
 const cs::PublicKey& cs::ConveyerBase::confidantByIndex(size_t index) const {
   return confidants()[index];
 }
