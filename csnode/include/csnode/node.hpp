@@ -212,10 +212,10 @@ private:
 
   // to neighbour
   template <typename... Args>
-  bool sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <typename... Args>
-  void sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  void sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
   void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
@@ -224,11 +224,11 @@ private:
   bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   template <class... Args>
-  void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  void sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   // to neighbours
   template<typename... Args>
-  bool sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
   // broadcast
   template <class... Args>
