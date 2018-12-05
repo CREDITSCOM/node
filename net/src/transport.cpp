@@ -834,6 +834,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock,
   conn.in = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
 
+  cs::SpinGuard lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
 
