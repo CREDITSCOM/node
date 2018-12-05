@@ -1096,9 +1096,9 @@ std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel) {
 
 template<typename... Args>
 void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  static constexpr cs::Byte noFlags = 0;
+  static constexpr cs::Byte defautFlags = BaseFlags::Fragmented;
 
-  ostream_.init(noFlags, target);
+  ostream_.init(defautFlags, target);
   csdebug() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -1192,8 +1192,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 }
 
 template <typename... Args>
-void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                         Args&&... args) {
+void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
   csdebug() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
@@ -1290,7 +1289,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 }
 
 void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  csdebug() << "NODE> " << __func__ << "()";
+  csprint();
 
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -1302,14 +1301,13 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   uint8_t requiredNumber = 0;
   istream_ >> requesterNumber >> requiredNumber;
 
-  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().confidants();
+  const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (confidants.size() <= requesterNumber) {
-    cserror() << __func__ << ", index " << int(requesterNumber) << ", confidants size " << confidants.size();
+  if (!conveyer.isConfidantExists(requesterNumber)) {
     return;
   }
 
-  if (requester != confidants[requesterNumber]) {
+  if (requester != conveyer.confidantByIndex(requesterNumber) {
     return;
   }
 
