@@ -85,6 +85,17 @@ bool Node::init() {
     return false;
   }
 
+#if 0 // DEBUG PURPOSE
+  constexpr size_t test_data_size = 2000;
+  std::vector<cs::Byte> test_data(test_data_size, 0);
+  for(int i = 0; i < test_data_size; ++i) {
+    test_data[i] = i % 10;
+  }
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed /*| BaseFlags::Fragmented*/);
+  ostream_ << MsgTypes::WriterNotification << roundNumber_;
+  ostream_ << test_data;
+#endif
+
 #ifdef SPAMMER
   runSpammer();
 #endif
@@ -296,7 +307,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   roundTable.round = rNum;
-  // TODO: what this call was intended for? transport_->clearTasks();
 
   // "normal" start
   if (roundTable.round == 1) {
@@ -1107,7 +1117,7 @@ template<typename... Args>
 void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   static constexpr cs::Byte noFlags = 0;
 
-  ostream_.init(noFlags, target);
+  ostream_.init(BaseFlags::Fragmented, target);
   csdebug() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
