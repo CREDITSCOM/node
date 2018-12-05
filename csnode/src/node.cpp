@@ -1321,7 +1321,7 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
   solver_->gotStageOneRequest(requesterNumber, requiredNumber);
 }
 
-void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature signature, const MsgTypes msgType, const uint8_t requester) {
+void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csprint() << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
@@ -1775,7 +1775,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   sendRoundTable(roundTable, poolMetaInfo, poolSignature);
 }
 
-void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature) {
+void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNumber_ = roundTable.round;
 
@@ -1868,7 +1868,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   blockchainSync();
   reviewConveyerHashes();
 
-  cslog() << "NODE> " << __func__ << "(): done\n";
+  csprint() << "done\n";
 }
 
 void Node::sendHash(cs::RoundNumber round) {

@@ -55,8 +55,7 @@ public:
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void sendStageReply(const uint8_t sender, const cscrypto::Signature sig, const MsgTypes msgType, const uint8_t requester);
-  // SOLVER3 methods
+  void sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
   void sendStageOne(cs::StageOne&);
 
   // sends StageOne request to respondent about required
@@ -77,7 +76,7 @@ public:
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
+  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   //smart-contracts consensus stages sending and getting 
