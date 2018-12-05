@@ -116,9 +116,18 @@ public:
 
   ///
   /// @brief Returns confidant key at current round table by index.
-  /// @warning call isConfidantExits before using this method
+  /// @warning call isConfidantExits before using this method.
   ///
   const cs::PublicKey& confidantByIndex(size_t index) const;
+
+  ///
+  /// @brief Returns confidant public key if confidant exists in round table.
+  /// @param index. Index of condifant.
+  /// @warning Returns copy of public key.
+  ///
+  std::optional<cs::PublicKey> confidantIfExists(size_t index) const;
+
+  // round information interfaces
 
   ///
   /// @brief Returns blockchain round table of Round key.
@@ -257,6 +266,9 @@ public slots:
 
   /// try to send transactions packets to network
   void flushTransactions();
+
+protected:
+  void removeHashesFromTable(const cs::PacketsHashes& hashes);
 
 private:
   /// pointer implementation
