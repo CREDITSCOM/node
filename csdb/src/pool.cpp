@@ -207,8 +207,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    next_confidants_.clear();
-    next_confidants_.reserve(cnt);
+    signatures_.clear();
+    signatures_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       int index;
       ::std::string sig;
