@@ -45,8 +45,8 @@ WalletsCache::Initer::Initer(WalletsCache& data)
   walletsSpecial_.reserve(data_.config_.initialWalletsNum_);
 }
 
-void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr) {
-  load(curr);
+void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants) {
+  load(curr, confidants);
 }
 
 // Updater
@@ -55,36 +55,55 @@ WalletsCache::Updater::Updater(WalletsCache& data)
   modified_.resize(data.wallets_.size(), false);
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr) {
+void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants) {
   modified_.reset();
-  load(curr);
+  load(curr, confidants);
 }
 
 // ProcessorBase
-void WalletsCache::ProcessorBase::load(csdb::Pool& pool) {
+void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::vector<uint8_t>>& confidants) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
-  csdb::Address writer_address = writer_address.from_public_key(pool.writer_public_key());
-
+  double totalAmountOfCountedFee = 0;
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
-    load(*itTrx, writer_address);
+    totalAmountOfCountedFee += load(*itTrx);
+  }
+  cslog() << "WALLETS CACHE>> total amount of counted fee in pool: " << totalAmountOfCountedFee;
+  fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
+}
+
+void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants) {
+  if (!confidants.size()) {
+    cslog() << "WALLETS CACHE>> NO CONFIDANTS";
+    return;
+  }
+  double feeToEachConfidant = totalFee / confidants.size();
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    WalletId confidantId{};
+    csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
+    if (!findWalletId(confidantAddress, confidantId)) {
+      LOG_ERROR("Cannot find confidant wallet, source is " << confidantAddress.to_string());
+      return;
+    }
+    WalletData& walletData = getWalletData(confidantId, confidantAddress);
+    walletData.balance_ += feeToEachConfidant;
+    setModified(confidantId);
   }
 }
 
-void WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const csdb::Address& writer_public_key) {
-  loadTrxForSource(tr, writer_public_key);
+double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr) {
   loadTrxForTarget(tr);
+  return loadTrxForSource(tr);
 }
 
-void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr,
-                                                   const csdb::Address& writer_public_key) {
+double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr) {
   csdb::Address wallAddress = tr.source();
 
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
-    return;
+    return 0;
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
     LOG_ERROR("Cannot find source wallet, source is " << wallAddress.to_string());
-    return;
+    return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
   wallData.balance_ -= tr.amount();
@@ -92,14 +111,7 @@ void WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr,
   wallData.trxTail_.push(tr.innerID());
   setModified(id);
 
-  WalletId writer_id{};
-  if (!findWalletId(writer_public_key, writer_id)) {
-    // maybe we should cache writer public key here
-    LOG_ERROR("Cannot find writer wallet, writer is " << writer_public_key.to_string());
-    return;
-  }
-  WalletData& writerWall = getWalletData(writer_id, writer_public_key);
-  writerWall.balance_ += tr.counted_fee().to_double();
+  return tr.counted_fee().to_double();
 }
 
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {
