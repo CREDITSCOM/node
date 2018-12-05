@@ -38,6 +38,7 @@
 
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
+#define className typeid(*this).name
 
 namespace cs {
 enum class Direction : uint8_t {
