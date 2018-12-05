@@ -117,6 +117,16 @@ public:
   csdb::PoolHash getHashBySequence(uint32_t seq) const;
   csdb::PoolHash getLastWrittenHash() const;
 
+#ifdef TRANSACTIONS_INDEX
+  csdb::TransactionID getLastTransaction(const csdb::Address&);
+  csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
+
+  //std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
+  //std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+
+  //uint64_t getTransactionsCount() const { return transactionsCount_; }
+#endif
+
   // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
@@ -264,5 +274,32 @@ private:
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;
 };
+
+class TransactionsIterator {
+public:
+  TransactionsIterator(BlockChain&, const csdb::Address&);
+
+  void next();
+  bool isValid() const;
+
+  const csdb::Pool& getPool() const { return lapoo_; }
+
+  const csdb::Transaction& operator*() const { return *it_; }
+  auto operator->() const { return it_; }
+
+private:
+#ifdef TRANSACTIONS_INDEX
+  void setFromTransId(const csdb::TransactionID&);
+#else
+  void setFromHash(const csdb::PoolHash&);
+#endif
+
+  BlockChain& bc_;
+
+  csdb::Address addr_;
+  csdb::Pool lapoo_;
+  std::vector<csdb::Transaction>::const_reverse_iterator it_;
+};
+
 
 #endif  //  BLOCKCHAIN_HPP

@@ -383,4 +383,46 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
   return Database::IteratorPtr(new DatabaseBerkeleyDB::Iterator(cursorp));
 }
 
+#ifdef TRANSACTIONS_INDEX
+/*bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array &value) {
+  if (!db_trans_idx_) {
+    set_last_error(NotOpen);
+    return false;
+  }
+
+  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<byte_array> db_value(value);
+
+  int status = db_trans_idx_->put(nullptr, &db_key, &db_value, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  set_last_error();
+  return true;
+}*/
+
+bool DatabaseBerkeleyDB::getFromTransIndex(const byte_array &key, byte_array *value) {
+  if (!db_trans_idx_) {
+    set_last_error(NotOpen);
+    return false;
+  }
+
+  Dbt_copy<byte_array> db_key(key);
+  Dbt_safe db_value;
+
+  int status = db_trans_idx_->get(nullptr, &db_key, &db_value, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+
+  auto begin = reinterpret_cast<uint8_t *>(db_value.get_data());
+  value->assign(begin, begin + db_value.get_size());
+  set_last_error();
+  return true;
+}
+#endif
+
 }  // namespace csdb

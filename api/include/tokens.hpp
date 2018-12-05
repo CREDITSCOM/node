@@ -79,11 +79,16 @@ public:
 
   static bool isTransfer(const std::string& method,
                          const std::vector<std::string>& params);
+  //static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
+
 
   static std::pair<csdb::Address, csdb::Address>
   getTransferData(const csdb::Address& initiator,
                   const std::string& method,
                   const std::vector<std::string>& params);
+  /*static std::pair<csdb::Address, csdb::Address> getTransferData(const csdb::Address& initiator,
+      const std::string& method,
+      const std::vector<general::Variant>& params);*/
 
   static std::string getAmount(const api::SmartContractInvocation&);
 

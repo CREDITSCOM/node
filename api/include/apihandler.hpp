@@ -111,10 +111,15 @@ public:
   //void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
 
   ////////new
+  void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
+  ////////new
   std::string getSmartByteCode(const csdb::Address&, bool&);
   void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
   void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
   ::executor::ContractExecutorConcurrentClient& getExecutor();
+
+  void TokenBalancesGet(api::TokenBalancesResult&, const api::Address&) override;
+  void TokenTransfersGet(api::TokenTransfersResult&, const api::Address& token, int64_t offset, int64_t limit) override;
   ////////new
 
 private:
@@ -153,7 +158,7 @@ private:
   void state_updater_work_function();
   void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& code,
                          const std::string& state, const std::string& method,
-                         const std::vector<::general::Variant>& params);
+                         const std::vector<std::string>& params); //::general::Variant
 
   std::vector<api::SealedTransaction> extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 
@@ -178,6 +183,8 @@ private:
   ::csdb::Transaction make_transaction(const ::api::Transaction&);
   void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
   void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+
+  TokensMaster tm;
 };
 
 class SequentialProcessorFactory;

@@ -927,3 +927,119 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet)
   }
   fee_->CountFeesInPool(*this, &packet);
 }
+
+#ifdef TRANSACTIONS_INDEX
+csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
+  /*std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  auto wd = walletsCache_->findWallet(addr.public_key());
+  if (!wd) return csdb::TransactionID();
+  return wd->lastTransaction_;*/
+
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  BlockChain::Transactions transactions;
+  getTransactions(transactions, addr, static_cast<uint64_t>(0), static_cast<uint64_t>(1));//last trx
+  return transactions[0].id();
+}
+
+csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
+  std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+  return storage_.get_previous_transaction_block(addr, ph);
+}
+
+/*std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
+  std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+  return std::make_pair(lastNonEmptyBlock_.hash, lastNonEmptyBlock_.transCount);
+}
+
+std::pair<csdb::PoolHash, uint32_t> BlockChain::getPreviousNonEmptyBlock(const csdb::PoolHash& ph) {
+  std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+  const auto it = previousNonEmpty_.find(ph);
+  if (it != previousNonEmpty_.end())
+    return std::make_pair(it->second.hash, it->second.transCount);
+
+  return std::pair<csdb::PoolHash, uint32_t>();
+}*/
+
+TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr) : bc_(bc), addr_(addr) {
+  setFromTransId(bc_.getLastTransaction(addr));
+}
+
+void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
+  if (lTrans.is_valid()) {
+    lapoo_ = bc_.loadBlock(lTrans.pool_hash());
+    it_ = lapoo_.transactions().rbegin() + (lapoo_.transactions().size() - lTrans.index() - 1);
+  }
+  else lapoo_ = csdb::Pool{};
+}
+
+bool TransactionsIterator::isValid() const {
+  return lapoo_.is_valid();
+}
+
+void TransactionsIterator::next() {
+  while (++it_ != lapoo_.transactions().rend()) {
+    if (it_->source() == addr_ || it_->target() == addr_)
+      break;
+  }
+
+  // Oops, no more in this block
+  if (it_ == lapoo_.transactions().rend()) {
+    auto ph = bc_.getPreviousPoolHash(addr_, lapoo_.hash());
+    lapoo_ = bc_.loadBlock(ph);
+
+    if (lapoo_.is_valid()) {
+      it_ = lapoo_.transactions().rbegin();
+      // transactions() cannot be empty
+      if (it_->source() != addr_ && it_->target() != addr_)
+        next();  // next should be executed only once
+    }
+  }
+}
+
+#else
+
+void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
+  auto hash = ph;
+  bool found = false;
+
+  while (!found) {
+    lapoo_ = bc_.loadBlock(hash);
+    if (!lapoo_.is_valid()) break;
+
+    for (it_ = lapoo_.transactions().rbegin();
+      it_ != lapoo_.transactions().rend();
+      ++it_) {
+      if (it_->source() == addr_ || it_->target() == addr_) {
+        found = true;
+        break;
+      }
+    }
+
+    hash = lapoo_.previous_hash();
+  }
+}
+
+TransactionsIterator::TransactionsIterator(BlockChain& bc,
+  const csdb::Address& addr) : bc_(bc),
+  addr_(addr) {
+  setFromHash(bc_.getLastHash());
+}
+
+bool TransactionsIterator::isValid() const {
+  return lapoo_.is_valid();
+}
+
+void TransactionsIterator::next() {
+  bool found = false;
+
+  while (++it_ != lapoo_.transactions().rend()) {
+    if (it_->source() == addr_ || it_->target() == addr_) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) setFromHash(lapoo_.previous_hash());
+}
+
+#endif

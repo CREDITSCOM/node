@@ -12,4 +12,7 @@
 #define BINARY_TCP_API
 #define DEFAULT_CURRENCY 1
 
+#define TRANSACTIONS_INDEX
+//#define TOKENS_CACHE
+
 #endif
