@@ -92,7 +92,8 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       pool = loadBlock(current_sequence);
       if (!updateWalletIds(pool, initer))
         return false;
-      initer.loadPrevBlock(pool);
+      const auto& confidants = this->loadBlock(pool.previous_hash()).confidants();
+      initer.loadPrevBlock(pool, confidants);
       if (!blockHashes_->initFromPrevBlock(pool))
         return false;
 
@@ -605,10 +606,12 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     }
   }
 
-  if (pool.sequence() != 0) {
-    csdb::Pool::NewWalletInfo::AddressId addressId = {transactions.size(),
-                                                      csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
-    addNewWalletToPool(csdb::Address::from_public_key(pool.writer_public_key()), addressId, *newWallets);
+  const auto& confidants = pool.confidants();
+  size_t confWalletsIndexStart = transactions.size();
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    csdb::Pool::NewWalletInfo::AddressId addressId = { confWalletsIndexStart + i,
+                                                      csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget };
+    addNewWalletToPool(csdb::Address::from_public_key(confidants[i]), addressId, *newWallets);
   }
 }
 
@@ -620,11 +623,9 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
 
   try {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-
     csdb::Pool pool = this->loadBlock(nextPool.previous_hash());
     const auto& currentRoundConfidants = pool.confidants();
-
-    walletsCacheUpdater_->loadNextBlock(nextPool);
+    walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants);
     walletsPools_->loadNextBlock(nextPool);
 
     blockHashes_->loadNextBlock(nextPool);

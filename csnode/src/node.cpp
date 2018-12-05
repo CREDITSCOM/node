@@ -642,7 +642,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
   // look at main node
   main = (roundTable != nullptr) ? roundTable->general : cs::Conveyer::instance().currentRoundTable().general;
 
-  const bool sendToGeneral = sendNeighbour(main, msgType, round, hashes);
+  const bool sendToGeneral = sendToNeighbour(main, msgType, round, hashes);
 
   if (!sendToGeneral) {
     sendPacketHashesRequestToRandomNeighbour(hashes, round);
@@ -674,7 +674,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
 
     if (connection && !connection->isSignal) {
       successRequest = true;
-      sendNeighbour(connection, msgType, round, hashes);
+      sendToNeighbour(connection, msgType, round, hashes);
     }
   }
 
@@ -695,7 +695,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
-  const bool success = sendNeighbour(target, msgType, round, packets);
+  const bool success = sendToNeighbour(target, msgType, round, packets);
 
   if (!success) {
     csdebug() << "NODE> Reply transaction packets: failed send to "
@@ -1114,18 +1114,18 @@ void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, cons
 }
 
 template <typename... Args>
-bool Node::sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
-    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
   }
 
   return static_cast<bool>(connection);
 }
 
 template <typename... Args>
-void Node::sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -1151,7 +1151,7 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 
 template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  const bool success = sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
+  const bool success = sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
   }
@@ -1162,14 +1162,14 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
-    sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
   }
 
   return target;
 }
 
 template <class... Args>
-void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const auto& confidants = cs::Conveyer::instance().confidants();
   for (const auto& confidant : confidants) {
     sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
@@ -1188,7 +1188,7 @@ void Node::writeDefaultStream(const T& value) {
 }
 
 template<typename... Args>
-bool Node::sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   Connections connections = transport_->getNeighboursWithoutSS();
 
   if (connections.empty()) {
@@ -1196,7 +1196,7 @@ bool Node::sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, A
   }
 
   for (auto connection : connections) {
-    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
   }
 }
 
@@ -1296,14 +1296,11 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   *ptr = (uint8_t)stageOneInfo.roundTimeStamp.size();
   ptr += sizeof(uint8_t);
   memcpy(ptr, stageOneInfo.roundTimeStamp.data(), stageOneInfo.roundTimeStamp.size());
-
   cscrypto::CalculateHash(stageOneInfo.msgHash, rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash), pStageOneMsgSize);
   memcpy(rawData + sizeof(cs::RoundNumber), stageOneInfo.msgHash.data(), sizeof(cs::Hash));
-
+  cslog() << "MsgHash: " << cs::Utils::byteStreamToHex((const char*)stageOneInfo.msgHash.data(), 32);
   cscrypto::GenerateSignature(stageOneInfo.sig, solver_->getPrivateKey(), rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash));
-  pStageOneMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash))), pStageOneMsgSize);
-
-  sendConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage);
+  sendToConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage[myConfidantIndex_]);
   csdebug() << __func__ << "(): done";
 }
 
@@ -1360,7 +1357,7 @@ void Node::sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t req
     return;
   }
 
-  sendBroadcast(conveyer.confidantByIndex(requester), MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage);
+  sendDefault(conveyer.confidantByIndex(requester), MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage[stageOneInfo.sender]);
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
@@ -1376,18 +1373,17 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   istream_.init(data, size);
   size_t msgSize;
-  std::string raw_bytes;
+  std::string rawBytes;
   cs::StageOne stage;
-  istream_ >> stage.sig >> raw_bytes;
-
+  istream_ >> stage.sig
+    >> rawBytes;
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageOne packet format";
     return;
   }
+  msgSize = rawBytes.size();
 
-  msgSize = raw_bytes.size();
-
-  const uint8_t* stagePtr = (const uint8_t*)raw_bytes.data();
+  const uint8_t* stagePtr = (const uint8_t*)rawBytes.data();
   auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash)));
 
   uint8_t* rawData = (uint8_t*)memPtr.get();
@@ -1400,13 +1396,22 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   uint8_t* ptr = rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash);
   stage.sender = *ptr;
 
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
+  //const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (!conveyer.isConfidantExists(stage.sender)) {
+  //if (!conveyer.isConfidantExists(stage.sender)) {
+
+  pStageOneMessage[stage.sender] = rawBytes;
+
+  cslog() << __func__ <<  "(): Sender: " << (int)stage.sender << ", sender key: "
+    << cs::Utils::byteStreamToHex((const char*)cs::Conveyer::instance().roundTable(roundNumber_)->confidants.at(stage.sender).data(), 32) << " - " << cs::Utils::byteStreamToHex((const char*)sender.data(), 32);
+  cslog() << "Message hash: " << cs::Utils::byteStreamToHex((const char*)stage.msgHash.data(),32);
+  if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNumber_)->confidants.at(stage.sender), 
+    rawData, sizeof(cs::RoundNumber) + sizeof(cs::Hash))) {
+    cswarning() << "NODE> Stage One from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
-  const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
+  const cs::PublicKey& confidant = cs::Conveyer::instance().roundTable(roundNumber_)->confidants.at(stage.sender); //conveyer.confidantByIndex(stage.sender);
 
   cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
     << cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
@@ -1451,8 +1456,6 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   std::string currentTimeStamp((const char*)ptr, tSize);
   stage.roundTimeStamp = currentTimeStamp;
 
-  allocator_.shrinkLast(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash)));
-
   csdebug() << "NODE> Stage One from [" << int(stage.sender) << "] is OK!";
   solver_->gotStageOne(std::move(stage));
 }
@@ -1467,7 +1470,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   pStageTwoMessage.clear();
   size_t curTrustedAmount = cs::Conveyer::instance().roundTable(roundNumber_)->confidants.size();
-  pStageTwoMsgSize  = sizeof(stageTwoInfo.sender)
+  size_t pStageTwoMsgSize  = sizeof(stageTwoInfo.sender)
                     + sizeof(stageTwoInfo.sender) 
                     + (sizeof(cs::Signature) + sizeof(cs::Hash)) * curTrustedAmount;
 
@@ -1491,12 +1494,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   cscrypto::GenerateSignature(stageTwoInfo.sig, solver_->getPrivateKey(), rawData, pStageTwoMsgSize + sizeof(cs::RoundNumber));
 
-  pStageTwoMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber))), pStageTwoMsgSize);
+  pStageTwoMessage[myConfidantIndex_] = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber))), pStageTwoMsgSize);
 
-  sendConfidants(MsgTypes::SecondStage, roundNumber_, pStageTwoMsgSize, stageTwoInfo.sig, pStageTwoMessage);
-
-  allocator_.shrinkLast(static_cast<uint32_t>(pStageTwoMsgSize + sizeof(cs::RoundNumber)));
-  csprint() << "done";
+  sendToConfidants(MsgTypes::SecondStage, roundNumber_, stageTwoInfo.sig, pStageTwoMessage[myConfidantIndex_]);
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::requestStageTwo(uint8_t respondent, uint8_t required) {
@@ -1543,14 +1544,13 @@ void Node::sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t req
     cswarning() << "Only confidant nodes can send consensus stages";
     return;
   }
-
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isConfidantExists(requester)) {
     return;
   }
 
-  sendBroadcast(conveyer.confidantByIndex(requester), MsgTypes::SecondStage, roundNumber_, pStageTwoMsgSize, stageTwoInfo.sig, pStageTwoMessage);
+  sendDefault(conveyer.confidantByIndex(requester), MsgTypes::SecondStage, roundNumber_, stageTwoInfo.sig, pStageTwoMessage[stageTwoInfo.sender]);
   csprint() << "done";
 }
 
@@ -1562,12 +1562,12 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
+  cslog() << "Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   istream_.init(data, size);
 
   size_t msgSize;
   cs::StageTwo stage;
-  istream_ >> msgSize >> stage.sig;
-
+  istream_ >> stage.sig;
   std::string rawBytes;
   istream_ >> rawBytes;
 
@@ -1577,13 +1577,13 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   }
 
   const uint8_t* stagePtr = (uint8_t*)rawBytes.data();
-  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber)));
+  msgSize = rawBytes.size();
+  auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber));
   uint8_t* rawData = (uint8_t*)memPtr.get();
-
   memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
-  memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, rawBytes.size());
-
-  stage.sender = *(rawData + sizeof(cs::RoundNumber));
+  memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, msgSize);
+  stage.sender = *stagePtr;
+  pStageTwoMessage[stage.sender] = rawBytes;
 
   cslog() << __func__  << "(): Sender :" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1596,7 +1596,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     cslog() << "Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
-
+  cslog() << "Signature is OK";
   rawData += (sizeof(uint8_t) + sizeof(cs::RoundNumber));
   uint8_t trustedAmount = *rawData;
   rawData += sizeof(uint8_t);
@@ -1614,9 +1614,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     rawData += sizeof(cs::Hash);
   }
 
-  allocator_.shrinkLast(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber)));
-
-  csdebug() << "NODE> Stage Two from [" << int(stage.sender) << "] is OK!";
+  csdebug() << "NODE> Stage Two from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageTwo(std::move(stage));
 }
 
@@ -1628,7 +1626,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     return;
   }
 
-  pStageThreeMsgSize = 2 * sizeof(uint8_t) + 3 * sizeof(cs::Hash) + stageThreeInfo.realTrustedMask.size();
+  size_t pStageThreeMsgSize = 2 * sizeof(uint8_t) + 3 * sizeof(cs::Hash) + stageThreeInfo.realTrustedMask.size();
   pStageThreeMessage.clear();
 
   auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(pStageThreeMsgSize + sizeof(cs::RoundNumber)));
@@ -1638,8 +1636,6 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
   rawData += sizeof(cs::RoundNumber);
 
-  *rawData = stageThreeInfo.sender;
-  rawData += sizeof(uint8_t);
   *rawData = stageThreeInfo.sender;
   rawData += sizeof(uint8_t);
   *rawData = stageThreeInfo.writer;
@@ -1655,12 +1651,10 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   memcpy(rawData, stageThreeInfo.realTrustedMask.data(), stageThreeInfo.realTrustedMask.size());
 
   cscrypto::GenerateSignature(stageThreeInfo.sig,solver_->getPrivateKey(), msgPtr,pStageThreeMsgSize + sizeof(cs::RoundNumber));
-  pStageThreeMessage = std::string(cs::numeric_cast<const char*>((void*)(msgPtr + sizeof(cs::RoundNumber))), pStageThreeMsgSize);
+  pStageThreeMessage[myConfidantIndex_] = std::string(cs::numeric_cast<const char*>((void*)(msgPtr + sizeof(cs::RoundNumber))), pStageThreeMsgSize);
+  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.sig, pStageThreeMessage[myConfidantIndex_]);
 
-  sendConfidants(MsgTypes::ThirdStage, roundNumber_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
-
-  allocator_.shrinkLast(static_cast<uint32_t>(pStageThreeMsgSize + sizeof(cs::RoundNumber)));
-  csprint() << "done";
+  csdebug() << "NODE> " << __func__ << "(): done";
 }
 
 void Node::requestStageThree(uint8_t respondent, uint8_t required) {
@@ -1707,8 +1701,7 @@ void Node::sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8
   }
 
   const auto& confidants = cs::Conveyer::instance().roundTable(roundNumber_)->confidants;
-  sendDefault(confidants.at(requester), MsgTypes::ThirdStage, roundNumber_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
-
+  sendDefault(confidants.at(requester), MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.sig, pStageThreeMessage[stageThreeInfo.sender]);
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
@@ -1719,32 +1712,35 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     return;
   }
 
-  size_t msgSize;
   istream_.init(data, size);
   cs::StageThree stage;
-  istream_ >> msgSize
-    >> stage.sig;
-  std::string raw_bytes;
-  istream_ >> raw_bytes;
-  const uint8_t* stagePtr = (uint8_t*)raw_bytes.data();
+  istream_  >> stage.sig;
+  std::string rawBytes;
+  istream_ >> rawBytes;
+
+  const uint8_t* stagePtr = (uint8_t*)rawBytes.data();
+  size_t msgSize = rawBytes.size();
   auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber));
   uint8_t* rawData = (uint8_t*)memPtr.get();
+
   memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
   memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, msgSize);
   if (!istream_.good() || !istream_.end()) {
     cserror() << "NODE> Bad StageTwo packet format";
     return;
   }
+
   //rawData += sizeof(cs::RoundNumber);
-  stage.sender = *(rawData + sizeof(cs::RoundNumber));
+  stage.sender = *stagePtr;
+  pStageThreeMessage[stage.sender] = rawBytes ;
   //cslog() << "Received message: "<< byteStreamToHex((const char*)rawData, msgSize);
 
-  
+
   if (!cscrypto::VerifySignature(stage.sig, cs::Conveyer::instance().roundTable(roundNumber_)->confidants.at(stage.sender), rawData, msgSize + sizeof(cs::RoundNumber))) {
     cswarning() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
-  
+
   rawData += (sizeof(cs::RoundNumber) + sizeof(uint8_t));
   stage.writer = *rawData;
   rawData += sizeof(uint8_t);
@@ -1754,12 +1750,13 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   rawData += stage.hashCandidatesList.size();
   memcpy(stage.hashHashesList.data(), rawData, stage.hashHashesList.size());
   rawData += stage.hashHashesList.size();
-  uint8_t mSize8 = (uint8_t)*rawData;
-  size_t mSize = mSize8;
+  //uint8_t mSize8 = (uint8_t)*rawData;
+  size_t mSize = cs::Conveyer::instance().roundTable(roundNumber_)->confidants.size();
   rawData += sizeof(uint8_t);
   std::string realTrustedMask((const char*)rawData, mSize);
-  memcpy(stage.realTrustedMask.data(), realTrustedMask.data(), mSize);
-  allocator_.shrinkLast(msgSize);
+  //memcpy(stage.realTrustedMask., realTrustedMask.data(), mSize); -- do not remove before repairing!!!
+  //stage.realTrustedMask = realTrustedMask;
+
   csdebug() << "NODE> Stage Three from [" << (int)stage.sender << "] is OK!";
   solver_->gotStageThree(std::move(stage));
 }
@@ -2110,6 +2107,13 @@ void Node::onRoundStart_V3(const cs::RoundTable& roundTable) {
   if (!found) {
     myLevel_ = NodeLevel::Normal;
   }
+
+  pStageOneMessage.clear();
+  pStageOneMessage.resize(roundTable.confidants.size());
+  pStageTwoMessage.clear();
+  pStageTwoMessage.resize(roundTable.confidants.size());
+  pStageThreeMessage.clear();
+  pStageThreeMessage.resize(roundTable.confidants.size());
 
   constexpr int pad_width = 30;
   int width = 0;
