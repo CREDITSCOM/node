@@ -62,17 +62,14 @@ public:
 
   // sends StageOne request to respondent about required
   void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-  void requestStageOne(uint8_t respondent, uint8_t required);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageOneReply(const cs::StageOne& stageOneInfo, const uint8_t requester);
-
+   
   void sendStageTwo(cs::StageTwo&);
-  void requestStageTwo(uint8_t respondent, uint8_t required);
   void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageTwoReply(const cs::StageTwo& stageTwoInfo, const uint8_t requester);
 
   void sendStageThree(cs::StageThree&);
-  void requestStageThree(uint8_t respondent, uint8_t required);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageThreeReply(const cs::StageThree& stageThreeInfo, const uint8_t requester);
 
@@ -87,6 +84,8 @@ public:
 
   void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, cs::Signature poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
+
+  //smart-contracts consensus stages sending and getting 
 
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
   void handleRoundMismatch(const cs::RoundTable& global_table);
@@ -313,9 +312,13 @@ private:
     cs::Notifications notifications;
   };
 
-  std::vector <std::string> pStageOneMessage;
-  std::vector <std::string> pStageTwoMessage;
-  std::vector <std::string> pStageThreeMessage;
+  std::vector <std::string> pStageOneMessage_;
+  std::vector <std::string> pStageTwoMessage_;
+  std::vector <std::string> pStageThreeMessage_;
+
+  std::vector <std::string> pStageOneSmartsMessage_;
+  std::vector <std::string> pStageTwoSmartsMessage_;
+  std::vector <std::string> pStageThreeSmartsMessage_;
 
   SentRoundData lastSentRoundData_;
 
