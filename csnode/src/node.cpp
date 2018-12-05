@@ -1223,13 +1223,6 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
   ostream_.clear();
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////                                              SOLVER 3 METHODS (START)                                     ////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//      | |                                          | |                                               | |
-//      \ /                                          \ /                                               \ /
-//       V                                            V                                                 V
-
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1255,7 +1248,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
                   + stageOneInfo.roundTimeStamp.size();
 
   size_t hashedMsgSize = pStageOneMsgSize + sizeof(cs::RoundNumber) + sizeof(cs::Hash);
-  auto memPtr = allocator_.allocateNext(hashedMsgSize);
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(hashedMsgSize));
   uint8_t* rawData = (uint8_t*)memPtr.get();
   uint8_t* ptr = rawData;
 
@@ -1482,7 +1475,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
                     + sizeof(stageTwoInfo.sender) 
                     + (sizeof(cs::Signature) + sizeof(cs::Hash)) * curTrustedAmount;
 
-  auto memPtr = allocator_.allocateNext(pStageTwoMsgSize + sizeof(cs::RoundNumber));
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(pStageTwoMsgSize + sizeof(cs::RoundNumber)));
   uint8_t* rawData = (uint8_t*)memPtr.get();
   uint8_t* ptr = rawData;
   memcpy(ptr, &roundNumber_, sizeof(cs::RoundNumber));
@@ -1564,7 +1557,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   const uint8_t* stagePtr = (uint8_t*)rawBytes.data();
   msgSize = rawBytes.size();
-  auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber));
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber)));
   uint8_t* rawData = (uint8_t*)memPtr.get();
   memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
   memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, msgSize);
@@ -1676,6 +1669,7 @@ void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs
 
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   csdetails() << "NODE> " << __func__ << "()";
+  csunused(sender);
 
   if (myLevel_ != NodeLevel::Confidant && myLevel_ != NodeLevel::Writer) {
     csdebug() << "NODE> ignore stage-3 as no confidant";
@@ -1690,7 +1684,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 
   const uint8_t* stagePtr = (uint8_t*)rawBytes.data();
   size_t msgSize = rawBytes.size();
-  auto memPtr = allocator_.allocateNext(msgSize + sizeof(cs::RoundNumber));
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber)));
   uint8_t* rawData = (uint8_t*)memPtr.get();
 
   memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
@@ -2110,9 +2104,11 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     i++;
   }
   cslog() << " Hashes: " << roundTable.hashes.size();
-  for (int i=0; i< roundTable.hashes.size(); i++) {
+
+  for (size_t i=0; i< roundTable.hashes.size(); i++) {
     csdetails() << "[" << i << "] " << cs::Utils::byteStreamToHex(roundTable.hashes.at(i).toBinary().data(), roundTable.hashes.at(i).size());
   }
+
   cslog() << line2.str();
   stat_.onRoundStart(roundNumber_);
   cslog() << line2.str();
