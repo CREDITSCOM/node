@@ -731,19 +731,21 @@ Pool Pool::load(const PoolHash& hash, Storage storage) {
 
 bool Pool::getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const {
   const csdb::Pool::Transactions& transactions = this->transactions();
+  const auto& conf = this->confidants();
+  size_t max_new_wallets_size = transactions.size() + conf.size();
 
   size_t idx = info.addressId_.trxInd_;
-  if (idx > transactions.size()) {
+  if (idx >= max_new_wallets_size) {
     return false;
   }
-  if (idx == transactions.size()) {
-    wallAddress = csdb::Address::from_public_key(this->writer_public_key());
+  if (idx < transactions.size()) {
+    csdb::Transaction trx = transactions[idx];
+    const bool isSource = (info.addressId_.addressType_ == NewWalletInfo::AddressType::AddressIsSource);
+    wallAddress = (isSource) ? trx.source() : trx.target();
     return true;
   }
 
-  csdb::Transaction trx = transactions[idx];
-  const bool isSource = (info.addressId_.addressType_ == NewWalletInfo::AddressType::AddressIsSource);
-  wallAddress = (isSource) ? trx.source() : trx.target();
+  wallAddress = csdb::Address::from_public_key(this->confidants()[idx - transactions.size()]);
   return true;
 }
 
