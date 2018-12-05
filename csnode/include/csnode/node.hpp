@@ -60,7 +60,7 @@ public:
   void sendStageOne(cs::StageOne&);
 
   // sends StageOne request to respondent about required
-  void getHash_V3(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+  void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
    
   void sendStageTwo(cs::StageTwo&);

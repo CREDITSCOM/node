@@ -71,7 +71,6 @@ enum MsgTypes : uint8_t {
   TransactionsPacketReply,
   NewCharacteristic,
   WriterNotification,
-  BlockHashV3,
   NodeStopRequest = 255
 };
 
