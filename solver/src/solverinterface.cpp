@@ -84,69 +84,6 @@ namespace cs
     }
   }
 
-  void SolverCore::gotTransaction(const csdb::Transaction& trans)
-  {
-    if(!pstate) {
-      return;
-    }
-    // produces too much output:
-    csdebug() << "SolverCore: got transaction " << trans.innerID() << " from " << trans.source().to_string();
-    if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
-      handleTransitions(Event::Transactions);
-    }
-  }
-
-  void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
-  {
-    if(!pstate) {
-      return;
-    }
-    csdebug() << "SolverCore: gotBlock()";
-    if(stateCompleted(pstate->onBlock(*pcontext, p, sender))) {
-      handleTransitions(Event::Block);
-    }
-  }
-
-  void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash)
-  {
-    std::ostringstream os;
-    os << "SolverCore: got request for block, ";
-    // state does not take part
-    if(pnode != nullptr) {
-      csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
-      if(p.is_valid()) {
-        os << "[" << p.sequence() << "] found, sending";
-        //                pnode->sendBlockReply(p, sender);
-      }
-      else {
-        os << "not found";
-      }
-    }
-    else {
-      os << "cannot handle";
-    }
-    if(Consensus::Log) {
-      csinfo() << os.str();
-    }
-  }
-
-  void SolverCore::gotBlockReply(csdb::Pool&)
-  {
-    if(!pstate) {
-      return;
-    }
-    // "uncache" stored hashes if any
-    if(!recv_hash.empty()) {
-      if(cur_round - pnode->getBlockChain().getLastWrittenSequence() == 1) {
-        for(const auto& hash_info : recv_hash) {
-          if(stateCompleted(pstate->onHash(*pcontext, hash_info.first, hash_info.second))) {
-            handleTransitions(Event::Hashes);
-          }
-        }
-      }
-    }
-  }
-
   void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
   {
     csdb::Pool::sequence_t delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
@@ -309,6 +246,29 @@ namespace cs
 
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
+    // if case of smart contract
+   
+    //TODO: how to detect smart contract in trx
+    constexpr csdb::user_field_id_t smart_state_idx = ~1; // see apihandler.cpp #9
+    const auto state_fld = tr.user_field(smart_state_idx); // see apihandler.cpp #495
+    if(state_fld.is_valid()) {
+      // extract smart contract
+      const auto& smart_fld = tr.user_field(0); // see apihandler.cpp #494
+      if(smart_fld.is_valid()) {
+        const auto smart_contract = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
+
+        //if(stateCompleted(pstate->onSmartContractDeploy(*pcontext, smart_contract))) {
+          handleTransitions(Event::SmartDeploy);
+        //}
+      }
+      else {
+        // error
+      }
+
+      return;
+    }
+
+    // in case of ordinary trx
     cs::Conveyer::instance().addTransaction(tr);
   }
 
