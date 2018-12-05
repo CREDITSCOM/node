@@ -642,7 +642,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
   // look at main node
   main = (roundTable != nullptr) ? roundTable->general : cs::Conveyer::instance().currentRoundTable().general;
 
-  const bool sendToGeneral = sendNeighbour(main, msgType, round, hashes);
+  const bool sendToGeneral = sendToNeighbour(main, msgType, round, hashes);
 
   if (!sendToGeneral) {
     sendPacketHashesRequestToRandomNeighbour(hashes, round);
@@ -674,7 +674,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
 
     if (connection && !connection->isSignal) {
       successRequest = true;
-      sendNeighbour(connection, msgType, round, hashes);
+      sendToNeighbour(connection, msgType, round, hashes);
     }
   }
 
@@ -695,7 +695,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
   const auto msgType = MsgTypes::TransactionsPacketReply;
-  const bool success = sendNeighbour(target, msgType, round, packets);
+  const bool success = sendToNeighbour(target, msgType, round, packets);
 
   if (!success) {
     csdebug() << "NODE> Reply transaction packets: failed send to "
@@ -1114,18 +1114,18 @@ void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, cons
 }
 
 template <typename... Args>
-bool Node::sendNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ConnectionPtr connection = transport_->getConnectionByKey(target);
 
   if (connection) {
-    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
   }
 
   return static_cast<bool>(connection);
 }
 
 template <typename... Args>
-void Node::sendNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
   ostream_ << msgType << round;
 
@@ -1151,7 +1151,7 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 
 template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  const bool success = sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
+  const bool success = sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
   if (!success) {
     sendBroadcast(target, msgType, round, std::forward<Args>(args)...);
   }
@@ -1162,14 +1162,14 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
   ConnectionPtr target = transport_->getRandomNeighbour();
 
   if (target) {
-    sendNeighbour(target, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
   }
 
   return target;
 }
 
 template <class... Args>
-void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const auto& confidants = cs::Conveyer::instance().confidants();
   for (const auto& confidant : confidants) {
     sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
@@ -1188,7 +1188,7 @@ void Node::writeDefaultStream(const T& value) {
 }
 
 template<typename... Args>
-bool Node::sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   Connections connections = transport_->getNeighboursWithoutSS();
 
   if (connections.empty()) {
@@ -1196,7 +1196,7 @@ bool Node::sendNeighbours(const MsgTypes msgType, const cs::RoundNumber round, A
   }
 
   for (auto connection : connections) {
-    sendNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+    sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
   }
 }
 
@@ -1304,7 +1304,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   pStageOneMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber) + sizeof(cs::Hash))), pStageOneMsgSize);
 
 
-  sendConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage);
+  sendToConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, pStageOneMessage);
 
   //allocator_.shrinkLast(cs::numeric_cast<uint32_t>(hashedMsgSize));
   csdebug() << __func__ << "(): done";
@@ -1503,7 +1503,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   pStageTwoMessage = std::string(cs::numeric_cast<const char*>((void*)(rawData + sizeof(cs::RoundNumber))), pStageTwoMsgSize);
 
-  sendConfidants(MsgTypes::SecondStage, roundNumber_, pStageTwoMsgSize, stageTwoInfo.sig, pStageTwoMessage);
+  sendToConfidants(MsgTypes::SecondStage, roundNumber_, pStageTwoMsgSize, stageTwoInfo.sig, pStageTwoMessage);
 
   // cslog() << "Sending message [" << pStageTwoMsgSize << "] :" << cs::Utils::byteStreamToHex((const char*)pStageTwoMessage.data(), pStageTwoMsgSize);
   // cslog() << "NODE> Sending StageTwo:";
@@ -1674,7 +1674,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   cscrypto::GenerateSignature(stageThreeInfo.sig,solver_->getPrivateKey(), msgPtr,pStageThreeMsgSize + sizeof(cs::RoundNumber));
   pStageThreeMessage = std::string(cs::numeric_cast<const char*>((void*)(msgPtr + sizeof(cs::RoundNumber))), pStageThreeMsgSize);
 
-  sendConfidants(MsgTypes::ThirdStage, roundNumber_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
+  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, pStageThreeMsgSize, stageThreeInfo.sig, pStageThreeMessage);
 
   allocator_.shrinkLast(pStageThreeMsgSize + sizeof(cs::RoundNumber));
 
