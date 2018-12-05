@@ -278,6 +278,8 @@ private:
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
+  
+
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;
   std::vector <cs::TransactionsPacketHash> hashes_candidates;
