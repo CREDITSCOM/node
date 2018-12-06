@@ -214,7 +214,7 @@ void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData:
   }*/
 
   for (const auto& wdp : wallets_) {
-    if (!func(wdp->address_, *wdp))
+    if (wdp != nullptr && !func(wdp->address_, *wdp))
       break;
   }
 }
