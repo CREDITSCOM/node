@@ -376,6 +376,11 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   return send_transaction;
 }
 
+void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  walletsCacheStorage_->iterateOverWallets(func);
+}
+
 std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
   auto bs = fromByteArray(tr.to_byte_stream_for_sig());
   return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
@@ -398,7 +403,7 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 
 void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address,
                                    const std::string& code, const std::string& state, const std::string& method,
-                                   const std::vector<std::string>& params) { //general::Variant
+                                   const std::vector<general::Variant>& params) { //general::Variant
   static std::mutex m;
   std::lock_guard<std::mutex> lk(m);
   using transport_type = decltype(executor_transport)::element_type;
@@ -1416,5 +1421,152 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
   });
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+//////////Wallets
+typedef std::list<std::pair<const cs::WalletsCache::WalletData::Address*,
+  const cs::WalletsCache::WalletData*>> WCSortedList;
+template <typename T>
+void walletStep(const cs::WalletsCache::WalletData::Address* addr,
+  const cs::WalletsCache::WalletData* wd,
+  const uint64_t num,
+  std::function<const T&(const cs::WalletsCache::WalletData&)> getter,
+  std::function<bool(const T&, const T&)> comparator,
+  WCSortedList& lst) {
+  assert(num > 0);
+
+  const T& val = getter(*wd);
+  if (lst.size() < num || comparator(val, getter(*(lst.back().second)))) {
+    // Guess why I can't use std::upper_bound in here
+    // C++ is not as expressive as I've imagined it to be...
+    auto it = lst.begin();
+    while (it != lst.end() && !comparator(val, getter(*(it->second)))) /* <-- this looks more like Lisp, doesn't it... */
+      ++it;
+
+    lst.insert(it, std::make_pair(addr, wd));
+    if (lst.size() > num) lst.pop_back();
+  }
+}
+
+template <typename T>
+void iterateOverWallets(std::function<const T&(const cs::WalletsCache::WalletData&)> getter,
+  const uint64_t num,
+  const bool desc,
+  WCSortedList& lst,
+  BlockChain& bc) {
+  std::function<bool(const T&, const T&)> comparator;
+  if (desc) comparator = std::greater<T>();
+  else comparator = std::less<T>();
+
+  bc.iterateOverWallets([&lst,
+    num,
+    getter,
+    comparator]
+    (const cs::WalletsCache::WalletData::Address& addr,
+      const cs::WalletsCache::WalletData& wd) {
+    if (!addr.empty() && wd.balance_ >= csdb::Amount(0))
+      walletStep(&addr,
+        &wd,
+        num,
+        getter,
+        comparator,
+        lst);
+    return true;
+  });
+}
+
+void
+APIHandler::WalletsGet(WalletsGetResult& _return,
+  int64_t _offset,
+  int64_t _limit,
+  int8_t _ordCol,
+  bool _desc) {
+  if (!validatePagination(_return, *this, _offset, _limit)) return;
+
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+
+  WCSortedList lst;
+  const uint64_t num = _offset + _limit;
+
+  if (_ordCol == 0) {  // Balance
+    iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; },
+      num, _desc, lst, s_blockchain);
+  }
+#ifdef MONITOR_NODE
+  else if (_ordCol == 1) {  // TimeReg
+    iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; },
+      num, _desc, lst, s_blockchain);
+  }
+  else {  // Tx count
+    iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; },
+      num, _desc, lst, s_blockchain);
+  }
+#endif
+
+  if (lst.size() < (uint64_t)_offset) return;
+
+  auto ptr = lst.begin();
+  std::advance(ptr, _offset);
+
+  for (; ptr != lst.end(); ++ptr) {
+    api::WalletInfo wi;
+
+    //wi.address = fromByteArray(*(ptr->first));
+    //
+    std::string res;
+    std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
+    wi.address = res;
+    //
+    
+    wi.balance.integral = ptr->second->balance_.integral();
+    wi.balance.fraction = ptr->second->balance_.fraction();
+#ifdef MONITOR_NODE
+    wi.transactionsNumber = ptr->second->transNum_;
+    wi.firstTransactionTime = ptr->second->createTime_;
+#endif
+
+    _return.wallets.push_back(wi);
+  }
+
+  _return.count = s_blockchain.getWalletsCount();
+}
+
+void
+APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
+#ifdef MONITOR_NODE
+  const static uint32_t PER_PAGE = 256;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  _page = std::max(int32_t(0), _page);
+
+  uint32_t offset = _page * PER_PAGE;
+  uint32_t limit = PER_PAGE;
+  uint32_t total = 0;
+
+  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const Credits::WalletsCache::WalletData::Address& addr, const Credits::WalletsCache::WriterData& wd) {
+    if (addr.empty()) return true;
+    if (offset == 0) {
+      if (limit > 0) {
+        api::WriterInfo wi;
+
+        wi.address = fromByteArray(addr);
+        wi.timesWriter = wd.times;
+        wi.feeCollected.integral = wd.totalFee.integral();
+        wi.feeCollected.fraction = wd.totalFee.fraction();
+
+        _return.writers.push_back(wi);
+        --limit;
+      }
+    }
+    else
+      --offset;
+
+    ++total;
+    return true;
+  });
+  _return.pages = (total / PER_PAGE) + (int)(total % PER_PAGE != 0);
+#else
+  ++_page;
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+#endif
 }
 ////////new

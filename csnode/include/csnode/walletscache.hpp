@@ -36,9 +36,22 @@ public:
     TransactionsTail trxTail_;
   };
 
+  struct WriterData {
+    uint64_t times = 0;
+    csdb::Amount totalFee;
+  };
+
 public:
   static void convert(const csdb::Address& address, WalletData::Address& walletAddress);
   static void convert(const WalletData::Address& walletAddress, csdb::Address& address);
+
+  void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
+
+#ifdef MONITOR_NODE
+  void iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)>);
+#endif
+
+  uint64_t getCount() const { return wallets_.size(); }
 
 private:
   using Data = std::vector<WalletData*>;

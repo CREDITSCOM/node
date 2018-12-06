@@ -377,7 +377,7 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
   }
   else {
     cslog() << " sequence failed, chain syncro start";
-    ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
+    ////////////////////////////////////////////////////////Chain::getBlockRequestNeed()////////////////////////////////////// Syncro!!!
     globalSequence_ = pool.sequence();
     blockRequestIsNeeded_ = true;
     result = false;
@@ -415,6 +415,11 @@ uint32_t BlockChain::getRequestedBlockNumber() const {
 
 bool BlockChain::getBlockRequestNeed() const {
   return blockRequestIsNeeded_;
+}
+
+uint64_t BlockChain::getWalletsCount() {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  return walletsCacheStorage_->getCount();
 }
 
 class BlockChain::TransactionsLoader {

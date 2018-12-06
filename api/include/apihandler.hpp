@@ -129,6 +129,8 @@ public:
   void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit);
   void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit);
 #endif
+  void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
+  void WritersGet(api::WritersGetResult& _return, int32_t page) override;
   ////////new
 
 private:
@@ -169,7 +171,7 @@ private:
   void state_updater_work_function();
   void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& code,
                          const std::string& state, const std::string& method,
-                         const std::vector<std::string>& params); //::general::Variant
+                         const std::vector<general::Variant>& params); //::general::Variant
 
   std::vector<api::SealedTransaction> extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 

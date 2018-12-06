@@ -78,14 +78,14 @@ public:
                                                 const HoldersMap&)>);
 
   static bool isTransfer(const std::string& method,
-                         const std::vector<std::string>& params);
+                         const std::vector<general::Variant>& params);
   //static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
 
 
   static std::pair<csdb::Address, csdb::Address>
   getTransferData(const csdb::Address& initiator,
                   const std::string& method,
-                  const std::vector<std::string>& params);
+                  const std::vector<general::Variant>& params);
   /*static std::pair<csdb::Address, csdb::Address> getTransferData(const csdb::Address& initiator,
       const std::string& method,
       const std::vector<general::Variant>& params);*/
@@ -121,7 +121,7 @@ private:
     struct Params {
       csdb::Address initiator;
       std::string method;
-      std::vector<std::string> params;
+      std::vector<general::Variant> params;
     };
 
     std::string newState;

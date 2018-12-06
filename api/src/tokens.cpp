@@ -13,14 +13,24 @@ static inline bool isStringParam(const std::string& param) {
   return param.size() >= 2 && param[0] == '"' && param.back() == '"';
 }
 
-static inline bool isNormalTransfer(const std::string& method,
+/*static inline bool isNormalTransfer(const std::string& method,
                                     const std::vector<std::string>& params) {
   return method == "transfer" && params.size() == 2 && isStringParam(params[0]) && isStringParam(params[1]);
+}*/
+
+static inline bool isNormalTransfer(const std::string& method,
+  const std::vector<general::Variant>& params) {
+  return method == "transfer" && params.size() == 2 && isStringParam(params[0].v_string) && isStringParam(params[1].v_string);
 }
 
-static inline bool isTransferFrom(const std::string& method,
+/*static inline bool isTransferFrom(const std::string& method,
                                   const std::vector<std::string>& params) {
   return method == "transferFrom" && params.size() == 3 && isStringParam(params[0]) && isStringParam(params[1]) && isStringParam(params[1]);
+}*/
+
+static inline bool isTransferFrom(const std::string& method,
+  const std::vector<general::Variant>& params) {
+  return method == "transferFrom" && params.size() == 3 && isStringParam(params[0].v_string) && isStringParam(params[1].v_string) && isStringParam(params[2].v_string);
 }
 
 static csdb::Address tryExtractPublicKey(const std::string& str) {
@@ -37,10 +47,18 @@ static csdb::Address tryExtractPublicKey(const std::string& str) {
   return csdb::Address::from_public_key(vc);
 }
 
-static csdb::Address tryGetRegisterData(const std::string& method,
+/*static csdb::Address tryGetRegisterData(const std::string& method,
                                         const std::vector<std::string>& params) {
   if (method == "register" && params.size() == 1)
     return tryExtractPublicKey(params[0]);
+
+  return csdb::Address();
+}*/
+
+static csdb::Address tryGetRegisterData(const std::string& method,
+  const std::vector<general::Variant>& params) {
+  if (method == "register" && params.size() == 1)
+    return tryExtractPublicKey(params[0].v_string);
 
   return csdb::Address();
 }
@@ -180,7 +198,7 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const std::string& byteCode,
                     const std::string& state,
                     const std::string& method,
-                    const std::vector<std::string>& params,
+                    const std::vector<general::Variant>& params,
                     const uint32_t timeout,
                     const std::function<void(const RetType&)> handler) {
   executor::ExecuteByteCodeResult result;
@@ -208,13 +226,13 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   std::string name, symbol, totalSupply;
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "getName", std::vector<std::string>(), 50,
+                 "getName", std::vector<general::Variant>(), 50,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "getSymbol", std::vector<std::string>(), 50,
+                 "getSymbol", std::vector<general::Variant>(), 50,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
 
@@ -225,7 +243,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                  });
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "totalSupply", std::vector<std::string>(), 50,
+                 "totalSupply", std::vector<general::Variant>(), 50,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount('"' + newSupp + '"');
                  });
@@ -423,7 +441,7 @@ void TokensMaster::applyToInternal(const std::function<void(const TokensMap&,
 }
 
 bool TokensMaster::isTransfer(const std::string& method,
-                              const std::vector<std::string>& params) {
+                              const std::vector<general::Variant>& params) {
   return isNormalTransfer(method, params) || isTransferFrom(method, params);
 }
 
@@ -431,16 +449,16 @@ using AddrPair = std::pair<csdb::Address, csdb::Address>;
 
 AddrPair TokensMaster::getTransferData(const csdb::Address& initiator,
                                        const std::string& method,
-                                       const std::vector<std::string>& params) {
+                                       const std::vector<general::Variant>& params) {
   AddrPair result;
 
   if (isNormalTransfer(method, params)) {
     result.first = initiator;
-    result.second = tryExtractPublicKey(params[0]);
+    result.second = tryExtractPublicKey(params[0].v_string);
   }
   else if (isTransferFrom(method, params)) {
-    result.first = tryExtractPublicKey(params[0]);
-    result.second = tryExtractPublicKey(params[1]);
+    result.first = tryExtractPublicKey(params[0].v_string);
+    result.second = tryExtractPublicKey(params[1].v_string);
   }
 
   return result;
@@ -448,9 +466,9 @@ AddrPair TokensMaster::getTransferData(const csdb::Address& initiator,
 
 std::string TokensMaster::getAmount(const api::SmartContractInvocation& sci) {
   if (isNormalTransfer(sci.method, sci.params))
-    return tryExtractAmount(sci.params[1]);
+    return tryExtractAmount(sci.params[1].v_string);
   else if (isTransferFrom(sci.method, sci.params))
-    return tryExtractAmount(sci.params[2]);
+    return tryExtractAmount(sci.params[2].v_string);
 
   return "0";
 }

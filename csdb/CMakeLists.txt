@@ -63,6 +63,7 @@ target_include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/lz4
   ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../client/include
 )
 
 include_directories(${Boost_INCLUDE_DIR})

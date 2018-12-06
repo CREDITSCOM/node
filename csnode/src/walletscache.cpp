@@ -207,4 +207,25 @@ const WalletsCache::WalletData* WalletsCache::Updater::findWallet(WalletId id) c
   return data_.wallets_[id];
 }
 
+void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)> func) {
+  /*for (const auto& wdp : data_) {
+    if (!func(wdp.first, wdp.second))
+      break;
+  }*/
+
+  for (const auto& wdp : wallets_) {
+    if (!func(wdp->address_, *wdp))
+      break;
+  }
+}
+
+#ifdef MONITOR_NODE
+void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)> func) {
+  for (const auto& wrd : writers_) {
+    if (!func(wrd.first, wrd.second))
+      break;
+  }
+}
+#endif
+
 }  // namespace cs

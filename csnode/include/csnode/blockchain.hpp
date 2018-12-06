@@ -114,6 +114,10 @@ public:
 
   bool getBlockRequestNeed() const;
 
+  void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
+
+  uint64_t getWalletsCount();
+
   csdb::PoolHash getHashBySequence(uint32_t seq) const;
   csdb::PoolHash getLastWrittenHash() const;
 
