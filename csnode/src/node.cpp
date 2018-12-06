@@ -1317,7 +1317,7 @@ void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::
     return;
   }
 
-  if (requester != conveyer.confidantByIndex(requesterNumber) {
+  if (requester != conveyer.confidantByIndex(requesterNumber)) {
     return;
   }
 
