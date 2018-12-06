@@ -247,7 +247,7 @@ public:
             assert(false);
           }
 
-          *reinterpret_cast<uint16_t*>(data + Offsets::FragmentId + sizeof(packetsCount_)) = packetsCount_;
+          *reinterpret_cast<uint16_t*>(data + Offsets::FragmentsNum) = packetsCount_;
         }
       }
       finished_ = true;
