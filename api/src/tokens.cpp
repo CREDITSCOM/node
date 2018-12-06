@@ -5,6 +5,7 @@
 
 #include "APIHandler.hpp"
 #include "tokens.hpp"
+#include <cctype>
 
 #ifdef TOKENS_CACHE
 
@@ -90,6 +91,7 @@ static std::string tryExtractAmount(const std::string& str) {
     }
   }
 
+  if (result.empty()) return "0";
   result = result.substr(leadingZeros, result.size() - leadingZeros - trailingZeros);
   if (result.empty()) return "0";
 
@@ -376,7 +378,7 @@ void TokensMaster::checkNewDeploy(const csdb::Address& sc,
   DeployTask dt;
   dt.address = sc;
   dt.deployer = deployer;
-  dt.byteCode = sci.byteCode;
+  dt.byteCode = sci.smartContractDeploy.byteCode;
 
   TokenInvocationData tdo;
   tdo.newState = newState;

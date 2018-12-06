@@ -743,14 +743,14 @@ PoolHash Storage::get_previous_transaction_block(const Address& addr, const Pool
   return result;
 }
 
-/*void Storage::set_previous_transaction_block(const Address& addr, const PoolHash& currTransBlock, const PoolHash& prevTransBlock) {
+void Storage::set_previous_transaction_block(const Address& addr, const PoolHash& currTransBlock, const PoolHash& prevTransBlock) {
   const auto key = get_trans_index_key(addr, currTransBlock);
 
   ::csdb::priv::obstream os;
   prevTransBlock.put(os);
 
   d->db->putToTransIndex(key, os.buffer());
-}*/
+}
 
 #endif
 

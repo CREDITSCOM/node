@@ -202,6 +202,8 @@ public:
   PoolHash hash() const noexcept;
   void recount() noexcept;
 
+  uint64_t get_time() const noexcept;
+
   /**
    * @brief Бинарное представление пула
    * @return Бинарное представление пула, если пул находится в режиме read-only, и пустой

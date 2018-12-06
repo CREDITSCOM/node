@@ -128,8 +128,6 @@ private:
 
   bool good_ = false;
 
-  //mutable cs::spinlock dbLock_;
-
   EndpointData inputEp_;
 
   bool twoSockets_;

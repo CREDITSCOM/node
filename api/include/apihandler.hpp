@@ -120,6 +120,15 @@ public:
 
   void TokenBalancesGet(api::TokenBalancesResult&, const api::Address&) override;
   void TokenTransfersGet(api::TokenTransfersResult&, const api::Address& token, int64_t offset, int64_t limit) override;
+  void TokenWalletTransfersGet(api::TokenTransfersResult&, const api::Address& token, const api::Address& address, int64_t offset, int64_t limit) override;
+  void TokenTransactionsGet(api::TokenTransactionsResult&, const api::Address&, int64_t offset, int64_t limit) override;
+  void TokenInfoGet(api::TokenInfoResult&, const api::Address&) override;
+  void TokenHoldersGet(api::TokenHoldersResult&,const api::Address&, int64_t offset, int64_t limit, const TokenHoldersSortField order, const bool desc) override;
+  void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc) override;
+#ifdef TRANSACTIONS_INDEX
+  void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit);
+  void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit);
+#endif
   ////////new
 
 private:
@@ -153,6 +162,8 @@ private:
   std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
   std::thread state_updater;
   std::map<std::string, cs::WorkerQueue<std::tuple<>>> work_queues;
+
+  api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
 private:
   void state_updater_work_function();

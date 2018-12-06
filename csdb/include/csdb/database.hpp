@@ -49,7 +49,7 @@ public:
   virtual bool write_batch(const ItemList &items) = 0;
 
 #ifdef TRANSACTIONS_INDEX
-  //virtual bool putToTransIndex(const byte_array &key, const byte_array &value) = 0;
+  virtual bool putToTransIndex(const byte_array &key, const byte_array &value) = 0;
   virtual bool getFromTransIndex(const byte_array &key, byte_array *value) = 0;
 #endif
 

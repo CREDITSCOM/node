@@ -592,6 +592,11 @@ bool Pool::compose() {
   return d->binary_representation_;
 }
 
+uint64_t Pool::get_time() const noexcept
+{
+  return atoll(user_field(0).value<std::string>().c_str());
+}
+
 Pool Pool::from_binary(const ::csdb::internal::byte_array& data) {
     std::unique_ptr<priv> p { new priv() };
   ::csdb::priv::ibstream is(data.data(), data.size());

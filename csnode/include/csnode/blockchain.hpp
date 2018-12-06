@@ -121,10 +121,10 @@ public:
   csdb::TransactionID getLastTransaction(const csdb::Address&);
   csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 
-  //std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
-  //std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+  std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
+  std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
 
-  //uint64_t getTransactionsCount() const { return transactionsCount_; }
+  uint64_t getTransactionsCount() const { return total_transactions_count_; }
 #endif
 
   // all wallet data (from cache)
@@ -153,6 +153,7 @@ public:
   struct AddrTrnxCount {
     uint64_t sendCount;
     uint64_t recvCount;
+    uint64_t total_trxns_count;
   };
 
   void recount_trxns(const std::optional<csdb::Pool>& new_pool);
@@ -160,6 +161,10 @@ public:
 
 private:
   bool writeGenesisBlock();
+
+#ifdef TRANSACTIONS_INDEX
+  void createTransactionsIndex(csdb::Pool&);
+#endif
 
   void writeBlock(csdb::Pool& pool);
 
@@ -211,6 +216,18 @@ private:
   std::condition_variable_any newBlockCv_;
   cs::SpinLock waitersLocker_;
   std::map<csdb::Address, AddrTrnxCount> transactionsCount_;
+
+#ifdef TRANSACTIONS_INDEX
+  uint64_t total_transactions_count_ = 0;
+
+  struct NonEmptyBlockData {
+    csdb::PoolHash hash;
+    uint32_t transCount = 0;
+  };
+  std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
+
+  NonEmptyBlockData lastNonEmptyBlock_;
+#endif
 
   // block cache
 

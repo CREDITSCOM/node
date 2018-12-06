@@ -384,7 +384,7 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
 }
 
 #ifdef TRANSACTIONS_INDEX
-/*bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array &value) {
+bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array &value) {
   if (!db_trans_idx_) {
     set_last_error(NotOpen);
     return false;
@@ -401,7 +401,7 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
 
   set_last_error();
   return true;
-}*/
+}
 
 bool DatabaseBerkeleyDB::getFromTransIndex(const byte_array &key, byte_array *value) {
   if (!db_trans_idx_) {

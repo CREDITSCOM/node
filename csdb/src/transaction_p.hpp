@@ -94,6 +94,8 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   std::string signature_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
 
+  uint64_t time_;  // optional, not set automatically
+
   friend class Transaction;
   friend class Pool;
   friend class ::csdb::internal::shared_data_ptr<priv>;

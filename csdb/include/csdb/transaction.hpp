@@ -154,6 +154,9 @@ public:
    */
   ::std::set<user_field_id_t> user_field_ids() const noexcept;
 
+  void set_time(const uint64_t);
+  uint64_t get_time() const;
+
 private:
   void put(::csdb::priv::obstream&) const;
   bool get(::csdb::priv::ibstream&);

@@ -437,4 +437,12 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
   return is.get(data->signature_) && is.get(data->counted_fee_);
 }
 
+void Transaction::set_time(const uint64_t ts) {
+  d->time_ = ts;
+}
+
+uint64_t Transaction::get_time() const {
+  return d->time_;
+}
+
 }  // namespace csdb

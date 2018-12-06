@@ -37,7 +37,7 @@ private:
   IteratorPtr new_iterator() final;
 
 #ifdef TRANSACTIONS_INDEX
-  //bool putToTransIndex(const byte_array &key, const byte_array &value) override final;
+  bool putToTransIndex(const byte_array &key, const byte_array &value) override final;
   bool getFromTransIndex(const byte_array &key, byte_array *value) override final;
 #endif
 

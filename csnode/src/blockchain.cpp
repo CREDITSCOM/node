@@ -29,6 +29,14 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 , fee_(std::make_unique<cs::Fee>()) {
   cslog() << "Trying to open DB...";
 
+#ifdef TRANSACTIONS_INDEX
+  bool recreateIndex;
+  {
+    std::ifstream inf(std::string(path) + "/index.db");
+    recreateIndex = !inf.good();
+  }
+#endif
+
   if (!storage_.open(path)) {
     cserror() << "Couldn't open database at " << path;
     return;
@@ -121,6 +129,44 @@ bool BlockChain::writeNewBlock(csdb::Pool& pool) {
   return putBlock(pool);
 }
 
+#ifdef TRANSACTIONS_INDEX
+void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
+  // Update
+  std::set<csdb::Address> indexedAddrs;
+
+  auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
+    if (indexedAddrs.insert(addr).second) {
+      csdb::PoolHash lapoo;
+
+      {
+        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        //auto wd = walletsCache_->findWallet(addr.public_key());
+        //if (wd) lapoo = wd->lastTransaction_.pool_hash();
+        lapoo = getLastTransaction(addr).pool_hash();
+      }
+
+      storage_.set_previous_transaction_block(addr, pool.hash(), lapoo);
+    }
+  };
+
+  for (auto& tr : pool.transactions()) {
+    lbd(tr.source());
+    lbd(tr.target());
+  }
+
+  if (pool.transactions().size()) {
+    //transactionsCount_ += pool.transactions().size();
+
+    if (lastNonEmptyBlock_.transCount &&
+      pool.hash() != lastNonEmptyBlock_.hash)
+      previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+
+    lastNonEmptyBlock_.hash = pool.hash();
+    lastNonEmptyBlock_.transCount = pool.transactions().size();
+  }
+}
+#endif
+
 void BlockChain::writeBlock(csdb::Pool& pool) {
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -140,6 +186,10 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
   }
 
   cslog() << "Block " << pool.sequence() << " saved succesfully";
+
+#ifdef TRANSACTIONS_INDEX
+  createTransactionsIndex(pool);
+#endif
 
   if (!updateFromNextBlock(pool)) {
     cserror() << "Couldn't update from next block";
@@ -727,7 +777,8 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
           return;
       }
       transactionsCount_[addr_send].sendCount++;
-      transactionsCount_[addr_send].recvCount++;
+      transactionsCount_[addr_recv].recvCount++;
+      total_transactions_count_++;
     }
   }
 }
@@ -946,7 +997,7 @@ csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const 
   return storage_.get_previous_transaction_block(addr, ph);
 }
 
-/*std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
+std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
   std::lock_guard<decltype(dbLock_)> lock(dbLock_);
   return std::make_pair(lastNonEmptyBlock_.hash, lastNonEmptyBlock_.transCount);
 }
@@ -958,7 +1009,7 @@ std::pair<csdb::PoolHash, uint32_t> BlockChain::getPreviousNonEmptyBlock(const c
     return std::make_pair(it->second.hash, it->second.transCount);
 
   return std::pair<csdb::PoolHash, uint32_t>();
-}*/
+}
 
 TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr) : bc_(bc), addr_(addr) {
   setFromTransId(bc_.getLastTransaction(addr));
