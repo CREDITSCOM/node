@@ -63,32 +63,41 @@ private:  // Service
 
   void synchroFinished();
 
-private:  // struct
+  void printNeighbours(const std::string& funcName);
 
-  enum class CounterType {
+private:  // struct
+  enum class CounterType
+  {
     ROUND,
     TIMER
   };
 
   class NeighboursSetElemet {
   public:
-    explicit NeighboursSetElemet(uint8_t neighbourNum)
+    explicit NeighboursSetElemet(uint8_t neighbourNum, uint8_t blockPoolsCount)
     : m_neighbourNum(neighbourNum)
-    , m_sequence(0)
     , m_roundCounter(0) {
+      m_sequences.reserve(blockPoolsCount);
     }
 
-    inline bool isEqual(csdb::Pool::sequence_t sequence) const {
-      return m_sequence == sequence;
+    inline void removeSequnce(csdb::Pool::sequence_t sequence) {
+      const auto it = std::find(m_sequences.begin(), m_sequences.end(), sequence);
+      if (it != m_sequences.end()) {
+        m_sequences.erase(it);
+      }
     }
-    inline bool isAvailableSequence() const {
-      return isEqual(0);
+    inline bool isAvailableSequences() const {
+      return m_sequences.empty();
     }
-    inline void setSequence(csdb::Pool::sequence_t sequence) {
-      m_sequence = sequence;
+    inline void setSequences(const PoolsRequestedSequences& sequences) {
+      m_sequences.clear();
+      m_sequences = sequences;
     }
     inline void reset() {
-      m_sequence = 0;
+      m_sequences.clear();
+      resetRoundCounter();
+    }
+    inline void resetRoundCounter() {
       m_roundCounter = 0;
     }
     inline void setNeighbourNum(uint8_t num) {
@@ -98,22 +107,47 @@ private:  // struct
     inline uint8_t neighbourNum() const {
       return m_neighbourNum;
     }
-    inline csdb::Pool::sequence_t sequence() const {
-      return m_sequence;
+    inline const PoolsRequestedSequences& sequences() const {
+      return m_sequences;
     }
     inline uint32_t roundCounter() const {
       return m_roundCounter;
     }
 
     inline void increaseRoundCounter() {
-      if (m_sequence) {
+      if (!m_sequences.empty()) {
         ++m_roundCounter;
       }
     }
 
+    bool operator<(const NeighboursSetElemet& other) const {
+      if (m_sequences.empty() || other.m_sequences.empty()) {
+        return m_sequences.size() > other.m_sequences.size();
+      }
+
+      return m_sequences.front() < other.m_sequences.front();
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const NeighboursSetElemet& el) {
+      os << "num: " << cs::numeric_cast<int>(el.m_neighbourNum) << ", seqs: ";
+
+      if (el.m_sequences.empty()) {
+        os << "empty";
+      }
+      else {
+        for (const auto seq : el.m_sequences) {
+          os << seq << " ";
+        }
+      }
+
+      os << ", round counter: " << el.m_roundCounter;
+
+      return os;
+    }
+
   private:
-    uint8_t m_neighbourNum;             // neighbour number
-    csdb::Pool::sequence_t m_sequence;  // requested sequence
+    uint8_t m_neighbourNum;               // neighbour number
+    PoolsRequestedSequences m_sequences;  // requested sequence
     uint32_t m_roundCounter;
   };
 
@@ -143,13 +177,14 @@ private:  // Members
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType& type) {
   switch (type) {
-    case PoolSynchronizer::CounterType::ROUND :
+    case PoolSynchronizer::CounterType::ROUND:
       os << "ROUND";
       break;
-    case PoolSynchronizer::CounterType::TIMER :
+    case PoolSynchronizer::CounterType::TIMER:
       os << "TIMER";
       break;
-    default: break;
+    default:
+      break;
   }
 
   return os;

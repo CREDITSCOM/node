@@ -106,7 +106,7 @@ public:
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-  void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
+  void getBlockReply(const uint8_t*, const size_t);
 
   // transaction's pack syncro
   void sendTransactionsPacket(const cs::TransactionsPacket& packet);
