@@ -47,8 +47,7 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
 
   cs::Lock lock(sharedMutex_);
 
-  if (pimpl_->transactionsBlock.empty() ||
-      (pimpl_->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
+  if (pimpl_->transactionsBlock.empty() || (pimpl_->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
     pimpl_->transactionsBlock.push_back(cs::TransactionsPacket());
   }
 
@@ -64,18 +63,6 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
   }
   else {
     cswarning() << "CONVEYER> Same hash already exists at table: " << hash.toString();
-
-    auto receivedPacketBinary = packet.toBinary();
-    auto currentPacketBinary = iterator->second.toBinary();
-
-    if (std::equal(receivedPacketBinary.begin(), receivedPacketBinary.end(), currentPacketBinary.begin(), currentPacketBinary.end())) {
-      cslog() << "CONVEYER> Same hashes, binaries are equal";
-    }
-    else {
-      cswarning() << "CONVEYER> Same hashes, binaries are different";
-      csdetails() << "CONVEYER> Received packet binary: " << cs::Utils::byteStreamToHex(receivedPacketBinary.data(), receivedPacketBinary.size());
-      csdetails() << "CONVEYER> Current packet binary: " << cs::Utils::byteStreamToHex(currentPacketBinary.data(), currentPacketBinary.size());
-    }
   }
 }
 
@@ -404,7 +391,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
 
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender) {
   cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
-  cslog() << "CONVEYER> " << __func__ << "(), round " << round << ":";
+  csprint() << ", round " << round;
 
   cs::Lock lock(sharedMutex_);
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
@@ -486,7 +473,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   csdb::internal::byte_array writerPublicKey(sender.begin(), sender.end());
   newPool.set_writer_public_key(std::move(writerPublicKey));
 
-  csdebug() << "CONVEYER> " << __func__ << "(): done";
+  csprint() << "done";
   return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
