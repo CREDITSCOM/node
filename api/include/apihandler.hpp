@@ -186,7 +186,7 @@ private:
   bool convertAddrToPublicKey(const csdb::Address& address);
 
   template <typename Mapper>
-  void get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper,
+  size_t get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper,
                                  std::vector<decltype(mapper(api::SmartContract()))>& out);
 
   bool update_smart_caches_once(const csdb::PoolHash&, bool = false);

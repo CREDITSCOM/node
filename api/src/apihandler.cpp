@@ -60,6 +60,16 @@ APIHandler::~APIHandler() {
     state_updater.join();
 }
 
+template <typename ResultType>
+bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
+  if (offset < 0 || limit <= 0 || limit > 100) {
+    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
+    return false;
+  }
+
+  return true;
+}
+
 void APIHandler::state_updater_work_function() {
   try {
     auto lasthash = s_blockchain.getLastHash();
@@ -222,7 +232,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   result.trxn.currency = DEFAULT_CURRENCY;
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
-  result.trxn.fee.commission = transaction.counted_fee().get_raw();
+  //result.trxn.fee.commission = transaction.counted_fee().get_raw();
+  result.trxn.fee.integral = transaction.counted_fee().get_raw();
 
   auto uf = transaction.user_field(0);
   result.trxn.__isset.smartContract = uf.is_valid();
@@ -244,7 +255,7 @@ std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::v
   return result;
 }
 
-api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
+/*api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
   api::Pool result;
   if (pool.is_valid()) {
     result.hash = fromByteArray(pool.hash().to_binary());
@@ -253,6 +264,39 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
     result.prevHash = fromByteArray(pool.previous_hash().to_binary());
     result.time = atoll(pool.user_field(0).value<std::string>().c_str());   // atoll(pool.user_field(0).value<std::string>().c_str());
     result.transactionsCount = (int32_t)pool.transactions_count();          // DO NOT EVER CREATE POOLS WITH // MORE THAN 2 // BILLION // TRANSACTIONS, EVEN AT NIGHT
+  }
+  return result;
+}*/
+
+api::Pool
+APIHandler::convertPool(const csdb::Pool& pool)
+{
+  api::Pool result;
+  pool.is_valid();
+  if (pool.is_valid()) {
+    result.hash = fromByteArray(pool.hash().to_binary());
+    result.poolNumber = pool.sequence();
+    assert(result.poolNumber >= 0);
+    result.prevHash = fromByteArray(pool.previous_hash().to_binary());
+    result.time = pool.get_time();
+
+    result.transactionsCount =
+      (int32_t)pool.transactions_count(); // DO NOT EVER CREATE POOLS WITH
+                                          // MORE THAN 2 BILLION
+                                          // TRANSACTIONS, EVEN AT NIGHT
+
+    auto wpk = pool.writer_public_key();
+    result.writer = fromByteArray(wpk);
+
+    double totalFee = 0;
+    const auto& transs = const_cast<csdb::Pool&>(pool).transactions();
+    for (auto& t : transs)
+      totalFee += t.counted_fee().to_double();
+
+
+    const auto tf = csdb::Amount(totalFee);
+    result.totalFee.integral = tf.integral();
+    result.totalFee.fraction = tf.fraction();
   }
   return result;
 }
@@ -370,7 +414,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   send_transaction.set_currency(csdb::Currency(1));
   send_transaction.set_source(source);
   send_transaction.set_target(BlockChain::getAddressFromKey(transaction.target));
-  send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
+  send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.integral/*commission*/));
   send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
   send_transaction.set_signature(transaction.signature);
   return send_transaction;
@@ -534,7 +578,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
   _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
 }
 
-void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
+/*void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
   const int MAX_LIMIT = 100;
   if (offset > MAX_LIMIT)
     const_cast<int64_t&>(offset) = MAX_LIMIT;
@@ -563,6 +607,30 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
       hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
     }
   }
+}*/
+
+void
+APIHandler::PoolListGet(api::PoolListGetResult& _return,
+  const int64_t offset,
+  const int64_t const_limit)
+{
+  if (!validatePagination(_return, *this, offset, const_limit)) return;
+
+  uint64_t sequence = s_blockchain.getLastWrittenSequence();
+  if ((uint64_t)offset > sequence) return;
+
+  _return.pools.reserve(const_limit);
+
+  csdb::PoolHash hash;
+  try {
+    hash = s_blockchain.getHashBySequence(sequence - offset);
+  }
+  catch (...) {
+    return;
+  }
+
+  PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
+  _return.count = sequence + 1;
 }
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t limit) {
@@ -720,18 +788,21 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 }
 
 template <typename Mapper>
-void APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
+size_t APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
   auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-  for (auto& trid : (*deployed_by_creator)[deployer]) {
+  auto& elt = (*deployed_by_creator)[deployer];
+  for (auto& trid : elt) {
     auto tr = s_blockchain.loadTransaction(trid);
     auto smart = fetch_smart_body(tr);
     out.push_back(mapper(smart));
   }
+
+  return elt.size();
 }
 
 void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const api::Address& deployer) {
   const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
-  get_mapped_deployer_smart(addr, [](const api::SmartContract& smart) { return smart; }, _return.smartContractsList);
+  _return.count = get_mapped_deployer_smart(addr, [](const api::SmartContract& smart) { return smart; }, _return.smartContractsList);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -746,7 +817,7 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
   return;
 }
 
-void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& hash, const int64_t limit) {
+/*void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& hash, const int64_t limit) {
   const int MAX_LIMIT = 100;
   csdb::PoolHash cur_hash = csdb::PoolHash::from_binary(toByteArray(hash));
   if (limit > MAX_LIMIT)
@@ -768,6 +839,49 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
       _return.pools.push_back(cch->second);
       cur_hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
     }
+  }
+}*/
+
+void
+APIHandler::PoolListGetStable(api::PoolListGetResult& _return,
+  const api::PoolHash& api_hash,
+  const int64_t const_limit) {
+  if (const_limit <= 0 || const_limit > 100) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  auto hash = csdb::PoolHash::from_binary(toByteArray(api_hash));
+  auto limit = const_limit;
+
+  bool limSet = false;
+
+  while (limit && !hash.is_empty()) {
+    auto cch = poolCache.find(hash);
+
+    if (cch == poolCache.end()) {
+      auto pool = s_blockchain.loadBlock(hash);
+      api::Pool apiPool = convertPool(pool);
+      _return.pools.push_back(apiPool);
+      poolCache.insert(cch, std::make_pair(hash, apiPool));
+      hash = pool.previous_hash();
+
+      if (!limSet) {
+        _return.count = pool.sequence() + 1;
+        limSet = true;
+      }
+    }
+    else {
+      _return.pools.push_back(cch->second);
+      hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
+
+      if (!limSet) {
+        _return.count = cch->second.poolNumber + 1;
+        limSet = true;
+      }
+    }
+
+    --limit;
   }
 }
 
@@ -972,7 +1086,7 @@ void putTokenInfo(api::TokenInfo& ti, const api::Address& addr, const Token& tok
   ti.standart = (decltype(api::TokenInfo::standart))(uint32_t)(token.standart);
 }
 
-template <typename ResultType>
+/*template <typename ResultType>
 bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
   if (offset < 0 || limit <= 0 || limit > 100) {
     handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
@@ -980,7 +1094,7 @@ bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset
   }
 
   return true;
-}
+}*/
 
 template <typename ResultType>
 void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm, const api::Address& token,
@@ -1276,7 +1390,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
     pooh = s_blockchain.getPreviousNonEmptyBlock(pooh).first;
   }
 
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS); 
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 #endif
