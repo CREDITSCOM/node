@@ -186,7 +186,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]");
     const auto ptr = find_stage1(required);
     if(ptr != nullptr) {
-      pnode->sendStageReply(ptr->sender,ptr->sig, MsgTypes::FirstStage , requester);     
+      pnode->sendStageReply(ptr->sender,ptr->signature, MsgTypes::FirstStage , requester);
     }
   }
 

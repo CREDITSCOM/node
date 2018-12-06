@@ -302,13 +302,13 @@ private:
     cs::Notifications notifications;
   };
 
-  std::vector <std::string> stageOneMessage_;
-  std::vector <std::string>  stageTwoMessage_;
-  std::vector <std::string>  stageThreeMessage_;
+  std::vector<cs::Bytes> stageOneMessage_;
+  std::vector<cs::Bytes> stageTwoMessage_;
+  std::vector<cs::Bytes> stageThreeMessage_;
 
-  std::vector <std::string> stageOneSmartsMessage_;
-  std::vector <std::string> stageTwoSmartsMessage_;
-  std::vector <std::string> stageThreeSmartsMessage_;
+  std::vector<cs::Bytes> stageOneSmartsMessage_;
+  std::vector<cs::Bytes> stageTwoSmartsMessage_;
+  std::vector<cs::Bytes> stageThreeSmartsMessage_;
 
   SentRoundData lastSentRoundData_;
 
