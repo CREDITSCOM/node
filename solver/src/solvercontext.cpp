@@ -140,7 +140,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
     return;
   }
   LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]");
-  core.pnode->requestStageConsensus(MsgTypes::FirstStageRequest, from, required);
+  core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required);
 }
 
 void SolverContext::request_stage2(uint8_t from, uint8_t required) {
@@ -149,7 +149,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
     return;
   }
   LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]");
-  core.pnode->requestStageConsensus(MsgTypes::SecondStageRequest, from, required);
+  core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required);
 }
 
 void SolverContext::request_stage3(uint8_t from, uint8_t required) {
@@ -158,7 +158,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
     return;
   }
   LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]");
-  core.pnode->requestStageConsensus(MsgTypes::ThirdStageRequest, from, required);
+  core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required);
 }
 
 bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
