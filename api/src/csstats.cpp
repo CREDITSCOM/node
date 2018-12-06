@@ -234,7 +234,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
   cstrace() << "csstats start " << "update interval is " << updateTimeSec << " sec";
-#ifndef MONITOR_NODE
+#ifndef STATS
   return;
 #endif
 
