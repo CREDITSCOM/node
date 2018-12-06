@@ -68,7 +68,8 @@ public:
   void sendStageThree(cs::StageThree&);
   void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
 
-  void requestStageConsensus(MsgTypes msgType, uint8_t respondent, uint8_t required);
+  void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void sendHash(cs::RoundNumber round);
 
   const cs::ConfidantsKeys& confidants() const;
@@ -301,13 +302,13 @@ private:
     cs::Notifications notifications;
   };
 
-  std::vector<std::string> stageOneMessage_;
-  std::vector<std::string> stageTwoMessage_;
-  std::vector<std::string> stageThreeMessage_;
+  std::vector <std::string> stageOneMessage_;
+  std::vector <std::string>  stageTwoMessage_;
+  std::vector <std::string>  stageThreeMessage_;
 
-  std::vector<std::string> stageOneSmartsMessage_;
-  std::vector<std::string> stageTwoSmartsMessage_;
-  std::vector<std::string> stageThreeSmartsMessage_;
+  std::vector <std::string> stageOneSmartsMessage_;
+  std::vector <std::string> stageTwoSmartsMessage_;
+  std::vector <std::string> stageThreeSmartsMessage_;
 
   SentRoundData lastSentRoundData_;
 
