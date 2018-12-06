@@ -203,6 +203,17 @@ private:
 
 public:
 
+  /**
+   * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
+   *
+   * @brief Gets amount of cached blocks
+   *
+   * @author    Alexander Avramenko
+   * @date  06.12.2018
+   *
+   * @return    The cached blocks amount.
+   */
+
   std::size_t getCachedBlocksSize() const;
 
   // continuous interval from ... to
@@ -212,7 +223,7 @@ public:
    * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
    *
    * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached
-   * ones. Each interval means [first..second] including bounds. Last interval ends with 0 meaning "until end"
+   * ones. Each interval means [first..second] including bounds. Last interval ends with current round number
    *
    * @author    Alexander Avramenko
    * @date  23.11.2018
@@ -257,6 +268,7 @@ private:
   struct BlockMeta
   {
     csdb::Pool pool;
+    // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
     bool by_sync;
   };
   std::map<csdb::Pool::sequence_t, BlockMeta> cachedBlocks_;
