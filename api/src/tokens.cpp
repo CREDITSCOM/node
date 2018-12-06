@@ -267,10 +267,13 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   const auto dp = deployer.public_key();
   api::Address dpAddr = std::string((char*)dp.data(), dp.size());
 
-  std::vector<std::vector<std::string>> holderKeysParams;
+  std::vector<std::vector<general::Variant>> holderKeysParams;
   holderKeysParams.reserve(holders.size());
-  for (auto& h : holders)
-    holderKeysParams.push_back(std::vector<std::string>(1, '"' + EncodeBase58(h.public_key()) + '"'));
+  for (auto& h : holders) {
+    general::Variant var;
+    var.v_string = '"' + EncodeBase58(h.public_key()) + '"';
+    holderKeysParams.push_back(std::vector<general::Variant>(1, var));
+  }
 
   executor::ExecuteByteCodeMultipleResult result;
   api_->getExecutor().

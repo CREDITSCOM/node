@@ -1058,8 +1058,8 @@ std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& presen
 
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   const std::string& sourceCode) {
-  executor::CompileByteCodeResult result;
-  getExecutor().compileBytecode(result, sourceCode);
+  executor::CompileSourceCodeResult result;
+  getExecutor().compileSourceCode(result, sourceCode);
 
   if (result.status.code) {
     _return.status.code = result.status.code;
@@ -1068,7 +1068,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   }
 
   executor::GetContractMethodsResult methodsResult;
-  getExecutor().getContractMethods(methodsResult, result.bytecode);
+  getExecutor().getContractMethods(methodsResult, result.byteCode);
 
   if (methodsResult.status.code) {
     _return.status.code = methodsResult.status.code;
@@ -1077,7 +1077,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   }
 
   _return.ts = (api::TokenStandart)(uint32_t)TokensMaster::getTokenStandart(methodsResult.methods);
-  _return.byteCode = std::move(result.bytecode);
+  _return.byteCode = std::move(result.byteCode);
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -1276,7 +1276,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
     pooh = s_blockchain.getPreviousNonEmptyBlock(pooh).first;
   }
 
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS); 
 }
 
 #endif

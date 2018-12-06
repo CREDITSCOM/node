@@ -139,7 +139,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
       csdb::PoolHash lapoo;
 
       {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        //std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
         //auto wd = walletsCache_->findWallet(addr.public_key());
         //if (wd) lapoo = wd->lastTransaction_.pool_hash();
         lapoo = getLastTransaction(addr).pool_hash();
@@ -373,6 +373,7 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
     if (globalSequence_ == getLastWrittenSequence()) {
       blockRequestIsNeeded_ = false;
     }
+    recount_trxns(pool);
     result = true;
   }
   else {
@@ -991,10 +992,12 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
   if (!wd) return csdb::TransactionID();
   return wd->lastTransaction_;*/
 
-  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  //std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   BlockChain::Transactions transactions;
   getTransactions(transactions, addr, static_cast<uint64_t>(0), static_cast<uint64_t>(1));//last trx
-  return transactions[0].id();
+  if(transactions.size())
+    return transactions[0].id();
+  return csdb::TransactionID();
 }
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
