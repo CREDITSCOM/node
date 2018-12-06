@@ -65,9 +65,12 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
           cs::SharedLock lock(conveyer.sharedMutex());
           for (const auto& element : conveyer.transactionsPacketTable()) {
             found = false;
-            for (const auto& it : conveyer.roundTable(context.round())->hashes) {
-              if (memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
-                found = true;
+            const auto rt = conveyer.roundTable(static_cast<cs::RoundNumber>(context.round()));
+            if(rt != nullptr) {
+              for(const auto& it : rt->hashes) {
+                if(memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
+                  found = true;
+                }
               }
             }
             if (!found) stage.hashesCandidates.push_back(element.first);
