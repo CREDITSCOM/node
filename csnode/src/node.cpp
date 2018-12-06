@@ -536,7 +536,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);  // writerPublicKey);
 
     if (!pool.has_value()) {
-      cserror() << "NODE> getCharacteristic(): created pool is not valid";
+      cserror() << "NODE> " << __func__ << "(): created pool is not valid";
       return;
     }
 
@@ -851,14 +851,18 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
   }
 
   if (conveyer.isSyncCompleted(round)) {
-    csdebug() << "NODE> Packets sync completed, round " << round;
+    csdebug() << "NODE> Packets sync completed, #" << round;
     resetNeighbours();
-    cslog() << "NODE> processPacketsReply -> got Round";
-    startConsensus();
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
       getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
+
+      // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
+      if(getBlockChain().getLastWrittenSequence() + 1 == getRoundNumber()) {
+        cslog() << "NODE> got all blocks written in current round";
+        startConsensus();
+      }
     }
   }
 }
@@ -2088,9 +2092,8 @@ void Node::startConsensus() {
   solver_->gotConveyerSync(roundNumber);
   transport_->processPostponed(roundNumber);
 
-  auto sequence = getBlockChain().getLastWrittenSequence();
   // claim the trusted role only if have got proper blockchain:
-  if (roundNumber > sequence && roundNumber - sequence == 1) {
+  if (roundNumber == getBlockChain().getLastWrittenSequence() + 1) {
     sendHash(roundNumber);
   }
 }

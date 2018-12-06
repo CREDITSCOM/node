@@ -35,6 +35,16 @@ namespace cs
     if(stateCompleted(pstate->onSyncTransactions(*pcontext, rNum))) {
       handleTransitions(Event::Transactions);
     }
+
+    // restore possibly cached hashes from other nodes
+    // this is actual if conveyer has just stored last required block
+    if(!recv_hash.empty() && cur_round == rNum) {
+      for(const auto& item : recv_hash) {
+        if(stateCompleted(pstate->onHash(*pcontext, item.first, item.second))) {
+          handleTransitions(Event::Hashes);
+        }
+      }
+    }
   }
 
   const cs::PublicKey& SolverCore::getWriterPublicKey() const
