@@ -85,6 +85,17 @@ bool Node::init() {
     return false;
   }
 
+#if 0 // DEBUG PURPOSE
+  constexpr size_t test_data_size = 2000;
+  std::vector<cs::Byte> test_data(test_data_size, 0);
+  for(int i = 0; i < test_data_size; ++i) {
+    test_data[i] = i % 10;
+  }
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed /*| BaseFlags::Fragmented*/);
+  ostream_ << MsgTypes::WriterNotification << roundNumber_;
+  ostream_ << test_data;
+#endif
+
 #ifdef SPAMMER
   runSpammer();
 #endif
@@ -296,7 +307,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   roundTable.round = rNum;
-  // TODO: what this call was intended for? transport_->clearTasks();
 
   // "normal" start
   if (roundTable.round == 1) {
@@ -1096,9 +1106,9 @@ std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel) {
 
 template<typename... Args>
 void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  static constexpr cs::Byte noFlags = 0;
+  static constexpr cs::Byte defautFlags = BaseFlags::Fragmented;
 
-  ostream_.init(noFlags, target);
+  ostream_.init(defautFlags, target);
   csdebug() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -1192,8 +1202,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 }
 
 template <typename... Args>
-void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round,
-                         Args&&... args) {
+void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
   csdebug() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
@@ -1295,176 +1304,6 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   sendToConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.sig, stageOneMessage_[myConfidantIndex_]);
   csdebug() << __func__ << "(): done";
 }
-
-//void Node::getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-//  csprint();
-//
-//  if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//
-//  uint8_t requesterNumber = 0u;
-//  uint8_t requiredNumber = 0u;
-//  istream_ >> requesterNumber >> requiredNumber;
-//
-//  cslog() << "NODE> Getting StageTwo Request from [" << int(requesterNumber) << "] ";
-//  cs::Conveyer& conveyer = cs::Conveyer::instance();
-//
-//  if (!conveyer.isConfidantExists(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (requester != conveyer.confidantByIndex(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    cserror() << "Bad StageTwo packet format";
-//    return;
-//  }
-//
-//  solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
-//}
-
-//void Node::getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-//  csdebug() << "NODE> " << __func__ << "()";
-//
-//  if (myLevel_ != NodeLevel::Confidant) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//
-//  uint8_t requesterNumber = 0;
-//  uint8_t requiredNumber = 0;
-//  istream_ >> requesterNumber >> requiredNumber;
-//
-//  const cs::ConfidantsKeys& confidants = cs::Conveyer::instance().confidants();
-//
-//  if (confidants.size() <= requesterNumber) {
-//    cserror() << __func__ << ", index " << int(requesterNumber) << ", confidants size " << confidants.size();
-//    return;
-//  }
-//
-//  if (requester != confidants[requesterNumber]) {
-//    return;
-//  }
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    cslog() << "NODE> Bad StageOne packet format";
-//    return;
-//  }
-//
-//  solver_->gotStageOneRequest(requesterNumber, requiredNumber);
-//}
-
-//void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-//  csprint() << "started";
-//
-//  if (myLevel_ != NodeLevel::Confidant) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//
-//  uint8_t requesterNumber = 0;
-//  uint8_t requiredNumber = 0;
-//  istream_ >> requesterNumber >> requiredNumber;
-//
-//  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-//
-//  if (conveyer.isConfidantExists(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (requester != conveyer.confidantByIndex(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    cserror() << "Bad StageThree packet format";
-//    return;
-//  }
-//
-//  solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
-//}
-
-void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  csprint() << "started";
-
-  if (myLevel_ != NodeLevel::Confidant) {
-    return;
-  }
-
-  istream_.init(data, size);
-
-  uint8_t requesterNumber = 0;
-  uint8_t requiredNumber = 0;
-  istream_ >> requesterNumber >> requiredNumber;
-
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (conveyer.isConfidantExists(requesterNumber)) {
-    return;
-  }
-
-  if (requester != conveyer.confidantByIndex(requesterNumber)) {
-    return;
-  }
-
-  if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageThree packet format";
-    return;
-  }
-
-  switch (msgType) {
-  case MsgTypes::FirstStageRequest:
-    solver_->gotStageOneRequest(requesterNumber, requiredNumber);
-    break;
-  case MsgTypes::SecondStageRequest:
-    solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
-    break;
-  case MsgTypes::ThirdStageRequest:
-    solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
-    break;
-  }
-}
-
-void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
-  csprint() << "started";
-
-  if (myLevel_ != NodeLevel::Confidant) {
-    cswarning() << "NODE> Only confidant nodes can send consensus stages";
-    return;
-  }
-
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (!conveyer.isConfidantExists(requester)) {
-    return;
-  }
-
-  const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
-  std::string message;
-
-  switch (msgType) {
-    case MsgTypes::FirstStage:
-      message = stageOneMessage_[sender];
-      break;
-    case MsgTypes::SecondStage:
-      message = stageTwoMessage_[sender];
-      break;
-    case MsgTypes::ThirdStage:
-      message = stageThreeMessage_[sender];
-      break;
-  }
-
-  sendDefault(confidant, msgType, roundNumber_, signature, message);
-  csprint() << "done";
-}
-
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   csprint() << "started";
@@ -1704,37 +1543,6 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   csdebug() << "NODE> " << __func__ << "(): done";
 }
 
-//void Node::getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-//  csprint() << "started";
-//
-//  if (myLevel_ != NodeLevel::Confidant) {
-//    return;
-//  }
-//
-//  istream_.init(data, size);
-//
-//  uint8_t requesterNumber = 0;
-//  uint8_t requiredNumber = 0;
-//  istream_ >> requesterNumber >> requiredNumber;
-//
-//  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-//
-//  if (conveyer.isConfidantExists(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (requester != conveyer.confidantByIndex(requesterNumber)) {
-//    return;
-//  }
-//
-//  if (!istream_.good() || !istream_.end()) {
-//    cserror() << "Bad StageThree packet format";
-//    return;
-//  }
-//
-//  solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
-//}
-
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
   csdetails() << "NODE> " << __func__ << "()";
   csunused(sender);
@@ -1807,6 +1615,82 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) 
   sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_ , myConfidantIndex_, required);
   csprint() << "done";
 }
+
+void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
+  csprint() << "started";
+
+  if (myLevel_ != NodeLevel::Confidant) {
+    return;
+  }
+
+  istream_.init(data, size);
+
+  uint8_t requesterNumber = 0;
+  uint8_t requiredNumber = 0;
+  istream_ >> requesterNumber >> requiredNumber;
+
+  const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+  if (!conveyer.isConfidantExists(requesterNumber)) {
+    return;
+  }
+
+  if (requester != conveyer.confidantByIndex(requesterNumber)) {
+    return;
+  }
+
+  if (!istream_.good() || !istream_.end()) {
+    cserror() << "Bad StageThree packet format";
+    return;
+  }
+
+  switch (msgType) {
+  case MsgTypes::FirstStageRequest:
+    solver_->gotStageOneRequest(requesterNumber, requiredNumber);
+    break;
+  case MsgTypes::SecondStageRequest:
+    solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
+    break;
+  case MsgTypes::ThirdStageRequest:
+    solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
+    break;
+  }
+}
+
+void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
+  csprint() << "started";
+
+  if (myLevel_ != NodeLevel::Confidant) {
+    cswarning() << "NODE> Only confidant nodes can send consensus stages";
+    return;
+  }
+
+  const cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+  if (!conveyer.isConfidantExists(requester)) {
+    return;
+  }
+
+  const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
+  std::string message;
+
+  switch (msgType) {
+  case MsgTypes::FirstStage:
+    message = stageOneMessage_[sender];
+    break;
+  case MsgTypes::SecondStage:
+    message = stageTwoMessage_[sender];
+    break;
+  case MsgTypes::ThirdStage:
+    message = stageThreeMessage_[sender];
+    break;
+  }
+
+  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  csprint() << "done";
+}
+
+
 
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp) {
   csprint() << " timestamp = " << timeStamp;

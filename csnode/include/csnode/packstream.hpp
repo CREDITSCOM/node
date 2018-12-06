@@ -131,9 +131,9 @@ public:
     return ptr_;
   }
 
-  //const cs::Byte* getEndPtr() const {
-  //  return end_;
-  //}
+  const cs::Byte* getEndPtr() const {
+    return end_;
+  }
 
   size_t remainsBytes() const {
     return end_ - ptr_;
@@ -241,9 +241,10 @@ public:
         for (auto p = packets_; p != packetsEnd_; ++p) {
           cs::Byte* data = static_cast<cs::Byte*>(p->data());
 
+          //TODO: make next impossible, see newPack()
           if (!p->isFragmented()) {
-            csdebug() << "No Fragmented flag for packets";
-            *data |= BaseFlags::Fragmented;
+            cserror() << "Malformed packet: Fragmented flag not set for fragmented packet";
+            assert(false);
           }
 
           *reinterpret_cast<uint16_t*>(data + Offsets::FragmentId + sizeof(packetsCount_)) = packetsCount_;
@@ -269,18 +270,41 @@ public:
 
 private:
   void newPack() {
+    
+    RegionPtr tmp_buf;
+    cs::Byte *tail = nullptr;
+    constexpr size_t size_inserted = sizeof(uint16_t) + sizeof(packetsCount_);
+    if(1 == packetsCount_) {
+      ptr_ = static_cast<cs::Byte*>(packets_->data());
+      if(BaseFlags::Fragmented != (*ptr_ & BaseFlags::Fragmented)) {
+        cserror() << "Malformed packet: fragmentation flag not set in fragmented packet, correcting";
+        *ptr_ |= BaseFlags::Fragmented;
+        // insert size_inserted bytes from [1] and shift current content "rightward"
+        ++ptr_;
+        size_t size_shifted = end_ - ptr_;
+        tmp_buf = allocator_->allocateNext(size_shifted);
+        tail = static_cast<cs::Byte*>(tmp_buf.get());
+        std::copy(ptr_, end_, tail);
+        *this << static_cast<uint16_t>(0) << static_cast<decltype(packetsCount_)>(0);
+        insertBytes(tail, size_shifted - size_inserted);
+        tail += (size_shifted - size_inserted);
+      }
+    }
+
     new (packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
 
     ptr_ = static_cast<cs::Byte*>(packetsEnd_->data());
     end_ = ptr_ + packetsEnd_->size();
 
     if (packetsEnd_ != packets_) {
-      std::copy(static_cast<cs::Byte*>(packets_->data()),
-                static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
-      *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) +
-                                   static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
+      std::copy(static_cast<cs::Byte*>(packets_->data()), static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength(), ptr_);
+      *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) + static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
 
       ptr_ += packets_->getHeadersLength();
+
+      if(tail != nullptr) {
+        insertBytes(tail, size_inserted);
+      }
     }
 
     ++packetsCount_;
