@@ -58,35 +58,33 @@ public:
    * @date  23.11.2018
    *
    * @param pool    The pool representing block to store in blockchain. Its sequence number MUST be
-   *                set. Its writer_public_key MUST be set. It will be modified.
+   *                set. It will be modified.
    * @param by_sync False if block is new, just constructed, true if block is received via sync subsystem
    *
    * @return    True if it succeeds, false if it fails. True DOES NOT MEAN the block recorded to
-   *            chain. It means block is correct and possibly recorded.
+   *            chain. It means block is correct and possibly recorded. If it is not recorded now, it is cached
+   *            for future use and will be recorded on time
    */
 
   bool  storeBlock(csdb::Pool pool, bool by_sync);
 
   /**
-   * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool, const cs::PrivateKey& writer_key);
+   * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
    *
-   * @brief Creates a block, then signs it with private key and records to blockchain if possible
+   * @brief Creates a block and records to blockchain
    *
    * @author    Alexander Avramenko
    * @date  23.11.2018
    *
-   * @param pool        The pool.
+   * @param pool    The pool.
    *
-   * @return    The new block.
+   * @return    The new recorded block if ok, otherwise nullopt.
    */
 
   std::optional<csdb::Pool> createBlock(csdb::Pool pool);
 
 private:
-  bool finishNewBlock(csdb::Pool& pool);                      // obsolete?
   void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
-  bool writeNewBlock(csdb::Pool& pool);                       // obsolete
-  bool onBlockReceived(csdb::Pool& pool);                     // obsolete
 
 public:
   size_t getSize() const;
@@ -131,8 +129,6 @@ public:
 
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
-private:
-  bool putBlock(csdb::Pool& pool);
 
 public:
   const csdb::Storage& getStorage() const;
@@ -146,8 +142,8 @@ public:
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
 
 private:
-  bool writeGenesisBlock();
 
+  void writeGenesisBlock();
   void writeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);

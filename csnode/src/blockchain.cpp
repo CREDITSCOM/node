@@ -40,25 +40,18 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 
   if (storage_.last_hash().is_empty()) {
     cslog() << "Last hash is empty...";
-
     if (storage_.size()) {
       cslog() << "failed!!! Delete the Database!!! It will be restored from nothing...";
       return;
     }
-
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-
-    if (!writeGenesisBlock()) {
-      cslog() << "failed!!! Cannot write genesis block";
-      return;
-    }
+    writeGenesisBlock();
   }
   else {
     cslog() << "Last hash is not empty...";
 
     {
       std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
-
       if (!initFromDB(*initer))
         return;
 
@@ -116,47 +109,12 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
   return res;
 }
 
-bool BlockChain::writeNewBlock(csdb::Pool& pool) {
-  csdebug() << "writeNewBlock is running";
-  return putBlock(pool);
-}
-
-void BlockChain::writeBlock(csdb::Pool& pool) {
-  {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    pool.set_storage(storage_);
-  }
-
-  if (!pool.compose())
-    if (!pool.compose()) {
-      cserror() << "Couldn't compose block";
-      if (!pool.save())
-        return;
-    }
-
-  if (!pool.save()) {
-    cserror() << "Couldn't save block";
-    return;
-  }
-
-  cslog() << "Block " << pool.sequence() << " saved succesfully";
-
-  if (!updateFromNextBlock(pool)) {
-    cserror() << "Couldn't update from next block";
-  }
-
-  {
-    std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
-    newBlockCv_.notify_all();
-  }
-}
-
 uint32_t BlockChain::getLastWrittenSequence() const {
   return (blockHashes_->empty()) ? static_cast<uint32_t>(-1)
                                  : static_cast<uint32_t>(blockHashes_->getDbStructure().last_);
 }
 
-bool BlockChain::writeGenesisBlock() {
+void BlockChain::writeGenesisBlock() {
   cswarning() << "Adding the genesis block";
 
   csdb::Pool genesis;
@@ -203,20 +161,18 @@ bool BlockChain::writeGenesisBlock() {
   genesis.add_transaction(transaction);
 
   genesis.set_previous_hash(csdb::PoolHash());
-  finishNewBlock(genesis);
-
+  genesis.set_sequence(getLastWrittenSequence() + 1);
+  addNewWalletsToPool(genesis);
+  
   cslog() << "Genesis block completed ... trying to save";
 
-  if (!writeNewBlock(genesis))
-    return false;
+  writeBlock(genesis);
 
   globalSequence_ = genesis.sequence();
   cslog() << genesis.hash().to_string();
 
   uint32_t bSize;
   genesis.to_byte_stream(bSize);
-
-  return true;
 }
 
 csdb::PoolHash BlockChain::getLastHash() const {
@@ -279,12 +235,6 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
   }
 }
 
-bool BlockChain::finishNewBlock(csdb::Pool& pool) {
-  pool.set_sequence(getLastWrittenSequence() + 1);
-  addNewWalletsToPool(pool);
-  return true;
-}
-
 void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
   const auto& new_wallets = pool.newWallets();
   for (const auto& it : new_wallets) {
@@ -292,18 +242,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
   }
 }
 
-bool BlockChain::onBlockReceived(csdb::Pool& pool) {
-  csdebug() << "onBlockReceived is running";
-
-  if (!updateWalletIds(pool, *walletsCacheUpdater_)) {
-    cserror() << "Couldn't update wallet ids";
-  }
-
-  return putBlock(pool);
-}
-
-bool BlockChain::putBlock(csdb::Pool& pool) {
-  // Put on top
+void BlockChain::writeBlock(csdb::Pool& pool) {
   cslog() << "----------------------------- Write Block #" << pool.sequence() << "----------------------------";
   const auto& trusted = pool.confidants();
   cslog() << " trusted count " << trusted.size();
@@ -318,9 +257,32 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
   bool result = false;
   if (pool.sequence() == getLastWrittenSequence() + 1) {
     cslog() << " sequence OK";
-
     pool.set_previous_hash(lastHash_);
-    writeBlock(pool);
+    
+    // former writeBlock():
+    {
+      std::lock_guard<decltype(dbLock_)> l(dbLock_);
+      pool.set_storage(storage_);
+    }
+    if(!pool.compose()) {
+      cserror() << "Couldn't compose block";
+      if(!pool.save())
+        return;
+    }
+    if(!pool.save()) {
+      cserror() << "Couldn't save block";
+      return;
+    }
+    cslog() << "Block " << pool.sequence() << " saved succesfully";
+    if(!updateFromNextBlock(pool)) {
+      cserror() << "Couldn't update from next block";
+    }
+    {
+      std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
+      newBlockCv_.notify_all();
+    }
+    // end of former writeBlock()
+
     lastHash_ = pool.hash();
     csdebug() << " last hash: " << lastHash_.to_string();
 
@@ -334,10 +296,8 @@ bool BlockChain::putBlock(csdb::Pool& pool) {
     ////////////////////////////////////////////////////////////////////////////////////////////// Syncro!!!
     globalSequence_ = pool.sequence();
     blockRequestIsNeeded_ = true;
-    result = false;
   }
   cslog() << "--------------------------------------------------------------------------------";
-  return result;
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const {
@@ -764,7 +724,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, update wallets ids";
     updateWalletIds(pool, *walletsCacheUpdater_);
   }
-  putBlock(pool);
+  writeBlock(pool);
   setGlobalSequence(getLastWrittenSequence());
   return std::make_pair(true, pool);
 }
@@ -786,6 +746,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
       //testCachedBlocks();
       return true;
     }
+    removeWalletsInPoolFromCache(pool);
     csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
     return false;
   }
