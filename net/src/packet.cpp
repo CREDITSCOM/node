@@ -52,22 +52,32 @@ bool Packet::isHeaderValid() const {
 
 uint32_t Packet::getHeadersLength() const {
   if (!headersLength_) {
-    headersLength_ = 1;  // Flags
-
-    if (isFragmented()) {
-      headersLength_ += 4;  // Min fragments & all fragments
-    }
-
-    if (!isNetwork()) {
-      headersLength_ += 40;  // Sender key + ID
-
-      if (!isBroadcast() && !isNeighbors()) {
-        headersLength_ += 32;  // Receiver key
-      }
-    }
+    headersLength_ = calculateHeaderLength();
   }
 
   return headersLength_;
+}
+
+uint32_t Packet::calculateHeaderLength() const {
+  uint32_t length = sizeof(BaseFlags);  // Flags
+
+  if (isFragmented()) {
+    length += sizeof(uint16_t) + sizeof(uint16_t);  // Min fragments & all fragments
+  }
+
+  if (!isNetwork()) {
+    length += PUBLIC_KEY_LENGTH + sizeof(getId());  // Sender key + ID
+
+    if (!isBroadcast() && !isNeighbors()) {
+      length += PUBLIC_KEY_LENGTH;  // Receiver key
+    }
+  }
+
+  return length;
+}
+
+void Packet::recalculateHeaderLength() {
+  headersLength_ = calculateHeaderLength();
 }
 
 MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
