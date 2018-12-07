@@ -269,6 +269,32 @@ bool BlockChain::writeGenesisBlock() {
   return true;
 }
 
+
+void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  walletsCacheStorage_->iterateOverWallets(func);
+}
+
+#ifdef MONITOR_NODE
+void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  walletsCacheStorage_->iterateOverWriters(func);
+}
+
+void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<void(const cs::WalletsCache::WalletData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  //auto wd = walletsCacheStorage_->findWallet(addr.public_key());
+  //if (!wd) return;
+  
+  WalletId id;
+  if (!walletIds_->normal().find(addr, id))
+    return;
+  auto wd = walletsCacheUpdater_->findWallet(id); 
+
+  func(*wd);
+}
+#endif
+
 csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   return storage_.last_hash();

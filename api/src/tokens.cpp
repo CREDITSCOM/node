@@ -336,6 +336,10 @@ void TokensMaster::run() {
         l.unlock();
 
         executor::GetContractMethodsResult methodsResult;
+
+        try { api_->getExecutor(); }
+        catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
+
         api_->getExecutor().getContractMethods(methodsResult, dt.byteCode);
         if (!methodsResult.status.code) {
           auto ts = getTokenStandart(methodsResult.methods);

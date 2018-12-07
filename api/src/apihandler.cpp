@@ -50,6 +50,9 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver)
   work_queues["TransactionFlow"];  // init value with default // constructors
   auto lapooh = s_blockchain.getLastHash();
   while (update_smart_caches_once(lapooh, true));
+
+  tm.run();  // Run this AFTER updating all the caches for maximal efficiency
+
   state_updater_running.test_and_set(std::memory_order_acquire);
   state_updater = std::thread([this]() { state_updater_work_function(); });
 }
@@ -420,7 +423,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   return send_transaction;
 }
 
-void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
+/*void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   walletsCacheStorage_->iterateOverWallets(func);
 }
@@ -430,7 +433,7 @@ void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCa
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   walletsCacheStorage_->iterateOverWriters(func);
 }
-#endif
+#endif*/
 
 std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
   auto bs = fromByteArray(tr.to_byte_stream_for_sig());
@@ -787,7 +790,12 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto deployed_by_creator = lockedReference(this->deployed_by_creator);
         (*deployed_by_creator)[pk_addr].push_back(tr.id());
       }
+
+      tm.checkNewDeploy(tr.target(), tr.source(), smart, tr.user_field(smart_state_idx).value<std::string>());
     }
+    else
+      tm.checkNewState(tr.target(), tr.source(), smart, tr.user_field(smart_state_idx).value<std::string>());
+
     return true;
   }
 
@@ -923,6 +931,8 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
   int64_t limit   = _limit;
 
   auto smart_origin = lockedReference(this->smart_origin);
+
+  _return.count = smart_origin->size();
 
   for (auto p : *smart_origin) {
     if (offset) {
@@ -1266,7 +1276,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
 
 executor::ContractExecutorConcurrentClient& APIHandler::getExecutor() {
   while (!executor_transport->isOpen()) {
-    executor_transport->open();
+      executor_transport->open();
   }
 
   return *executor;

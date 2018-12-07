@@ -4,7 +4,7 @@
 #define MONITOR_NODE
 #define NODE_API
 #define AJAX_IFACE
-#define SPAMMER
+//#define SPAMMER
 #define SYNCRO
 
 #define BOTTLENECKED_SMARTS
