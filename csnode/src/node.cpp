@@ -85,7 +85,7 @@ bool Node::init() {
     return false;
   }
 
-#if 0 // DEBUG PURPOSE
+#if 0 // debug & test auto fragmenting in OPackStream 
   constexpr size_t test_data_size = 2000;
   std::vector<cs::Byte> test_data(test_data_size, 0);
   for(int i = 0; i < test_data_size; ++i) {
@@ -94,6 +94,19 @@ bool Node::init() {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed /*| BaseFlags::Fragmented*/);
   ostream_ << MsgTypes::WriterNotification << roundNumber_;
   ostream_ << test_data;
+
+  struct LargeValue
+  {
+    std::array<uint8_t, 1023> data;
+  };
+  LargeValue large_value;
+  for(int i = 0; i < 1023; ++i) {
+    large_value.data[i] = i % 10;
+  }
+  ostream_.init(BaseFlags::Broadcast /*| BaseFlags::Compressed*/);
+  ostream_ << MsgTypes::BlockHash << (cs::RoundNumber) 22;
+  ostream_ << large_value;
+  ostream_.clear();
 #endif
 
 #ifdef SPAMMER
@@ -571,7 +584,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
 
 void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                               const cs::Characteristic& characteristic, const cs::Signature& signature) {
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
+  ostream_.init(BaseFlags::Broadcast /*| BaseFlags::Compressed*/ | BaseFlags::Fragmented);
   ostream_ << MsgTypes::RoundTable << roundNumber_;
   ostream_ << roundTable.confidants.size();
   ostream_ << roundTable.hashes.size();
@@ -919,7 +932,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
             << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
             << ", round: " << round;
 
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed /*| BaseFlags::Compressed*/);
   ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
@@ -992,18 +1005,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
   if (type == TransactionsPacketReply) {
     return MessageActions::Process;
-  }
-
-  if (type == MsgTypes::RoundTable) {
-    // obsolete message
-    cswarning() << "NODE> drop obsolete MsgTypes::RoundTable";
-    return MessageActions::Drop;
-  }
-
-  if (type == MsgTypes::RoundTableRequest) {
-    // obsolete message
-    cswarning() << "NODE> drop obsolete MsgTypes::RoundTableRequest";
-    return MessageActions::Drop;
   }
 
   if (type == MsgTypes::RoundTableRequest) {
@@ -1131,7 +1132,7 @@ bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, 
 
 template <typename... Args>
 void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented /*| BaseFlags::Compressed*/);
   ostream_ << msgType << round;
 
   writeDefaultStream(std::forward<Args>(args)...);
@@ -1148,7 +1149,7 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
 
 template <class... Args>
 void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented /*| BaseFlags::Compressed*/);
   csdebug() << "NODE> Sending broadcast";
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -1207,7 +1208,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
-  ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
+  ostream_.init(BaseFlags::Fragmented /*| BaseFlags::Compressed*/, target);
   csdebug() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
