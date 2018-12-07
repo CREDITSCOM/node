@@ -1,6 +1,7 @@
 #include <consensus.hpp>
 #include <solvercontext.hpp>
 #include <states/trustedstage1state.hpp>
+#include <smartcontracts.hpp>
 
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
@@ -9,7 +10,6 @@
 #include <lib/system/utils.hpp>
 
 #include <cscrypto/cscrypto.hpp>
-#include <sstream>
 
 namespace cs {
 void TrustedStage1State::on(SolverContext& context) {
@@ -45,18 +45,8 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   }
   cs::TransactionsPacket pack = std::move(maybe_pack.value());
   cslog() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
-#if LOG_LEVEL & FLAG_LOG_DEBUG
-  std::ostringstream os;
-  for (const auto& t : p.transactions()) {
-    os << " " << t.innerID();
-  }
-  csdebug() << name() << ":" << os.str());
-#endif  // FLAG_LOG_DEBUG
 
-  // obsolete?
-  // pool = filter_test_signatures(context, pool);
-
-  // see Solver::runCinsensus()
+  // review & validate transactions
   context.blockchain().setTransactionsFees(pack);
   stage.hash = build_vector(context, pack);
 
@@ -190,6 +180,15 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       }
 
       characteristicMask.push_back(byte);
+
+      if(0 != byte) {
+        // if validated transaction contains smart contract, remember info it future execution
+        if(SmartContracts::contains_smart_contract(transaction)) {
+          const cs::RoundNumber round = (cs::RoundNumber) context.round();
+          csdebug() << name() << ": SC found, scheduled for execution upon block #" << round << " is ready";
+          context.smarts().add_exe_candidate(transaction, round);
+        }
+      }
     }
 
     csdb::Pool excluded;

@@ -1,8 +1,6 @@
-#include <callsqueuescheduler.hpp>
-#include <consensus.hpp>
-#include <solvercontext.hpp>
 #include <solvercore.hpp>
-#include <stage.hpp>
+#include <solvercontext.hpp>
+#include <smartcontracts.hpp>
 #include <states/nostate.hpp>
 
 #pragma warning(push)
@@ -55,6 +53,7 @@ namespace cs
     // previous solver version instance
     , pnode(nullptr)
     , pws(nullptr)
+    , psmarts(nullptr)
   {
     if constexpr(MonitorModeOn) {
       cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
@@ -77,7 +76,9 @@ namespace cs
     addr_genesis = GenesisAddress;
     addr_start = StartAddress;
     pnode = pNode;
-    pws = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
+    auto& bc = pNode->getBlockChain();
+    pws = std::make_unique<cs::WalletsState>(bc);
+    psmarts = std::make_unique<cs::SmartContracts>(bc);
   }
 
   SolverCore::~SolverCore()
