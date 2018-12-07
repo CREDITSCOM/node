@@ -282,7 +282,7 @@ private:
         cswarning() << "Malformed packet: fragmentation flag not set in fragmented packet, correcting";
         *ptr_ |= BaseFlags::Fragmented;
 
-        packets_->recalculateHeaderLength();
+        packets_->recalculateHeadersLength();
 
         // insert size_inserted bytes from [1] and shift current content "rightward"
         ++ptr_;

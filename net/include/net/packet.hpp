@@ -164,7 +164,7 @@ public:
   }
 
   uint32_t getHeadersLength() const;
-  void recalculateHeaderLength();
+  void recalculateHeadersLength();
 
   explicit operator bool() {
     return data_;
@@ -245,7 +245,7 @@ private:
     return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
   }
 
-  uint32_t calculateHeaderLength() const;
+  uint32_t calculateHeadersLength() const;
 
   template <typename T>
   const T& getWithOffset(const uint32_t offset) const {

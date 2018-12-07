@@ -52,13 +52,13 @@ bool Packet::isHeaderValid() const {
 
 uint32_t Packet::getHeadersLength() const {
   if (!headersLength_) {
-    headersLength_ = calculateHeaderLength();
+    headersLength_ = calculateHeadersLength();
   }
 
   return headersLength_;
 }
 
-uint32_t Packet::calculateHeaderLength() const {
+uint32_t Packet::calculateHeadersLength() const {
   uint32_t length = sizeof(BaseFlags);  // Flags
 
   if (isFragmented()) {
@@ -76,8 +76,8 @@ uint32_t Packet::calculateHeaderLength() const {
   return length;
 }
 
-void Packet::recalculateHeaderLength() {
-  headersLength_ = calculateHeaderLength();
+void Packet::recalculateHeadersLength() {
+  headersLength_ = calculateHeadersLength();
 }
 
 MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
