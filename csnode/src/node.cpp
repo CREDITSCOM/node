@@ -744,7 +744,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packetNum = 0;
   istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  packet: " << packetNum;
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  id: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -772,18 +772,15 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
       poolsBlock.clear();
     }
   }
-
-//  sendBlockReply(poolsBlock, sender, packetNum);
 }
 
-void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  cslog() << "NODE> Get Block Reply";
-  csdebug() << "NODE> Get block reply> Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
+void Node::getBlockReply(const uint8_t* data, const size_t size) {
   if (!poolSynchronizer_->isSyncroStarted()) {
-    csdebug() << "NODE> Get block reply> Pool synchronizer already is syncro started";
+    csdebug() << "NODE> Get block reply> Pool synchronizer already syncro";
     return;
   }
+
+  cslog() << "NODE> Get Block Reply";
 
   std::size_t poolsCount = 0;
 
@@ -927,13 +924,8 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 }
 
 void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
-  const auto round = cs::Conveyer::instance().currentRoundNumber();
-  csdebug() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
-            << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
-            << ", round: " << round;
-
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed /*| BaseFlags::Compressed*/);
-  ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
+  ostream_ << MsgTypes::BlockRequest << cs::Conveyer::instance().currentRoundNumber() << sequences << packetNum;
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
