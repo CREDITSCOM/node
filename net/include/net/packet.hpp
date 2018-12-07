@@ -192,10 +192,10 @@ public:
       int sourceSize = static_cast<int>(data_.size() - headerSize);
       int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
-      size_t compressedSize = static_cast<size_t>(LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize));
+      int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
 
-      if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
-        return boost::asio::buffer(dest, compressedSize + headerSize);
+      if ((compressedSize > 0) && (compressedSize < sourceSize)) {
+        return boost::asio::buffer(dest, static_cast<size_t>(compressedSize + headerSize));
       }
       else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
@@ -225,9 +225,9 @@ public:
       int sourceSize = static_cast<int>(packetSize - headerSize);
       int destSize = static_cast<int>(sizeof(dest) - headerSize);
 
-      auto uncompressedSize = static_cast<size_t>(LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize));
+      auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
 
-      if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
+      if ((uncompressedSize > 0) && (uncompressedSize <= destSize)) {
         std::copy(dest, dest + uncompressedSize, source + headerSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;
