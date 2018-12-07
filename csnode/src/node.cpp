@@ -85,17 +85,6 @@ bool Node::init() {
     return false;
   }
 
-#if 0 // DEBUG PURPOSE
-  constexpr size_t test_data_size = 2000;
-  std::vector<cs::Byte> test_data(test_data_size, 0);
-  for(int i = 0; i < test_data_size; ++i) {
-    test_data[i] = i % 10;
-  }
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed /*| BaseFlags::Fragmented*/);
-  ostream_ << MsgTypes::WriterNotification << roundNumber_;
-  ostream_ << test_data;
-#endif
-
 #ifdef SPAMMER
   runSpammer();
 #endif
@@ -241,8 +230,7 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-namespace
-{
+namespace {
 #ifdef MONITOR_NODE
   bool monitorNode = true;
 #else
@@ -810,10 +798,6 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
 void Node::becomeWriter() {
   myLevel_ = NodeLevel::Writer;
   cslog() << "NODE> Became writer";
-
-  // if (cs::Conveyer::instance().isEnoughNotifications(cs::Conveyer::NotificationState::GreaterEqual)) {
-  //  applyNotifications();
-  //}
 }
 
 void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -911,9 +895,9 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 
 void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
-  csdebug() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
-            << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
-            << ", round: " << round;
+  csdetails() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
+              << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
+              << ", round: " << round;
 
   ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
   ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
@@ -1109,7 +1093,7 @@ void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, cons
   static constexpr cs::Byte defautFlags = BaseFlags::Fragmented;
 
   ostream_.init(defautFlags, target);
-  csdebug() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  csdetails() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
@@ -1132,11 +1116,11 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
 
   writeDefaultStream(std::forward<Args>(args)...);
 
-  csdebug() << "NODE> Sending Direct data: packets count = " << ostream_.getPacketsCount() << ", last size = " << (ostream_.getCurrentSize())
-    << ", out = " << target->out
-    << ", in = " << target->in
-    << ", specialOut = " << target->specialOut
-    << ", msgType: " << getMsgTypesString(msgType);
+  csdetails() << "NODE> Sending Direct data: packets count = " << ostream_.getPacketsCount() << ", last size = " << (ostream_.getCurrentSize())
+              << ", out = " << target->out
+              << ", in = " << target->in
+              << ", specialOut = " << target->specialOut
+              << ", msgType: " << getMsgTypesString(msgType);
 
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
   ostream_.clear();
@@ -1145,7 +1129,7 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
 template <class... Args>
 void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
-  csdebug() << "NODE> Sending broadcast";
+  csdetails() << "NODE> Sending broadcast";
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
@@ -1172,7 +1156,15 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
   const auto& confidants = cs::Conveyer::instance().confidants();
-  for (const auto& confidant : confidants) {
+  const auto size = confidants.size();
+
+  for (size_t i = 0; i < size; ++i) {
+    const auto& confidant = confidants[i];
+
+    if (myConfidantIndex_ == i && nodeIdKey_ == confidant) {
+      continue;
+    }
+
     sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
   }
 }
@@ -1204,7 +1196,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
   ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
-  csdebug() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  csdetails() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
   sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
@@ -1215,9 +1207,8 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
   writeDefaultStream(std::forward<Args>(args)...);
 
-  csdebug() << "NODE> Sending broadcast data: size = " << ostream_.getCurrentSize()
-      << ", round: " << round
-      << ", msgType: " << getMsgTypesString(msgType);
+  csdetails() << "NODE> Sending broadcast data: size = " << ostream_.getCurrentSize() << ", round: " << round
+              << ", msgType: " << getMsgTypesString(msgType);
 
   transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();
@@ -1632,8 +1623,6 @@ void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature& signa
   csprint() << "done";
 }
 
-
-
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp) {
   csprint() << " timestamp = " << timeStamp;
 
@@ -1789,7 +1778,7 @@ void Node::sendHash(cs::RoundNumber round) {
   // = personallyDamagedHash();
 
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
-  sendBroadcast(MsgTypes::BlockHash, round, hash);
+  sendToConfidants(MsgTypes::BlockHash, round, hash);
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
