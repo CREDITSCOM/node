@@ -116,6 +116,10 @@ public:
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
+#ifdef MONITOR_NODE
+  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)>);
+#endif
+
   uint64_t getWalletsCount();
 
   csdb::PoolHash getHashBySequence(uint32_t seq) const;

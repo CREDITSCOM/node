@@ -2029,11 +2029,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);// writerPublicKey);
 
       if(pool.has_value()) {
-
       if(!getBlockChain().storeBlock(pool.value(), signature)) {
         cserror() << "NODE> failed to store block in BlockChain";
       }
       else {
+        std::vector writer(sender.begin(), sender.end());
+        pool.value().set_writer_public_key(writer);
+
         ::std::vector <uint8_t> tmp;
         std::vector <::std::vector<uint8_t>> confs;
         for (auto& it : roundTable.confidants) {

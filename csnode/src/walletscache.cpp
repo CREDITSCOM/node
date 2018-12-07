@@ -65,6 +65,23 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
   csdb::Address writer_address = writer_address.from_public_key(pool.writer_public_key());
 
+#ifdef MONITOR_NODE
+  auto wrWall = pool.writer_public_key();
+
+  //
+  WalletData::Address addr;
+  std::copy(wrWall.begin(), wrWall.end(), addr.begin());
+  //
+
+  auto wrWrIt = data_.writers_.find(addr);
+  if (wrWrIt == data_.writers_.end()) {
+    auto res = data_.writers_.insert(std::make_pair(addr, WriterData()));
+    wrWrIt = res.first;
+  }
+
+  ++wrWrIt->second.times;
+#endif
+
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
     load(*itTrx, writer_address);
   }
@@ -227,5 +244,36 @@ void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData:
   }
 }
 #endif
+
+/*void WalletsCache::load(csdb::Pool& curr, Mode mode)
+{
+  PoolHash poolHash;
+  convert(curr.hash(), poolHash);
+  //LOG_NOTICE(__FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count());
+
+  const uint64_t timeStamp = atoll(curr.user_field(0).value<std::string>().c_str());
+
+  auto* walDataPtr = getWalletData(curr.writer_public_key(), timeStamp);
+  WalletsCache::WalletData& walWriter = *walDataPtr;
+#ifdef MONITOR_NODE
+  auto wrWall = curr.writer_public_key();
+  auto wrWrIt = writers_.find(curr.writer_public_key());
+  if (wrWrIt == writers_.end()) {
+    auto res = writers_.insert(std::make_pair(curr.writer_public_key(), WriterData()));
+    wrWrIt = res.first;
+  }
+
+  ++wrWrIt->second.times;
+#endif
+
+  for (size_t i = 0; i < curr.transactions_count(); i++)
+  {
+    csdb::Transaction tr = curr.transaction(i);
+#ifdef MONITOR_NODE
+    wrWrIt->second.totalFee += tr.counted_fee();
+#endif
+    load(tr, mode, poolHash, walWriter, timeStamp);
+  }
+}*/
 
 }  // namespace cs

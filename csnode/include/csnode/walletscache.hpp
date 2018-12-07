@@ -9,6 +9,7 @@
 #include <csnode/transactionstail.hpp>
 #include <memory>
 #include <vector>
+#include <map>
 
 namespace csdb {
 class Pool;
@@ -34,6 +35,11 @@ public:
     Address address_;
     csdb::Amount balance_;
     TransactionsTail trxTail_;
+
+#ifdef MONITOR_NODE
+    uint64_t createTime_ = 0;
+    uint64_t transNum_ = 0;
+#endif
   };
 
   struct WriterData {
@@ -72,6 +78,10 @@ private:
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
+
+/*#ifdef MONITOR_NODE
+    std::map<WalletData::Address, WriterData> writers_;
+#endif*/
 
   protected:
     static WalletData& getWalletData(Data& wallets, WalletId id, const csdb::Address& address);
@@ -131,6 +141,10 @@ private:
   WalletsIds& walletsIds_;
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
+
+#ifdef MONITOR_NODE
+  std::map<WalletData::Address, WriterData> writers_; 
+#endif
 
   Data wallets_;
 };

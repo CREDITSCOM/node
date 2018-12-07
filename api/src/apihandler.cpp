@@ -425,6 +425,13 @@ void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCa
   walletsCacheStorage_->iterateOverWallets(func);
 }
 
+#ifdef MONITOR_NODE
+void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)> func) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  walletsCacheStorage_->iterateOverWriters(func);
+}
+#endif
+
 std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
   auto bs = fromByteArray(tr.to_byte_stream_for_sig());
   return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
@@ -1627,9 +1634,11 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 
     //wi.address = fromByteArray(*(ptr->first));
     //
-    std::string res;
+    const ::csdb::internal::byte_array addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
+    wi.address = fromByteArray(addr_b);
+    /*std::string res;
     std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    wi.address = res;
+    wi.address = res;*/
     //
     
     wi.balance.integral = ptr->second->balance_.integral();
@@ -1656,13 +1665,22 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t limit = PER_PAGE;
   uint32_t total = 0;
 
-  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const Credits::WalletsCache::WalletData::Address& addr, const Credits::WalletsCache::WriterData& wd) {
+  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WriterData& wd) {
     if (addr.empty()) return true;
     if (offset == 0) {
       if (limit > 0) {
         api::WriterInfo wi;
 
-        wi.address = fromByteArray(addr);
+        //wi.address = fromByteArray(addr);
+        const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
+        wi.address = fromByteArray(addr_b);
+
+
+
+        /*std::string res;
+        std::transform((addr).begin(), (addr).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
+        wi.address = res;*/
+
         wi.timesWriter = wd.times;
         wi.feeCollected.integral = wd.totalFee.integral();
         wi.feeCollected.fraction = wd.totalFee.fraction();
