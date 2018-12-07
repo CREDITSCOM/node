@@ -230,11 +230,8 @@ private:
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   // write values to stream
-  template <typename T, typename... Args>
-  void writeDefaultStream(const T& value, Args&&... args);
-
-  template <typename T>
-  void writeDefaultStream(const T& value);
+  template <typename... Args>
+  void writeDefaultStream(Args&&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;

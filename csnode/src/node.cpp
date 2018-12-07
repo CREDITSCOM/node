@@ -1169,15 +1169,9 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
   }
 }
 
-template <typename T, typename... Args>
-void Node::writeDefaultStream(const T& value, Args&&... args) {
-  ostream_ << value;
-  writeDefaultStream(std::forward<Args>(args)...);
-}
-
-template <typename T>
-void Node::writeDefaultStream(const T& value) {
-  ostream_ << value;
+template <typename... Args>
+void Node::writeDefaultStream(Args&&... args) {
+  (ostream_ << ... << std::forward<Args>(args));  // fold expression
 }
 
 template<typename... Args>
