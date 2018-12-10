@@ -100,14 +100,14 @@ bool Node::checkKeysFile() {
   std::ifstream pub(publicKeyFileName_);
   std::ifstream priv(privateKeyFileName_);
 
-  if(!pub.is_open() || !priv.is_open()) {
+  if (!pub.is_open() || !priv.is_open()) {
     cslog() << "\n\nNo suitable keys were found. Type \"g\" to generate or \"q\" to quit.";
 
     char gen_flag = 'a';
     std::cin >> gen_flag;
 
-    if(gen_flag == 'g') {
-      auto[generatedPublicKey, generatedPrivateKey] = generateKeys();
+    if (gen_flag == 'g') {
+      auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
       solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
       return true;
     }
@@ -129,7 +129,7 @@ bool Node::checkKeysFile() {
     DecodeBase58(pub58, publicKey);
     DecodeBase58(priv58, privateKey);
 
-    if(publicKey.size() != PUBLIC_KEY_LENGTH || privateKey.size() != PRIVATE_KEY_LENGTH) {
+    if (publicKey.size() != PUBLIC_KEY_LENGTH || privateKey.size() != PRIVATE_KEY_LENGTH) {
       cslog() << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit.";
 
       char gen_flag = 'a';
@@ -137,8 +137,8 @@ bool Node::checkKeysFile() {
 
       bool needGenerateKeys = gen_flag == 'g';
 
-      if(gen_flag == 'g') {
-        auto[generatedPublicKey, generatedPrivateKey] = generateKeys();
+      if (gen_flag == 'g') {
+        auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
         solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
       }
 
@@ -154,7 +154,6 @@ bool Node::checkKeysFile() {
     return checkKeysForSignature(fixedPublicKey, fixedPrivatekey);
   }
 }
-
 
 std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
   cs::PublicKey fixedPublicKey;
@@ -172,19 +171,19 @@ std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
   return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
 }
 
-bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey)
-{
-  if(cscrypto::ValidateKeyPair(publicKey, privateKey)) {
+bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
+  if (cscrypto::ValidateKeyPair(publicKey, privateKey)) {
     solver_->setKeysPair(publicKey, privateKey);
     return true;
   }
+
   cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
 
   char gen_flag = 'a';
   std::cin >> gen_flag;
 
-  if(gen_flag == 'g') {
-    auto[generatedPublickey, generatedPrivateKey] = generateKeys();
+  if (gen_flag == 'g') {
+    auto [generatedPublickey, generatedPrivateKey] = generateKeys();
     solver_->setKeysPair(generatedPublickey, generatedPrivateKey);
     return true;
   }
@@ -521,7 +520,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     cs::PublicKey pk;
     std::fill(pk.begin(), pk.end(), 0);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);  // writerPublicKey);
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
 
     if (!pool.has_value()) {
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
@@ -681,8 +680,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
   const bool success = sendToNeighbour(target, msgType, round, packets);
 
   if (!success) {
-    csdebug() << "NODE> Reply transaction packets: failed send to "
-              << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
+    csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
     sendBroadcast(target, msgType, round, packets);
   }
 }
@@ -1316,9 +1314,6 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
     return;
   }
 
-  // TODO: fix it by logic changing
-  stageTwoMessage_.clear();
-
   size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
   size_t stageBytesSize  = sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
 
@@ -1403,7 +1398,6 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   bytes.reserve(stageSize);
 
   cs::DataStream stream(bytes);
-
   stream << stageThreeInfo.sender;
   stream << stageThreeInfo.writer;
   stream << stageThreeInfo.hashBlock;
@@ -1457,7 +1451,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   }
 
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
-    cswarning() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
+    cswarning() << "NODE> Stage Three from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
