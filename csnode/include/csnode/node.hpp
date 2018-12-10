@@ -230,11 +230,8 @@ private:
   void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
   // write values to stream
-  template <typename T, typename... Args>
-  void writeDefaultStream(const T& value, Args&&... args);
-
-  template <typename T>
-  void writeDefaultStream(const T& value);
+  template <typename... Args>
+  void writeDefaultStream(Args&&... args);
 
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
@@ -302,13 +299,13 @@ private:
     cs::Notifications notifications;
   };
 
-  std::vector <std::string> stageOneMessage_;
-  std::vector <std::string>  stageTwoMessage_;
-  std::vector <std::string>  stageThreeMessage_;
+  std::vector<cs::Bytes> stageOneMessage_;
+  std::vector<cs::Bytes> stageTwoMessage_;
+  std::vector<cs::Bytes> stageThreeMessage_;
 
-  std::vector <std::string> stageOneSmartsMessage_;
-  std::vector <std::string> stageTwoSmartsMessage_;
-  std::vector <std::string> stageThreeSmartsMessage_;
+  std::vector<cs::Bytes> stageOneSmartsMessage_;
+  std::vector<cs::Bytes> stageTwoSmartsMessage_;
+  std::vector<cs::Bytes> stageThreeSmartsMessage_;
 
   SentRoundData lastSentRoundData_;
 

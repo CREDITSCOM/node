@@ -193,7 +193,7 @@ bool cs::ConveyerBase::isConfidantExists(size_t index) const {
   const cs::ConfidantsKeys& confidantsReference = confidants();
 
   if (confidantsReference.size() <= index) {
-    cserror() << __func__ << ", index " << index << "out of range , confidants count " << confidantsReference.size()
+    cserror() << __func__ << ", index " << index << " out of range , confidants count " << confidantsReference.size()
               << ", on round " << pimpl_->currentRound;
     return false;
   }

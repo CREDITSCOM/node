@@ -9,13 +9,12 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
+#include "lib/system/utils.hpp"
 
 #include <lz4.h>
 
 #include <iostream>
 #include <memory>
-
-#include "lib/system/utils.hpp"
 
 namespace ip = boost::asio::ip;
 
@@ -165,6 +164,7 @@ public:
   }
 
   uint32_t getHeadersLength() const;
+  void recalculateHeadersLength();
 
   explicit operator bool() {
     return data_;
@@ -178,7 +178,7 @@ public:
 
     if (isCompressed()) {
       static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
-      constexpr size_t headerSize = sizeof(BaseFlags);
+      const size_t headerSize = getHeadersLength();
 
       // Packet::MaxSize is a part of implementation magic(
       assert(tempBuffer.size() == Packet::MaxSize);
@@ -186,15 +186,16 @@ public:
       char* source = static_cast<char*>(data_.get());
       char* dest = static_cast<char*>(tempBuffer.data());
 
-      *dest = *source;  // copy header
+      // copy header
+      std::copy(source, source + headerSize, dest);
 
       int sourceSize = static_cast<int>(data_.size() - headerSize);
       int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
-      size_t compressedSize = static_cast<size_t>(LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize));
+      int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
 
-      if (compressedSize > 0 && cs::numeric_cast<decltype(sourceSize)>(compressedSize) < sourceSize) {
-        return boost::asio::buffer(dest, compressedSize + headerSize);
+      if ((compressedSize > 0) && (compressedSize < sourceSize)) {
+        return boost::asio::buffer(dest, static_cast<size_t>(compressedSize + headerSize));
       }
       else {
         csdebug() << "Skipping packet compression, rawSize=" << sourceSize << ", compressedSize=" << compressedSize;
@@ -212,7 +213,7 @@ public:
 
     if (isCompressed()) {
       static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
-      constexpr size_t headerSize = sizeof(BaseFlags);
+      const size_t headerSize = getHeadersLength();
 
       // It's a part of implementation magic(
       // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
@@ -224,9 +225,9 @@ public:
       int sourceSize = static_cast<int>(packetSize - headerSize);
       int destSize = static_cast<int>(sizeof(dest) - headerSize);
 
-      auto uncompressedSize = static_cast<size_t>(LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize));
+      auto uncompressedSize = LZ4_decompress_safe(source + headerSize, dest, sourceSize, destSize);
 
-      if (uncompressedSize > 0 && cs::numeric_cast<decltype(destSize)>(uncompressedSize) <= destSize) {
+      if ((uncompressedSize > 0) && (uncompressedSize <= destSize)) {
         std::copy(dest, dest + uncompressedSize, source + headerSize);
         *source &= ~BaseFlags::Compressed;
         packetSize = uncompressedSize + headerSize;
@@ -243,6 +244,8 @@ private:
   bool checkFlag(const BaseFlags flag) const {
     return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
   }
+
+  uint32_t calculateHeadersLength() const;
 
   template <typename T>
   const T& getWithOffset(const uint32_t offset) const {

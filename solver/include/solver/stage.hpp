@@ -13,8 +13,8 @@ struct StageOne {
   std::string roundTimeStamp;
   std::vector<PublicKey> trustedCandidates;
   std::vector<TransactionsPacketHash> hashesCandidates;
-  Hash msgHash;
-  Signature sig;
+  Hash messageHash;
+  Signature signature;
 };
 
 struct StageTwo {

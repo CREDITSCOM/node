@@ -163,7 +163,8 @@ public:
     ++id_;
 
     newPack();
-    *static_cast<cs::Byte*>(ptr_) = flags;
+
+    *ptr_ = flags;
     ++ptr_;
 
     if (flags & BaseFlags::Fragmented) {
@@ -272,14 +273,16 @@ private:
   void newPack() {
     RegionPtr tempBuffer;
     cs::Byte* tail = nullptr;
-    constexpr size_t insertedSize = sizeof(uint16_t) + sizeof(packetsCount_);
+    static constexpr size_t insertedSize = sizeof(uint16_t) + sizeof(packetsCount_);
 
     if (packetsCount_ == 1) {
       ptr_ = static_cast<cs::Byte*>(packets_->data());
 
-      if (BaseFlags::Fragmented != (*ptr_ & BaseFlags::Fragmented)) {
+      if (!packets_->isFragmented()) {
         cswarning() << "Malformed packet: fragmentation flag not set in fragmented packet, correcting";
         *ptr_ |= BaseFlags::Fragmented;
+
+        packets_->recalculateHeadersLength();
 
         // insert size_inserted bytes from [1] and shift current content "rightward"
         ++ptr_;
@@ -303,7 +306,7 @@ private:
 
     if (packetsEnd_ != packets_) {
       auto begin = static_cast<cs::Byte*>(packets_->data());
-      auto end = static_cast<cs::Byte*>(packets_->data()) + packets_->getHeadersLength();
+      auto end = begin + packets_->getHeadersLength();
 
       std::copy(begin, end, ptr_);
       *reinterpret_cast<uint16_t*>(static_cast<cs::Byte*>(packetsEnd_->data()) + static_cast<uint32_t>(Offsets::FragmentId)) = packetsCount_;
