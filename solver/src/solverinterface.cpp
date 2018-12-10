@@ -1,5 +1,6 @@
 #include <consensus.hpp>
 #include <solvercore.hpp>
+#include <smartcontracts.hpp>
 
 #pragma warning(push)
 #pragma warning(disable : 4267 4244 4100 4245)
@@ -23,8 +24,14 @@ namespace cs
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
-    // previous solver implementation calls to runConsensus method() here
-    // perform similar actions, but only in proper state (TrustedStage1State for now)
+    if(rNum == cur_round && pnode->getBlockChain().getLastWrittenSequence() + 1 == rNum) {
+      // now we have just written last block to chain having smart contacts as candidates to execute
+      const auto cnt = psmarts->cnt_exe_candidates();
+      if(cnt > 0) {
+        cslog() << "SolverCore: ready to execute SC: " << cnt << ", do it now";
+        psmarts->execute_candidates();
+      }
+    }
 
     // clear data
     markUntrusted.fill(0);
@@ -256,29 +263,6 @@ namespace cs
 
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
-    // if case of smart contract
-   
-    //TODO: how to detect smart contract in trx
-    constexpr csdb::user_field_id_t smart_state_idx = ~1; // see apihandler.cpp #9
-    const auto state_fld = tr.user_field(smart_state_idx); // see apihandler.cpp #495
-    if(state_fld.is_valid()) {
-      // extract smart contract
-      const auto& smart_fld = tr.user_field(0); // see apihandler.cpp #494
-      if(smart_fld.is_valid()) {
-        const auto smart_contract = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
-
-        //if(stateCompleted(pstate->onSmartContractDeploy(*pcontext, smart_contract))) {
-          handleTransitions(Event::SmartDeploy);
-        //}
-      }
-      else {
-        // error
-      }
-
-      return;
-    }
-
-    // in case of ordinary trx
     cs::Conveyer::instance().addTransaction(tr);
   }
 
@@ -339,4 +323,4 @@ namespace cs
       true);
   }
 
-}  // namespace slv2
+}  // namespace cs

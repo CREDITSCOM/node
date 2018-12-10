@@ -7,10 +7,11 @@
 #include "stage.hpp"
 
 #include <csdb/pool.hpp>
+#include <csnode/transactionspacket.hpp>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <csnode/transactionspacket.hpp>
 #include <map>
 #include <memory>
 #include <optional>
@@ -22,6 +23,7 @@ class Node;
 
 namespace cs {
 class WalletsState;
+class SmartContracts;
 }  // namespace cs
 
 // TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by
@@ -166,6 +168,8 @@ private:
 
   Node* pnode;
   std::unique_ptr<cs::WalletsState> pws;
+  // smart contracts service
+  std::unique_ptr<cs::SmartContracts> psmarts;
 
   void ExecuteStart(Event start_event);
 
