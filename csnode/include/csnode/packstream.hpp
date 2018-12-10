@@ -143,6 +143,10 @@ public:
     return end_ - ptr_;
   }
 
+  bool isBytesAvailable(size_t bytes) const {
+    return remainsBytes() >= bytes;
+  }
+
 private:
   const cs::Byte* ptr_ = nullptr;
   const cs::Byte* end_ = nullptr;
@@ -365,7 +369,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
   std::size_t size = 0;
   (*this) >> size;
 
-  if (size == 0) {
+  if (size == 0 || !isBytesAvailable(size)) {
     return *this;
   }
 
@@ -381,7 +385,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
   std::size_t size;
   (*this) >> size;
 
-  if (size == 0) {
+  if (size == 0 || !isBytesAvailable(size)) {
     return *this;
   }
 

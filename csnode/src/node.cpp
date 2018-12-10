@@ -1389,9 +1389,6 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     return;
   }
 
-  // TODO: think how to improve this code
-  stageThreeMessage_.clear();
-
   size_t stageSize = 2 * sizeof(uint8_t) + 3 * sizeof(cs::Hash) + stageThreeInfo.realTrustedMask.size();
 
   cs::Bytes bytes;
