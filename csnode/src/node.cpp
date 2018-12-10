@@ -1316,70 +1316,56 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
     return;
   }
 
+  // TODO: fix it by logic changing
   stageTwoMessage_.clear();
-  size_t curTrustedAmount = cs::Conveyer::instance().roundTable(roundNumber_)->confidants.size();
-  size_t pStageTwoMsgSize  = sizeof(stageTwoInfo.sender)
-                    + sizeof(stageTwoInfo.sender) 
-                    + (sizeof(cs::Signature) + sizeof(cs::Hash)) * curTrustedAmount;
 
-  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(pStageTwoMsgSize + sizeof(cs::RoundNumber)));
-  uint8_t* rawData = (uint8_t*)memPtr.get();
-  uint8_t* ptr = rawData;
-  memcpy(ptr, &roundNumber_, sizeof(cs::RoundNumber));
-  ptr += sizeof(cs::RoundNumber);
-  *ptr= stageTwoInfo.sender;
+  size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
+  size_t stageBytesSize  = sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
 
-  ptr += 1;
-  *ptr = (uint8_t)curTrustedAmount;
-  ptr += 1;
+  cs::Bytes bytes;
+  bytes.reserve(stageBytesSize);
 
-  for (int i = 0; i < curTrustedAmount; ++i) {
-    memcpy(ptr, stageTwoInfo.signatures.at(i).data(), sizeof(cs::Signature));
-    ptr += sizeof(cs::Signature);
-    memcpy(ptr, stageTwoInfo.hashes.at(i).data(), sizeof(cs::Hash));
-    ptr += sizeof(cs::Hash);
-  }
+  cs::DataStream stream(bytes);
+  stream << stageTwoInfo.sender;
+  stream << stageTwoInfo.signatures;
+  stream << stageTwoInfo.hashes;
 
-  cscrypto::GenerateSignature(stageTwoInfo.sig, solver_->getPrivateKey(), rawData, pStageTwoMsgSize + sizeof(cs::RoundNumber));
+  // create signature
+  cscrypto::GenerateSignature(stageTwoInfo.signature, solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  auto begin = rawData + sizeof(cs::RoundNumber);
-  auto end = begin + pStageTwoMsgSize;
-  stageTwoMessage_[myConfidantIndex_] = cs::Bytes(begin, end);
+  sendToConfidants(MsgTypes::SecondStage, roundNumber_, bytes, stageTwoInfo.signature);
 
-  sendToConfidants(MsgTypes::SecondStage, roundNumber_, stageTwoInfo.sig, stageTwoMessage_[myConfidantIndex_]);
+  // cash our stage two
+  stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
   csprint() << "done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  csdetails() << "NODE> " << __func__ << "()";
+  csprint();
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
-    csdebug() << "NODE> ignore stage-2 as no confidant";
+    csdebug() << "NODE> ignore stage two as no confidant";
     return;
   }
 
   cslog() << "Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   istream_.init(data, size);
 
-  size_t msgSize;
+  cs::Bytes bytes;
+  istream_ >> bytes;
+
   cs::StageTwo stage;
-  istream_ >> stage.sig;
-  cs::Bytes rawBytes;
-  istream_ >> rawBytes;
+  istream_ >> stage.signature;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageTwo packet format";
     return;
   }
 
-  const uint8_t* stagePtr = (uint8_t*)rawBytes.data();
-  msgSize = rawBytes.size();
-  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(msgSize + sizeof(cs::RoundNumber)));
-  uint8_t* rawData = (uint8_t*)memPtr.get();
-  memcpy(rawData, &roundNumber_, sizeof(cs::RoundNumber));
-  memcpy(rawData + sizeof(cs::RoundNumber), stagePtr, msgSize);
-  stage.sender = *stagePtr;
-  stageTwoMessage_[stage.sender] = rawBytes;
+  cs::DataStream stream(bytes.data(), bytes.size());
+  stream >> stage.sender;
+  stream >> stage.signatures;
+  stream >> stage.hashes;
 
   cslog() << __func__  << "(): Sender :" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1388,29 +1374,15 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
-  if (!cscrypto::VerifySignature(stage.sig, conveyer.confidantByIndex(stage.sender), rawData, msgSize + sizeof(cs::RoundNumber))) {
+  if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     cslog() << "Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
-  cslog() << "Signature is OK";
-  rawData += (sizeof(uint8_t) + sizeof(cs::RoundNumber));
-  uint8_t trustedAmount = *rawData;
-  rawData += sizeof(uint8_t);
 
-  cs::Signature tempSig;
-  cs::Hash tempHash;
+  csprint() << "Signature is OK";
+  stageTwoMessage_[stage.sender] = std::move(bytes);
 
-  for (int i = 0; i < trustedAmount; i++) {
-    memcpy(tempSig.data(), rawData, tempSig.size());
-    stage.signatures.push_back(tempSig);
-    rawData += sizeof(cs::Signature);
-
-    memcpy(tempHash.data(), rawData, tempHash.size());
-    stage.hashes.push_back(tempHash);
-    rawData += sizeof(cs::Hash);
-  }
-
-  csdebug() << "NODE> Stage Two from [" << (int)stage.sender << "] is OK!";
+  csdebug() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->gotStageTwo(std::move(stage));
 }
 
@@ -1446,12 +1418,12 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   rawData += sizeof(uint8_t);
   memcpy(rawData, stageThreeInfo.realTrustedMask.data(), stageThreeInfo.realTrustedMask.size());
 
-  cscrypto::GenerateSignature(stageThreeInfo.sig,solver_->getPrivateKey(), msgPtr,pStageThreeMsgSize + sizeof(cs::RoundNumber));
+  cscrypto::GenerateSignature(stageThreeInfo.signature,solver_->getPrivateKey(), msgPtr,pStageThreeMsgSize + sizeof(cs::RoundNumber));
 
   auto begin = msgPtr + sizeof(cs::RoundNumber);
   auto end = begin + pStageThreeMsgSize;
   stageThreeMessage_[myConfidantIndex_] = cs::Bytes(begin, end);
-  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.sig, stageThreeMessage_[myConfidantIndex_]);
+  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.signature, stageThreeMessage_[myConfidantIndex_]);
 
   csdebug() << "NODE> " << __func__ << "(): done";
 }
@@ -1467,7 +1439,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 
   istream_.init(data, size);
   cs::StageThree stage;
-  istream_  >> stage.sig;
+  istream_  >> stage.signature;
   cs::Bytes rawBytes;
   istream_ >> rawBytes;
 
@@ -1493,7 +1465,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     return;
   }
 
-  if (!cscrypto::VerifySignature(stage.sig, conveyer.confidantByIndex(stage.sender), rawData, msgSize + sizeof(cs::RoundNumber))) {
+  if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), rawData, msgSize + sizeof(cs::RoundNumber))) {
     cswarning() << "NODE> Stage Three from [" << (int)stage.sender << "] -  WRONG SIGNATURE!!!";
     return;
   }
