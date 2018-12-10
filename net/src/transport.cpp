@@ -501,7 +501,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     case MsgTypes::BlockRequest:
       return node_->getBlockRequest(data, size, firstPack.getSender());
     case MsgTypes::RequestedBlock:
-      return node_->getBlockReply(data, size, firstPack.getSender());
+      return node_->getBlockReply(data, size);
     case MsgTypes::BigBang: // any round (in theory) may be set
       return node_->getBigBang(data, size, rNum, type);
     case MsgTypes::RoundTableRequest: // old-round node may ask for round info

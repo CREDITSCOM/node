@@ -40,7 +40,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   auto maybe_pack = conveyer.createPacket();
   if (!maybe_pack.has_value()) {
     cserror() << name()
-              << ": error while prepare consensus to build vector, maybe method called before sync completed?";
+      << ": error while prepare consensus to build vector, maybe method called before sync completed?";
     return Result::Ignore;
   }
   cs::TransactionsPacket pack = std::move(maybe_pack.value());
@@ -50,33 +50,36 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   for (const auto& t : p.transactions()) {
     os << " " << t.innerID();
   }
-        csdebug() << name() << ":" << os.str());
+  csdebug() << name() << ":" << os.str());
 #endif  // FLAG_LOG_DEBUG
 
-        // obsolete?
-        // pool = filter_test_signatures(context, pool);
+  // obsolete?
+  // pool = filter_test_signatures(context, pool);
 
-        // see Solver::runCinsensus()
-        context.blockchain().setTransactionsFees(pack);
-        stage.hash = build_vector(context, pack);
+  // see Solver::runCinsensus()
+  context.blockchain().setTransactionsFees(pack);
+  stage.hash = build_vector(context, pack);
 
-        {
-          bool found = false;
-          cs::SharedLock lock(conveyer.sharedMutex());
-          for (const auto& element : conveyer.transactionsPacketTable()) {
-            found = false;
-            for (const auto& it : conveyer.roundTable(context.round())->hashes) {
-              if (memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
-                found = true;
-              }
-            }
-            if (!found) stage.hashesCandidates.push_back(element.first);
+  {
+    bool found = false;
+    cs::SharedLock lock(conveyer.sharedMutex());
+    for (const auto& element : conveyer.transactionsPacketTable()) {
+      found = false;
+      const auto rt = conveyer.roundTable(static_cast<cs::RoundNumber>(context.round()));
+      if(rt != nullptr) {
+        for(const auto& it : rt->hashes) {
+          if(memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
+            found = true;
           }
         }
+      }
+      if (!found) stage.hashesCandidates.push_back(element.first);
+    }
+  }
 
-        transactions_checked = true;
+  transactions_checked = true;
 
-        return (enough_hashes ? Result::Finish : Result::Ignore);
+  return (enough_hashes ? Result::Finish : Result::Ignore);
 }
 
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
