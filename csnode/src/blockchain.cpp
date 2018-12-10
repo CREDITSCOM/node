@@ -85,7 +85,8 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       pool = loadBlock(current_sequence);
       if (!updateWalletIds(pool, initer))
         return false;
-      const auto confidants = this->loadBlock(pool.previous_hash()).confidants();
+      csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
+      const auto& confidants = prev_pool.confidants();
       initer.loadPrevBlock(pool, confidants);
       if (!blockHashes_->initFromPrevBlock(pool))
         return false;
