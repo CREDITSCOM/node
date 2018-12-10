@@ -485,17 +485,11 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
 }
 
 void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept {
-  if (d.constData()->read_only_) {
+  if (d.constData()->read_only_)
     return;
-  }
-
+  
   priv* data = d.data();
   data->is_valid_ = true;
-
-  //data->writer_public_key_.data() = new uint8_t[32];
-
-  //memcpy(data->writer_public_key_.data(), writer_public_key.data(), ::csdb::priv::crypto::public_key_size);
-
   data->writer_public_key_ = std::move(writer_public_key);
 }
 
