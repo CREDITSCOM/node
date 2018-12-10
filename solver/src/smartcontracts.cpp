@@ -8,90 +8,82 @@
 namespace cs
 {
 
-  constexpr csdb::user_field_id_t SmartContractField = 0;
-  constexpr csdb::user_field_id_t SmartStateField = ~1; // see apihandler.cpp #9
-
   /*explicit*/
   SmartContracts::SmartContracts(BlockChain& blockchain)
     : bc(blockchain)
-  {
+  {}
 
+  /*static*/
+  bool SmartContracts::contains_smart_contract(const csdb::Transaction tr)
+  {
+    return tr.user_field(trx_uf::deploy::Code).is_valid(); // see apihandler.cpp near #494
   }
 
   /*static*/
-  bool SmartContracts::contains_smart_contract(const csdb::Transaction& tr)
+  std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction tr)
   {
-    return tr.user_field(SmartContractField).is_valid(); // see apihandler.cpp near #494
-  }
-
-  /*static*/
-  std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction& tr)
-  {
-    const auto& smart_fld = tr.user_field(SmartContractField); // see apihandler.cpp near #494
+    const auto& smart_fld = tr.user_field(trx_uf::deploy::Code); // see apihandler.cpp near #494
     if(smart_fld.is_valid()) {
       return deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
     }
     return std::nullopt;
   }
 
-  // lookup in exe candidates
-  std::vector<SmartContracts::TransactionMeta>::const_iterator SmartContracts::find_exe_candidate(const csdb::Transaction& tr) const
+  /*static*/
+  bool SmartContracts::is_deploy(const csdb::Transaction tr)
   {
-    csdb::Address source = tr.source();
-    trx_innerid_t id = tr.innerID();
-    auto it = exe_candidates.cbegin();
-    if(!exe_candidates.empty()) {
-      for(; it != exe_candidates.cend(); ++it) {
-        if(it->inner_id == id && it->source == source) {
-          break;
-        }
-      }
-    }
-    return it;
+    //TODO: correctly define tx type
+    return contains_smart_contract(tr);
+  }
+  /*static*/
+  bool SmartContracts::is_start(const csdb::Transaction tr)
+  {
+    //TODO: correctly define tx type
+    return contains_smart_contract(tr);
+  }
+  /*static*/
+  bool SmartContracts::is_new_state(const csdb::Transaction tr)
+  {
+    //TODO: correctly define tx type
+    return tr.user_field_ids().size() == trx_uf::new_state::Count;
   }
 
-  void SmartContracts::execute_candidates()
+  csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& ref)
   {
-    // assume the method has called upon record related block to chain
-    //csdb::Pool block = bc.loadBlock(bc.getLastWrittenSequence());
-    csdb::Pool block = bc.loadBlock(bc.getLastWrittenHash());
-    if(block.transactions_count() == 0) {
-      cserror() << "Smarts: last written block does not contain trx with SC";
+    csdb::Pool block = bc.loadBlock(ref.hash);
+    if(!block.is_valid()) {
+      return csdb::Transaction {};
+    }
+    if(ref.transaction >= block.transactions_count()) {
+      return csdb::Transaction {};
+    }
+    return block.transactions().at(ref.transaction);
+  }
+
+  std::pair<SmartContractStatus, const SmartContractRef&> SmartContracts::enqueue(
+    const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round)
+  {
+    SmartContractRef new_item { blk_hash, blk_seq, trx_idx };
+    SmartContractStatus new_status = SmartContractStatus::Running;
+    auto it = exe_queue.cbegin();
+    if(!exe_queue.empty()) {
+      for(; it != exe_queue.cend(); ++it) {
+        // test the same contract
+        if(it->contract == new_item) {
+          cserror() << "Smarts: attempt to queue duplicated contract transaction, already queued on round #" << it->round;
+          return std::make_pair(it->status, it->contract);
+        }
+      }
+      // only the 1st item currently is allowed to execute
+      new_status = SmartContractStatus::Waiting;
+      csdebug() << "Smarts: enqueue contract for execution";
     }
     else {
-      // outer search through trx to provide the same order of execution on every node
-      size_t i = 0;
-      for(const auto& tr : block.transactions()) {
-        // inner search through candidates on particular node
-        const auto src = tr.source();
-        const auto id = tr.innerID();
-        if(contains_smart_contract(tr)) {
-          const auto maybe_sc = get_smart_contract(tr);
-          if(!maybe_sc.has_value()) {
-            cserror() << "Smarts: get SC failed, skip execution";
-            ++i;
-            continue;
-          }
-          const auto it = find_exe_candidate(tr);
-          if(exe_candidates.cend() == it) {
-            cswarning() << "Smarts: ready to execute SC from unknown trx, block #" << block.sequence() << ", trx #" << i;
-          }
-          else {
-            cslog() << "Smarts: ready to execute SC, block #" << block.sequence() << ", trx #" << i << ", from round " << it->round;
-            exe_candidates.erase(it);
-          }
-          const auto& sc = maybe_sc.value();
-          std::ostringstream os;
-          cslog() << "------------------- Smart contract -------------------";
-          cslog() << sc.smartContractDeploy.sourceCode;
-          cslog() << "------------------------------------------------------";
-        }
-        ++i;
-      }
+      csdebug() << "Smarts: starting contract execution";
     }
-    if(!exe_candidates.empty()) {
-      csdebug() << "Smarts: " << exe_candidates.size() << " SC is/are wait until to be in block to execute";
-    }
+    // enqueue to end
+    const auto& ref = exe_queue.emplace_back(QueueItem { new_item, new_status, round });
+    return std::make_pair(ref.status, ref.contract);
   }
 
 } // cs

@@ -1823,7 +1823,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
 
   // special request to re-send again handling
   if (requesterNumber == InvalidTrustedIndex) {
-    csdebug() << "NODE> som enode asks for last round info to repeat";
+    csdebug() << "NODE> some node asks for last round info to repeat";
 
     if (lastSentRoundData_.roundTable.round == rNum) {
       if (tryResendRoundTable(requester, rNum)) {

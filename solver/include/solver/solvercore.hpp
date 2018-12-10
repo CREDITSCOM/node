@@ -96,14 +96,7 @@ public:
 
   void send_wallet_transaction(const csdb::Transaction& tr);
 
-  // obsolete:
-  csdb::Pool::sequence_t getNextMissingBlock(const uint32_t /*starting_after*/) const {
-    return 0;
-  }
-
-  // empty in Solver
-  void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const {
-  }
+  void gotSmartContractStart(const csdb::Pool block, size_t trx_idx);
 
 private:
   // to use private data while serve for states as SolverCore context:
