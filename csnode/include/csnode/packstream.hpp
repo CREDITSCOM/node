@@ -96,6 +96,10 @@ public:
     std::size_t size;
     (*this) >> size;
 
+    if (size == 0) {
+      return *this;
+    }
+
     std::vector<T, A> entity;
 
     for (std::size_t i = 0; i < size; ++i) {
@@ -361,6 +365,10 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
   std::size_t size = 0;
   (*this) >> size;
 
+  if (size == 0) {
+    return *this;
+  }
+
   auto nextPtr = ptr_ + size;
   str = std::string(ptr_, nextPtr);
 
@@ -372,6 +380,10 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
   std::size_t size;
   (*this) >> size;
+
+  if (size == 0) {
+    return *this;
+  }
 
   auto nextPtr = ptr_ + size;
   bytes = std::vector<uint8_t>(ptr_, nextPtr);

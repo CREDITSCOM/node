@@ -385,8 +385,7 @@ public:
   ///
   /// Verifies data signature with public key
   ///
-  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message,
-                              std::size_t messageSize) {
+  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message, std::size_t messageSize) {
     return cscrypto::VerifySignature(signature, publicKey, message, messageSize);
   }
 
