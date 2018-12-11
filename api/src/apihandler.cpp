@@ -345,9 +345,11 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& 
   decltype(auto) trxns_count_res = s_blockchain.get_trxns_count(addr);
   _return.trxns_count.sendCount = trxns_count_res.sendCount;
   _return.trxns_count.recvCount = trxns_count_res.recvCount;
+
 #ifdef TRANSACTIONS_INDEX
   _return.total_trxns_count = s_blockchain.getTransactionsCount();
 #endif
+
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
