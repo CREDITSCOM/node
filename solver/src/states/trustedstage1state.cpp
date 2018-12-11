@@ -19,8 +19,8 @@ void TrustedStage1State::on(SolverContext& context) {
 
   DefaultStateBehavior::on(context);
 
-  memset(static_cast<void*>(&stage), 0, sizeof(stage));
-  stage.sender = (uint8_t)context.own_conf_number();
+  cs::Utils::clearMemory(stage);
+  stage.sender = static_cast<uint8_t>(context.own_conf_number());
   enough_hashes = false;
   transactions_checked = false;
 }
