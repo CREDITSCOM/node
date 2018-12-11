@@ -275,6 +275,29 @@ namespace cs
     else if(cs::SmartContracts::is_start(tr)) {
       csdebug() << "SolverCore: enqueue start smart contract for execution";
       psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
+
+      //DEBUG: currently, the start transaction contains result also
+      csdb::Transaction result;
+      result.set_innerID(tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
+      result.set_source(tr.target()); // contracts' key
+      result.set_target(tr.target()); // contracts' key
+      result.set_amount(0);
+      result.set_max_fee(tr.max_fee());
+      result.set_currency(tr.currency());
+      // USRFLD0 - new state
+      constexpr csdb::user_field_id_t smart_state_idx = ~1; // see apihandler.cpp #9
+      const auto fields = tr.user_field_ids();
+      if(fields.count(smart_state_idx) > 0) {
+        result.add_user_field(trx_uf::new_state::Value, tr.user_field(smart_state_idx));
+      }
+      else {
+        result.add_user_field(trx_uf::new_state::Value, csdb::UserField {});
+      }
+      // USRFLD1 - ref to start trx
+      result.add_user_field(trx_uf::new_state::RefStart, (cs::SmartContractRef { block.hash(), block.sequence(), trx_idx }).to_user_field());
+      // USRFLD2 - total fee
+      result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(tr.max_fee().to_double())));
+      getSmartResultTransaction(result);
     }
     else if(cs::SmartContracts::is_new_state(tr)) {
       csdebug() << "SolverCore: smart contract is executed, state updated with new one";

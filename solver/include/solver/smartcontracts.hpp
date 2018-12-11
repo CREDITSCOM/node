@@ -7,6 +7,7 @@
 
 #include <optional>
 #include <vector>
+#include <sstream>
 
 class BlockChain;
 
@@ -38,7 +39,7 @@ namespace cs
     namespace new_state
     {
       // new state value, new byte-code
-      constexpr csdb::user_field_id_t Value = 0; // see apihandler.cpp #9 for currently used value
+      constexpr csdb::user_field_id_t Value = 0; // see apihandler.cpp #9 for currently used value ~1
       // reference to start transaction
       constexpr csdb::user_field_id_t RefStart = 1;
       // fee value
@@ -67,6 +68,24 @@ namespace cs
     csdb::Pool::sequence_t sequence;
     // transaction sequence in block, instead of ID
     size_t transaction;
+
+    // "serialization" methods
+    
+    csdb::UserField to_user_field()
+    {
+      std::ostringstream os;
+      os << sequence << '|' << transaction;
+      return csdb::UserField(os.str());
+    }
+
+    void from_user_field(csdb::UserField fld)
+    {
+      std::istringstream is;
+      char delim;
+      is >> sequence >> delim >> transaction;
+      //TODO: review this code
+      assert(delim == '|');
+    }
   };
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
