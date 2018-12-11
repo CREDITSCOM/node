@@ -72,9 +72,10 @@ private:
     virtual bool findWalletId(const csdb::Address& address, WalletId& id) = 0;
 
   protected:
-    void load(csdb::Pool& curr);
-    void load(const csdb::Transaction& tr, const csdb::Address& writer_public_key);
-    void loadTrxForSource(const csdb::Transaction& tr, const csdb::Address& writer_public_key);
+    void load(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
+    double load(const csdb::Transaction& tr);
+    double loadTrxForSource(const csdb::Transaction& tr);
+    void fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants);
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
@@ -94,7 +95,7 @@ public:
   class Initer : protected ProcessorBase {
   public:
     Initer(WalletsCache& data);
-    void loadPrevBlock(csdb::Pool& curr);
+    void loadPrevBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
     bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
     bool isFinishedOk() const;
 
@@ -110,7 +111,7 @@ public:
   class Updater : protected ProcessorBase {
   public:
     Updater(WalletsCache& data);
-    void loadNextBlock(csdb::Pool& curr);
+    void loadNextBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
     const WalletData* findWallet(WalletId id) const;
     const Mask& getModified() const {
       return modified_;

@@ -7,10 +7,11 @@
 #include "stage.hpp"
 
 #include <csdb/pool.hpp>
+#include <csnode/transactionspacket.hpp>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <csnode/transactionspacket.hpp>
 #include <map>
 #include <memory>
 #include <optional>
@@ -22,6 +23,7 @@ class Node;
 
 namespace cs {
 class WalletsState;
+class SmartContracts;
 }  // namespace cs
 
 // TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by
@@ -71,10 +73,7 @@ public:
   const cs::PublicKey& getWriterPublicKey() const;
 
   void gotBigBang();
-  void gotTransaction(const csdb::Transaction& trans);
-  void gotBlock(csdb::Pool&& p, const cs::PublicKey& sender);
-  void gotBlockRequest(const csdb::PoolHash& p_hash);
-  void gotBlockReply(csdb::Pool& p);
+
   void beforeNextRound();
   void nextRound();
   void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);
@@ -121,12 +120,12 @@ private:
     BigBang,
     RoundTable,
     Transactions,
-    Block,
     Hashes,
     Stage1Enough,
     Stage2Enough,
     Stage3Enough,
-    SyncData,
+    SmartDeploy,
+    SmartResult,
     Expired,
     SetNormal,
     SetTrusted,
@@ -169,6 +168,8 @@ private:
 
   Node* pnode;
   std::unique_ptr<cs::WalletsState> pws;
+  // smart contracts service
+  std::unique_ptr<cs::SmartContracts> psmarts;
 
   void ExecuteStart(Event start_event);
 
@@ -259,6 +260,8 @@ private:
   std::vector<cs::StageTwo> stageTwoStorage;
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
+
+  
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;

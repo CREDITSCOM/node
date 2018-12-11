@@ -1,5 +1,6 @@
 #include <consensus.hpp>
 #include <solvercore.hpp>
+#include <smartcontracts.hpp>
 
 #pragma warning(push)
 #pragma warning(disable : 4267 4244 4100 4245)
@@ -23,8 +24,14 @@ namespace cs
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
-    // previous solver implementation calls to runConsensus method() here
-    // perform similar actions, but only in proper state (TrustedStage1State for now)
+    if(rNum == cur_round && pnode->getBlockChain().getLastWrittenSequence() + 1 == rNum) {
+      // now we have just written last block to chain having smart contacts as candidates to execute
+      const auto cnt = psmarts->cnt_exe_candidates();
+      if(cnt > 0) {
+        cslog() << "SolverCore: ready to execute SC: " << cnt << ", do it now";
+        psmarts->execute_candidates();
+      }
+    }
 
     // clear data
     markUntrusted.fill(0);
@@ -34,6 +41,16 @@ namespace cs
     }
     if(stateCompleted(pstate->onSyncTransactions(*pcontext, rNum))) {
       handleTransitions(Event::Transactions);
+    }
+
+    // restore possibly cached hashes from other nodes
+    // this is actual if conveyer has just stored last required block
+    if(!recv_hash.empty() && cur_round == rNum) {
+      for(const auto& item : recv_hash) {
+        if(stateCompleted(pstate->onHash(*pcontext, item.first, item.second))) {
+          handleTransitions(Event::Hashes);
+        }
+      }
     }
   }
 
@@ -81,69 +98,6 @@ namespace cs
     }
     else {
       cslog() << "SolverCore: stage-3 not ready yet to re-send after BigBang";
-    }
-  }
-
-  void SolverCore::gotTransaction(const csdb::Transaction& trans)
-  {
-    if(!pstate) {
-      return;
-    }
-    // produces too much output:
-    csdebug() << "SolverCore: got transaction " << trans.innerID() << " from " << trans.source().to_string();
-    if(stateCompleted(pstate->onTransaction(*pcontext, trans))) {
-      handleTransitions(Event::Transactions);
-    }
-  }
-
-  void SolverCore::gotBlock(csdb::Pool&& p, const cs::PublicKey& sender)
-  {
-    if(!pstate) {
-      return;
-    }
-    csdebug() << "SolverCore: gotBlock()";
-    if(stateCompleted(pstate->onBlock(*pcontext, p, sender))) {
-      handleTransitions(Event::Block);
-    }
-  }
-
-  void SolverCore::gotBlockRequest(const csdb::PoolHash& p_hash)
-  {
-    std::ostringstream os;
-    os << "SolverCore: got request for block, ";
-    // state does not take part
-    if(pnode != nullptr) {
-      csdb::Pool p = pnode->getBlockChain().loadBlock(p_hash);
-      if(p.is_valid()) {
-        os << "[" << p.sequence() << "] found, sending";
-        //                pnode->sendBlockReply(p, sender);
-      }
-      else {
-        os << "not found";
-      }
-    }
-    else {
-      os << "cannot handle";
-    }
-    if(Consensus::Log) {
-      csinfo() << os.str();
-    }
-  }
-
-  void SolverCore::gotBlockReply(csdb::Pool&)
-  {
-    if(!pstate) {
-      return;
-    }
-    // "uncache" stored hashes if any
-    if(!recv_hash.empty()) {
-      if(cur_round - pnode->getBlockChain().getLastWrittenSequence() == 1) {
-        for(const auto& hash_info : recv_hash) {
-          if(stateCompleted(pstate->onHash(*pcontext, hash_info.first, hash_info.second))) {
-            handleTransitions(Event::Hashes);
-          }
-        }
-      }
     }
   }
 
@@ -249,7 +203,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]");
     const auto ptr = find_stage1(required);
     if(ptr != nullptr) {
-      pnode->sendStageOneReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender,ptr->signature, MsgTypes::FirstStage , requester);
     }
   }
 
@@ -258,7 +212,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]");
     const auto ptr = find_stage2(required);
     if(ptr != nullptr) {
-      pnode->sendStageTwoReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester);
     }
   }
 
@@ -267,7 +221,7 @@ namespace cs
     LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]");
     const auto ptr = find_stage3(required);
     if(ptr != nullptr) {
-      pnode->sendStageThreeReply(*ptr, requester);
+      pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::ThirdStage, requester);
     }
   }
 
@@ -369,4 +323,4 @@ namespace cs
       true);
   }
 
-}  // namespace slv2
+}  // namespace cs

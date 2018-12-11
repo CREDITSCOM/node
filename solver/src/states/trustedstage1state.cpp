@@ -1,6 +1,7 @@
 #include <consensus.hpp>
 #include <solvercontext.hpp>
 #include <states/trustedstage1state.hpp>
+#include <smartcontracts.hpp>
 
 #include <csnode/blockchain.hpp>
 #include <csnode/conveyer.hpp>
@@ -9,7 +10,6 @@
 #include <lib/system/utils.hpp>
 
 #include <cscrypto/cscrypto.hpp>
-#include <sstream>
 
 namespace cs {
 void TrustedStage1State::on(SolverContext& context) {
@@ -18,11 +18,6 @@ void TrustedStage1State::on(SolverContext& context) {
   }
 
   DefaultStateBehavior::on(context);
-
-  // if we were Writer un the previous round, we have a deferred block, flush it:
-  if (context.is_block_deferred()) {
-    context.flush_deferred_block();
-  }
 
   memset(&stage, 0, sizeof(stage));
   stage.sender = (uint8_t)context.own_conf_number();
@@ -35,18 +30,6 @@ void TrustedStage1State::off(SolverContext& context) {
   context.add_stage1(stage, true);
 }
 
-void TrustedStage1State::onRoundEnd(SolverContext& context, bool is_bigbang) {
-  // in this stage we got round end only having troubles
-  if (context.is_block_deferred()) {
-    if (is_bigbang) {
-      context.drop_deferred_block();
-    }
-    else {
-      context.flush_deferred_block();
-    }
-  }
-}
-
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {
   if (round < context.round()) {
     cserror() << name() << ": cannot handle previous round transactions";
@@ -57,43 +40,36 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   auto maybe_pack = conveyer.createPacket();
   if (!maybe_pack.has_value()) {
     cserror() << name()
-              << ": error while prepare consensus to build vector, maybe method called before sync completed?";
+      << ": error while prepare consensus to build vector, maybe method called before sync completed?";
     return Result::Ignore;
   }
   cs::TransactionsPacket pack = std::move(maybe_pack.value());
   cslog() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
-#if LOG_LEVEL & FLAG_LOG_DEBUG
-  std::ostringstream os;
-  for (const auto& t : p.transactions()) {
-    os << " " << t.innerID();
-  }
-        csdebug() << name() << ":" << os.str());
-#endif  // FLAG_LOG_DEBUG
 
-        // obsolete?
-        // pool = filter_test_signatures(context, pool);
+  // review & validate transactions
+  context.blockchain().setTransactionsFees(pack);
+  stage.hash = build_vector(context, pack);
 
-        // see Solver::runCinsensus()
-        context.blockchain().setTransactionsFees(pack);
-        stage.hash = build_vector(context, pack);
-
-        {
-          bool found = false;
-          cs::SharedLock lock(conveyer.sharedMutex());
-          for (const auto& element : conveyer.transactionsPacketTable()) {
-            found = false;
-            for (const auto& it : conveyer.roundTable(context.round())->hashes) {
-              if (memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
-                found = true;
-              }
-            }
-            if (!found) stage.hashesCandidates.push_back(element.first);
+  {
+    bool found = false;
+    cs::SharedLock lock(conveyer.sharedMutex());
+    for (const auto& element : conveyer.transactionsPacketTable()) {
+      found = false;
+      const auto rt = conveyer.roundTable(static_cast<cs::RoundNumber>(context.round()));
+      if(rt != nullptr) {
+        for(const auto& it : rt->hashes) {
+          if(memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
+            found = true;
           }
         }
+      }
+      if (!found) stage.hashesCandidates.push_back(element.first);
+    }
+  }
 
-        transactions_checked = true;
+  transactions_checked = true;
 
-        return (enough_hashes ? Result::Finish : Result::Ignore);
+  return (enough_hashes ? Result::Finish : Result::Ignore);
 }
 
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
@@ -140,9 +116,6 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
   if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
     // enough hashes
     // flush deferred block to blockchain if any
-    if (context.is_block_deferred()) {
-      context.flush_deferred_block();
-    }
     enough_hashes = true;
     return (transactions_checked ? Result::Finish : Result::Ignore);
   }
@@ -207,6 +180,15 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       }
 
       characteristicMask.push_back(byte);
+
+      if(0 != byte) {
+        // if validated transaction contains smart contract, remember info it future execution
+        if(SmartContracts::contains_smart_contract(transaction)) {
+          const cs::RoundNumber round = (cs::RoundNumber) context.round();
+          csdebug() << name() << ": SC found, scheduled for execution upon block #" << round << " is ready";
+          context.smarts().add_exe_candidate(transaction, round);
+        }
+      }
     }
 
     csdb::Pool excluded;

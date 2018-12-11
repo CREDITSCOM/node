@@ -135,19 +135,47 @@ public:
   /**
    * @fn	BlockChain& SolverContext::blockchain() const;
    *
-   * @brief	Gets the blockchain
+   * @brief	Gets the blockchain instance
    *
    * @author	User
    * @date	09.10.2018
    *
-   * @return	A reference to a BlockChain.
+   * @return	A reference to a BlockChain instance.
    */
 
   BlockChain& blockchain() const;
 
+  /**
+   * @fn    cs::SmartContracts& SolverContext::smarts() const;
+   *
+   * @brief Gets the smart contracts service instance
+   *
+   * @author    Alexander Avramenko
+   * @date  07.12.2018
+   *
+   * @return    A reference cs::SmartContracts instance.
+   */
+
+  cs::SmartContracts& smarts() const
+  {
+    return *core.psmarts;
+  }
+
+  /**
+   * @fn    cs::WalletsState& SolverContext::wallets() const
+   *
+   * @brief Gets the wallets service instance
+   *
+   * @author    Alexander Avramenko
+   * @date  07.12.2018
+   *
+   * @return    A reference to a cs::WalletsState instance.
+   */
+
   cs::WalletsState& wallets() const {
     return *core.pws;
   }
+
   /**
    * @fn  CallsQueueScheduler& SolverContext::scheduler() const;
    *
@@ -344,65 +372,6 @@ public:
    */
 
   const std::vector<cs::PublicKey>& trusted() const;
-
-  /**
-   * @fn  void SolverContext::store_received_block(csdb::Pool & block, bool defer_write = false)
-   *
-   * @brief   Stores received block
-   *
-   * @author  Alexander Avramenko
-   * @date    10.10.2018
-   *
-   * @param [in,out]  block       The block.
-   * @param           defer_write (Optional) True to defer write.
-   */
-
-  void store_received_block(csdb::Pool& block, bool defer_write = false) {
-    core.store_received_block(block, defer_write);
-  }
-
-  // Common operations, candidates for refactoring:
-
-  /**
-   * @fn  void SolverContext::flush_deferred_block()
-   *
-   * @brief   Flus deferred block
-   *
-   * @author  Alexander Avramenko
-   * @date    24.10.2018
-   */
-
-  void flush_deferred_block() {
-    core.flush_deferred_block();
-  }
-
-  /**
-   * @fn  void SolverContext::drop_deferred_block()
-   *
-   * @brief   Drop deferred block
-   *
-   * @author  Alexander Avramenko
-   * @date    24.10.2018
-   */
-
-  void drop_deferred_block() {
-    core.drop_deferred_block();
-  }
-
-  /**
-   * @fn  bool SolverContext::is_block_deferred() const
-   *
-   * @brief   Query if this object is block deferred
-   *
-   * @author  Alexander Avramenko
-   * @date    24.10.2018
-   *
-   * @return  True if block deferred, false if not.
-   */
-
-  bool is_block_deferred() const {
-    return core.is_block_deferred();
-  }
 
   /**
    * @fn  const uint8_t* SolverContext::last_block_hash();

@@ -17,19 +17,6 @@ namespace cs {
 
 void NormalState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
-
-  // if we were Writer un the previous round, we have a deferred block, flush it:
-  if (context.is_block_deferred()) {
-    context.flush_deferred_block();
-  }
-}
-
-Result NormalState::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender) {
-  auto r = DefaultStateBehavior::onBlock(context, block, sender);
-  if (context.is_block_deferred()) {
-    context.flush_deferred_block();
-  }
-  return r;
 }
 
 }  // namespace slv2

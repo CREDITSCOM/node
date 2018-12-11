@@ -1,8 +1,6 @@
-#include <callsqueuescheduler.hpp>
-#include <consensus.hpp>
-#include <solvercontext.hpp>
 #include <solvercore.hpp>
-#include <stage.hpp>
+#include <solvercontext.hpp>
+#include <smartcontracts.hpp>
 #include <states/nostate.hpp>
 
 #pragma warning(push)
@@ -55,6 +53,7 @@ namespace cs
     // previous solver version instance
     , pnode(nullptr)
     , pws(nullptr)
+    , psmarts(nullptr)
   {
     if constexpr(MonitorModeOn) {
       cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
@@ -77,7 +76,9 @@ namespace cs
     addr_genesis = GenesisAddress;
     addr_start = StartAddress;
     pnode = pNode;
-    pws = std::make_unique<cs::WalletsState>(pNode->getBlockChain());
+    auto& bc = pNode->getBlockChain();
+    pws = std::make_unique<cs::WalletsState>(bc);
+    psmarts = std::make_unique<cs::SmartContracts>(bc);
   }
 
   SolverCore::~SolverCore()
@@ -203,49 +204,6 @@ namespace cs
     }
 
     pnode->prepareMetaForSending(table, currentTimeStamp);
-  }
-
-  void SolverCore::store_received_block(csdb::Pool& p, bool /*defer_write*/)
-  {
-    cslog() << "SolverCore: store received block #" << p.sequence()
-      << ", " << p.transactions_count() << " transactions";
-
-    // see: Solver-1, method Solver::gotBlock()
-    if(!pnode->getBlockChain().storeBlock(p)) {
-      cserror() << "SolverCore: block sync required";
-      return;
-    }
-    else {
-      pnode->getBlockChain().testCachedBlocks();
-    }
-  }
-
-  bool SolverCore::is_block_deferred() const
-  {
-    return false;  // pnode->getBlockChain().isLastBlockDeferred();
-  }
-
-  void SolverCore::flush_deferred_block()
-  {
-    // if nothing to save deferred_block has zero sequence number
-    if(!is_block_deferred()) {
-      return;
-    }
-    // pnode->getBlockChain().writeDeferredBlock();
-  }
-
-  void SolverCore::drop_deferred_block()
-  {
-    if(!is_block_deferred()) {
-      return;
-    }
-    if(false /*pnode->getBlockChain().revertLastBlock()*/) {
-      // TODO: bc.revertWalletsInPool(deferred_block);
-      cswarning() << "SolverCore: deferred block dropped, wallets are reverted";
-    }
-    else {
-      cserror() << "SolverCore: cannot drop deferred block";
-    }
   }
 
 }  // namespace slv2

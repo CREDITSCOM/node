@@ -21,8 +21,7 @@
 
 #if defined(_MSC_VER)
 #pragma warning(push)
-#pragma warning( \
-    disable : 4324)  // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
+#pragma warning(disable : 4324)  // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
 #endif
 
 #if defined(_MSC_VER)
@@ -38,6 +37,10 @@
 
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
+
+// compile time and rtti reflection in action
+#define className typeid(*this).name
+#define csprint() csdebug() << className() << " " << __func__ << ": "
 
 namespace cs {
 enum class Direction : uint8_t {
@@ -382,8 +385,7 @@ public:
   ///
   /// Verifies data signature with public key
   ///
-  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message,
-                              std::size_t messageSize) {
+  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message, std::size_t messageSize) {
     return cscrypto::VerifySignature(signature, publicKey, message, messageSize);
   }
 

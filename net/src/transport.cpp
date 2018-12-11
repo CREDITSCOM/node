@@ -501,7 +501,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     case MsgTypes::BlockRequest:
       return node_->getBlockRequest(data, size, firstPack.getSender());
     case MsgTypes::RequestedBlock:
-      return node_->getBlockReply(data, size, firstPack.getSender());
+      return node_->getBlockReply(data, size);
     case MsgTypes::BigBang: // any round (in theory) may be set
       return node_->getBigBang(data, size, rNum, type);
     case MsgTypes::RoundTableRequest: // old-round node may ask for round info
@@ -528,8 +528,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   switch (type) {
   case MsgTypes::RoundTableSS:
     return node_->getRoundTableSS(data, size, rNum);
-  case MsgTypes::BlockHashV3:
-    return node_->getHash_V3(data, size, rNum, firstPack.getSender());
+  case MsgTypes::BlockHash:
+    return node_->getHash(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:
@@ -541,15 +541,15 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::FirstStage:
     return node_->getStageOne(data, size, firstPack.getSender());
   case MsgTypes::FirstStageRequest:
-    return node_->getStageOneRequest(data, size, firstPack.getSender());
+    return node_->getStageRequest(MsgTypes::FirstStageRequest, data, size, firstPack.getSender());
   case MsgTypes::SecondStage:
     return node_->getStageTwo(data, size, firstPack.getSender());
   case MsgTypes::SecondStageRequest:
-    return node_->getStageTwoRequest(data, size, firstPack.getSender());
+    return node_->getStageRequest(MsgTypes::SecondStageRequest, data, size, firstPack.getSender());
   case MsgTypes::ThirdStage:
     return node_->getStageThree(data, size, firstPack.getSender());
   case MsgTypes::ThirdStageRequest:
-    return node_->getStageThreeRequest(data, size, firstPack.getSender());
+    return node_->getStageRequest(MsgTypes::ThirdStageRequest, data, size, firstPack.getSender());
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:
@@ -834,6 +834,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock,
   conn.in = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
 
+  cs::SpinGuard lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
 

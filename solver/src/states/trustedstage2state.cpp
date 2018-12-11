@@ -21,8 +21,8 @@ void TrustedStage2State::on(SolverContext& context) {
     }
   }
   else {
-    stage.signatures[ptr->sender] = ptr->sig;
-    stage.hashes[ptr->sender] = ptr->msgHash;
+    stage.signatures[ptr->sender] = ptr->signature;
+    stage.hashes[ptr->sender] = ptr->messageHash;
   }
   // if have already received stage-1, make possible to go further (to stage-3)
   if (!context.stage1_data().empty()) {
@@ -80,8 +80,8 @@ void TrustedStage2State::off(SolverContext& /*context*/) {
 }
 
 Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& st) {
-  stage.signatures[st.sender] = st.sig;
-  stage.hashes[st.sender] = st.msgHash;
+  stage.signatures[st.sender] = st.signature;
+  stage.hashes[st.sender] = st.messageHash;
   if (context.enough_stage1()) {
     LOG_NOTICE(name() << ": enough stage-1 received");
     /*signing of the second stage should be placed here*/
