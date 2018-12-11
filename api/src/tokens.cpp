@@ -130,7 +130,7 @@ static bool javaTypesEqual(const std::string& goodType, const std::string& quest
   return true;
 }
 
-TokenStandart TokensMaster::getTokenStandart(const std::vector<executor::MethodDescription>& methods) {
+TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) {
   const static std::map<std::string, std::pair<std::string, std::vector<std::string>>>
     StandartMethods =
     {
@@ -491,7 +491,7 @@ void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, co
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
 std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb::Address&, const std::string&, const std::vector<general::Variant>&) { return std::pair<csdb::Address, csdb::Address>(); }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
-TokenStandart TokensMaster::getTokenStandart(const std::vector<executor::MethodDescription>& methods) { return TokenStandart::NotAToken; }
+TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) { return TokenStandart::NotAToken; }
 
 /*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
@@ -499,6 +499,6 @@ void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, co
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
 std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb::Address&, const std::string&, const std::vector<general::Variant>&) { return std::pair<csdb::Address, csdb::Address>(); }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
-TokenStandart TokensMaster::getTokenStandart(const std::vector<executor::MethodDescription>& methods) { return TokenStandart::NotAToken; }
+TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) { return TokenStandart::NotAToken; }
 */
 #endif

@@ -94,7 +94,7 @@ public:
 
   static bool isZeroAmount(const std::string& str) { return str == "0"; }
 
-  static TokenStandart getTokenStandart(const std::vector<::executor::MethodDescription>&);
+  static TokenStandart getTokenStandart(const std::vector<::general::MethodDescription>&);
 
 private:
   void refreshTokenState(const csdb::Address& token,

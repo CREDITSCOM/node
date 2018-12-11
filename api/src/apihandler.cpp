@@ -235,8 +235,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   result.trxn.currency = DEFAULT_CURRENCY;
   result.trxn.source = fromByteArray(address.public_key());
   result.trxn.target = fromByteArray(target.public_key());
-  //result.trxn.fee.commission = transaction.counted_fee().get_raw();
-  result.trxn.fee.integral = transaction.counted_fee().get_raw();
+  result.trxn.fee.commission = transaction.counted_fee().get_raw();
+  //result.trxn.fee.integral = transaction.counted_fee().get_raw();
 
   auto uf = transaction.user_field(0);
   result.trxn.__isset.smartContract = uf.is_valid();
@@ -419,7 +419,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   send_transaction.set_currency(csdb::Currency(1));
   send_transaction.set_source(source);
   send_transaction.set_target(BlockChain::getAddressFromKey(transaction.target));
-  send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.integral/*commission*/));
+  send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
   send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
   send_transaction.set_signature(transaction.signature);
   return send_transaction;
