@@ -10,7 +10,6 @@ const cs::PublicKey kPublicKey = {
     0x0E, 0xCC, 0x14, 0xAA, 0x05, 0x0B, 0x77, 0x11, 0x6D, 0x8F, 0xCD,
     0x80, 0x4B, 0x45, 0x36, 0x6B, 0x5C, 0xAE, 0x4A, 0x06, 0x82};
 
-const size_t kNumberOfConfidants = 7;
 const cs::ConfidantsKeys kConfidantsKeys = {
     {0X53, 0X4B, 0XD3, 0XDF, 0X77, 0X29, 0XFD, 0XCF, 0XEA, 0X4A, 0XCD,
      0X0E, 0XCC, 0X14, 0XAA, 0X05, 0X0B, 0X77, 0X11, 0X6D, 0X8F, 0XCD,

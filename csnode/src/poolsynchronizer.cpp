@@ -305,6 +305,7 @@ bool cs::PoolSynchronizer::getNeededSequences(uint8_t nieghbourNumber) {
   if (isLastPacket && !m_requestedSequences.empty()) {
     m_neededSequences.clear();
     for (const auto& [sequence, packet] : m_requestedSequences) {
+      (void)packet;
       m_neededSequences.push_back(cs::numeric_cast<cs::RoundNumber>(sequence));
       csdebug() << "POOL SYNCHRONIZER> Get needed sequences: Is last packet: size: add seq: " << sequence;
     }

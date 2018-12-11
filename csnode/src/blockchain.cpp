@@ -460,7 +460,6 @@ public:
   TransactionsLoader(csdb::Address wallPubKey, BlockChain::WalletId id, bool isToLoadWalletsPoolsCache, BlockChain& blockchain,
             Transactions& transactions)
   : wallPubKey_(wallPubKey)
-  , id_(id)
   , isToLoadWalletsPoolsCache_(isToLoadWalletsPoolsCache)
   , blockchain_(blockchain)
   , transactions_(transactions) {
@@ -505,7 +504,6 @@ public:
 
 private:
   csdb::Address wallPubKey_;
-  BlockChain::WalletId id_;
   const bool isToLoadWalletsPoolsCache_;
   BlockChain& blockchain_;
   Transactions& transactions_;

@@ -411,7 +411,7 @@ auto set_max_fee(T& trx, const csdb::Amount& am, int) -> decltype(trx.set_max_fe
 }
 
 template <typename T>
-void set_max_fee(T& trx, const csdb::Amount& am, long) {
+void set_max_fee(T&, const csdb::Amount&, long) {
 }
 
 csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {

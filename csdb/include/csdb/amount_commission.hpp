@@ -36,7 +36,7 @@ public:
     return to_double();
   }
   inline uint16_t get_raw() {
-    return bits_;
+    return u_.bits;
   }
 
   // Сериализация
@@ -46,7 +46,7 @@ public:
 
 private:
   union {
-    uint16_t bits_{};  // All bits
+    uint16_t bits{};  // All bits
     struct {
 #ifdef BOOST_BIG_ENDIAN
       uint16_t sign : 1;   // sign
@@ -57,8 +57,8 @@ private:
       uint16_t exp : 5;    // exponent
       uint16_t sign : 1;   // sign
 #endif
-    } fIEEE_;
-  };
+    } fIEEE;
+  } u_;
 };
 #pragma pack(pop)
 
@@ -66,7 +66,7 @@ static_assert(std::is_trivially_copyable<AmountCommission>::value, "Invalid csdb
 
 inline double AmountCommission::to_double() const noexcept {
   const double _1_1024 = 1. / 1024;
-  return (fIEEE_.sign != 0u ? -1. : 1.) * fIEEE_.frac * _1_1024 * std::pow(10., fIEEE_.exp - 18);
+  return (u_.fIEEE.sign != 0u ? -1. : 1.) * u_.fIEEE.frac * _1_1024 * std::pow(10., u_.fIEEE.exp - 18);
 }
 
 }  // namespace csdb
