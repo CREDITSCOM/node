@@ -24,15 +24,6 @@ namespace cs
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
-    if(rNum == cur_round && pnode->getBlockChain().getLastWrittenSequence() + 1 == rNum) {
-      // now we have just written last block to chain having smart contacts as candidates to execute
-      const auto cnt = psmarts->cnt_exe_candidates();
-      if(cnt > 0) {
-        cslog() << "SolverCore: ready to execute SC: " << cnt << ", do it now";
-        psmarts->execute_candidates();
-      }
-    }
-
     // clear data
     markUntrusted.fill(0);
 
@@ -264,6 +255,21 @@ namespace cs
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
     cs::Conveyer::instance().addTransaction(tr);
+  }
+
+  void SolverCore::gotSmartContractStart(const csdb::Pool block, size_t trx_idx)
+  {
+    if(trx_idx >= block.transactions_count()) {
+      cserror() << "SolverCore: incorrect transaction to start contract";
+      return;
+    }
+    csdb::Transaction tr = * (block.transactions().cbegin() + trx_idx);
+    if(!SmartContracts::is_start(tr)) {
+      cserror() << "SolverCore: incorrect transaction type to start contract";
+      return;
+    }
+    csdebug() << "SolverCore: enqueue start contract transaction";
+    psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
   }
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)

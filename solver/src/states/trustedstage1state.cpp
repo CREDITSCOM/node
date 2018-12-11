@@ -180,15 +180,6 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       }
 
       characteristicMask.push_back(byte);
-
-      if(0 != byte) {
-        // if validated transaction contains smart contract, remember info it future execution
-        if(SmartContracts::contains_smart_contract(transaction)) {
-          const cs::RoundNumber round = (cs::RoundNumber) context.round();
-          csdebug() << name() << ": SC found, scheduled for execution upon block #" << round << " is ready";
-          context.smarts().add_exe_candidate(transaction, round);
-        }
-      }
     }
 
     csdb::Pool excluded;

@@ -175,12 +175,6 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "Transactions";
     case FirstTransaction:
       return "FirstTransaction";
-    case TransactionList:
-      return "TransactionList";
-    case ConsVector:
-      return "ConsVector";
-    case ConsMatrix:
-      return "ConsMatrix";
     case NewBlock:
       return "NewBlock";
     case BlockHash:
@@ -189,18 +183,8 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "BlockRequest";
     case RequestedBlock:
       return "RequestedBlock";
-    case TLConfirmation:
-      return "TLConfirmation";
-    case ConsVectorRequest:
-      return "ConsVectorRequest";
-    case ConsMatrixRequest:
-      return "ConsMatrixRequest";
-    case ConsTLRequest:
-      return "ConsTLRequest";
     case RoundTableRequest:
       return "RoundTableRequest";
-    case NewBadBlock:
-      return "NewBadBlock";
     case BigBang:
       return "BigBang";
     case TransactionPacket:
