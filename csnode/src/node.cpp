@@ -722,7 +722,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packetNum = 0;
   istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  id: " << packetNum;
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -897,7 +897,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, uint32_t packetNum) {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
   csdetails() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
               << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
