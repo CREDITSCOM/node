@@ -269,10 +269,8 @@ namespace cs
       return;
     }
     // dispatch transaction by its type
-    if(cs::SmartContracts::is_deploy(tr)) {
-      csdebug() << "SolverCore: smart contract is deployed, waiting for start transaction to execute";
-    }
-    else if(cs::SmartContracts::is_start(tr)) {
+    if(cs::SmartContracts::is_deploy(tr) || cs::SmartContracts::is_start(tr)) {
+      csdebug() << "SolverCore: smart contract is deployed or started";
       csdebug() << "SolverCore: enqueue start smart contract for execution";
       psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
 

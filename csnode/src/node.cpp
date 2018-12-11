@@ -1599,7 +1599,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
     smartStagesStorageClear();
     isSmartStageStorageCleared_ = true;
   }
-  smartStageOneMessage_[myConfidantIndex_] = std::move(message);
+  //smartStageOneMessage_[myConfidantIndex_] = std::move(message);
   csprint() << "(): done";
 }
 
