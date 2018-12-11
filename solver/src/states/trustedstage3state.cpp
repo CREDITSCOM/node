@@ -111,7 +111,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
           // TODO: redesign required: 
-          if (memcmp(ptr->signatures[j].data(), it.signatures[j].data(), sig_len) != 0) {
+          if (ptr->signatures[j] != it.signatures[j]) {
             cs::Bytes toVerify;
             size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
@@ -119,7 +119,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
             stream << (uint32_t)context.round(); // Attention!!! the uint32_t type 
             stream << it.hashes[j];
             
-            if(cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
+            if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
               cslog() << name() << ": [" << (int)j << "] marked as untrusted";
               context.mark_untrusted((uint8_t)j);
             }

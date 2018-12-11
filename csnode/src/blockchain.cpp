@@ -726,6 +726,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     updateWalletIds(pool, *walletsCacheUpdater_);
   }
   writeBlock(pool);
+  emit smartContractStarted_(pool, 0);
   setGlobalSequence(getLastWrittenSequence());
   return std::make_pair(true, pool);
 }

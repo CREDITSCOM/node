@@ -80,8 +80,6 @@ public:
 
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
-
-
   const cs::ConfidantsKeys& confidants() const;
 
   void onRoundStart(const cs::RoundTable& roundTable);

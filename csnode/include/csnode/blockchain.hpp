@@ -26,6 +26,8 @@
 #include <csnode/threading.hpp>
 #include <csnode/nodecore.hpp>
 
+#include <lib/system/signals.hpp>
+
 #include <condition_variable>
 #include <mutex>
 
@@ -34,6 +36,8 @@ class BlockHashes;
 class WalletsIds;
 class Fee;
 class TransactionsPacket;
+
+using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
 }  // namespace cs
 
 class BlockChain {
@@ -239,6 +243,9 @@ public:
    */
 
   void testCachedBlocks();
+
+public signals:
+  cs::SmartContractStartSignal smartContractStarted_;
 
 private:
 
