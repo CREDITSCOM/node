@@ -300,6 +300,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     neighbour.reset();
     const int nhIdx = cs::numeric_cast<int>(neighbour.index());
     for (const auto& [sequence, packet] : m_requestedSequences) {
+      (void)packet;
       neighbour.addSequences(cs::numeric_cast<cs::RoundNumber>(sequence));
       csprint() << "Is last packet: nh: " << nhIdx << ", add seq: " << sequence;
     }

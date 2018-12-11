@@ -28,7 +28,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 {
 #ifdef BINARY_TCP_API
-  thread = std::thread([this, config]() {
+  thread = std::thread([this]() {
     try {
       server.run();
     }
@@ -39,7 +39,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 #ifdef AJAX_IFACE
   ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
-  ajax_thread = std::thread([this, config]() {
+  ajax_thread = std::thread([this]() {
     try {
       ajax_server.run();
     }

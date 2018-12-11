@@ -146,7 +146,6 @@ private:
   EndpointData signalServerEp_;
 
   std::vector<EndpointData> bList_;
-  bool server_;
 
   std::string pathToDb_;
   cs::PublicKey publicKey_;
