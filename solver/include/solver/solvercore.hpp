@@ -170,7 +170,7 @@ private:
   void InitDebugModeTransitions();
   void InitMonitorModeTransitions();
   void setState(const StatePtr& pState);
-
+ 
   void handleTransitions(Event evt);
   bool stateCompleted(Result result);
 
@@ -180,6 +180,10 @@ private:
   bool is_block_deferred() const;
   void flush_deferred_block();
   void drop_deferred_block();
+
+  //smart-contracts consensus driver:
+  void getSmartResultTransaction(const csdb::Transaction& transaction);
+
 
   /**
    * @fn  cs::StageOne* SolverCore::find_stage1(uint8_t sender);
@@ -254,7 +258,8 @@ private:
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
-  
+  std::vector<cs::PublicKey> smartConfidants;
+  uint8_t ownSmartsConfNum;
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;

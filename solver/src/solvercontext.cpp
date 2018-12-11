@@ -49,7 +49,6 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
 
 void SolverContext::addSmartStage1(cs::StageOneSmarts& stage, bool send) {
   // core.stageOneStorage.push_back(stage);
-  core.pnode->smartStagesStorageClear();
   if (send) {
     core.pnode->sendSmartStageOne(stage);
   }

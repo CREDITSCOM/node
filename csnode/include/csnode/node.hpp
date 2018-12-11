@@ -123,6 +123,8 @@ public:
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
   void resetNeighbours();
 
+  //smarts consensus additional functions:
+
   // syncro send functions
   void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
@@ -316,7 +318,7 @@ private:
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;
   std::vector<cs::Bytes> smartStageThreeMessage_;
-  bool isSmartStageStorageCleared = false;
+  bool isSmartStageStorageCleared_ = false;
 
 
   SentRoundData lastSentRoundData_;

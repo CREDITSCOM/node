@@ -1595,9 +1595,9 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   sendToConfidants(MsgTypes::FirstSmartStage, roundNumber_, stageOneInfo.signature, message);
 
   // cache
-  if (!isSmartStageStorageCleared) {
+  if (!isSmartStageStorageCleared_) {
     smartStagesStorageClear();
-    isSmartStageStorageCleared = true;
+    isSmartStageStorageCleared_ = true;
   }
   smartStageOneMessage_[myConfidantIndex_] = std::move(message);
   csprint() << "(): done";
@@ -1612,6 +1612,7 @@ void Node::smartStagesStorageClear()
   stageTwoMessage_.resize(cSize);
   stageThreeMessage_.clear();
   stageThreeMessage_.resize(cSize);
+  isSmartStageStorageCleared_ = true;
 }
 
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1663,9 +1664,9 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Pu
     return;
   }
 
-  if (!isSmartStageStorageCleared) {
+  if (!isSmartStageStorageCleared_) {
     smartStagesStorageClear();
-    isSmartStageStorageCleared = true;
+    isSmartStageStorageCleared_ = true;
   }
   smartStageOneMessage_[stage.sender] = std::move(bytes);
 
