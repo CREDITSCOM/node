@@ -257,19 +257,28 @@ namespace cs
     cs::Conveyer::instance().addTransaction(tr);
   }
 
-  void SolverCore::gotSmartContractStart(const csdb::Pool block, size_t trx_idx)
+  void SolverCore::gotSmartContractEvent(const csdb::Pool block, size_t trx_idx)
   {
     if(trx_idx >= block.transactions_count()) {
-      cserror() << "SolverCore: incorrect transaction to start contract";
+      cserror() << "SolverCore: incorrect transaction index related to smart contract";
       return;
     }
     csdb::Transaction tr = * (block.transactions().cbegin() + trx_idx);
-    if(!SmartContracts::is_start(tr)) {
-      cserror() << "SolverCore: incorrect transaction type to start contract";
+    if(!SmartContracts::is_smart_contract(tr)) {
+      cserror() << "SolverCore: incorrect transaction type related to smart contract";
       return;
     }
-    csdebug() << "SolverCore: enqueue start contract transaction";
-    psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
+    // dispatch transaction by its type
+    if(cs::SmartContracts::is_deploy(tr)) {
+      csdebug() << "SolverCore: smart contract is deployed, waiting for start transaction to execute";
+    }
+    else if(cs::SmartContracts::is_start(tr)) {
+      csdebug() << "SolverCore: enqueue start smart contract for execution";
+      psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
+    }
+    else if(cs::SmartContracts::is_new_state(tr)) {
+      csdebug() << "SolverCore: smart contract is executed, state updated with new one";
+    }
   }
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)

@@ -92,7 +92,7 @@ bool Node::init() {
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
   cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-  cs::Connector::connect(&blockChain_.smartContractStarted_, solver_, &cs::SolverCore::gotSmartContractStart);
+  cs::Connector::connect(&blockChain_.smartContractEvent_, solver_, &cs::SolverCore::gotSmartContractEvent);
 
   return true;
 }

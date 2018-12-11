@@ -31,7 +31,7 @@ namespace cs
     {
       // methods with args
       constexpr csdb::user_field_id_t Calls = 0;
-      // reference to start-transaction
+      // reference to last state transaction
       constexpr csdb::user_field_id_t RefState = 1;
     }
     // new state transaction fields
@@ -91,12 +91,12 @@ namespace cs
 
     // test transaction methods
     
-    static bool contains_smart_contract(const csdb::Transaction);
-    static std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
-
+    static bool is_smart_contract(const csdb::Transaction);
     static bool is_deploy(const csdb::Transaction);
     static bool is_start(const csdb::Transaction);
     static bool is_new_state(const csdb::Transaction);
+
+    static std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
     csdb::Transaction get_transaction(const SmartContractRef& ref);
 

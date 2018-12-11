@@ -14,7 +14,7 @@ namespace cs
   {}
 
   /*static*/
-  bool SmartContracts::contains_smart_contract(const csdb::Transaction tr)
+  bool SmartContracts::is_smart_contract(const csdb::Transaction tr)
   {
     return tr.user_field(trx_uf::deploy::Code).is_valid(); // see apihandler.cpp near #494
   }
@@ -33,13 +33,13 @@ namespace cs
   bool SmartContracts::is_deploy(const csdb::Transaction tr)
   {
     //TODO: correctly define tx type
-    return contains_smart_contract(tr);
+    return is_smart_contract(tr);
   }
   /*static*/
   bool SmartContracts::is_start(const csdb::Transaction tr)
   {
     //TODO: correctly define tx type
-    return contains_smart_contract(tr);
+    return is_smart_contract(tr);
   }
   /*static*/
   bool SmartContracts::is_new_state(const csdb::Transaction tr)
@@ -83,6 +83,14 @@ namespace cs
     }
     // enqueue to end
     const auto& ref = exe_queue.emplace_back(QueueItem { new_item, new_status, round });
+    //DEBUG: currently, the start transaction contains result also,
+    const csdb::Transaction tr = get_transaction(new_item);
+    if(!tr.is_valid()) {
+      cserror() << "Smarts: cannot get smart contract transaction";
+    }
+    else {
+
+    }
     return std::make_pair(ref.status, ref.contract);
   }
 

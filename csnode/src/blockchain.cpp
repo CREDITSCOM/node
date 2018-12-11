@@ -283,8 +283,9 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     if(pool.transactions_count() > 0) {
       size_t idx = 0;
       for(const auto& t : pool.transactions()) {
-        if(cs::SmartContracts::is_start(t)) {
-          emit smartContractStarted_(pool, idx);
+        if(cs::SmartContracts::is_smart_contract(t)) {
+          csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
+          emit smartContractEvent_(pool, idx);
         }
         ++idx;
       }
