@@ -902,6 +902,9 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
               << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
               << ", round: " << round;
 
+  ostream_.init(BaseFlags::Neighbours | BaseFlags::Signed | BaseFlags::Compressed);
+  ostream_ << MsgTypes::BlockRequest << round << sequences << packetNum;
+
   transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
   ostream_.clear();

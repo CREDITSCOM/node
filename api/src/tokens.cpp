@@ -488,8 +488,8 @@ void TokensMaster::run() { }
 void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>) { }
-bool TokensMaster::isTransfer(const std::string&, const std::vector<std::string>&) { return false; }
-std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb::Address&, const std::string&, const std::vector<std::string>&) { return std::pair<csdb::Address, csdb::Address>(); }
+bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
+std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb::Address&, const std::string&, const std::vector<general::Variant>&) { return std::pair<csdb::Address, csdb::Address>(); }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
 TokenStandart TokensMaster::getTokenStandart(const std::vector<executor::MethodDescription>& methods) { return TokenStandart::NotAToken; }
 

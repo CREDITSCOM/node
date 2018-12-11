@@ -813,7 +813,9 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
       }
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
+#ifdef TRANSACTIONS_INDEX
       total_transactions_count_++;
+#endif
     }
   }
 }
@@ -1028,7 +1030,7 @@ void TransactionsIterator::next() {
       break;
   }
 
-  // Oops, no more in this block
+  // Oops, no more in this blockfTransactionsListGet
   if (it_ == lapoo_.transactions().rend()) {
     auto ph = bc_.getPreviousPoolHash(addr_, lapoo_.hash());
     lapoo_ = bc_.loadBlock(ph);
