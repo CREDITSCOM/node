@@ -55,7 +55,7 @@ public:
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+  void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
   void sendStageOne(cs::StageOne&);
 
   // sends StageOne request to respondent about required

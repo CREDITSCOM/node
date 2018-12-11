@@ -1515,7 +1515,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
   }
 }
 
-void Node::sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
+void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csprint() << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
