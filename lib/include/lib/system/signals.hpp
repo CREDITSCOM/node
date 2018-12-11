@@ -331,9 +331,9 @@ public:
   /// @param signal Any signal object.
   /// @param slot Function/lambda/closure.
   ///
-  template <typename Signal, typename Slot>
-  inline static void connect(Signal& signal, Slot&& slot) {
-    signal.add(std::forward<Slot>(slot));
+  template <typename Signal>
+  inline static void connect(Signal& signal, typename Signal::Argument slot) {
+    signal.add(slot);
   }
 
   ///
@@ -341,9 +341,9 @@ public:
   /// @param signal Any signal object.
   /// @param slot Function or lambda/closure.
   ///
-  template <typename Signal, typename Slot>
-  inline static void connect(const Signal& signal, Slot&& slot) {
-    const_cast<Signal*>(&signal)->add(std::forward<Slot>(slot));
+  template <typename Signal>
+  inline static void connect(const Signal& signal, typename Signal::Argument slot) {
+    const_cast<Signal*>(&signal)->add(slot);
   }
 
   ///
@@ -351,9 +351,9 @@ public:
   /// @param signal Any signal pointer.
   /// @param slot Function or lambda/closure.
   ///
-  template <typename Signal, typename Slot>
-  inline static void connect(Signal* signal, Slot&& slot) {
-    cs::Connector::connect(*signal, std::forward<Slot>(slot));
+  template <typename Signal>
+  inline static void connect(Signal* signal, typename Signal::Argument slot) {
+    cs::Connector::connect(*signal, slot);
   }
 
   ////
@@ -376,6 +376,23 @@ public:
   template <typename Signal, typename T, typename Slot>
   inline static void connect(const Signal* signal, const T& slotObj, Slot&& slot) {
     cs::Connector::connect(*signal, slotObj, std::forward<Slot>(slot));
+  }
+
+  ///
+  /// @brief Connects two signals with earch other.
+  /// @param lhs Any const signal1 pointer.
+  /// @param rhs Any const signal2 pointer.
+  ///
+  template <template <typename> typename Signal>
+  inline static void connect(const Signal* lhs, const Signal* rhs) {
+    auto closure = [=](auto... args) -> void {
+      if (rhs) {
+        rhs->operator()(args...);
+      }
+    };
+
+    std::function<typename Signal::Signature> func = closure;
+    cs::Connector::connect(lhs, std::move(func));
   }
 
   ///

@@ -381,6 +381,13 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
   res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
 #endif
 
+#ifdef MONITOR_NODE
+  s_blockchain.applyToWallet(tr.target(), [&res](const Credits::WalletsCache::WalletData& wd) {
+    res.createTime = wd.createTime_;
+    res.transactionsCount = wd.transNum_;
+  });
+#endif
+
   return res;
 }
 
@@ -404,7 +411,7 @@ auto set_max_fee(T& trx, const csdb::Amount& am, int) -> decltype(trx.set_max_fe
 }
 
 template <typename T>
-void set_max_fee(T& trx, const csdb::Amount& am, long) {
+void set_max_fee(T&, const csdb::Amount&, long) {
 }
 
 csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
@@ -477,7 +484,7 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
   executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
 }
-void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) {
+void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const TransactionId&) {
   /*const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
   const auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
   auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
@@ -547,7 +554,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       if (!state.empty()) {
         contract_state = state;
         return true;
-      } 
+      }
       return false;
     });
   }
@@ -1370,7 +1377,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
   _return.count = totalTransfers;
 
   csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
-  while (limit && !pooh.is_empty()) {
+  while (limit && !pooh.is_empty() && tokenTransPools.size()) {
     auto it = tokenTransPools.find(pooh);
     if (it != tokenTransPools.end()) {
       auto pool = s_blockchain.loadBlock(pooh);
@@ -1654,7 +1661,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
     std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
     wi.address = res;*/
     //
-    
+
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();
 #ifdef MONITOR_NODE

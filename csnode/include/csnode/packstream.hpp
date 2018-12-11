@@ -382,7 +382,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
-  std::size_t size;
+  std::size_t size = std::size_t();
   (*this) >> size;
 
   if (size == 0 || !isBytesAvailable(size)) {

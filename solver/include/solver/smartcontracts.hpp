@@ -70,7 +70,7 @@ namespace cs
     size_t transaction;
 
     // "serialization" methods
-    
+
     csdb::UserField to_user_field()
     {
       std::ostringstream os;
@@ -78,7 +78,7 @@ namespace cs
       return csdb::UserField(os.str());
     }
 
-    void from_user_field(csdb::UserField fld)
+    void from_user_field(csdb::UserField)
     {
       std::istringstream is;
       char delim;
@@ -109,7 +109,7 @@ namespace cs
     SmartContracts(const SmartContracts&) = delete;
 
     // test transaction methods
-    
+
     static bool is_smart_contract(const csdb::Transaction);
     static bool is_deploy(const csdb::Transaction);
     static bool is_start(const csdb::Transaction);
@@ -123,7 +123,7 @@ namespace cs
       const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round);
 
   private:
-  
+
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
 
     BlockChain& bc;

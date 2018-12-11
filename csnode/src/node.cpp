@@ -722,7 +722,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   uint32_t packetNum = 0;
   istream_ >> packetNum;
 
-  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ",  id: " << packetNum;
+  cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
     cserror() << "Bad sequences created";
@@ -897,7 +897,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences sequences, uint32_t packetNum) {
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, uint32_t packetNum) {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
   csdetails() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
               << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
@@ -1526,6 +1526,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
   case MsgTypes::ThirdStageRequest:
     solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
     break;
+  default: break;
   }
 }
 
@@ -1556,6 +1557,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   case MsgTypes::ThirdStage:
     message = stageThreeMessage_[sender];
     break;
+  default: break;
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);
@@ -1893,6 +1895,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   case MsgTypes::ThirdStageRequest:
     solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
     break;
+  default: break;
   }
 }
 
@@ -1923,6 +1926,7 @@ void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& 
   case MsgTypes::ThirdStage:
     message = stageThreeMessage_[sender];
     break;
+  default: break;
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);

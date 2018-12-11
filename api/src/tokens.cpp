@@ -3,7 +3,7 @@
 
 #include <base58.h>
 
-#include "APIHandler.hpp"
+#include "apihandler.hpp"
 #include "tokens.hpp"
 #include <cctype>
 
@@ -226,13 +226,13 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   std::string name, symbol, totalSupply;
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "getName", std::vector<general::Variant>(), 50,
+                 "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "getSymbol", std::vector<general::Variant>(), 50,
+                 "getSymbol", std::vector<general::Variant>(), 250,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
 
@@ -243,7 +243,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                  });
 
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
-                 "totalSupply", std::vector<general::Variant>(), 50,
+                 "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount('"' + newSupp + '"');
                  });
@@ -491,7 +491,7 @@ void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, co
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
 std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb::Address&, const std::string&, const std::vector<general::Variant>&) { return std::pair<csdb::Address, csdb::Address>(); }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
-TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) { return TokenStandart::NotAToken; }
+TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>&) { return TokenStandart::NotAToken; }
 
 /*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }

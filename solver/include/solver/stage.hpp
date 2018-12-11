@@ -59,4 +59,4 @@ struct StageThreeSmarts {
 
 }  // namespace cs
 
-#endif STAGE_HPP
+#endif // STAGE_HPP

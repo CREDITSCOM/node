@@ -17,8 +17,6 @@ using namespace cs;
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
 , dbLock_()
-, waitersLocker_()
-, cacheMutex_()
 , globalSequence_(static_cast<decltype(globalSequence_)>(-1))
 , blockRequestIsNeeded_(false)
 , genesisAddress_(genesisAddress)
@@ -26,16 +24,10 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
+, cacheMutex_()
+, waitersLocker_()
 , fee_(std::make_unique<cs::Fee>()) {
   cslog() << "Trying to open DB...";
-
-#ifdef TRANSACTIONS_INDEX
-  bool recreateIndex;
-  {
-    std::ifstream inf(std::string(path) + "/index.db");
-    recreateIndex = !inf.good();
-  }
-#endif
 
   if (!storage_.open(path)) {
     cserror() << "Couldn't open database at " << path;
@@ -244,7 +236,7 @@ void BlockChain::writeGenesisBlock() {
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(getLastWrittenSequence() + 1);
   addNewWalletsToPool(genesis);
-  
+
   cslog() << "Genesis block completed ... trying to save";
 
   writeBlock(genesis);
@@ -272,11 +264,11 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   //auto wd = walletsCacheStorage_->findWallet(addr.public_key());
   //if (!wd) return;
-  
+
   WalletId id;
   if (!walletIds_->normal().find(addr, id))
     return;
-  auto wd = walletsCacheUpdater_->findWallet(id); 
+  auto wd = walletsCacheUpdater_->findWallet(id);
 
   func(*wd);
 }
@@ -361,11 +353,10 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
   csdebug() << " previous hash: " << lastHash_.to_string();
   csdebug() << " last storage size: " << storage_.size();
 
-  bool result = false;
   if (pool.sequence() == getLastWrittenSequence() + 1) {
     cslog() << " sequence OK";
     pool.set_previous_hash(lastHash_);
-    
+
     // former writeBlock():
     {
       std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -415,7 +406,6 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
       blockRequestIsNeeded_ = false;
     }
     recount_trxns(pool);
-    result = true;
   }
   else {
     cslog() << " sequence failed, chain syncro start";
@@ -470,7 +460,6 @@ public:
   TransactionsLoader(csdb::Address wallPubKey, BlockChain::WalletId id, bool isToLoadWalletsPoolsCache, BlockChain& blockchain,
             Transactions& transactions)
   : wallPubKey_(wallPubKey)
-  , id_(id)
   , isToLoadWalletsPoolsCache_(isToLoadWalletsPoolsCache)
   , blockchain_(blockchain)
   , transactions_(transactions) {
@@ -515,7 +504,6 @@ public:
 
 private:
   csdb::Address wallPubKey_;
-  BlockChain::WalletId id_;
   const bool isToLoadWalletsPoolsCache_;
   BlockChain& blockchain_;
   Transactions& transactions_;
@@ -826,10 +814,11 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
       }
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
-#ifdef TRANSACTIONS_INDEX
-      total_transactions_count_++;
-#endif
     }
+
+#ifdef TRANSACTIONS_INDEX
+    total_transactions_count_+= new_pool.value().transactions().size();
+#endif
   }
 }
 
