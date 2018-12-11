@@ -24,15 +24,6 @@ namespace cs
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
   {
-    if(rNum == cur_round && pnode->getBlockChain().getLastWrittenSequence() + 1 == rNum) {
-      // now we have just written last block to chain having smart contacts as candidates to execute
-      const auto cnt = psmarts->cnt_exe_candidates();
-      if(cnt > 0) {
-        cslog() << "SolverCore: ready to execute SC: " << cnt << ", do it now";
-        psmarts->execute_candidates();
-      }
-    }
-
     // clear data
     markUntrusted.fill(0);
 
@@ -264,6 +255,51 @@ namespace cs
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
     cs::Conveyer::instance().addTransaction(tr);
+  }
+
+  void SolverCore::gotSmartContractEvent(const csdb::Pool block, size_t trx_idx)
+  {
+    if(trx_idx >= block.transactions_count()) {
+      cserror() << "SolverCore: incorrect transaction index related to smart contract";
+      return;
+    }
+    csdb::Transaction tr = * (block.transactions().cbegin() + trx_idx);
+    if(!SmartContracts::is_smart_contract(tr)) {
+      cserror() << "SolverCore: incorrect transaction type related to smart contract";
+      return;
+    }
+    // dispatch transaction by its type
+    if(cs::SmartContracts::is_deploy(tr) || cs::SmartContracts::is_start(tr)) {
+      csdebug() << "SolverCore: smart contract is deployed or started";
+      csdebug() << "SolverCore: enqueue start smart contract for execution";
+      psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
+
+      //DEBUG: currently, the start transaction contains result also
+      csdb::Transaction result;
+      result.set_innerID(tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
+      result.set_source(tr.target()); // contracts' key
+      result.set_target(tr.target()); // contracts' key
+      result.set_amount(0);
+      result.set_max_fee(tr.max_fee());
+      result.set_currency(tr.currency());
+      // USRFLD0 - new state
+      constexpr csdb::user_field_id_t smart_state_idx = ~1; // see apihandler.cpp #9
+      const auto fields = tr.user_field_ids();
+      if(fields.count(smart_state_idx) > 0) {
+        result.add_user_field(trx_uf::new_state::Value, tr.user_field(smart_state_idx));
+      }
+      else {
+        result.add_user_field(trx_uf::new_state::Value, csdb::UserField {});
+      }
+      // USRFLD1 - ref to start trx
+      result.add_user_field(trx_uf::new_state::RefStart, (cs::SmartContractRef { block.hash(), block.sequence(), trx_idx }).to_user_field());
+      // USRFLD2 - total fee
+      result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(tr.max_fee().to_double())));
+      getSmartResultTransaction(result);
+    }
+    else if(cs::SmartContracts::is_new_state(tr)) {
+      csdebug() << "SolverCore: smart contract is executed, state updated with new one";
+    }
   }
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)

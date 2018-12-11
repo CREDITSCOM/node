@@ -206,4 +206,12 @@ namespace cs
     pnode->prepareMetaForSending(table, currentTimeStamp);
   }
 
+  void SolverCore::getSmartResultTransaction(const csdb::Transaction& transaction) {
+    StageOneSmarts stage;
+    cscrypto::CalculateHash(stage.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+    stage.sender = ownSmartsConfNum;
+    pcontext->addSmartStage1(stage, true);  
+  }
+
+
 }  // namespace slv2
