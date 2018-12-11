@@ -245,6 +245,10 @@ public:
   void testCachedBlocks();
 
 public signals:
+
+  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.  
+  *   Connected to SolverCore::gotStartSmartContract() method
+  */
   cs::SmartContractStartSignal smartContractStarted_;
 
 private:
