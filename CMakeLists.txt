@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.11)
 if (MSVC)
   add_definitions(-DNOMINMAX)
   add_definitions(-D_WIN32_WINNT=0x0601)
+  add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
+  add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
 option(LEVELDB_BUILD_TESTS "" OFF)

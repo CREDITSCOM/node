@@ -518,7 +518,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     assert(sequence <= this->getRoundNumber());
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
-    conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
+    conveyer.setCharacteristic(characteristic, static_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
     cs::PublicKey pk;
     std::fill(pk.begin(), pk.end(), 0);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);

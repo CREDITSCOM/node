@@ -177,6 +177,12 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
       if (byte) {
         byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+        if(!byte) {
+          csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+        }
+      }
+      else {
+        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
       characteristicMask.push_back(byte);

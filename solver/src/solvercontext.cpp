@@ -1,12 +1,8 @@
 #include "solvercontext.hpp"
 #include "solvercore.hpp"
 
-#pragma warning(push)
-#pragma warning(disable : 4267 4244 4100 4245)
 #include <csnode/conveyer.hpp>
 #include <csnode/node.hpp>
-#pragma warning(pop)
-
 #include <lib/system/logger.hpp>
 
 namespace cs {
