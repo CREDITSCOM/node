@@ -7,4 +7,3 @@ build64/
 js-client/js/*
 .idea/
 /CMakeLists.txt.user
-/third-party/ed25519
