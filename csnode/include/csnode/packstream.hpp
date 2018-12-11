@@ -390,7 +390,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
   }
 
   auto nextPtr = ptr_ + size;
-  bytes = std::vector<uint8_t>(ptr_, nextPtr);
+  bytes = cs::Bytes(ptr_, nextPtr);
 
   ptr_ = nextPtr;
   return *this;

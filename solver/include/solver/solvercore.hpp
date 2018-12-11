@@ -96,14 +96,7 @@ public:
 
   void send_wallet_transaction(const csdb::Transaction& tr);
 
-  // obsolete:
-  csdb::Pool::sequence_t getNextMissingBlock(const uint32_t /*starting_after*/) const {
-    return 0;
-  }
-
-  // empty in Solver
-  void gotBadBlockHandler(const csdb::Pool& /*p*/, const cs::PublicKey& /*sender*/) const {
-  }
+  void gotSmartContractEvent(const csdb::Pool block, size_t trx_idx);
 
 private:
   // to use private data while serve for states as SolverCore context:
@@ -177,7 +170,7 @@ private:
   void InitDebugModeTransitions();
   void InitMonitorModeTransitions();
   void setState(const StatePtr& pState);
-
+ 
   void handleTransitions(Event evt);
   bool stateCompleted(Result result);
 
@@ -187,6 +180,10 @@ private:
   bool is_block_deferred() const;
   void flush_deferred_block();
   void drop_deferred_block();
+
+  //smart-contracts consensus driver:
+  void getSmartResultTransaction(const csdb::Transaction& transaction);
+
 
   /**
    * @fn  cs::StageOne* SolverCore::find_stage1(uint8_t sender);
@@ -261,7 +258,8 @@ private:
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
-  
+  std::vector<cs::PublicKey> smartConfidants;
+  uint8_t ownSmartsConfNum;
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;

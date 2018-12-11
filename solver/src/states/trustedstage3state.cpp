@@ -1,6 +1,8 @@
 #include <solvercontext.hpp>
 #include <states/trustedstage3state.hpp>
 
+#include <csnode/datastream.hpp>
+
 #include <cmath>
 #include <csnode/blockchain.hpp>
 #include <lib/system/utils.hpp>
@@ -100,15 +102,49 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
 Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& st) {
   const auto ptr = context.stage2((uint8_t)context.own_conf_number());
   if (ptr != nullptr && context.enough_stage2()) {
-    LOG_NOTICE(name() << ": enough stage-2 received");
+    cslog() << name() << ": enough stage-2 received";
     const size_t cnt = context.cnt_trusted();
     constexpr size_t sig_len = sizeof(st.signatures[0].size());
-    for (size_t i = 0; i < cnt; i++) {
-      // check amount of trusted node's signatures nonconformity
-      // TODO: redesign required:
-      if (memcmp(ptr->signatures[i].data(), st.signatures[i].data(), sig_len) != 0) {
-        LOG_WARN(name() << ": [" << (int)st.sender << "] marked as untrusted");
-        context.mark_untrusted(st.sender);
+    StageTwo currentStage;
+    for (auto& it : context.stage2_data()) {
+      if ( it.sender != context.own_conf_number()) {
+        for (size_t j = 0; j < cnt; j++) {
+          // check amount of trusted node's signatures nonconformity
+          // TODO: redesign required: 
+          if (ptr->signatures[j] != it.signatures[j]) {
+            cs::Bytes toVerify;
+            size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
+            toVerify.reserve(messageSize);
+            cs::DataStream stream(toVerify);
+            stream << (uint32_t)context.round(); // Attention!!! the uint32_t type 
+            stream << it.hashes[j];
+            
+            if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
+              cslog() << name() << ": [" << (int)j << "] marked as untrusted";
+              context.mark_untrusted((uint8_t)j);
+            }
+            else {
+              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted";
+              context.mark_untrusted(it.sender);
+            }
+
+          }
+        }
+        bool toBreak = false;
+        size_t tCandSize = context.stage1(it.sender)->trustedCandidates.size();
+        for (size_t outer = 0; outer < tCandSize - 1; outer++) {
+          for (size_t inner = outer + 1; inner < tCandSize; inner++) {
+            if (context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
+              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted"; 
+              context.mark_untrusted(it.sender);
+              toBreak = true;
+              break;
+            }
+          }
+          if(toBreak) {
+            break;
+          }
+        }
       }
     }
 
@@ -116,7 +152,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
 
     cswarning() << "============================ CONSENSUS SUMMARY =================================";
     if (pool_solution_analysis(context)) {
-      stage.writer = take_urgent_decision(context);
+      stage.writer = take_urgent_decision(context); //to be redesigned
       cswarning() << "\t==> [" << (int)stage.writer << "]";
     }
     else {
@@ -227,16 +263,17 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   uint8_t cr = cnt_trusted / 2;
   std::vector<cs::PublicKey> aboveThreshold;
   std::vector<cs::PublicKey> belowThreshold;
-
-  LOG_NOTICE(name() << ": number of generals / 2 = " << (int)cr);
+  cslog() << name() << ": number of generals / 2 = " << (int)cr;
 
   for (uint8_t i = 0; i < cnt_trusted; i++) {
-    trustedMask[i] = (context.untrusted_value(i) <= cr);
+    trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
-      stage.realTrustedMask.push_back(1);
+      stage.realTrustedMask.push_back(1); // set 1 if trusted and 0 if untrusted
       const auto& stage_i = *(context.stage1_data().cbegin() + i);
       uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
       cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
+
+
       for (uint8_t j = 0; j < candidates_amount; j++) {
       //  cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
         if (candidatesElection.count(stage_i.trustedCandidates.at(j)) > 0) {

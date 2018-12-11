@@ -38,15 +38,15 @@ struct StageThree {
 struct StageOneSmarts {
   uint8_t sender;
   Hash hash;
-  Hash msgHash;
-  Signature sig;
+  Hash messageHash;
+  Signature signature;
 };
 
 struct StageTwoSmarts {
   uint8_t sender;
   std::vector<Hash> hashes;  // hashes of stage one
   std::vector<Signature> signatures;
-  Signature sig;
+  Signature signature;
 };
 
 struct StageThreeSmarts {
@@ -54,7 +54,7 @@ struct StageThreeSmarts {
   uint8_t writer;
   std::vector<uint8_t> realTrustedMask;
   Hash finalHash;
-  Signature sig;
+  Signature signature;
 };
 
 }  // namespace cs

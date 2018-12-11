@@ -9,8 +9,8 @@
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
 #include <csnode/conveyer.hpp>
-
 #include <csnode/fee.hpp>
+#include <solver/smartcontracts.hpp>
 
 using namespace cs;
 
@@ -389,6 +389,19 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     if(!updateFromNextBlock(pool)) {
       cserror() << "Couldn't update from next block";
     }
+
+    // inspect transactions against smart contracts, raise special event on every item found:
+    if(pool.transactions_count() > 0) {
+      size_t idx = 0;
+      for(const auto& t : pool.transactions()) {
+        if(cs::SmartContracts::is_smart_contract(t)) {
+          csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
+          emit smartContractEvent_(pool, idx);
+        }
+        ++idx;
+      }
+    }
+
     {
       std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
       newBlockCv_.notify_all();

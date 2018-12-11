@@ -235,6 +235,10 @@ public:
 
   void add_stage3(cs::StageThree& stage);
 
+  void addSmartStage1(cs::StageOneSmarts& stage, bool send);
+  void addSmartStage2(cs::StageTwoSmarts& stage, bool send);
+  void addSmartStage3(cs::StageThreeSmarts& stage);
+
   const std::vector<cs::StageOne>& stage1_data() const {
     return core.stageOneStorage;
   }
@@ -279,7 +283,9 @@ public:
 
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {
-      ++(core.markUntrusted[sender]);
+      if(core.markUntrusted[sender] < 255) {
+        ++(core.markUntrusted[sender]);
+      }
     }
   }
 

@@ -50,27 +50,35 @@ public:
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
   // SOLVER3 methods
+  void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
+  void sendHash(cs::RoundNumber round);  
+  void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+
+  //consensus communication
+  void sendStageOne(cs::StageOne&); 
+  void sendStageTwo(cs::StageTwo&);
+  void sendStageThree(cs::StageThree&);
   void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
-
-  void sendStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
-  void sendStageOne(cs::StageOne&);
-
-  // sends StageOne request to respondent about required
-  void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-  void getStageOneRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-   
-  void sendStageTwo(cs::StageTwo&);
-  void getStageTwoRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-
-  void sendStageThree(cs::StageThree&);
-  void getStageThreeRequest(const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-
-  void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  
   void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
-  void sendHash(cs::RoundNumber round);
+  void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+
+  //smart-contracts consensus communicatioin
+  void sendSmartStageOne(cs::StageOneSmarts& stageOneInfo);
+  void getSmartStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo);
+  void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo);
+  void getSmartStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+
+  void smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
+  void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
+  void sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+
+  //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
 
@@ -115,6 +123,8 @@ public:
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
   void resetNeighbours();
 
+  //smarts consensus additional functions:
+
   // syncro send functions
   void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
@@ -122,6 +132,8 @@ public:
   void becomeWriter();
 
   bool isPoolsSyncroStarted();
+
+  void smartStagesStorageClear();
 
   enum MessageActions {
     Process,
@@ -303,9 +315,11 @@ private:
   std::vector<cs::Bytes> stageTwoMessage_;
   std::vector<cs::Bytes> stageThreeMessage_;
 
-  std::vector<cs::Bytes> stageOneSmartsMessage_;
-  std::vector<cs::Bytes> stageTwoSmartsMessage_;
-  std::vector<cs::Bytes> stageThreeSmartsMessage_;
+  std::vector<cs::Bytes> smartStageOneMessage_;
+  std::vector<cs::Bytes> smartStageTwoMessage_;
+  std::vector<cs::Bytes> smartStageThreeMessage_;
+  bool isSmartStageStorageCleared_ = false;
+
 
   SentRoundData lastSentRoundData_;
 
