@@ -381,6 +381,13 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
   res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
 #endif
 
+#ifdef MONITOR_NODE
+  s_blockchain.applyToWallet(tr.target(), [&res](const Credits::WalletsCache::WalletData& wd) {
+    res.createTime = wd.createTime_;
+    res.transactionsCount = wd.transNum_;
+  });
+#endif
+
   return res;
 }
 
@@ -1370,7 +1377,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
   _return.count = totalTransfers;
 
   csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
-  while (limit && !pooh.is_empty()) {
+  while (limit && !pooh.is_empty() && tokenTransPools.size()) {
     auto it = tokenTransPools.find(pooh);
     if (it != tokenTransPools.end()) {
       auto pool = s_blockchain.loadBlock(pooh);
