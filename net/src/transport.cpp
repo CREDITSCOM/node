@@ -299,12 +299,11 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       break;
     case NetworkCommand::SSSpecificBlock: {
       try {
-        uint32_t round;
+        uint32_t round = 0;
         iPackStream_ >> round;
         gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
       }
-      catch (std::out_of_range) {
-      }
+      catch (std::out_of_range&) { }
       break;
     }
     case NetworkCommand::PackInform:
@@ -697,7 +696,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
   }
 
   if (flags & RegFlags::RedirectPort) {
-    Port port;
+    Port port = Port();
     iPackStream_ >> port;
 
     if (!conn.specialOut) {

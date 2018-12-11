@@ -1526,6 +1526,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
   case MsgTypes::ThirdStageRequest:
     solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
     break;
+  default: break;
   }
 }
 
@@ -1556,6 +1557,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   case MsgTypes::ThirdStage:
     message = stageThreeMessage_[sender];
     break;
+  default: break;
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);
@@ -1893,6 +1895,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   case MsgTypes::ThirdStageRequest:
     solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
     break;
+  default: break;
   }
 }
 
@@ -1923,6 +1926,7 @@ void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& 
   case MsgTypes::ThirdStage:
     message = stageThreeMessage_[sender];
     break;
+  default: break;
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);

@@ -67,16 +67,16 @@ class Transport {
 public:
   Transport(const Config& config, Node* node)
   : config_(config)
+  , sendPacksFlag_()
   , remoteNodes_(MaxRemoteNodes + 1)
   , netPacksAllocator_(1 << 24, 1)
   , myPublicKey_(node->getNodeIdKey())
+  , oLock_()
   , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
+  , uLock_()
   , net_(new Network(config, this))
   , node_(node)
-  , nh_(this)
-  , sendPacksFlag_()
-  , oLock_()
-  , uLock_() {
+  , nh_(this) {
     good_ = net_->isGood();
   }
 

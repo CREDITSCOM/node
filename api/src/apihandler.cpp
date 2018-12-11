@@ -484,7 +484,7 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
   executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
 }
-void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) {
+void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const TransactionId&) {
   /*const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
   const auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
   auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
@@ -554,7 +554,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       if (!state.empty()) {
         contract_state = state;
         return true;
-      } 
+      }
       return false;
     });
   }
@@ -1661,7 +1661,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
     std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
     wi.address = res;*/
     //
-    
+
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();
 #ifdef MONITOR_NODE

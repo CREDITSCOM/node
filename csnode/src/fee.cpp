@@ -144,7 +144,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   std::set<std::vector<uint8_t>> unique_trusted_;
   if (blockchain.getLastWrittenSequence() < kBlocksNumForNodesQtyEstimation) {
     while (pool.is_valid()) {
-      for (int i = 0; i < pool.confidants().size(); ++i) {
+      for (uint32_t i = 0; i < pool.confidants().size(); ++i) {
         unique_trusted_.insert(pool.confidants()[i]);
       }
       pool = blockchain.loadBlock(pool.previous_hash());
@@ -154,7 +154,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   else {
     size_t i = kBlocksNumForNodesQtyEstimation;
     while (pool.is_valid() && i != 0) {
-      for (int j = 0; j < pool.confidants().size(); ++j) {
+      for (uint32_t j = 0; j < pool.confidants().size(); ++j) {
         unique_trusted_.insert(pool.confidants()[j]);
       }
       pool = blockchain.loadBlock(pool.previous_hash());

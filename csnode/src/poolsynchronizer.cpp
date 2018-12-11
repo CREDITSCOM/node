@@ -70,8 +70,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
 
   // already synchro start, but BigBang received
   if (m_isSyncroStarted && !useTimer && isBigBand && !m_timer.isRunning()) {
-    const int delay =
-        useTimer ? cs::numeric_cast<int>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
+    const uint32_t delay =
+        useTimer ? cs::numeric_cast<uint32_t>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
     m_timer.start(delay);
   }
 
@@ -82,8 +82,8 @@ void cs::PoolSynchronizer::processingSync(const cs::RoundNumber roundNum, bool i
     sendBlockRequest();
 
     if (isBigBand || useTimer) {
-      const int delay =
-          useTimer ? cs::numeric_cast<int>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
+      const uint32_t delay =
+          useTimer ? cs::numeric_cast<uint32_t>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
       m_timer.start(delay);
     }
   }
