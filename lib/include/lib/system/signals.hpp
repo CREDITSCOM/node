@@ -385,6 +385,10 @@ public:
   ///
   template <template <typename> typename Signal>
   inline static void connect(const Signal* lhs, const Signal* rhs) {
+    if (lhs == rhs) {
+      return;
+    }
+
     auto closure = [=](auto... args) -> void {
       if (rhs) {
         rhs->operator()(args...);
