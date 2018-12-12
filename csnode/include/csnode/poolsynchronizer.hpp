@@ -34,6 +34,8 @@ public:  // Interface
 
   bool isSyncroStarted() const;
 
+  bool isOneBlockReply() const;
+
 public signals:  // Signals
 
   PoolSynchronizerRequestSignal sendRequest;

@@ -99,8 +99,6 @@ public:
 
   MOCK_METHOD1(readRoundData, bool(bool));
   MOCK_METHOD0(onRoundStart, void());
-
-  MOCK_METHOD2(composeMessageWithBlock, void(const csdb::Pool&, const MsgTypes));
 };
 
 #endif  // PROJECT_NODEMOCK_HPP

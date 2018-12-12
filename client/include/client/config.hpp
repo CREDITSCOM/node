@@ -44,6 +44,7 @@ enum BootstrapType {
 };
 
 struct PoolSyncData {
+  bool oneReplyBlock = true;            // true: sendBlockRequest one pool at a time. false: equal to number of pools requested.
   uint8_t blockPoolsCount = 5;          // max block count in one request: cannot be 0
   uint8_t requestRepeatRoundCount = 5;  // round count for repeat request : 0-never
   uint8_t neighbourPacketsCount = 10;   // packet count for connect another neighbor : 0-never

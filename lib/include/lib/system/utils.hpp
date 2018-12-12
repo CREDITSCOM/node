@@ -443,6 +443,14 @@ constexpr T getMin(const T&) {
   return std::numeric_limits<T>::min();
 }
 
+constexpr int getMax(const bool) {
+  return static_cast<int>(std::numeric_limits<bool>::max());
+}
+
+constexpr int getMin(const bool) {
+  return static_cast<int>(std::numeric_limits<bool>::min());
+}
+
 template <typename T>
 constexpr bool isVector() {
   return cs::is_vector<T>::value;
