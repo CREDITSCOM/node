@@ -4,10 +4,10 @@
 #include <csdb/address.hpp>
 #include <csdb/user_field.hpp>
 #include <csdb/pool.hpp>
+#include <csnode/datastream.hpp>
 
 #include <optional>
 #include <vector>
-#include <sstream>
 
 class BlockChain;
 
@@ -71,20 +71,19 @@ namespace cs
 
     // "serialization" methods
 
-    csdb::UserField to_user_field()
+    csdb::UserField to_user_field() const
     {
-      std::ostringstream os;
-      os << sequence << '|' << transaction;
-      return csdb::UserField(os.str());
+      cs::Bytes data;
+      cs::DataStream stream(data);
+      stream << hash << sequence << transaction;
+      return csdb::UserField(std::string(data.cbegin(), data.cend()));
     }
 
-    void from_user_field(csdb::UserField)
+    void from_user_field(csdb::UserField fld)
     {
-      std::istringstream is;
-      char delim;
-      is >> sequence >> delim >> transaction;
-      //TODO: review this code
-      assert(delim == '|');
+      std::string data = fld.value<std::string>();
+      cs::DataStream stream(data.c_str(), data.size());
+      stream >> hash >> sequence >> transaction;
     }
   };
 
@@ -95,6 +94,7 @@ namespace cs
 
   enum class SmartContractStatus
   {
+    Finished = 0,
     Running,
     Waiting
   };
