@@ -20,6 +20,7 @@ namespace cs
   {
     public_key = pub;
     private_key = priv;
+    psmarts->set_id(pub);
   }
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
@@ -278,10 +279,11 @@ namespace cs
       else {
         csdebug() << "SolverCore: smart contract is started, enqueue it for execution";
       }
-      psmarts->enqueue(block.hash(), block.sequence(), trx_idx, static_cast<cs::RoundNumber>(cur_round));
+      psmarts->enqueue(block, trx_idx);
     }
     else if(cs::SmartContracts::is_new_state(tr)) {
       csdebug() << "SolverCore: smart contract is executed, state updated with new one";
+      psmarts->on_completed(block, trx_idx);
     }
     
   }

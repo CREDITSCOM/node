@@ -1,5 +1,7 @@
 #include <smartcontracts.hpp>
+#include <solvercontext.hpp>
 
+#include <lib/system/logger.hpp>
 #include <csdb/currency.hpp>
 
 #include <optional>
@@ -12,18 +14,19 @@ namespace cs
   {
   public:
 
-    static std::optional<csdb::Transaction> execute(const SmartContracts& contracts, const cs::SmartContractRef& item);
+    static bool execute(SmartContracts& contracts, const cs::SmartContractRef& item);
   };
 
   /*static*/
-  std::optional <csdb::Transaction> SmartContractsExecutor::execute(const SmartContracts& contracts, const cs::SmartContractRef& item)
+  bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = contracts.get_transaction(item);
-    if(!SmartContracts::is_start(start_tr)) {
-      cserror() << "Smarts: unable execute non-start transaction";
-      return csdb::Transaction {};
+    //TODO: after debug completed remove the 2nd condidition:
+    if(!SmartContracts::is_start(start_tr) && !SmartContracts::is_deploy(start_tr)) {
+      cserror() << contracts.name() << ": unable execute non-start transaction";
+      return false;
     }
-    csdebug() << "Smarts: imitate execution of start contract transaction";
+    csdebug() << contracts.name() << ": imitate execution of start contract transaction";
     //DEBUG: currently, the start transaction contains result also
     csdb::Transaction result;
     result.set_innerID(start_tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
@@ -45,16 +48,23 @@ namespace cs
     result.add_user_field(trx_uf::new_state::RefStart, item.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(start_tr.max_fee().to_double())));
-    return result;
+    contracts.set_execution_result(result);
+    return true;
   }
 
   /*explicit*/
   SmartContracts::SmartContracts(BlockChain& blockchain)
     : bc(blockchain)
-    //, pexecutor(std::make_unique<SmartContractsExecutor>())
-  {}
+  {
+  }
 
   SmartContracts::~SmartContracts() = default;
+
+  void SmartContracts::set_id(const cs::PublicKey& id)
+  {
+    node_id.resize(id.size());
+    std::copy(id.cbegin(), id.cend(), node_id.begin());
+  }
 
   /*static*/
   bool SmartContracts::is_smart_contract(const csdb::Transaction tr)
@@ -132,37 +142,61 @@ namespace cs
     return block.transactions().at(contract.transaction);
   }
 
-  std::pair<SmartContractStatus, const SmartContractRef&> SmartContracts::enqueue(
-    const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round)
+  //  const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round
+  SmartContractStatus SmartContracts::enqueue(csdb::Pool block, size_t trx_idx)
   {
-    SmartContractRef new_item { blk_hash, blk_seq, trx_idx };
+    SmartContractRef new_item { block.hash(), block.sequence(), trx_idx };
     SmartContractStatus new_status = SmartContractStatus::Running;
-    auto it = exe_queue.cbegin();
     if(!exe_queue.empty()) {
-      for(; it != exe_queue.cend(); ++it) {
-        // test the same contract
-        if(it->contract == new_item) {
-          cserror() << "Smarts: attempt to queue duplicated contract transaction, already queued on round #" << it->round;
-          return std::make_pair(it->status, it->contract);
-        }
+      auto it = find_in_queue(new_item);
+      // test the same contract
+      if(it != exe_queue.cend()) {
+        cserror() << name() << ": attempt to queue duplicated contract transaction, already queued on round #" << it->round;
+        return it->status;
       }
       // only the 1st item currently is allowed to execute
       new_status = SmartContractStatus::Waiting;
-      csdebug() << "Smarts: enqueue contract for future execution";
+      csdebug() << name() << ": enqueue contract for future execution";
     }
     else {
-      csdebug() << "Smarts: starting contract execution now";
-      auto result = SmartContractsExecutor::execute(*this, new_item);
-      if(result.has_value()) {
-        // have been already executed, needn't to enqueue
-        set_execution_result(result.value());
-        return;
+      csdebug() << name() << ": starting contract execution now";
+      // call to executor only if currently is trusted
+      if(contains_me(block.confidants())) {
+        if(SmartContractsExecutor::execute(*this, new_item)) {
+          return SmartContractStatus::Finished;
+        }
       }
       // wait until executed, place new_item to queue
+      //new_status = SmartContractStatus::Running;
     }
     // enqueue to end
-    const auto& ref = exe_queue.emplace_back(QueueItem { new_item, new_status, round });
-    return std::make_pair(ref.status, ref.contract);
+    exe_queue.emplace_back(QueueItem { new_item, new_status, static_cast<cs::RoundNumber>(block.sequence()) });
+    return new_status;
+  }
+
+  void SmartContracts::on_completed(csdb::Pool block, size_t trx_idx)
+  {
+    auto it = find_in_queue(SmartContractRef { block.hash(), block.sequence(), trx_idx });
+    if(it == exe_queue.cend()) {
+      cserror() << name() << ": completed contract is not in queue";
+      return;
+    }
+    if(it != exe_queue.cbegin()) {
+      cswarning() << name() << ": completed contract is not at the top of queue";
+    }
+    exe_queue.erase(it);
+    if(!exe_queue.empty()) {
+      csdebug() << name() << ": set running status to next contract in queue";
+      auto next = exe_queue.begin();
+      next->status = SmartContractStatus::Running;
+      if(contains_me(block.confidants())) {
+        csdebug() << name() << ": execute next contract in queue";
+        SmartContractsExecutor::execute(*this, next->contract);
+      }
+    }
+    else {
+      csdebug() << name() << ": contract execution queue is empty";
+    }
   }
 
 } // cs
