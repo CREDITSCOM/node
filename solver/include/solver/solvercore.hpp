@@ -69,6 +69,15 @@ public:
     return private_key;
   }
 
+  //Solver smarts consensus methods
+  void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
+  void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
+  void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
+  void getSmartResultTransaction(const csdb::Transaction& transaction);
+  void refreshSmartStagesStorage();
+  void processStages();
+  bool stageOneEnough();
+
   // TODO: requires revision
   const cs::PublicKey& getWriterPublicKey() const;
 
@@ -87,6 +96,11 @@ public:
   void gotStageOneRequest(uint8_t requester, uint8_t required);
   void gotStageTwoRequest(uint8_t requester, uint8_t required);
   void gotStageThreeRequest(uint8_t requester, uint8_t required);
+
+  bool SolverCore::smartStageOneEnough();
+  bool SolverCore::smartStageTwoEnough();
+  bool SolverCore::smartStageThreeEnough();
+  csdb::Pool::sequence_t smartRoundNumber();
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -181,11 +195,7 @@ private:
   void flush_deferred_block();
   void drop_deferred_block();
 
-  //smart-contracts consensus driver:
-  void getSmartResultTransaction(const csdb::Transaction& transaction);
-
-
-  /**
+   /**
    * @fn  cs::StageOne* SolverCore::find_stage1(uint8_t sender);
    *
    * @brief   Searches for the stage 1 of given sender
@@ -258,8 +268,17 @@ private:
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
-  std::vector<cs::PublicKey> smartConfidants;
-  uint8_t ownSmartsConfNum;
+  std::vector<cs::StageOneSmarts> smartStageOneStorage_;
+  std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
+  std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
+  bool smartStagesStorageRefreshed_ = false;
+  std::vector<cs::PublicKey> smartConfidants_;
+  uint8_t ownSmartsConfNum_;
+  csdb::Pool::sequence_t smartRoundNumber_;
+
+  cs::StageOneSmarts st1;
+  cs::StageTwoSmarts st2;
+  cs::StageThreeSmarts st3;
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;
