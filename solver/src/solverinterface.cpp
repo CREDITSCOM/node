@@ -283,6 +283,7 @@ namespace cs
     else if(cs::SmartContracts::is_new_state(tr)) {
       csdebug() << "SolverCore: smart contract is executed, state updated with new one";
     }
+    
   }
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)
@@ -341,5 +342,5 @@ namespace cs
     },
       true);
   }
-
+  
 }  // namespace cs

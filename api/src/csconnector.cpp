@@ -5,10 +5,13 @@
 #pragma warning(push)
 // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
 #pragma warning(disable: 4245)
+#endif
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
+#if defined(_MSC_VER)
 #pragma warning(pop)
-#endif // _MSC_VER
+#endif  // _MSC_VER
+
 #include "csconnector/csconnector.hpp"
 
 namespace csconnector {
@@ -33,13 +36,14 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
               make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 {
+  cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
 #ifdef BINARY_TCP_API
   thread = std::thread([this]() {
     try {
       server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead :'-(";
     }
   });
 #endif
@@ -50,7 +54,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
       ajax_server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead in AJAX :'-(";
     }
   });
 #endif

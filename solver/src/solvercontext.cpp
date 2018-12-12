@@ -43,39 +43,6 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
   core.gotStageThree(stage);
 }
 
-void SolverContext::addSmartStage1(cs::StageOneSmarts& stage, bool send) {
-  // core.stageOneStorage.push_back(stage);
-  if (send) {
-    core.pnode->sendSmartStageOne(stage);
-  }
-  /*the order is important! the signature is created in node
-  before sending stage and then is inserted in the field .sig
-  now we can add it to stages storage*/
-  //core.gotStageOne(stage);
-}
-
-void SolverContext::addSmartStage2(cs::StageTwoSmarts& stage, bool send) {
-  // core.stageTwoStorage.push_back(stage);
-
-  if (send) {
-    core.pnode->sendSmartStageTwo(stage);
-  }
-  /*the order is important! the signature is created in node
-  before sending stage and then is inserted in the field .sig
-  now we can add it to stages storage*/
-  //core.gotStageTwo(stage);
-}
-
-void SolverContext::addSmartStage3(cs::StageThreeSmarts& stage) {
-  // core.stageThreeStorage.push_back(stage);
-
-  core.pnode->sendSmartStageThree(stage);
-  /*the order is important! the signature is created in node
-  before sending stage and then is inserted in the field .sig
-  now we can add it to stages storage*/
-  //core.gotStageThree(stage);
-}
-
 size_t SolverContext::own_conf_number() const {
   return (size_t)core.pnode->getConfidantNumber();
 }
