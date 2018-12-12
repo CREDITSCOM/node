@@ -1,8 +1,17 @@
 #include "stdafx.h"
 
 #include <csdb/currency.hpp>
+#if defined(_MSC_VER)
+#pragma warning(push)
+// 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
+#pragma warning(disable: 4245)
+#endif
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif  // _MSC_VER
+
 #include "csconnector/csconnector.hpp"
 
 namespace csconnector {
@@ -15,7 +24,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
-: api_handler(make_shared<api::APIHandler>(m_blockchain, *solver))
+: api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, config))
 , api_processor(api_handler)
 , p_api_processor_factory(new api::SequentialProcessorFactory(api_processor))
 #ifdef BINARY_TCP_API
@@ -27,24 +36,25 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
               make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 {
+  cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
 #ifdef BINARY_TCP_API
-  thread = std::thread([this, config]() {
+  thread = std::thread([this]() {
     try {
       server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead :'-(";
     }
   });
 #endif
 #ifdef AJAX_IFACE
   ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
-  ajax_thread = std::thread([this, config]() {
+  ajax_thread = std::thread([this]() {
     try {
       ajax_server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead in AJAX :'-(";
     }
   });
 #endif

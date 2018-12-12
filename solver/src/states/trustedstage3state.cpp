@@ -99,26 +99,26 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
   }
 }
 
-Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& st) {
+Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&) {
   const auto ptr = context.stage2((uint8_t)context.own_conf_number());
   if (ptr != nullptr && context.enough_stage2()) {
     cslog() << name() << ": enough stage-2 received";
     const size_t cnt = context.cnt_trusted();
-    constexpr size_t sig_len = sizeof(st.signatures[0].size());
+    //constexpr size_t sig_len = sizeof(st.signatures[0].size());
     StageTwo currentStage;
     for (auto& it : context.stage2_data()) {
       if ( it.sender != context.own_conf_number()) {
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
-          // TODO: redesign required: 
+          // TODO: redesign required:
           if (ptr->signatures[j] != it.signatures[j]) {
             cs::Bytes toVerify;
             size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
             cs::DataStream stream(toVerify);
-            stream << (uint32_t)context.round(); // Attention!!! the uint32_t type 
+            stream << (uint32_t)context.round(); // Attention!!! the uint32_t type
             stream << it.hashes[j];
-            
+
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
               cslog() << name() << ": [" << (int)j << "] marked as untrusted";
               context.mark_untrusted((uint8_t)j);
@@ -135,7 +135,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo& 
         for (size_t outer = 0; outer < tCandSize - 1; outer++) {
           for (size_t inner = outer + 1; inner < tCandSize; inner++) {
             if (context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
-              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted"; 
+              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted";
               context.mark_untrusted(it.sender);
               toBreak = true;
               break;
@@ -292,7 +292,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
 
       cslog() << "Hashes amount of [" << (int)i << "]: " << (int)hashes_amount;
-      for (int j = 0; j < hashes_amount; j++) {
+      for (uint32_t j = 0; j < hashes_amount; j++) {
          // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
         if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;

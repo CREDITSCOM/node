@@ -146,22 +146,6 @@ public:
   BlockChain& blockchain() const;
 
   /**
-   * @fn    cs::SmartContracts& SolverContext::smarts() const;
-   *
-   * @brief Gets the smart contracts service instance
-   *
-   * @author    Alexander Avramenko
-   * @date  07.12.2018
-   *
-   * @return    A reference cs::SmartContracts instance.
-   */
-
-  cs::SmartContracts& smarts() const
-  {
-    return *core.psmarts;
-  }
-
-  /**
    * @fn    cs::WalletsState& SolverContext::wallets() const
    *
    * @brief Gets the wallets service instance

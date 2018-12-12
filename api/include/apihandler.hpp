@@ -1,6 +1,14 @@
 #ifndef APIHANDLER_HPP
 #define APIHANDLER_HPP
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+// 4706 - assignment within conditional expression
+// 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
+//         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
+#pragma warning(disable: 4706 4373)
+#endif
+
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
 
@@ -39,6 +47,10 @@ namespace cs {
 class SolverCore;
 }
 
+namespace csconnector {
+struct Config;
+}
+
 namespace executor {
 class APIResponse;
 class ContractExecutorConcurrentClient;
@@ -56,7 +68,7 @@ public:
 
 class APIHandler : public APIHandlerInterface {
 public:
-  APIHandler(BlockChain& blockchain, cs::SolverCore& _solver);
+  explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config);
   ~APIHandler() override;
 
   APIHandler(const APIHandler&) = delete;
@@ -266,5 +278,9 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #endif  // APIHANDLER_HPP

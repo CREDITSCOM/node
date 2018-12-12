@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 3.11)
 
+if (NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/berkeleydb_prebuilt/.git OR
+    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/blake2/.git OR
+    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
+    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/libsodium/.git OR
+    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
+    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift-interface-definitions/.git)
+  message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
+endif()
+
 if (MSVC)
   add_definitions(-DNOMINMAX)
   add_definitions(-D_WIN32_WINNT=0x0601)
+  add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
+  add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
 option(LEVELDB_BUILD_TESTS "" OFF)

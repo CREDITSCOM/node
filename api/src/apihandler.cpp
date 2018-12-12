@@ -33,12 +33,12 @@ bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* i
   return res;
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config)
 : s_blockchain(blockchain)
 , solver(_solver)
 , stats(blockchain)
 , executor_transport(new ::apache::thrift::transport::TBufferedTransport(
-      ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", 9080)))
+      ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , executor(std::make_unique<client_type>(
       apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executor_transport)))
 , tm(this)
@@ -423,7 +423,7 @@ auto set_max_fee(T& trx, const csdb::Amount& am, int) -> decltype(trx.set_max_fe
 }
 
 template <typename T>
-void set_max_fee(T& trx, const csdb::Amount& am, long) {
+void set_max_fee(T&, const csdb::Amount&, long) {
 }
 
 csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
@@ -496,7 +496,7 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
   executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
 }
-void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) {
+void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const TransactionId&) {
   /*const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
   const auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
   auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
@@ -566,7 +566,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       if (!state.empty()) {
         contract_state = state;
         return true;
-      } 
+      }
       return false;
     });
   }
@@ -1673,7 +1673,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
     std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
     wi.address = res;*/
     //
-    
+
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();
 #ifdef MONITOR_NODE

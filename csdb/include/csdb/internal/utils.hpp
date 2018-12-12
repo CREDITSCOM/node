@@ -14,7 +14,7 @@ namespace internal {
 template <typename Iterator>
 byte_array from_hex(Iterator beg, Iterator end) {
   auto digit_from_hex = [](char val, uint8_t &result) {
-    val = toupper(val);
+    val = static_cast<char>(toupper(val));
 
     if ((val >= '0') && (val <= '9'))
       result = static_cast<uint8_t>(val - '0');

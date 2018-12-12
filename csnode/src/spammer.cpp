@@ -127,7 +127,7 @@ void Spammer::FundMyWallets(Node& node) {
     transaction.set_amount(csdb::Amount(kMaxMoneyForOneSpammer / kMyWalletsNum, 0));
     transaction.set_max_fee(csdb::AmountCommission(0.1));
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
-    srand(time(0));
+    srand((unsigned int)time(0));
     transaction.set_innerID((rand() + 2) & 0x3fffffffffff);
     SignTransaction(transaction, genesis.data());
     node.getSolver()->send_wallet_transaction(transaction);

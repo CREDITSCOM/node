@@ -6,8 +6,16 @@
 #include <memory>
 #include <thread>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+// 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
+#pragma warning(disable: 4245)
+#endif
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #include <solver/solvercore.hpp>
 
@@ -20,11 +28,12 @@ struct Config {
 #ifdef AJAX_IFACE
   int ajax_port = 8081;
 #endif
+  int executor_port = 9080;
 };
 
 class connector {
 public:
-  connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
+  explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
   ~connector();
 
   connector(const connector&) = delete;

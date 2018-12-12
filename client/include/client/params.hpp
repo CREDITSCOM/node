@@ -5,15 +5,14 @@
 #define NODE_API
 #define AJAX_IFACE
 //#define SPAMMER
-#define SYNCRO
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
 #define BINARY_TCP_API
 #define DEFAULT_CURRENCY 1
 
-#define TRANSACTIONS_INDEX
-#define TOKENS_CACHE
+//#define TRANSACTIONS_INDEX
+//#define TOKENS_CACHE
 //#define STATS
 
 #endif
