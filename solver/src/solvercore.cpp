@@ -210,7 +210,7 @@ namespace cs
     cs::SmartContractRef smartRef;
     smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
     smartRoundNumber_ = smartRef.sequence;
-    smartConfidants_ = pnode->smartConfidants(smartRoundNumber_);
+    smartConfidants_ = pnode->smartConfidants(static_cast<cs::RoundNumber>(smartRoundNumber_));
     refreshSmartStagesStorage();
     cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
     st1.sender = ownSmartsConfNum_;
