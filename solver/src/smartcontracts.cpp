@@ -74,6 +74,9 @@ namespace cs
   /*static*/
   bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
   {
+    // prevent untested code from execution
+    return true;
+
     csdb::Transaction start_tr = contracts.get_transaction(item);
     //TODO: after debug completed remove the 2nd condidition:
     bool is_deploy = SmartContracts::is_deploy(start_tr);
