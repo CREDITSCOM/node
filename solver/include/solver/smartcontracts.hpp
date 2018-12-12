@@ -4,10 +4,13 @@
 #include <csdb/address.hpp>
 #include <csdb/user_field.hpp>
 #include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
+#include <lib/system/signals.hpp>
+#include <lib/system/common.hpp>
+#include <csnode/datastream.hpp>
 
 #include <optional>
 #include <vector>
-#include <sstream>
 
 class BlockChain;
 
@@ -71,20 +74,19 @@ namespace cs
 
     // "serialization" methods
 
-    csdb::UserField to_user_field()
+    csdb::UserField to_user_field() const
     {
-      std::ostringstream os;
-      os << sequence << '|' << transaction;
-      return csdb::UserField(os.str());
+      cs::Bytes data;
+      cs::DataStream stream(data);
+      stream << hash << sequence << transaction;
+      return csdb::UserField(std::string(data.cbegin(), data.cend()));
     }
 
-    void from_user_field(csdb::UserField)
+    void from_user_field(csdb::UserField fld)
     {
-      std::istringstream is;
-      char delim;
-      is >> sequence >> delim >> transaction;
-      //TODO: review this code
-      assert(delim == '|');
+      std::string data = fld.value<std::string>();
+      cs::DataStream stream(data.c_str(), data.size());
+      stream >> hash >> sequence >> transaction;
     }
   };
 
@@ -95,9 +97,12 @@ namespace cs
 
   enum class SmartContractStatus
   {
+    Finished = 0,
     Running,
     Waiting
   };
+
+  using SmartContractExecutedSignal = cs::Signal<void(csdb::Transaction)>;
 
   class SmartContracts final
   {
@@ -108,6 +113,10 @@ namespace cs
     SmartContracts() = delete;
     SmartContracts(const SmartContracts&) = delete;
 
+    ~SmartContracts();
+
+    void set_id(const cs::PublicKey&);
+
     // test transaction methods
 
     static bool is_smart_contract(const csdb::Transaction);
@@ -117,16 +126,37 @@ namespace cs
 
     static std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
-    csdb::Transaction get_transaction(const SmartContractRef& ref);
+    static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
+    
+    // non-static variant
+    csdb::Transaction get_transaction(const SmartContractRef& contract) const
+    {
+      return SmartContracts::get_transaction(bc, contract);
+    }
 
-    std::pair<SmartContractStatus, const SmartContractRef&> enqueue(
-      const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round);
+    SmartContractStatus enqueue(csdb::Pool block, size_t trx_idx);
+    void on_completed(csdb::Pool block, size_t trx_idx);
+
+    void set_execution_result(csdb::Transaction tr)
+    {
+      emit signal_smart_executed(tr);
+    }
+
+    const char* name()
+    {
+      return "Smarts";
+    }
+
+  public signals:
+
+    SmartContractExecutedSignal signal_smart_executed;
 
   private:
 
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
 
     BlockChain& bc;
+    cs::Bytes node_id;
 
     struct QueueItem
     {
@@ -137,6 +167,21 @@ namespace cs
 
     std::vector<QueueItem> exe_queue;
 
+    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item)
+    {
+      auto it = exe_queue.cbegin();
+      for(; it != exe_queue.cend(); ++it) {
+        if(it->contract == item) {
+          break;
+        }
+      }
+      return it;
+    }
+
+    bool contains_me(const std::vector<cs::Bytes>& list)
+    {
+      return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
+    }
   };
 
 } // cs
