@@ -4,6 +4,8 @@
 #include <csdb/address.hpp>
 #include <csdb/user_field.hpp>
 #include <csdb/pool.hpp>
+#include <csdb/transaction.hpp>
+#include <lib/system/signals.hpp>
 
 #include <optional>
 #include <vector>
@@ -71,7 +73,7 @@ namespace cs
 
     // "serialization" methods
 
-    csdb::UserField to_user_field()
+    csdb::UserField to_user_field() const
     {
       std::ostringstream os;
       os << sequence << '|' << transaction;
@@ -99,6 +101,10 @@ namespace cs
     Waiting
   };
 
+  class SolverCore;
+
+  using SmartContractExecutedSignal = cs::Signal<void(csdb::Transaction)>;
+
   class SmartContracts final
   {
   public:
@@ -107,6 +113,8 @@ namespace cs
 
     SmartContracts() = delete;
     SmartContracts(const SmartContracts&) = delete;
+
+    ~SmartContracts();
 
     // test transaction methods
 
@@ -117,10 +125,25 @@ namespace cs
 
     static std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
-    csdb::Transaction get_transaction(const SmartContractRef& ref);
+    static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
+    
+    // non-static variant
+    csdb::Transaction get_transaction(const SmartContractRef& contract) const
+    {
+      return SmartContracts::get_transaction(bc, contract);
+    }
 
     std::pair<SmartContractStatus, const SmartContractRef&> enqueue(
       const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round);
+
+    void set_execution_result(csdb::Transaction tr)
+    {
+      emit signal_smart_executed(tr);
+    }
+
+  public signals:
+
+    SmartContractExecutedSignal signal_smart_executed;
 
   private:
 

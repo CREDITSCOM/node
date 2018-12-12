@@ -79,6 +79,9 @@ namespace cs
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc);
+
+    // bind signals
+    cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResultTransaction);
   }
 
   SolverCore::~SolverCore()
@@ -206,7 +209,7 @@ namespace cs
     pnode->prepareMetaForSending(table, currentTimeStamp);
   }
 
-  void SolverCore::getSmartResultTransaction(const csdb::Transaction& transaction) {
+  void SolverCore::getSmartResultTransaction(const csdb::Transaction transaction) {
     StageOneSmarts stage;
     cscrypto::CalculateHash(stage.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
     stage.sender = ownSmartsConfNum;

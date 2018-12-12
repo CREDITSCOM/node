@@ -182,7 +182,7 @@ private:
   void drop_deferred_block();
 
   //smart-contracts consensus driver:
-  void getSmartResultTransaction(const csdb::Transaction& transaction);
+  void getSmartResultTransaction(csdb::Transaction transaction);
 
 
   /**
