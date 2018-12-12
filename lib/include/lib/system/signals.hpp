@@ -383,8 +383,8 @@ public:
   /// @param lhs Any const signal1 pointer.
   /// @param rhs Any const signal2 pointer.
   ///
-  template <template <typename> typename Signal>
-  inline static void connect(const Signal* lhs, const Signal* rhs) {
+  template <template <typename> typename Signal, typename T>
+  inline static void connect(const Signal<T>* lhs, const Signal<T>* rhs) {
     if (lhs == rhs) {
       return;
     }
@@ -395,7 +395,7 @@ public:
       }
     };
 
-    std::function<typename Signal::Signature> func = closure;
+    std::function<typename Signal<T>::Signature> func = closure;
     cs::Connector::connect(lhs, std::move(func));
   }
 
