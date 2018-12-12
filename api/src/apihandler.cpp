@@ -33,12 +33,12 @@ bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* i
   return res;
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config)
 : s_blockchain(blockchain)
 , solver(_solver)
 , stats(blockchain)
 , executor_transport(new ::apache::thrift::transport::TBufferedTransport(
-      ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", 9080)))
+      ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , executor(std::make_unique<client_type>(
       apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executor_transport)))
 , tm(this)

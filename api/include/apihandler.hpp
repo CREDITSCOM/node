@@ -47,6 +47,10 @@ namespace cs {
 class SolverCore;
 }
 
+namespace csconnector {
+struct Config;
+}
+
 namespace executor {
 class APIResponse;
 class ContractExecutorConcurrentClient;
@@ -64,7 +68,7 @@ public:
 
 class APIHandler : public APIHandlerInterface {
 public:
-  APIHandler(BlockChain& blockchain, cs::SolverCore& _solver);
+  explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config);
   ~APIHandler() override;
 
   APIHandler(const APIHandler&) = delete;

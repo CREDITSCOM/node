@@ -42,7 +42,11 @@ Node::Node(const Config& config)
 ,
 #endif
 #ifdef NODE_API
-  api_(blockChain_, solver_, csconnector::Config { config.getApiSettings().port, config.getApiSettings().ajaxPort })
+  api_(blockChain_, solver_, csconnector::Config {
+   config.getApiSettings().port,
+   config.getApiSettings().ajaxPort,
+   config.getApiSettings().executorPort
+  })
 ,
 #endif
   allocator_(1 << 24, 5)
@@ -562,7 +566,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
 }
 
 const cs::ConfidantsKeys& Node::smartConfidants(const cs::RoundNumber startSmartRoundNumber) const {
-  //возможна ошибка если на пишущем узле происходит хзапись блока в конце предыдущего раунда, а в других нода в начале
+  //???? ??? ?? ? ???? ?? ????? ???? ?????????????????, ????? ?? ?????
   return cs::Conveyer::instance().roundTable(startSmartRoundNumber)->confidants;
 }
 
