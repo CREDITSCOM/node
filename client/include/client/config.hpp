@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __CONFIG_HPP__
-#define __CONFIG_HPP__
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
+
 #include <boost/asio.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
@@ -53,6 +54,7 @@ struct PoolSyncData {
 struct ApiData {
   uint16_t port = 9090;
   uint16_t ajaxPort = 8081;
+  uint16_t executorPort = 9080;
 };
 
 class Config {
@@ -168,4 +170,4 @@ private:
   ApiData apiData_;
 };
 
-#endif  // __CONFIG_HPP__
+#endif  // CONFIG_HPP

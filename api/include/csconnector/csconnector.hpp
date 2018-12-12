@@ -28,6 +28,7 @@ struct Config {
 #ifdef AJAX_IFACE
   int ajax_port = 8081;
 #endif
+  int executor_port = 9080;
 };
 
 class connector {

@@ -41,6 +41,7 @@ const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_
 
 const std::string PARAM_NAME_API_PORT = "port";
 const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
+const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
@@ -81,7 +82,7 @@ EndpointData EndpointData::fromString(const std::string& str) {
     throw std::invalid_argument(str);
   }
 
-  result.port = std::stoul(match[2]);
+  result.port = static_cast<uint16_t>(std::stoul(match[2]));
 
   return result;
 }
@@ -282,6 +283,7 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
 
   checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_API_PORT, apiData_.port);
   checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_PORT, apiData_.ajaxPort);
+  checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
 }
 
 template <typename T>
