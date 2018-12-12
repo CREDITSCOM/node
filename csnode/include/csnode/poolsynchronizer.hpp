@@ -17,8 +17,7 @@ class Node;
 
 namespace cs {
 
-using PoolSynchronizerRequestSignal =
-  cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, uint32_t packet)>;
+using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, uint32_t packet)>;
 
 class PoolSynchronizer {
 public:  // Interface
