@@ -30,7 +30,7 @@ struct Config {
 
 class connector {
 public:
-  connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
+  explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
   ~connector();
 
   connector(const connector&) = delete;

@@ -50,6 +50,11 @@ struct PoolSyncData {
   uint16_t sequencesVerificationFrequency = 350; // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
 };
 
+struct ApiData {
+  uint16_t port = 9090;
+  uint16_t ajaxPort = 8081;
+};
+
 class Config {
 public:
   Config() {
@@ -113,15 +118,14 @@ public:
   }
 
   const boost::log::settings& getLoggerSettings() const;
-
-  const PoolSyncData& getPoolSyncSettings() const {
-    return poolSyncData_;
-  }
+  const PoolSyncData& getPoolSyncSettings() const;
+  const ApiData& getApiSettings() const;
 
 private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
   void readPoolSynchronizerData(const boost::property_tree::ptree& config);
+  void readApiData(const boost::property_tree::ptree& config);
 
   template<typename T>
   bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
@@ -153,6 +157,7 @@ private:
   boost::log::settings loggerSettings_;
 
   PoolSyncData poolSyncData_;
+  ApiData apiData_;
 };
 
 #endif  // __CONFIG_HPP__

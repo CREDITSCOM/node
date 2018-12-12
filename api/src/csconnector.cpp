@@ -33,13 +33,14 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
               make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 {
+  cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
 #ifdef BINARY_TCP_API
   thread = std::thread([this]() {
     try {
       server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead :'-(";
     }
   });
 #endif
@@ -50,7 +51,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
       ajax_server.run();
     }
     catch (...) {
-      std::cerr << "Oh no! I'm dead in AJAX :'-(" << std::endl;
+      cserror() << "Oh no! I'm dead in AJAX :'-(";
     }
   });
 #endif

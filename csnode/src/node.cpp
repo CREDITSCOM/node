@@ -42,7 +42,7 @@ Node::Node(const Config& config)
 ,
 #endif
 #ifdef NODE_API
-  api_(blockChain_, solver_)
+  api_(blockChain_, solver_, csconnector::Config { config.getApiSettings().port, config.getApiSettings().ajaxPort })
 ,
 #endif
   allocator_(1 << 24, 5)
