@@ -4,8 +4,25 @@
 #include <lib/system/logger.hpp>
 #include <csdb/currency.hpp>
 
+#include <ContractExecutor.h>
+//#include <stdafx.h>:
+#if defined(_MSC_VER)
+#pragma warning(push)
+// 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
+#pragma warning(disable: 4245)
+#endif // _MSC_VER
+#include <thrift/protocol/TJSONProtocol.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/THttpServer.h>
+#include <thrift/transport/TBufferTransports.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif // _MSC_VER
+
 #include <optional>
-#include <sstream>
+#include <memory>
 
 namespace cs
 {
@@ -15,18 +32,101 @@ namespace cs
   public:
 
     static bool execute(SmartContracts& contracts, const cs::SmartContractRef& item);
+
+  private:
+
+    using client_type = executor::ContractExecutorConcurrentClient;
+    using transport_ptr_t = ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport>;
+    static std::unique_ptr<client_type> client;
+    static transport_ptr_t transport;
+
+    static client_type* get_client()
+    {
+      if(client == nullptr) {
+        // one-time initialization
+        transport = transport_ptr_t(
+          new ::apache::thrift::transport::TBufferedTransport(
+            ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", 9080)));
+        client = std::make_unique<client_type>(
+          apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(transport));
+
+      }
+      using transport_type = decltype(transport)::element_type;
+      const auto deleter = [](transport_type* transp) {
+        if(transp != nullptr)
+          transp->close();
+      };
+      // every-time initialization
+      const auto ptr = std::unique_ptr<transport_type, decltype(deleter)>(transport.get(), deleter);
+      while(!ptr->isOpen()) {
+        ptr->open();
+      }
+      return client.get();
+    }
   };
+
+  /*static*/
+  std::unique_ptr<SmartContractsExecutor::client_type> SmartContractsExecutor::client = nullptr;
+  /*static*/
+  ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> SmartContractsExecutor::transport = nullptr;
+
 
   /*static*/
   bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = contracts.get_transaction(item);
     //TODO: after debug completed remove the 2nd condidition:
-    if(!SmartContracts::is_start(start_tr) && !SmartContracts::is_deploy(start_tr)) {
+    bool is_deploy = SmartContracts::is_deploy(start_tr);
+    if(!SmartContracts::is_start(start_tr) && !is_deploy) {
       cserror() << contracts.name() << ": unable execute non-start transaction";
       return false;
     }
+
+    csdebug() << contracts.name() << ": invoke remote execution of start contract transaction";
+
+    auto maybe_contract = SmartContracts::get_smart_contract(start_tr);
+    if(maybe_contract.has_value()) {
+      const auto contract = maybe_contract.value();
+      auto pclient = SmartContractsExecutor::get_client();
+      //APIHandler::smart_transaction_flow():
+      executor::ExecuteByteCodeResult resp;
+      std::string code;
+      if(is_deploy) {
+        code = contract.smartContractDeploy.byteCode;
+      }
+      else {
+        //TODO: get contract code from deploy transaction
+      }
+      std::string state;
+      constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
+      pclient->executeByteCode(resp, start_tr.source().to_api_addr(), code, state, contract.method, contract.params, MAX_EXECUTION_TIME);
+      if(resp.status.code == 0) {
+        csdb::Transaction result;
+        result.set_innerID(start_tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
+        result.set_source(start_tr.target()); // contracts' key
+        result.set_target(start_tr.target()); // contracts' key
+        result.set_amount(0);
+        result.set_max_fee(start_tr.max_fee());
+        result.set_currency(start_tr.currency());
+        // USRFLD0 - new state
+        result.add_user_field(trx_uf::new_state::Value, resp.contractState);
+        // USRFLD1 - ref to start trx
+        result.add_user_field(trx_uf::new_state::RefStart, item.to_user_field());
+        // USRFLD2 - total fee
+        result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(start_tr.max_fee().to_double())));
+        contracts.set_execution_result(result);
+        return true;
+      }
+      else {
+        cserror() << contracts.name() << ": failed to execute remotely smart contract";
+      }
+    }
+    else {
+      cserror() << contracts.name() << ": failed get smart contract from transaction";
+    }
+
     csdebug() << contracts.name() << ": imitate execution of start contract transaction";
+    
     //DEBUG: currently, the start transaction contains result also
     csdb::Transaction result;
     result.set_innerID(start_tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
