@@ -97,9 +97,9 @@ public:
   void gotStageTwoRequest(uint8_t requester, uint8_t required);
   void gotStageThreeRequest(uint8_t requester, uint8_t required);
 
-  bool SolverCore::smartStageOneEnough();
-  bool SolverCore::smartStageTwoEnough();
-  bool SolverCore::smartStageThreeEnough();
+  bool smartStageOneEnough();
+  bool smartStageTwoEnough();
+  bool smartStageThreeEnough();
   csdb::Pool::sequence_t smartRoundNumber();
 
   /// <summary>   Adds a transaction passed to send pool </summary>

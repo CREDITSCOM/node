@@ -184,8 +184,6 @@ inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::Counte
   case PoolSynchronizer::CounterType::TIMER:
     os << "TIMER";
     break;
-  default:
-    break;
   }
 
   return os;

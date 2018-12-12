@@ -117,9 +117,17 @@ public:
     return hostAddressEp_;
   }
 
-  const boost::log::settings& getLoggerSettings() const;
-  const PoolSyncData& getPoolSyncSettings() const;
-  const ApiData& getApiSettings() const;
+  const boost::log::settings& getLoggerSettings() const {
+    return loggerSettings_;
+  }
+
+  const PoolSyncData& getPoolSyncSettings() const {
+    return poolSyncData_;
+  }
+
+  const ApiData& getApiSettings() const {
+    return apiData_;
+  }
 
 private:
   static Config readFromFile(const std::string& fileName);

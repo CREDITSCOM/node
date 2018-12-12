@@ -260,18 +260,6 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   loggerSettings_ = boost::log::parse_settings(ss);
 }
 
-const boost::log::settings& Config::getLoggerSettings() const {
-  return loggerSettings_;
-}
-
-const PoolSyncData& Config::getPoolSyncSettings() const {
-  return poolSyncData_;
-}
-
-const ApiData& Config::getApiSettings() const {
-  return apiData_;
-}
-
 void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config) {
   if (!config.count(BLOCK_NAME_POOL_SYNC)) {
     return;
