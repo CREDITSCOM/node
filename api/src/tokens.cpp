@@ -271,7 +271,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   holderKeysParams.reserve(holders.size());
   for (auto& h : holders) {
     general::Variant var;
-    var.v_string = '"' + EncodeBase58(h.public_key()) + '"';
+    var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
     holderKeysParams.push_back(std::vector<general::Variant>(1, var));
   }
 
@@ -279,8 +279,6 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   api_->getExecutor().
     executeByteCodeMultiple(result, dpAddr, byteCode, newState,
                             "balanceOf", holderKeysParams, 100);
-
-  std::cout << "SIZES " << result.results.size() << " VS" << holders.size() << std::endl;
 
   if (!result.status.code &&
       (result.results.size() == holders.size())) {
