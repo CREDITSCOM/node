@@ -11,8 +11,9 @@
 #include <lib/system/signals.hpp>
 
 namespace cs {
-using TimerCallback = std::function<void()>;
-using TimeOutSignal = cs::Signal<TimerCallback>;
+using TimerCallbackSignature = void();
+using TimerCallback = std::function<TimerCallbackSignature>;
+using TimeOutSignal = cs::Signal<TimerCallbackSignature>;
 
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.

@@ -81,6 +81,7 @@ public:
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
+  const cs::ConfidantsKeys& smartConfidants(const cs::RoundNumber startSmartRoundNumber) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();

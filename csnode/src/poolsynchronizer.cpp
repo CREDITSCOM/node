@@ -63,6 +63,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << roundNum - last;
 
   const bool useTimer = m_syncData.sequencesVerificationFrequency > 1;
+  const uint32_t delay = useTimer ? cs::numeric_cast<uint32_t>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
 
   // already synchro start, no BigBang, but no use timer
   if (m_isSyncroStarted && !useTimer && !isBigBand && m_timer.isRunning()) {
@@ -71,9 +72,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
   // already synchro start, but BigBang received
   if (m_isSyncroStarted && !useTimer && isBigBand && !m_timer.isRunning()) {
-    const int delay =
-      useTimer ? cs::numeric_cast<int>(m_syncData.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
-    m_timer.start(delay);
+    m_timer.start(cs::numeric_cast<int>(delay));
   }
 
   if (!m_isSyncroStarted) {
@@ -83,8 +82,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     sendBlockRequest();
 
     if (isBigBand || useTimer) {
-      const int delay = useTimer ? m_syncData.sequencesVerificationFrequency : cs::NeighboursRequestDelay;
-      m_timer.start(delay);
+      m_timer.start(cs::numeric_cast<int>(delay));
     }
   }
   else if (m_syncData.requestRepeatRoundCount > 0) {
@@ -240,10 +238,10 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
     switch (counterType) {
     case CounterType::ROUND: {
       neighbour.increaseRoundCounter();
-        if (!isNeedRequest && isAvailableRequest(neighbour)) {
-          isNeedRequest = true;
-        }
-        break;
+      if (!isNeedRequest && isAvailableRequest(neighbour)) {
+        isNeedRequest = true;
+      }
+      break;
     }
     case CounterType::TIMER: {
       if (!isNeedRequest && neighbour.sequences().empty()) {
@@ -251,8 +249,6 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
       }
       break;
     }
-    default:
-      break;
     }
   }
 

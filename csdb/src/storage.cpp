@@ -236,9 +236,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
   std::stringstream ss;
   ss << "More than one chains or orphan chains. List follows:" << std::endl;
-  for (auto it = heads.begin(); it != heads.end(); ++it) {
-    ss << "  " << it->first.to_string() << " (lenght = " << it->second.len_ << "): ";
-    if (it->second.next_.is_empty()) {
+  for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
+    ss << "  " << ith->first.to_string() << " (lenght = " << ith->second.len_ << "): ";
+    if (ith->second.next_.is_empty()) {
       ss << "Normal";
     }
     else {

@@ -19,8 +19,8 @@ void TrustedStage1State::on(SolverContext& context) {
 
   DefaultStateBehavior::on(context);
 
-  memset(static_cast<void*>(&stage), 0, sizeof(stage));
-  stage.sender = (uint8_t)context.own_conf_number();
+  cs::Utils::clearMemory(stage);
+  stage.sender = static_cast<uint8_t>(context.own_conf_number());
   enough_hashes = false;
   transactions_checked = false;
 }
@@ -177,6 +177,12 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
       if (byte) {
         byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+        if(!byte) {
+          csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+        }
+      }
+      else {
+        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
       characteristicMask.push_back(byte);

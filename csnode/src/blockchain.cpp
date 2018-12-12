@@ -143,7 +143,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
       previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
 
     lastNonEmptyBlock_.hash = pool.hash();
-    lastNonEmptyBlock_.transCount = pool.transactions().size();
+    lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
   }
 }
 #endif

@@ -22,6 +22,7 @@ const std::string BLOCK_NAME_HOST_INPUT = "host_input";
 const std::string BLOCK_NAME_HOST_OUTPUT = "host_output";
 const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
 const std::string BLOCK_NAME_POOL_SYNC = "pool_sync";
+const std::string BLOCK_NAME_API = "api";
 
 const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
@@ -39,6 +40,10 @@ const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
 const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_frequency";
 
+const std::string PARAM_NAME_API_PORT = "port";
+const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
+const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
+
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
                                                                   {"list", BootstrapType::IpList}};
@@ -47,12 +52,14 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
   const boost::property_tree::ptree& epTree = config.get_child(propName);
 
   EndpointData result;
+
   if (epTree.count(PARAM_NAME_IP)) {
     result.ipSpecified = true;
     result.ip = ip::make_address(epTree.get<std::string>(PARAM_NAME_IP));
   }
-  else
+  else {
     result.ipSpecified = false;
+  }
 
   result.port = epTree.get<Port>(PARAM_NAME_PORT);
 
@@ -66,14 +73,17 @@ EndpointData EndpointData::fromString(const std::string& str) {
   std::smatch match;
   EndpointData result;
 
-  if (std::regex_match(str, match, ipv4Regex))
+  if (std::regex_match(str, match, ipv4Regex)) {
     result.ip = ip::make_address_v4(match[1]);
-  else if (std::regex_match(str, match, ipv6Regex))
+  }
+  else if (std::regex_match(str, match, ipv6Regex)) {
     result.ip = ip::make_address_v6(match[1]);
-  else
+  }
+  else {
     throw std::invalid_argument(str);
+  }
 
-  result.port = std::stoul(match[2]);
+  result.port = static_cast<uint16_t>(std::stoul(match[2]));
 
   return result;
 }
@@ -82,8 +92,9 @@ template <typename MapType>
 typename MapType::mapped_type getFromMap(const std::string& pName, const MapType& map) {
   auto it = map.find(pName);
 
-  if (it != map.end())
+  if (it != map.end()) {
     return it->second;
+  }
 
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
@@ -102,6 +113,7 @@ Config Config::read(po::variables_map& vm) {
     std::getline(pub, pub58);
     pub.close();
     DecodeBase58(pub58, myPublic);
+
     if (myPublic.size() != 32) {
       result.good_ = false;
       LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
@@ -111,6 +123,7 @@ Config Config::read(po::variables_map& vm) {
   }
   else {
     srand(time(NULL));
+
     for (int i = 0; i < 32; ++i) {
       *(result.publicKey_.data() + i) = (char)(rand() % 255);
     }
@@ -145,8 +158,9 @@ Config Config::readFromFile(const std::string& fileName) {
       result.twoSockets_ = true; /*(result.outputEp_.ip != result.inputEp_.ip ||
                                    result.outputEp_.port != result.inputEp_.port);*/
     }
-    else
+    else {
       result.twoSockets_ = false;
+    }
 
     const boost::property_tree::ptree& params = config.get_child(BLOCK_NAME_PARAMS);
 
@@ -165,13 +179,16 @@ Config Config::readFromFile(const std::string& fileName) {
       result.hostAddressEp_ = readEndpoint(config, BLOCK_NAME_HOST_ADDRESS);
       result.symmetric_ = false;
     }
-    else
+    else {
       result.symmetric_ = true;
+    }
 
     result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE), BOOTSTRAP_TYPES_MAP);
 
-    if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router)
+    if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router) {
       result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
+    }
+
     if (result.bType_ == BootstrapType::IpList) {
       const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
@@ -182,16 +199,20 @@ Config Config::readFromFile(const std::string& fileName) {
       hostsFile.open(hostsFileName);
       hostsFile.exceptions(std::ifstream::goodbit);
 
-      while (getline(hostsFile, line))
-        if (!line.empty())
+      while (getline(hostsFile, line)) {
+        if (!line.empty()) {
           result.bList_.push_back(EndpointData::fromString(line));
+        }
+      }
 
-      if (result.bList_.empty())
+      if (result.bList_.empty()) {
         throw std::length_error("No hosts specified");
+      }
     }
 
     result.setLoggerSettings(config);
     result.readPoolSynchronizerData(config);
+    result.readApiData(config);
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
@@ -241,10 +262,6 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
   loggerSettings_ = boost::log::parse_settings(ss);
 }
 
-const boost::log::settings& Config::getLoggerSettings() const {
-  return loggerSettings_;
-}
-
 void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config) {
   if (!config.count(BLOCK_NAME_POOL_SYNC)) {
     return;
@@ -257,6 +274,18 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
+}
+
+void Config::readApiData(const boost::property_tree::ptree& config) {
+  if (!config.count(BLOCK_NAME_API)) {
+    return;
+  }
+
+  const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_API);
+
+  checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_API_PORT, apiData_.port);
+  checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_PORT, apiData_.ajaxPort);
+  checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
 }
 
 template <typename T>

@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
-#ifndef __CONFIG_HPP__
-#define __CONFIG_HPP__
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
+
 #include <boost/asio.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
@@ -49,6 +50,12 @@ struct PoolSyncData {
   uint8_t requestRepeatRoundCount = 5;  // round count for repeat request : 0-never
   uint8_t neighbourPacketsCount = 10;   // packet count for connect another neighbor : 0-never
   uint16_t sequencesVerificationFrequency = 350; // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
+};
+
+struct ApiData {
+  uint16_t port = 9090;
+  uint16_t ajaxPort = 8081;
+  uint16_t executorPort = 9080;
 };
 
 class Config {
@@ -113,16 +120,23 @@ public:
     return hostAddressEp_;
   }
 
-  const boost::log::settings& getLoggerSettings() const;
+  const boost::log::settings& getLoggerSettings() const {
+    return loggerSettings_;
+  }
 
   const PoolSyncData& getPoolSyncSettings() const {
     return poolSyncData_;
+  }
+
+  const ApiData& getApiSettings() const {
+    return apiData_;
   }
 
 private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
   void readPoolSynchronizerData(const boost::property_tree::ptree& config);
+  void readApiData(const boost::property_tree::ptree& config);
 
   template<typename T>
   bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
@@ -154,6 +168,7 @@ private:
   boost::log::settings loggerSettings_;
 
   PoolSyncData poolSyncData_;
+  ApiData apiData_;
 };
 
-#endif  // __CONFIG_HPP__
+#endif  // CONFIG_HPP
