@@ -1,7 +1,7 @@
 #ifndef PARAMS_HPP
 #define PARAMS_HPP
 
-#define MONITOR_NODE
+//#define MONITOR_NODE
 #define NODE_API
 #define AJAX_IFACE
 //#define SPAMMER
