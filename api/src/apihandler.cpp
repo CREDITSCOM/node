@@ -36,7 +36,9 @@ bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* i
 APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config)
 : s_blockchain(blockchain)
 , solver(_solver)
+#ifdef MONITOR_NODE
 , stats(blockchain)
+#endif
 , executor_transport(new ::apache::thrift::transport::TBufferedTransport(
       ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , executor(std::make_unique<client_type>(
@@ -238,6 +240,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   result.trxn.fee.commission = transaction.counted_fee().get_raw();
   //result.trxn.fee.integral = transaction.counted_fee().get_raw();
 
+  result.trxn.timeCreation = transaction.get_time();
+
   auto uf = transaction.user_field(0);
   result.trxn.__isset.smartContract = uf.is_valid();
   if(result.trxn.__isset.smartContract)
@@ -357,7 +361,7 @@ api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
   return tr.is_valid() ? deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>()) : api::SmartContractInvocation();
 }
 
-api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
+api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
   api::SmartContract res;
   if (!tr.is_valid())
     return res;
@@ -365,12 +369,19 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
   res.smartContractDeploy.byteCode = sci.smartContractDeploy.byteCode;
   res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
   res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
-  res.deployer = fromByteArray(tr.source().public_key());
-  res.address = fromByteArray(tr.target().public_key());
+
+  const csdb::Address pk_source = tr.source();
+  const csdb::Address pk_target = tr.target();
+  if (!convertAddrToPublicKey(pk_source) || !convertAddrToPublicKey(pk_target)) {
+    cserror() << "Public key of wallet not found by walletId";
+    return res;
+  }
+
+  res.deployer = fromByteArray(pk_source.public_key());
+  res.address = fromByteArray(pk_target.public_key());
 
 #ifdef TOKENS_CACHE
-  tm.applyToInternal([&tr, &res](const TokensMap& tokens,
-    const HoldersMap&) {
+  tm.applyToInternal([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
     auto it = tokens.find(tr.target());
     if (it != tokens.end())
       res.smartContractDeploy.tokenStandart = (api::TokenStandart)(uint32_t)it->second.standart;
@@ -381,12 +392,15 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
   res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
 #endif
 
-#ifdef MONITOR_NODE
-  s_blockchain.applyToWallet(tr.target(), [&res](const Credits::WalletsCache::WalletData& wd) {
+#ifdef MONITOR_NODE  
+  s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
     res.transactionsCount = wd.transNum_;
   });
 #endif
+
+  auto pool = s_blockchain.loadBlock(tr.id().pool_hash());
+  res.createTime = pool.get_time();
 
   return res;
 }
@@ -689,6 +703,7 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
 }
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
+#ifdef MONITOR_NODE
   csstats::StatsPerPeriod stats = this->stats.getStats();
 
   for (auto& s : stats) {
@@ -708,7 +723,7 @@ void APIHandler::StatsGet(api::StatsGetResult& _return) {
 
     _return.stats.push_back(ps);
   }
-
+#endif
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -797,27 +812,27 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       e.update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
     }
 
-    if (is_smart_deploy(smart)) {
+    const csdb::Address pk_source = tr.source();
+    const csdb::Address pk_target = tr.target();
+    if (!convertAddrToPublicKey(pk_source) || !convertAddrToPublicKey(pk_target)) {
+      cserror() << "Public key of wallet not found by walletId";
+      return false;
+    }
 
+    if (is_smart_deploy(smart)) {
       {
         auto smart_origin = lockedReference(this->smart_origin);
         (*smart_origin)[address] = tr.id();
       }
       {
-        const csdb::Address pk_addr = tr.source();
-        if (!convertAddrToPublicKey(pk_addr)) {
-          cserror() << "Public key of wallet not found by walletId";
-          return false;
-        }
-
         auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-        (*deployed_by_creator)[pk_addr].push_back(tr.id());
+        (*deployed_by_creator)[pk_source].push_back(tr.id());
       }
 
-      tm.checkNewDeploy(tr.target(), tr.source(), smart, tr.user_field(smart_state_idx).value<std::string>());
+      tm.checkNewDeploy(pk_target, pk_source, smart, tr.user_field(smart_state_idx).value<std::string>());
     }
     else
-      tm.checkNewState(tr.target(), tr.source(), smart, tr.user_field(smart_state_idx).value<std::string>());
+      tm.checkNewState(pk_target, pk_source, smart, tr.user_field(smart_state_idx).value<std::string>());
 
     return true;
   }
@@ -1697,22 +1712,14 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t offset = _page * PER_PAGE;
   uint32_t limit = PER_PAGE;
   uint32_t total = 0;
-
+    
   s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WriterData& wd) {
     if (addr.empty()) return true;
     if (offset == 0) {
       if (limit > 0) {
         api::WriterInfo wi;
-
-        //wi.address = fromByteArray(addr);
         const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
-
-
-
-        /*std::string res;
-        std::transform((addr).begin(), (addr).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-        wi.address = res;*/
 
         wi.timesWriter = wd.times;
         wi.feeCollected.integral = wd.totalFee.integral();

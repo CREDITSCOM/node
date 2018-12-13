@@ -443,10 +443,25 @@ constexpr T getMin(const T&) {
   return std::numeric_limits<T>::min();
 }
 
+constexpr int getMax(const bool) {
+  return static_cast<int>(std::numeric_limits<bool>::max());
+}
+
+constexpr int getMin(const bool) {
+  return static_cast<int>(std::numeric_limits<bool>::min());
+}
+
 template <typename T>
 constexpr bool isVector() {
   return cs::is_vector<T>::value;
 }
+
+template<typename TBytes>
+inline constexpr cs::BytesView bytesView_cast(const TBytes& bytes) {
+  static_assert(std::is_same_v<typename TBytes::value_type, cs::Byte>, "Only bytes storages can use bytesView_cast func");
+  return cs::BytesView(bytes.data(), bytes.size());
+}
+
 }  // namespace cs
 
 inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {

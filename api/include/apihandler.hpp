@@ -23,6 +23,7 @@
 #include <queue>
 
 #include <csnode/threading.hpp>
+#include <client/params.hpp>
 
 #include "tokens.hpp"
 
@@ -163,7 +164,9 @@ private:
 
   BlockChain& s_blockchain;
   cs::SolverCore& solver;
+#ifdef MONITOR_NODE
   csstats::csstats stats;
+#endif
   ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executor_transport;
   std::unique_ptr<client_type> executor;
 

@@ -37,10 +37,6 @@ Node::Node(const Config& config)
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 ,
-#ifdef MONITOR_NODE
-    stats_(blockChain_)
-,
-#endif
 #ifdef NODE_API
   api_(blockChain_, solver_, csconnector::Config {
    config.getApiSettings().port,
@@ -743,8 +739,16 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     return;
   }
 
+  const bool isOneBlockReply = poolSynchronizer_->isOneBlockReply();
+  const std::size_t reserveSize = isOneBlockReply ? 1 : sequencesCount;
+
   cs::PoolsBlock poolsBlock;
-  poolsBlock.reserve(sequencesCount);
+  poolsBlock.reserve(reserveSize);
+
+  auto sendReply = [&] {
+    sendBlockReply(poolsBlock, sender, packetNum);
+    poolsBlock.clear();
+  };
 
   for (auto& sequence : sequences) {
     csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
@@ -755,9 +759,14 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
       poolsBlock.push_back(std::move(pool));
 
-      sendBlockReply(poolsBlock, sender, packetNum);
-      poolsBlock.clear();
+      if (isOneBlockReply) {
+        sendReply();
+      }
     }
+  }
+
+  if (!isOneBlockReply) {
+    sendReply();
   }
 }
 
@@ -769,25 +778,15 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
   cslog() << "NODE> Get Block Reply";
 
-  std::size_t poolsCount = 0;
+  cs::PoolsBlock poolsBlock = decompressPoolsBlock(data, size);
 
-  istream_.init(data, size);
-  istream_ >> poolsCount;
-
-  if (!poolsCount) {
+  if (poolsBlock.empty()) {
     cserror() << "NODE> Get block reply> Pools count is 0";
     return;
   }
 
-  cs::PoolsBlock poolsBlock;
-  poolsBlock.reserve(poolsCount);
-
-  for (std::size_t i = 0; i < poolsCount; ++i) {
-    csdb::Pool pool;
-    istream_ >> pool;
-
+  for (const auto& pool : poolsBlock) {
     transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
-    poolsBlock.push_back(std::move(pool));
   }
 
   uint32_t packetNum = 0;
@@ -796,12 +795,16 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNum);
 }
 
-void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
+void Node::sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
-  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), poolsBlock, packetNum);
+  std::size_t realBinSize = 0;
+  RegionPtr memPtr = compressPoolsBlock(poolsBlock, realBinSize);
+
+  tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), realBinSize,
+                  cs::numeric_cast<std::uint32_t>(memPtr.size()), memPtr, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -963,9 +966,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
     else {
       // more then 1 round lag, request round info
-      if (cs::Conveyer::instance().currentRoundNumber() > 1) {
+      if (round > 1) {
         // not on the very start
-        cswarning() << "NODE> detect round lag, request round info";
+        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << "), request round info";
         cs::RoundTable emptyRoundTable;
         emptyRoundTable.round = rNum;
         handleRoundMismatch(emptyRoundTable);
@@ -1213,6 +1216,66 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
   ostream_.clear();
 }
 
+RegionPtr Node::compressPoolsBlock(cs::PoolsBlock& poolsBlock, std::size_t& realBinSize) {
+  cs::Bytes bytes;
+  cs::DataStream stream(bytes);
+
+  stream << poolsBlock;
+
+  char* data = reinterpret_cast<char*>(bytes.data());
+  const int binSize = cs::numeric_cast<int>(bytes.size());
+
+  const auto maxSize = LZ4_compressBound(binSize);
+  auto memPtr = allocator_.allocateNext(maxSize);
+
+  const int compressedSize = LZ4_compress_default(data,
+                                                  static_cast<char*>(memPtr.get()),
+                                                  binSize,
+                                                  cs::numeric_cast<int>(memPtr.size()));
+
+  if (!compressedSize) {
+    cserror() << "NODE> " << __func__ << " Compress poools block error";
+  }
+
+  allocator_.shrinkLast(cs::numeric_cast<uint32_t>(compressedSize));
+
+  realBinSize = cs::numeric_cast<std::size_t>(binSize);
+
+  return memPtr;
+}
+
+cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size) {
+  istream_.init(data, size);
+  std::size_t realBinSize = 0;
+  istream_ >> realBinSize;
+
+  std::uint32_t compressSize = 0;
+  istream_ >> compressSize;
+
+  RegionPtr memPtr = allocator_.allocateNext(compressSize);
+  istream_ >> memPtr;
+
+  cs::Bytes bytes;
+  bytes.resize(realBinSize);
+  char* bytesData = reinterpret_cast<char*>(bytes.data());
+
+  const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr.get()),
+                                                   bytesData,
+                                                   cs::numeric_cast<int>(compressSize),
+                                                   cs::numeric_cast<int>(realBinSize));
+
+  if (uncompressedSize < 0) {
+    cserror() << "NODE> " << __func__ << " Decompress poools block error";
+  }
+
+  cs::DataStream stream(bytes.data(), bytes.size());
+  cs::PoolsBlock poolsBlock;
+
+  stream >> poolsBlock;
+
+  return poolsBlock;
+}
+
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1318,9 +1381,15 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   stageOneMessage_[stage.sender] = std::move(bytes);
 
-  cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
-          << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
-          << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  if (confidant != sender) {
+    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
+            << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
+            << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  }
+  else {
+    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key ok";
+  }
+
   cslog() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
   csdebug() << "NODE> Stage One from [" << static_cast<int>(stage.sender) << "] is OK!";

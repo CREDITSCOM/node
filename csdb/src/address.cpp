@@ -12,7 +12,7 @@ namespace csdb {
 
 class Address::priv : public ::csdb::internal::shared_data {
   union {
-    std::array<uint8_t, 32> public_key;
+    std::array<uint8_t, cscrypto::kPublicKeySize> public_key;
     WalletId wallet_id;
   } data_{};
 

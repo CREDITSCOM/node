@@ -67,10 +67,8 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::
 #ifdef MONITOR_NODE
   auto wrWall = pool.writer_public_key();
 
-  //
   WalletData::Address addr;
   std::copy(wrWall.begin(), wrWall.end(), addr.begin());
-  //
 
   auto wrWrIt = data_.writers_.find(addr);
   if (wrWrIt == data_.writers_.end()) {
@@ -83,6 +81,9 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::
 
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
     totalAmountOfCountedFee += load(*itTrx);
+#ifdef MONITOR_NODE
+      wrWrIt->second.totalFee = totalAmountOfCountedFee;
+#endif
   }
   cslog() << "WALLETS CACHE>> total amount of counted fee in pool: " << totalAmountOfCountedFee;
   if (totalAmountOfCountedFee > 0) {
@@ -181,6 +182,7 @@ WalletsCache::WalletData& WalletsCache::ProcessorBase::getWalletData(Data& walle
     wallets[id] = new WalletData{};
     convert(address, wallets[id]->address_);
   }
+
   return *wallets[id];
 }
 

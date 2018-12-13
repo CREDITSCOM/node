@@ -76,6 +76,9 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
   std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
   db_seq_no_->close(0);
   std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
+#ifdef TRANSACTIONS_INDEX
+  db_trans_idx_->close(0);
+#endif
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
@@ -110,6 +113,10 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
 
+#ifdef TRANSACTIONS_INDEX
+  db_trans_idx_.reset(nullptr);
+#endif
+
   DbEnv env(static_cast<uint32_t>(0));
   uint32_t db_env_open_flags =
       DB_CREATE | DB_INIT_MPOOL | DB_INIT_TXN | DB_RECOVER | DB_USE_ENVIRON | DB_PRIVATE | DB_INIT_LOG;
@@ -136,6 +143,10 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   auto db_blocks = std::make_unique<Db>(&env_, 0);
   auto db_seq_no = std::make_unique<Db>(&env_, 0);
 
+#ifdef TRANSACTIONS_INDEX
+  auto db_trans_idx = new Db(&env_, 0);
+#endif
+
   int status = db_blocks->open(nullptr, "blockchain.db", nullptr, DB_RECNO, DB_CREATE, 0);
   if (status != 0) {
     set_last_error_from_berkeleydb(status);
@@ -149,6 +160,15 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     return false;
   }
   db_seq_no_.reset(db_seq_no.release());
+
+#ifdef TRANSACTIONS_INDEX
+  status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
+  if (status) {
+    set_last_error_from_berkeleydb(status);
+    return false;
+  }
+  db_trans_idx_.reset(db_trans_idx);
+#endif
 
   set_last_error();
   return true;

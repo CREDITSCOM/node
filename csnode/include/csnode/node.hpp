@@ -127,7 +127,7 @@ public:
   //smarts consensus additional functions:
 
   // syncro send functions
-  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
+  void sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -246,6 +246,9 @@ private:
   template <typename... Args>
   void writeDefaultStream(Args&&... args);
 
+  RegionPtr compressPoolsBlock(cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
+  cs::PoolsBlock decompressPoolsBlock(const uint8_t* data, const size_t size);
+
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
@@ -270,10 +273,6 @@ private:
   cs::SolverCore* solver_;
   Transport* transport_;
   std::unique_ptr<cs::Spammer> spammer_;
-
-#ifdef MONITOR_NODE
-  csstats::csstats stats_;
-#endif
 
 #ifdef NODE_API
   csconnector::connector api_;

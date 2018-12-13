@@ -14,6 +14,7 @@
 
 #include <base58.h>
 #include <lib/system/logger.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include "config.hpp"
 
 const std::string BLOCK_NAME_PARAMS = "params";
@@ -34,6 +35,7 @@ const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
+const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
 const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
@@ -113,7 +115,7 @@ Config Config::read(po::variables_map& vm) {
     pub.close();
     DecodeBase58(pub58, myPublic);
 
-    if (myPublic.size() != 32) {
+    if (myPublic.size() != cscrypto::kPublicKeySize) {
       result.good_ = false;
       LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
     }
@@ -123,7 +125,7 @@ Config Config::read(po::variables_map& vm) {
   else {
     srand(time(NULL));
 
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < cscrypto::kPublicKeySize; ++i) {
       *(result.publicKey_.data() + i) = (char)(rand() % 255);
     }
   }
@@ -268,6 +270,7 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
 
   const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_POOL_SYNC);
 
+  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
   checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
@@ -289,7 +292,7 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
 template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
   if (data.count(param)) {
-    const int readValue = data.get<int>(param);
+    const int readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<int>(param);
     const auto max = cs::getMax(value);
     const auto min = cs::getMin(value);
 

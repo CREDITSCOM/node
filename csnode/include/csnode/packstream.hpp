@@ -44,7 +44,7 @@ public:
   void safeSkip(uint32_t num = 1) {
     auto size = sizeof(T) * num;
 
-    if ((uint32_t)(end_ - ptr_) < size) {
+    if (!isBytesAvailable(size)) {
       good_ = false;
     }
     else {
@@ -67,7 +67,7 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(FixedString<Length>& str) {
-    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
+    if (!isBytesAvailable(Length)) {
       good_ = false;
     }
     else {
@@ -80,7 +80,7 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(cs::ByteArray<Length>& byteArray) {
-    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
+    if (!isBytesAvailable(Length)) {
       good_ = false;
     }
     else {
@@ -96,15 +96,21 @@ public:
     std::size_t size;
     (*this) >> size;
 
-    if (size == 0) {
+    // check min needed bytes. It may be more bytes needed on the elements.
+    if (size == 0 || !isBytesAvailable(size)) {
       return *this;
     }
 
     std::vector<T, A> entity;
+    entity.reserve(size);
 
     for (std::size_t i = 0; i < size; ++i) {
       T element;
       (*this) >> element;
+
+      if (!good()) {
+        break;
+      }
 
       entity.push_back(element);
     }
@@ -484,6 +490,21 @@ inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
 }
 
 template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
+  std::size_t size = regionPtr.size();
+
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    std::copy(ptr_, ptr_ + size, reinterpret_cast<char*>(regionPtr.get()));
+    ptr_ += size;
+  }
+
+  return *this;
+}
+
+template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
   (*this) << static_cast<cs::Byte>(ip.is_v6());
 
@@ -571,4 +592,9 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) 
   return *this;
 }
 
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const RegionPtr& regionPtr) {
+  insertBytes(reinterpret_cast<const char*>(regionPtr.get()), static_cast<uint32_t>(regionPtr.size()));
+  return *this;
+}
 #endif  // PACKSTREAM_HPP

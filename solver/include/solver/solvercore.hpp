@@ -254,7 +254,7 @@ private:
   StageT* find_stage(const std::vector<StageT>& vec, uint8_t sender) const {
     for (auto it = vec.begin(); it != vec.end(); ++it) {
       if (it->sender == sender) {
-        return (StageT*)&(*it);
+        return const_cast<StageT*>(&(*it));
       }
     }
     return nullptr;
