@@ -14,6 +14,7 @@
 
 #include <base58.h>
 #include <lib/system/logger.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include "config.hpp"
 
 const std::string BLOCK_NAME_PARAMS = "params";
@@ -114,7 +115,7 @@ Config Config::read(po::variables_map& vm) {
     pub.close();
     DecodeBase58(pub58, myPublic);
 
-    if (myPublic.size() != 32) {
+    if (myPublic.size() != cscrypto::kPublicKeySize) {
       result.good_ = false;
       LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
     }
@@ -124,7 +125,7 @@ Config Config::read(po::variables_map& vm) {
   else {
     srand(time(NULL));
 
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < cscrypto::kPublicKeySize; ++i) {
       *(result.publicKey_.data() + i) = (char)(rand() % 255);
     }
   }

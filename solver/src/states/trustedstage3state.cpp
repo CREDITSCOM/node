@@ -219,7 +219,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
     }
   }
   uint8_t liarNumber = 0;
-  /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, 32);*/
+  /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, cscrypto::kHashSize);*/
   for (const auto& it : context.stage1_data()) {
     if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
       cslog() << "[" << (int)it.sender << "] is not liar";
@@ -275,7 +275,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
 
       for (uint8_t j = 0; j < candidates_amount; j++) {
-      //  cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), 32);
+      //  cslog() << (int)i << "." << (int)j << " " << cs::Utils::byteStreamToHex(stage_i.trustedCandidates.at(j).data(), cscrypto::kPublicKeySize);
         if (candidatesElection.count(stage_i.trustedCandidates.at(j)) > 0) {
           candidatesElection.at(stage_i.trustedCandidates.at(j)) += 1;
         }
@@ -293,7 +293,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
       cslog() << "Hashes amount of [" << (int)i << "]: " << (int)hashes_amount;
       for (uint32_t j = 0; j < hashes_amount; j++) {
-         // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), 32);
+         // cslog() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), cscrypto::kHashSize);
         if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
         }
@@ -315,7 +315,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   }
 
   for (auto& it : candidatesElection) {
-    // cslog() << byteStreamToHex(it.first.str, 32) << " - " << (int) it.second;
+    // cslog() << byteStreamToHex(it.first.str, cscrypto::kPublicKeySize) << " - " << (int) it.second;
     if (it.second > cr) {
       aboveThreshold.push_back(it.first);
     }
@@ -326,7 +326,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
   //LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
   for (auto& it : hashesElection) {
-  //  cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), 32) << " - " << (int)it.second;
+  //  cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), cscrypto::kHashSize) << " - " << (int)it.second;
     if (it.second > cr) {
       next_round_hashes.push_back(it.first);
     }
@@ -338,7 +338,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     rejectedFound = true;
     //cslog() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
     for (auto& it : next_round_hashes) {
-      if (memcmp(it.toBinary().data(), itt.toBinary().data(), 32)) {}
+      if (memcmp(it.toBinary().data(), itt.toBinary().data(), cscrypto::kHashSize)) {}
       else {
         ++acceptedPacks;
         rejectedFound = false;

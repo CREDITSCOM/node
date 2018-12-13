@@ -58,7 +58,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
       const auto rt = conveyer.roundTable(static_cast<cs::RoundNumber>(context.round()));
       if(rt != nullptr) {
         for(const auto& it : rt->hashes) {
-          if(memcmp(it.toBinary().data(), element.first.toBinary().data(), 32) == 0) {
+          if(memcmp(it.toBinary().data(), element.first.toBinary().data(), cscrypto::kHashSize) == 0) {
             found = true;
           }
         }
