@@ -933,7 +933,16 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
-  const auto roundNumber = currentRoundNumber ? currentRoundNumber - 1 : 0;
+  auto roundNumber = 0;
+
+  if (currentRoundNumber) {
+    if (currentRoundNumber > firstSequence) {
+      roundNumber = currentRoundNumber - 1;
+    }
+    else {
+      roundNumber = firstSequence;
+    }
+  }
 
   // return at least [next..0]:
   std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };

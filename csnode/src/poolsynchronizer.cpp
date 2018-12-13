@@ -234,25 +234,24 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
   csprint() << counterType;
   bool isNeedRequest = false;
 
-  for (auto& neighbour : m_neighbours) {
-    switch (counterType) {
-    case CounterType::ROUND: {
-      neighbour.increaseRoundCounter();
-      if (!isNeedRequest && isAvailableRequest(neighbour)) {
-        isNeedRequest = true;
+  switch (counterType) {
+    case CounterType::ROUND:
+      printNeighbours("Activity:");
+      for (auto& neighbour : m_neighbours) {
+        neighbour.increaseRoundCounter();
+        if (!isNeedRequest && isAvailableRequest(neighbour)) {
+          isNeedRequest = true;
+        }
       }
       break;
-    }
-    case CounterType::TIMER: {
-      if (!isNeedRequest && neighbour.sequences().empty()) {
-        isNeedRequest = true;
+    case CounterType::TIMER:
+      for (auto& neighbour : m_neighbours) {
+        if (!isNeedRequest && neighbour.sequences().empty()) {
+          isNeedRequest = true;
+        }
       }
       break;
-    }
-    }
   }
-
-  printNeighbours("Activity:");
 
   return isNeedRequest;
 }
