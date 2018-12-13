@@ -5,6 +5,7 @@
 #include <csdb/amount.hpp>
 #include <csdb/internal/types.hpp>
 #include <csdb/pool.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include <array>
 #include <csnode/cyclicbuffer.hpp>
 #include <limits>
@@ -22,7 +23,7 @@ class WalletsIds;
 class WalletsPools {
 public:
   using WalletId = csdb::internal::WalletId;
-  using PoolHash = std::array<uint8_t, 32>;
+  using PoolHash = std::array<uint8_t, cscrypto::kHashSize>;
 
 public:
   struct WalletData {
