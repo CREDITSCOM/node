@@ -79,7 +79,8 @@ namespace cs
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc);
-
+    //DEBUG:
+    psmarts->disable_execution();
     // bind signals
     cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResultTransaction);
   }

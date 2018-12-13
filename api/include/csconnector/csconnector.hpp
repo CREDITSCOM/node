@@ -52,6 +52,7 @@ private:
   std::thread ajax_thread;
 #endif
   friend class ::api::custom::APIProcessor;
+  friend class Node; // wants access to api_handler
 };
 }  // namespace csconnector
 

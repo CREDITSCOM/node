@@ -20,7 +20,7 @@ namespace cs
   {
     public_key = pub;
     private_key = priv;
-    psmarts->set_id(pub);
+    psmarts->init(pub, pnode->get_api_handler());
   }
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)
@@ -255,6 +255,10 @@ namespace cs
 
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
+    //DEBUG:
+    if(SmartContracts::is_smart_contract(tr)) {
+      psmarts->always_execute(true);
+    }
     cs::Conveyer::instance().addTransaction(tr);
   }
 

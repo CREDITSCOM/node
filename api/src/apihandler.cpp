@@ -523,6 +523,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
 
+#if 0
+
   std::string origin_bytecode;
   if (!deploy) {
     input_smart.smartContractDeploy.byteCode.clear();
@@ -558,13 +560,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       return false;
     });
   }
-
+#endif // 0
+  
   auto pk_source = send_transaction.source();
   if (!convertAddrToPublicKey(pk_source)) {
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
 
+#if 0
   executor::ExecuteByteCodeResult api_resp;
   const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
   execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
@@ -580,12 +584,20 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   if (_return.__isset.smart_contract_result)
     _return.smart_contract_result = api_resp.ret_val;
 
+#endif // 0
+
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
+
+#if 0
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
+#endif // 0
+  
   solver.send_wallet_transaction(send_transaction);
 
+#if 0
   if (deploy)
     contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
+#endif // 0
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }

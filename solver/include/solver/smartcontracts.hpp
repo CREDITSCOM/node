@@ -8,6 +8,7 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/common.hpp>
 #include <csnode/datastream.hpp>
+#include <csnode/node.hpp>
 
 #include <optional>
 #include <vector>
@@ -27,21 +28,25 @@ namespace cs
     // deploy transaction fields
     namespace deploy
     {
-      // byte-code
+      // byte-code (string)
       constexpr csdb::user_field_id_t Code = 0;
+      // count of user fields
+      constexpr size_t Count = 1;
     }
     // start transaction fields
     namespace start
     {
-      // methods with args
+      // methods with args (string)
       constexpr csdb::user_field_id_t Calls = 0;
       // reference to last state transaction
       constexpr csdb::user_field_id_t RefState = 1;
+      // count of user fields
+      constexpr size_t Count = 2;
     }
     // new state transaction fields
     namespace new_state
     {
-      // new state value, new byte-code
+      // new state value, new byte-code (string)
       constexpr csdb::user_field_id_t Value = 0; // see apihandler.cpp #9 for currently used value ~1
       // reference to start transaction
       constexpr csdb::user_field_id_t RefStart = 1;
@@ -115,7 +120,7 @@ namespace cs
 
     ~SmartContracts();
 
-    void set_id(const cs::PublicKey&);
+    void init(const cs::PublicKey&, Node::api_handler_ptr_t);
 
     // test transaction methods
 
@@ -124,7 +129,7 @@ namespace cs
     static bool is_start(const csdb::Transaction);
     static bool is_new_state(const csdb::Transaction);
 
-    static std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
+    std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
     static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
     
@@ -142,9 +147,24 @@ namespace cs
       emit signal_smart_executed(tr);
     }
 
-    const char* name()
+    const char* name() const
     {
       return "Smarts";
+    }
+
+    void disable_execution()
+    {
+      execution_allowed = false;
+    }
+
+    void enable_execution()
+    {
+      execution_allowed = true;
+    }
+
+    void always_execute(bool val)
+    {
+      force_execution = val;
     }
 
   public signals:
@@ -157,6 +177,9 @@ namespace cs
 
     BlockChain& bc;
     cs::Bytes node_id;
+
+    bool execution_allowed;
+    bool force_execution;
 
     struct QueueItem
     {
@@ -182,6 +205,8 @@ namespace cs
     {
       return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }
+
+    bool invoke_execution(const SmartContractRef& contract, csdb::Pool block);
   };
 
 } // cs
