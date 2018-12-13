@@ -96,8 +96,13 @@ public:
     std::size_t size;
     (*this) >> size;
 
+    if (size == 0) {
+      return *this;
+    }
+
     // check min needed bytes. It may be more bytes needed on the elements.
-    if (size == 0 || !isBytesAvailable(size)) {
+    if (!isBytesAvailable(size)) {
+      good_ = false;
       return *this;
     }
 
@@ -121,7 +126,6 @@ public:
     }
 
     vector = std::move(entity);
-
     return *this;
   }
 
@@ -375,14 +379,20 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
   std::size_t size = 0;
   (*this) >> size;
 
-  if (size == 0 || !isBytesAvailable(size)) {
+  if (size == 0) {
     return *this;
   }
 
-  auto nextPtr = ptr_ + size;
-  str = std::string(ptr_, nextPtr);
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    auto nextPtr = ptr_ + size;
+    str = std::string(ptr_, nextPtr);
 
-  ptr_ = nextPtr;
+    ptr_ = nextPtr;
+  }
+
   return *this;
 }
 
@@ -391,14 +401,20 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
   std::size_t size = std::size_t();
   (*this) >> size;
 
-  if (size == 0 || !isBytesAvailable(size)) {
+  if (size == 0) {
     return *this;
   }
 
-  auto nextPtr = ptr_ + size;
-  bytes = cs::Bytes(ptr_, nextPtr);
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    auto nextPtr = ptr_ + size;
+    bytes = cs::Bytes(ptr_, nextPtr);
 
-  ptr_ = nextPtr;
+    ptr_ = nextPtr;
+  }
+
   return *this;
 }
 
