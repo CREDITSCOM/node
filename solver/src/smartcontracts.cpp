@@ -99,7 +99,11 @@ namespace cs
     : bc(blockchain)
     , execution_allowed(true)
     , force_execution(false)
-  {}
+  {
+#if defined(DEBUG_SMARTS)
+    execution_allowed = false;
+#endif
+  }
 
   SmartContracts::~SmartContracts() = default;
 

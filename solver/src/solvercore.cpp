@@ -76,8 +76,6 @@ SolverCore::SolverCore()
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc);
-    //DEBUG:
-    psmarts->disable_execution();
     // bind signals
     cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResultTransaction);
   }
@@ -247,6 +245,12 @@ void SolverCore::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
 
   cslog() << ": <-- SMART-Stage-1 [" << static_cast<int>(stage.sender) << "] = " << smartStageOneStorage_.size();
 
+  if(stage.sender >= st2.signatures.size()) {
+    st2.signatures.resize(stage.sender);
+  }
+  if(stage.sender >= st2.hashes.size()) {
+    st2.hashes.resize(stage.sender);
+  }
   st2.signatures.at(stage.sender) = stage.signature;
   st2.hashes.at(stage.sender) = stage.messageHash;
 

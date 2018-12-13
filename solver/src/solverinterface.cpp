@@ -256,9 +256,11 @@ namespace cs
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
     //DEBUG:
+#if defined(DEBUG_SMARTS)
     if(SmartContracts::is_smart_contract(tr)) {
-      psmarts->always_execute(true);
+      psmarts->force_execution = true;
     }
+#endif
     cs::Conveyer::instance().addTransaction(tr);
   }
 

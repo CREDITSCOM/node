@@ -13,6 +13,8 @@
 #include <optional>
 #include <vector>
 
+//#define DEBUG_SMARTS
+
 class BlockChain;
 
 namespace csdb
@@ -152,20 +154,8 @@ namespace cs
       return "Smarts";
     }
 
-    void disable_execution()
-    {
-      execution_allowed = false;
-    }
-
-    void enable_execution()
-    {
-      execution_allowed = true;
-    }
-
-    void always_execute(bool val)
-    {
-      force_execution = val;
-    }
+    bool execution_allowed;
+    bool force_execution;
 
   public signals:
 
@@ -177,9 +167,6 @@ namespace cs
 
     BlockChain& bc;
     cs::Bytes node_id;
-
-    bool execution_allowed;
-    bool force_execution;
 
     struct QueueItem
     {
