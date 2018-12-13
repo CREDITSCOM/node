@@ -234,26 +234,36 @@ namespace cs
     smartStageTwoStorage_.resize(cSize);
     smartStageThreeStorage_.clear();
     smartStageThreeStorage_.resize(cSize);
-    for (int i = 0; i < cSize; ++i) {
-      smartStageOneStorage_.at(i).sender = 255;
-      smartStageTwoStorage_.at(i).sender = 255;
-      smartStageThreeStorage_.at(i).sender = 255;
+
+    using SenderType = cs::Byte;
+    auto max = std::numeric_limits<SenderType>::max();
+
+    for (size_t i = 0; i < cSize; ++i) {
+      smartStageOneStorage_.at(i).sender = max;
+      smartStageTwoStorage_.at(i).sender = max;
+      smartStageThreeStorage_.at(i).sender = max;
     }
   }
 
   void SolverCore::addSmartStageOne( cs::StageOneSmarts& stage, bool send) {
     if (send) {
-      
       pnode->sendSmartStageOne(stage);
     }
+
     if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
       return;
     }
+
     smartStageOneStorage_.at(stage.sender) = stage;
-    cslog() << ": <-- SMART-Stage-1 [" << (int)stage.sender << "] = " << smartStageOneStorage_.size();
+
+    cslog() << ": <-- SMART-Stage-1 [" << static_cast<int>(stage.sender) << "] = " << smartStageOneStorage_.size();
+
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
-    if (smartStageOneEnough()) addSmartStageTwo(st2, true);
+
+    if (smartStageOneEnough()) {
+      addSmartStageTwo(st2, true);
+    }
   }
 
   void SolverCore::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
@@ -261,13 +271,18 @@ namespace cs
       st2.sender = ownSmartsConfNum_;
       pnode->sendSmartStageTwo(stage);
     }
+
     if (smartStageTwoStorage_.at(stage.sender).sender == stage.sender) {
       return;
     }
-    smartStageTwoStorage_.at(stage.sender) = stage;
-    cslog() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
-    if (smartStageTwoEnough()) processStages();
 
+    smartStageTwoStorage_.at(stage.sender) = stage;
+
+    cslog() << ": <-- SMART-Stage-2 [" << static_cast<int>(stage.sender) << "] = " << smartStageTwoStorage_.size();
+
+    if (smartStageTwoEnough()) {
+      processStages();
+    }
   }
 
   void SolverCore::processStages() {
@@ -280,41 +295,58 @@ namespace cs
       stage.sender = ownSmartsConfNum_;
       pnode->sendSmartStageThree(stage);
     }
+
     if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
       return;
     }
+
     smartStageThreeStorage_.at(stage.sender) = stage;
-    cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStageThreeStorage_.size();
-    if (smartStageThreeEnough()) processStages();
+
+    cslog() << ": <-- SMART-Stage-3 [" << static_cast<int>(stage.sender) << "] = " << smartStageThreeStorage_.size();
+
+    if (smartStageThreeEnough()) {
+      processStages();
+    }
   }
 
   bool SolverCore::smartStageOneEnough() {
     uint8_t stageSize = 0;
     uint8_t i = 0;
+
     for (auto& it : smartStageTwoStorage_) {
-      if(it.sender != i) ++stageSize;
+      if(it.sender != i) {
+        ++stageSize;
+      }
     }
+
     return stageSize == smartConfidants_.size() ? true : false;
   }
 
   bool SolverCore::smartStageTwoEnough() {
     uint8_t stageSize = 0;
     uint8_t i = 0;
+
     for (auto& it : smartStageTwoStorage_) {
-      if (it.sender != i) ++stageSize;
+      if (it.sender != i) {
+        ++stageSize;
+      }
     }
+
     return stageSize == smartConfidants_.size() ? true : false;
   }
 
   bool SolverCore::smartStageThreeEnough() {
     uint8_t stageSize = 0;
     uint8_t i = 0;
-    for (auto& it : smartStageTwoStorage_) {
-      if (it.sender == i) ++stageSize;
-    }
-    return (stageSize > smartConfidants_.size()/2 + 1) ? true : false;
 
+    for (auto& it : smartStageTwoStorage_) {
+      if (it.sender == i) {
+        ++stageSize;
+      }
+    }
+
+    return (stageSize > smartConfidants_.size()/2 + 1) ? true : false;
   }
 
 
-}  // namespace slv2
+}  // namespace cs
