@@ -22,6 +22,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   const uint8_t hl = 25;
   const uint8_t vl = 6;
   cslog() << "POOL SYNCHRONIZER> Pool sync data : \n"
+          << std::setw(hl) << "One reply block:  " << std::setw(vl) << m_syncData.oneReplyBlock << "\n"
           << std::setw(hl) << "Block pools:      " << std::setw(vl) << cs::numeric_cast<int>(m_syncData.blockPoolsCount)
           << "\n"
           << std::setw(hl) << "Request round:    " << std::setw(vl)
@@ -172,6 +173,10 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
   return m_isSyncroStarted;
+}
+
+bool cs::PoolSynchronizer::isOneBlockReply() const {
+  return m_syncData.oneReplyBlock;
 }
 
 //

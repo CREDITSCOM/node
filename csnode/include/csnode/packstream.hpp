@@ -484,6 +484,21 @@ inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
 }
 
 template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
+  std::size_t size = regionPtr.size();
+
+  if (static_cast<uint32_t>(end_ - ptr_) < size) {
+    good_ = false;
+  }
+  else {
+    std::copy(ptr_, ptr_ + size, reinterpret_cast<char*>(regionPtr.get()));
+    ptr_ += size;
+  }
+
+  return *this;
+}
+
+template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
   (*this) << static_cast<cs::Byte>(ip.is_v6());
 
@@ -571,4 +586,9 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) 
   return *this;
 }
 
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const RegionPtr& regionPtr) {
+  insertBytes(reinterpret_cast<const char*>(regionPtr.get()), static_cast<uint32_t>(regionPtr.size()));
+  return *this;
+}
 #endif  // PACKSTREAM_HPP
