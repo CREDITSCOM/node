@@ -22,6 +22,7 @@ using Byte = cscrypto::Byte;
 
 // dynamic vector of bytes
 using Bytes = cscrypto::Bytes;
+using BytesView = cscrypto::BytesView;
 
 // static byte array
 template <std::size_t size>

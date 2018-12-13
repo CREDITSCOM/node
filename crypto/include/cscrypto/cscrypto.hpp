@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <array>
 #include <vector>
+#include <string_view>
 
 namespace cscrypto {
 
@@ -18,6 +19,7 @@ using Byte = uint8_t;
 template <std::size_t size>
 using ByteArray = std::array<cscrypto::Byte, size>;
 using Bytes = std::vector<cscrypto::Byte>;
+using BytesView = std::basic_string_view<cscrypto::Byte>;
 
 using Hash = cscrypto::ByteArray<kHashSize>;
 using PublicKey = cscrypto::ByteArray<kPublicKeySize>;
