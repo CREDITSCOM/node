@@ -1,7 +1,7 @@
 #ifndef PARAMS_HPP
 #define PARAMS_HPP
 
-//#define MONITOR_NODE
+#define MONITOR_NODE
 #define NODE_API
 #define AJAX_IFACE
 //#define SPAMMER
@@ -11,8 +11,8 @@
 #define BINARY_TCP_API
 #define DEFAULT_CURRENCY 1
 
-//#define TRANSACTIONS_INDEX
-//#define TOKENS_CACHE
-//#define STATS
+#define TRANSACTIONS_INDEX
+#define TOKENS_CACHE
+#define STATS
 
 #endif
