@@ -970,9 +970,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
     else {
       // more then 1 round lag, request round info
-      if (cs::Conveyer::instance().currentRoundNumber() > 1) {
+      if (round > 1) {
         // not on the very start
-        cswarning() << "NODE> detect round lag, request round info";
+        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << "), request round info";
         cs::RoundTable emptyRoundTable;
         emptyRoundTable.round = rNum;
         handleRoundMismatch(emptyRoundTable);
@@ -1385,9 +1385,15 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   stageOneMessage_[stage.sender] = std::move(bytes);
 
-  cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
-          << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
-          << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  if (confidant != sender) {
+    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
+            << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
+            << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  }
+  else {
+    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key ok";
+  }
+
   cslog() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
   csdebug() << "NODE> Stage One from [" << static_cast<int>(stage.sender) << "] is OK!";
