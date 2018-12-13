@@ -307,7 +307,7 @@ bool SolverCore::smartStageOneEnough() {
     }
   }
 
-  return stageSize == smartConfidants_.size() ? true : false;
+  return stageSize == smartConfidants_.size();
 }
 
 bool SolverCore::smartStageTwoEnough() {
@@ -320,7 +320,7 @@ bool SolverCore::smartStageTwoEnough() {
     }
   }
 
-  return stageSize == smartConfidants_.size() ? true : false;
+  return stageSize == smartConfidants_.size();
 }
 
 bool SolverCore::smartStageThreeEnough() {
@@ -333,6 +333,6 @@ bool SolverCore::smartStageThreeEnough() {
     }
   }
 
-  return (stageSize > smartConfidants_.size() / 2 + 1) ? true : false;
+  return (stageSize > smartConfidants_.size() / 2 + 1);
 }
 }  // namespace cs
