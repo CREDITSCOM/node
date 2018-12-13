@@ -36,7 +36,9 @@ bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* i
 APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config)
 : s_blockchain(blockchain)
 , solver(_solver)
+#ifdef MONITOR_NODE
 , stats(blockchain)
+#endif
 , executor_transport(new ::apache::thrift::transport::TBufferedTransport(
       ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , executor(std::make_unique<client_type>(
@@ -689,6 +691,7 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
 }
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
+#ifdef MONITOR_NODE
   csstats::StatsPerPeriod stats = this->stats.getStats();
 
   for (auto& s : stats) {
@@ -708,7 +711,7 @@ void APIHandler::StatsGet(api::StatsGetResult& _return) {
 
     _return.stats.push_back(ps);
   }
-
+#endif
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 

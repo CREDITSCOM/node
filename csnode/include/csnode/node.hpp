@@ -274,10 +274,6 @@ private:
   Transport* transport_;
   std::unique_ptr<cs::Spammer> spammer_;
 
-#ifdef MONITOR_NODE
-  csstats::csstats stats_;
-#endif
-
 #ifdef NODE_API
   csconnector::connector api_;
 #endif

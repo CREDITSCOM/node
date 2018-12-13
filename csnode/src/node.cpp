@@ -37,10 +37,6 @@ Node::Node(const Config& config)
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 ,
-#ifdef MONITOR_NODE
-    stats_(blockChain_)
-,
-#endif
 #ifdef NODE_API
   api_(blockChain_, solver_, csconnector::Config {
    config.getApiSettings().port,
