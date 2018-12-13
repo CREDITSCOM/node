@@ -8,7 +8,7 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/common.hpp>
 #include <csnode/datastream.hpp>
-#include <csnode/node.hpp>
+#include <csnode/node.hpp> // introduce Node::api_handler_ptr_t
 
 #include <optional>
 #include <vector>
