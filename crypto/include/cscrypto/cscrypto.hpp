@@ -28,7 +28,8 @@ using Signature = cscrypto::ByteArray<kSignatureSize>;
 
 bool CryptoInit();
 
-void CalculateHash(Hash& hash, const Byte* data, size_t data_size);
+void CalculateHash(Hash& hash, const Byte* data, size_t data_size,
+                   const void* key = nullptr, size_t key_size = 0);
 
 void GenerateKeyPair(PublicKey& public_key, PrivateKey& private_key);
 
@@ -41,7 +42,7 @@ bool VerifySignature(const Signature& signature, const PublicKey& public_key,
                      const Byte* data, size_t data_size);
 
 bool VerifySignature(const Byte* signature, const Byte* public_key,
-  const Byte* data, size_t data_size);
+                     const Byte* data, size_t data_size);
 
 void FillBufWithRandomBytes(void* buf, size_t buf_size);
 
