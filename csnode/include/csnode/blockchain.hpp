@@ -108,11 +108,6 @@ public:
 
   uint32_t getRequestedBlockNumber() const;
 
-  void setGlobalSequence(uint32_t seq);
-  csdb::Pool::sequence_t getGlobalSequence() const;
-
-  bool getBlockRequestNeed() const;
-
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
 #ifdef MONITOR_NODE
@@ -206,8 +201,6 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  csdb::Pool::sequence_t globalSequence_;
-  bool blockRequestIsNeeded_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
 
