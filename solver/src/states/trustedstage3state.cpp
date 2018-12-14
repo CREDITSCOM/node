@@ -23,7 +23,7 @@ void TrustedStage3State::on(SolverContext& context) {
   if (!context.stage2_data().empty()) {
     cslog() << name() << ": handle early received stages-2";
     for (const auto& st : context.stage2_data()) {
-      csdebug() << name() << ": stage-2[" << st.sender << "]";
+      csdebug() << name() << ": stage-2[" << (int) st.sender << "]";
       if (Result::Finish == onStage2(context, st)) {
         context.complete_stage3();
         return;
@@ -133,17 +133,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
   if (ptr != nullptr && context.enough_stage2()) {
     cslog() << name() << ": enough stage-2 received";
     const size_t cnt = context.cnt_trusted();
-    //constexpr size_t sig_len = sizeof(st.signatures[0].size());
-    StageTwo currentStage;
     for (auto& it : context.stage2_data()) {
       if ( it.sender != context.own_conf_number()) {
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
-          // TODO: redesign required:
-          cs::Hash zeroHash;
-          memset(zeroHash.data(), 0, zeroHash.size());
-          if (it.hashes[j] == zeroHash) {
-            cslog() << name() << ": [" << (int)j << "] marked as untrusted";
+          if (it.hashes[j] == SolverContext::zeroHash) {
+            cslog() << name() << ": [" << (int)j << "] marked as untrusted (silent)";
             context.mark_untrusted((uint8_t)j);
             continue;
           }

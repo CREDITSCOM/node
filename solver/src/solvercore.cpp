@@ -206,7 +206,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartConfidants_.clear();
     smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
     smartRoundNumber_ = smartRef.sequence;
-    pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
+    pnode->retriveSmartConfidants(static_cast<cs::RoundNumber>(smartRoundNumber_), smartConfidants_);
     refreshSmartStagesStorage();
     cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_ << " WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
     cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
