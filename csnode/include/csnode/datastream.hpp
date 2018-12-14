@@ -322,6 +322,16 @@ public:
   cs::TransactionsPacket transactionPacket();
 
   ///
+  /// @brief Adds bytesView entity to stream.
+  ///
+  void addBytesView(const cs::BytesView& bytesView);
+
+  ///
+  /// @brief Returns BytesView entity if can, otherwise return empty object.
+  ///
+  cs::BytesView bytesView();
+
+  ///
   /// Peeks next parameter.
   ///
   /// @return Returns next T parameter.
@@ -345,13 +355,14 @@ private:
   template <typename T>
   T createAddress();
 
-  template <typename T>
-  inline void insertToArray(char* data, std::size_t index, T value) {
-    char* ptr = reinterpret_cast<char*>(&value);
-
-    for (std::size_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
-      *(data + i) = *(ptr + k);
+  inline void insertBytes(const char* data, std::size_t index) {
+    if (bytes_) {
+      bytes_->insert(bytes_->end(), data, data + index);
     }
+  }
+
+  inline void insertBytes(const cs::Byte* data, std::size_t size) {
+    insertBytes(reinterpret_cast<const char*>(data), size);
   }
 };
 
@@ -503,6 +514,14 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
 }
 
 ///
+/// Gets pool from stream.
+///
+inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
+  bytesView = stream.bytesView();
+  return stream;
+}
+
+///
 /// Writes array to stream.
 ///
 template <std::size_t size>
@@ -624,6 +643,14 @@ inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entit
     stream << entity;
   }
 
+  return stream;
+}
+
+///
+/// Writes bytes view to stream.
+///
+inline DataStream& operator<<(DataStream& stream, const cs::BytesView& bytesView) {
+  stream.addBytesView(bytesView);
   return stream;
 }
 }  // namespace cs
