@@ -138,6 +138,8 @@ public:
     return privateKey_;
   }
 
+  void dumpJSONKeys(const std::string& fName) const;
+
 private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);

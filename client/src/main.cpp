@@ -138,7 +138,8 @@ int main(int argc, char* argv[]) {
     ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
     ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
     ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
-    ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")");
+    ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
+    ("dumpkeys", po::value<std::string>(), "dump your public and private keys into JSON file (UNENCRYPTED!)");
 
   variables_map vm;
 
@@ -157,10 +158,24 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  if (!cscrypto::CryptoInit()) {
+    std::cout << "Couldn't initialize the crypto library" << std::endl;
+    panic();
+  }
+
   auto config = Config::read(vm);
 
   if (!config.isGood()) {
     panic();
+  }
+
+  if (vm.count("dumpkeys")) {
+    auto fName = vm["dumpkeys"].as<std::string>();
+    if (fName.size() > 0) {
+      config.dumpJSONKeys(fName);
+      cslog() << "Keys dumped to " << fName;
+      return 0;
+    }
   }
 
   logger::initialize(config.getLoggerSettings());

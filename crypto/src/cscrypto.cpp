@@ -11,13 +11,10 @@
 
 namespace cscrypto {
 
-PrivateKey::PrivateKey() {
-  mem_ = nullptr;
-  ctr_ = new uint32_t(1);
-}
+PrivateKey::PrivateKey(): mem_(nullptr), ctr_(new uint32_t(1)) { }
 
 PrivateKey::~PrivateKey() {
-  if (!--(*ctr_)) sodium_free(mem_);
+  if (!(--(*ctr_))) sodium_free(mem_);
 }
 
 PrivateKey::PrivateKey(const PrivateKey& rhs): mem_(rhs.mem_), ctr_(rhs.ctr_) {
@@ -27,7 +24,8 @@ PrivateKey::PrivateKey(const PrivateKey& rhs): mem_(rhs.mem_), ctr_(rhs.ctr_) {
 PrivateKey::PrivateKey(PrivateKey&& rhs): PrivateKey(rhs) { }
 
 PrivateKey& PrivateKey::operator=(const PrivateKey& rhs) {
-  if (rhs.mem_ != mem_) this->~PrivateKey();
+  if (rhs.mem_ != mem_ && !(--(*ctr_))) sodium_free(mem_);
+
   mem_ = rhs.mem_;
   ctr_ = rhs.ctr_;
   ++(*ctr_);
@@ -36,7 +34,7 @@ PrivateKey& PrivateKey::operator=(const PrivateKey& rhs) {
 }
 
 PrivateKey& PrivateKey::operator=(PrivateKey&& rhs) {
-  return *this = rhs;
+  return (*this = rhs);
 }
 
 PrivateKeyGuard PrivateKey::access() const {

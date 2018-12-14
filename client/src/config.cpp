@@ -127,6 +127,20 @@ static inline void writeFile(const std::string name, const std::string data) {
   file.close();
 }
 
+void Config::dumpJSONKeys(const std::string& fName) const {
+  auto sk = privateKey_.access();
+
+  auto pk58 = EncodeBase58(publicKey_.data(), publicKey_.data() + publicKey_.size());
+  auto sk58 = EncodeBase58(sk.data(), sk.data() + sk.size());
+
+  std::ofstream f(fName);
+  f << "{\"key\":{\"public\":\"" << pk58 << "\",\"private\":\"" << sk58 << "\"}}";
+
+  cscrypto::FillWithZeros(const_cast<char*>(pk58.data()), pk58.size());
+  cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
+}
+
+
 Config Config::read(po::variables_map& vm) {
   Config result = readFromFile(getArgFromCmdLine(vm,
                                                  ARG_NAME_CONFIG_FILE,

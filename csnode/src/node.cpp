@@ -67,10 +67,6 @@ Node::~Node() {
 }
 
 bool Node::init() {
-  if (!cscrypto::CryptoInit()) {
-    return false;
-  }
-
   if (!transport_->isGood()) {
     return false;
   }
