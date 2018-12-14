@@ -44,7 +44,7 @@ public:
   void safeSkip(uint32_t num = 1) {
     auto size = sizeof(T) * num;
 
-    if ((uint32_t)(end_ - ptr_) < size) {
+    if (!isBytesAvailable(size)) {
       good_ = false;
     }
     else {
@@ -67,7 +67,7 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(FixedString<Length>& str) {
-    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
+    if (!isBytesAvailable(Length)) {
       good_ = false;
     }
     else {
@@ -80,7 +80,7 @@ public:
 
   template <size_t Length>
   IPackStream& operator>>(cs::ByteArray<Length>& byteArray) {
-    if (static_cast<uint32_t>(end_ - ptr_) < Length) {
+    if (!isBytesAvailable(Length)) {
       good_ = false;
     }
     else {
@@ -100,11 +100,22 @@ public:
       return *this;
     }
 
+    // check min needed bytes. It may be more bytes needed on the elements.
+    if (!isBytesAvailable(size)) {
+      good_ = false;
+      return *this;
+    }
+
     std::vector<T, A> entity;
+    entity.reserve(size);
 
     for (std::size_t i = 0; i < size; ++i) {
       T element;
       (*this) >> element;
+
+      if (!good()) {
+        break;
+      }
 
       entity.push_back(element);
     }
@@ -115,7 +126,6 @@ public:
     }
 
     vector = std::move(entity);
-
     return *this;
   }
 
@@ -369,14 +379,20 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
   std::size_t size = 0;
   (*this) >> size;
 
-  if (size == 0 || !isBytesAvailable(size)) {
+  if (size == 0) {
     return *this;
   }
 
-  auto nextPtr = ptr_ + size;
-  str = std::string(ptr_, nextPtr);
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    auto nextPtr = ptr_ + size;
+    str = std::string(ptr_, nextPtr);
 
-  ptr_ = nextPtr;
+    ptr_ = nextPtr;
+  }
+
   return *this;
 }
 
@@ -385,14 +401,20 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
   std::size_t size = std::size_t();
   (*this) >> size;
 
-  if (size == 0 || !isBytesAvailable(size)) {
+  if (size == 0) {
     return *this;
   }
 
-  auto nextPtr = ptr_ + size;
-  bytes = cs::Bytes(ptr_, nextPtr);
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    auto nextPtr = ptr_ + size;
+    bytes = cs::Bytes(ptr_, nextPtr);
 
-  ptr_ = nextPtr;
+    ptr_ = nextPtr;
+  }
+
   return *this;
 }
 
@@ -487,7 +509,7 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
   std::size_t size = regionPtr.size();
 
-  if (static_cast<uint32_t>(end_ - ptr_) < size) {
+  if (!isBytesAvailable(size)) {
     good_ = false;
   }
   else {

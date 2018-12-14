@@ -108,11 +108,6 @@ public:
 
   uint32_t getRequestedBlockNumber() const;
 
-  void setGlobalSequence(uint32_t seq);
-  csdb::Pool::sequence_t getGlobalSequence() const;
-
-  bool getBlockRequestNeed() const;
-
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
 #ifdef MONITOR_NODE
@@ -133,6 +128,10 @@ public:
   std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
 
   uint64_t getTransactionsCount() const { return total_transactions_count_; }
+#endif
+
+#ifdef MONITOR_NODE
+  uint32_t getTransactionsCount(const csdb::Address&);
 #endif
 
   // all wallet data (from cache)
@@ -164,9 +163,9 @@ public:
 
   void recount_trxns(const std::optional<csdb::Pool>& new_pool);
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-
+  std::vector<csdb::Transaction> genesisTrxns_;
 private:
-
+  
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
@@ -206,8 +205,6 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  csdb::Pool::sequence_t globalSequence_;
-  bool blockRequestIsNeeded_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
 

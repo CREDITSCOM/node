@@ -17,7 +17,8 @@ class Node;
 
 namespace cs {
 
-using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, uint32_t packet)>;
+using PoolSynchronizerRequestSignal =
+    cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, uint32_t packet)>;
 
 class PoolSynchronizer {
 public:  // Interface
@@ -76,115 +77,115 @@ private:  // struct
   class NeighboursSetElemet {
   public:
     explicit NeighboursSetElemet(uint8_t neighbourIndex, uint8_t blockPoolsCount)
-    : m_neighbourIndex(neighbourIndex)
-    , m_roundCounter(0) {
-      m_sequences.reserve(blockPoolsCount);
+    : neighbourIndex_(neighbourIndex)
+    , roundCounter_(0) {
+      sequences_.reserve(blockPoolsCount);
     }
 
     inline void removeSequnce(const csdb::Pool::sequence_t sequence) {
-      const auto it = std::find(m_sequences.begin(), m_sequences.end(), sequence);
-      if (it != m_sequences.end()) {
-        m_sequences.erase(it);
+      const auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
+      if (it != sequences_.end()) {
+        sequences_.erase(it);
       }
     }
     inline void setSequences(const PoolsRequestedSequences& sequences) {
       resetSequences();
-      m_sequences = sequences;
+      sequences_ = sequences;
     }
     inline void addSequences(const RoundNumber sequence) {
-      m_sequences.push_back(sequence);
+      sequences_.push_back(sequence);
     }
     inline void reset() {
       resetSequences();
       resetRoundCounter();
     }
     inline void resetSequences() {
-      m_sequences.clear();
+      sequences_.clear();
     }
     inline void resetRoundCounter() {
-      m_roundCounter = 0;
+      roundCounter_ = 0;
     }
     inline void setIndex(const uint8_t num) {
-      m_neighbourIndex = num;
+      neighbourIndex_ = num;
     }
 
     inline uint8_t index() const {
-      return m_neighbourIndex;
+      return neighbourIndex_;
     }
     inline const PoolsRequestedSequences& sequences() const {
-      return m_sequences;
+      return sequences_;
     }
     inline uint32_t roundCounter() const {
-      return m_roundCounter;
+      return roundCounter_;
     }
 
     inline void increaseRoundCounter() {
-      if (!m_sequences.empty()) {
-        ++m_roundCounter;
+      if (!sequences_.empty()) {
+        ++roundCounter_;
       }
     }
 
     bool operator<(const NeighboursSetElemet& other) const {
-      if (m_sequences.empty() || other.m_sequences.empty()) {
-        return m_sequences.size() > other.m_sequences.size();
+      if (sequences_.empty() || other.sequences_.empty()) {
+        return sequences_.size() > other.sequences_.size();
       }
 
-      return m_sequences.front() < other.m_sequences.front();
+      return sequences_.front() < other.sequences_.front();
     }
 
     friend std::ostream& operator<<(std::ostream& os, const NeighboursSetElemet& el) {
-      os << "idx: " << cs::numeric_cast<int>(el.m_neighbourIndex) << ", seqs:";
+      os << "idx: " << cs::numeric_cast<int>(el.neighbourIndex_) << ", seqs:";
 
-      if (el.m_sequences.empty()) {
+      if (el.sequences_.empty()) {
         os << " empty";
       }
       else {
-        for (const auto seq : el.m_sequences) {
+        for (const auto seq : el.sequences_) {
           os << " " << seq;
         }
       }
 
-      os << ", round counter: " << el.m_roundCounter;
+      os << ", round counter: " << el.roundCounter_;
 
       return os;
     }
 
   private:
-    uint8_t m_neighbourIndex;             // neighbour number
-    PoolsRequestedSequences m_sequences;  // requested sequence
-    uint32_t m_roundCounter;
+    uint8_t neighbourIndex_;             // neighbour number
+    PoolsRequestedSequences sequences_;  // requested sequence
+    uint32_t roundCounter_;
   };
 
 private:  // Members
-  inline static const cs::RoundNumber s_roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
+  inline static const cs::RoundNumber roundDifferentForSync_ = cs::values::defaultMetaStorageMaxSize;
 
-  const PoolSyncData m_syncData;
+  const PoolSyncData syncData_;
 
-  Transport* m_transport;
-  BlockChain* m_blockChain;
+  Transport* transport_;
+  BlockChain* blockChain_;
 
   // flag starting  syncronization
-  bool m_isSyncroStarted = false;
+  bool isSyncroStarted_ = false;
   // [key] = sequence,
   // [value] =  packet counter
   // value: increase each new round
-  std::map<csdb::Pool::sequence_t, uint32_t> m_requestedSequences;
+  std::map<csdb::Pool::sequence_t, uint32_t> requestedSequences_;
 
-  std::vector<NeighboursSetElemet> m_neighbours;
+  std::vector<NeighboursSetElemet> neighbours_;
 
-  cs::Timer m_timer;
+  cs::Timer timer_;
 
   friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType&);
 };
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType& type) {
   switch (type) {
-  case PoolSynchronizer::CounterType::ROUND:
-    os << "ROUND";
-    break;
-  case PoolSynchronizer::CounterType::TIMER:
-    os << "TIMER";
-    break;
+    case PoolSynchronizer::CounterType::ROUND:
+      os << "ROUND";
+      break;
+    case PoolSynchronizer::CounterType::TIMER:
+      os << "TIMER";
+      break;
   }
 
   return os;

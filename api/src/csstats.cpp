@@ -76,6 +76,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   total.poolsCount += periodStats.poolsCount;
   total.transactionsCount += periodStats.transactionsCount;
   total.smartContractsCount += periodStats.smartContractsCount;
+  total.transactionsSmartCount += periodStats.transactionsSmartCount;
 
   for (auto& element : periodStats.balancePerCurrency) {
     total.balancePerCurrency[element.first].integral += element.second.integral;
@@ -95,6 +96,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.poolsCount -= lastPeriodStats.poolsCount;
       stat.smartContractsCount -= lastPeriodStats.smartContractsCount;
       stat.transactionsCount -= lastPeriodStats.transactionsCount;
+      stat.transactionsSmartCount -= lastPeriodStats.transactionsSmartCount;
 
       for (auto& element : lastPeriodStats.balancePerCurrency) {
         stat.balancePerCurrency[element.first].integral -= element.second.integral;
@@ -105,6 +107,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.poolsCount += periodStats.poolsCount;
       stat.smartContractsCount += periodStats.smartContractsCount;
       stat.transactionsCount += periodStats.transactionsCount;
+      stat.transactionsSmartCount += periodStats.transactionsSmartCount;
 
       for (auto& element : periodStats.balancePerCurrency) {
         stat.balancePerCurrency[element.first].integral += element.second.integral;
@@ -112,7 +115,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       }
     }
     catch (const std::exception& e) {
-      cslog() << e.what();
+      cslog() << "STATS> " << e.what();
     }
   }
 
@@ -125,8 +128,8 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   using Seconds = std::chrono::seconds;
   Seconds seconds = std::chrono::duration_cast<Seconds>(finishTime - startTime);
 
-  cstrace() << "Collecting stats: finished (took " << seconds.count() << "s";
-  cslog() << "Stats updated";
+  cstrace() << "STATS> Collecting stats: finished (took " << seconds.count() << "s";
+  cslog() << "STATS> Stats updated";
 
   return stats;
 }
@@ -135,7 +138,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   assert(
       std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
-  cstrace() << " Collecting All stats: started";
+  cstrace() << "STATS>  Collecting All stats: started";
 
   AllStats stats;
   stats.second.resize(periods.size());
@@ -155,6 +158,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   unsigned int currentCutIndex = 0;
   auto startCutTime = stats.first[currentCutIndex].timeStamp;
   auto endCutTime = stats.first[currentCutIndex + 1].timeStamp;
+
+  auto future_lastHash = blockchain.getLastWrittenHash();
 
   while (!blockHash.is_empty() && !quit) {
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -221,7 +226,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
     blockHash = pool.previous_hash();
   }
 
-  lastHash = blockchain.getLastWrittenHash();
+  //lastHash = blockchain.getLastWrittenHash();
+  lastHash = future_lastHash;
 
   auto finishTime = std::chrono::system_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);
@@ -233,7 +239,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
-  cstrace() << "csstats start " << "update interval is " << updateTimeSec << " sec";
+  cstrace() << "STATS> csstats start " << "update interval is " << updateTimeSec << " sec";
 #ifndef STATS
   return;
 #endif
@@ -241,7 +247,7 @@ csstats::csstats(BlockChain& blockchain)
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
-    cstrace() << "csstats thread started";
+    cstrace() << "STATS> csstats thread started";
 
     AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
@@ -268,19 +274,19 @@ csstats::csstats(BlockChain& blockchain)
           ss << s.poolsCount << " pools, " << s.transactionsCount;
           ss << " transactions";
 
-          cstrace() << ss.str();
+          cstrace() << "STATS> "  << ss.str();
 #ifdef LOG_STATS_TO_FILE
-          cstrace() << ss.str();
+          cstrace() << "STATS> "  << ss.str();
 
           ss.str(std::string());
 
           ss << "Blockchain size:";
           ss << this->blockchain.getSize();
 
-          cstrace() << ss.str();
+          cstrace() << "STATS> " << ss.str();
 #endif
           for (auto& t : s.balancePerCurrency) {
-            cstrace() << "'" << t.first
+            cstrace() << "STATS> "  << "'" << t.first
                       << "' = " << std::to_string(t.second.integral) << "." << std::to_string(t.second.fraction);
           }
         }
@@ -294,12 +300,12 @@ csstats::csstats(BlockChain& blockchain)
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-      cstrace() << "csstats thread stopped";
+      cstrace()  << "STATS> csstats thread stopped";
   });
 }
 
 csstats::~csstats() {
-  cstrace() << "csstats stop";
+  cstrace() << "STATS> csstats stop";
 
   ScopedLock lock(mutex);
 
