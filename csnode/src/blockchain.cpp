@@ -249,21 +249,33 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 
 csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.is_valid()) {
+    return deferredBlock_.hash();
+  }
+
   return storage_.last_hash();
 }
 
 size_t BlockChain::getSize() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  return storage_.size();
+  const auto storageSize = storage_.size();
+
+  return deferredBlock_.is_valid() ? (storageSize + 1) : storageSize;
 }
 
 csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.hash() == ph) {
+    return deferredBlock_;
+  }
   return storage_.pool_load(ph);
 }
 
 csdb::Pool BlockChain::loadBlock(const uint32_t sequence) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.sequence() == sequence) {
+    return deferredBlock_;
+  }
   return storage_.pool_load(sequence);
 }
 
@@ -274,13 +286,18 @@ csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) cons
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.hash() == transId.pool_hash()) {
+    return deferredBlock_.transaction(transId);
+  }
+
   return storage_.transaction(transId);
 }
 
 void BlockChain::removeLastBlock() {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  auto pool = storage_.pool_remove_last();
-  removeWalletsInPoolFromCache(pool);
+  deferredBlock_ = csdb::Pool();
+//  auto pool = storage_.pool_remove_last();
+//  removeWalletsInPoolFromCache(pool);
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -324,7 +341,7 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
   cslog() << " transactions count " << pool.transactions_count();
   csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   csdebug() << " previous hash: " << lastHash_.to_string();
-  csdebug() << " last storage size: " << storage_.size();
+  csdebug() << " last storage size: " << getSize();
 
   if (pool.sequence() == getLastWrittenSequence() + 1) {
     cslog() << " sequence OK";
