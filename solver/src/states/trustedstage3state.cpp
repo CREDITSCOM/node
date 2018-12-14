@@ -140,6 +140,13 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
           // TODO: redesign required:
+          cs::Hash zeroHash;
+          memset(zeroHash.data(), 0, zeroHash.size());
+          if (it.hashes[j] == zeroHash) {
+            cslog() << name() << ": [" << (int)j << "] marked as untrusted";
+            context.mark_untrusted((uint8_t)j);
+            continue;
+          }
           if (ptr->signatures[j] != it.signatures[j]) {
             cs::Bytes toVerify;
             size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
@@ -259,7 +266,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
     }
   }
-
+  // TODO: modify to select right confidants to trusted_mask 
   if (liarNumber > 0) {
     cswarning() << "\tLiars detected: " << (int)liarNumber;
   }
