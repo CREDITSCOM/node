@@ -136,7 +136,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
   }
 
   if (pool.transactions().size()) {
-    //transactionsCount_ += pool.transactions().size();
+    total_transactions_count_ += pool.transactions().size();
 
     if (lastNonEmptyBlock_.transCount &&
       pool.hash() != lastNonEmptyBlock_.hash)
@@ -236,6 +236,10 @@ void BlockChain::writeGenesisBlock() {
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(getLastWrittenSequence() + 1);
   addNewWalletsToPool(genesis);
+
+  for (auto &trxn : genesis.transactions()) {
+    genesisTrxns_.push_back(trxn);
+  }
 
   cslog() << "Genesis block completed ... trying to save";
 
@@ -975,6 +979,21 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet)
   }
   fee_->CountFeesInPool(*this, &packet);
 }
+
+#ifdef MONITOR_NODE
+uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  WalletId id;
+  if (addr.is_wallet_id())
+    id = addr.wallet_id();
+  else if (!walletIds_->normal().find(addr, id))
+    return 0;
+  const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+  if (!wallDataPtr)
+    return 0;
+  return wallDataPtr->transNum_;
+}
+#endif
 
 #ifdef TRANSACTIONS_INDEX
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {

@@ -135,6 +135,10 @@ public:
   uint64_t getTransactionsCount() const { return total_transactions_count_; }
 #endif
 
+#ifdef MONITOR_NODE
+  uint32_t getTransactionsCount(const csdb::Address&);
+#endif
+
   // all wallet data (from cache)
   bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
   bool findWalletData(WalletId id, WalletData& wallData) const;
@@ -164,9 +168,9 @@ public:
 
   void recount_trxns(const std::optional<csdb::Pool>& new_pool);
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-
+  std::vector<csdb::Transaction> genesisTrxns_;
 private:
-
+  
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
