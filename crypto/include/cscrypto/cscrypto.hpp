@@ -86,7 +86,7 @@ using PrivateKeyGuard = MemAccessGuard<cscrypto::Byte, kPrivateKeySize>;
 class PrivateKey {
 public:
   PrivateKey();
-  ~PrivateKey();
+  ~PrivateKey() { clear(); }
 
   PrivateKey(const PrivateKey&);
   PrivateKey(PrivateKey&&);
@@ -103,6 +103,8 @@ public:
   static PrivateKey generateWithPair(PublicKey&);
 
 private:
+  void clear();
+
   void* mem_;
   uint32_t* ctr_;
 };
