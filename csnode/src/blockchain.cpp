@@ -823,17 +823,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   if (deferredBlock_.is_valid()) {
     writeBlock(deferredBlock_);
-
-    const auto seq = std::max(deferredBlock_.sequence() - 1, static_cast<uint64_t>(1));
-    csdb::PoolHash hash = getHashBySequence(seq);
-    auto loadPool = loadBlock(hash);
-    if (!loadPool.is_valid()) {
-      cserror() << "BLOCKCHAIN> test load pool failed: #" << seq << ", getHashBySequence " << hash.to_string()
-        << ", error " << storage_.last_error() << " (" << storage_.last_error_message() << ")";
-    }
-    else {
-      cslog() << "BLOCKCHAIN> test load pool ok: #" << seq;
-    }
   }
 
   if(!pool.compose()) {
