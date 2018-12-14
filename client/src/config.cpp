@@ -191,7 +191,7 @@ static bool readPasswordFromCin(T& mem) {
         std::cout << "\b \b" << std::flush;
       }
     }
-    else if ((size_t)(ptr - mem.data()) < mem.size() &&
+    else if ((size_t)(ptr - mem.data()) < (mem.size() - 1) &&
              ch >=32 && ch <= 126) {
       *(ptr++) = ch;
       std::cout << '*' << std::flush;
@@ -221,8 +221,8 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk) 
     skFile.close();
     DecodeBase58(sk58, sk);
 
-    if (!sk.size()) {
-      LOG_ERROR("Couldn't decode Base58 in " << pathToSk);
+    if (sk.size() <= cscrypto::kPrivateKeySize) {
+      LOG_ERROR("Bad private key file in " << pathToSk);
       return false;
     }
 
@@ -232,6 +232,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk) 
     if (encFlag) { // Check the encryption flag
       while (!privateKey_) {
         if (!std::cin.good()) return false;
+        std::cout << "The key file seems to be encrypted" << std::endl;
         std::cout << "Enter password: " << std::flush;
         cscrypto::MemGuard<char, 256> pass;
         if (!readPasswordFromCin(pass)) return false;

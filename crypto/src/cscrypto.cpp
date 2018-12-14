@@ -47,6 +47,7 @@ PrivateKey PrivateKey::generateWithPair(PublicKey& public_key) {
   PrivateKey result;
   result.mem_ = sodium_malloc(kPrivateKeySize);
   crypto_sign_keypair(public_key.data(), static_cast<Byte*>(result.mem_));
+  sodium_mprotect_noaccess(result.mem_);
   return result;
 }
 
