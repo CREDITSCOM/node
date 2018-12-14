@@ -233,7 +233,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
-                   totalSupply = tryExtractAmount('"' + newSupp + '"');
+                   totalSupply = tryExtractAmount(newSupp);
                  });
 
   std::vector<csdb::Address> holders;

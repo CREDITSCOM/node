@@ -344,11 +344,6 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& 
   if (limit > 0) {
     const int64_t offset = (_offset < 0) ? 0 : _offset;
     s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
-    for (auto &trxn : s_blockchain.genesisTrxns_) {
-      if (trxn.target() == addr) {
-        transactions.push_back(trxn);
-      }
-    }
   }
   _return.transactions = convertTransactions(transactions);
   decltype(auto) trxns_count_res = s_blockchain.get_trxns_count(addr);
@@ -400,7 +395,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 #ifdef MONITOR_NODE  
   s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
-    res.transactionsCount = wd.transNum_ - 1;
+    res.transactionsCount = wd.transNum_;
   });
 #endif
 

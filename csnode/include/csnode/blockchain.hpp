@@ -53,6 +53,57 @@ public:
 
   bool isGood() const;
 
+  bool isEqual(csdb::Address &laddr, csdb::Address &raddr) {
+    csdb::Address laddr_pk, raddr_pk;
+
+    //
+    if (laddr.is_wallet_id()) {
+      const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(laddr).to_api_addr().data());
+      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(laddr_pk)))
+        return false;
+    }
+    else
+      laddr_pk = laddr;
+    //
+    //
+    if (raddr.is_wallet_id()) {
+      const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(laddr).to_api_addr().data());
+      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(raddr_pk)))
+        return false;
+    }
+    else
+      raddr_pk = raddr;
+    //
+
+    if (laddr_pk == raddr_pk)
+      return true;
+    return false;
+    
+    /*if (laddr.is_wallet_id()) {//laddr to pk
+      WalletId id = laddr.wallet_id();
+      const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+      if (!wallDataPtr)
+        return false;
+      WalletsCache::convert(wallDataPtr->address_, laddr_pk);
+    }
+    else
+      laddr_pk = raddr;
+    
+    if (raddr.is_wallet_id()) {//raddr to pk
+      WalletId id = raddr.wallet_id();
+      const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+      if (!wallDataPtr)
+        return false;
+      WalletsCache::convert(wallDataPtr->address_, raddr_pk);
+    }
+    else
+      raddr_pk = raddr;
+
+    if(laddr_pk == raddr_pk)
+      return true;
+    return false;*/
+  }
+
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
    *
@@ -163,7 +214,7 @@ public:
 
   void recount_trxns(const std::optional<csdb::Pool>& new_pool);
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-  std::vector<csdb::Transaction> genesisTrxns_;
+  //std::vector<csdb::Transaction> genesisTrxns_;
 private:
   
   void writeGenesisBlock();
