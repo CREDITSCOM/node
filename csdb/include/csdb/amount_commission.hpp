@@ -26,6 +26,9 @@ class ibstream;
 class AmountCommission {
 public:
   inline AmountCommission() = default;
+  AmountCommission(const AmountCommission& rhs) {
+    u_.bits = rhs.u_.bits;
+  }
   explicit AmountCommission(uint16_t value);
   explicit AmountCommission(double value);
 
@@ -61,8 +64,6 @@ private:
   } u_;
 };
 #pragma pack(pop)
-
-static_assert(std::is_trivially_copyable<AmountCommission>::value, "Invalid csdb::Amount definition.");
 
 inline double AmountCommission::to_double() const noexcept {
   const double _1_1024 = 1. / 1024;
