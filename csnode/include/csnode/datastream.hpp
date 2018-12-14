@@ -12,6 +12,7 @@
 
 #include <lib/system/common.hpp>
 #include <lib/system/structures.hpp>
+#include <lib/system/utils.hpp>
 
 namespace cs {
 ///
@@ -79,10 +80,11 @@ public:
   ///
   template <typename T>
   inline T streamField() {
-    if (!isAvailable(sizeof(T)))
+    if (!isAvailable(sizeof(T))) {
       return T();
+    }
 
-    T field = getFromArray<T>(data_, index_);
+    T field = cs::Utils::getFromArray<T>(data_, index_);
     index_ += sizeof(T);
 
     return field;
@@ -351,11 +353,6 @@ private:
       *(data + i) = *(ptr + k);
     }
   }
-
-  template <typename T>
-  inline static T getFromArray(char* data, std::size_t index) {
-    return *(reinterpret_cast<T*>(data + index));
-  }
 };
 
 ///
@@ -371,8 +368,7 @@ inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint
 ///
 template <typename T>
 inline DataStream& operator>>(DataStream& stream, T& streamField) {
-  static_assert(std::is_trivial<T>::value,
-                "Template parameter to must be trivial. Overload this function for non-trivial type");
+  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
   streamField = stream.streamField<T>();
   return stream;
 }
@@ -520,8 +516,7 @@ inline DataStream& operator<<(DataStream& stream, const std::array<char, size>& 
 ///
 template <typename T>
 inline DataStream& operator<<(DataStream& stream, const T& streamField) {
-  static_assert(std::is_trivial<T>::value,
-                "Template parameter to must be trivial. Overload this function for non-trivial type");
+  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
   stream.setStreamField(streamField);
   return stream;
 }
