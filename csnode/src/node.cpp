@@ -34,6 +34,7 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
+, nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 ,
@@ -84,10 +85,7 @@ bool Node::init() {
 
   csdebug() << "Everything init";
 
-  // check file with keys
-  if (!checkKeysFile()) {
-    return false;
-  }
+  solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
@@ -99,101 +97,6 @@ bool Node::init() {
   cs::Connector::connect(&blockChain_.smartContractEvent_, solver_, &cs::SolverCore::gotSmartContractEvent);
 
   return true;
-}
-
-bool Node::checkKeysFile() {
-  std::ifstream pub(publicKeyFileName_);
-  std::ifstream priv(privateKeyFileName_);
-
-  if (!pub.is_open() || !priv.is_open()) {
-    cslog() << "\n\nNo suitable keys were found. Type \"g\" to generate or \"q\" to quit.";
-
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
-
-    if (gen_flag == 'g') {
-      auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
-      solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
-  else {
-    std::string pub58, priv58;
-    std::getline(pub, pub58);
-    std::getline(priv, priv58);
-
-    pub.close();
-    priv.close();
-
-    cs::Bytes privateKey;
-    cs::Bytes publicKey;
-
-    DecodeBase58(pub58, publicKey);
-    DecodeBase58(priv58, privateKey);
-
-    if (publicKey.size() != PUBLIC_KEY_LENGTH || privateKey.size() != PRIVATE_KEY_LENGTH) {
-      cslog() << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit.";
-
-      char gen_flag = 'a';
-      std::cin >> gen_flag;
-
-      bool needGenerateKeys = gen_flag == 'g';
-
-      if (gen_flag == 'g') {
-        auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
-        solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
-      }
-
-      return needGenerateKeys;
-    }
-
-    cs::PublicKey fixedPublicKey;
-    cs::PrivateKey fixedPrivatekey;
-
-    std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
-    std::copy(privateKey.begin(), privateKey.end(), fixedPrivatekey.begin());
-
-    return checkKeysForSignature(fixedPublicKey, fixedPrivatekey);
-  }
-}
-
-std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
-  cs::PublicKey fixedPublicKey;
-  cs::PrivateKey fixedPrivateKey;
-  cscrypto::GenerateKeyPair(fixedPublicKey, fixedPrivateKey);
-
-  std::ofstream f_pub(publicKeyFileName_);
-  f_pub << EncodeBase58(cs::Bytes(fixedPublicKey.begin(), fixedPublicKey.end()));
-  f_pub.close();
-
-  std::ofstream f_priv(privateKeyFileName_);
-  f_priv << EncodeBase58(cs::Bytes(fixedPrivateKey.begin(), fixedPrivateKey.end()));
-  f_priv.close();
-
-  return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
-}
-
-bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
-  if (cscrypto::ValidateKeyPair(publicKey, privateKey)) {
-    solver_->setKeysPair(publicKey, privateKey);
-    return true;
-  }
-
-  cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
-
-  char gen_flag = 'a';
-  std::cin >> gen_flag;
-
-  if (gen_flag == 'g') {
-    auto [generatedPublickey, generatedPrivateKey] = generateKeys();
-    solver_->setKeysPair(generatedPublickey, generatedPrivateKey);
-    return true;
-  }
-
-  return false;
 }
 
 void Node::blockchainSync() {
@@ -1287,7 +1190,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   }
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
-  
+
   csprint() << "(): Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()

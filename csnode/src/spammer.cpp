@@ -147,7 +147,8 @@ void Spammer::SignTransaction(csdb::Transaction& transaction, const uint8_t* pri
   auto transaction_bytes = transaction.to_byte_stream_for_sig();
   cscrypto::Signature signature;
   cscrypto::PrivateKey priv;
-  memcpy(priv.data(), private_key, cscrypto::kPrivateKeySize);
+  auto kp = priv.access();
+  memcpy(const_cast<uint8_t*>(kp.data()), private_key, cscrypto::kPrivateKeySize);
   cscrypto::GenerateSignature(signature, priv, transaction_bytes.data(), transaction_bytes.size());
   transaction.set_signature(std::string(signature.begin(), signature.end()));
 }

@@ -17,6 +17,13 @@
 #include <cscrypto/cscrypto.hpp>
 #include "config.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+#endif
+
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -44,6 +51,14 @@ const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_
 const std::string PARAM_NAME_API_PORT = "port";
 const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
 const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
+
+const std::string ARG_NAME_CONFIG_FILE = "config-file";
+const std::string ARG_NAME_DB_PATH = "db-path";
+const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
+const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
+
+const uint32_t MIN_PASSWORD_LENGTH = 3;
+const uint32_t MAX_PASSWORD_LENGTH = 128;
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer},
@@ -100,37 +115,255 @@ typename MapType::mapped_type getFromMap(const std::string& pName, const MapType
   throw boost::property_tree::ptree_bad_data("Bad param value", pName);
 }
 
+static inline std::string getArgFromCmdLine(const po::variables_map& vm,
+                                            const std::string& name,
+                                            const std::string& defVal) {
+  return vm.count(name) ? vm[name].as<std::string>() : defVal;
+}
+
+static inline void writeFile(const std::string name, const std::string data) {
+  std::ofstream file(name);
+  file << data;
+  file.close();
+}
+
 Config Config::read(po::variables_map& vm) {
-  Config result = readFromFile(vm.count("config-file") ? vm["config-file"].as<std::string>() : DEFAULT_PATH_TO_CONFIG);
+  Config result = readFromFile(getArgFromCmdLine(vm,
+                                                 ARG_NAME_CONFIG_FILE,
+                                                 DEFAULT_PATH_TO_CONFIG));
 
-  result.pathToDb_ = vm.count("db-path") ? vm["db-path"].as<std::string>() : DEFAULT_PATH_TO_DB;
+  result.pathToDb_ = getArgFromCmdLine(vm,
+                                       ARG_NAME_DB_PATH,
+                                       DEFAULT_PATH_TO_DB);
 
-  const auto keyFile = vm.count("key-file") ? vm["key-file"].as<std::string>() : DEFAULT_PATH_TO_PUBLIC_KEY;
-  std::ifstream pub(keyFile);
-
-  if (pub.is_open()) {
-    std::string pub58;
-    std::vector<uint8_t> myPublic;
-    std::getline(pub, pub58);
-    pub.close();
-    DecodeBase58(pub58, myPublic);
-
-    if (myPublic.size() != cscrypto::kPublicKeySize) {
-      result.good_ = false;
-      LOG_ERROR("Bad Base-58 Public Key in " << keyFile);
-    }
-
-    std::copy(myPublic.begin(), myPublic.end(), result.publicKey_.begin());
-  }
-  else {
-    srand(time(NULL));
-
-    for (int i = 0; i < cscrypto::kPublicKeySize; ++i) {
-      *(result.publicKey_.data() + i) = (char)(rand() % 255);
-    }
-  }
+  if (result.good_)
+    result.good_ =
+      result.readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
+                      getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY));
 
   return result;
+}
+
+#ifndef _WIN32
+int getch() {
+  int ch;
+  struct termios t_old, t_new;
+
+  tcgetattr(STDIN_FILENO, &t_old);
+  t_new = t_old;
+  t_new.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &t_new);
+
+  ch = getchar();
+
+  tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
+  return ch;
+}
+#endif
+
+template <typename T>
+static bool readPasswordFromCin(T& mem) {
+  auto ptr = mem.data();
+  unsigned char ch = 0;
+
+#ifdef _WIN32
+  const char BACKSPACE = 8;
+  const char RETURN = 13;
+
+  DWORD con_mode;
+  DWORD dwRead;
+
+  HANDLE hIn=GetStdHandle(STD_INPUT_HANDLE);
+
+  GetConsoleMode(hIn, &con_mode);
+  SetConsoleMode(hIn, con_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT));
+
+  while (ReadConsoleA(hIn, &ch, 1, &dwRead, NULL) && ch != RETURN) {
+#else
+  const char BACKSPACE = 127;
+  const char RETURN = 10;
+
+  while ((ch = getch()) != RETURN) {
+#endif
+    if (ch == BACKSPACE) {
+      if (ptr != mem.data()) {
+        *(ptr--) = '\0';
+        std::cout << "\b \b" << std::flush;
+      }
+    }
+    else if ((size_t)(ptr - mem.data()) < mem.size() &&
+             ch >=32 && ch <= 126) {
+      *(ptr++) = ch;
+      std::cout << '*' << std::flush;
+    }
+    else break;
+  }
+
+  *ptr = '\0';
+  std::cout << std::endl;
+
+  const auto sz = strlen(mem.data());
+  if (!sz) return false;
+
+  return ferror(stdin) == 0;
+}
+
+bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk) {
+  // First read private
+  std::ifstream skFile(pathToSk);
+  std::string pk58;
+
+  if (skFile.is_open()) {
+    std::string sk58;
+    std::vector<uint8_t> sk;
+
+    std::getline(skFile, sk58);
+    skFile.close();
+    DecodeBase58(sk58, sk);
+
+    if (!sk.size()) {
+      LOG_ERROR("Couldn't decode Base58 in " << pathToSk);
+      return false;
+    }
+
+    const auto encFlag = sk.front();
+    sk.erase(sk.begin());
+
+    if (encFlag) { // Check the encryption flag
+      while (!privateKey_) {
+        if (!std::cin.good()) return false;
+        std::cout << "Enter password: " << std::flush;
+        cscrypto::MemGuard<char, 256> pass;
+        if (!readPasswordFromCin(pass)) return false;
+        std::cout << "Trying to open file..." << std::endl;
+        privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, pass.data());
+
+        if (!privateKey_) std::cout << "Incorrect password (or corrupted file)" << std::endl;
+      }
+    }
+    else {
+      privateKey_ = cscrypto::PrivateKey::readFromBytes(sk);
+
+      if (!privateKey_) {
+        LOG_ERROR("Bad private key in " << pathToSk);
+        return false;
+      }
+
+      cscrypto::FillWithZeros(sk.data(), sk.size());
+      cscrypto::FillWithZeros(sk58.data(), sk58.size());
+    }
+
+    publicKey_ = cscrypto::GetMatchingPublic(privateKey_);
+    pk58 = EncodeBase58(publicKey_.data(),
+                        (publicKey_.data() + PUBLIC_KEY_LENGTH));
+  }
+  else {
+    // No private key detected
+    for (;;) {
+      std::cout << "No suitable keys were found. Type \"g\" to generate or \"q\" to quit." << std::endl;
+      char flag;
+      std::cin >> flag;
+
+      if (flag == 'g') {
+        std::vector<uint8_t> skBytes;
+        cscrypto::GenerateKeyPair(publicKey_, privateKey_);
+
+        std::cout << "Choose your private key file encryption type (enter number):" << std::endl;
+        std::cout << "[1] Encrypt with password (recommended)" << std::endl;
+        std::cout << "[2] No encryption" << std::endl;
+        std::cout << "[q] Quit" << std::endl;
+
+        char sChoice = '\0';
+        while (sChoice != '1' && sChoice != '2' && sChoice != 'q') {
+          std::cout << "Enter choice: " << std::flush;
+          std::cin >> sChoice;
+          if (!std::cin.good()) return false;
+        }
+
+        if (sChoice == 'q') return false;
+        else if (sChoice == '1') {
+          bool pGood = false;
+          cscrypto::MemGuard<char, 256> pass;
+
+          while (!pGood) {
+            if (!std::cin.good()) return false;
+            // Encrypted
+            std::cout << "Enter password: " << std::flush;
+            if (!readPasswordFromCin(pass)) return false;
+            const auto pLen = strlen(pass.data());
+
+            if (pLen < MIN_PASSWORD_LENGTH) {
+              std::cout << "Password is too short, minimum length is " << MIN_PASSWORD_LENGTH << std::endl;
+              continue;
+            }
+            else if (pLen > MAX_PASSWORD_LENGTH) {
+              std::cout << "Password is too long, maximum length is " << MAX_PASSWORD_LENGTH << std::endl;
+              continue;
+            }
+
+            std::cout << "Confirm password: " << std::flush;
+            cscrypto::MemGuard<char, 256> passConf;
+            if (!readPasswordFromCin(passConf)) return false;
+
+            if (strcmp(pass.data(), passConf.data()) != 0) {
+              std::cout << "Passwords do not match" << std::endl;
+              continue;
+            }
+
+            pGood = true;
+          }
+
+          skBytes = privateKey_.getEncrypted(pass.data());
+          skBytes.insert(skBytes.begin(), true);  // Encryption flag
+        }
+        else {
+          auto sk = privateKey_.access();
+          skBytes.assign(sk.data(), sk.data() + sk.size());
+          skBytes.insert(skBytes.begin(), false); // Encryption flag
+        }
+
+        pk58 = EncodeBase58(publicKey_.data(),
+                            (publicKey_.data() + PUBLIC_KEY_LENGTH));
+        std::string sk58 = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
+
+        writeFile(pathToPk, pk58);
+        writeFile(pathToSk, sk58);
+
+        // Just in case...
+        cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
+        cscrypto::FillWithZeros(const_cast<uint8_t*>(skBytes.data()), skBytes.size());
+
+        LOG_EVENT("Keys generated");
+        break;
+      }
+      else if (flag == 'q')
+        return false;
+    }
+  }
+
+  // Okay so by now we have both public and private key fields filled up
+  std::ifstream pkFile(pathToPk);
+  bool pkGood = false;
+
+  if (pkFile.is_open()) {
+    std::string pkFileCont;
+    std::getline(pkFile, pkFileCont);
+    pkFile.close();
+
+    pkGood = (pkFileCont == pk58);
+  }
+
+  if (!pkGood) {
+    std::cout << "The PUBLIC key file not found or doesn't contain a valid key (matching the provided private key). Type \"f\" to rewrite the PUBLIC key file." << std::endl;
+    char flag;
+    std::cin >> flag;
+    if (flag == 'f')
+      writeFile(pathToPk, pk58);
+    else
+      return false;
+  }
+
+  return true;
 }
 
 Config Config::readFromFile(const std::string& fileName) {
