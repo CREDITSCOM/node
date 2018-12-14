@@ -508,7 +508,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
   csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
-  if (getBlockChain().getLastWrittenSequence() < sequence) {
+  if (getBlockChain().getLastWrittenSequence() <= sequence) {
     // otherwise senseless, this block is already in chain
     cs::Characteristic characteristic;
     characteristic.mask = std::move(characteristicMask);

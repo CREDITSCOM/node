@@ -169,6 +169,8 @@ private:
 
   void writeBlock(csdb::Pool& pool);
 
+  void postWriteBlock(csdb::Pool& pool);
+
   bool initFromDB(cs::WalletsCache::Initer& initer);
 
   template <typename WalletCacheProcessor>
@@ -193,6 +195,8 @@ private:
 
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
                        const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
+
+  void updateLastBlockTrustedConfidants(const csdb::Pool& pool);
 
 private:
   bool good_;
@@ -308,6 +312,10 @@ private:
     bool by_sync;
   };
   std::map<csdb::Pool::sequence_t, BlockMeta> cachedBlocks_;
+
+  // block storage to defer storing it in blockchain until confirmation from other nodes got
+  // (idea is it is more easy not to store block immediately then to revert it after storing)
+  csdb::Pool deferredBlock_;
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;

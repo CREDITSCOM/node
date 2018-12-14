@@ -503,7 +503,7 @@ void Pool::set_signature(const std::string& signature) noexcept {
   data->signature_ = signature;
 }
 
-void Pool::set_confidants(std::vector<::std::vector<uint8_t>>& confidants) noexcept {
+void Pool::set_confidants(const std::vector<::std::vector<uint8_t>>& confidants) noexcept {
   if (d.constData()->read_only_) {
     return;
   }
@@ -590,6 +590,13 @@ bool Pool::compose() {
 
 ::csdb::internal::byte_array Pool::to_binary() const noexcept {
   return d->binary_representation_;
+}
+
+void Pool::update_binary() {
+  d->binary_representation_.clear();
+
+  uint32_t size = 0;
+  to_byte_stream(size);
 }
 
 uint64_t Pool::get_time() const noexcept

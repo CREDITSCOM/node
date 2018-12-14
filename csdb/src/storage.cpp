@@ -439,8 +439,6 @@ bool Storage::write_queue_pop(Pool &res_pool) {
 }
 
 Pool Storage::pool_load(const PoolHash &hash) const {
-  Pool empty_Pool{};
-
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
@@ -475,8 +473,6 @@ Pool Storage::pool_load(const PoolHash &hash) const {
 }
 
 Pool Storage::pool_load(const uint32_t sequence) const {
-  Pool empty_Pool{};
-
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};

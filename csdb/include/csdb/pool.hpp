@@ -153,7 +153,7 @@ public:
   void set_storage(const Storage& storage) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
   void set_signature(const std::string& signature) noexcept;
-  void set_confidants(std::vector<::std::vector<uint8_t>>& confidants) noexcept;
+  void set_confidants(const std::vector<::std::vector<uint8_t>>& confidants) noexcept;
   void add_signature(int index, ::std::string& signature) noexcept;
 
   Transactions& transactions();
@@ -210,6 +210,8 @@ public:
    *         массив в противном случае.
    */
   ::csdb::internal::byte_array to_binary() const noexcept;
+
+  void update_binary();
 
   /**
    * @brief Сохранение пула в хранилище.
