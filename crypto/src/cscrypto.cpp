@@ -9,7 +9,7 @@ namespace cscrypto {
 
 void CalculateHash(Hash& hash, const Byte* data, size_t data_size) {
   assert(data != nullptr);
-  blake2sp(hash.data(), BLAKE2S_OUTBYTES, data, data_size, 0, 0);
+  blake2s(hash.data(), BLAKE2S_OUTBYTES, data, data_size, 0, 0);
 }
 
 bool CryptoInit() {

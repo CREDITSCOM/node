@@ -324,7 +324,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   std::vector<uint8_t> writer_public_key_;
-  //::std::array<uint8_t, 32> writer_public_key_;
+  //::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
   ::std::vector<std::pair<int, ::std::string>> signatures_;
   ::csdb::internal::byte_array binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -708,7 +708,7 @@ bool Pool::verify_signature() {
 }
 
 bool Pool::verify_signature(const std::string& signature) {
-  if (this->writer_public_key().size() != internal::kPublicKeySize || signature.size() != internal::kSignatureLength) {
+  if (this->writer_public_key().size() != cscrypto::kPublicKeySize || signature.size() != cscrypto::kSignatureSize) {
     return false;
   }
   const auto& pool_bytes = this->to_byte_stream_for_sig();

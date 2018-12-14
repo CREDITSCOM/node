@@ -7,6 +7,7 @@
 #include <csdb/transaction.hpp>
 #include <boost/dynamic_bitset.hpp>
 #include <csnode/transactionstail.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include <memory>
 #include <vector>
 #include <map>
@@ -30,7 +31,7 @@ public:
 
 public:
   struct WalletData {
-    using Address = std::array<uint8_t, 32>;
+    using Address = std::array<uint8_t, cscrypto::kPublicKeySize>;
 
     Address address_;
     csdb::Amount balance_;

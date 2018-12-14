@@ -9,7 +9,7 @@
 #include <csdb/transaction.hpp>
 #include <csdb/address.hpp>
 #include <csdb/currency.hpp>
-#include <sodium.h>
+#include <cscrypto/cscrypto.hpp>
 
 #include <lib/system/utils.hpp>
 
@@ -24,11 +24,9 @@ TEST(TransactionsPacket, createPacket)
 TEST(TransactionsPacket, addTransactions)
 {
     auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
-    std::vector<uint8_t> myPublicForSig;
-    std::vector<uint8_t> myPrivateForSig;
-    myPublicForSig.resize(32);
-    myPrivateForSig.resize(64);
-    crypto_sign_ed25519_keypair(myPublicForSig.data(), myPrivateForSig.data());
+    cscrypto::PublicKey myPublicForSig;
+    cscrypto::PrivateKey myPrivateForSig;
+    cscrypto::GenerateKeyPair(myPublicForSig, myPrivateForSig);
 
     csdb::Transaction transaction;
     transaction.set_target(csdb::Address::from_public_key((char*)myPublicForSig.data()));

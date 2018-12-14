@@ -161,7 +161,7 @@ TEST(DataStream, CorrectlySkipsRequestedNumberOfBytes) {
   ASSERT_FALSE(stream.isAvailable(1));
 }
 
-TEST(DateStream, TransactionHashIsCorrectlyReadFromStream) {
+TEST(DataStream, TransactionHashIsCorrectlyReadFromStream) {
   unsigned char data[] = {0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                           0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04,
                           0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e,
@@ -197,7 +197,7 @@ TEST(DataStream, VectorIsCorrectlyWritenToStream) {
   ASSERT_EQ(bytes, target_bytes);
 }
 
-TEST(DateStream, VectorIsCorrectlyReadFromStream) {
+TEST(DataStream, VectorIsCorrectlyReadFromStream) {
   unsigned char data[] = {0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                           0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
   cs::DataStream stream(data, sizeof data);

@@ -17,8 +17,6 @@ using namespace cs;
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
 , dbLock_()
-, globalSequence_(static_cast<decltype(globalSequence_)>(-1))
-, blockRequestIsNeeded_(false)
 , genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
@@ -245,7 +243,6 @@ void BlockChain::writeGenesisBlock() {
 
   writeBlock(genesis);
 
-  globalSequence_ = genesis.sequence();
   cslog() << genesis.hash().to_string();
 
   uint32_t bSize;
@@ -406,16 +403,10 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     lastHash_ = pool.hash();
     csdebug() << " last hash: " << lastHash_.to_string();
 
-    if (globalSequence_ == getLastWrittenSequence()) {
-      blockRequestIsNeeded_ = false;
-    }
     recount_trxns(pool);
   }
   else {
     cslog() << " sequence failed, chain syncro start";
-    ////////////////////////////////////////////////////////Chain::getBlockRequestNeed()////////////////////////////////////// Syncro!!!
-    globalSequence_ = pool.sequence();
-    blockRequestIsNeeded_ = true;
   }
   cslog() << "--------------------------------------------------------------------------------";
 }
@@ -428,14 +419,6 @@ const csdb::Storage& BlockChain::getStorage() const {
   return storage_;
 }
 
-csdb::Pool::sequence_t BlockChain::getGlobalSequence() const {
-  return globalSequence_;
-}
-
-void BlockChain::setGlobalSequence(uint32_t seq) {
-  globalSequence_ = seq;
-}
-
 csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
   csdb::PoolHash res{};
   if (!blockHashes_->find(seq, res))
@@ -445,10 +428,6 @@ csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
 
 uint32_t BlockChain::getRequestedBlockNumber() const {
   return getLastWrittenSequence() + 1;
-}
-
-bool BlockChain::getBlockRequestNeed() const {
-  return blockRequestIsNeeded_;
 }
 
 uint64_t BlockChain::getWalletsCount() {
@@ -852,7 +831,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     updateWalletIds(pool, *walletsCacheUpdater_);
   }
   writeBlock(pool);
-  setGlobalSequence(getLastWrittenSequence());
   return std::make_pair(true, pool);
 }
 
@@ -937,7 +915,16 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
-  const auto roundNumber = currentRoundNumber ? currentRoundNumber - 1 : 0;
+  auto roundNumber = 0;
+
+  if (currentRoundNumber) {
+    if (currentRoundNumber > firstSequence) {
+      roundNumber = currentRoundNumber - 1;
+    }
+    else {
+      roundNumber = firstSequence;
+    }
+  }
 
   // return at least [next..0]:
   std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };

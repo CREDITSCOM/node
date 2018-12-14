@@ -9,6 +9,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include "lib/system/utils.hpp"
 
 #include <lz4.h>
@@ -35,8 +36,8 @@ enum Offsets : uint32_t {
   IdWhenSingle = 1,
   SenderWhenFragmented = 13,
   SenderWhenSingle = 9,
-  AddresseeWhenFragmented = 45,
-  AddresseeWhenSingle = 41
+  AddresseeWhenFragmented = cscrypto::kPublicKeySize + SenderWhenFragmented,
+  AddresseeWhenSingle = cscrypto::kPublicKeySize + SenderWhenSingle
 };
 
 enum MsgTypes : uint8_t {
