@@ -43,8 +43,8 @@ template <>
 struct Dbt_copy<::csdb::internal::byte_array> : public Dbt {
   explicit Dbt_copy(const ::csdb::internal::byte_array &data) {
     set_data(const_cast<unsigned char *>(data.data()));
-    set_size(data.size());
-    set_ulen(data.size());
+    set_size(static_cast<uint32_t>(data.size()));
+    set_ulen(static_cast<uint32_t>(data.size()));
     set_flags(DB_DBT_USERMEM);
   }
 };

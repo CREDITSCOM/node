@@ -164,7 +164,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    transactionsCount_ = cnt;
+    transactionsCount_ = static_cast<decltype(transactionsCount_)>(cnt);
     is_valid_ = true;
 
     return true;
@@ -654,7 +654,7 @@ char* Pool::to_byte_stream(uint32_t& size) {
     d->binary_representation_ = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
   }
 
-  size = d->binary_representation_.size();
+  size = static_cast<uint32_t>(d->binary_representation_.size());
   return reinterpret_cast<char*>(d->binary_representation_.data());
 }
 

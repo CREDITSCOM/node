@@ -35,7 +35,7 @@ std::size_t encode(void *buf, uint64_t value) {
   uint8_t bytes = 8;
   uint8_t first = (uint8_t) '\xFF';
   if (57 > bits) {
-    bytes = ((bits - 1) / 7);
+    bytes = static_cast<uint8_t>((bits - 1) / 7);
     first = static_cast<char>((value << (bytes + 1u)) | ((1u << bytes) - 1u));
     value >>= (7 - bytes);
   }
