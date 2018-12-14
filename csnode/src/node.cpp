@@ -1284,7 +1284,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
   
-  csprint() << "(): Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csprint() << "Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp << std::endl
@@ -1327,7 +1327,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   // cache
   stageOneMessage_[myConfidantIndex_] = std::move(message);
-  csprint() << "(): done";
+  csprint() << "done";
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
