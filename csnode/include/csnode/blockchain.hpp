@@ -108,11 +108,6 @@ public:
 
   uint32_t getRequestedBlockNumber() const;
 
-  void setGlobalSequence(uint32_t seq);
-  csdb::Pool::sequence_t getGlobalSequence() const;
-
-  bool getBlockRequestNeed() const;
-
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
 #ifdef MONITOR_NODE
@@ -174,6 +169,8 @@ private:
 
   void writeBlock(csdb::Pool& pool);
 
+  void postWriteBlock(csdb::Pool& pool);
+
   bool initFromDB(cs::WalletsCache::Initer& initer);
 
   template <typename WalletCacheProcessor>
@@ -199,6 +196,8 @@ private:
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
                        const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
+  void updateLastBlockTrustedConfidants(const csdb::Pool& pool);
+
 private:
   bool good_;
 
@@ -206,8 +205,6 @@ private:
   csdb::Storage storage_;
 
   csdb::PoolHash lastHash_;
-  csdb::Pool::sequence_t globalSequence_;
-  bool blockRequestIsNeeded_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
 
@@ -315,6 +312,10 @@ private:
     bool by_sync;
   };
   std::map<csdb::Pool::sequence_t, BlockMeta> cachedBlocks_;
+
+  // block storage to defer storing it in blockchain until confirmation from other nodes got
+  // (idea is it is more easy not to store block immediately then to revert it after storing)
+  csdb::Pool deferredBlock_;
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;

@@ -17,8 +17,6 @@ using namespace cs;
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
 , dbLock_()
-, globalSequence_(static_cast<decltype(globalSequence_)>(-1))
-, blockRequestIsNeeded_(false)
 , genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
@@ -148,43 +146,16 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 }
 #endif
 
-/*void BlockChain::writeBlock(csdb::Pool& pool) {
-  {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    pool.set_storage(storage_);
-  }
-
-  if (!pool.compose())
-    if (!pool.compose()) {
-      cserror() << "Couldn't compose block";
-      if (!pool.save())
-        return;
-    }
-
-  if (!pool.save()) {
-    cserror() << "Couldn't save block";
-    return;
-  }
-
-  cslog() << "Block " << pool.sequence() << " saved succesfully";
-
-#ifdef TRANSACTIONS_INDEX
-  createTransactionsIndex(pool);
-#endif
-
-  if (!updateFromNextBlock(pool)) {
-    cserror() << "Couldn't update from next block";
-  }
-
-  {
-    std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
-    newBlockCv_.notify_all();
-  }
-}*/
-
 uint32_t BlockChain::getLastWrittenSequence() const {
-  return (blockHashes_->empty()) ? static_cast<uint32_t>(-1)
-                                 : static_cast<uint32_t>(blockHashes_->getDbStructure().last_);
+  if (deferredBlock_.is_valid()) {
+    return static_cast<uint32_t>(deferredBlock_.sequence());
+  }
+  else if (blockHashes_->empty()) {
+    return static_cast<uint32_t>(-1);
+  }
+  else {
+    return static_cast<uint32_t>(blockHashes_->getDbStructure().last_);
+  }
 }
 
 void BlockChain::writeGenesisBlock() {
@@ -253,8 +224,10 @@ void BlockChain::writeGenesisBlock() {
   cslog() << "Genesis block completed ... trying to save";
 
   writeBlock(genesis);
+  postWriteBlock(genesis);
 
-  globalSequence_ = genesis.sequence();
+  //deferredBlock_ = genesis;
+
   cslog() << genesis.hash().to_string();
 
   uint32_t bSize;
@@ -289,21 +262,33 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 
 csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.is_valid()) {
+    return deferredBlock_.hash();
+  }
+
   return storage_.last_hash();
 }
 
 size_t BlockChain::getSize() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  return storage_.size();
+  const auto storageSize = storage_.size();
+
+  return deferredBlock_.is_valid() ? (storageSize + 1) : storageSize;
 }
 
 csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.hash() == ph) {
+    return deferredBlock_;
+  }
   return storage_.pool_load(ph);
 }
 
 csdb::Pool BlockChain::loadBlock(const uint32_t sequence) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.sequence() == sequence) {
+    return deferredBlock_;
+  }
   return storage_.pool_load(sequence);
 }
 
@@ -314,13 +299,18 @@ csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) cons
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  if (deferredBlock_.hash() == transId.pool_hash()) {
+    return deferredBlock_.transaction(transId);
+  }
+
   return storage_.transaction(transId);
 }
 
 void BlockChain::removeLastBlock() {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  auto pool = storage_.pool_remove_last();
-  removeWalletsInPoolFromCache(pool);
+  deferredBlock_ = csdb::Pool();
+//  auto pool = storage_.pool_remove_last();
+//  removeWalletsInPoolFromCache(pool);
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -364,69 +354,55 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
   cslog() << " transactions count " << pool.transactions_count();
   csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   csdebug() << " previous hash: " << lastHash_.to_string();
-  csdebug() << " last storage size: " << storage_.size();
+  csdebug() << " last storage size: " << getSize();
 
-  if (pool.sequence() == getLastWrittenSequence() + 1) {
-    cslog() << " sequence OK";
-    pool.set_previous_hash(lastHash_);
+  cslog() << " sequence OK";
+  pool.set_previous_hash(lastHash_);
 
-    // former writeBlock():
-    {
-      std::lock_guard<decltype(dbLock_)> l(dbLock_);
-      pool.set_storage(storage_);
-    }
-    if(!pool.compose()) {
-      cserror() << "Couldn't compose block";
-      if(!pool.save())
-        return;
-    }
-    if(!pool.save()) {
-      cserror() << "Couldn't save block";
-      return;
-    }
-
-#ifdef TRANSACTIONS_INDEX
-    createTransactionsIndex(pool);
-#endif
-
-    cslog() << "Block " << pool.sequence() << " saved succesfully";
-    if(!updateFromNextBlock(pool)) {
-      cserror() << "Couldn't update from next block";
-    }
-
-    // inspect transactions against smart contracts, raise special event on every item found:
-    if(pool.transactions_count() > 0) {
-      size_t idx = 0;
-      for(const auto& t : pool.transactions()) {
-        if(cs::SmartContracts::is_smart_contract(t)) {
-          csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
-          emit smartContractEvent_(pool, idx);
-        }
-        ++idx;
-      }
-    }
-
-    {
-      std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
-      newBlockCv_.notify_all();
-    }
-    // end of former writeBlock()
-
-    lastHash_ = pool.hash();
-    csdebug() << " last hash: " << lastHash_.to_string();
-
-    if (globalSequence_ == getLastWrittenSequence()) {
-      blockRequestIsNeeded_ = false;
-    }
-    recount_trxns(pool);
+  // former writeBlock():
+  {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    pool.set_storage(storage_);
   }
-  else {
-    cslog() << " sequence failed, chain syncro start";
-    ////////////////////////////////////////////////////////Chain::getBlockRequestNeed()////////////////////////////////////// Syncro!!!
-    globalSequence_ = pool.sequence();
-    blockRequestIsNeeded_ = true;
+  if(!pool.save()) {
+    cserror() << "Couldn't save block";
+    return;
+  }
+
+  {
+    std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
+    newBlockCv_.notify_all();
   }
   cslog() << "--------------------------------------------------------------------------------";
+}
+
+void BlockChain::postWriteBlock(csdb::Pool& pool) {
+#ifdef TRANSACTIONS_INDEX
+  createTransactionsIndex(pool);
+#endif
+
+  cslog() << "Block " << pool.sequence() << " saved succesfully";
+  if(!updateFromNextBlock(pool)) {
+    cserror() << "Couldn't update from next block";
+  }
+
+  // inspect transactions against smart contracts, raise special event on every item found:
+  if(pool.transactions_count() > 0) {
+    size_t idx = 0;
+    for(const auto& t : pool.transactions()) {
+      if(cs::SmartContracts::is_smart_contract(t)) {
+        csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
+        emit smartContractEvent_(pool, idx);
+      }
+      ++idx;
+    }
+  }
+  // end of former writeBlock()
+
+  lastHash_ = pool.hash();
+  csdebug() << " last hash: " << lastHash_.to_string();
+
+  recount_trxns(pool);
 }
 
 csdb::PoolHash BlockChain::getLastWrittenHash() const {
@@ -437,27 +413,18 @@ const csdb::Storage& BlockChain::getStorage() const {
   return storage_;
 }
 
-csdb::Pool::sequence_t BlockChain::getGlobalSequence() const {
-  return globalSequence_;
-}
-
-void BlockChain::setGlobalSequence(uint32_t seq) {
-  globalSequence_ = seq;
-}
-
 csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
   csdb::PoolHash res{};
-  if (!blockHashes_->find(seq, res))
+  if (deferredBlock_.sequence() == seq) {
+    return deferredBlock_.hash();
+  }
+  if (!blockHashes_->find(seq + 1, res))
     return csdb::PoolHash{};
   return res;
 }
 
 uint32_t BlockChain::getRequestedBlockNumber() const {
   return getLastWrittenSequence() + 1;
-}
-
-bool BlockChain::getBlockRequestNeed() const {
-  return blockRequestIsNeeded_;
 }
 
 uint64_t BlockChain::getWalletsCount() {
@@ -843,6 +810,12 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   const auto last_seq = getLastWrittenSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
+
+  if (last_seq == pool_seq) {
+    updateLastBlockTrustedConfidants(pool);
+    return std::make_pair(true, deferredBlock_);
+  }
+
   if (last_seq + 1 != pool_seq) {
     cserror() << "BLOCKCHAIN> cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
     return std::make_pair(false, std::nullopt);
@@ -860,9 +833,20 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, update wallets ids";
     updateWalletIds(pool, *walletsCacheUpdater_);
   }
-  writeBlock(pool);
-  setGlobalSequence(getLastWrittenSequence());
-  return std::make_pair(true, pool);
+
+  if (deferredBlock_.is_valid()) {
+    writeBlock(deferredBlock_);
+  }
+
+  if(!pool.compose()) {
+    cserror() << __func__ << " Couldn't compose block";
+  }
+
+  deferredBlock_ = pool;
+
+  postWriteBlock(deferredBlock_);
+
+  return std::make_pair(true, deferredBlock_);
 }
 
 bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
@@ -946,9 +930,9 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
-  const auto roundNumber = currentRoundNumber ? currentRoundNumber - 1 : 0;
+  const auto roundNumber = currentRoundNumber ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
-  // return at least [next..0]:
+  // return at least [next, 0] or [next, currentRoundNumber]:
   std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };
 
   // always point to last interval
@@ -976,6 +960,21 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
   }
 
   return vec;
+}
+
+void BlockChain::updateLastBlockTrustedConfidants(const csdb::Pool& pool) {
+  const auto& deffConfidants = deferredBlock_.confidants();
+  const auto& newConfidants = pool.confidants();
+
+  if (deffConfidants != newConfidants) {
+    cswarning() << "BLOCKCHAIN> " << " confidants in new pool is same as cached pool";
+    return;
+  }
+
+  csdebug() << "BLOCKCHAIN> " << __func__;
+
+  deferredBlock_.set_confidants(newConfidants);
+  deferredBlock_.update_binary();
 }
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet)
