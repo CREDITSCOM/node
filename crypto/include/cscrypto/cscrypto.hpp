@@ -89,7 +89,7 @@ public:
   static PrivateKey readFromBytes(const std::vector<Byte>&);
   static PrivateKey readFromEncrypted(const std::vector<Byte>&, const char* passwd);
 
-  std::vector<Byte> getEncrypted(const char* passwd);
+  std::vector<Byte> getEncrypted(const char* passwd) const;
   static PrivateKey generateWithPair(PublicKey&);
 
 private:

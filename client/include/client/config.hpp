@@ -146,7 +146,7 @@ private:
   void readPoolSynchronizerData(const boost::property_tree::ptree& config);
   void readApiData(const boost::property_tree::ptree& config);
 
-  bool readKeys(const std::string& pathToPk, const std::string& pathToSk);
+  bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
 
   template<typename T>
   bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);

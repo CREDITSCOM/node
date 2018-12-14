@@ -108,7 +108,7 @@ PrivateKey PrivateKey::readFromEncrypted(const std::vector<Byte>& bytes, const c
   return result;
 }
 
-std::vector<Byte> PrivateKey::getEncrypted(const char* passwd) {
+std::vector<Byte> PrivateKey::getEncrypted(const char* passwd) const {
   std::vector<Byte> result;
 
   auto key = getKeyFromPassword(passwd);
