@@ -13,6 +13,6 @@
 
 #define TRANSACTIONS_INDEX
 #define TOKENS_CACHE
-#define STATS
+//#define STATS
 
 #endif

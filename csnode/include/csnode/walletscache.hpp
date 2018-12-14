@@ -87,6 +87,9 @@ private:
 
   protected:
     static WalletData& getWalletData(Data& wallets, WalletId id, const csdb::Address& address);
+#ifdef MONITOR_NODE
+    bool setWalletTime(const WalletData::Address& address, const uint64_t &p_timeStamp);
+#endif
 
   protected:
     WalletsCache& data_;

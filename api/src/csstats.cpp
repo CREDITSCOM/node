@@ -76,6 +76,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   total.poolsCount += periodStats.poolsCount;
   total.transactionsCount += periodStats.transactionsCount;
   total.smartContractsCount += periodStats.smartContractsCount;
+  total.transactionsSmartCount += periodStats.transactionsSmartCount;
 
   for (auto& element : periodStats.balancePerCurrency) {
     total.balancePerCurrency[element.first].integral += element.second.integral;
@@ -95,6 +96,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.poolsCount -= lastPeriodStats.poolsCount;
       stat.smartContractsCount -= lastPeriodStats.smartContractsCount;
       stat.transactionsCount -= lastPeriodStats.transactionsCount;
+      stat.transactionsSmartCount -= lastPeriodStats.transactionsSmartCount;
 
       for (auto& element : lastPeriodStats.balancePerCurrency) {
         stat.balancePerCurrency[element.first].integral -= element.second.integral;
@@ -105,6 +107,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       stat.poolsCount += periodStats.poolsCount;
       stat.smartContractsCount += periodStats.smartContractsCount;
       stat.transactionsCount += periodStats.transactionsCount;
+      stat.transactionsSmartCount += periodStats.transactionsSmartCount;
 
       for (auto& element : periodStats.balancePerCurrency) {
         stat.balancePerCurrency[element.first].integral += element.second.integral;
@@ -155,6 +158,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   unsigned int currentCutIndex = 0;
   auto startCutTime = stats.first[currentCutIndex].timeStamp;
   auto endCutTime = stats.first[currentCutIndex + 1].timeStamp;
+
+  auto future_lastHash = blockchain.getLastWrittenHash();
 
   while (!blockHash.is_empty() && !quit) {
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -221,7 +226,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
     blockHash = pool.previous_hash();
   }
 
-  lastHash = blockchain.getLastWrittenHash();
+  //lastHash = blockchain.getLastWrittenHash();
+  lastHash = future_lastHash;
 
   auto finishTime = std::chrono::system_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);

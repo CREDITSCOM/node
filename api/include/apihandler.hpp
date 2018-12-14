@@ -139,12 +139,14 @@ public:
   void TokenHoldersGet(api::TokenHoldersResult&,const api::Address&, int64_t offset, int64_t limit, const TokenHoldersSortField order, const bool desc) override;
   void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc) override;
 #ifdef TRANSACTIONS_INDEX
-  void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit);
-  void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit);
+  void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit) override;
+  void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
 #endif
   void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
   void WritersGet(api::WritersGetResult& _return, int32_t page) override;
   ////////new
+
+  bool convertAddrToPublicKey(const csdb::Address& address);
 
 private:
   struct smart_trxns_queue {
@@ -198,7 +200,7 @@ private:
 
   api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-  bool convertAddrToPublicKey(const csdb::Address& address);
+  //bool convertAddrToPublicKey(const csdb::Address& address);
 
   template <typename Mapper>
   size_t get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper,
