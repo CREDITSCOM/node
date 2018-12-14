@@ -296,9 +296,6 @@ private:
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
 
-  // sync meta
-  cs::PoolMetaMap poolMetaMap_;  // active pool meta information
-
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;
@@ -315,9 +312,8 @@ private:
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;
   std::vector<cs::Bytes> smartStageThreeMessage_;
+
   bool isSmartStageStorageCleared_ = false;
-
-
   SentRoundData lastSentRoundData_;
 
   // round stat
