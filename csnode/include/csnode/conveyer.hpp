@@ -32,7 +32,7 @@ public:
   };
 
   enum : unsigned int {
-    HashTablesStorageCapacity = 5,
+    HashTablesStorageCapacity = cs::values::defaultMetaStorageMaxSize,
     CharacteristicMetaCapacity = HashTablesStorageCapacity,
   };
 
