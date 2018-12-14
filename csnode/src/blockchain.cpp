@@ -12,7 +12,12 @@
 #include <csnode/fee.hpp>
 #include <solver/smartcontracts.hpp>
 
+#include <client/config.hpp>
+
 using namespace cs;
+
+void generateCheatDbFile(std::string, const BlockHashes&);
+bool validateCheatDbFile(std::string, const BlockHashes&);
 
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
@@ -34,7 +39,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 
   cslog() << "DB is opened";
 
-  blockHashes_.reset(new cs::BlockHashes("test_db/dbs.txt"));
+  blockHashes_ = std::make_unique<cs::BlockHashes>();
 
   if (storage_.last_hash().is_empty()) {
     cslog() << "Last hash is empty...";
@@ -44,6 +49,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     writeGenesisBlock();
+    generateCheatDbFile(path, *blockHashes_);
   }
   else {
     cslog() << "Last hash is not empty...";
@@ -60,6 +66,11 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+
+    if (!validateCheatDbFile(path, *blockHashes_)) {
+      cserror() << "Bad database version";
+      return;
+    }
   }
 
   good_ = true;
@@ -91,8 +102,6 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
       ++current_sequence;
     }
-
-    blockHashes_->saveDbStructure();
 
     lastHash_ = getLastHash();
 
@@ -159,39 +168,40 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 }
 #endif
 
-/*void BlockChain::writeBlock(csdb::Pool& pool) {
-  {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    pool.set_storage(storage_);
-  }
+const std::string CHEAT_FILENAME = "__integr.seq";
 
-  if (!pool.compose())
-    if (!pool.compose()) {
-      cserror() << "Couldn't compose block";
-      if (!pool.save())
-        return;
-    }
+std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
+  if (path.size() && path.back() != '/') path.push_back('/');
+  path+= CHEAT_FILENAME;
 
-  if (!pool.save()) {
-    cserror() << "Couldn't save block";
-    return;
-  }
+  std::array<cscrypto::Byte, cscrypto::kHashSize + sizeof(NODE_VERSION)> data;
 
-  cslog() << "Block " << pool.sequence() << " saved succesfully";
+  csdb::PoolHash genHash;
+  bh.find(0, genHash);
+  auto hb = genHash.to_binary();
 
-#ifdef TRANSACTIONS_INDEX
-  createTransactionsIndex(pool);
-#endif
+  memcpy(data.data(), hb.data(), cscrypto::kHashSize);
+  memcpy(data.data() + cscrypto::kHashSize, reinterpret_cast<const cscrypto::Byte*>(&NODE_VERSION), sizeof(NODE_VERSION));
 
-  if (!updateFromNextBlock(pool)) {
-    cserror() << "Couldn't update from next block";
-  }
+  return EncodeBase58(data.data(), data.data() + sizeof(data));
+}
 
-  {
-    std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
-    newBlockCv_.notify_all();
-  }
-}*/
+void generateCheatDbFile(std::string path, const BlockHashes& bh) {
+  const auto cd = prepareCheatData(path, bh);
+
+  std::ofstream f(path);
+  f << cd;
+}
+
+bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+  const auto cd = prepareCheatData(path, bh);
+
+  std::ifstream f(path);
+  std::string rcd;
+  f >> rcd;
+
+  return rcd == cd;
+}
 
 uint32_t BlockChain::getLastWrittenSequence() const {
   return (blockHashes_->empty()) ? static_cast<uint32_t>(-1)
@@ -712,8 +722,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants);
     walletsPools_->loadNextBlock(nextPool);
 
-    blockHashes_->loadNextBlock(nextPool);
-    if (!blockHashes_->saveDbStructure()) {
+    if (!blockHashes_->loadNextBlock(nextPool)) {
       cslog() << "Error writing DB structure";
     }
   }
@@ -937,7 +946,7 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
-  auto roundNumber = 0;
+  csdb::Pool::sequence_t roundNumber = 0;
 
   if (currentRoundNumber) {
     if (currentRoundNumber > firstSequence) {

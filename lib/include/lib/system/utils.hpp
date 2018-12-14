@@ -179,7 +179,7 @@ public:
   /// Returns value from char array
   ///
   template <typename T>
-  inline static T getFromArray(char* data, uint32_t index) {
+  inline static T getFromArray(char* data, size_t index) {
     return *(reinterpret_cast<T*>(data + index));
   }
 

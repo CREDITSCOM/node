@@ -13,8 +13,7 @@ public:
   };
 
 public:
-  BlockHashes(std::string dbs_fname);
-  bool loadDbStructure();
+  BlockHashes();
   const DbStructure& getDbStructure() const {
     return db_;
   }
@@ -25,12 +24,10 @@ public:
   bool initFromPrevBlock(csdb::Pool prevBlock);
   void initFinish();
   bool loadNextBlock(csdb::Pool nextBlock);
-  bool saveDbStructure();
 
   bool find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const;
 
 private:
-  const std::string dbs_fname_;
   std::vector<csdb::PoolHash> hashes_;
 
   DbStructure db_;
