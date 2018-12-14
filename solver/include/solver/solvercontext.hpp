@@ -265,6 +265,34 @@ public:
 
   void request_stage3(uint8_t from, uint8_t required);
 
+  void fake_stage1(uint8_t from)
+  {
+    if(core.find_stage1(from) == nullptr) {
+      cs::StageOne fake;
+      fake.sender = from;
+      fake.hash = SolverCore::fake_hash;
+      core.gotStageOne(fake);
+    }
+  }
+
+  void fake_stage2(uint8_t from)
+  {
+    if(core.find_stage2(from) == nullptr) {
+      cs::StageTwo fake;
+      fake.sender = from;
+      core.gotStageTwo(fake);
+    }
+  }
+
+  void fake_stage3(uint8_t from)
+  {
+    if(core.find_stage3(from) == nullptr) {
+      cs::StageThree fake;
+      fake.sender = from;
+      core.gotStageThree(fake);
+    }
+  }
+
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {
       if(core.markUntrusted[sender] < 255) {

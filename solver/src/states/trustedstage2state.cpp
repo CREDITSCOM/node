@@ -117,4 +117,15 @@ void TrustedStage2State::request_stages_neighbors(SolverContext& context) {
   }
 }
 
+// forces transition to next stage
+void TrustedStage2State::mark_outbound_nodes(SolverContext& context)
+{
+  uint8_t cnt = (uint8_t) context.cnt_trusted();
+  for(uint8_t i = 0; i < cnt; ++i) {
+    if(context.stage1(i) == nullptr) {
+      context.fake_stage1(i);
+    }
+  }
+}
+
 }  // namespace slv2

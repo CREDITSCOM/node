@@ -50,13 +50,16 @@ private:
 
   TimeoutTracking timeout_request_stage;
   TimeoutTracking timeout_request_neighbors;
-  // TimeoutTracking timeout_force_transition;
+  TimeoutTracking timeout_force_transition;
 
   // requests stages from corresponded nodes
   void request_stages(SolverContext& context);
 
   // requests stages from any available neighbor nodes
   void request_stages_neighbors(SolverContext& context);
+
+  // forces transition to next stage
+  void mark_outbound_nodes(SolverContext& context);
 };
 
 }  // namespace slv2
