@@ -915,7 +915,7 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastWrittenSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
-  auto roundNumber = 0;
+  csdb::Pool::sequence_t roundNumber = 0;
 
   if (currentRoundNumber) {
     if (currentRoundNumber > firstSequence) {

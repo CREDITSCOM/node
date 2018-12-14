@@ -125,7 +125,7 @@ Config Config::read(po::variables_map& vm) {
   else {
     srand(time(NULL));
 
-    for (int i = 0; i < cscrypto::kPublicKeySize; ++i) {
+    for (size_t i = 0; i < cscrypto::kPublicKeySize; ++i) {
       *(result.publicKey_.data() + i) = (char)(rand() % 255);
     }
   }
