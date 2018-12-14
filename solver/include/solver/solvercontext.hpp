@@ -52,6 +52,9 @@ public:
   : core(core) {
   }
 
+  static cs::Hash zeroHash;
+  static cs::Signature zeroSignature;
+
   /**
    * @fn  void SolverContext::request_role(Role role)
    *
@@ -265,12 +268,29 @@ public:
 
   void request_stage3(uint8_t from, uint8_t required);
 
+  void init_zero(cs::StageOne & stage)
+  {
+    stage.sender = cs::InvalidSender;
+    stage.hash.fill(0);
+    stage.messageHash.fill(0);
+    stage.signature.fill(0);
+  }
+
+  void init_zero(cs::StageTwo & stage)
+  {
+    stage.sender = cs::InvalidSender;
+    stage.signature.fill(0);
+    size_t cnt = cnt_trusted();
+    stage.hashes.resize(cnt, SolverContext::zeroHash);
+    stage.signatures.resize(cnt, SolverContext::zeroSignature);
+  }
+
   void fake_stage1(uint8_t from)
   {
     if(core.find_stage1(from) == nullptr) {
       cs::StageOne fake;
+      init_zero(fake);
       fake.sender = from;
-      fake.hash = SolverCore::fake_hash;
       core.gotStageOne(fake);
     }
   }
@@ -279,19 +299,20 @@ public:
   {
     if(core.find_stage2(from) == nullptr) {
       cs::StageTwo fake;
+      init_zero(fake);
       fake.sender = from;
       core.gotStageTwo(fake);
     }
   }
 
-  void fake_stage3(uint8_t from)
-  {
-    if(core.find_stage3(from) == nullptr) {
-      cs::StageThree fake;
-      fake.sender = from;
-      core.gotStageThree(fake);
-    }
-  }
+  //void fake_stage3(uint8_t from)
+  //{
+  //  if(core.find_stage3(from) == nullptr) {
+  //    cs::StageThree fake;
+  //    fake.sender = from;
+  //    core.gotStageThree(fake);
+  //  }
+  //}
 
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {

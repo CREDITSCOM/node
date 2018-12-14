@@ -7,6 +7,9 @@
 #include <lib/system/keys.hpp>
 
 namespace cs {
+
+  constexpr const uint8_t InvalidSender = uint8_t(-1);
+
 struct StageOne {
   uint8_t sender;
   Hash hash;

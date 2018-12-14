@@ -36,11 +36,6 @@ constexpr const bool MonitorModeOn =
     false;
 #endif  // MONITOR_NODE
 
-/*static*/
-cs::Hash SolverCore::fake_hash;
-/*static*/
-cs::PublicKey SolverCore::fake_key;
-
 // default (test intended) constructor
 SolverCore::SolverCore()
 // options
@@ -69,12 +64,6 @@ SolverCore::SolverCore()
   else if constexpr (true) {
     cslog() << "SolverCore: use default transition table";
     InitTransitions();
-  }
-  if(SolverCore::fake_hash[0] == 0) {
-    fake_hash.fill(0xFF);
-  }
-  if(SolverCore::fake_key[0] == 0) {
-    fake_key.fill(0xFF);
   }
 }
 

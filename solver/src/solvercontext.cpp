@@ -6,6 +6,14 @@
 #include <lib/system/logger.hpp>
 
 namespace cs {
+
+  /*static*/
+  cs::Hash SolverContext::zeroHash;
+
+  /*static*/
+  cs::Signature SolverContext::zeroSignature;
+
+
 BlockChain& SolverContext::blockchain() const {
   return core.pnode->getBlockChain();
 }

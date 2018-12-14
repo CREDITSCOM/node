@@ -35,9 +35,6 @@ class SolverCore {
 public:
   using Counter = size_t;
 
-  static cs::Hash fake_hash;
-  static cs::PublicKey fake_key;
-
   SolverCore();
   explicit SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address StartAddress);
 

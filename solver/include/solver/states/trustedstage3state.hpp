@@ -34,14 +34,13 @@ public:
   const char* name() const override {
     return "Trusted-3";
   }
-  void request_stages(SolverContext& context);
-  void request_stages_neighbors(SolverContext& context);
 
 protected:
   // timeout tracking
 
   TimeoutTracking timeout_request_stage;
   TimeoutTracking timeout_request_neighbors;
+  TimeoutTracking timeout_force_transition;
 
   cs::StageThree stage;
   std::vector<cs::PublicKey> next_round_trust;
@@ -50,6 +49,11 @@ protected:
   void trusted_election(SolverContext& context);
   bool pool_solution_analysis(SolverContext& context);
   uint8_t take_urgent_decision(SolverContext& context);
+
+  void request_stages(SolverContext& context);
+  void request_stages_neighbors(SolverContext& context);
+  // forces transition to next stage
+  void mark_outbound_nodes(SolverContext& context);
 };
 
 }  // namespace slv2

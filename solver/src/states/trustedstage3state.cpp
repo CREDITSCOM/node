@@ -23,6 +23,7 @@ void TrustedStage3State::on(SolverContext& context) {
   if (!context.stage2_data().empty()) {
     cslog() << name() << ": handle early received stages-2";
     for (const auto& st : context.stage2_data()) {
+      csdebug() << name() << ": stage-2[" << st.sender << "]";
       if (Result::Finish == onStage2(context, st)) {
         context.complete_stage3();
         return;
@@ -30,13 +31,18 @@ void TrustedStage3State::on(SolverContext& context) {
     }
   }
 
+  // 3 subsequent timeouts:
+  //  - request stages-2 from origins
+  //  - request stages-2 from anyone
+  //  - create fake stages-2 from outbound nodes and force to next state
+
   SolverContext* pctx = &context;
   if (Consensus::Log) {
     LOG_NOTICE(name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-2 received");
   }
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
-      // timeout handler:
+      // timeout #1 handler:
       [pctx, this]() {
         if (Consensus::Log) {
           LOG_NOTICE(name() << ": timeout for stages-2 is expired, make requests");
@@ -49,13 +55,21 @@ void TrustedStage3State::on(SolverContext& context) {
         }
         timeout_request_neighbors.start(
             pctx->scheduler(), Consensus::T_stage_request,
-            // timeout handler:
+            // timeout #2 handler:
             [pctx, this]() {
               if (Consensus::Log) {
                 LOG_NOTICE(name() << ": timeout for transition is expired, make requests to neighbors");
               }
               request_stages_neighbors(*pctx);
-            },
+              // timeout #3 handler
+              timeout_force_transition.start(
+                pctx->scheduler(), Consensus::T_stage_request,
+                [pctx, this]() {
+                  cslog() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
+                  mark_outbound_nodes(*pctx);
+                },
+                true/*replace if exists*/);
+        },
             true /*replace if exists*/);
       },
       true /*replace if exists*/);
@@ -71,6 +85,9 @@ void TrustedStage3State::off(SolverContext& /*context*/) {
     if (Consensus::Log) {
       LOG_NOTICE(name() << ": cancel track timeout to request neighbors about stages-2");
     }
+  }
+  if(timeout_force_transition.cancel()) {
+    cslog() << name() << ": cancel track timeout to force transition to next state";
   }
 }
 
@@ -95,6 +112,18 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
           context.request_stage2(d.sender, i);
         }
       }
+    }
+  }
+}
+
+// forces transition to next stage
+void TrustedStage3State::mark_outbound_nodes(SolverContext& context)
+{
+  uint8_t cnt = (uint8_t) context.cnt_trusted();
+  for(uint8_t i = 0; i < cnt; ++i) {
+    if(context.stage2(i) == nullptr) {
+      // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+      context.fake_stage2(i);
     }
   }
 }
