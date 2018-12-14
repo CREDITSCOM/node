@@ -101,6 +101,10 @@ public:
   bool smartStageTwoEnough();
   bool smartStageThreeEnough();
   csdb::Pool::sequence_t smartRoundNumber();
+  uint8_t calculateSmartsConfNum();
+  uint8_t ownSmartsConfidantNumber();
+
+  std::vector<cs::PublicKey> smartConfidants();
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///

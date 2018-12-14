@@ -197,81 +197,121 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   pnode->prepareMetaForSending(table, currentTimeStamp);
 }
 
-void SolverCore::getSmartResultTransaction(const csdb::Transaction& transaction) {
-  cs::SmartContractRef smartRef;
-  smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
-  smartRoundNumber_ = smartRef.sequence;
-  smartConfidants_ = pnode->smartConfidants(static_cast<cs::RoundNumber>(smartRoundNumber_));
-  refreshSmartStagesStorage();
-  cscrypto::CalculateHash(st1.hash, transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
-  st1.sender = ownSmartsConfNum_;
-  st1.sRoundNum = smartRoundNumber_;
-  addSmartStageOne(st1, true);
-}
-
-csdb::Pool::sequence_t SolverCore::smartRoundNumber() {
-  return smartRoundNumber_;
-}
-
-void SolverCore::refreshSmartStagesStorage() {
-  size_t cSize = smartConfidants_.size();
-  smartStageOneStorage_.clear();
-  smartStageOneStorage_.resize(cSize);
-  smartStageTwoStorage_.clear();
-  smartStageTwoStorage_.resize(cSize);
-  smartStageThreeStorage_.clear();
-  smartStageThreeStorage_.resize(cSize);
-
-  using SenderType = cs::Byte;
-  auto max = std::numeric_limits<SenderType>::max();
-
-  for (size_t i = 0; i < cSize; ++i) {
-    smartStageOneStorage_.at(i).sender = max;
-    smartStageTwoStorage_.at(i).sender = max;
-    smartStageThreeStorage_.at(i).sender = max;
-  }
-}
-
-void SolverCore::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
-  if (send) {
-    pnode->sendSmartStageOne(stage);
+  std::vector<cs::PublicKey> SolverCore::smartConfidants() {
+    return smartConfidants_;
   }
 
-  if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
-    return;
+  void SolverCore::getSmartResultTransaction(const csdb::Transaction& transaction) {
+    cs::SmartContractRef smartRef;
+    smartConfidants_.clear();
+    smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
+    smartRoundNumber_ = smartRef.sequence;
+    pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
+    refreshSmartStagesStorage();
+    cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_ << " WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+    cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
+    ownSmartsConfNum_ = calculateSmartsConfNum();
+    if (ownSmartsConfNum_ == 255) {
+      return;
+    }
+    cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+    st1.sender = ownSmartsConfNum_;
+    st1.sRoundNum = smartRoundNumber_;
+    addSmartStageOne(st1, true);
   }
 
-  smartStageOneStorage_.at(stage.sender) = stage;
-
-  cslog() << ": <-- SMART-Stage-1 [" << static_cast<int>(stage.sender) << "] = " << smartStageOneStorage_.size();
-
-  if(stage.sender >= st2.signatures.size()) {
-    st2.signatures.resize(stage.sender);
-  }
-  if(stage.sender >= st2.hashes.size()) {
-    st2.hashes.resize(stage.sender);
-  }
-  st2.signatures.at(stage.sender) = stage.signature;
-  st2.hashes.at(stage.sender) = stage.messageHash;
-
-  if (smartStageOneEnough()) {
-    addSmartStageTwo(st2, true);
-  }
-}
-
-void SolverCore::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
-  if (send) {
-    st2.sender = ownSmartsConfNum_;
-    pnode->sendSmartStageTwo(stage);
+  uint8_t SolverCore::calculateSmartsConfNum()
+  {
+    uint8_t i = 0 ;
+    uint8_t ownSmartConfNumber = 255;
+    for (auto& e : smartConfidants_) {
+      if (e == pnode->getNodeIdKey()) {
+        ownSmartConfNumber = i;
+      }
+      cslog() << "[" << (int)i << "] "
+        << (ownSmartConfNumber != 255 && i == ownSmartConfNumber
+          ? "me"
+          : cs::Utils::byteStreamToHex(e.data(), e.size()));
+      ++i;
+    }
+    if (ownSmartConfNumber == 255) {
+      cslog() << "          This NODE is not a confidant one for this smart-contract consensus round";
+    }
+    return ownSmartConfNumber;
   }
 
-  if (smartStageTwoStorage_.at(stage.sender).sender == stage.sender) {
-    return;
+  uint8_t SolverCore::ownSmartsConfidantNumber()
+  {
+    return ownSmartsConfNum_;
   }
 
-  smartStageTwoStorage_.at(stage.sender) = stage;
+  csdb::Pool::sequence_t SolverCore::smartRoundNumber() {
+    return smartRoundNumber_;
+  }
 
-  cslog() << ": <-- SMART-Stage-2 [" << static_cast<int>(stage.sender) << "] = " << smartStageTwoStorage_.size();
+  void SolverCore::refreshSmartStagesStorage()
+  {
+    cslog() << "          " << __func__;
+    size_t cSize = smartConfidants_.size();
+    smartStageOneStorage_.clear();
+    smartStageOneStorage_.resize(cSize);
+    smartStageTwoStorage_.clear();
+    smartStageTwoStorage_.resize(cSize);
+    smartStageThreeStorage_.clear();
+    smartStageThreeStorage_.resize(cSize);
+    uint8_t undefinedSender = 255;
+    for (int i = 0; i < cSize; ++i) {
+      smartStageOneStorage_.at(i).sender = undefinedSender;
+      smartStageTwoStorage_.at(i).sender = undefinedSender;
+      smartStageThreeStorage_.at(i).sender = undefinedSender;
+    }
+    memset(&st1,0,sizeof(st1));
+    st2.signatures.clear();
+    st2.signatures.resize(cSize);
+    st2.hashes.clear();
+    st2.hashes.resize(cSize);
+    st3.realTrustedMask.clear();
+    st3.realTrustedMask.resize(cSize);
+    st2.sender = undefinedSender;
+    st3.sender = undefinedSender;
+    st3.writer = undefinedSender;
+    st2.sRoundNum = 0;
+    st3.sRoundNum = 0;
+    memset(st3.signature.data(),0,st3.signature.size());
+    memset(st2.signature.data(),0,st3.signature.size());
+  }
+
+  void SolverCore::addSmartStageOne( cs::StageOneSmarts& stage, bool send) {
+    if (send) {
+      pnode->sendSmartStageOne(stage);
+    }
+    if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
+      return;
+    }
+    smartStageOneStorage_.at(stage.sender) = stage;
+    for (int i=0; i<smartConfidants_.size(); ++i) {
+      cslog() << "[" << i << "] - " << (int)smartStageOneStorage_.at(i).sender;
+    }
+    cslog() << "          <-- SMART-Stage-1 [" << (int)stage.sender << "]";
+    st2.signatures.at(stage.sender) = stage.signature;
+    st2.hashes.at(stage.sender) = stage.messageHash;
+    if (smartStageOneEnough()) {
+      addSmartStageTwo(st2, true);
+    }
+  }
+
+  void SolverCore::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
+    if (send) {
+      st2.sender = ownSmartsConfNum_;
+      st2.sRoundNum = smartRoundNumber_;
+      pnode->sendSmartStageTwo(stage);
+    }
+    if (smartStageTwoStorage_.at(stage.sender).sender == stage.sender) {
+      return;
+    }
+    smartStageTwoStorage_.at(stage.sender) = stage;
+    cslog() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
+    if (smartStageTwoEnough()) processStages();
 
   if (smartStageTwoEnough()) {
     processStages();
@@ -283,61 +323,57 @@ void SolverCore::processStages() {
   addSmartStageThree(st3, true);
 }
 
-void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
-  if (send) {
-    stage.sender = ownSmartsConfNum_;
-    pnode->sendSmartStageThree(stage);
-  }
-
-  if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
-    return;
-  }
-
-  smartStageThreeStorage_.at(stage.sender) = stage;
-
-  cslog() << ": <-- SMART-Stage-3 [" << static_cast<int>(stage.sender) << "] = " << smartStageThreeStorage_.size();
-
-  if (smartStageThreeEnough()) {
-    processStages();
-  }
-}
-
-bool SolverCore::smartStageOneEnough() {
-  uint8_t stageSize = 0;
-  uint8_t i = 0;
-
-  for (auto& it : smartStageTwoStorage_) {
-    if (it.sender != i) {
-      ++stageSize;
+  void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
+    if (send) {
+      stage.sender = ownSmartsConfNum_;
+      stage.sRoundNum = smartRoundNumber_;
+      pnode->sendSmartStageThree(stage);
+    }
+    if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
+      return;
+    }
+    smartStageThreeStorage_.at(stage.sender) = stage;
+    cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStageThreeStorage_.size();
+    if (smartStageThreeEnough()) {
+      processStages();
     }
   }
 
-  return stageSize == smartConfidants_.size();
-}
-
-bool SolverCore::smartStageTwoEnough() {
-  uint8_t stageSize = 0;
-  uint8_t i = 0;
-
-  for (auto& it : smartStageTwoStorage_) {
-    if (it.sender != i) {
-      ++stageSize;
+  bool SolverCore::smartStageOneEnough() {
+    size_t stageSize = 0;
+    uint8_t i = 0;
+    for (auto& it : smartStageOneStorage_) {
+      if(it.sender == i) ++stageSize;
+      ++i;
     }
+    size_t cSize = smartConfidants_.size();
+    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    return (stageSize == cSize ? true : false);
   }
 
-  return stageSize == smartConfidants_.size();
-}
-
-bool SolverCore::smartStageThreeEnough() {
-  uint8_t stageSize = 0;
-  uint8_t i = 0;
-
-  for (auto& it : smartStageTwoStorage_) {
-    if (it.sender == i) {
-      ++stageSize;
+  bool SolverCore::smartStageTwoEnough() {
+    size_t stageSize = 0;
+    uint8_t i = 0;
+    for (auto& it : smartStageTwoStorage_) {
+      if (it.sender == i) ++stageSize;
+      ++i;
     }
+    size_t cSize = smartConfidants_.size();
+    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    return (stageSize == cSize ? true : false);
   }
 
-  return (stageSize > smartConfidants_.size() / 2 + 1);
-}
-}  // namespace cs
+  bool SolverCore::smartStageThreeEnough() {
+    size_t stageSize = 0;
+    uint8_t i = 0;
+    for (auto& it : smartStageThreeStorage_) {
+      if (it.sender == i) ++stageSize;
+      ++i;
+    }
+    size_t cSize = smartConfidants_.size();
+    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    return (stageSize == cSize ? true : false);
+  }
+
+
+}  // namespace slv2

@@ -81,7 +81,7 @@ public:
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
-  const cs::ConfidantsKeys& smartConfidants(const cs::RoundNumber startSmartRoundNumber) const;
+  void retriveSmartConfidants(const cs::RoundNumber startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
@@ -227,6 +227,11 @@ private:
 
   template <class... Args>
   void sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+  
+  //smarts
+  template <class... Args>
+  void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
 
   // to neighbours
   template<typename... Args>
