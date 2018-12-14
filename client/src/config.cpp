@@ -56,7 +56,7 @@ const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
 const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
 const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
-const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encrypt";
+const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
