@@ -137,12 +137,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
       if ( it.sender != context.own_conf_number()) {
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
-          if (it.hashes[j] == SolverContext::zeroHash) {
-            cslog() << name() << ": [" << (int)j << "] marked as untrusted (silent)";
-            context.mark_untrusted((uint8_t)j);
-            continue;
-          }
           if (ptr->signatures[j] != it.signatures[j]) {
+            if(it.hashes[j] == SolverContext::zeroHash) {
+              cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (silent)";
+              context.mark_untrusted(it.sender);
+              continue;
+            }
             cs::Bytes toVerify;
             size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
@@ -163,18 +163,24 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         }
         bool toBreak = false;
         size_t tCandSize = context.stage1(it.sender)->trustedCandidates.size();
-        for (size_t outer = 0; outer < tCandSize - 1; outer++) {
-          for (size_t inner = outer + 1; inner < tCandSize; inner++) {
-            if (context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
-              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted";
-              context.mark_untrusted(it.sender);
-              toBreak = true;
+        if(tCandSize > 0) {
+          for(size_t outer = 0; outer < tCandSize - 1; outer++) {
+            for(size_t inner = outer + 1; inner < tCandSize; inner++) {
+              if(context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
+                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted";
+                context.mark_untrusted(it.sender);
+                toBreak = true;
+                break;
+              }
+            }
+            if(toBreak) {
               break;
             }
           }
-          if(toBreak) {
-            break;
-          }
+        }
+        else {
+          cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (no candidates)";
+          context.mark_untrusted(it.sender);
         }
       }
     }
@@ -196,11 +202,6 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     LOG_NOTICE(name() << ": --> stage-3 [" << (int)stage.sender << "]");
     context.add_stage3(stage);  //, stage.writer != stage.sender);
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
-    // if(stage.writer == stage.sender) {
-    //    // we are selected to write & send block
-    //    LOG_NOTICE(name() << ": spawn next round");
-    //    context.spawn_next_round();
-    //}
     return Result::Finish;
   }
   LOG_DEBUG(name() << ": continue to receive stages-2");
