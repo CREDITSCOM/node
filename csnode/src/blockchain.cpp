@@ -343,27 +343,22 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
   csdebug() << " previous hash: " << lastHash_.to_string();
   csdebug() << " last storage size: " << getSize();
 
-  if (pool.sequence() == getLastWrittenSequence() + 1) {
-    cslog() << " sequence OK";
-    pool.set_previous_hash(lastHash_);
+  cslog() << " sequence OK";
+  pool.set_previous_hash(lastHash_);
 
-    // former writeBlock():
-    {
-      std::lock_guard<decltype(dbLock_)> l(dbLock_);
-      pool.set_storage(storage_);
-    }
-    if(!pool.save()) {
-      cserror() << "Couldn't save block";
-      return;
-    }
-
-    {
-      std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
-      newBlockCv_.notify_all();
-    }
+  // former writeBlock():
+  {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    pool.set_storage(storage_);
   }
-  else {
-    cslog() << " sequence failed, chain syncro start";
+  if(!pool.save()) {
+    cserror() << "Couldn't save block";
+    return;
+  }
+
+  {
+    std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
+    newBlockCv_.notify_all();
   }
   cslog() << "--------------------------------------------------------------------------------";
 }
@@ -833,11 +828,11 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     csdb::PoolHash hash = getHashBySequence(seq);
     auto loadPool = loadBlock(hash);
     if (!loadPool.is_valid()) {
-      cserror() << "BLOCKCHAIN> Load pool failed: " << seq;
-      cserror() << "BLOCKCHAIN> getHashBySequence: " << hash.to_string();
+      cserror() << "BLOCKCHAIN> test load pool failed: #" << seq << ", getHashBySequence " << hash.to_string()
+        << ", error " << storage_.last_error() << " (" << storage_.last_error_message() << ")";
     }
     else {
-      cslog() << "BLOCKCHAIN> Load pool ok: " << seq;
+      cslog() << "BLOCKCHAIN> test load pool ok: #" << seq;
     }
   }
 
