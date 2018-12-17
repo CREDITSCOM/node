@@ -42,67 +42,20 @@ using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
 
 class BlockChain {
 public:
-  using Transactions = std::vector<csdb::Transaction>;
-  using WalletId = csdb::internal::WalletId;
+  using Transactions  = std::vector<csdb::Transaction>;
+  using WalletId      = csdb::internal::WalletId;
   using WalletAddress = csdb::Address;
-  using WalletData = cs::WalletsCache::WalletData;
-  using Mask = boost::dynamic_bitset<uint64_t>;
+  using WalletData    = cs::WalletsCache::WalletData;
+  using Mask          = boost::dynamic_bitset<uint64_t>;
 
   explicit BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
   bool isGood() const;
 
-  bool isEqual(const csdb::Address &laddr, const csdb::Address &raddr) {
-    csdb::Address laddr_pk, raddr_pk;
-
-    //
-    if (laddr.is_wallet_id()) {
-      const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(laddr).to_api_addr().data());
-      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(laddr_pk)))
-        return false;
-    }
-    else
-      laddr_pk = laddr;
-    //
-    //
-    if (raddr.is_wallet_id()) {
-      const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(laddr).to_api_addr().data());
-      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(raddr_pk)))
-        return false;
-    }
-    else
-      raddr_pk = raddr;
-    //
-
-    if (laddr_pk == raddr_pk)
-      return true;
-    return false;
-
-    /*if (laddr.is_wallet_id()) {//laddr to pk
-      WalletId id = laddr.wallet_id();
-      const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-      if (!wallDataPtr)
-        return false;
-      WalletsCache::convert(wallDataPtr->address_, laddr_pk);
-    }
-    else
-      laddr_pk = raddr;
-
-    if (raddr.is_wallet_id()) {//raddr to pk
-      WalletId id = raddr.wallet_id();
-      const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-      if (!wallDataPtr)
-        return false;
-      WalletsCache::convert(wallDataPtr->address_, raddr_pk);
-    }
-    else
-      raddr_pk = raddr;
-
-    if(laddr_pk == raddr_pk)
-      return true;
-    return false;*/
-  }
+  enum class ADDR_TYPE { PUBLIC_KEY, ID };
+  csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
+  bool is_equal(csdb::Address &laddr, csdb::Address &raddr) const;
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);

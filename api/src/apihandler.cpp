@@ -372,16 +372,8 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
   res.smartContractDeploy.byteCode = sci.smartContractDeploy.byteCode;
   res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
   res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
-
-  const csdb::Address pk_source = tr.source();
-  const csdb::Address pk_target = tr.target();
-  if (!convertAddrToPublicKey(pk_source) || !convertAddrToPublicKey(pk_target)) {
-    cserror() << "Public key of wallet not found by walletId";
-    return res;
-  }
-
-  res.deployer = fromByteArray(pk_source.public_key());
-  res.address = fromByteArray(pk_target.public_key());
+  res.deployer = fromByteArray(s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
+  res.address = fromByteArray(s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
 
 #ifdef TOKENS_CACHE
   tm.applyToInternal([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
@@ -451,18 +443,6 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   return send_transaction;
 }
 
-/*void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
-  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  walletsCacheStorage_->iterateOverWallets(func);
-}
-
-#ifdef MONITOR_NODE
-void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)> func) {
-  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  walletsCacheStorage_->iterateOverWriters(func);
-}
-#endif*/
-
 std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
   auto bs = fromByteArray(tr.to_byte_stream_for_sig());
   return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
@@ -485,7 +465,7 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 
 void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address,
                                    const std::string& code, const std::string& state, const std::string& method,
-                                   const std::vector<general::Variant>& params) { //general::Variant
+                                   const std::vector<general::Variant>& params) {
   static std::mutex m;
   std::lock_guard<std::mutex> lk(m);
   using transport_type = decltype(executor_transport)::element_type;
@@ -532,13 +512,8 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const T
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
   auto input_smart      = transaction.smartContract;
   auto send_transaction = make_transaction(transaction);
-  const auto smart_addr = send_transaction.target();
+  const auto smart_addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   const bool deploy     = is_smart_deploy(input_smart);
-
-  if (!convertAddrToPublicKey(smart_addr)) {
-    LOG_ERROR("Public key of wallet not found by walletId");
-    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-  }
 
   std::string origin_bytecode;
   if (!deploy) {
@@ -555,12 +530,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
   }
   else {
-    csdb::Address addr = send_transaction.target();
-    csdb::Address deployer = send_transaction.source();
-
+    csdb::Address addr      = send_transaction.target();
+    csdb::Address deployer  = send_transaction.source();
     s_blockchain.getKeyFromAddress(addr);
     s_blockchain.getKeyFromAddress(deployer);
-
     auto scKey = cs::SmartContracts::get_valid_smart_address(deployer,
                                                              send_transaction.innerID(),
                                                              input_smart.smartContractDeploy);
@@ -596,15 +569,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     });
   }
 
-  auto pk_source = send_transaction.source();
-  if (!convertAddrToPublicKey(pk_source)) {
-    LOG_ERROR("Public key of wallet not found by walletId");
-    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-  }
-
+  auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   executor::ExecuteByteCodeResult api_resp;
   const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
-  execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
+  execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.status.code) {
     _return.status.code     = api_resp.status.code;
@@ -818,12 +786,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
     const auto smart = fetch_smart(tr);
-    auto address = tr.target();
-    if (!convertAddrToPublicKey(address)) {
-      cserror() << "Public key of wallet not found by walletId";
-      return false;
-    }
-
+    auto address = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     if (!init) {
       auto& e = [&]() -> decltype(auto) {
         auto smart_last_trxn = lockedReference(this->smart_last_trxn);
@@ -841,12 +804,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       e.update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
     }
 
-    const csdb::Address pk_source = tr.source();
-    const csdb::Address pk_target = tr.target();
-    if (!convertAddrToPublicKey(pk_source) || !convertAddrToPublicKey(pk_target)) {
-      cserror() << "Public key of wallet not found by walletId";
-      return false;
-    }
+    auto source_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
 
     if (is_smart_deploy(smart)) {
       {
@@ -855,13 +814,13 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       }
       {
         auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-        (*deployed_by_creator)[pk_source].push_back(tr.id());
+        (*deployed_by_creator)[source_pk].push_back(tr.id());
       }
 
-      tm.checkNewDeploy(pk_target, pk_source, smart, tr.user_field(smart_state_idx).value<std::string>());
+      tm.checkNewDeploy(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
     }
     else
-      tm.checkNewState(pk_target, pk_source, smart, tr.user_field(smart_state_idx).value<std::string>());
+      tm.checkNewState(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
 
     return true;
   }
@@ -1022,14 +981,14 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete) 
   _return = fromByteArray(s_blockchain.wait_for_block(csdb::PoolHash::from_binary(toByteArray(obsolete))).to_binary());
 }
 
-bool APIHandler::convertAddrToPublicKey(const csdb::Address& addr) {
+/*bool APIHandler::convertAddrToPublicKey(const csdb::Address& addr) {
   if (addr.is_wallet_id()) {
     const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
     if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address&>(addr)))
       return false;
   }
   return true;
-}
+}*/
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t>& v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
@@ -1118,27 +1077,18 @@ void addTokenResult(api::TokenTransfersResult& _return,
   const csdb::Pool& pool,
   const csdb::Transaction& tr,
   const api::SmartContractInvocation& smart,
-  const std::pair<csdb::Address, csdb::Address>& addrPair, APIHandler& handler) {
+  const std::pair<csdb::Address, csdb::Address>& addrPair, const BlockChain& handler) {
   api::TokenTransfer transfer;
-
-  transfer.token = fromByteArray(token.public_key());
-  transfer.code = code;
-  transfer.sender = fromByteArray(addrPair.first.public_key());
-  transfer.receiver = fromByteArray(addrPair.second.public_key());
-  transfer.amount = TokensMaster::getAmount(smart);
-  //
-  const csdb::Address pk_source = tr.source();
-  if (!handler.convertAddrToPublicKey(pk_source))
-    return;
-  transfer.initiator = fromByteArray(tr.source().public_key());
-  //
-  //transfer.initiator = fromByteArray(tr.source().public_key());
+  transfer.token      = fromByteArray(token.public_key());
+  transfer.code       = code;
+  transfer.sender     = fromByteArray(addrPair.first.public_key());
+  transfer.receiver   = fromByteArray(addrPair.second.public_key());
+  transfer.amount     = TokensMaster::getAmount(smart);
+  transfer.initiator  = fromByteArray(handler.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
 
   transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
   transfer.transaction.index = tr.id().index();
-
   transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
-
   _return.transfers.push_back(transfer);
 }
 
@@ -1148,25 +1098,15 @@ void addTokenResult(api::TokenTransactionsResult& _return,
   const csdb::Pool& pool,
   const csdb::Transaction& tr,
   const api::SmartContractInvocation& smart,
-  const std::pair<csdb::Address, csdb::Address>&, APIHandler& handler) {
+  const std::pair<csdb::Address, csdb::Address>&, BlockChain& handler) {
   api::TokenTransaction trans;
-
   trans.token = fromByteArray(token.public_key());
-
-  trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
-  trans.transaction.index = tr.id().index();
-
-  trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
-  //
-  const csdb::Address pk_source = tr.source();
-  if (!handler.convertAddrToPublicKey(pk_source))
-    return;
-  trans.initiator = fromByteArray(pk_source.public_key());
-  //
-  //trans.initiator = fromByteArray(tr.source().public_key());
-  trans.method = smart.method;
-  trans.params = smart.params;
-
+  trans.transaction.poolHash  = fromByteArray(tr.id().pool_hash().to_binary());
+  trans.transaction.index     = tr.id().index();
+  trans.time                  = atoll(pool.user_field(0).value<std::string>().c_str());
+  trans.initiator             = fromByteArray(handler.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
+  trans.method                = smart.method;
+  trans.params                = smart.params;
   _return.transactions.push_back(trans);
 }
 
@@ -1182,23 +1122,13 @@ void putTokenInfo(api::TokenInfo& ti, const api::Address& addr, const Token& tok
   ti.standart = (decltype(api::TokenInfo::standart))(uint32_t)(token.standart);
 }
 
-/*template <typename ResultType>
-bool validatePagination(ResultType& _return, APIHandler& handler, int64_t offset, int64_t limit) {
-  if (offset < 0 || limit <= 0 || limit > 100) {
-    handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
-    return false;
-  }
-
-  return true;
-}*/
-
 template <typename ResultType>
 void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm, const api::Address& token,
   bool transfersOnly, bool filterByWallet, int64_t offset, int64_t limit, const csdb::Address& wallet = csdb::Address()) {
-  if (!validatePagination(_return, handler, offset, limit)) return;
+  if (!validatePagination(_return, handler, offset, limit))
+    return;
 
   const csdb::Address addr = BlockChain::getAddressFromKey(token);
-
   bool tokenFound = false;
   std::string code;
 
@@ -1208,7 +1138,6 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
     tokenFound = !(it == tm.end());
     if (tokenFound) {
       code = it->second.symbol;
-
       if (transfersOnly && !filterByWallet)
         _return.count = it->second.transfersCount;
       else if (!transfersOnly)
@@ -1229,25 +1158,19 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
   }
 
   handler.iterateOverTokenTransactions(addr,
-    [&_return, &offset, &limit, &addr, &code, &transfersOnly, &filterByWallet, &wallet, &handler = handler]
-  (const csdb::Pool& pool, const csdb::Transaction& tr) {
+    [&_return, &offset, &limit, &addr, &code, &transfersOnly, &filterByWallet, &wallet, &s_blockchain = handler.get_s_blockchain()]
+    (const csdb::Pool& pool, const csdb::Transaction& tr) {
     auto smart = fetch_smart(tr);
-
-    if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) return true;
-
-    //
-    const csdb::Address pk_source = tr.source();
-    if (!handler.convertAddrToPublicKey(pk_source))
-      return false;
-    auto addrPair = TokensMaster::getTransferData(pk_source, smart.method, smart.params);
-    //
-    //auto addrPair = TokensMaster::getTransferData(tr.source(), smart.method, smart.params);
-    if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet) return true;
-
-    if (--offset >= 0) return true;
-
-    addTokenResult(_return, addr, code, pool, tr, smart, addrPair, handler);
-
+    if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) 
+      return true;
+    csdb::Address addr_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
+    if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet) 
+      return true;
+    if (--offset >= 0) 
+      return true;
+    
+    addTokenResult(_return, addr, code, pool, tr, smart, addrPair, s_blockchain);
     return !(--limit == 0);
   });
 
@@ -1460,37 +1383,14 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 
       for (auto& t : pool.transactions()) {
         if (!is_smart(t)) continue;
-
-        //
-        const csdb::Address pk_target = t.target();
-        if (!convertAddrToPublicKey(pk_target))
-          return;
-        auto tIt = tokenCodes.find(pk_target);
-        //
-
-        //auto tIt = tokenCodes.find(t.target());
+        auto tIt = tokenCodes.find(s_blockchain.get_addr_by_type(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY));
         if (tIt == tokenCodes.end()) continue;
-
         const auto smart = fetch_smart(t);
         if (!TokensMaster::isTransfer(smart.method, smart.params)) continue;
         if (--offset >= 0) continue;
-
-        //
-        const csdb::Address pk_source = t.source();
-        if (!convertAddrToPublicKey(pk_source))
-          return;
-        auto addrPair = TokensMaster::getTransferData(pk_source, smart.method, smart.params);
-        //
-
-        addTokenResult(_return,
-          pk_target/*t.target()*/,
-          tIt->second,
-          pool,
-          t,
-          smart,
-          addrPair, *this);
-          //TokensMaster::getTransferData(pk_source/*t.source()*/, smart.method, smart.params), *this);
-
+        csdb::Address target_pk = s_blockchain.get_addr_by_type(t.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
+        addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
         if (--limit == 0) break;
       }
 
