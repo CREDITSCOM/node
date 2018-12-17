@@ -286,7 +286,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     ::csdb::priv::obstream os;
     put(os);
-    binary_representation_ = os.buffer();
+    binary_representation_ = std::move(os.buffer());
 
     update_transactions();
   }
@@ -592,11 +592,11 @@ bool Pool::compose() {
   return d->binary_representation_;
 }
 
-void Pool::update_binary() {
-  d->binary_representation_.clear();
-
-  uint32_t size = 0;
-  to_byte_stream(size);
+void Pool::update_confidants(const std::vector<::std::vector<uint8_t>>& confidants) {
+  priv* data = d.data();
+  data->read_only_ = false;
+  data->next_confidants_ = confidants;
+  compose();
 }
 
 uint64_t Pool::get_time() const noexcept

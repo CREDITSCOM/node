@@ -211,7 +211,7 @@ public:
    */
   ::csdb::internal::byte_array to_binary() const noexcept;
 
-  void update_binary();
+  void update_confidants(const std::vector<::std::vector<uint8_t>>& confidants);
 
   /**
    * @brief Сохранение пула в хранилище.
