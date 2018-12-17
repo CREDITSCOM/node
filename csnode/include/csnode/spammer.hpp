@@ -46,7 +46,7 @@ private:
   void SpamWithTransactions(Node&);
   void FundMyWallets(Node&);
   csdb::Address OptimizeAddress(const csdb::Address&, Node&);
-  void SignTransaction(csdb::Transaction&, const uint8_t* private_key);
+  void SignTransaction(csdb::Transaction&, const std::vector<cscrypto::Byte>& private_key);
   void SignTransaction(csdb::Transaction&, const cscrypto::PrivateKey& private_key);
 
   // wallets to which spammer sends transactions

@@ -427,7 +427,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       return;
     }
 #ifdef MONITOR_NODE
-    std::vector writer(sender.begin(), sender.end());
+    std::vector<uint8_t> writer(sender.begin(), sender.end());
     pool.value().set_writer_public_key(writer);
 #endif
 
