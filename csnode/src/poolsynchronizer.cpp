@@ -60,7 +60,13 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   }
 
   const auto last = cs::numeric_cast<uint32_t>(lastWrittenSequence + blockChain_->getCachedBlocksSize());
-  cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << roundNum - last;
+  const auto blocksRemaining = roundNum - last;
+  cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << blocksRemaining;
+
+  if (blocksRemaining == 0) {
+    synchroFinished();
+    return;
+  }
 
   const bool useTimer = syncData_.sequencesVerificationFrequency > 1;
   const uint32_t delay =
@@ -78,6 +84,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
   if (!isSyncroStarted_) {
     isSyncroStarted_ = true;
+    cs::Connector::connect(&blockChain_->writeBlockEvent, this, &cs::PoolSynchronizer::onWriteBlock);
 
     refreshNeighbours();
     sendBlockRequest();
@@ -107,10 +114,6 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
   /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
   csdb::Pool::sequence_t lastWrittenSequence =
       cs::numeric_cast<csdb::Pool::sequence_t>(blockChain_->getLastWrittenSequence());
-
-  if (lastWrittenSequence >= poolsBlock.back().sequence()) {
-    return;
-  }
 
   const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
   const csdb::Pool::sequence_t oldLastWrittenSequence =
@@ -194,6 +197,15 @@ void cs::PoolSynchronizer::onTimeOut() {
   });
 }
 
+void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool::sequence_t sequence) {
+  auto it = requestedSequences_.find(sequence);
+
+  if (it != requestedSequences_.end()) {
+    checkNeighbourSequence(sequence);
+    requestedSequences_.erase(it);
+  }
+}
+
 //
 // Service
 //
@@ -225,6 +237,7 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
   refreshNeighbours();
 
   if (neighbours_.empty()) {
+    csprint() << " neighbours count is 0";
     return false;
   }
 
@@ -243,9 +256,10 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
       break;
     case CounterType::TIMER:
       for (auto& neighbour : neighbours_) {
-        if (!isNeedRequest && neighbour.sequences().empty()) {
-          isNeedRequest = true;
+        if (isNeedRequest) {
+          break;
         }
+        isNeedRequest = neighbour.sequences().empty();
       }
       break;
   }
@@ -413,7 +427,7 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const csdb::Pool::sequence_t s
     neighbour.removeSequnce(sequence);
 
     if (neighbour.sequences().empty()) {
-      neighbour.reset();
+      neighbour.resetRoundCounter();
     }
   }
 
@@ -484,6 +498,7 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
+  cs::Connector::disconnect(blockChain_->writeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();
   }

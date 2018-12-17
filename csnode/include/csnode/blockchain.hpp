@@ -38,6 +38,7 @@ class Fee;
 class TransactionsPacket;
 
 using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
+using WriteBlockSignal = cs::Signal<void(const csdb::Pool::sequence_t)>;
 }  // namespace cs
 
 class BlockChain {
@@ -283,6 +284,8 @@ public signals:
   *   Connected to SolverCore::gotStartSmartContract() method
   */
   cs::SmartContractStartSignal smartContractEvent_;
+
+  cs::WriteBlockSignal writeBlockEvent;
 
 private:
 

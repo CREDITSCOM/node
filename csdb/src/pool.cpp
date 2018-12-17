@@ -291,7 +291,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   void update_binary_representation() {
     ::csdb::priv::obstream os;
     put(os);
-    binary_representation_ =  std::move(const_cast<internal::byte_array&>(os.buffer()));
+    binary_representation_ = std::move(const_cast<internal::byte_array&>(os.buffer()));
   }
 
   void update_transactions() {

@@ -43,6 +43,8 @@ public signals:  // Signals
 private slots:
   void onTimeOut();
 
+  void onWriteBlock(const csdb::Pool::sequence_t sequence);
+
 private:  // Service
   enum class CounterType;
   class NeighboursSetElemet;
@@ -83,6 +85,10 @@ private:  // struct
     }
 
     inline void removeSequnce(const csdb::Pool::sequence_t sequence) {
+      if (sequences_.empty()) {
+        return;
+      }
+
       const auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
       if (it != sequences_.end()) {
         sequences_.erase(it);

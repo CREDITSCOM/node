@@ -345,7 +345,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 }
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
-  cslog() << "----------------------------- Write Block #" << pool.sequence() << "----------------------------";
+  cslog() << "----------------------------- Write Block #" << pool.sequence() << " ----------------------------";
   const auto& trusted = pool.confidants();
   cslog() << " trusted count " << trusted.size();
   for(const auto& t : trusted) {
@@ -368,6 +368,8 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     cserror() << "Couldn't save block";
     return;
   }
+
+  emit writeBlockEvent(pool.sequence());
 
   {
     std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
