@@ -146,15 +146,15 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 }
 #endif
 
-uint32_t BlockChain::getLastWrittenSequence() const {
+csdb::Pool::sequence_t BlockChain::getLastWrittenSequence() const {
   if (deferredBlock_.is_valid()) {
-    return static_cast<uint32_t>(deferredBlock_.sequence());
+    return deferredBlock_.sequence();
   }
   else if (blockHashes_->empty()) {
-    return static_cast<uint32_t>(-1);
+    return static_cast<csdb::Pool::sequence_t> (-1);
   }
   else {
-    return static_cast<uint32_t>(blockHashes_->getDbStructure().last_);
+    return blockHashes_->getDbStructure().last_;
   }
 }
 
@@ -284,7 +284,7 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   return storage_.pool_load(ph);
 }
 
-csdb::Pool BlockChain::loadBlock(const uint32_t sequence) const {
+csdb::Pool BlockChain::loadBlock(const csdb::Pool::sequence_t sequence) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   if (deferredBlock_.sequence() == sequence) {
     return deferredBlock_;
@@ -413,7 +413,7 @@ const csdb::Storage& BlockChain::getStorage() const {
   return storage_;
 }
 
-csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
+csdb::PoolHash BlockChain::getHashBySequence(csdb::Pool::sequence_t seq) const {
   csdb::PoolHash res{};
   if (deferredBlock_.sequence() == seq) {
     return deferredBlock_.hash();
@@ -423,7 +423,7 @@ csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
   return res;
 }
 
-uint32_t BlockChain::getRequestedBlockNumber() const {
+csdb::Pool::sequence_t BlockChain::getRequestedBlockNumber() const {
   return getLastWrittenSequence() + 1;
 }
 

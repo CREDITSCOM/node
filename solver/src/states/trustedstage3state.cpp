@@ -161,6 +161,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
           }
         }
+
         bool toBreak = false;
         size_t tCandSize = context.stage1(it.sender)->trustedCandidates.size();
         if(tCandSize > 0) {
@@ -301,9 +302,13 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
       stage.realTrustedMask.push_back(1); // set 1 if trusted and 0 if untrusted
-      const auto& stage_i = *(context.stage1_data().cbegin() + i);
+      auto ptr = context.stage1(i);
+      if(ptr == nullptr) {
+        continue;
+      }
+      const auto& stage_i = *ptr;
       uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
-      cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
+      cslog() << "Candidates amount of [" << (int)i << "] : " << (int)candidates_amount;
 
 
       for (uint8_t j = 0; j < candidates_amount; j++) {

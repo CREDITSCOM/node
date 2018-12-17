@@ -68,11 +68,11 @@ public:
 
   //smart-contracts consensus communicatioin
   void sendSmartStageOne(cs::StageOneSmarts& stageOneInfo);
-  void getSmartStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,  const cs::PublicKey& sender);
   void sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo);
-  void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
   void sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo);
-  void getSmartStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
 
   void smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
@@ -81,7 +81,7 @@ public:
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
-  void retriveSmartConfidants(const cs::RoundNumber startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
+  void retriveSmartConfidants(const csdb::Pool::sequence_t startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
@@ -134,7 +134,7 @@ public:
 
   bool isPoolsSyncroStarted();
 
-  void smartStagesStorageClear();
+  void smartStagesStorageClear(size_t cSize);
 
   enum MessageActions {
     Process,
@@ -152,7 +152,7 @@ public:
     return myLevel_;
   }
 
-  uint32_t getRoundNumber();
+  cs::RoundNumber getRoundNumber();
   uint8_t getConfidantNumber();
 
   BlockChain& getBlockChain() {
@@ -322,6 +322,7 @@ private:
   std::vector<cs::Bytes> smartStageThreeMessage_;
   bool isSmartStageStorageCleared_ = false;
 
+  std::vector<cs::Stage> smartStageTemporary_;
 
   SentRoundData lastSentRoundData_;
 
