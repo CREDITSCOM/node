@@ -9,7 +9,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(${PROJECT_NAME} STATIC
   include/cscrypto/cscrypto.hpp
-  src/cscrypto.cpp
+  include/cscrypto/cryptotypes.hpp
+  include/cscrypto/memoryprotection.hpp
+  include/cscrypto/privatekey.hpp
+  include/cscrypto/cryptoconstants.hpp
+  include/cscrypto/maincryptofunctions.hpp
+  src/maincryptofunctions.cpp
+  src/privatekey.cpp
   )
 
 target_link_libraries (${PROJECT_NAME} blake2 libsodium)
