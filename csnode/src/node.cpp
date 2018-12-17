@@ -129,14 +129,6 @@ void Node::flushCurrentTasks() {
   ostream_.clear();
 }
 
-namespace {
-#ifdef MONITOR_NODE
-  bool monitorNode = true;
-#else
-  bool monitorNode = false;
-#endif
-}
-
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   csunused(type);
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
@@ -2043,11 +2035,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::sendHash(cs::RoundNumber round) {
-  if (monitorNode) {
-    // to block request trusted status
-    return;
-  }
-
+#if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
   if (getBlockChain().getLastWrittenSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
@@ -2058,6 +2046,7 @@ void Node::sendHash(cs::RoundNumber round) {
 
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
   sendToConfidants(MsgTypes::BlockHash, round, hash);
+#endif
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {

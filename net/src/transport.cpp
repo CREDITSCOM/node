@@ -823,10 +823,8 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
 }
 
 bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash& lastHash) {
+#if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
   csdebug() << "TRANSPORT> Got SS Last Block: " << lastBlock;
-#ifdef MONITOR_NODE
-  return true;
-#endif
   csunused(task);
 
   Connection conn;
@@ -844,6 +842,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock,
   oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
 
   sendDirect(oPackStream_.getPackets(), conn);
+#endif
   return true;
 }
 
