@@ -567,8 +567,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     if (scKey != addr) {
       _return.status.code = 127;
       const auto d = scKey.public_key();
+      const auto t = deployer.public_key();
       std::string str = EncodeBase58(d.data(), d.data() + cscrypto::kPublicKeySize);
-      _return.status.message = "Bad smart contract address, expected " + str;
+      std::string dep = EncodeBase58(t.data(), t.data() + cscrypto::kPublicKeySize);
+      _return.status.message = "Bad smart contract address, expected " + str + " composed of " + dep;
       return;
     }
   }
@@ -618,7 +620,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     _return.smart_contract_result = api_resp.ret_val;
 
   if (amnesia) {
-    TRACE("");
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     contract_state_entry.yield();
     return;
