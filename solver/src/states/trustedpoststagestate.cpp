@@ -29,26 +29,29 @@ void TrustedPostStageState::on(SolverContext& context) {
   }
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
-      // timeout handler:
+      // timeout #1 handler:
       [pctx, this]() {
         if (Consensus::Log) {
           LOG_NOTICE(name() << ": timeout for stages-3 is expired, make requests");
         }
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        if (Consensus::Log) {
-          LOG_NOTICE(name() << ": start subsequent track timeout " << Consensus::T_stage_request
-                            << " ms to request neighbors about stages-3");
-        }
+        cslog() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+                          << " ms to request neighbors about stages-3";
         timeout_request_neighbors.start(
             pctx->scheduler(), Consensus::T_stage_request,
-            // timeout handler:
+            // timeout #2 handler:
             [pctx, this]() {
-              if (Consensus::Log) {
-                LOG_NOTICE(name() << ": timeout for transition is expired, make requests to neighbors");
-              }
+              cslog() << name() << ": timeout for transition is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
-            },
+              // timeout #3 handler
+              timeout_force_transition.start(
+                pctx->scheduler(), Consensus::T_stage_request,
+                [pctx, this]() {
+                  cslog() << name() << ": timeout for transition is expired, cannot proceed further, BigBang required";
+                },
+                true/*replace if exists*/);
+        },
             true /*replace if exists*/);
       },
       true /*replace if exists*/);
@@ -64,6 +67,9 @@ void TrustedPostStageState::off(SolverContext& /*context*/) {
     if (Consensus::Log) {
       LOG_NOTICE(name() << ": cancel track timeout to request neighbors about stages-3");
     }
+  }
+  if(timeout_force_transition.cancel()) {
+    cslog() << name() << ": cancel track timeout to force transition to next state";
   }
 }
 

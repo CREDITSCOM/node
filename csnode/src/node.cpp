@@ -240,8 +240,10 @@ namespace {
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   csunused(type);
-  cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
-              << ", current #" << roundNumber_;
+  cswarning() << "-----------------------------------------------------------\n"
+    << "NODE> BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
+    << ", current #" << roundNumber_
+    << "\n-----------------------------------------------------------";
 
   istream_.init(data, size);
 
@@ -259,8 +261,22 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   // currently in global round
   if (global_table.round == local_table.round) {
-    // resend all this round data available
-    cslog() << "NODE> resend last block hash after BigBang";
+
+    if(blockChain_.getLastWrittenSequence() + 1U == local_table.round) {
+      cs::Bytes tmp = blockChain_.getLastWrittenHash().to_binary();
+      cs::Hash lwh;
+      if(tmp.size() == lwh.size()) {
+        std::copy(tmp.cbegin(), tmp.cend(), lwh.begin());
+        if(!(lwh == last_block_hash)) {
+          //TODO: must delete last block in chain, fork detected
+          cserror() << "NODE> fork detected in chain, must not proceed with last stored block #" << local_table.round - 1U;
+        }
+      }
+      else {
+        // "impossible": hash size mismatch!
+      }
+    }
+
     // update round table
     onRoundStart(global_table);
 
