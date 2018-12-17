@@ -299,7 +299,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       break;
     case NetworkCommand::SSSpecificBlock: {
       try {
-        uint32_t round = 0;
+        cs::RoundNumber round = 0;
         iPackStream_ >> round;
         gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
       }
@@ -356,7 +356,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  uint32_t rNum = 0;
+  cs::RoundNumber rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrentPtr();
@@ -371,7 +371,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
   auto trFinish = iPackStream_.getCurrentPtr();
-  node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), static_cast<cs::RoundNumber> (rNum));
+  node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
@@ -828,7 +828,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, uint32_t lastBlock, const csdb::PoolHash& lastHash) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, csdb::Pool::sequence_t lastBlock, const csdb::PoolHash& lastHash) {
   csdebug() << "TRANSPORT> Got SS Last Block: " << lastBlock;
 #ifdef MONITOR_NODE
   return true;
@@ -1058,7 +1058,7 @@ void Transport::sendPingPack(const Connection& conn) {
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
-  uint32_t lastSeq = 0u;
+  csdb::Pool::sequence_t lastSeq = 0u;
 
   cs::PublicKey pk;
   iPackStream_ >> id >> lastSeq >> pk;
