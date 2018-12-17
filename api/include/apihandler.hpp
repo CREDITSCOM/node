@@ -146,8 +146,7 @@ public:
   void WritersGet(api::WritersGetResult& _return, int32_t page) override;
   ////////new
 
-  bool convertAddrToPublicKey(const csdb::Address& address);
-
+  BlockChain &get_s_blockchain() const noexcept { return s_blockchain; }
 private:
   struct smart_trxns_queue {
     cs::SpinLock lock;

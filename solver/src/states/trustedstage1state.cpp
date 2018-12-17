@@ -176,9 +176,24 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       cs::Byte byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
 
       if (byte) {
-        byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
-        if(!byte) {
-          csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+        if (SmartContracts::is_smart_contract(transaction)) {
+          auto sci = SmartContracts::get_smart_contract(transaction);
+          if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
+            csdb::Address deployer = transaction.source();
+            context.blockchain().getKeyFromAddress(deployer);
+            byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
+
+            if (!byte) {
+              csdebug() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
+            }
+          }
+        }
+
+        if (byte) {
+          byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+          if(!byte) {
+            csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+          }
         }
       }
       else {

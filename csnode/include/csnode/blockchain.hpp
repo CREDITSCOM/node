@@ -54,8 +54,8 @@ public:
   bool isGood() const;
 
   enum class ADDR_TYPE { PUBLIC_KEY, ID };
-  csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type);
-  bool is_equal(csdb::Address &laddr, csdb::Address &raddr);
+  csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
+  bool is_equal(csdb::Address &laddr, csdb::Address &raddr) const;
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
@@ -107,6 +107,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
+  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
 
   uint32_t getLastWrittenSequence() const;
 
@@ -169,7 +170,7 @@ public:
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
   //std::vector<csdb::Transaction> genesisTrxns_;
 private:
-  
+
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
@@ -283,7 +284,7 @@ public:
 
 public signals:
 
-  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.  
+  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.
   *   Connected to SolverCore::gotStartSmartContract() method
   */
   cs::SmartContractStartSignal smartContractEvent_;

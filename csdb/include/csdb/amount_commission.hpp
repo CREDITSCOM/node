@@ -26,9 +26,7 @@ class ibstream;
 class AmountCommission {
 public:
   inline AmountCommission() = default;
-  AmountCommission(const AmountCommission& rhs) {
-    u_.bits = rhs.u_.bits;
-  }
+
   explicit AmountCommission(uint16_t value);
   explicit AmountCommission(double value);
 

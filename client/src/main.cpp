@@ -143,13 +143,22 @@ int main(int argc, char* argv[]) {
     ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
 
   variables_map vm;
-
   try {
     store(parse_command_line(argc, argv, desc), vm);
     notify(vm);
   }
   catch (unknown_option& e) {
     cserror() << e.what();
+    cslog() << desc;
+    return 1;
+  }
+  catch (invalid_command_line_syntax& e) {
+    cserror() << e.what();
+    cslog() << desc;
+    return 1;
+  }
+  catch (...) {
+    cserror() << "Couldn't parse the arguments";
     cslog() << desc;
     return 1;
   }

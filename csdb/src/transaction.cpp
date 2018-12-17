@@ -334,7 +334,7 @@ void Transaction::put(::csdb::priv::obstream& os) const {
 
     if (size) {
       os.put(data->user_fields_);
-    }   
+    }
   }
 
   os.put(data->signature_);
