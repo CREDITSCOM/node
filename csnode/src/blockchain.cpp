@@ -257,7 +257,7 @@ void BlockChain::writeGenesisBlock() {
   genesis.set_previous_hash(csdb::PoolHash());
   genesis.set_sequence(getLastWrittenSequence() + 1);
   addNewWalletsToPool(genesis);
-  
+
   cslog() << "Genesis block completed ... trying to save";
 
   writeBlock(genesis);
@@ -503,7 +503,7 @@ public:
 
     return true;
   }
-  
+
 private:
   csdb::Address wallPubKey_;
   const bool isToLoadWalletsPoolsCache_;
@@ -572,7 +572,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address wallP
     WalletId _id;
     if (!findWalletId(wallPubKey, _id))
       return;
-    wallPubKey = csdb::Address::from_wallet_id(_id); 
+    wallPubKey = csdb::Address::from_wallet_id(_id);
   }
   TransactionsLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
 
@@ -936,6 +936,13 @@ void BlockChain::testCachedBlocks() {
       break;
     }
   }
+}
+
+csdb::internal::byte_array BlockChain::getKeyFromAddress(csdb::Address& addr) const {
+  if (!addr.is_public_key())
+    findAddrByWalletId(addr.wallet_id(), addr);
+
+  return addr.public_key();
 }
 
 std::size_t BlockChain::getCachedBlocksSize() const {

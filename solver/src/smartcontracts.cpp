@@ -129,7 +129,7 @@ namespace cs
     }
 
     csdebug() << contracts.name() << ": imitate execution of start contract transaction";
-    
+
     //DEBUG: currently, the start transaction contains result also
     csdb::Transaction result;
     result.set_innerID(start_tr.innerID() + 1); // TODO: possible conflict with spammer transactions!
@@ -203,6 +203,7 @@ namespace cs
     if(!contract.has_value()) {
       return false;
     }
+
     return contract.value().method.empty();
   }
 
@@ -220,6 +221,31 @@ namespace cs
       return false;
     }
     return true;
+  }
+
+  /* static */
+  /* Assuming deployer.is_public_key() */
+  csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deployer,
+                                                        const uint64_t trId,
+                                                        const api::SmartContractDeploy& data) {
+    static_assert(cscrypto::kHashSize == cscrypto::kPublicKeySize);
+
+    std::vector<cscrypto::Byte> strToHash;
+    strToHash.reserve(cscrypto::kPublicKeySize + 6 + data.byteCode.size());
+
+    const auto dPk = deployer.public_key();
+    const auto idPtr = reinterpret_cast<const cscrypto::Byte*>(&trId);
+
+    std::copy(dPk.begin(), dPk.end(), std::back_inserter(strToHash));
+    std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
+    std::copy(data.byteCode.begin(),
+              data.byteCode.end(),
+              std::back_inserter(strToHash));
+
+    cscrypto::Hash result;
+    cscrypto::CalculateHash(result, strToHash.data(), strToHash.size());
+
+    return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
   }
 
   /*static*/

@@ -53,7 +53,7 @@ public:
 
   bool isGood() const;
 
-  bool isEqual(csdb::Address &laddr, csdb::Address &raddr) {
+  bool isEqual(const csdb::Address &laddr, const csdb::Address &raddr) {
     csdb::Address laddr_pk, raddr_pk;
 
     //
@@ -78,7 +78,7 @@ public:
     if (laddr_pk == raddr_pk)
       return true;
     return false;
-    
+
     /*if (laddr.is_wallet_id()) {//laddr to pk
       WalletId id = laddr.wallet_id();
       const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
@@ -88,7 +88,7 @@ public:
     }
     else
       laddr_pk = raddr;
-    
+
     if (raddr.is_wallet_id()) {//raddr to pk
       WalletId id = raddr.wallet_id();
       const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
@@ -154,6 +154,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
+  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
 
   uint32_t getLastWrittenSequence() const;
 
@@ -216,7 +217,7 @@ public:
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
   //std::vector<csdb::Transaction> genesisTrxns_;
 private:
-  
+
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
@@ -330,7 +331,7 @@ public:
 
 public signals:
 
-  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.  
+  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.
   *   Connected to SolverCore::gotStartSmartContract() method
   */
   cs::SmartContractStartSignal smartContractEvent_;

@@ -5,6 +5,9 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <csnode/conveyer.hpp>
+#include <solver/smartcontracts.hpp>
+
+#include <base58.h>
 
 constexpr csdb::user_field_id_t smart_state_idx = ~1;
 using namespace api;
@@ -239,7 +242,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   result.trxn.target = fromByteArray(target.public_key());
   result.trxn.fee.commission = transaction.counted_fee().get_raw();
 
-  auto pool = s_blockchain.loadBlock(transaction.id().pool_hash()); 
+  auto pool = s_blockchain.loadBlock(transaction.id().pool_hash());
   result.trxn.timeCreation = pool.get_time();
 
   auto uf = transaction.user_field(0);
@@ -392,7 +395,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
   res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
 #endif
 
-#ifdef MONITOR_NODE  
+#ifdef MONITOR_NODE
   s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
     res.transactionsCount = wd.transNum_;
@@ -548,6 +551,24 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
     else {
       SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+      return;
+    }
+  }
+  else {
+    csdb::Address addr = send_transaction.target();
+    csdb::Address deployer = send_transaction.source();
+
+    s_blockchain.getKeyFromAddress(addr);
+    s_blockchain.getKeyFromAddress(deployer);
+
+    auto scKey = cs::SmartContracts::get_valid_smart_address(deployer,
+                                                             send_transaction.innerID(),
+                                                             input_smart.smartContractDeploy);
+    if (scKey != addr) {
+      _return.status.code = 127;
+      const auto d = scKey.public_key();
+      std::string str = EncodeBase58(d.data(), d.data() + cscrypto::kPublicKeySize);
+      _return.status.message = "Bad smart contract address, expected " + str;
       return;
     }
   }
@@ -1736,7 +1757,7 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t offset = _page * PER_PAGE;
   uint32_t limit = PER_PAGE;
   uint32_t total = 0;
-    
+
   s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WriterData& wd) {
     if (addr.empty()) return true;
     if (offset == 0) {
