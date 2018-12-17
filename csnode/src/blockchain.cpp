@@ -418,7 +418,7 @@ csdb::PoolHash BlockChain::getHashBySequence(uint32_t seq) const {
   if (deferredBlock_.sequence() == seq) {
     return deferredBlock_.hash();
   }
-  if (!blockHashes_->find(seq + 1, res))
+  if (!blockHashes_->find(seq, res))
     return csdb::PoolHash{};
   return res;
 }

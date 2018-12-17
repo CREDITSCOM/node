@@ -563,7 +563,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
 
  void Node::retriveSmartConfidants(const cs::RoundNumber startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
   cslog() << __func__;
-  //âîçìîæíà îøèáêà åñëè íà ïèøóùåì óçëå ïðîèñõîäèò çàïèñü áëîêà â êîíöå ïðåäûäóùåãî ðàóíäà, à â äðóãèõ íîäàõ â íà÷àëå
+  //Ð²Ð¾Ð·Ð¼Ð¾Ð¶Ð½Ð° Ð¾ÑˆÐ¸Ð±ÐºÐ° ÐµÑÐ»Ð¸ Ð½Ð° Ð¿Ð¸ÑˆÑƒÑ‰ÐµÐ¼ ÑƒÐ·Ð»Ðµ Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð±Ð»Ð¾ÐºÐ° Ð² ÐºÐ¾Ð½Ñ†Ðµ Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰ÐµÐ³Ð¾ Ñ€Ð°ÑƒÐ½Ð´Ð°, Ð° Ð² Ð´Ñ€ÑƒÐ³Ð¸Ñ… Ð½Ð¾Ð´Ð°Ñ… Ð² Ð½Ð°Ñ‡Ð°Ð»Ðµ
   auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber + 1);
   if (ptr == nullptr) {
     cs::PublicKey c1;
@@ -743,12 +743,12 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
 
   if (sequencesCount != sequences.size()) {
-    cserror() << "Bad sequences created";
+    cserror() << "NODE> Bad sequences created";
     return;
   }
 
   if (sequences.front() > blockChain_.getLastWrittenSequence()) {
-    cslog() << "NODE> Get block request> The requested block: " << sequences.front() << " is BEYOND my CHAIN";
+    cswarning() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond last written sequence";
     return;
   }
 
