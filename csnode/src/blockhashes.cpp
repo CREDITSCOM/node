@@ -97,8 +97,7 @@ bool BlockHashes::saveDbStructure() {
   if (!f.is_open())
     return false;
   f << db_.first_ << "->" << db_.last_ << std::endl;
-  cslog() << "DB structure: " << db_.first_ << "->" << db_.last_;
-  cslog() << "DB structure is written succesfully";
+  csdebug() << "DB structure: " << db_.first_ << "->" << db_.last_ << " is written succesfully";
   return true;
 }
 }  // namespace cs

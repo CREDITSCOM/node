@@ -75,20 +75,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
                                   const cs::PublicKey& sender) {
   // get node status for useful logging
-  std::string sender_status("N");
-  unsigned idx = 0;
-  for (const auto& key : context.trusted()) {
-    if (std::equal(key.cbegin(), key.cend(), sender.cbegin())) {
-      std::ostringstream os;
-      os << "T[" << idx << "]";
-      sender_status = os.str();
-      break;
-    }
-    ++idx;
-  }
-
-  cslog() << name() << ": <-- hash from " << sender_status << " ("
-          << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
+  cslog() << name() << ": <-- hash from " << context.sender_description(sender);
   const auto& lwh = context.blockchain().getLastWrittenHash();
   if (stage.trustedCandidates.size() < Consensus::MinTrustedNodes) {
     if (pool_hash == lwh) {
@@ -108,7 +95,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     else {
       // hash does not match to own hash
       cswarning() << name() << ": hash " << pool_hash.to_string() << " from "
-                  << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " DOESN'T match to my value "
+                  << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " DOES NOT MATCH to my value "
                   << lwh.to_string();
       return Result::Ignore;
     }

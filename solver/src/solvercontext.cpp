@@ -18,6 +18,12 @@ BlockChain& SolverContext::blockchain() const {
   return core.pnode->getBlockChain();
 }
 
+std::string SolverContext::sender_description(const cs::PublicKey & sender_id)
+{
+  // either RVO or string's move constructor used:
+  return core.pnode->getSenderText(sender_id);
+}
+
 void SolverContext::add_stage1(cs::StageOne& stage, bool send) {
   // core.stageOneStorage.push_back(stage);
   if (send) {

@@ -345,21 +345,9 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 }
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
-  cslog() << "----------------------------- Write Block #" << pool.sequence() << "----------------------------";
-  const auto& trusted = pool.confidants();
-  cslog() << " trusted count " << trusted.size();
-  for(const auto& t : trusted) {
-    csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
-  }
-  cslog() << " transactions count " << pool.transactions_count();
-  csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
-  csdebug() << " previous hash: " << lastHash_.to_string();
-  csdebug() << " last storage size: " << getSize();
+  cslog() << "----------------------------- Flush block #" << pool.sequence() << " to disk ----------------------------";
+  logBlockInfo(pool);
 
-  cslog() << " sequence OK";
-  pool.set_previous_hash(lastHash_);
-
-  // former writeBlock():
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
     pool.set_storage(storage_);
@@ -368,12 +356,28 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     cserror() << "Couldn't save block";
     return;
   }
-
   {
     std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
     newBlockCv_.notify_all();
   }
-  cslog() << "--------------------------------------------------------------------------------";
+
+  cslog() << "----------------------------------------- #" << pool.sequence() << " ------------------------------------";
+}
+
+void BlockChain::logBlockInfo(csdb::Pool& pool)
+{
+  const auto& trusted = pool.confidants();
+  cslog() << " trusted count " << trusted.size();
+  for(const auto& t : trusted) {
+    csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
+  }
+  cslog() << " transactions count " << pool.transactions_count();
+  if(pool.user_field_ids().count(0) > 0) {
+    csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
+  }
+  csdebug() << " previous hash: " << pool.previous_hash().to_string();
+  csdebug() << " hash: " << pool.hash().to_string();
+  csdebug() << " last storage size: " << getSize();
 }
 
 void BlockChain::postWriteBlock(csdb::Pool& pool) {
@@ -381,9 +385,8 @@ void BlockChain::postWriteBlock(csdb::Pool& pool) {
   createTransactionsIndex(pool);
 #endif
 
-  cslog() << "Block " << pool.sequence() << " saved succesfully";
   if(!updateFromNextBlock(pool)) {
-    cserror() << "Couldn't update from next block";
+    cserror() << "BLOCKCHAIN> error in updateFromNextBlock()";
   }
 
   // inspect transactions against smart contracts, raise special event on every item found:
@@ -400,7 +403,7 @@ void BlockChain::postWriteBlock(csdb::Pool& pool) {
   // end of former writeBlock()
 
   lastHash_ = pool.hash();
-  csdebug() << " last hash: " << lastHash_.to_string();
+  csdetails() << "BLOCKCHAIN> lastHash_ = " << lastHash_.to_string();
 
   recount_trxns(pool);
 }
@@ -838,8 +841,12 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   }
 
   deferredBlock_ = pool;
-
   postWriteBlock(deferredBlock_);
+
+  // log cached block
+  cslog() << "----------------------------- Defer block #" << pool.sequence() << " until next round ----------------------------";
+  logBlockInfo(deferredBlock_);
+  cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
 
   return std::make_pair(true, deferredBlock_);
 }
@@ -957,7 +964,7 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
   return vec;
 }
 
-void BlockChain::updateLastBlockTrustedConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants) {
+void BlockChain::updateLastBlockConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants) {
   if (!deferredBlock_.is_valid()) {
     return;
   }

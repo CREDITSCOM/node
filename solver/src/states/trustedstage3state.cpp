@@ -258,7 +258,8 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
     }
     else {
       ++liarNumber;
-      cslog() << "[" << (int)it.sender << "] IS LIAR with hash "
+      bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
+      cslog() << "[" << (int)it.sender << "] IS " << (is_lost ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
     }
   }
@@ -301,7 +302,11 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
       stage.realTrustedMask.push_back(1); // set 1 if trusted and 0 if untrusted
-      const auto& stage_i = *(context.stage1_data().cbegin() + i);
+      auto ptr = context.stage1(i);
+      if(ptr == nullptr) {
+        continue;
+      }
+      const auto& stage_i = *ptr;
       uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
       cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
 

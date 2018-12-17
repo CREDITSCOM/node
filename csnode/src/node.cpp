@@ -262,19 +262,14 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   // currently in global round
   if (global_table.round == local_table.round) {
 
+    // if last block already stored update trusted list
     if(blockChain_.getLastWrittenSequence() + 1U == local_table.round) {
-      cs::Bytes tmp = blockChain_.getLastWrittenHash().to_binary();
-      cs::Hash lwh;
-      if(tmp.size() == lwh.size()) {
-        std::copy(tmp.cbegin(), tmp.cend(), lwh.begin());
-        if(!(lwh == last_block_hash)) {
-          //TODO: must delete last block in chain, fork detected
-          cserror() << "NODE> fork detected in chain, must not proceed with last stored block #" << local_table.round - 1U;
-        }
+      cslog() << "NODE> update trusted list in last block after BigBang";
+      std::vector<std::vector<uint8_t>> new_trusted;
+      for(const auto t : global_table.confidants) {
+        new_trusted.emplace_back(std::vector<uint8_t>(t.cbegin(), t.cend()));
       }
-      else {
-        // "impossible": hash size mismatch!
-      }
+      blockChain_.updateLastBlockConfidants(new_trusted);
     }
 
     // update round table
@@ -422,7 +417,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   std::size_t hashesCount = 0;
   istream_ >> hashesCount;
 
-  csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Get packet hashes request from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   cs::PacketsHashes hashes;
   hashes.reserve(hashesCount);
@@ -1362,7 +1357,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cs::DataStream signStream(messageToSign);
   signStream << roundNumber_ << stageOneInfo.messageHash;
 
-  cslog() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
+  csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
@@ -1426,17 +1421,13 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   stageOneMessage_[stage.sender] = std::move(bytes);
 
   if (confidant != sender) {
-    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key: "
-            << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
-            << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    cslog() << __func__ <<  "(): stage-1 of " << getSenderText(confidant) << " sent by " << getSenderText(sender);
   }
   else {
-    cslog() << __func__ <<  "(): Sender: " << static_cast<int>(stage.sender) << ", sender key ok";
+    cslog() << __func__ <<  "(): stage-1 of [" << static_cast<int>(stage.sender) << "], sender key ok";
   }
-
   cslog() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
-  csdebug() << "NODE> Stage One from [" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->gotStageOne(std::move(stage));
 }
 
@@ -1474,11 +1465,11 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   csprint();
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
-    csdebug() << "NODE> ignore stage two as no confidant";
+    csdebug() << "NODE> ignore stage-2 as no confidant";
     return;
   }
 
-  cslog() << "Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> getting stage-2 from " << getSenderText(sender);
   istream_.init(data, size);
 
   cs::Bytes bytes;
@@ -1488,7 +1479,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   istream_ >> stage.signature;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageTwo packet format";
+    cserror() << "NODE> bad stage-2 packet format";
     return;
   }
 
@@ -1497,7 +1488,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   stream >> stage.signatures;
   stream >> stage.hashes;
 
-  cslog() << __func__  << "(): Sender :" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isConfidantExists(stage.sender)) {
@@ -1505,14 +1495,14 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   }
 
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
-    cslog() << "Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    cslog() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
-  csprint() << "Signature is OK";
+  csdebug() << "NODE> signature is OK";
   stageTwoMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->gotStageTwo(std::move(stage));
 }
 
@@ -1846,7 +1836,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
     return;
   }
 
-  cslog() << "Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   istream_.init(data, size);
   cs::StageTwoSmarts stage;
   cs::Bytes bytes;
@@ -1854,7 +1844,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
   istream_ >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageTwo packet format";
+    cserror() << "NODE> Bad StageTwo packet format";
     return;
   }
 
@@ -1866,11 +1856,11 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
 
 
   if (stage.sRoundNum != solver_->smartRoundNumber()) {
-    cswarning() << "Bad Smart's RoundNumber";
+    cswarning() << "NODE> Bad Smart's RoundNumber";
     return;
   }
 
-  cslog() << __func__ << "(): Sender :" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << __func__ << "(): Sender :" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
  
   if (stage.sender >= solver_->smartConfidants().size()) {
     cswarning() << "NODE> WRONG sender number";
@@ -1880,11 +1870,11 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
   const cs::PublicKey& confidant = solver_->smartConfidants().at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
-    cslog() << "Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    cslog() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
-  csprint() << "Signature is OK";
+  csprint() << "NODE> Signature is OK";
   smartStageTwoMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] is OK!";
@@ -2299,7 +2289,7 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
 }
 
 void Node::sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info) {
-  cslog() << "NODE> send RoundInfo reply to " << cs::Utils::byteStreamToHex(target.data(), target.size());
+  cslog() << "NODE> send RoundInfo reply to " << getSenderText(target);
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "Only confidant nodes can reply consensus stages";
@@ -2459,4 +2449,19 @@ void Node::startConsensus() {
   if (roundNumber == getBlockChain().getLastWrittenSequence() + 1) {
     sendHash(roundNumber);
   }
+}
+
+std::string Node::getSenderText(const cs::PublicKey& sender)
+{
+  std::ostringstream os;
+  unsigned idx = 0;
+  for(const auto& key : cs::Conveyer::instance().confidants()) {
+    if(std::equal(key.cbegin(), key.cend(), sender.cbegin())) {
+      os << "T[" << idx << "]";
+      return os.str();
+    }
+    ++idx;
+  }
+  os << "N (" << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
+  return os.str();
 }

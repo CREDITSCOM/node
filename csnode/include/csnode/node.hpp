@@ -43,6 +43,8 @@ public:
   void stop();
   void runSpammer();
 
+  std::string getSenderText(const cs::PublicKey& sender);
+
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
   void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber, uint8_t type = 0);
