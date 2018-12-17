@@ -811,11 +811,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
 
-  if (last_seq == pool_seq) {
-    updateLastBlockTrustedConfidants(pool);
-    return std::make_pair(true, deferredBlock_);
-  }
-
   if (last_seq + 1 != pool_seq) {
     cserror() << "BLOCKCHAIN> cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
     return std::make_pair(false, std::nullopt);
@@ -962,19 +957,19 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
   return vec;
 }
 
-void BlockChain::updateLastBlockTrustedConfidants(const csdb::Pool& pool) {
-  const auto& deffConfidants = deferredBlock_.confidants();
-  const auto& newConfidants = pool.confidants();
-
-  if (deffConfidants != newConfidants) {
-    cswarning() << "BLOCKCHAIN> " << " confidants in new pool is same as cached pool";
+void BlockChain::updateLastBlockTrustedConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants) {
+  if (!deferredBlock_.is_valid()) {
     return;
   }
 
-  csdebug() << "BLOCKCHAIN> " << __func__;
+  if (deferredBlock_.confidants() == confidants) {
+    cswarning() << "BLOCKCHAIN> confidants in new pool is same as cached pool";
+    return;
+  }
 
-  deferredBlock_.set_confidants(newConfidants);
-  deferredBlock_.update_binary();
+  csprint();
+
+  deferredBlock_.update_confidants(confidants);
 }
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet)

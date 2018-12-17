@@ -196,7 +196,7 @@ private:
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
                        const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
-  void updateLastBlockTrustedConfidants(const csdb::Pool& pool);
+  void updateLastBlockTrustedConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants);
 
 private:
   bool good_;
