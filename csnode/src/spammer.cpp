@@ -129,7 +129,7 @@ void Spammer::FundMyWallets(Node& node) {
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     srand((unsigned int)time(0));
     transaction.set_innerID((rand() + 2) & 0x3fffffffffff);
-    SignTransaction(transaction, genesis.data());
+    SignTransaction(transaction, genesis);
     node.getSolver()->send_wallet_transaction(transaction);
   }
 }
@@ -143,12 +143,10 @@ csdb::Address Spammer::OptimizeAddress(const csdb::Address& address, Node& node)
   return address;
 }
 
-void Spammer::SignTransaction(csdb::Transaction& transaction, const uint8_t* private_key) {
+void Spammer::SignTransaction(csdb::Transaction& transaction, const std::vector<cscrypto::Byte>& private_key) {
   auto transaction_bytes = transaction.to_byte_stream_for_sig();
   cscrypto::Signature signature;
-  cscrypto::PrivateKey priv;
-  auto kp = priv.access();
-  memcpy(const_cast<uint8_t*>(kp.data()), private_key, cscrypto::kPrivateKeySize);
+  auto priv = cscrypto::PrivateKey::readFromBytes(private_key);
   cscrypto::GenerateSignature(signature, priv, transaction_bytes.data(), transaction_bytes.size());
   transaction.set_signature(std::string(signature.begin(), signature.end()));
 }
