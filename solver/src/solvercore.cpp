@@ -206,11 +206,12 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartConfidants_.clear();
     smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
     smartRoundNumber_ = smartRef.sequence;
-    pnode->retriveSmartConfidants(static_cast<cs::RoundNumber>(smartRoundNumber_), smartConfidants_);
-    refreshSmartStagesStorage();
-    cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_ << " WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
-    cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
+    pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
+
+    cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+    cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
+    refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == 255) {
       return;
     }
@@ -279,6 +280,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     st3.sRoundNum = 0;
     memset(st3.signature.data(),0,st3.signature.size());
     memset(st2.signature.data(),0,st3.signature.size());
+    pnode->smartStagesStorageClear(cSize);
   }
 
   void SolverCore::addSmartStageOne( cs::StageOneSmarts& stage, bool send) {
@@ -311,12 +313,10 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     }
     smartStageTwoStorage_.at(stage.sender) = stage;
     cslog() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
-    if (smartStageTwoEnough()) processStages();
-
-  if (smartStageTwoEnough()) {
-    processStages();
+    if (smartStageTwoEnough()) {
+      processStages();
+    }
   }
-}
 
 void SolverCore::processStages() {
   st3.writer = 0;

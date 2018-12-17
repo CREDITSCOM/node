@@ -102,10 +102,9 @@ struct Connection {
 
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  uint32_t syncSeqs[BlocksToSync];
-  uint32_t syncSeqsRetries[BlocksToSync];
-
-  uint32_t lastSeq = 0;
+  uint64_t syncSeqs[BlocksToSync];
+  uint64_t syncSeqsRetries[BlocksToSync];
+  uint64_t lastSeq = 0;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut ||
@@ -167,7 +166,7 @@ public:
   ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
   void resetSyncNeighbours();
-  void releaseSyncRequestee(const uint32_t seq);
+  void releaseSyncRequestee(const uint64_t seq);
   void registerDirect(const Packet*, ConnectionPtr);
 
 private:

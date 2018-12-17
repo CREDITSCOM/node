@@ -121,7 +121,7 @@ private:  // struct
     inline const PoolsRequestedSequences& sequences() const {
       return sequences_;
     }
-    inline uint32_t roundCounter() const {
+    inline cs::RoundNumber roundCounter() const {
       return roundCounter_;
     }
 
@@ -159,7 +159,7 @@ private:  // struct
   private:
     uint8_t neighbourIndex_;             // neighbour number
     PoolsRequestedSequences sequences_;  // requested sequence
-    uint32_t roundCounter_;
+    cs::RoundNumber roundCounter_;
   };
 
 private:  // Members
@@ -175,7 +175,7 @@ private:  // Members
   // [key] = sequence,
   // [value] =  packet counter
   // value: increase each new round
-  std::map<csdb::Pool::sequence_t, uint32_t> requestedSequences_;
+  std::map<csdb::Pool::sequence_t, cs::RoundNumber> requestedSequences_;
 
   std::vector<NeighboursSetElemet> neighbours_;
 

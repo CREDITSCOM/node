@@ -137,7 +137,7 @@ public:
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
   uint32_t getMaxNeighbours() const;
-  ConnectionPtr getSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getSyncRequestee(const csdb::Pool::sequence_t seq, bool& alreadyRequested);
   ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
   ConnectionPtr getNeighbourByNumber(const std::size_t number);
   ConnectionPtr getRandomNeighbour();
@@ -145,7 +145,7 @@ public:
   const Connections getNeighbours() const;
   const Connections getNeighboursWithoutSS() const;
 
-  void syncReplied(const uint32_t seq);
+  void syncReplied(const csdb::Pool::sequence_t seq);
   bool isPingDone();
   void resetNeighbours();
 

@@ -171,7 +171,7 @@ private:
 
   csdb::Address addr_genesis;
   csdb::Address addr_start;
-  size_t cur_round;
+  cs::RoundNumber cur_round;
   cs::PublicKey public_key;
   cs::PrivateKey private_key;
   // senders of hashes received this round
@@ -277,7 +277,7 @@ private:
   std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
   bool smartStagesStorageRefreshed_ = false;
   std::vector<cs::PublicKey> smartConfidants_;
-  uint8_t ownSmartsConfNum_;
+  uint8_t ownSmartsConfNum_ = 255;
   csdb::Pool::sequence_t smartRoundNumber_;
 
   cs::StageOneSmarts st1;

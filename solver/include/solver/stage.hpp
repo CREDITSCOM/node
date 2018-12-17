@@ -63,6 +63,13 @@ struct StageThreeSmarts {
   Signature signature;
 };
 
+struct Stage{
+  uint8_t msgType;
+  cs::Bytes msgData;
+  cs::RoundNumber msgRoundNum;
+  cs::PublicKey msgSender;
+};
+
 }  // namespace cs
 
 #endif // STAGE_HPP

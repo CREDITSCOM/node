@@ -356,7 +356,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
-  cs::RoundNumber rNum = 0;
+  uint32_t rNum = 0;
   iPackStream_ >> rNum;
 
   auto trStart = iPackStream_.getCurrentPtr();
@@ -371,7 +371,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
   auto trFinish = iPackStream_.getCurrentPtr();
-  node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
+  node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), static_cast<cs::RoundNumber> (rNum));
 
   uint8_t numCirc;
   iPackStream_ >> numCirc;
@@ -550,11 +550,11 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::ThirdStage:
     return node_->getStageThree(data, size, firstPack.getSender());
   case MsgTypes::FirstSmartStage:
-    return node_->getSmartStageOne(data, size, firstPack.getSender());
+    return node_->getSmartStageOne(data, size, rNum, firstPack.getSender());
   case MsgTypes::SecondSmartStage:
-    return node_->getSmartStageTwo(data, size, firstPack.getSender());
+    return node_->getSmartStageTwo(data, size, rNum, firstPack.getSender());
   case MsgTypes::ThirdSmartStage:
-    return node_->getSmartStageThree(data, size, firstPack.getSender());
+    return node_->getSmartStageThree(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:
@@ -602,7 +602,7 @@ uint32_t Transport::getMaxNeighbours() const {
   return config_.getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
+ConnectionPtr Transport::getSyncRequestee(const csdb::Pool::sequence_t seq, bool& alreadyRequested) {
   return nh_.getNextSyncRequestee(seq, alreadyRequested);
 }
 
@@ -627,7 +627,7 @@ const Connections Transport::getNeighboursWithoutSS() const {
   return nh_.getNeighboursWithoutSS();
 }
 
-void Transport::syncReplied(const uint32_t seq) {
+void Transport::syncReplied(const csdb::Pool::sequence_t seq) {
   return nh_.releaseSyncRequestee(seq);
 }
 

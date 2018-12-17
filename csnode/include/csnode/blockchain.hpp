@@ -98,16 +98,16 @@ public:
   csdb::PoolHash wait_for_block(const csdb::PoolHash& obsolete);
 
   csdb::Pool loadBlock(const csdb::PoolHash&) const;
-  csdb::Pool loadBlock(const uint32_t sequence) const;
+  csdb::Pool loadBlock(const csdb::Pool::sequence_t sequence) const;
   csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
   csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
 
-  uint32_t getLastWrittenSequence() const;
+  csdb::Pool::sequence_t getLastWrittenSequence() const;
 
-  uint32_t getRequestedBlockNumber() const;
+  csdb::Pool::sequence_t getRequestedBlockNumber() const;
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
@@ -118,7 +118,7 @@ public:
 
   uint64_t getWalletsCount();
 
-  csdb::PoolHash getHashBySequence(uint32_t seq) const;
+  csdb::PoolHash getHashBySequence(csdb::Pool::sequence_t seq) const;
   csdb::PoolHash getLastWrittenHash() const;
 
 #ifdef TRANSACTIONS_INDEX
