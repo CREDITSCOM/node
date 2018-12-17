@@ -119,7 +119,8 @@ private:
   enum class Mode {
     Default,
     Debug,
-    Monitor
+    Monitor,
+    WebWallet
   };
 
   enum class Event {
@@ -183,8 +184,9 @@ private:
   void InitTransitions();
   void InitDebugModeTransitions();
   void InitMonitorModeTransitions();
+  void InitWebWalletModeTransitions();
   void setState(const StatePtr& pState);
- 
+
   void handleTransitions(Event evt);
   bool stateCompleted(Result result);
 

@@ -114,4 +114,19 @@ namespace cs
       {pNone, {{Event::Start, pNormal}}}
     };
   }
+
+  void SolverCore::InitWebWalletModeTransitions()
+  {
+    opt_mode = Mode::WebWallet;
+
+    StatePtr pNormal = std::make_shared<NormalState>();
+    StatePtr pNone = std::make_shared<NoState>();
+    // start with that:
+    pstate = pNone;
+
+    transitions = {
+      // transition on the first round
+      {pNone, {{Event::Start, pNormal}}}
+    };
+  }
 } // namespace slv2
