@@ -783,7 +783,7 @@ void Neighbourhood::registerDirect(const Packet* packPtr,
   bp.receiver = conn;
 }
 
-void Neighbourhood::releaseSyncRequestee(const uint32_t seq) {
+void Neighbourhood::releaseSyncRequestee(const csdb::Pool::sequence_t seq) {
   cs::SpinGuard lock(nLockFlag_);
 
   for (auto& nb : neighbours_) {

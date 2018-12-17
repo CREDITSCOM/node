@@ -161,6 +161,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
           }
         }
+
         bool toBreak = false;
         size_t tCandSize = context.stage1(it.sender)->trustedCandidates.size();
         if(tCandSize > 0) {
@@ -308,7 +309,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       }
       const auto& stage_i = *ptr;
       uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
-      cslog() << "Candidates amount of " << (int)i << " : " << (int)candidates_amount;
+      cslog() << "Candidates amount of [" << (int)i << "] : " << (int)candidates_amount;
 
 
       for (uint8_t j = 0; j < candidates_amount; j++) {
