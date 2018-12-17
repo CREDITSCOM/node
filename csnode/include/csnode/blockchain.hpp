@@ -53,7 +53,7 @@ public:
 
   bool isGood() const;
 
-  bool isEqual(csdb::Address &laddr, csdb::Address &raddr) {
+  bool isEqual(const csdb::Address &laddr, const csdb::Address &raddr) {
     csdb::Address laddr_pk, raddr_pk;
 
     //
