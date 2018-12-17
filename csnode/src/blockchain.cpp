@@ -124,29 +124,8 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 
   auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
     if (indexedAddrs.insert(addr).second) {
-      csdb::PoolHash lapoo;
-
-      {
-        auto last_trx = loadTransaction(getLastTransaction(addr));
-        lapoo = getLastTransaction(addr).pool_hash();
-      }
-
-      //
-      csdb::Address addr_pk;
-      if (addr.is_wallet_id()) {
-        WalletId id = addr.wallet_id();
-        const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-        if (!wallDataPtr) {
-          int a = 1;//for debug
-        }
-        WalletsCache::convert(wallDataPtr->address_, addr_pk);
-      }
-      else
-        addr_pk = addr;
-      //
-
-      storage_.set_previous_transaction_block(addr_pk, pool.hash(), lapoo);
-      //storage_.set_previous_transaction_block(addr, pool.hash(), lapoo);
+      csdb::PoolHash lapoo = getLastTransaction(addr).pool_hash();
+      storage_.set_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), pool.hash(), lapoo);
     }
   };
 
@@ -158,8 +137,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
   if (pool.transactions().size()) {
     total_transactions_count_ += pool.transactions().size();
 
-    if (lastNonEmptyBlock_.transCount &&
-      pool.hash() != lastNonEmptyBlock_.hash)
+    if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
       previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
 
     lastNonEmptyBlock_.hash = pool.hash();
@@ -282,9 +260,6 @@ void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCa
 
 void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<void(const cs::WalletsCache::WalletData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  //auto wd = walletsCacheStorage_->findWallet(addr.public_key());
-  //if (!wd) return;
-
   WalletId id;
   if (!walletIds_->normal().find(addr, id))
     return;
@@ -998,6 +973,32 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet)
   fee_->CountFeesInPool(*this, &packet);
 }
 
+csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) {
+  csdb::Address addr_res = addr;
+  if (type == ADDR_TYPE::PUBLIC_KEY) {
+    if (addr_res.is_wallet_id()) {
+      const auto id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr_res).to_api_addr().data());
+      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(addr_res)))
+        return csdb::Address();
+    }
+    else if (addr_res.is_public_key())
+      return addr_res;
+  }
+  else if (type == ADDR_TYPE::ID) {
+    uint32_t _id;
+    if (!findWalletId(addr_res, _id))
+      return csdb::Address();
+    addr_res = csdb::Address::from_wallet_id(_id);
+  }
+  return addr_res;
+}
+
+bool BlockChain::is_equal(csdb::Address &laddr, csdb::Address &raddr) {
+  if (get_addr_by_type(laddr, ADDR_TYPE::PUBLIC_KEY) == get_addr_by_type(raddr, ADDR_TYPE::PUBLIC_KEY))
+    return true;
+  return false;
+}
+
 #ifdef MONITOR_NODE
 uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
@@ -1030,19 +1031,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
   std::lock_guard<decltype(dbLock_)> lock(dbLock_);
-  //
-  csdb::Address addr_pk;
-  if (addr.is_wallet_id()) {
-    WalletId id = addr.wallet_id();
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-    WalletsCache::convert(wallDataPtr->address_, addr_pk);
-  }
-  else
-    addr_pk = addr;
-  //
-  return storage_.get_previous_transaction_block(addr_pk, ph);
-
-  //return storage_.get_previous_transaction_block(addr, ph);
+  return storage_.get_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), ph);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
@@ -1077,8 +1066,7 @@ bool TransactionsIterator::isValid() const {
 
 void TransactionsIterator::next() {
   while (++it_ != lapoo_.transactions().rend()) {
-    //if (it_->source() == addr_ || it_->target() == addr_)
-    if(bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_))
+    if(bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_))
       break;
   }
 
@@ -1090,8 +1078,7 @@ void TransactionsIterator::next() {
     if (lapoo_.is_valid()) {
       it_ = lapoo_.transactions().rbegin();
       // transactions() cannot be empty
-      //if (it_->source() != addr_ && it_->target() != addr_)
-      if(!bc_.isEqual(it_->source(), addr_) && !bc_.isEqual(it_->target(), addr_))
+      if(!bc_.is_equal(it_->source(), addr_) && !bc_.is_equal(it_->target(), addr_))
         next();  // next should be executed only once
     }
   }
