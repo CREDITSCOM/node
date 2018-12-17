@@ -1,6 +1,7 @@
-#include "cscrypto/privatekey.hpp"
-
+#include <cstring>
 #include <memory.h>
+
+#include "cscrypto/privatekey.hpp"
 
 namespace cscrypto {
 
