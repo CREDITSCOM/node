@@ -567,11 +567,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     if (scKey != addr) {
       _return.status.code = 127;
       const auto d = scKey.public_key();
+      const auto t = deployer.public_key();
       std::string str = EncodeBase58(d.data(), d.data() + cscrypto::kPublicKeySize);
-      _return.status.message = "Bad smart contract address, expected " + str;
+      std::string dep = EncodeBase58(t.data(), t.data() + cscrypto::kPublicKeySize);
+      _return.status.message = "Bad smart contract address, expected " + str + " composed of " + dep;
       return;
     }
   }
+
+  bool amnesia = input_smart.forgetNewState;
 
   auto& contract_state_entry = [this, &smart_addr]() -> decltype(auto) {
     auto smart_state(lockedReference(this->smart_state));
@@ -607,7 +611,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   if (api_resp.status.code) {
     _return.status.code     = api_resp.status.code;
     _return.status.message  = api_resp.status.message;
-    contract_state_entry.update_state([&]() -> decltype(auto) { return std::move(contract_state); });
+    contract_state_entry.yield();
     return;
   }
 
@@ -615,12 +619,30 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   if (_return.__isset.smart_contract_result)
     _return.smart_contract_result = api_resp.ret_val;
 
+  if (amnesia) {
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    contract_state_entry.yield();
+    return;
+  }
+
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
   send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
   solver.send_wallet_transaction(send_transaction);
 
-  if (deploy)
-    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
+  if (deploy) {
+    contract_state_entry.wait_till_front([&](std::string& state) {
+                                           return !state.empty();
+                                         });
+  }
+  else {
+#ifndef TETRIS_NODE
+    contract_state_entry.yield();
+#else
+    contract_state_entry.update_state([=](const std::string&) {
+                                        return execResp.contractState;
+                                      });
+#endif
+  }
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
