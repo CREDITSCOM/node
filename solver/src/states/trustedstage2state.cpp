@@ -100,7 +100,7 @@ void TrustedStage2State::request_stages(SolverContext& context) {
     }
   }
   if(0 == cnt_requested) {
-    csdebug() << name() << ": no node ot request";
+    csdebug() << name() << ": no node to request";
   }
 }
 
@@ -120,7 +120,7 @@ void TrustedStage2State::request_stages_neighbors(SolverContext& context) {
     }
   }
   if(0 == cnt_requested) {
-    csdebug() << name() << ": no node ot request";
+    csdebug() << name() << ": no node to request";
   }
 }
 
