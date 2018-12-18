@@ -980,12 +980,12 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
   csdb::Address addr_res{};
   switch (type) {
     case ADDR_TYPE::PUBLIC_KEY:
-      if (addr_res.is_public_key() || !findAddrByWalletId(addr_res.wallet_id(), addr_res))
+      if (addr.is_public_key() || !findAddrByWalletId(addr.wallet_id(), addr_res))
         addr_res = addr;
       break;
     case ADDR_TYPE::ID:
       uint32_t _id;
-      if (findWalletId(addr_res, _id))
+      if (findWalletId(addr, _id))
         addr_res = csdb::Address::from_wallet_id(_id);
       break;
   } 
