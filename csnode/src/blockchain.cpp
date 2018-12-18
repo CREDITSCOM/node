@@ -980,11 +980,11 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
       if (findWalletId(addr, _id))
         addr_res = csdb::Address::from_wallet_id(_id);
       break;
-  } 
+  }
   return addr_res;
 }
 
-bool BlockChain::is_equal(csdb::Address &laddr, csdb::Address &raddr) const {
+bool BlockChain::is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const {
   if (get_addr_by_type(laddr, ADDR_TYPE::PUBLIC_KEY) == get_addr_by_type(raddr, ADDR_TYPE::PUBLIC_KEY))
     return true;
   return false;
