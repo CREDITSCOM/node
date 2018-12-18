@@ -346,7 +346,8 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 
 void BlockChain::writeBlock(csdb::Pool& pool) {
   cslog() << "----------------------------- Flush block #" << pool.sequence() << " to disk ----------------------------";
-  logBlockInfo(pool);
+  cslog() << "see block info above";
+  //logBlockInfo(pool);
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
