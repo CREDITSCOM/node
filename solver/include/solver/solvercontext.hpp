@@ -290,6 +290,7 @@ public:
       init_zero(fake);
       fake.sender = from;
       core.gotStageOne(fake);
+      csdebug() << "SolverCore: make stage-1 [" << (int) from << "] as silent";
     }
   }
 
@@ -300,6 +301,7 @@ public:
       init_zero(fake);
       fake.sender = from;
       core.gotStageTwo(fake);
+      csdebug() << "SolverCore: make stage-2 [" << (int) from << "] as silent";
     }
   }
 

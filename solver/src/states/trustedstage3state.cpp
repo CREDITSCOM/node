@@ -94,10 +94,15 @@ void TrustedStage3State::off(SolverContext& /*context*/) {
 // requests stages from corresponded nodes
 void TrustedStage3State::request_stages(SolverContext& context) {
   uint8_t cnt = (uint8_t)context.cnt_trusted();
+  int cnt_requested = 0;
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage2(i) == nullptr) {
       context.request_stage2(i, i);
+      ++cnt_requested;
     }
+  }
+  if(0 == cnt_requested) {
+    csdebug() << name() << ": no node ot request";
   }
 }
 
@@ -105,14 +110,19 @@ void TrustedStage3State::request_stages(SolverContext& context) {
 void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
   const auto& stage2_data = context.stage2_data();
   uint8_t cnt = (uint8_t)context.cnt_trusted();
+  int cnt_requested = 0;
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage2(i) == nullptr) {
       for (const auto& d : stage2_data) {
         if (d.sender != context.own_conf_number()) {
           context.request_stage2(d.sender, i);
+          ++cnt_requested;
         }
       }
     }
+  }
+  if(0 == cnt_requested) {
+    csdebug() << name() << ": no node ot request";
   }
 }
 
