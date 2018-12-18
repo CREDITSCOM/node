@@ -14,6 +14,8 @@
 #include "csdb/database.hpp"
 #include "csdb/transaction.hpp"
 
+#include <lib/system/common.hpp>
+
 namespace csdb {
 
 class Pool;
@@ -188,7 +190,7 @@ public:
    * \sa ::csdb::Pool::load
    */
   Pool pool_load(const PoolHash &hash) const;
-  Pool pool_load(const uint32_t sequence) const;
+  Pool pool_load(const cs::Sequence sequence) const;
   Pool pool_load_meta(const PoolHash &hash, size_t &cnt) const;
 
   Pool pool_remove_last();

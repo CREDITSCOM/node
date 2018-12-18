@@ -36,7 +36,7 @@ void BlockHashes::initStart() {
 }
 
 bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock) {
-  csdb::Pool::sequence_t seq = prevBlock.sequence();
+  cs::Sequence seq = prevBlock.sequence();
   db_.last_ = seq;
   if (!isDbInited_) {
     db_.first_ = 0;
@@ -63,7 +63,7 @@ void BlockHashes::initFinish() {
 }
 
 bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
-  csdb::Pool::sequence_t seq = nextBlock.sequence();
+  cs::Sequence seq = nextBlock.sequence();
   if (!isDbInited_) {
     db_.first_ = 0;
     db_.last_ = seq;
@@ -80,7 +80,7 @@ bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
   return true;
 }
 
-bool BlockHashes::find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const {
+bool BlockHashes::find(cs::Sequence seq, csdb::PoolHash& res) const {
   if (empty())
     return false;
   const auto& range = getDbStructure();

@@ -13,6 +13,8 @@
 #include "csdb/internal/shared_data.hpp"
 #include "csdb/internal/types.hpp"
 
+#include "lib/system/common.hpp"
+
 namespace csdb {
 
 namespace priv {
@@ -48,7 +50,7 @@ class TransactionID {
   SHARED_DATA_CLASS_DECLARE(TransactionID)
 public:
   /// \deprecated Тип будет удалён в следующих версиях.
-  using sequence_t = size_t;
+  using sequence_t = cs::Sequence;
 
   /// \deprecated Конструктор будет удалён в следующих версиях.
   TransactionID(PoolHash poolHash, sequence_t index);

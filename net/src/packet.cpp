@@ -17,8 +17,7 @@ const char* getMsgTypesString(MsgTypes messageType);
 
 const cs::Hash& Packet::getHeaderHash() const {
   if (!headerHashed_) {
-    headerHash_ = generateHash(static_cast<const char*>(data_.get()) + static_cast<uint32_t>(Offsets::FragmentsNum),
-                                Lengths::FragmentedHeader);
+    headerHash_ = generateHash(static_cast<const char*>(data_.get()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
     headerHashed_ = true;
   }
   return headerHash_;

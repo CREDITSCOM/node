@@ -137,7 +137,7 @@ public:
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
   uint32_t getMaxNeighbours() const;
-  ConnectionPtr getSyncRequestee(const csdb::Pool::sequence_t seq, bool& alreadyRequested);
+  ConnectionPtr getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
   ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
   ConnectionPtr getNeighbourByNumber(const std::size_t number);
   ConnectionPtr getRandomNeighbour();
@@ -145,7 +145,7 @@ public:
   const Connections getNeighbours() const;
   const Connections getNeighboursWithoutSS() const;
 
-  void syncReplied(const csdb::Pool::sequence_t seq);
+  void syncReplied(const cs::Sequence seq);
   bool isPingDone();
   void resetNeighbours();
 
@@ -170,7 +170,7 @@ private:
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
   bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
-  bool gotSSLastBlock(const TaskPtr<IPacMan>&, csdb::Pool::sequence_t, const csdb::PoolHash&);
+  bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&);
 
   bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
   bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
@@ -246,8 +246,8 @@ private:
   cs::SpinLock uLock_;
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
-  uint32_t maxBlock_ = 0;
-  uint32_t maxBlockCount_;
+  cs::Sequence maxBlock_ = 0;
+  cs::Sequence maxBlockCount_;
 
   Network* net_;
   Node* node_;

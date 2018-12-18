@@ -85,7 +85,7 @@ bool PoolHash::get(::csdb::priv::ibstream& is) {
 class Pool::priv : public ::csdb::internal::shared_data {
   priv() = default;
 
-  priv(PoolHash previous_hash, Pool::sequence_t sequence, ::csdb::Storage::WeakPtr storage)
+  priv(PoolHash previous_hash, cs::Sequence sequence, ::csdb::Storage::WeakPtr storage)
   : is_valid_(true)
   , previous_hash_(std::move(previous_hash))
   , sequence_(sequence)
@@ -319,7 +319,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   bool read_only_ = false;
   PoolHash hash_;
   PoolHash previous_hash_;
-  Pool::sequence_t sequence_ {};
+  cs::Sequence sequence_ {};
   ::std::vector<::std::vector<uint8_t>> next_confidants_;
   ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
@@ -335,7 +335,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Pool)
 
-Pool::Pool(PoolHash previous_hash, sequence_t sequence, const Storage& storage)
+Pool::Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage)
 : d(new priv(std::move(previous_hash), sequence, storage.weak_ptr())) {
 }
 
@@ -447,7 +447,7 @@ void Pool::recount() noexcept {
   d->transactionsCount_ = static_cast<uint32_t>(d->transactions_.size());
 }
 
-Pool::sequence_t Pool::sequence() const noexcept {
+cs::Sequence Pool::sequence() const noexcept {
   return d->sequence_;
 }
 
@@ -467,7 +467,7 @@ const ::std::vector<std::pair<int, ::std::string>>& Pool::signatures() const noe
   return d->signatures_;
 }
 
-void Pool::set_sequence(Pool::sequence_t seq) noexcept {
+void Pool::set_sequence(cs::Sequence seq) noexcept {
   if (d.constData()->read_only_) {
     return;
   }

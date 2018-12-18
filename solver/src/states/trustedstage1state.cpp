@@ -55,7 +55,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     cs::SharedLock lock(conveyer.sharedMutex());
     for (const auto& element : conveyer.transactionsPacketTable()) {
       found = false;
-      const auto rt = conveyer.roundTable(static_cast<cs::RoundNumber>(context.round()));
+      const auto rt = conveyer.roundTable(context.round());
       if(rt != nullptr) {
         for(const auto& it : rt->hashes) {
           if(memcmp(it.toBinary().data(), element.first.toBinary().data(), cscrypto::kHashSize) == 0) {
@@ -184,7 +184,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     characteristic.mask = std::move(characteristicMask);
   }
 
-  conveyer.setCharacteristic(characteristic, static_cast<cs::RoundNumber>(context.round()));
+  conveyer.setCharacteristic(characteristic, context.round());
 
   if (characteristic.mask.size() != transactionsCount) {
     cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";

@@ -179,15 +179,15 @@ TEST(fuqueue, overwrite) {
   FUQueue<uint32_t, 1000> q;
 
   for (int i = 0; i < 100; ++i) {
-    for (uint32_t i = 0; i < 200; ++i) {
+    for (uint32_t j = 0; j < 200; ++j) {
       auto s = q.lockWrite();
-      s->element = i;
+      s->element = j;
       q.unlockWrite(s);
     }
 
-    for (uint32_t i = 0; i < 200; ++i) {
+    for (uint32_t j = 0; j < 200; ++j) {
       auto s = q.lockRead();
-      ASSERT_EQ(s->element, i);
+      ASSERT_EQ(s->element, j);
       q.unlockRead(s);
     }
   }

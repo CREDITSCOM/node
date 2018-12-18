@@ -246,7 +246,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     return ownSmartsConfNum_;
   }
 
-  csdb::Pool::sequence_t SolverCore::smartRoundNumber() {
+  cs::Sequence SolverCore::smartRoundNumber() {
     return smartRoundNumber_;
   }
 

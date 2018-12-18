@@ -76,13 +76,14 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
   bool res = false;
   try {
     csdb::Pool pool = loadBlock(getLastHash());
-    uint32_t last_written_sequence = static_cast<uint32_t>(pool.sequence());
-    uint32_t current_sequence = 1;
+    const cs::Sequence last_written_sequence = pool.sequence();
+    cs::Sequence current_sequence = 1;
 
     while (current_sequence <= last_written_sequence + 1) {
       pool = loadBlock(current_sequence);
-      if (!updateWalletIds(pool, initer))
+      if (!updateWalletIds(pool, initer)) {
         return false;
+      }
       csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
       const auto& confidants = prev_pool.confidants();
       initer.loadPrevBlock(pool, confidants);
@@ -146,12 +147,12 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 }
 #endif
 
-csdb::Pool::sequence_t BlockChain::getLastWrittenSequence() const {
+cs::Sequence BlockChain::getLastWrittenSequence() const {
   if (deferredBlock_.is_valid()) {
     return deferredBlock_.sequence();
   }
   else if (blockHashes_->empty()) {
-    return static_cast<csdb::Pool::sequence_t> (-1);
+    return static_cast<cs::Sequence> (-1);
   }
   else {
     return blockHashes_->getDbStructure().last_;
@@ -284,7 +285,7 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   return storage_.pool_load(ph);
 }
 
-csdb::Pool BlockChain::loadBlock(const csdb::Pool::sequence_t sequence) const {
+csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   if (deferredBlock_.sequence() == sequence) {
     return deferredBlock_;
@@ -419,7 +420,7 @@ const csdb::Storage& BlockChain::getStorage() const {
   return storage_;
 }
 
-csdb::PoolHash BlockChain::getHashBySequence(csdb::Pool::sequence_t seq) const {
+csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
   csdb::PoolHash res{};
   if (deferredBlock_.sequence() == seq) {
     return deferredBlock_.hash();
@@ -429,7 +430,7 @@ csdb::PoolHash BlockChain::getHashBySequence(csdb::Pool::sequence_t seq) const {
   return res;
 }
 
-csdb::Pool::sequence_t BlockChain::getRequestedBlockNumber() const {
+cs::Sequence BlockChain::getRequestedBlockNumber() const {
   return getLastWrittenSequence() + 1;
 }
 

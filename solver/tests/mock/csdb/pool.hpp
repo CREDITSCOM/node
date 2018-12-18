@@ -63,8 +63,6 @@ namespace csdb
     class Pool
     {
     public:
-        using sequence_t = size_t;
-
         Pool() = default;
 
         Pool(const Pool&)

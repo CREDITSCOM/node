@@ -83,7 +83,7 @@ public:
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
-  void retriveSmartConfidants(const csdb::Pool::sequence_t startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
+  void retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();

@@ -100,7 +100,7 @@ public:
   bool smartStageOneEnough();
   bool smartStageTwoEnough();
   bool smartStageThreeEnough();
-  csdb::Pool::sequence_t smartRoundNumber();
+  cs::Sequence smartRoundNumber();
   uint8_t calculateSmartsConfNum();
   uint8_t ownSmartsConfidantNumber();
 
@@ -278,7 +278,7 @@ private:
   bool smartStagesStorageRefreshed_ = false;
   std::vector<cs::PublicKey> smartConfidants_;
   uint8_t ownSmartsConfNum_ = 255;
-  csdb::Pool::sequence_t smartRoundNumber_;
+  cs::Sequence smartRoundNumber_;
 
   cs::StageOneSmarts st1;
   cs::StageTwoSmarts st2;

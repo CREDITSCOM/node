@@ -441,7 +441,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 }
 
 uint8_t TrustedStage3State::take_urgent_decision(SolverContext& context) {
-  auto hash_t = context.blockchain().getHashBySequence(static_cast<uint32_t>(context.round()) - 1).to_binary();
+  auto hash_t = context.blockchain().getHashBySequence(context.round() - 1).to_binary();
   if (hash_t.empty()) {
     return 0;  // TODO: decide what to return
   }

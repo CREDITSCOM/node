@@ -106,7 +106,7 @@ void Neighbourhood::checkPending(const uint32_t) {
 void Neighbourhood::refreshLimits() {
   cs::SpinGuard l(nLockFlag_);
   for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+    for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
       if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
         (*conn)->syncSeqs[i] = 0;
         (*conn)->syncSeqsRetries[i] = 0;
@@ -383,7 +383,7 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node,
                                          const Connection::Id id,
                                          const ip::udp::endpoint& ep,
                                          const cs::PublicKey& pk,
-                                         const uint32_t lastSeq) {
+                                         const cs::Sequence lastSeq) {
   cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
 
   auto realPtr = findInMap(id, connections_);
@@ -673,7 +673,7 @@ ConnectionPtr Neighbourhood::getNextRequestee(const cs::Hash& hash) {
   return si.prioritySender;
 }
 
-ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested) {
+ConnectionPtr Neighbourhood::getNextSyncRequestee(const cs::Sequence seq, bool& alreadyRequested) {
   cs::SpinGuard lock(nLockFlag_);
 
   alreadyRequested = false;
@@ -684,7 +684,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
       continue;
     }
 
-    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+    for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
       if (nb->syncSeqs[i] == seq) {
         if (nb->syncSeqsRetries[i] < MaxSyncAttempts) {
           alreadyRequested = true;
@@ -703,7 +703,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const uint32_t seq, bool& alre
   }
 
   if (candidate) {
-    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+    for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
       if (!candidate->syncSeqs[i]) {
         candidate->syncSeqs[i] = seq;
         candidate->syncSeqsRetries[i] = rand() % (MaxSyncAttempts / 2);
@@ -783,11 +783,11 @@ void Neighbourhood::registerDirect(const Packet* packPtr,
   bp.receiver = conn;
 }
 
-void Neighbourhood::releaseSyncRequestee(const csdb::Pool::sequence_t seq) {
+void Neighbourhood::releaseSyncRequestee(const cs::Sequence seq) {
   cs::SpinGuard lock(nLockFlag_);
 
   for (auto& nb : neighbours_) {
-    for (uint32_t i = 0; i < BlocksToSync; ++i) {
+    for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
       if (nb->syncSeqs[i] == seq) {
         nb->syncSeqs[i] = 0;
         nb->syncSeqsRetries[i] = 0;
@@ -803,7 +803,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     return -1;
   }
 
-  const std::size_t neighbourCount = neighbours_.size() - 1;
+  const int neighbourCount = static_cast<int>(neighbours_.size() - 1);
 
   if (attemptCount > (neighbourCount * 3)) {
     int index = 0;

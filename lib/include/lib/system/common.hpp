@@ -17,6 +17,7 @@ constexpr std::size_t SIGNATURE_LENGTH = cscrypto::kSignatureSize;
 namespace cs {
 // key node type
 using RoundNumber = uint64_t;
+using Sequence = RoundNumber;
 
 using Byte = cscrypto::Byte;
 

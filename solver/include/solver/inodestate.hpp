@@ -95,7 +95,7 @@ public:
   virtual void onRoundEnd(SolverContext& context, bool is_bigbang) = 0;
 
   /**
-   * @fn  virtual Result INodeState::onRoundTable(SolverContext& context, const uint32_t round) = 0;
+   * @fn  virtual Result INodeState::onRoundTable(SolverContext& context, const cs::RoundNumber round) = 0;
    *
    * @brief   Is called when the new round table is received
    *
@@ -111,7 +111,7 @@ public:
    * ### remarks  Aae, 30.09.2018.
    */
 
-  virtual Result onRoundTable(SolverContext& context, const size_t round) = 0;
+  virtual Result onRoundTable(SolverContext& context, const cs::RoundNumber round) = 0;
 
   /**
    * @fn  virtual Result INodeState::onBlock(SolverContext& context, csdb::Pool& pool, const cs::PublicKey& sender) = 0;

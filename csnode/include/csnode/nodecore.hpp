@@ -55,7 +55,7 @@ using Packets = std::vector<cs::TransactionsPacket>;
 using Signatures = std::vector<cs::Signature>;
 using Hashes = std::vector<cs::Hash>;
 
-using PoolsRequestedSequences = std::vector<csdb::Pool::sequence_t>;
+using PoolsRequestedSequences = std::vector<cs::Sequence>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
@@ -87,7 +87,7 @@ struct RoundTable {
 
 struct PoolMetaInfo {
   std::string timestamp;
-  csdb::Pool::sequence_t sequenceNumber;
+  cs::Sequence sequenceNumber;
 };
 
 struct HashVector {
@@ -111,7 +111,7 @@ struct PoolSyncMeta {
   cs::PublicKey sender;
 };
 
-using PoolMetaMap = std::map<csdb::Pool::sequence_t, cs::PoolSyncMeta>;
+using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
 
 struct ConveyerMeta {
   cs::Characteristic characteristic;

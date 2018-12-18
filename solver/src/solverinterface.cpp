@@ -95,7 +95,7 @@ namespace cs
 
   void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
   {
-    csdb::Pool::sequence_t delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
+    cs::Sequence delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
     if(delta > 1) {
       recv_hash.push_back(std::make_pair<>(hash, sender));
       csdebug() << "SolverCore: cache hash until last block ready";
@@ -167,7 +167,7 @@ namespace cs
       },
       true /*replace exisiting*/);
 
-    if(stateCompleted(pstate->onRoundTable(*pcontext, static_cast<uint32_t>(cur_round)))) {
+    if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
       handleTransitions(Event::RoundTable);
     }
   }

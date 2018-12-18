@@ -75,7 +75,7 @@ namespace cs
     // block hash
     csdb::PoolHash hash; // TODO: stop to use after loadBlock(sequence) works correctly
     // block sequence
-    csdb::Pool::sequence_t sequence;
+    cs::Sequence sequence;
     // transaction sequence in block, instead of ID
     size_t transaction;
 

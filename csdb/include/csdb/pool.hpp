@@ -75,7 +75,6 @@ private:
 class Pool {
   SHARED_DATA_CLASS_DECLARE(Pool)
 public:
-  using sequence_t = uint64_t;
   using Transactions = std::vector<csdb::Transaction>;
   class NewWalletInfo {
   public:
@@ -124,7 +123,7 @@ public:
   using NewWallets = std::vector<NewWalletInfo>;
 
 public:
-  Pool(PoolHash previous_hash, sequence_t sequence, const Storage& storage = Storage());
+  Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage = Storage());
 
   static Pool from_binary(const ::csdb::internal::byte_array& data);
   static Pool meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt);
@@ -140,7 +139,7 @@ public:
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
   PoolHash previous_hash() const noexcept;
-  sequence_t sequence() const noexcept;
+  cs::Sequence sequence() const noexcept;
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
   std::vector<uint8_t> writer_public_key() const noexcept;
@@ -149,7 +148,7 @@ public:
   const ::std::vector<std::pair<int, ::std::string>>& signatures() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
-  void set_sequence(sequence_t sequence) noexcept;
+  void set_sequence(cs::Sequence sequence) noexcept;
   void set_storage(const Storage& storage) noexcept;
   void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
   void set_signature(const std::string& signature) noexcept;
