@@ -1093,10 +1093,8 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
     lapoo_ = bc_.loadBlock(hash);
     if (!lapoo_.is_valid()) break;
 
-    for (it_ = lapoo_.transactions().rbegin();
-      it_ != lapoo_.transactions().rend();
-      ++it_) {
-      if (it_->source() == addr_ || it_->target() == addr_) {
+    for (it_ = lapoo_.transactions().rbegin(); it_ != lapoo_.transactions().rend(); ++it_) {
+      if(bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
         found = true;
         break;
       }
@@ -1106,9 +1104,7 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
   }
 }
 
-TransactionsIterator::TransactionsIterator(BlockChain& bc,
-  const csdb::Address& addr) : bc_(bc),
-  addr_(addr) {
+TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr) : bc_(bc), addr_(addr) {
   setFromHash(bc_.getLastHash());
 }
 
@@ -1120,7 +1116,7 @@ void TransactionsIterator::next() {
   bool found = false;
 
   while (++it_ != lapoo_.transactions().rend()) {
-    if (it_->source() == addr_ || it_->target() == addr_) {
+    if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
       found = true;
       break;
     }
