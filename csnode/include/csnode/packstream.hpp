@@ -241,6 +241,13 @@ public:
     return *this;
   }
 
+  // overloading
+  OPackStream& operator<<(cs::BytesView view) {
+    (*this) << view.size();
+    insertBytes(view.data(), view.size());
+    return *this;
+  }
+
   template <typename T, typename A>
   cs::OPackStream& operator<<(const std::vector<T, A>& vector) {
     (*this) << vector.size();
@@ -379,7 +386,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
   std::size_t size = 0;
   (*this) >> size;
 
-  if (size == 0) {
+  if (!good_) {
     return *this;
   }
 
@@ -398,10 +405,10 @@ inline cs::IPackStream& cs::IPackStream::operator>>(std::string& str) {
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(cs::Bytes& bytes) {
-  std::size_t size = std::size_t();
+  size_t size = 0;
   (*this) >> size;
 
-  if (size == 0) {
+  if (!good_) {
     return *this;
   }
 
@@ -502,6 +509,26 @@ inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
   cs::Bytes bytes;
   (*this) >> bytes;
   hash = csdb::PoolHash::from_binary(bytes);
+  return *this;
+}
+
+template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(cs::BytesView& view) {
+  size_t size = 0;
+  (*this) >> size;
+
+  if (!good_) {
+    return *this;
+  }
+
+  if (!isBytesAvailable(size)) {
+    good_ = false;
+  }
+  else {
+    view = cs::BytesView(ptr_, size);
+    ptr_ += size;
+  }
+
   return *this;
 }
 
