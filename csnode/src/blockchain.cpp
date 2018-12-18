@@ -824,7 +824,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   }
 
   fee_->CountFeesInPool(*this, &pool);
-  pool.set_previous_hash(getLastWrittenHash());
+  pool.set_previous_hash(deferredBlock_.hash());
 
   if (requireAddWallets) {
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, add new wallets to pool";
@@ -844,13 +844,14 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     cserror() << __func__ << " Couldn't compose block";
   }
 
-  deferredBlock_ = pool;
-  postWriteBlock(deferredBlock_);
+  postWriteBlock(pool);
 
   // log cached block
   cslog() << "----------------------------- Defer block #" << pool.sequence() << " until next round ----------------------------";
-  logBlockInfo(deferredBlock_);
+  logBlockInfo(pool);
   cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
+
+  deferredBlock_ = pool;
 
   return std::make_pair(true, deferredBlock_);
 }
