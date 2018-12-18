@@ -102,7 +102,7 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
       ++current_sequence;
 #ifdef TRANSACTIONS_INDEX
-total_transactions_count_ += pool.transactions().size();
+      total_transactions_count_ += pool.transactions().size();
 #endif
     }
 
@@ -980,7 +980,7 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
       if (findWalletId(addr, _id))
         addr_res = csdb::Address::from_wallet_id(_id);
       break;
-  }
+  } 
   return addr_res;
 }
 
