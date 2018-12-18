@@ -55,7 +55,7 @@ public:
 
   enum class ADDR_TYPE { PUBLIC_KEY, ID };
   csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
-  bool is_equal(csdb::Address &laddr, csdb::Address &raddr) const;
+  bool is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const;
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
