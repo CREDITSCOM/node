@@ -37,7 +37,7 @@ constexpr const bool MonitorModeOn =
 #endif  // MONITOR_NODE
 
 constexpr const bool WebWalletModeOn =
-#if defined(WEB_WALLET_NODE)
+#if defined(WEB_WALLET_NODE) && false
     true;
 #else
     false;
