@@ -54,6 +54,7 @@ public:
 
   static cs::Hash zeroHash;
   static cs::Signature zeroSignature;
+  static cs::PublicKey zeroKey;
 
   /**
    * @fn  void SolverContext::request_role(Role role)
