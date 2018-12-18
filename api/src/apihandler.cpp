@@ -551,10 +551,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return (*smart_state)[smart_addr];
   }();
 
-  work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
-    contract_state_entry.get_position();
-    return true;
-  });
+  work_queues["TransactionFlow"].yield();
+  contract_state_entry.get_position();
 
   std::string contract_state;
   if (!deploy) {
