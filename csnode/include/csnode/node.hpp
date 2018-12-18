@@ -129,7 +129,7 @@ public:
   //smarts consensus additional functions:
 
   // syncro send functions
-  void sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packCounter);
+  void sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -182,7 +182,7 @@ public:
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-  void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, uint32_t packCounter);
+  void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
 
 private:
   bool init();

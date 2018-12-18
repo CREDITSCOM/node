@@ -18,7 +18,7 @@ class Node;
 namespace cs {
 
 using PoolSynchronizerRequestSignal =
-    cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, uint32_t packet)>;
+    cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
 
 class PoolSynchronizer {
 public:  // Interface
@@ -27,7 +27,7 @@ public:  // Interface
   void processingSync(cs::RoundNumber roundNum, bool isBigBand = false);
 
   // syncro get functions
-  void getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packet);
+  void getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum);
 
   // syncro send functions
   void sendBlockRequest();
@@ -98,7 +98,7 @@ private:  // struct
       resetSequences();
       sequences_ = sequences;
     }
-    inline void addSequences(const RoundNumber sequence) {
+    inline void addSequences(const csdb::Pool::sequence_t sequence) {
       sequences_.push_back(sequence);
     }
     inline void reset() {

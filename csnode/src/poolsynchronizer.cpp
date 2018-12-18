@@ -39,10 +39,10 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     return;
   }
 
-  const auto lastWrittenSequence = blockChain_->getLastWrittenSequence();
+  const csdb::Pool::sequence_t lastWrittenSequence = blockChain_->getLastWrittenSequence();
 
   if (lastWrittenSequence >= roundNum) {
-    const bool isFinished = showSyncronizationProgress(cs::numeric_cast<csdb::Pool::sequence_t>(lastWrittenSequence));
+    const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
     if (isFinished) {
       synchroFinished();
     }
@@ -59,8 +59,8 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     --roundNum;
   }
 
-  const auto last = cs::numeric_cast<uint32_t>(lastWrittenSequence + blockChain_->getCachedBlocksSize());
-  const auto blocksRemaining = roundNum - last;
+  const csdb::Pool::sequence_t last = lastWrittenSequence + blockChain_->getCachedBlocksSize();
+  const csdb::Pool::sequence_t blocksRemaining = roundNum - last;
   cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << blocksRemaining;
 
   if (blocksRemaining == 0) {
@@ -107,17 +107,14 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   }
 }
 
-void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t packet) {
+void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
   cslog() << "POOL SYNCHRONIZER> Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: ["
-          << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "], id: " << packet;
+          << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "], id: " << packetNum;
 
   /// TODO Fix numeric cast from RoundNum to csdb::Pool::sequence_t
-  csdb::Pool::sequence_t lastWrittenSequence =
-      cs::numeric_cast<csdb::Pool::sequence_t>(blockChain_->getLastWrittenSequence());
-
+  csdb::Pool::sequence_t lastWrittenSequence = blockChain_->getLastWrittenSequence();
+  const csdb::Pool::sequence_t oldLastWrittenSequence = lastWrittenSequence;
   const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
-  const csdb::Pool::sequence_t oldLastWrittenSequence =
-      cs::numeric_cast<csdb::Pool::sequence_t>(blockChain_->getLastWrittenSequence());
 
   for (auto& pool : poolsBlock) {
     const auto sequence = pool.sequence();
@@ -135,7 +132,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, uint32_t p
 
     if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
       blockChain_->testCachedBlocks();
-      lastWrittenSequence = cs::numeric_cast<csdb::Pool::sequence_t>(blockChain_->getLastWrittenSequence());
+      lastWrittenSequence = blockChain_->getLastWrittenSequence();
     }
   }
 
@@ -211,8 +208,7 @@ void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool::sequence_t sequence) {
 //
 
 bool cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence) const {
-  const csdb::Pool::sequence_t globalSequence =
-      cs::numeric_cast<csdb::Pool::sequence_t>(cs::Conveyer::instance().currentRoundNumber());
+  const cs::RoundNumber globalSequence = cs::Conveyer::instance().currentRoundNumber();
 
   if (!globalSequence) {
     cswarning() << "POOL SYNCHRONIZER> " << __func__ << " Current round number: 0";
@@ -223,7 +219,6 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const csdb::Pool::sequence
   const float global = float(globalSequence - 1);
   const float maxValue = 100.0f;
   const uint32_t syncStatus = cs::numeric_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
-
   const uint32_t remaining = cs::numeric_cast<uint32_t>(global - last);
 
   ProgressBar bar;
@@ -275,7 +270,7 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
     return;
   }
 
-  uint32_t packet = 0;
+  std::size_t packet = 0;
   const auto& sequences = neighbour.sequences();
 
   for (const auto& sequence : sequences) {
@@ -298,8 +293,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
               << requestedSequences_.rbegin()->first << "]";
 
     const auto& sequences = neighbour.sequences();
-    if (!sequences.empty() && 
-        requestedSequences_.find(cs::numeric_cast<csdb::Pool::sequence_t>(sequences.front())) != requestedSequences_.end()) {
+    if (!sequences.empty() && requestedSequences_.find(sequences.front()) != requestedSequences_.end()) {
       csprint() << "Is last packet: this neighbour is already requested";
       if (isAvailableRequest(neighbour)) {
         neighbour.resetRoundCounter();
@@ -312,7 +306,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     const int nhIdx = cs::numeric_cast<int>(neighbour.index());
     for (const auto& [sequence, packet] : requestedSequences_) {
       (void)packet;
-      neighbour.addSequences(cs::numeric_cast<cs::RoundNumber>(sequence));
+      neighbour.addSequences(sequence);
       csprint() << "Is last packet: nh: " << nhIdx << ", add seq: " << sequence;
     }
     csprint() << "Needed sequences size: " << neighbour.sequences().size();
@@ -320,8 +314,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   }
 
   const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
-  const csdb::Pool::sequence_t lastWrittenSequence =
-      cs::numeric_cast<csdb::Pool::sequence_t>(blockChain_->getLastWrittenSequence());
+  const csdb::Pool::sequence_t lastWrittenSequence = blockChain_->getLastWrittenSequence();
 
   for (const auto& el : requiredBlocks) {
     csprint() << "requiredBlocks: [" << el.first << ", " << el.second << "]";
@@ -414,7 +407,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
       }
     }
 
-    neighbour.addSequences(cs::numeric_cast<cs::RoundNumber>(sequence));
+    neighbour.addSequences(sequence);
   }
 
   return true;
@@ -489,7 +482,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
 bool cs::PoolSynchronizer::isLastRequest() const {
   const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastWrittenSequence() -
-                   cs::numeric_cast<uint32_t>(blockChain_->getCachedBlocksSize());
+                   blockChain_->getCachedBlocksSize();
   return sum <= syncData_.blockPoolsCount;
 }
 
