@@ -208,6 +208,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
     update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
     count_pool++;
+
+    last_hash = p.hash();
+
     progress.poolsProcessed++;
     if (nullptr != callback) {
       if (callback(progress)) {
@@ -223,10 +226,11 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
           if (!it.second.next_.is_empty())
             continue;
 
-          if (!last_hash.is_empty())
-            return false;
+          //if (!last_hash.is_empty())
+          //  return false;
 
-          last_hash = it.first;
+          // already set above
+          //last_hash = it.first;
         }
         return true;
       }()) {
