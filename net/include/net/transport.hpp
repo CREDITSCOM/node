@@ -170,7 +170,7 @@ private:
   bool gotSSRefusal(const TaskPtr<IPacMan>&);
   bool gotSSDispatch(const TaskPtr<IPacMan>&);
   bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
-  bool gotSSLastBlock(const TaskPtr<IPacMan>&, uint32_t, const csdb::PoolHash&);
+  bool gotSSLastBlock(const TaskPtr<IPacMan>&, csdb::Pool::sequence_t, const csdb::PoolHash&);
 
   bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
   bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);

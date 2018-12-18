@@ -216,15 +216,13 @@ public:
     return core.private_key;
   }
 
+  std::string sender_description(const cs::PublicKey& sender_id);
+
   void add_stage1(cs::StageOne& stage, bool send);
 
   void add_stage2(cs::StageTwo& stage, bool send);
 
   void add_stage3(cs::StageThree& stage);
-
-  void addSmartStage1(cs::StageOneSmarts& stage, bool send);
-  void addSmartStage2(cs::StageTwoSmarts& stage, bool send);
-  void addSmartStage3(cs::StageThreeSmarts& stage);
 
   const std::vector<cs::StageOne>& stage1_data() const {
     return core.stageOneStorage;

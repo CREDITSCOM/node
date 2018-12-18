@@ -149,7 +149,8 @@ public:
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
 
-public:
+  void updateLastBlockConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants);
+
   const csdb::Storage& getStorage() const;
 
   struct AddrTrnxCount {
@@ -169,6 +170,7 @@ private:
 #endif
 
   void writeBlock(csdb::Pool& pool);
+  void logBlockInfo(csdb::Pool& pool);
 
   void postWriteBlock(csdb::Pool& pool);
 
@@ -197,9 +199,6 @@ private:
   void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
                        const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
 
-  void updateLastBlockTrustedConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants);
-
-private:
   bool good_;
 
   mutable cs::SpinLock dbLock_;

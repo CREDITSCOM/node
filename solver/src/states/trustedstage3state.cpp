@@ -259,7 +259,8 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
     }
     else {
       ++liarNumber;
-      cslog() << "[" << (int)it.sender << "] IS LIAR with hash "
+      bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
+      cslog() << "[" << (int)it.sender << "] IS " << (is_lost ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
     }
   }

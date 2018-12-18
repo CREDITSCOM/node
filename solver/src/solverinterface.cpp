@@ -296,7 +296,7 @@ namespace cs
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)
   {
-    cslog() << "SolverCore: got request for round info from "
+    cslog() << "SolverCore: got round info request from "
       << cs::Utils::byteStreamToHex(requester.data(), requester.size());
 
     if(requester_round == cur_round) {

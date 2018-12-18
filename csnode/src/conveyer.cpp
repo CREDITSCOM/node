@@ -406,8 +406,8 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   const cs::Characteristic& characteristic = meta->characteristic;
   cs::TransactionsPacketTable& currentHashTable = pimpl_->packetsTable;
 
-  csdebug() << "CONVEYER> ApplyCharacteristic, characteristic: " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
-  cslog() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
+  csdetails() << "CONVEYER> ApplyCharacteristic, characteristic: " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
+  csdebug() << "CONVEYER> ApplyCharacteristic, characteristic bytes size " << characteristic.mask.size();
   csdebug() << "CONVEYER> ApplyCharacteristic, viewing hashes count " << localHashes.size();
   csdebug() << "CONVEYER> ApplyCharacteristic, viewing hash table size " << currentHashTable.size();
 
