@@ -40,7 +40,7 @@
 
 // compile time and rtti reflection in action
 #define className typeid(*this).name
-#define csprint() csdebug() << className() << " " << __func__ << ": "
+#define csprint() csdetails() << className() << " " << __func__ << ": "
 
 namespace cs {
 enum class Direction : uint8_t {
