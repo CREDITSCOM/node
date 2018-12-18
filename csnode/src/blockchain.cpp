@@ -101,6 +101,9 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
         return false;
 
       ++current_sequence;
+#ifdef TRANSACTIONS_INDEX
+total_transactions_count_ += pool.transactions().size();
+#endif
     }
 
     lastHash_ = getLastHash();
