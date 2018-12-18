@@ -913,12 +913,12 @@ void BlockChain::testCachedBlocks() {
   }
 }
 
-csdb::internal::byte_array BlockChain::getKeyFromAddress(csdb::Address& addr) const {
+/*csdb::internal::byte_array BlockChain::getKeyFromAddress(csdb::Address& addr) const {
   if (!addr.is_public_key())
     findAddrByWalletId(addr.wallet_id(), addr);
 
   return addr.public_key();
-}
+}*/
 
 std::size_t BlockChain::getCachedBlocksSize() const {
   return cachedBlocks_.size();
@@ -977,22 +977,18 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet)
 }
 
 csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const {
-  csdb::Address addr_res = addr;
-  if (type == ADDR_TYPE::PUBLIC_KEY) {
-    if (addr_res.is_wallet_id()) {
-      const auto id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr_res).to_api_addr().data());
-      if (!findAddrByWalletId(id, const_cast<csdb::Address&>(addr_res)))
-        return csdb::Address();
-    }
-    else if (addr_res.is_public_key())
-      return addr_res;
-  }
-  else if (type == ADDR_TYPE::ID) {
-    uint32_t _id;
-    if (!findWalletId(addr_res, _id))
-      return csdb::Address();
-    addr_res = csdb::Address::from_wallet_id(_id);
-  }
+  csdb::Address addr_res{};
+  switch (type) {
+    case ADDR_TYPE::PUBLIC_KEY:
+      if (addr_res.is_public_key() || !findAddrByWalletId(addr_res.wallet_id(), addr_res))
+        addr_res = addr;
+      break;
+    case ADDR_TYPE::ID:
+      uint32_t _id;
+      if (findWalletId(addr_res, _id))
+        addr_res = csdb::Address::from_wallet_id(_id);
+      break;
+  } 
   return addr_res;
 }
 

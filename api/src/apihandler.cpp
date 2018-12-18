@@ -530,17 +530,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
   }
   else {
-    csdb::Address addr      = send_transaction.target();
-    csdb::Address deployer  = send_transaction.source();
-    s_blockchain.getKeyFromAddress(addr);
-    s_blockchain.getKeyFromAddress(deployer);
+    csdb::Address addr      = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    csdb::Address deployer  = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     auto scKey = cs::SmartContracts::get_valid_smart_address(deployer,
                                                              send_transaction.innerID(),
                                                              input_smart.smartContractDeploy);
     if (scKey != addr) {
       _return.status.code = 127;
-      const auto d = scKey.public_key();
-      std::string str = EncodeBase58(d.data(), d.data() + cscrypto::kPublicKeySize);
+      const auto data = scKey.public_key().data();
+      std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
       _return.status.message = "Bad smart contract address, expected " + str;
       return;
     }
@@ -561,11 +559,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   std::string contract_state;
   if (!deploy) {
     contract_state_entry.wait_till_front([&](std::string& state) {
-      if (!state.empty()) {
-        contract_state = state;
-        return true;
-      }
-      return false;
+      if (state.empty())
+        return false;
+      contract_state = state;
+      return true;
     });
   }
 

@@ -179,8 +179,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         if (SmartContracts::is_smart_contract(transaction)) {
           auto sci = SmartContracts::get_smart_contract(transaction);
           if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
-            csdb::Address deployer = transaction.source();
-            context.blockchain().getKeyFromAddress(deployer);
+            csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY); 
             byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
 
             if (!byte) {
