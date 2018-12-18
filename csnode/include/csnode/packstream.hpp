@@ -244,7 +244,7 @@ public:
   // overloading
   OPackStream& operator<<(cs::BytesView view) {
     (*this) << view.size();
-    insertBytes(view.data(), view.size());
+    insertBytes(view.data(), static_cast<uint32_t>(view.size()));
     return *this;
   }
 
