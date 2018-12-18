@@ -347,7 +347,7 @@ public:
    * ### remarks  Aae, 30.09.2018.
    */
 
-  size_t round() const {
+  cs::RoundNumber round() const {
     return core.cur_round;
   }
 

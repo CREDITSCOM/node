@@ -8,8 +8,8 @@ namespace cs {
 class BlockHashes {
 public:
   struct DbStructure {
-    csdb::Pool::sequence_t first_;
-    csdb::Pool::sequence_t last_;
+    cs::Sequence first_;
+    cs::Sequence last_;
   };
 
 public:
@@ -27,7 +27,7 @@ public:
   bool loadNextBlock(csdb::Pool nextBlock);
   bool saveDbStructure();
 
-  bool find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const;
+  bool find(cs::Sequence seq, csdb::PoolHash& res) const;
 
 private:
   const std::string dbs_fname_;

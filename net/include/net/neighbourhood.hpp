@@ -20,9 +20,9 @@ class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
 const uint32_t MaxResendTimes = 32;
-const uint32_t MaxSyncAttempts = 8;
+const cs::Sequence MaxSyncAttempts = 8;
 
-const uint32_t BlocksToSync = 16;
+const cs::Sequence BlocksToSync = 16;
 const uint32_t WarnsBeforeRefill = 8;
 
 struct Connection;
@@ -102,9 +102,9 @@ struct Connection {
 
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  uint64_t syncSeqs[BlocksToSync];
-  uint64_t syncSeqsRetries[BlocksToSync];
-  uint64_t lastSeq = 0;
+  cs::Sequence syncSeqs[BlocksToSync];
+  cs::Sequence syncSeqsRetries[BlocksToSync];
+  cs::Sequence lastSeq = 0;
 
   bool operator!=(const Connection& rhs) const {
     return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut ||
@@ -156,17 +156,17 @@ public:
 
   void pingNeighbours();
   bool isPingDone();
-  void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const uint32_t);
+  void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
 
   ConnectionPtr getConnection(const RemoteNodePtr);
   ConnectionPtr getNextRequestee(const cs::Hash&);
-  ConnectionPtr getNextSyncRequestee(const uint32_t seq, bool& alreadyRequested);
+  ConnectionPtr getNextSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
   ConnectionPtr getNeighbour(const std::size_t number);
   ConnectionPtr getRandomSyncNeighbour();
   ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
   void resetSyncNeighbours();
-  void releaseSyncRequestee(const uint64_t seq);
+  void releaseSyncRequestee(const cs::Sequence seq);
   void registerDirect(const Packet*, ConnectionPtr);
 
 private:

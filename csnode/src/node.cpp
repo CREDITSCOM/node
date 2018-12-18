@@ -494,7 +494,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   std::string time;
   cs::Bytes characteristicMask;
-  csdb::Pool::sequence_t sequence = 0;
+  cs::Sequence sequence = 0;
 
   cslog() << "\tconveyer sync completed, parsing data size " << size;
 
@@ -572,7 +572,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
   return cs::Conveyer::instance().currentRoundTable().confidants;
 }
 
- void Node::retriveSmartConfidants(const csdb::Pool::sequence_t startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
+ void Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
   cslog() << __func__;
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале
   auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber+1);
@@ -810,7 +810,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   }
 
   for (const auto& pool : poolsBlock) {
-    transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
+    transport_->syncReplied(pool.sequence());
   }
 
   std::size_t packetNum = 0;
@@ -828,7 +828,7 @@ void Node::sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& targe
   RegionPtr memPtr = compressPoolsBlock(poolsBlock, realBinSize);
 
   tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), realBinSize,
-                  cs::numeric_cast<std::uint32_t>(memPtr.size()), memPtr, packetNum);
+                  cs::numeric_cast<uint32_t>(memPtr.size()), memPtr, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -1747,8 +1747,7 @@ void Node::smartStagesStorageClear(size_t cSize)
 
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csprint() << "          started";
-  csdb::Pool::sequence_t sRNum = rNum;
-  if (sRNum != solver_->smartRoundNumber()) {
+  if (rNum != solver_->smartRoundNumber()) {
     cs::Stage st;
     st.msgType = MsgTypes::FirstSmartStage;
     cs::DataStream stageStream(data,size);
@@ -1769,7 +1768,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   istream_.init(data, size);
 
   cs::StageOneSmarts stage;
-  stage.sRoundNum = sRNum;
+  stage.sRoundNum = rNum;
   cs::Bytes bytes;
   istream_ >>  stage.signature >> bytes;
 
@@ -1824,7 +1823,7 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   // TODO: fix it by logic changing
 
   size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
-  size_t stageBytesSize = sizeof(csdb::Pool::sequence_t) + sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
+  size_t stageBytesSize = sizeof(cs::Sequence) + sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
 
   cs::Bytes bytes;
   bytes.reserve(stageBytesSize);

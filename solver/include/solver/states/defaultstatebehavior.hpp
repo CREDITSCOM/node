@@ -46,7 +46,7 @@ public:
   void onRoundEnd(SolverContext& context, bool is_bigbang) override;
 
   /**
-   * @fn  Result DefaultStateBehavior::onRoundTable(SolverContext& context, const uint32_t round, bool is_bigbang)
+   * @fn  Result DefaultStateBehavior::onRoundTable(SolverContext& context, const cs::RoundNumber round)
    * override;
    *
    * @brief   Executes the round table action. Signals for core to make transition on
@@ -55,14 +55,13 @@ public:
    * @author  aae
    * @date    01.10.2018
    *
-   * @param [in,out]  context     The context.
-   * @param           round       The new round number.
-   * @param           is_bigbang  True if is bigbang, false if not.
+   * @param [in,out]  context  The context.
+   * @param           round    The new round number.
    *
    * @return  A Result::Finished value.
    */
 
-  Result onRoundTable(SolverContext& context, const size_t round) override;
+  Result onRoundTable(SolverContext& context, const cs::RoundNumber round) override;
 
   /**
    * @fn  Result DefaultStateBehavior::onBlock(SolverContext& context, csdb::Pool& block, const cs::PublicKey& sender)

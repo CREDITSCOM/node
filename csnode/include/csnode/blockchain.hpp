@@ -38,7 +38,7 @@ class Fee;
 class TransactionsPacket;
 
 using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
-using WriteBlockSignal = cs::Signal<void(const csdb::Pool::sequence_t)>;
+using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
 class BlockChain {
@@ -98,16 +98,16 @@ public:
   csdb::PoolHash wait_for_block(const csdb::PoolHash& obsolete);
 
   csdb::Pool loadBlock(const csdb::PoolHash&) const;
-  csdb::Pool loadBlock(const csdb::Pool::sequence_t sequence) const;
+  csdb::Pool loadBlock(const cs::Sequence sequence) const;
   csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
   csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
 
-  csdb::Pool::sequence_t getLastWrittenSequence() const;
+  cs::Sequence getLastWrittenSequence() const;
 
-  csdb::Pool::sequence_t getRequestedBlockNumber() const;
+  cs::Sequence getRequestedBlockNumber() const;
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
@@ -118,7 +118,7 @@ public:
 
   uint64_t getWalletsCount();
 
-  csdb::PoolHash getHashBySequence(csdb::Pool::sequence_t seq) const;
+  csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
   csdb::PoolHash getLastWrittenHash() const;
 
 #ifdef TRANSACTIONS_INDEX
@@ -250,7 +250,7 @@ public:
   std::size_t getCachedBlocksSize() const;
 
   // continuous interval from ... to
-  using SequenceInterval = std::pair<csdb::Pool::sequence_t, csdb::Pool::sequence_t>;
+  using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
   /**
    * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
@@ -313,7 +313,7 @@ private:
     // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
     bool by_sync;
   };
-  std::map<csdb::Pool::sequence_t, BlockMeta> cachedBlocks_;
+  std::map<cs::Sequence, BlockMeta> cachedBlocks_;
 
   // block storage to defer storing it in blockchain until confirmation from other nodes got
   // (idea is it is more easy not to store block immediately then to revert it after storing)

@@ -26,7 +26,7 @@ namespace cs {
 void DefaultStateBehavior::onRoundEnd(SolverContext& /*context*/, bool /*is_bigbang*/) {
 }
 
-Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const size_t round) {
+Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const cs::RoundNumber round) {
   cslog() << name() << ": <-- round table #" << round;
   return Result::Finish;
 }

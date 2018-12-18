@@ -43,14 +43,14 @@ public signals:  // Signals
 private slots:
   void onTimeOut();
 
-  void onWriteBlock(const csdb::Pool::sequence_t sequence);
+  void onWriteBlock(const cs::Sequence sequence);
 
 private:  // Service
   enum class CounterType;
   class NeighboursSetElemet;
 
   // pool sync progress
-  bool showSyncronizationProgress(const csdb::Pool::sequence_t lastWrittenSequence) const;
+  bool showSyncronizationProgress(const cs::Sequence lastWrittenSequence) const;
 
   bool checkActivity(const CounterType& counterType);
 
@@ -58,7 +58,7 @@ private:  // Service
 
   bool getNeededSequences(NeighboursSetElemet& neighbour);
 
-  void checkNeighbourSequence(const csdb::Pool::sequence_t sequence);
+  void checkNeighbourSequence(const cs::Sequence sequence);
   void refreshNeighbours();
 
   bool isLastRequest() const;
@@ -84,7 +84,7 @@ private:  // struct
       sequences_.reserve(blockPoolsCount);
     }
 
-    inline void removeSequnce(const csdb::Pool::sequence_t sequence) {
+    inline void removeSequnce(const cs::Sequence sequence) {
       if (sequences_.empty()) {
         return;
       }
@@ -98,7 +98,7 @@ private:  // struct
       resetSequences();
       sequences_ = sequences;
     }
-    inline void addSequences(const csdb::Pool::sequence_t sequence) {
+    inline void addSequences(const cs::Sequence sequence) {
       sequences_.push_back(sequence);
     }
     inline void reset() {
@@ -175,7 +175,7 @@ private:  // Members
   // [key] = sequence,
   // [value] =  packet counter
   // value: increase each new round
-  std::map<csdb::Pool::sequence_t, cs::RoundNumber> requestedSequences_;
+  std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
 
   std::vector<NeighboursSetElemet> neighbours_;
 

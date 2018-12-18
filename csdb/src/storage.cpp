@@ -472,14 +472,14 @@ Pool Storage::pool_load(const PoolHash &hash) const {
   return res;
 }
 
-Pool Storage::pool_load(const uint32_t sequence) const {
+Pool Storage::pool_load(const cs::Sequence sequence) const {
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
   }
 
   ::csdb::internal::byte_array data;
-  if (!d->db->get(sequence, &data)) {
+  if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
     d->set_last_error(DatabaseError);
     return Pool{};
   }

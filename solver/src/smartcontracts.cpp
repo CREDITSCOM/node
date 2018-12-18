@@ -196,7 +196,7 @@ namespace cs
     return std::nullopt;
   }
 
-  //  const csdb::PoolHash blk_hash, csdb::Pool::sequence_t blk_seq, size_t trx_idx, cs::RoundNumber round
+  //  const csdb::PoolHash blk_hash, cs::Sequence blk_seq, size_t trx_idx, cs::RoundNumber round
   SmartContractStatus SmartContracts::enqueue(csdb::Pool block, size_t trx_idx)
   {
     SmartContractRef new_item { block.hash(), block.sequence(), trx_idx };
@@ -220,7 +220,7 @@ namespace cs
       //new_status = SmartContractStatus::Running;
     }
     // enqueue to end
-    exe_queue.emplace_back(QueueItem { new_item, new_status, static_cast<cs::RoundNumber>(block.sequence()) });
+    exe_queue.emplace_back(QueueItem { new_item, new_status, block.sequence() });
     return new_status;
   }
 

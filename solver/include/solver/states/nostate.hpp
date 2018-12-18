@@ -31,7 +31,7 @@ public:
   }
 
   /**
-   * @fn  Result final::onRoundTable(SolverContext& , const uint32_t ) override
+   * @fn  Result final::onRoundTable(SolverContext& , const cs::RoundNumber ) override
    *
    * @brief   Handles the round table action
    *
@@ -44,7 +44,7 @@ public:
    * @return  A Result::Finish to allow/initiate transition to proper state.
    */
 
-  Result onRoundTable(SolverContext& /*context*/, const size_t /*round*/) override {
+  Result onRoundTable(SolverContext& /*context*/, const cs::RoundNumber /*round*/) override {
     return Result::Finish;
   }
 

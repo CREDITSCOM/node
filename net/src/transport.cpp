@@ -189,7 +189,7 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
 
   if (ep.protocol() == ip::udp::v4()) {
     uint32_t address  = ep.address().to_v4().to_uint();
-    uint16_t lowBits  = address;
+    uint16_t lowBits  = static_cast<uint16_t>(address);
     uint16_t highBits = address >> (sizeof(uint16_t) * CHAR_BIT);
     result ^= lowBits ^ highBits;
   }
@@ -602,7 +602,7 @@ uint32_t Transport::getMaxNeighbours() const {
   return config_.getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getSyncRequestee(const csdb::Pool::sequence_t seq, bool& alreadyRequested) {
+ConnectionPtr Transport::getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested) {
   return nh_.getNextSyncRequestee(seq, alreadyRequested);
 }
 
@@ -627,7 +627,7 @@ const Connections Transport::getNeighboursWithoutSS() const {
   return nh_.getNeighboursWithoutSS();
 }
 
-void Transport::syncReplied(const csdb::Pool::sequence_t seq) {
+void Transport::syncReplied(const cs::Sequence seq) {
   return nh_.releaseSyncRequestee(seq);
 }
 
@@ -828,7 +828,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, csdb::Pool::sequence_t lastBlock, const csdb::PoolHash& lastHash) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBlock, const csdb::PoolHash& lastHash) {
   csdebug() << "TRANSPORT> Got SS Last Block: " << lastBlock;
 #ifdef MONITOR_NODE
   return true;
@@ -1058,7 +1058,7 @@ void Transport::sendPingPack(const Connection& conn) {
 
 bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   Connection::Id id = 0u;
-  csdb::Pool::sequence_t lastSeq = 0u;
+  cs::Sequence lastSeq = 0u;
 
   cs::PublicKey pk;
   iPackStream_ >> id >> lastSeq >> pk;
