@@ -55,7 +55,7 @@ using Packets = std::vector<cs::TransactionsPacket>;
 using Signatures = std::vector<cs::Signature>;
 using Hashes = std::vector<cs::Hash>;
 
-using PoolsRequestedSequences = std::vector<RoundNumber>;
+using PoolsRequestedSequences = std::vector<csdb::Pool::sequence_t>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {

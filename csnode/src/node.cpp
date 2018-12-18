@@ -757,7 +757,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     sequences.push_back(std::move(sequence));
   }
 
-  uint32_t packetNum = 0;
+  std::size_t packetNum = 0;
   istream_ >> packetNum;
 
   cslog() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
@@ -822,13 +822,13 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     transport_->syncReplied(cs::numeric_cast<uint32_t>(pool.sequence()));
   }
 
-  uint32_t packetNum = 0;
+  std::size_t packetNum = 0;
   istream_ >> packetNum;
 
   poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNum);
 }
 
-void Node::sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, uint32_t packetNum) {
+void Node::sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
@@ -942,7 +942,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, uint32_t packetNum) {
+void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
   csdetails() << "NODE> " << __func__ << "() Target out(): " << target->getOut()
               << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum

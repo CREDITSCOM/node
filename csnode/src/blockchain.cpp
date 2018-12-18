@@ -357,6 +357,8 @@ void BlockChain::writeBlock(csdb::Pool& pool) {
     cserror() << "Couldn't save block";
     return;
   }
+  emit writeBlockEvent(pool.sequence());
+
   {
     std::lock_guard<decltype(waitersLocker_)> l(waitersLocker_);
     newBlockCv_.notify_all();

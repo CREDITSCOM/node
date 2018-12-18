@@ -284,11 +284,14 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return;
     }
 
+    update_binary_representation();
+    update_transactions();
+  }
+
+  void update_binary_representation() {
     ::csdb::priv::obstream os;
     put(os);
-    binary_representation_ = std::move(os.buffer());
-
-    update_transactions();
+    binary_representation_ = std::move(const_cast<internal::byte_array&>(os.buffer()));
   }
 
   void update_transactions() {
@@ -580,12 +583,9 @@ bool Pool::compose() {
     return true;
   }
 
-  if (!d.constData()->is_valid_) {
-    return false;
-  }
-
   d->compose();
-  return true;
+
+  return d.constData()->is_valid_;
 }
 
 ::csdb::internal::byte_array Pool::to_binary() const noexcept {
@@ -656,9 +656,7 @@ Pool Pool::from_lz4_byte_stream(size_t uncompressedSize) {
 
 char* Pool::to_byte_stream(uint32_t& size) {
   if (d->binary_representation_.empty()) {
-    ::csdb::priv::obstream os;
-    d->put(os);
-    d->binary_representation_ = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+    d->update_binary_representation();
   }
 
   size = static_cast<uint32_t>(d->binary_representation_.size());
