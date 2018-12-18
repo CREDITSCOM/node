@@ -470,8 +470,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-  csdb::internal::byte_array writerPublicKey(sender.begin(), sender.end());
-  newPool.set_writer_public_key(std::move(writerPublicKey));
+  newPool.set_writer_public_key(std::vector<uint8_t>(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
 
   csprint() << "done";
   return std::make_optional<csdb::Pool>(std::move(newPool));

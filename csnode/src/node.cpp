@@ -388,8 +388,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Signature signature;
   istream_ >> signature;
 
-  cs::PublicKey writerPublicKey;
-  istream_ >> writerPublicKey;
+  istream_ >> poolMetaInfo.writerKey;
 
   if (!istream_.good()) {
     cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
@@ -418,10 +417,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
       return;
     }
-#ifdef MONITOR_NODE
-    std::vector<uint8_t> writer(sender.begin(), sender.end());
-    pool.value().set_writer_public_key(writer);
-#endif
 
     const auto ptable = conveyer.roundTable(round);
     if (ptable == nullptr) {
@@ -481,7 +476,7 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMe
   ostream_ << characteristic.mask;
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
-  ostream_ << solver_->getPublicKey();
+  ostream_ << poolMetaInfo.writerKey;
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
@@ -499,6 +494,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::Poo
   std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), lastSentRoundData_.characteristic.mask.begin());
   lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
   lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
+  lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
   lastSentRoundData_.poolSignature = signature;
 }
 
@@ -1901,6 +1897,13 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = blockChain_.getLastWrittenSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = timeStamp;
+  auto st3 = solver_->find_stage3(myConfidantIndex_);
+  if (st3) {
+    try {
+      poolMetaInfo.writerKey = confidants().at(st3->writer);
+    }
+    catch (...) { }
+  }
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
