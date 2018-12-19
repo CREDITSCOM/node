@@ -9,8 +9,6 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
-#include <lib/system/common.hpp>
-#include <lib/system/structures.hpp>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -35,12 +33,20 @@
 #include <boost/bind.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <lib/system/common.hpp>
+#include <lib/system/structures.hpp>
+#include <lib/system/logger.hpp>
+
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
 
-// compile time and rtti reflection in action
+// compile time and rtti reflection in action, works only in methods.
+// if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
 #define className typeid(*this).name
-#define csprint() csdebug() << className() << " " << __func__ << ": "
+#define reflectionHelper() className() << " " << __func__ << ": "
+
+#define csreflection(...) __VA_ARGS__() << reflectionHelper()
+#define csprint() csreflection(csdetails)
 
 namespace cs {
 enum class Direction : uint8_t {
