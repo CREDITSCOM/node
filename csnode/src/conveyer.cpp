@@ -111,7 +111,7 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
 
   {
     cs::Lock lock(sharedMutex_);
-    while (table.round >= currentRoundNumber()) {
+    while (table.round <= currentRoundNumber()) {
       pimpl_->metaStorage.extract(currentRoundNumber());
       --pimpl_->currentRound;
     }
