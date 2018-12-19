@@ -158,6 +158,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   onRoundStart(global_table);
   conveyer.updateRoundTable(std::move(global_table));
 
+  poolSynchronizer_->processingSync(global_table.round, true);
+
   const auto& updated_table = conveyer.currentRoundTable();
   if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
     startConsensus();
