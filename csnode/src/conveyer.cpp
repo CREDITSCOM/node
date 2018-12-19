@@ -109,23 +109,15 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
   cslog() << "CONVEYER> updateRoundTable";
 
-  if (table.round != currentRoundNumber()) {
-    cserror() << "CONVEYER> Update round table in conveyer failed: round mismatch";
-    return;
-  }
-
   {
     cs::Lock lock(sharedMutex_);
-    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(table.round);
-
-    if (meta == nullptr) {
-      cserror() << "CONVEYER> Update round table in conveyer failed: round table not found, call setRound() before";
-      return;
+    while (table.round >= currentRoundNumber()) {
+      pimpl_->metaStorage.extract(currentRoundNumber());
+      --pimpl_->currentRound;
     }
-
-    meta->roundTable.general = std::move(table.general);
-    meta->roundTable.confidants = std::move(table.confidants);
   }
+
+  setRound(std::move(table));
 }
 
 void cs::ConveyerBase::setRound(cs::RoundTable&& table) {

@@ -134,9 +134,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
               << ", current #" << roundNumber_;
 
-  while (getBlockChain().getLastWrittenSequence() >= rNum)
-    getBlockChain().removeLastBlock();
-
   istream_.init(data, size);
 
   cs::Hash last_block_hash;
@@ -146,35 +143,32 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   global_table.round = rNum;
 
   if (!readRoundData(global_table)) {
-    cserror() << "NODE> read round data from SS failed, continue without round table";
-  }
-
-  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
-
-  // currently in global round
-  if (global_table.round == local_table.round) {
-    // resend all this round data available
-    cslog() << "NODE> resend last block hash after BigBang";
-    // update round table
-    onRoundStart(global_table);
-
-    // do almost the same as reviewConveyerHashes(), only difference is call to
-    // conveyer.updateRoundTable()
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    conveyer.updateRoundTable(std::move(global_table));
-    const auto& updated_table = conveyer.currentRoundTable();
-    if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
-      startConsensus();
-    }
-    else {
-      sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
-    }
-
+    cserror() << "NODE> read round data from SS failed";
     return;
   }
 
-  // global round is other then local one
-  handleRoundMismatch(global_table);
+  while (getBlockChain().getLastWrittenSequence() >= rNum)
+    getBlockChain().removeLastBlock();
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+  // resend all this round data available
+  cslog() << "NODE> resend last block hash after BigBang";
+  // update round table
+  onRoundStart(global_table);
+
+  // do almost the same as reviewConveyerHashes(), only difference is call to
+  // conveyer.updateRoundTable()
+  conveyer.updateRoundTable(std::move(global_table));
+  const auto& updated_table = conveyer.currentRoundTable();
+  if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+    startConsensus();
+  }
+  else {
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
+  }
+
+  return;
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
