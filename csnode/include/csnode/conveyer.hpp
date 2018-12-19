@@ -235,7 +235,7 @@ public:
   /// @param sender Sender public key.
   /// @return pool Returns created csdb::Pool, otherwise returns nothing.
   ///
-  std::optional<csdb::Pool> applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender = cs::PublicKey());
+  std::optional<csdb::Pool> applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo);
 
   // hash table storage
 

@@ -381,7 +381,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   return generateHash(pointer->mask.data(), pointer->mask.size());
 }
 
-std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender) {
+std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo) {
   cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
   csreflection(csdebug) << ", round " << round;
 
@@ -459,10 +459,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
   cslog() << "\tsequence = " << metaPoolInfo.sequenceNumber;
 
+  // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-  newPool.set_writer_public_key(std::vector<uint8_t>(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_writer_public_key(cs::Bytes(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csprint() << "done";

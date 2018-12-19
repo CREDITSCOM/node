@@ -403,9 +403,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, static_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
-    cs::PublicKey pk;
-    std::fill(pk.begin(), pk.end(), 0);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
     if (!pool.has_value()) {
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
@@ -1904,18 +1902,17 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  cs::PublicKey pk;
-  std::fill(pk.begin(), pk.end(), 0);
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
   if (!pool.has_value()) {
     cserror() << "NODE> applyCharacteristic() failed to create block";
     return;
   }
 
-  std::vector<std::vector<uint8_t>> confs;
+  std::vector<cs::Bytes> confs;
 
   for(const auto& src : roundTable.confidants) {
-    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+    auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
     std::copy(src.cbegin(), src.cend(), tmp.begin());
   }
 
