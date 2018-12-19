@@ -265,19 +265,6 @@ std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::v
   return result;
 }
 
-/*api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
-  api::Pool result;
-  if (pool.is_valid()) {
-    result.hash = fromByteArray(pool.hash().to_binary());
-    result.poolNumber = pool.sequence();
-    assert(result.poolNumber >= 0);
-    result.prevHash = fromByteArray(pool.previous_hash().to_binary());
-    result.time = atoll(pool.user_field(0).value<std::string>().c_str());   // atoll(pool.user_field(0).value<std::string>().c_str());
-    result.transactionsCount = (int32_t)pool.transactions_count();          // DO NOT EVER CREATE POOLS WITH // MORE THAN 2 // BILLION // TRANSACTIONS, EVEN AT NIGHT
-  }
-  return result;
-}*/
-
 api::Pool
 APIHandler::convertPool(const csdb::Pool& pool)
 {
@@ -338,7 +325,7 @@ void APIHandler::TransactionGet(TransactionGetResult& _return, const Transaction
   if (_return.found)
     _return.transaction = convertTransaction(transaction);
 
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, std::to_string(transaction.counted_fee().to_double()));
 }
 
 void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& address, const int64_t _offset, const int64_t limit) {
@@ -1152,15 +1139,15 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
     [&_return, &offset, &limit, &addr, &code, &transfersOnly, &filterByWallet, &wallet, &s_blockchain = handler.get_s_blockchain()]
     (const csdb::Pool& pool, const csdb::Transaction& tr) {
     auto smart = fetch_smart(tr);
-    if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) 
+    if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params))
       return true;
     csdb::Address addr_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
-    if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet) 
+    if (filterByWallet && addrPair.first != wallet && addrPair.second != wallet)
       return true;
-    if (--offset >= 0) 
+    if (--offset >= 0)
       return true;
-    
+
     addTokenResult(_return, addr, code, pool, tr, smart, addrPair, s_blockchain);
     return !(--limit == 0);
   });
