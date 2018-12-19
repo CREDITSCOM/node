@@ -109,23 +109,15 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
   cslog() << className() << " updateRoundTable";
 
-  if (table.round != currentRoundNumber()) {
-    cserror() << className() << " Update round table in conveyer failed: round mismatch";
-    return;
-  }
-
   {
     cs::Lock lock(sharedMutex_);
-    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(table.round);
-
-    if (meta == nullptr) {
-      cserror() << className() << " Update round table in conveyer failed: round table not found, call setRound() before";
-      return;
+    while (table.round <= currentRoundNumber()) {
+      pimpl_->metaStorage.extract(currentRoundNumber());
+      --pimpl_->currentRound;
     }
-
-    meta->roundTable.general = std::move(table.general);
-    meta->roundTable.confidants = std::move(table.confidants);
   }
+
+  setRound(std::move(table));
 }
 
 void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
@@ -389,8 +381,8 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   return generateHash(pointer->mask.data(), pointer->mask.size());
 }
 
-std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& /*sender*/) {
-  cs::RoundNumber round = metaPoolInfo.sequenceNumber;
+std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo) {
+  cs::RoundNumber round = static_cast<cs::RoundNumber>(metaPoolInfo.sequenceNumber);
   csmeta(csdetails) << ", round " << round;
 
   cs::Lock lock(sharedMutex_);
@@ -468,10 +460,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
   cslog() << "\tsequence = " << metaPoolInfo.sequenceNumber;
 
+  // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-  newPool.set_writer_public_key(std::vector<uint8_t>(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_writer_public_key(cs::Bytes(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csmeta(csdetails) << "done";
   return std::make_optional<csdb::Pool>(std::move(newPool));

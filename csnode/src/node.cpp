@@ -145,44 +145,30 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   global_table.round = rNum;
 
   if (!readRoundData(global_table)) {
-    cserror() << "NODE> read round data from SS failed, continue without round table";
-  }
-
-  const auto& local_table = cs::Conveyer::instance().currentRoundTable();
-
-  // currently in global round
-  if (global_table.round == local_table.round) {
-
-    // if last block already stored update trusted list
-    if(blockChain_.getLastWrittenSequence() + 1U == local_table.round) {
-      cslog() << "NODE> update trusted list in last block after BigBang";
-      std::vector<std::vector<uint8_t>> new_trusted;
-      for(const auto t : global_table.confidants) {
-        new_trusted.emplace_back(std::vector<uint8_t>(t.cbegin(), t.cend()));
-      }
-      blockChain_.updateLastBlockConfidants(new_trusted);
-    }
-
-    // update round table
-    onRoundStart(global_table);
-
-    // do almost the same as reviewConveyerHashes(), only difference is call to
-    // conveyer.updateRoundTable()
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    conveyer.updateRoundTable(std::move(global_table));
-    const auto& updated_table = conveyer.currentRoundTable();
-    if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
-      startConsensus();
-    }
-    else {
-      sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
-    }
-
+    cserror() << "NODE> read round data from SS failed";
     return;
   }
 
-  // global round is other then local one
-  handleRoundMismatch(global_table);
+  while (getBlockChain().getLastWrittenSequence() >= rNum)
+    getBlockChain().removeLastBlock();
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+
+  // resend all this round data available
+  cslog() << "NODE> resend last block hash after BigBang";
+
+  onRoundStart(global_table);
+  conveyer.updateRoundTable(std::move(global_table));
+
+  poolSynchronizer_->processingSync(global_table.round, true);
+
+  const auto& updated_table = conveyer.currentRoundTable();
+  if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+    startConsensus();
+  }
+  else {
+    sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
+  }
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
@@ -409,6 +395,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   istream_ >> signature;
 
   istream_ >> poolMetaInfo.writerKey;
+  istream_ >> poolMetaInfo.previousHash;
 
   if (!istream_.good()) {
     cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
@@ -429,9 +416,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
-    cs::PublicKey pk;
-    std::fill(pk.begin(), pk.end(), 0);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
     if (!pool.has_value()) {
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
@@ -510,6 +495,7 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMe
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
   ostream_ << poolMetaInfo.writerKey;
+  ostream_ << poolMetaInfo.previousHash;
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
@@ -528,6 +514,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::Poo
   lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
   lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
   lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
+  lastSentRoundData_.poolMetaInfo.previousHash = poolMetaInfo.previousHash;
   lastSentRoundData_.poolSignature = signature;
 }
 
@@ -674,8 +661,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
 
     if (pool.is_valid()) {
-      auto prev_hash = csdb::PoolHash::from_string("");
-      pool.set_previous_hash(prev_hash);
+      /*auto prev_hash = csdb::PoolHash::from_string("");
+        pool.set_previous_hash(prev_hash);*/
 
       poolsBlock.push_back(std::move(pool));
 
@@ -1396,7 +1383,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
-  csdebug() << "NODE> signature is OK";
+  csprint() << "Signature is OK";
   stageTwoMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
@@ -1450,7 +1437,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   istream_  >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "NODE> Bad StageTwo packet format";
+    cserror() << "NODE> Bad stage-3 packet format";
     return;
   }
 
@@ -1974,21 +1961,21 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     }
     catch (...) { }
   }
+  poolMetaInfo.previousHash = getBlockChain().getLastWrittenHash();
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  cs::PublicKey pk;
-  std::fill(pk.begin(), pk.end(), 0);
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
   if (!pool.has_value()) {
     cserror() << "NODE> applyCharacteristic() failed to create block";
     return;
   }
 
-  std::vector<std::vector<uint8_t>> confs;
+  std::vector<cs::Bytes> confs;
 
   for(const auto& src : roundTable.confidants) {
-    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+    auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
     std::copy(src.cbegin(), src.cend(), tmp.begin());
   }
 
@@ -2047,7 +2034,7 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csdebug() << "\nNODE> next round table received";
-  csmeta(csdetails) << "started";
+  csmeta(csdetails);
 
   if (myLevel_ == NodeLevel::Writer) {
     cserror() << "NODE> writers don't receive round table";

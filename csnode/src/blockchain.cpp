@@ -344,9 +344,20 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 
 void BlockChain::removeLastBlock() {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
+
+  auto pool = storage_.pool_remove_last();
+  removeWalletsInPoolFromCache(pool);
+  auto removedHash = blockHashes_->removeLast();
+
+#ifdef TRANSACTIONS_INDEX
+  total_transactions_count_-= pool.transactions().size();
+#endif
+
+  lastHash_ = pool.previous_hash();
+  if (removedHash != pool.hash()) {
+    cserror() << "Error! Last pool hash mismatch";
+  }
   deferredBlock_ = csdb::Pool();
-//  auto pool = storage_.pool_remove_last();
-//  removeWalletsInPoolFromCache(pool);
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -904,6 +915,10 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     return true;
   }
   if (pool_seq == last_seq + 1) {
+    if (pool.previous_hash() != getLastWrittenHash()) {
+      removeLastBlock();
+      return false;
+    }
     // write immediately
     if (recordBlock(pool, !by_sync).first) {
       csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
@@ -1048,7 +1063,7 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
       if (findWalletId(addr, _id))
         addr_res = csdb::Address::from_wallet_id(_id);
       break;
-  } 
+  }
   return addr_res;
 }
 

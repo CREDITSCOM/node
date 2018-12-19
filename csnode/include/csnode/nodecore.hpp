@@ -88,6 +88,7 @@ struct RoundTable {
 struct PoolMetaInfo {
   std::string timestamp;
   cs::PublicKey writerKey;
+  csdb::PoolHash previousHash;
   cs::Sequence sequenceNumber;
 };
 

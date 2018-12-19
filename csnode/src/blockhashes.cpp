@@ -67,4 +67,12 @@ bool BlockHashes::find(cs::Sequence seq, csdb::PoolHash& res) const {
   return true;
 }
 
+csdb::PoolHash BlockHashes::removeLast() {
+  if (!hashes_.size()) return csdb::PoolHash{};
+  const auto result = hashes_.back();
+  hashes_.pop_back();
+  --db_.last_;
+  return result;
+}
+
 }  // namespace cs

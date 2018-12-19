@@ -239,7 +239,8 @@ TEST(Conveyer, MainLogic) {
   ASSERT_EQ(characteristic_hash, kCharacteristicHash);
 
   cs::PublicKey pk;
-  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, kRoundNumber};
+  csdb::PoolHash ph;
+  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber};
   auto pool{conveyer.applyCharacteristic(pool_meta_info)};
   ASSERT_TRUE(pool.has_value());
   ASSERT_EQ(3, pool.value().transactions_count());
