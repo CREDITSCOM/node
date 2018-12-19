@@ -977,7 +977,7 @@ void BlockChain::updateLastBlockConfidants(const ::std::vector<::std::vector<uin
     return;
   }
 
-  csprint();
+  csreflection(csdetails);
 
   deferredBlock_.update_confidants(confidants);
 }

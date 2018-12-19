@@ -391,7 +391,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
 
 std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender) {
   cs::RoundNumber round = metaPoolInfo.sequenceNumber;
-  csprint() << ", round " << round;
+  csreflection(csdetails) << ", round " << round;
 
   cs::Lock lock(sharedMutex_);
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
@@ -474,7 +474,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   csdb::internal::byte_array writerPublicKey(sender.begin(), sender.end());
   newPool.set_writer_public_key(std::move(writerPublicKey));
 
-  csprint() << "done";
+  csreflection(csdetails) << "done";
   return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
