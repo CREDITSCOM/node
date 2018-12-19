@@ -20,7 +20,7 @@ static inline bool isStringParam(const std::string& param) {
 
 static inline bool isNormalTransfer(const std::string& method,
   const std::vector<general::Variant>& params) {
-  return method == "transfer" && params.size() == 2 && isStringParam(params[0].v_string) && isStringParam(params[1].v_string);
+  return method == "transfer" && params.size() == 2 && params[0].__isset.v_string && params[1].__isset.v_string; /*&& isStringParam(params[0].v_string) && isStringParam(params[1].v_string);*/
 }
 
 /*static inline bool isTransferFrom(const std::string& method,
@@ -30,30 +30,18 @@ static inline bool isNormalTransfer(const std::string& method,
 
 static inline bool isTransferFrom(const std::string& method,
   const std::vector<general::Variant>& params) {
-  return method == "transferFrom" && params.size() == 3 && isStringParam(params[0].v_string) && isStringParam(params[1].v_string) && isStringParam(params[2].v_string);
+  return method == "transferFrom" && params.size() == 3 && params[0].__isset.v_string && params[1].__isset.v_string && params[2].__isset.v_string; /*&& isStringParam(params[0].v_string) && isStringParam(params[1].v_string) && isStringParam(params[2].v_string);*/
 }
 
 static csdb::Address tryExtractPublicKey(const std::string& str) {
   // First try to decipher
   csdb::Address result;
-  if (!isStringParam(str)) return result;
-
-  std::string pureStr = str.substr(1, str.size() - 2);
   std::vector<uint8_t> vc;
-
-  bool decodeSucc = DecodeBase58(pureStr, vc);
+  bool decodeSucc = DecodeBase58(str, vc);
   if (!decodeSucc || vc.size() != PUBLIC_KEY_LENGTH) return result;
 
   return csdb::Address::from_public_key(vc);
 }
-
-/*static csdb::Address tryGetRegisterData(const std::string& method,
-                                        const std::vector<std::string>& params) {
-  if (method == "register" && params.size() == 1)
-    return tryExtractPublicKey(params[0]);
-
-  return csdb::Address();
-}*/
 
 static csdb::Address tryGetRegisterData(const std::string& method,
   const std::vector<general::Variant>& params) {
@@ -68,9 +56,9 @@ static inline bool isValidAmountChar(const char c) {
 }
 
 static std::string tryExtractAmount(const std::string& str) {
-  if (str.size() > 258 || !isStringParam(str)) return "0";
+  if (str.size() > 256) return "0";
 
-  const auto end = str.end() - 1;
+  const auto end = str.end();
   bool hasSep = false;
 
   uint8_t leadingZeros = 0; // From beginning
@@ -79,7 +67,7 @@ static std::string tryExtractAmount(const std::string& str) {
   bool hasNonZero = false;
 
   std::string result;
-  for (auto cIt = str.begin() + 1; cIt != end; ++cIt) {
+  for (auto cIt = str.begin(); cIt != end; ++cIt) {
     if (!isValidAmountChar(*cIt)) {
       result.clear();
       break;
@@ -245,7 +233,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
-                   totalSupply = tryExtractAmount('"' + newSupp + '"');
+                   totalSupply = tryExtractAmount(newSupp);
                  });
 
   std::vector<csdb::Address> holders;
@@ -271,7 +259,8 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   holderKeysParams.reserve(holders.size());
   for (auto& h : holders) {
     general::Variant var;
-    var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
+    //var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
+    var.__set_v_string(EncodeBase58(h.public_key()));
     holderKeysParams.push_back(std::vector<general::Variant>(1, var));
   }
 
@@ -289,7 +278,8 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
       const auto& res = result.results[i];
       if (!res.status.code) {
         auto& oldBalance = t.holders[holders[i]].balance;
-        auto newBalance = tryExtractAmount('"' + getVariantAs<std::string>(res.ret_val) + '"');
+        //auto newBalance = tryExtractAmount('"' + getVariantAs<std::string>(res.ret_val) + '"');
+        auto newBalance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
         if (isZeroAmount(newBalance) && !isZeroAmount(oldBalance)) --t.realHoldersCount;
         else if (isZeroAmount(oldBalance) && !isZeroAmount(newBalance)) ++t.realHoldersCount;
         oldBalance = newBalance;

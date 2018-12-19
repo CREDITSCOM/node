@@ -19,7 +19,9 @@ const NodeVersion NODE_VERSION = 302;
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
+
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
+const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
 const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
@@ -88,9 +90,6 @@ public:
     return bList_;
   }
 
-  const cs::PublicKey& getMyPublicKey() const {
-    return publicKey_;
-  }
   const std::string& getPathToDB() const {
     return pathToDb_;
   }
@@ -132,11 +131,22 @@ public:
     return apiData_;
   }
 
+  const cs::PublicKey& getMyPublicKey() const {
+    return publicKey_;
+  }
+  const cs::PrivateKey& getMyPrivateKey() const {
+    return privateKey_;
+  }
+
+  void dumpJSONKeys(const std::string& fName) const;
+
 private:
   static Config readFromFile(const std::string& fileName);
   void setLoggerSettings(const boost::property_tree::ptree& config);
   void readPoolSynchronizerData(const boost::property_tree::ptree& config);
   void readApiData(const boost::property_tree::ptree& config);
+
+  bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
 
   template<typename T>
   bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
@@ -163,7 +173,9 @@ private:
   std::vector<EndpointData> bList_;
 
   std::string pathToDb_;
+
   cs::PublicKey publicKey_;
+  cs::PrivateKey privateKey_;
 
   boost::log::settings loggerSettings_;
 

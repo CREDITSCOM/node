@@ -131,6 +131,9 @@ private:
   std::thread write_thread;
   bool quit = false;
 
+  std::mutex data_lock;
+  std::mutex bc_lock;
+
   std::deque<Pool> write_queue;
   std::mutex write_lock;
   std::condition_variable write_cond_var;
@@ -208,9 +211,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
     update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
     count_pool++;
-
-    last_hash = p.hash();
-
     progress.poolsProcessed++;
     if (nullptr != callback) {
       if (callback(progress)) {
@@ -226,10 +226,10 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
           if (!it.second.next_.is_empty())
             continue;
 
-          // already set above:
-          //if (!last_hash.is_empty())
-          //  return false;
-          //last_hash = it.first;
+          if (!last_hash.is_empty())
+            return false;
+
+          last_hash = it.first;
         }
         return true;
       }()) {
@@ -416,6 +416,61 @@ bool Storage::pool_save(Pool pool) {
   return true;
 }
 
+Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const
+{
+  std::unique_lock<std::mutex> lock(d->bc_lock);
+  if (!isOpen()) {
+    d->set_last_error(NotOpen);
+    return Pool{};
+  }
+
+  if (hash.is_empty())
+  {
+    d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
+    return Pool{};
+  }
+
+  Pool res;
+  bool needParseData = true;
+  ::csdb::internal::byte_array data;
+
+  if (!d->db->get(hash.to_binary(), &data)) {
+    {
+      std::unique_lock<std::mutex> lock(d->write_lock);
+      for (auto& poolToWrite : d->write_queue) {
+        if (poolToWrite.hash() == hash) {
+          res = poolToWrite;
+          needParseData = false;
+          trxCnt = res.transactions().size();
+          break;
+        }
+      }
+    }
+
+    if (needParseData && !d->db->get(hash.to_binary(), &data)) {
+      d->set_last_error(DatabaseError);
+      return Pool{};
+    }
+  }
+
+  if (needParseData) {
+    if (metaOnly)
+      res = Pool::meta_from_binary(data, trxCnt);
+    else
+      res = Pool::from_binary(data);
+  }
+
+  if (!res.is_valid()) {
+    d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
+    return Pool{};
+  }
+  else {
+    d->set_last_error();
+  }
+
+  return res;
+}
+
 bool Storage::write_queue_search(const PoolHash &hash, Pool &res_pool) const {
   std::unique_lock<std::mutex> lock(d->write_lock, std::defer_lock);
 
@@ -442,6 +497,10 @@ bool Storage::write_queue_pop(Pool &res_pool) {
 }
 
 Pool Storage::pool_load(const PoolHash &hash) const {
+  size_t _;
+  return pool_load_internal(hash, false, _);
+  /*Pool empty_Pool{};
+
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
@@ -472,7 +531,7 @@ Pool Storage::pool_load(const PoolHash &hash) const {
     d->set_last_error();
   }
 
-  return res;
+  return res;*/
 }
 
 Pool Storage::pool_load(const cs::Sequence sequence) const {

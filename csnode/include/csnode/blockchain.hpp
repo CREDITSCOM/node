@@ -43,16 +43,20 @@ using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
 
 class BlockChain {
 public:
-  using Transactions = std::vector<csdb::Transaction>;
-  using WalletId = csdb::internal::WalletId;
+  using Transactions  = std::vector<csdb::Transaction>;
+  using WalletId      = csdb::internal::WalletId;
   using WalletAddress = csdb::Address;
-  using WalletData = cs::WalletsCache::WalletData;
-  using Mask = boost::dynamic_bitset<uint64_t>;
+  using WalletData    = cs::WalletsCache::WalletData;
+  using Mask          = boost::dynamic_bitset<uint64_t>;
 
   explicit BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
 
   bool isGood() const;
+
+  enum class ADDR_TYPE { PUBLIC_KEY, ID };
+  csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
+  bool is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const;
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
@@ -104,6 +108,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
+  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastWrittenSequence() const;
 
@@ -129,6 +134,10 @@ public:
   std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
 
   uint64_t getTransactionsCount() const { return total_transactions_count_; }
+#endif
+
+#ifdef MONITOR_NODE
+  uint32_t getTransactionsCount(const csdb::Address&);
 #endif
 
   // all wallet data (from cache)
@@ -161,7 +170,7 @@ public:
 
   void recount_trxns(const std::optional<csdb::Pool>& new_pool);
   const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-
+  //std::vector<csdb::Transaction> genesisTrxns_;
 private:
 
   void writeGenesisBlock();
@@ -279,7 +288,7 @@ public:
 
 public signals:
 
-  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.  
+  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.
   *   Connected to SolverCore::gotStartSmartContract() method
   */
   cs::SmartContractStartSignal smartContractEvent_;

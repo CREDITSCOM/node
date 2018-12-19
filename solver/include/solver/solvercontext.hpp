@@ -164,6 +164,11 @@ public:
     return *core.pws;
   }
 
+  cs::SmartContracts& smart_contracts() const
+  {
+    return *core.psmarts;
+  }
+
   /**
    * @fn  CallsQueueScheduler& SolverContext::scheduler() const;
    *

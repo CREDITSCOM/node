@@ -148,9 +148,8 @@ cs::Bytes cs::DataStream::byteVector() {
   (*this) >> size;
 
   if (isAvailable(size)) {
-    for (std::size_t i = 0; i < size; ++i, ++index_) {
-      result.push_back(static_cast<uint8_t>(data_[index_]));
-    }
+    result = cs::Bytes(data_ + index_, data_ +index_ + size);
+    index_ += size;
   }
 
   return result;
@@ -174,9 +173,8 @@ std::string cs::DataStream::string() {
   (*this) >> size;
 
   if (isAvailable(size)) {
-    for (std::size_t i = 0; i < size; ++i, ++index_) {
-      result.push_back(data_[index_]);
-    }
+    result = std::string(data_ + index_ , data_ + index_ + size);
+    index_ += size;
   }
 
   return result;
@@ -227,6 +225,25 @@ cs::TransactionsPacket cs::DataStream::transactionPacket() {
   (*this) >> bytes;
 
   return cs::TransactionsPacket::fromBinary(bytes);
+}
+
+void cs::DataStream::addBytesView(const cs::BytesView& bytesView) {
+  if (bytes_) {
+    (*this) << bytesView.size();
+    insertBytes(bytesView.data(), bytesView.size());
+  }
+}
+
+cs::BytesView cs::DataStream::bytesView() {
+  cs::BytesView bytesView;
+  size_t size = streamField<size_t>();
+
+  if (isAvailable(size)) {
+    bytesView = cs::BytesView(reinterpret_cast<cs::Byte*>(data_), size);
+    index_ += size;
+  }
+
+  return bytesView;
 }
 
 template <typename T>

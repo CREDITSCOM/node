@@ -34,6 +34,7 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
+, nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 ,
@@ -62,10 +63,6 @@ Node::~Node() {
 }
 
 bool Node::init() {
-  if (!cscrypto::CryptoInit()) {
-    return false;
-  }
-
   if (!transport_->isGood()) {
     return false;
   }
@@ -80,10 +77,7 @@ bool Node::init() {
 
   csdebug() << "Everything init";
 
-  // check file with keys
-  if (!checkKeysFile()) {
-    return false;
-  }
+  solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
@@ -95,101 +89,6 @@ bool Node::init() {
   cs::Connector::connect(&blockChain_.smartContractEvent_, solver_, &cs::SolverCore::gotSmartContractEvent);
 
   return true;
-}
-
-bool Node::checkKeysFile() {
-  std::ifstream pub(publicKeyFileName_);
-  std::ifstream priv(privateKeyFileName_);
-
-  if (!pub.is_open() || !priv.is_open()) {
-    cslog() << "\n\nNo suitable keys were found. Type \"g\" to generate or \"q\" to quit.";
-
-    char gen_flag = 'a';
-    std::cin >> gen_flag;
-
-    if (gen_flag == 'g') {
-      auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
-      solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
-  else {
-    std::string pub58, priv58;
-    std::getline(pub, pub58);
-    std::getline(priv, priv58);
-
-    pub.close();
-    priv.close();
-
-    cs::Bytes privateKey;
-    cs::Bytes publicKey;
-
-    DecodeBase58(pub58, publicKey);
-    DecodeBase58(priv58, privateKey);
-
-    if (publicKey.size() != PUBLIC_KEY_LENGTH || privateKey.size() != PRIVATE_KEY_LENGTH) {
-      cslog() << "\n\nThe size of keys found is not correct. Type \"g\" to generate or \"q\" to quit.";
-
-      char gen_flag = 'a';
-      std::cin >> gen_flag;
-
-      bool needGenerateKeys = gen_flag == 'g';
-
-      if (gen_flag == 'g') {
-        auto [generatedPublicKey, generatedPrivateKey] = generateKeys();
-        solver_->setKeysPair(generatedPublicKey, generatedPrivateKey);
-      }
-
-      return needGenerateKeys;
-    }
-
-    cs::PublicKey fixedPublicKey;
-    cs::PrivateKey fixedPrivatekey;
-
-    std::copy(publicKey.begin(), publicKey.end(), fixedPublicKey.begin());
-    std::copy(privateKey.begin(), privateKey.end(), fixedPrivatekey.begin());
-
-    return checkKeysForSignature(fixedPublicKey, fixedPrivatekey);
-  }
-}
-
-std::pair<cs::PublicKey, cs::PrivateKey> Node::generateKeys() {
-  cs::PublicKey fixedPublicKey;
-  cs::PrivateKey fixedPrivateKey;
-  cscrypto::GenerateKeyPair(fixedPublicKey, fixedPrivateKey);
-
-  std::ofstream f_pub(publicKeyFileName_);
-  f_pub << EncodeBase58(cs::Bytes(fixedPublicKey.begin(), fixedPublicKey.end()));
-  f_pub.close();
-
-  std::ofstream f_priv(privateKeyFileName_);
-  f_priv << EncodeBase58(cs::Bytes(fixedPrivateKey.begin(), fixedPrivateKey.end()));
-  f_priv.close();
-
-  return std::make_pair<cs::PublicKey, cs::PrivateKey>(std::move(fixedPublicKey), std::move(fixedPrivateKey));
-}
-
-bool Node::checkKeysForSignature(const cs::PublicKey& publicKey, const cs::PrivateKey& privateKey) {
-  if (cscrypto::ValidateKeyPair(publicKey, privateKey)) {
-    solver_->setKeysPair(publicKey, privateKey);
-    return true;
-  }
-
-  cslog() << "\n\nThe keys for node are not correct. Type \"g\" to generate or \"q\" to quit.";
-
-  char gen_flag = 'a';
-  std::cin >> gen_flag;
-
-  if (gen_flag == 'g') {
-    auto [generatedPublickey, generatedPrivateKey] = generateKeys();
-    solver_->setKeysPair(generatedPublickey, generatedPrivateKey);
-    return true;
-  }
-
-  return false;
 }
 
 void Node::blockchainSync() {
@@ -228,14 +127,6 @@ void Node::runSpammer() {
 void Node::flushCurrentTasks() {
   transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
   ostream_.clear();
-}
-
-namespace {
-#ifdef MONITOR_NODE
-  bool monitorNode = true;
-#else
-  bool monitorNode = false;
-#endif
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
@@ -517,8 +408,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Signature signature;
   istream_ >> signature;
 
-  cs::PublicKey writerPublicKey;
-  istream_ >> writerPublicKey;
+  istream_ >> poolMetaInfo.writerKey;
 
   if (!istream_.good()) {
     cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
@@ -547,10 +437,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
       return;
     }
-#ifdef MONITOR_NODE
-    std::vector writer(sender.begin(), sender.end());
-    pool.value().set_writer_public_key(writer);
-#endif
 
     const auto ptable = conveyer.roundTable(round);
     if (ptable == nullptr) {
@@ -623,7 +509,7 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMe
   ostream_ << characteristic.mask;
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
-  ostream_ << solver_->getPublicKey();
+  ostream_ << poolMetaInfo.writerKey;
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
@@ -641,6 +527,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::Poo
   std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), lastSentRoundData_.characteristic.mask.begin());
   lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
   lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
+  lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
   lastSentRoundData_.poolSignature = signature;
 }
 
@@ -2080,6 +1967,13 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = blockChain_.getLastWrittenSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = timeStamp;
+  auto st3 = solver_->find_stage3(myConfidantIndex_);
+  if (st3) {
+    try {
+      poolMetaInfo.writerKey = confidants().at(st3->writer);
+    }
+    catch (...) { }
+  }
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2214,11 +2108,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::sendHash(cs::RoundNumber round) {
-  if (monitorNode) {
-    // to block request trusted status
-    return;
-  }
-
+#if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
   if (getBlockChain().getLastWrittenSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
@@ -2229,6 +2119,7 @@ void Node::sendHash(cs::RoundNumber round) {
 
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
   sendToConfidants(MsgTypes::BlockHash, round, hash);
+#endif
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {

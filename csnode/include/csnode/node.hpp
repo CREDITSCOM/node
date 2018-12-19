@@ -53,17 +53,17 @@ public:
 
   // SOLVER3 methods
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
-  void sendHash(cs::RoundNumber round);  
+  void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
   //consensus communication
-  void sendStageOne(cs::StageOne&); 
+  void sendStageOne(cs::StageOne&);
   void sendStageTwo(cs::StageTwo&);
   void sendStageThree(cs::StageThree&);
   void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  
+
   void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
@@ -91,7 +91,7 @@ public:
   void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
-  //smart-contracts consensus stages sending and getting 
+  //smart-contracts consensus stages sending and getting
 
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
   void handleRoundMismatch(const cs::RoundTable& global_table);
@@ -192,11 +192,6 @@ private:
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, const cs::Signature& signature);
 
-  // signature verification
-  bool checkKeysFile();
-  std::pair<cs::PublicKey, cs::PrivateKey> generateKeys();
-  bool checkKeysForSignature(const cs::PublicKey&, const cs::PrivateKey&);
-
   // pool sync helpers
   void blockchainSync();
 
@@ -261,6 +256,7 @@ private:
   static const csdb::Address startAddress_;
 
   const cs::PublicKey nodeIdKey_;
+  const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
 
   // file names for crypto public/private keys
@@ -303,9 +299,6 @@ private:
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
 
-  // sync meta
-  cs::PoolMetaMap poolMetaMap_;  // active pool meta information
-
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;
@@ -322,6 +315,7 @@ private:
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;
   std::vector<cs::Bytes> smartStageThreeMessage_;
+
   bool isSmartStageStorageCleared_ = false;
 
   std::vector<cs::Stage> smartStageTemporary_;

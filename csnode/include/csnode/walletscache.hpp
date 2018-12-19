@@ -41,6 +41,9 @@ public:
     uint64_t createTime_ = 0;
     uint64_t transNum_ = 0;
 #endif
+#ifdef TRANSACTIONS_INDEX
+    csdb::TransactionID lastTransaction_;
+#endif
   };
 
   struct WriterData {
@@ -87,6 +90,9 @@ private:
 
   protected:
     static WalletData& getWalletData(Data& wallets, WalletId id, const csdb::Address& address);
+#ifdef MONITOR_NODE
+    bool setWalletTime(const WalletData::Address& address, const uint64_t &p_timeStamp);
+#endif
 
   protected:
     WalletsCache& data_;

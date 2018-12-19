@@ -12,7 +12,12 @@
 #include <csnode/fee.hpp>
 #include <solver/smartcontracts.hpp>
 
+#include <client/config.hpp>
+
 using namespace cs;
+
+void generateCheatDbFile(std::string, const BlockHashes&);
+bool validateCheatDbFile(std::string, const BlockHashes&);
 
 BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
@@ -34,7 +39,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 
   cslog() << "DB is opened";
 
-  blockHashes_.reset(new cs::BlockHashes("test_db/dbs.txt"));
+  blockHashes_ = std::make_unique<cs::BlockHashes>();
 
   if (storage_.last_hash().is_empty()) {
     cslog() << "Last hash is empty...";
@@ -44,6 +49,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     writeGenesisBlock();
+    generateCheatDbFile(path, *blockHashes_);
   }
   else {
     cslog() << "Last hash is not empty...";
@@ -60,6 +66,11 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+
+    if (!validateCheatDbFile(path, *blockHashes_)) {
+      cserror() << "Bad database version";
+      return;
+    }
   }
 
   cslog() << "BLOCKCHAIN> max loaded block #" << getLastWrittenSequence();
@@ -92,9 +103,10 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
         return false;
 
       ++current_sequence;
+#ifdef TRANSACTIONS_INDEX
+      total_transactions_count_ += pool.transactions().size();
+#endif
     }
-
-    blockHashes_->saveDbStructure();
 
     lastHash_ = getLastHash();
 
@@ -117,16 +129,8 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 
   auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
     if (indexedAddrs.insert(addr).second) {
-      csdb::PoolHash lapoo;
-
-      {
-        //std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-        //auto wd = walletsCache_->findWallet(addr.public_key());
-        //if (wd) lapoo = wd->lastTransaction_.pool_hash();
-        lapoo = getLastTransaction(addr).pool_hash();
-      }
-
-      storage_.set_previous_transaction_block(addr, pool.hash(), lapoo);
+      csdb::PoolHash lapoo = getLastTransaction(addr).pool_hash();
+      storage_.set_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), pool.hash(), lapoo);
     }
   };
 
@@ -136,10 +140,9 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
   }
 
   if (pool.transactions().size()) {
-    //transactionsCount_ += pool.transactions().size();
+    total_transactions_count_ += pool.transactions().size();
 
-    if (lastNonEmptyBlock_.transCount &&
-      pool.hash() != lastNonEmptyBlock_.hash)
+    if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
       previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
 
     lastNonEmptyBlock_.hash = pool.hash();
@@ -158,6 +161,40 @@ cs::Sequence BlockChain::getLastWrittenSequence() const {
   else {
     return blockHashes_->getDbStructure().last_;
   }
+}
+const std::string CHEAT_FILENAME = "__integr.seq";
+
+std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
+  if (path.size() && path.back() != '/') path.push_back('/');
+  path+= CHEAT_FILENAME;
+
+  std::array<cscrypto::Byte, cscrypto::kHashSize + sizeof(NODE_VERSION)> data;
+
+  csdb::PoolHash genHash;
+  bh.find(0, genHash);
+  auto hb = genHash.to_binary();
+
+  memcpy(data.data(), hb.data(), cscrypto::kHashSize);
+  memcpy(data.data() + cscrypto::kHashSize, reinterpret_cast<const cscrypto::Byte*>(&NODE_VERSION), sizeof(NODE_VERSION));
+
+  return EncodeBase58(data.data(), data.data() + sizeof(data));
+}
+
+void generateCheatDbFile(std::string path, const BlockHashes& bh) {
+  const auto cd = prepareCheatData(path, bh);
+
+  std::ofstream f(path);
+  f << cd;
+}
+
+bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+  const auto cd = prepareCheatData(path, bh);
+
+  std::ifstream f(path);
+  std::string rcd;
+  f >> rcd;
+
+  return rcd == cd;
 }
 
 void BlockChain::writeGenesisBlock() {
@@ -250,9 +287,6 @@ void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCa
 
 void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<void(const cs::WalletsCache::WalletData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  //auto wd = walletsCacheStorage_->findWallet(addr.public_key());
-  //if (!wd) return;
-
   WalletId id;
   if (!walletIds_->normal().find(addr, id))
     return;
@@ -498,7 +532,7 @@ private:
 };
 
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
-  if (offset >= getSize())
+  /*if (offset >= getSize())
     return;
   if (!limit)
     return;
@@ -509,7 +543,20 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
   if (!findDataForTransactions(address, wallPubKey, id, hashesArray))
     return;
 
-  getTransactions(transactions, wallPubKey, id, hashesArray, offset, limit);
+  getTransactions(transactions, wallPubKey, id, hashesArray, offset, limit);*/
+  for (auto trIt = TransactionsIterator(*this, address);
+    trIt.isValid();
+    trIt.next()) {
+    if (offset > 0) {
+      --offset;
+      continue;
+    }
+
+    transactions.push_back(*trIt);
+    //transactions.back().set_time(trIt.getPool().get_time());
+
+    if (--limit == 0) break;
+  }
 }
 
 bool BlockChain::findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
@@ -695,8 +742,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants);
     walletsPools_->loadNextBlock(nextPool);
 
-    blockHashes_->loadNextBlock(nextPool);
-    if (!blockHashes_->saveDbStructure()) {
+    if (!blockHashes_->loadNextBlock(nextPool)) {
       cslog() << "Error writing DB structure";
     }
   }
@@ -788,25 +834,14 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
   if (new_pool.value().transactions_count()) {
     csdb::Address addr_send, addr_recv;
     for (const auto& trx : new_pool.value().transactions()) {
-      addr_send = trx.source();
-      if (addr_send.is_wallet_id()) {
-        WalletId id = *reinterpret_cast<const WalletId*>(addr_send.to_api_addr().data());
-        if (!findAddrByWalletId(id, addr_send))
-          return;
-      }
-      addr_recv = trx.target();
-      if (addr_recv.is_wallet_id()) {
-        WalletId id = *reinterpret_cast<const WalletId*>(addr_recv.to_api_addr().data());
-        if (!findAddrByWalletId(id, addr_recv))
-          return;
-      }
+      addr_send = get_addr_by_type(trx.source(), ADDR_TYPE::PUBLIC_KEY);
+      addr_recv = get_addr_by_type(trx.target(), ADDR_TYPE::PUBLIC_KEY);
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
     }
-
-#ifdef TRANSACTIONS_INDEX
-    total_transactions_count_+= new_pool.value().transactions().size();
-#endif
+//#ifdef TRANSACTIONS_INDEX
+    //total_transactions_count_+= new_pool.value().transactions().size();
+//#endif
   }
 }
 
@@ -930,6 +965,13 @@ void BlockChain::testCachedBlocks() {
   }
 }
 
+/*csdb::internal::byte_array BlockChain::getKeyFromAddress(csdb::Address& addr) const {
+  if (!addr.is_public_key())
+    findAddrByWalletId(addr.wallet_id(), addr);
+
+  return addr.public_key();
+}*/
+
 std::size_t BlockChain::getCachedBlocksSize() const {
   return cachedBlocks_.size();
 }
@@ -987,33 +1029,66 @@ void BlockChain::updateLastBlockConfidants(const ::std::vector<::std::vector<uin
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet)
 {
-  if(!fee_) {
+  if(!fee_ || packet.transactionsCount() == 0)
     return;
-  }
-  if(packet.transactionsCount() == 0) {
-    return;
-  }
   fee_->CountFeesInPool(*this, &packet);
 }
 
+csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const {
+  csdb::Address addr_res{};
+  switch (type) {
+    case ADDR_TYPE::PUBLIC_KEY:
+      if (addr.is_public_key() || !findAddrByWalletId(addr.wallet_id(), addr_res))
+        addr_res = addr;
+      break;
+    case ADDR_TYPE::ID:
+      uint32_t _id;
+      if (findWalletId(addr, _id))
+        addr_res = csdb::Address::from_wallet_id(_id);
+      break;
+  } 
+  return addr_res;
+}
+
+bool BlockChain::is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const {
+  if (get_addr_by_type(laddr, ADDR_TYPE::PUBLIC_KEY) == get_addr_by_type(raddr, ADDR_TYPE::PUBLIC_KEY))
+    return true;
+  return false;
+}
+
+#ifdef MONITOR_NODE
+uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  WalletId id;
+  if (addr.is_wallet_id())
+    id = addr.wallet_id();
+  else if (!walletIds_->normal().find(addr, id))
+    return 0;
+  const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+  if (!wallDataPtr)
+    return 0;
+  return wallDataPtr->transNum_;
+}
+#endif
+
 #ifdef TRANSACTIONS_INDEX
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
-  /*std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  auto wd = walletsCache_->findWallet(addr.public_key());
-  if (!wd) return csdb::TransactionID();
-  return wd->lastTransaction_;*/
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  WalletId id;
+  if (addr.is_wallet_id())
+    id = addr.wallet_id();
+  else if (!walletIds_->normal().find(addr, id))
+    return csdb::TransactionID();
+  const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+  if (!wallDataPtr)
+    return csdb::TransactionID();
 
-  //std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  BlockChain::Transactions transactions;
-  getTransactions(transactions, addr, static_cast<uint64_t>(0), static_cast<uint64_t>(1));//last trx
-  if(transactions.size())
-    return transactions[0].id();
-  return csdb::TransactionID();
+  return wallDataPtr->lastTransaction_;
 }
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
   std::lock_guard<decltype(dbLock_)> lock(dbLock_);
-  return storage_.get_previous_transaction_block(addr, ph);
+  return storage_.get_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), ph);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
@@ -1048,7 +1123,7 @@ bool TransactionsIterator::isValid() const {
 
 void TransactionsIterator::next() {
   while (++it_ != lapoo_.transactions().rend()) {
-    if (it_->source() == addr_ || it_->target() == addr_)
+    if(bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_))
       break;
   }
 
@@ -1060,7 +1135,7 @@ void TransactionsIterator::next() {
     if (lapoo_.is_valid()) {
       it_ = lapoo_.transactions().rbegin();
       // transactions() cannot be empty
-      if (it_->source() != addr_ && it_->target() != addr_)
+      if(!bc_.is_equal(it_->source(), addr_) && !bc_.is_equal(it_->target(), addr_))
         next();  // next should be executed only once
     }
   }
@@ -1076,10 +1151,8 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
     lapoo_ = bc_.loadBlock(hash);
     if (!lapoo_.is_valid()) break;
 
-    for (it_ = lapoo_.transactions().rbegin();
-      it_ != lapoo_.transactions().rend();
-      ++it_) {
-      if (it_->source() == addr_ || it_->target() == addr_) {
+    for (it_ = lapoo_.transactions().rbegin(); it_ != lapoo_.transactions().rend(); ++it_) {
+      if(bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
         found = true;
         break;
       }
@@ -1089,9 +1162,7 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
   }
 }
 
-TransactionsIterator::TransactionsIterator(BlockChain& bc,
-  const csdb::Address& addr) : bc_(bc),
-  addr_(addr) {
+TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr) : bc_(bc), addr_(addr) {
   setFromHash(bc_.getLastHash());
 }
 
@@ -1103,7 +1174,7 @@ void TransactionsIterator::next() {
   bool found = false;
 
   while (++it_ != lapoo_.transactions().rend()) {
-    if (it_->source() == addr_ || it_->target() == addr_) {
+    if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
       found = true;
       break;
     }

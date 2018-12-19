@@ -118,22 +118,12 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
 
 int main(int argc, char* argv[]) {
 #ifdef WIN32
-  if (SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
-    std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-    std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
-    std::cout << "\n\t !!! closing the console...\n" << std::flush;
-    Sleep(2000);
-  }
-  else {
+  if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
     std::cout << "\nERROR: Could not set control handler" << std::flush;
     return 1;
   }
 #else
   installSignalHandler();
-  std::cout << "\n\n\n\tThe Control Handler is installed.\n" << std::flush;
-  std::cout << "\n\t !!! To STOP NODE try pressing Ctrl+C or" << std::flush;
-  std::cout << "\n\t !!! closing the console...\n" << std::flush;
-  sleep(2);
 #endif  // WIN32
   mouseSelectionDisable();
 #if BUILD_WITH_GPROF
@@ -143,13 +133,16 @@ int main(int argc, char* argv[]) {
 
   using namespace boost::program_options;
   options_description desc("Allowed options");
-  desc.add_options()("help", "produce this message")("db-path", boost::program_options::value<std::string>(),
-                                                     "path to DB (default: \"test_db/\")")(
-      "config-file", boost::program_options::value<std::string>(),
-      "path to configuration file (default: \"config.ini\"), supported formats: json, xml, ini");
+  desc.add_options()
+    ("help", "produce this message")
+    ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
+    ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
+    ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
+    ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
+    ("dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")
+    ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
 
   variables_map vm;
-
   try {
     store(parse_command_line(argc, argv, desc), vm);
     notify(vm);
@@ -159,16 +152,40 @@ int main(int argc, char* argv[]) {
     cslog() << desc;
     return 1;
   }
+  catch (invalid_command_line_syntax& e) {
+    cserror() << e.what();
+    cslog() << desc;
+    return 1;
+  }
+  catch (...) {
+    cserror() << "Couldn't parse the arguments";
+    cslog() << desc;
+    return 1;
+  }
 
   if (vm.count("help")) {
     cslog() << desc;
     return 0;
   }
 
+  if (!cscrypto::CryptoInit()) {
+    std::cout << "Couldn't initialize the crypto library" << std::endl;
+    panic();
+  }
+
   auto config = Config::read(vm);
 
   if (!config.isGood()) {
     panic();
+  }
+
+  if (vm.count("dumpkeys")) {
+    auto fName = vm["dumpkeys"].as<std::string>();
+    if (fName.size() > 0) {
+      config.dumpJSONKeys(fName);
+      cslog() << "Keys dumped to " << fName;
+      return 0;
+    }
   }
 
   logger::initialize(config.getLoggerSettings());

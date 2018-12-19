@@ -9,8 +9,6 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
-#include <lib/system/common.hpp>
-#include <lib/system/structures.hpp>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -34,6 +32,10 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/bind.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+
+#include <lib/system/common.hpp>
+#include <lib/system/structures.hpp>
+#include <lib/system/logger.hpp>
 
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
@@ -183,7 +185,7 @@ public:
   /// Returns value from char array
   ///
   template <typename T>
-  inline static T getFromArray(char* data, uint32_t index) {
+  inline static T getFromArray(char* data, size_t index) {
     return *(reinterpret_cast<T*>(data + index));
   }
 

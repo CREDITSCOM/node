@@ -4,32 +4,9 @@
 #include <lib/system/logger.hpp>
 
 namespace cs {
-BlockHashes::BlockHashes(std::string dbs_fname)
-: dbs_fname_(dbs_fname)
-, db_{}
+BlockHashes::BlockHashes()
+: db_{}
 , isDbInited_(false) {
-}
-
-bool BlockHashes::loadDbStructure() {
-  std::ifstream f(dbs_fname_);
-  if (!f.is_open())
-    return false;
-
-  cslog() << "File is opened ... reading";
-
-  char kk[14];
-  f.read(kk, 14);
-  f.close();
-
-  char* s_beg = kk;
-  char* s_end = strchr(kk, '-');
-  *s_end = '\0';
-  db_.first_ = atoi(s_beg);
-  s_beg = s_end + 2;
-  db_.last_ = atoi(s_beg);
-  isDbInited_ = true;
-  cslog() << "DB structure: " << db_.first_ << "->" << db_.last_;
-  return true;
 }
 
 void BlockHashes::initStart() {
@@ -90,14 +67,4 @@ bool BlockHashes::find(cs::Sequence seq, csdb::PoolHash& res) const {
   return true;
 }
 
-bool BlockHashes::saveDbStructure() {
-  if (!isDbInited_)
-    return false;
-  std::ofstream f(dbs_fname_);
-  if (!f.is_open())
-    return false;
-  f << db_.first_ << "->" << db_.last_ << std::endl;
-  csdebug() << "DB structure: " << db_.first_ << "->" << db_.last_ << " is written succesfully";
-  return true;
-}
 }  // namespace cs

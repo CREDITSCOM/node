@@ -131,10 +131,15 @@ namespace cs
     static bool is_start(const csdb::Transaction);
     static bool is_new_state(const csdb::Transaction);
 
+    /* Assuming deployer.is_public_key() */
+    static csdb::Address get_valid_smart_address(const csdb::Address& deployer,
+                                                 const uint64_t trId,
+                                                 const api::SmartContractDeploy&);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
     static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
-    
+
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract) const
     {

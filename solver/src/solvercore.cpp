@@ -36,6 +36,13 @@ constexpr const bool MonitorModeOn =
     false;
 #endif  // MONITOR_NODE
 
+constexpr const bool WebWalletModeOn =
+#if defined(WEB_WALLET_NODE) && false
+    true;
+#else
+    false;
+#endif  // WEB_WALLET_NODE
+
 // default (test intended) constructor
 SolverCore::SolverCore()
 // options
@@ -56,6 +63,10 @@ SolverCore::SolverCore()
   if constexpr (MonitorModeOn) {
     cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
     InitMonitorModeTransitions();
+  }
+  else if constexpr (WebWalletModeOn) {
+    cslog() << "SolverCore: opt_web_wallet_mode is on, so use special transition table";
+    InitWebWalletModeTransitions();
   }
   else if constexpr (DebugModeOn) {
     cslog() << "SolverCore: opt_debug_mode is on, so use special transition table";

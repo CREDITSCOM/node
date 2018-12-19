@@ -81,15 +81,31 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::
 
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
     totalAmountOfCountedFee += load(*itTrx);
-#ifdef MONITOR_NODE
-      wrWrIt->second.totalFee = totalAmountOfCountedFee;
-#endif
   }
-  cslog() << "WALLETS CACHE>> total amount of counted fee in pool: " << totalAmountOfCountedFee;
+#ifdef MONITOR_NODE
+  wrWrIt->second.totalFee += totalAmountOfCountedFee;
+#endif
+
   if (totalAmountOfCountedFee > 0) {
     fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
   }
+
+  auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
+#ifdef MONITOR_NODE
+  setWalletTime(addr, timeStamp);
+#endif
 }
+#ifdef MONITOR_NODE
+bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& address, const uint64_t &p_timeStamp) {
+  for (auto &it : data_.wallets_) {
+    if (it != nullptr && it->address_ == address) {
+      it->createTime_ = p_timeStamp;
+      return true;
+    }
+  }
+  return false;
+}
+#endif
 
 void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants) {
   if (!confidants.size()) {
@@ -133,6 +149,11 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
+  setWalletTime(wallData.address_, tr.get_time());
+#endif
+
+#ifdef TRANSACTIONS_INDEX
+  wallData.lastTransaction_ = tr.id();
 #endif
 
   return tr.counted_fee().to_double();
@@ -156,6 +177,11 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
+  setWalletTime(wallData.address_, tr.get_time());
+#endif
+
+#ifdef TRANSACTIONS_INDEX
+  wallData.lastTransaction_ = tr.id();
 #endif
 }
 
