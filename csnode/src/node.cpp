@@ -1322,11 +1322,9 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   cslog() << "Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   istream_.init(data, size);
 
-  cs::Bytes bytes;
-  istream_ >> bytes;
-
   cs::StageTwo stage;
-  istream_ >> stage.signature;
+  cs::Bytes bytes;
+  istream_ >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageTwo packet format";
@@ -1399,11 +1397,9 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 
   istream_.init(data, size);
 
-  cs::Bytes bytes;
-  istream_ >> bytes;
-
   cs::StageThree stage;
-  istream_  >> stage.signature;
+  cs::Bytes bytes;
+  istream_ >> bytes >> stage.signature;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "NODE> Bad StageTwo packet format";
