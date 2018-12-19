@@ -1383,7 +1383,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
-  csprint() << "Signature is OK";
+  csmeta(csdetails) << "Signature is OK";
   stageTwoMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
