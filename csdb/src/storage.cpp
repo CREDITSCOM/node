@@ -436,7 +436,7 @@ Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size
 
   if (!d->db->get(hash.to_binary(), &data)) {
     {
-      std::unique_lock<std::mutex> lock(d->write_lock);
+      std::unique_lock<std::mutex> lock2(d->write_lock);
       for (auto& poolToWrite : d->write_queue) {
         if (poolToWrite.hash() == hash) {
           res = poolToWrite;

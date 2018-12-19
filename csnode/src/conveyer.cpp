@@ -389,7 +389,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   return generateHash(pointer->mask.data(), pointer->mask.size());
 }
 
-std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& sender) {
+std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMetaInfo& metaPoolInfo, const cs::PublicKey& /*sender*/) {
   cs::RoundNumber round = metaPoolInfo.sequenceNumber;
   csreflection(csdebug) << ", round " << round;
 

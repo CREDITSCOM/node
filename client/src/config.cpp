@@ -312,10 +312,10 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         std::vector<uint8_t> skBytes;
         const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
         if (encSucc) {
-          std::string sk58 =
+          std::string sk58tmp =
             EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
-          writeFile(pathToSk, sk58);
-          cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
+          writeFile(pathToSk, sk58tmp);
+          cscrypto::FillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
           LOG_EVENT("Key in " << pathToSk << " has been encrypted successfully");
         }
         else {
