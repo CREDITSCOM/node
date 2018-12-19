@@ -609,6 +609,7 @@ Pool Storage::pool_remove_last() {
   Pool res{};
   bool found = write_queue_pop(res);
   if (found) {
+    d->last_hash = res.previous_hash();
     return res;
   }
 
@@ -627,6 +628,7 @@ Pool Storage::pool_remove_last() {
 
   d->db->remove(last_hash().to_binary());
 
+  d->last_hash = res.previous_hash();
   return res;
 }
 
