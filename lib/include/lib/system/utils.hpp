@@ -38,9 +38,19 @@
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
 
-// compile time and rtti reflection in action
+using namespace std::literals::string_literals;
+
+// compile time and rtti reflection in action, works only in methods.
+// if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
 #define className typeid(*this).name
-#define csprint() csdetails() << className() << " " << __func__ << ": "
+#define classNameString() std::string(className()) + " "s
+#define classNameStream() className() << " "
+
+#define funcName() __func__
+#define methodName() funcName()
+
+#define csreflection() className() << ", method " << methodName() << ": "
+#define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
 enum class Direction : uint8_t {
@@ -179,7 +189,7 @@ public:
   /// Returns value from char array
   ///
   template <typename T>
-  inline static T getFromArray(char* data, uint32_t index) {
+  inline static T getFromArray(char* data, size_t index) {
     return *(reinterpret_cast<T*>(data + index));
   }
 

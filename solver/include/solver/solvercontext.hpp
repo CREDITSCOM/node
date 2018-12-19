@@ -54,6 +54,7 @@ public:
 
   static cs::Hash zeroHash;
   static cs::Signature zeroSignature;
+  static cs::PublicKey zeroKey;
 
   /**
    * @fn  void SolverContext::request_role(Role role)
@@ -286,22 +287,22 @@ public:
   void fake_stage1(uint8_t from)
   {
     if(core.find_stage1(from) == nullptr) {
+      csdebug() << "SolverCore: make stage-1 [" << (int) from << "] as silent";
       cs::StageOne fake;
       init_zero(fake);
       fake.sender = from;
       core.gotStageOne(fake);
-      csdebug() << "SolverCore: make stage-1 [" << (int) from << "] as silent";
     }
   }
 
   void fake_stage2(uint8_t from)
   {
     if(core.find_stage2(from) == nullptr) {
+      csdebug() << "SolverCore: make stage-2 [" << (int) from << "] as silent";
       cs::StageTwo fake;
       init_zero(fake);
       fake.sender = from;
       core.gotStageTwo(fake);
-      csdebug() << "SolverCore: make stage-2 [" << (int) from << "] as silent";
     }
   }
 

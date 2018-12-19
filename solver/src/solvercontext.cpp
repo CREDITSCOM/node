@@ -13,6 +13,8 @@ namespace cs {
   /*static*/
   cs::Signature SolverContext::zeroSignature;
 
+  /*static*/
+  cs::PublicKey SolverContext::zeroKey;
 
 BlockChain& SolverContext::blockchain() const {
   return core.pnode->getBlockChain();

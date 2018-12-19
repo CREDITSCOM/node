@@ -12,6 +12,7 @@
 
 #include <lib/system/common.hpp>
 #include <lib/system/structures.hpp>
+#include <lib/system/utils.hpp>
 
 namespace cs {
 ///
@@ -79,10 +80,11 @@ public:
   ///
   template <typename T>
   inline T streamField() {
-    if (!isAvailable(sizeof(T)))
+    if (!isAvailable(sizeof(T))) {
       return T();
+    }
 
-    T field = getFromArray<T>(data_, index_);
+    T field = cs::Utils::getFromArray<T>(data_, index_);
     index_ += sizeof(T);
 
     return field;
@@ -320,6 +322,16 @@ public:
   cs::TransactionsPacket transactionPacket();
 
   ///
+  /// @brief Adds bytesView entity to stream.
+  ///
+  void addBytesView(const cs::BytesView& bytesView);
+
+  ///
+  /// @brief Returns BytesView entity if can, otherwise return empty object.
+  ///
+  cs::BytesView bytesView();
+
+  ///
   /// Peeks next parameter.
   ///
   /// @return Returns next T parameter.
@@ -343,18 +355,14 @@ private:
   template <typename T>
   T createAddress();
 
-  template <typename T>
-  inline void insertToArray(char* data, std::size_t index, T value) {
-    char* ptr = reinterpret_cast<char*>(&value);
-
-    for (std::size_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
-      *(data + i) = *(ptr + k);
+  inline void insertBytes(const char* data, std::size_t index) {
+    if (bytes_) {
+      bytes_->insert(bytes_->end(), data, data + index);
     }
   }
 
-  template <typename T>
-  inline static T getFromArray(char* data, std::size_t index) {
-    return *(reinterpret_cast<T*>(data + index));
+  inline void insertBytes(const cs::Byte* data, std::size_t size) {
+    insertBytes(reinterpret_cast<const char*>(data), size);
   }
 };
 
@@ -371,8 +379,7 @@ inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint
 ///
 template <typename T>
 inline DataStream& operator>>(DataStream& stream, T& streamField) {
-  static_assert(std::is_trivial<T>::value,
-                "Template parameter to must be trivial. Overload this function for non-trivial type");
+  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
   streamField = stream.streamField<T>();
   return stream;
 }
@@ -507,6 +514,14 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
 }
 
 ///
+/// Gets pool from stream.
+///
+inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
+  bytesView = stream.bytesView();
+  return stream;
+}
+
+///
 /// Writes array to stream.
 ///
 template <std::size_t size>
@@ -520,8 +535,7 @@ inline DataStream& operator<<(DataStream& stream, const std::array<char, size>& 
 ///
 template <typename T>
 inline DataStream& operator<<(DataStream& stream, const T& streamField) {
-  static_assert(std::is_trivial<T>::value,
-                "Template parameter to must be trivial. Overload this function for non-trivial type");
+  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
   stream.setStreamField(streamField);
   return stream;
 }
@@ -629,6 +643,14 @@ inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entit
     stream << entity;
   }
 
+  return stream;
+}
+
+///
+/// Writes bytes view to stream.
+///
+inline DataStream& operator<<(DataStream& stream, const cs::BytesView& bytesView) {
+  stream.addBytesView(bytesView);
   return stream;
 }
 }  // namespace cs
