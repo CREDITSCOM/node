@@ -53,7 +53,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     return;
   }
 
-  csreflection(csdetails);
+  csmeta(csdetails);
 
   if (isSyncroStarted_ && roundNum > 0) {
     --roundNum;
@@ -149,16 +149,16 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     return;
   }
 
-  csreflection(csdetails) << "start";
+  csmeta(csdetails) << "start";
 
   for (auto& neighbour : neighbours_) {
     if (!getNeededSequences(neighbour)) {
-      csreflection(csdetails) << "neighbor: " << cs::numeric_cast<int>(neighbour.index()) << " is busy";
+      csmeta(csdetails) << "neighbor: " << cs::numeric_cast<int>(neighbour.index()) << " is busy";
       continue;
     }
 
     if (neighbour.sequences().empty()) {
-      csreflection(csdetails) << ">>> All sequences already requested";
+      csmeta(csdetails) << ">>> All sequences already requested";
       continue;
     }
 
@@ -185,7 +185,7 @@ void cs::PoolSynchronizer::onTimeOut() {
     if (!isSyncroStarted_) {
       return;
     }
-    csreflection(csdetails) << "onTimeOut: " << syncData_.sequencesVerificationFrequency;
+    csmeta(csdetails) << "onTimeOut: " << syncData_.sequencesVerificationFrequency;
     const bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
 
     if (isAvailable) {
@@ -232,11 +232,11 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
   refreshNeighbours();
 
   if (neighbours_.empty()) {
-    csreflection(csdetails) << " neighbours count is 0";
+    csmeta(csdetails) << " neighbours count is 0";
     return false;
   }
 
-  csreflection(csdetails) << counterType;
+  csmeta(csdetails) << counterType;
   bool isNeedRequest = false;
 
   switch (counterType) {
@@ -289,12 +289,12 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
 bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const bool isLastPacket = isLastRequest();
   if (isLastPacket && !requestedSequences_.empty()) {
-    csreflection(csdetails) << "Is last packet: requested sequences: [" << requestedSequences_.begin()->first << ", "
+    csmeta(csdetails) << "Is last packet: requested sequences: [" << requestedSequences_.begin()->first << ", "
               << requestedSequences_.rbegin()->first << "]";
 
     const auto& sequences = neighbour.sequences();
     if (!sequences.empty() && requestedSequences_.find(sequences.front()) != requestedSequences_.end()) {
-      csreflection(csdetails) << "Is last packet: this neighbour is already requested";
+      csmeta(csdetails) << "Is last packet: this neighbour is already requested";
       if (isAvailableRequest(neighbour)) {
         neighbour.resetRoundCounter();
         return true;
@@ -307,9 +307,9 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     for (const auto& [sequence, packet] : requestedSequences_) {
       (void)packet;
       neighbour.addSequences(sequence);
-      csreflection(csdetails) << "Is last packet: nh: " << nhIdx << ", add seq: " << sequence;
+      csmeta(csdetails) << "Is last packet: nh: " << nhIdx << ", add seq: " << sequence;
     }
-    csreflection(csdetails) << "Needed sequences size: " << neighbour.sequences().size();
+    csmeta(csdetails) << "Needed sequences size: " << neighbour.sequences().size();
     return true;
   }
 
@@ -317,7 +317,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const cs::Sequence lastWrittenSequence = blockChain_->getLastWrittenSequence();
 
   for (const auto& el : requiredBlocks) {
-    csreflection(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
+    csmeta(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
   }
 
   if (!requestedSequences_.empty()) {
@@ -325,7 +325,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(lastWrittenSequence));
   }
   else {
-    csreflection(csdetails) << "Requested storage: size: 0";
+    csmeta(csdetails) << "Requested storage: size: 0";
   }
 
   cs::Sequence sequence = lastWrittenSequence;
@@ -339,13 +339,13 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   // if storage requested sequences is impty
   if (requestedSequences_.empty()) {
     sequence = lastWrittenSequence;
-    csreflection(csdetails) << "From blockchain: " << sequence;
+    csmeta(csdetails) << "From blockchain: " << sequence;
   }
   // Needed help another neighbour
   else if (isNeededHelpIt != requestedSequences_.end()) {
     sequence = isNeededHelpIt->first;
 
-    csreflection(csdetails) << "From needed help: " << sequence;
+    csmeta(csdetails) << "From needed help: " << sequence;
 
     if (!neighbour.sequences().empty() && sequence != neighbour.sequences().front()) {
       for (const auto& seq : neighbour.sequences()) {
@@ -364,45 +364,45 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   }
   // Repeat request
   else if (isAvailableRequest(neighbour)) {
-    csreflection(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back()
+    csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back()
               << "]";
     neighbour.resetRoundCounter();
     return true;
   }
   else {
     sequence = std::max(requestedSequences_.rbegin()->first, lastWrittenSequence);
-    csreflection(csdetails) << "From other: " << sequence;
+    csmeta(csdetails) << "From other: " << sequence;
   }
 
   if (!neighbour.sequences().empty()) {
     return false;
   }
 
-  csreflection(csdetails) << "Begin needed request Sequence: " << sequence;
+  csmeta(csdetails) << "Begin needed request Sequence: " << sequence;
 
   neighbour.resetSequences();
 
   for (std::size_t i = 0; i < syncData_.blockPoolsCount; ++i) {
     ++sequence;
-    csreflection(csdetails) << "Need new sequence: " << sequence;
+    csmeta(csdetails) << "Need new sequence: " << sequence;
 
     // max sequence
     if (requiredBlocks.back().second != 0 && sequence > requiredBlocks.back().second) {
-      csreflection(csdetails) << "Max sequence ";
+      csmeta(csdetails) << "Max sequence ";
       break;
     }
 
     for (std::size_t j = 1; j < requiredBlocks.size(); ++j) {
       // Within a valid pair
       if (sequence > requiredBlocks[j].first && sequence < requiredBlocks[j].second) {
-        csreflection(csdetails) << "Check sequence interval: seq: " << sequence << ", Within a valid pair (" << j << "): ["
+        csmeta(csdetails) << "Check sequence interval: seq: " << sequence << ", Within a valid pair (" << j << "): ["
                   << requiredBlocks[j].first << ", " << requiredBlocks[j].second << "]";
         break;
       }
       // Between pairs
       if (sequence > requiredBlocks[j - 1].second && sequence < requiredBlocks[j].first) {
         sequence = requiredBlocks[j].first;
-        csreflection(csdetails) << "Between pairs: " << sequence;
+        csmeta(csdetails) << "Between pairs: " << sequence;
         break;
       }
     }
@@ -414,7 +414,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 }
 
 void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence) {
-  csreflection(csdetails) << sequence;
+  csmeta(csdetails) << sequence;
 
   for (auto& neighbour : neighbours_) {
     neighbour.removeSequnce(sequence);
@@ -437,7 +437,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     return;
   }
 
-  csreflection(csdetails) << "Neighbours count without ss: " << neededNeighboursCount;
+  csmeta(csdetails) << "Neighbours count without ss: " << neededNeighboursCount;
 
   const uint32_t allNeighboursCount = transport_->getNeighboursCount();
 
@@ -453,7 +453,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
         }
       }
     }
-    csreflection(csdetails) << "Neighbours saved count is: " << neighbours_.size();
+    csmeta(csdetails) << "Neighbours saved count is: " << neighbours_.size();
     return;
   }
 
@@ -476,7 +476,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     neighbours_.pop_back();
   }
 
-  csreflection(csdetails) << "Neighbours saved count is: " << neighbours_.size();
+  csmeta(csdetails) << "Neighbours saved count is: " << neighbours_.size();
   printNeighbours("Refresh:");
 }
 
