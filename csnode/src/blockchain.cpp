@@ -101,6 +101,9 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
         return false;
 
       ++current_sequence;
+#ifdef TRANSACTIONS_INDEX
+      total_transactions_count_ += pool.transactions().size();
+#endif
     }
 
     lastHash_ = getLastHash();
@@ -789,25 +792,14 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
   if (new_pool.value().transactions_count()) {
     csdb::Address addr_send, addr_recv;
     for (const auto& trx : new_pool.value().transactions()) {
-      addr_send = trx.source();
-      if (addr_send.is_wallet_id()) {
-        WalletId id = *reinterpret_cast<const WalletId*>(addr_send.to_api_addr().data());
-        if (!findAddrByWalletId(id, addr_send))
-          return;
-      }
-      addr_recv = trx.target();
-      if (addr_recv.is_wallet_id()) {
-        WalletId id = *reinterpret_cast<const WalletId*>(addr_recv.to_api_addr().data());
-        if (!findAddrByWalletId(id, addr_recv))
-          return;
-      }
+      addr_send = get_addr_by_type(trx.source(), ADDR_TYPE::PUBLIC_KEY);
+      addr_recv = get_addr_by_type(trx.target(), ADDR_TYPE::PUBLIC_KEY);
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
     }
-
-#ifdef TRANSACTIONS_INDEX
-    total_transactions_count_+= new_pool.value().transactions().size();
-#endif
+//#ifdef TRANSACTIONS_INDEX
+    //total_transactions_count_+= new_pool.value().transactions().size();
+//#endif
   }
 }
 
@@ -992,7 +984,7 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
   return addr_res;
 }
 
-bool BlockChain::is_equal(csdb::Address &laddr, csdb::Address &raddr) const {
+bool BlockChain::is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const {
   if (get_addr_by_type(laddr, ADDR_TYPE::PUBLIC_KEY) == get_addr_by_type(raddr, ADDR_TYPE::PUBLIC_KEY))
     return true;
   return false;

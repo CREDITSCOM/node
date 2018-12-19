@@ -369,11 +369,11 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
   if (!tr.is_valid())
     return res;
   const auto sci = deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>());
-  res.smartContractDeploy.byteCode = sci.smartContractDeploy.byteCode;
-  res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
-  res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
-  res.deployer = fromByteArray(s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
-  res.address = fromByteArray(s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
+  res.smartContractDeploy.byteCode    = sci.smartContractDeploy.byteCode;
+  res.smartContractDeploy.sourceCode  = sci.smartContractDeploy.sourceCode;
+  res.smartContractDeploy.hashState   = sci.smartContractDeploy.hashState;
+  res.deployer  = fromByteArray(s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
+  res.address   = fromByteArray(s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
 
 #ifdef TOKENS_CACHE
   tm.applyToInternal([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
@@ -551,10 +551,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return (*smart_state)[smart_addr];
   }();
 
-  work_queues["TransactionFlow"].wait_till_front([&](std::tuple<>) {
-    contract_state_entry.get_position();
-    return true;
-  });
+  work_queues["TransactionFlow"].yield();
+  contract_state_entry.get_position();
 
   std::string contract_state;
   if (!deploy) {
@@ -593,17 +591,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy) {
-    contract_state_entry.wait_till_front([&](std::string& state) {
-                                           return !state.empty();
-                                         });
+    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty();});
   }
   else {
 #ifndef TETRIS_NODE
     contract_state_entry.yield();
 #else
-    contract_state_entry.update_state([=](const std::string&) {
-                                        return execResp.contractState;
-                                      });
+    contract_state_entry.update_state([=](const std::string&) { return execResp.contractState;});
 #endif
   }
 

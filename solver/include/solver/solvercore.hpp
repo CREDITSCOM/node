@@ -244,10 +244,12 @@ private:
    * @return  Null if it fails, else the found stage 3.
    */
 
+public:
   cs::StageThree* find_stage3(uint8_t sender) {
     return find_stage<>(stageThreeStorage, sender);
   }
 
+private:
   const cs::StageThree* find_stage3(uint8_t sender) const {
     return find_stage<>(stageThreeStorage, sender);
   }
