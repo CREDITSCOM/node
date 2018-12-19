@@ -349,7 +349,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
-  csprint();
+  csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isSyncCompleted(round)) {
@@ -405,9 +405,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, static_cast<cs::RoundNumber>(poolMetaInfo.sequenceNumber));
-    cs::PublicKey pk;
-    std::fill(pk.begin(), pk.end(), 0);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
     if (!pool.has_value()) {
       cserror() << "NODE> " << __func__ << "(): created pool is not valid";
@@ -436,7 +434,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     }
   }
 
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 const cs::ConfidantsKeys& Node::confidants() const {
@@ -1169,7 +1167,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
 
-  csprint() << "(): Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csmeta(csdetails) << "(): Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp << std::endl
@@ -1212,11 +1210,11 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   // cache
   stageOneMessage_[myConfidantIndex_] = std::move(message);
-  csprint() << "(): done";
+  csmeta(csdetails) << "(): done";
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     csdebug() << "NODE> ignore stage-1 as no confidant";
@@ -1282,7 +1280,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     cswarning() << "Only confidant nodes can send consensus stages";
@@ -1308,11 +1306,11 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   // cash our stage two
   stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  csprint();
+  csmeta(csdetails);
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     csdebug() << "NODE> ignore stage two as no confidant";
@@ -1348,7 +1346,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
-  csprint() << "Signature is OK";
+  csmeta(csdetails) << "Signature is OK";
   stageTwoMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] is OK!";
@@ -1356,7 +1354,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1383,7 +1381,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
   // cach stage three
   stageThreeMessage_[myConfidantIndex_] = std::move(bytes);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1444,11 +1442,11 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) 
   }
 
   sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_ , myConfidantIndex_, required);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -1490,7 +1488,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 }
 
 void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1520,7 +1518,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
@@ -1529,7 +1527,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
     return;
   }
 
-  csprint() << "(): Smart starting Round = " << stageOneInfo.sRoundNum << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csmeta(csdetails) << "(): Smart starting Round = " << stageOneInfo.sRoundNum << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
   size_t expectedMessageSize = sizeof(stageOneInfo.sender)
@@ -1564,7 +1562,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
     smartStagesStorageClear();
   }
   //smartStageOneMessage_[myConfidantIndex_] = std::move(message);
-  csprint() << "(): done";
+  csmeta(csdetails) << "(): done";
 }
 
 void Node::smartStagesStorageClear()
@@ -1580,7 +1578,7 @@ void Node::smartStagesStorageClear()
 }
 
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     csdebug() << "NODE> ignore stage-1 as no confidant";
@@ -1640,7 +1638,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Pu
 }
 
 void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     cswarning() << "Only confidant nodes can send consensus stages";
@@ -1668,11 +1666,11 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
 
   // cash our stage two
   smartStageTwoMessage_[myConfidantIndex_] = std::move(bytes);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  csprint();
+  csmeta(csdetails);
 
   if ((myLevel_ != NodeLevel::Confidant) && (myLevel_ != NodeLevel::Writer)) {
     csdebug() << "NODE> ignore stage two as no confidant";
@@ -1710,7 +1708,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
     return;
   }
 
-  csprint() << "Signature is OK";
+  csmeta(csdetails) << "Signature is OK";
   smartStageTwoMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> Stage Two from [" << static_cast<int>(stage.sender) << "] is OK!";
@@ -1718,7 +1716,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Pu
 }
 
 void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1745,7 +1743,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
 
   // cach stage three
   smartStageThreeMessage_[myConfidantIndex_] = std::move(bytes);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1805,11 +1803,11 @@ void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t requi
   }
 
   sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_, myConfidantIndex_, required);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     return;
@@ -1851,7 +1849,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 }
 
 void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
-  csprint() << "started";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1881,11 +1879,11 @@ void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& 
   }
 
   sendDefault(confidant, msgType, roundNumber_, signature, message);
-  csprint() << "done";
+  csmeta(csdetails) << "done";
 }
 
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp) {
-  csprint() << " timestamp = " << timeStamp;
+  csmeta(csdetails) << " timestamp = " << timeStamp;
 
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
@@ -1902,18 +1900,17 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  cs::PublicKey pk;
-  std::fill(pk.begin(), pk.end(), 0);
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo, pk);
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
   if (!pool.has_value()) {
     cserror() << "NODE> applyCharacteristic() failed to create block";
     return;
   }
 
-  std::vector<std::vector<uint8_t>> confs;
+  std::vector<cs::Bytes> confs;
 
   for(const auto& src : roundTable.confidants) {
-    auto& tmp = confs.emplace_back(std::vector<uint8_t>(src.size()));
+    auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
     std::copy(src.cbegin(), src.cend(), tmp.begin());
   }
 
@@ -1972,7 +1969,7 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csdebug() << "\n";
-  csprint();
+  csmeta(csdetails);
 
   if (myLevel_ == NodeLevel::Writer) {
     cswarning() << "\tWriters don't need ROUNDINFO";
@@ -1986,7 +1983,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   istream_ >> confidantsCount;
 
   if (confidantsCount == 0) {
-    csprint() << "Bad confidants count in round table";
+    csmeta(csdetails) << "Bad confidants count in round table";
     return;
   }
 
@@ -2029,7 +2026,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   blockchainSync();
   reviewConveyerHashes();
 
-  csprint() << "done\n";
+  csmeta(csdetails) << "done\n";
 }
 
 void Node::sendHash(cs::RoundNumber round) {
@@ -2095,7 +2092,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
-  csprint();
+  csmeta(csdetails);
 
   istream_.init(data, size);
 
@@ -2156,7 +2153,7 @@ bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs
 }
 
 void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent) {
-  csprint();
+  csmeta(csdetails);
 
   if (myLevel_ != NodeLevel::Confidant) {
     return;
