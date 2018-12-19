@@ -878,7 +878,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if (type == MsgTypes::RoundTableRequest) {
-    return (rNum <= round ? MessageActions::Process : MessageActions::Drop);
+    return MessageActions::Process;
   }
 
   if (type == MsgTypes::RoundTableReply) {
@@ -1201,7 +1201,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cs::DataStream signStream(messageToSign);
   signStream << roundNumber_ << stageOneInfo.messageHash;
 
-  cslog() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
+  csdetails() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
@@ -1289,7 +1289,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   // TODO: fix it by logic changing
   size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
-  size_t stageBytesSize  = sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
+  size_t stageBytesSize  = sizeof(stageTwoInfo.sender)
+    + sizeof(size_t) // count of signatures
+    + sizeof(size_t) // count of hashes
+    + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount; // signature + hash items
 
   cs::Bytes bytes;
   bytes.reserve(stageBytesSize);
@@ -1397,10 +1400,10 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
 
   cs::StageThree stage;
   cs::Bytes bytes;
-  istream_ >> bytes >> stage.signature;
+  istream_  >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "NODE> Bad StageTwo packet format";
+    cserror() << "NODE> Bad stage-3 packet format";
     return;
   }
 
