@@ -262,8 +262,8 @@ void BlockChain::writeGenesisBlock() {
 
   cslog() << "Genesis block completed ... trying to save";
 
-  writeBlock(genesis);
-  postWriteBlock(genesis);
+  finalizeBlock(genesis);
+  flushBlockToDisk(genesis);
 
   //deferredBlock_ = genesis;
 
@@ -382,7 +382,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
   }
 }
 
-void BlockChain::writeBlock(csdb::Pool& pool) {
+void BlockChain::flushBlockToDisk(csdb::Pool& pool) {
   cslog() << "----------------------------- Flush block #" << pool.sequence() << " to disk ----------------------------";
   cslog() << "see block info above";
   //logBlockInfo(pool);
@@ -421,7 +421,7 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   csdebug() << " last storage size: " << getSize();
 }
 
-void BlockChain::postWriteBlock(csdb::Pool& pool) {
+void BlockChain::finalizeBlock(csdb::Pool& pool) {
 #ifdef TRANSACTIONS_INDEX
   createTransactionsIndex(pool);
 #endif
@@ -441,7 +441,6 @@ void BlockChain::postWriteBlock(csdb::Pool& pool) {
       ++idx;
     }
   }
-  // end of former writeBlock()
 
   lastHash_ = pool.hash();
   csdetails() << "BLOCKCHAIN> lastHash_ = " << lastHash_.to_string();
@@ -875,21 +874,22 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   }
 
   if (deferredBlock_.is_valid()) {
-    writeBlock(deferredBlock_);
+    flushBlockToDisk(deferredBlock_);
   }
 
   if(!pool.compose()) {
     cserror() << __func__ << " Couldn't compose block";
   }
 
-  postWriteBlock(pool);
+  // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
+  deferredBlock_ = pool;
+  finalizeBlock(pool);
 
   // log cached block
   cslog() << "----------------------------- Defer block #" << pool.sequence() << " until next round ----------------------------";
   logBlockInfo(pool);
   cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
 
-  deferredBlock_ = pool;
 
   return std::make_pair(true, deferredBlock_);
 }

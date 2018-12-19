@@ -504,8 +504,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   const auto smart_addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   const bool deploy     = is_smart_deploy(input_smart);
 
-#if 0
-
   std::string origin_bytecode;
   if (!deploy) {
     input_smart.smartContractDeploy.byteCode.clear();
@@ -541,9 +539,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       return false;
     });
   }
-#endif // 0
-  auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+
 #if 0
+  auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   executor::ExecuteByteCodeResult api_resp;
   const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
   execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
@@ -576,7 +574,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   
   solver.send_wallet_transaction(send_transaction);
 
-#if 0
   if (deploy) {
     contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty();});
   }
@@ -587,7 +584,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     contract_state_entry.update_state([=](const std::string&) { return execResp.contractState;});
 #endif
   }
-#endif // 0
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }

@@ -178,10 +178,10 @@ private:
   void createTransactionsIndex(csdb::Pool&);
 #endif
 
-  void writeBlock(csdb::Pool& pool);
+  void flushBlockToDisk(csdb::Pool& pool);
   void logBlockInfo(csdb::Pool& pool);
 
-  void postWriteBlock(csdb::Pool& pool);
+  void finalizeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
 
