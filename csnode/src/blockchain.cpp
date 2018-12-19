@@ -62,6 +62,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
   }
 
+  cslog() << "BLOCKCHAIN> max loaded block #" << getLastWrittenSequence();
   good_ = true;
 }
 

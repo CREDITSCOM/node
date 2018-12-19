@@ -226,10 +226,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
           if (!it.second.next_.is_empty())
             continue;
 
+          // already set above:
           //if (!last_hash.is_empty())
           //  return false;
-
-          // already set above
           //last_hash = it.first;
         }
         return true;
