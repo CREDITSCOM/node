@@ -158,6 +158,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   onRoundStart(global_table);
   conveyer.updateRoundTable(std::move(global_table));
 
+  poolSynchronizer_->processingSync(global_table.round, true);
+
   const auto& updated_table = conveyer.currentRoundTable();
   if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
     startConsensus();
@@ -1300,7 +1302,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
   // create signature
   cscrypto::GenerateSignature(stageTwoInfo.signature, solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  sendToConfidants(MsgTypes::SecondStage, roundNumber_, bytes, stageTwoInfo.signature);
+  sendToConfidants(MsgTypes::SecondStage, roundNumber_, stageTwoInfo.signature, bytes);
 
   // cash our stage two
   stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
@@ -1377,7 +1379,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
   cscrypto::GenerateSignature(stageThreeInfo.signature,solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, bytes, stageThreeInfo.signature);
+  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.signature, bytes);
 
   // cach stage three
   stageThreeMessage_[myConfidantIndex_] = std::move(bytes);
