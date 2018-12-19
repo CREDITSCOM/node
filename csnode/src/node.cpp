@@ -154,12 +154,10 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   // resend all this round data available
   cslog() << "NODE> resend last block hash after BigBang";
-  // update round table
-  onRoundStart(global_table);
 
-  // do almost the same as reviewConveyerHashes(), only difference is call to
-  // conveyer.updateRoundTable()
+  onRoundStart(global_table);
   conveyer.updateRoundTable(std::move(global_table));
+
   const auto& updated_table = conveyer.currentRoundTable();
   if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
     startConsensus();
@@ -167,8 +165,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   else {
     sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
   }
-
-  return;
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
@@ -386,6 +382,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   istream_ >> signature;
 
   istream_ >> poolMetaInfo.writerKey;
+  istream_ >> poolMetaInfo.previousHash;
 
   if (!istream_.good()) {
     cserror() << "NODE> " << __func__ << "(): round info parsing failed, data is corrupted";
@@ -474,6 +471,7 @@ void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMe
   ostream_ << poolMetaInfo.sequenceNumber;
   ostream_ << signature;
   ostream_ << poolMetaInfo.writerKey;
+  ostream_ << poolMetaInfo.previousHash;
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
@@ -492,6 +490,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::Poo
   lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
   lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
   lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
+  lastSentRoundData_.poolMetaInfo.previousHash = poolMetaInfo.previousHash;
   lastSentRoundData_.poolSignature = signature;
 }
 
@@ -638,8 +637,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
 
     if (pool.is_valid()) {
-      auto prev_hash = csdb::PoolHash::from_string("");
-      pool.set_previous_hash(prev_hash);
+      /*auto prev_hash = csdb::PoolHash::from_string("");
+        pool.set_previous_hash(prev_hash);*/
 
       poolsBlock.push_back(std::move(pool));
 
@@ -1901,6 +1900,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     }
     catch (...) { }
   }
+  poolMetaInfo.previousHash = getBlockChain().getLastWrittenHash();
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();

@@ -463,6 +463,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
   newPool.set_writer_public_key(std::vector<uint8_t>(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csprint() << "done";
   return std::make_optional<csdb::Pool>(std::move(newPool));
