@@ -79,8 +79,10 @@ void APIHandler::state_updater_work_function() {
   try {
     auto lasthash = s_blockchain.getLastHash();
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
-      if (!update_smart_caches_once(lasthash))
-        lasthash = s_blockchain.wait_for_block(lasthash);
+      if (!update_smart_caches_once(lasthash)) {
+        /*lasthash = */s_blockchain.wait_for_block(lasthash);
+        lasthash = s_blockchain.getLastHash();
+      }
     }
   }
   catch (std::exception& ex) {
@@ -527,17 +529,15 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const T
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-  auto input_smart      = transaction.smartContract;
+  auto input_smart = transaction.smartContract;
   auto send_transaction = make_transaction(transaction);
   const auto smart_addr = send_transaction.target();
-  const bool deploy     = is_smart_deploy(input_smart);
+  const bool deploy = is_smart_deploy(input_smart);
 
   if (!convertAddrToPublicKey(smart_addr)) {
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
-
-#if 0
 
   std::string origin_bytecode;
   if (!deploy) {
@@ -574,22 +574,22 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       return false;
     });
   }
-#endif // 0
-  
+
+#if 0
   auto pk_source = send_transaction.source();
   if (!convertAddrToPublicKey(pk_source)) {
     LOG_ERROR("Public key of wallet not found by walletId");
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
   }
 
-#if 0
+
   executor::ExecuteByteCodeResult api_resp;
   const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
   execute_byte_code(api_resp, pk_source.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
   if (api_resp.status.code) {
-    _return.status.code     = api_resp.status.code;
-    _return.status.message  = api_resp.status.message;
+    _return.status.code = api_resp.status.code;
+    _return.status.message = api_resp.status.message;
     contract_state_entry.update_state([&]() -> decltype(auto) { return std::move(contract_state); });
     return;
   }
@@ -600,6 +600,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
 #endif // 0
 
+
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
 
 #if 0
@@ -608,10 +609,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   
   solver.send_wallet_transaction(send_transaction);
 
-#if 0
   if (deploy)
     contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
-#endif // 0
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }

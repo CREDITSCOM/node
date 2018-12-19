@@ -318,10 +318,12 @@ csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) 
   std::unique_lock<decltype(dbLock_)> l(dbLock_);
   csdb::PoolHash res;
 
-  newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
+  newBlockCv_.wait(l);
+  /*newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
     res = storage_.last_hash();
-    return obsolete_block != res;
-  });
+    //return obsolete_block != res;
+    return obsolete_block == res;
+  });*/
 
   return res;
 }
