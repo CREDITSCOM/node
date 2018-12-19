@@ -82,8 +82,10 @@ void APIHandler::state_updater_work_function() {
   try {
     auto lasthash = s_blockchain.getLastHash();
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
-      if (!update_smart_caches_once(lasthash))
-        lasthash = s_blockchain.wait_for_block(lasthash);
+      if (!update_smart_caches_once(lasthash)) {
+        /*lasthash = */s_blockchain.wait_for_block(lasthash);
+        lasthash = s_blockchain.getLastHash();
+      }
     }
   }
   catch (std::exception& ex) {
@@ -497,7 +499,7 @@ void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const T
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-  auto input_smart      = transaction.smartContract;
+  auto input_smart = transaction.smartContract;
   auto send_transaction = make_transaction(transaction);
   const auto smart_addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   const bool deploy     = is_smart_deploy(input_smart);
@@ -564,6 +566,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   }
 
 #endif // 0
+
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));
 

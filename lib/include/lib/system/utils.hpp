@@ -40,13 +40,19 @@
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
 
+using namespace std::literals::string_literals;
+
 // compile time and rtti reflection in action, works only in methods.
 // if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
 #define className typeid(*this).name
-#define reflectionHelper() className() << " " << __func__ << ": "
+#define classNameString() std::string(className()) + " "s
+#define classNameStream() className() << " "
 
-#define csreflection(...) __VA_ARGS__() << reflectionHelper()
-#define csprint() csreflection(csdetails)
+#define funcName() __func__
+#define methodName() funcName()
+
+#define csreflection() className() << ", method " << methodName() << ": "
+#define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
 enum class Direction : uint8_t {

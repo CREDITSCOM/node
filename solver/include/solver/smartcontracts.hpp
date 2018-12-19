@@ -49,7 +49,7 @@ namespace cs
     namespace new_state
     {
       // new state value, new byte-code (string)
-      constexpr csdb::user_field_id_t Value = 0; // see apihandler.cpp #9 for currently used value ~1
+      constexpr csdb::user_field_id_t Value = ~1; // see apihandler.cpp #9 for currently used value ~1
       // reference to start transaction
       constexpr csdb::user_field_id_t RefStart = 1;
       // fee value
