@@ -627,6 +627,9 @@ Pool Storage::pool_remove_last() {
 
   d->db->remove(last_hash().to_binary());
 
+  --d->count_pool;
+  d->last_hash = res.previous_hash();
+
   return res;
 }
 

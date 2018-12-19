@@ -27,6 +27,8 @@ public:
 
   bool find(csdb::Pool::sequence_t seq, csdb::PoolHash& res) const;
 
+  csdb::PoolHash removeLast();
+
 private:
   std::vector<csdb::PoolHash> hashes_;
 

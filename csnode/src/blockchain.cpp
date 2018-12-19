@@ -306,6 +306,14 @@ void BlockChain::removeLastBlock() {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   auto pool = storage_.pool_remove_last();
   removeWalletsInPoolFromCache(pool);
+  auto removedHash = blockHashes_->removeLast();
+#ifdef TRANSACTIONS_INDEX
+  total_transactions_count_-= pool.transactions().size();
+#endif
+
+  if (removedHash != pool.hash()) {
+    cserror() << "Error! Last pool hash mismatch";
+  }
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -980,7 +988,7 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE 
       if (findWalletId(addr, _id))
         addr_res = csdb::Address::from_wallet_id(_id);
       break;
-  } 
+  }
   return addr_res;
 }
 

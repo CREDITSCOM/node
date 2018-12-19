@@ -134,6 +134,9 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   cswarning() << "NODE> get BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
               << ", current #" << roundNumber_;
 
+  while (getBlockChain().getLastWrittenSequence() >= rNum)
+    getBlockChain().removeLastBlock();
+
   istream_.init(data, size);
 
   cs::Hash last_block_hash;
