@@ -1,5 +1,6 @@
 #include <consensus.hpp>
 #include <solvercore.hpp>
+#include <solvercontext.hpp>
 #include <smartcontracts.hpp>
 
 #pragma warning(push)
@@ -58,8 +59,7 @@ namespace cs
       }
     }
     // TODO: redesign getting ref to persistent object
-    static cs::PublicKey empty {};
-    return empty;
+    return SolverContext::zeroKey;
   }
 
   void SolverCore::gotBigBang()

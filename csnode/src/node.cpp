@@ -308,11 +308,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   roundTable.round = rNum;
 
   // "normal" start
-  if (roundTable.round == 1) {
+  if(roundTable.round == 1) {
     cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
-      if (roundTable.round != 1) {
-        return;
-      }
       onRoundStart(roundTable);
       cs::Conveyer::instance().setRound(std::move(roundTable));
       reviewConveyerHashes();
@@ -360,11 +357,23 @@ void Node::handleRoundMismatch(const cs::RoundTable& global_table) {
     // no return, ask for next round info
   }
 
-  // broadcast request round info
-  cswarning() << "NODE> broadcast request round info";
-  sendNextRoundRequest();
+  // broadcast request round info, on the start with timeout to let transport setup connections
+  if(local_table.round == 0) {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this]() mutable {
+      if(cs::Conveyer::instance().currentRoundNumber() != 0) {
+        // not need already
+        return;
+      }
+      cswarning() << "NODE> broadcast request round info";
+      sendNextRoundRequest();
+    });
+    return;
+  }
+  else {
+    cswarning() << "NODE> broadcast request round info";
+    sendNextRoundRequest();
+  }
 
-  //// directly request from trusted
   return;
 }
 
@@ -1019,7 +1028,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   if (type == MsgTypes::RoundTableRequest) {
-    return (rNum <= round ? MessageActions::Process : MessageActions::Drop);
+    return MessageActions::Process;
   }
 
   if (type == MsgTypes::RoundTableReply) {
@@ -1573,13 +1582,13 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   }
 
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
-    cswarning() << "NODE> Stage Three from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
   stageThreeMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> Stage Three from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->gotStageThree(std::move(stage));
 }
 
@@ -1967,7 +1976,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 
   smartStageThreeMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> Stage Three from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageThree(stage, false);
 }
 
@@ -2143,11 +2152,11 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-  csdebug() << "\n";
-  csmeta(csdetails);
+  csdebug() << "\nNODE> next round table received";
+  csmeta(csdetails) << "started";
 
   if (myLevel_ == NodeLevel::Writer) {
-    cswarning() << "\tWriters don't need ROUNDINFO";
+    cserror() << "NODE> writers don't receive round table";
     return;
   }
 
@@ -2158,7 +2167,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   istream_ >> confidantsCount;
 
   if (confidantsCount == 0) {
-    csmeta(csdetails) << "Bad confidants count in round table";
+    csmeta(cserror) << "illegal confidants count in round table";
     return;
   }
 
@@ -2192,7 +2201,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
   roundTable.general = sender;
-  cslog() << "\tconfidants: " << roundTable.confidants.size();
+  csdebug() << "NODE> confidants: " << roundTable.confidants.size();
 
   cs::Conveyer::instance().setRound(std::move(roundTable));
   getCharacteristic(istream_.getCurrentPtr(), istream_.remainsBytes(), rNum, sender);

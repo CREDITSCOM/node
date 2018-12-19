@@ -2,10 +2,11 @@
 #include <states/trustedstage3state.hpp>
 
 #include <csnode/datastream.hpp>
-
-#include <cmath>
 #include <csnode/blockchain.hpp>
 #include <lib/system/utils.hpp>
+
+#include <cmath>
+#include <algorithm>
 
 namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
@@ -102,7 +103,7 @@ void TrustedStage3State::request_stages(SolverContext& context) {
     }
   }
   if(0 == cnt_requested) {
-    csdebug() << name() << ": no node ot request";
+    csdebug() << name() << ": no node to request";
   }
 }
 
@@ -122,7 +123,7 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
     }
   }
   if(0 == cnt_requested) {
-    csdebug() << name() << ": no node ot request";
+    csdebug() << name() << ": no node to request";
   }
 }
 
@@ -444,12 +445,29 @@ uint8_t TrustedStage3State::take_urgent_decision(SolverContext& context) {
   if (hash_t.empty()) {
     return 0;  // TODO: decide what to return
   }
-  int k = *(hash_t.begin());
-  // cslog() << "K : " << k;
-  int result0 = (int)context.cnt_trusted();
-  int result = 0;
-  result = k % result0;
-  return (uint8_t)result;
+  int k = *(unsigned int *)hash_t.data();
+  if(k < 0) {
+    k = -k;
+  }
+  // stage.realTrustedMask contains !0 on good nodes:
+  int cnt = (int) context.cnt_trusted();
+  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), 0);
+  int idx_writer = k % cnt_active;
+  if(cnt != cnt_active) {
+    cslog() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
+  }
+  // count idx_writer through good nodes:
+  int idx = -1;
+  for(int i = 0; i < cnt; ++i) {
+    if(stage.realTrustedMask.at(i) > 0) {
+      ++idx;
+      if(idx == idx_writer) {
+        return static_cast<uint8_t>(i);
+      }
+    }
+  }
+  // how can we reach this? no way but...
+  return static_cast<uint8_t>(idx_writer);
 }
 
 }  // namespace slv2
