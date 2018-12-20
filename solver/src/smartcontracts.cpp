@@ -15,7 +15,7 @@ namespace cs
   {
   public:
 
-    static void init(Node::api_handler_ptr_t api)
+    static void init(csconnector::connector::ApiHandlerPtr api)
     {
       papi = api;
     }
@@ -24,11 +24,11 @@ namespace cs
 
   private:
 
-    static Node::api_handler_ptr_t papi;
+    static csconnector::connector::ApiHandlerPtr papi;
   };
 
   /*static*/
-  Node::api_handler_ptr_t SmartContractsExecutor::papi;
+  csconnector::connector::ApiHandlerPtr SmartContractsExecutor::papi;
 
   /*static*/
   bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
@@ -107,7 +107,7 @@ namespace cs
 
   SmartContracts::~SmartContracts() = default;
 
-  void SmartContracts::init(const cs::PublicKey& id, Node::api_handler_ptr_t api)
+  void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
   {
     node_id.resize(id.size());
     std::copy(id.cbegin(), id.cend(), node_id.begin());

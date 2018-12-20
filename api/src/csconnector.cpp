@@ -75,4 +75,8 @@ connector::~connector() {
   }
 #endif
 }
+
+connector::ApiHandlerPtr connector::apiHandler() const {
+  return api_handler;
+}
 }  // namespace csconnector
