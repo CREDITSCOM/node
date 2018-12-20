@@ -89,5 +89,5 @@ endif()
 target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/blake2/ref
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/blake2/sse
 	${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libsodium/src/libsodium/include)
