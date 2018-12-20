@@ -35,7 +35,7 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
-, blockChain_(config.getPathToDB().c_str(), genesisAddress_, startAddress_)
+, blockChain_(config.getPathToDB(), genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 ,
 #ifdef NODE_API

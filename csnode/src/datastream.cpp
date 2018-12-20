@@ -31,6 +31,13 @@ cs::DataStream::DataStream(cs::Bytes& storage)
 }
 
 boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
+   boost::asio::ip::udp::endpoint point;
+
+  if (!isAvailable(sizeof(char))) {
+    badState();
+    return point;
+  }
+
   char flags = *(data_ + index_);
   char v6 = flags & 1;
   char addressFlag = (flags >> 1) & 1;
@@ -48,7 +55,11 @@ boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
     size += sizeof(uint16_t);
   }
 
-  boost::asio::ip::udp::endpoint point;
+  if (!isAvailable(size)) {
+    badState();
+    return point;
+  }
+
   boost::asio::ip::address address;
   uint16_t port = 0;
 
@@ -70,11 +81,11 @@ boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
 }
 
 bool cs::DataStream::isValid() const {
-  if (index_ > dataSize_) { //tmp until Arew review
+  if (index_ > dataSize_) {
     return false;
   }
 
-  return true;
+  return state_;
 }
 
 bool cs::DataStream::isAvailable(std::size_t size) {
@@ -141,6 +152,7 @@ cs::Bytes cs::DataStream::byteVector() {
   cs::Bytes result;
 
   if (!isAvailable(sizeof(std::size_t))) {
+    badState();
     return result;
   }
 
@@ -150,6 +162,9 @@ cs::Bytes cs::DataStream::byteVector() {
   if (isAvailable(size)) {
     result = cs::Bytes(data_ + index_, data_ +index_ + size);
     index_ += size;
+  }
+  else {
+    badState();
   }
 
   return result;
@@ -166,6 +181,7 @@ std::string cs::DataStream::string() {
   std::string result;
 
   if (!isAvailable(sizeof(std::size_t))) {
+    badState();
     return result;
   }
 
@@ -175,6 +191,9 @@ std::string cs::DataStream::string() {
   if (isAvailable(size)) {
     result = std::string(data_ + index_ , data_ + index_ + size);
     index_ += size;
+  }
+  else {
+    badState();
   }
 
   return result;
@@ -241,6 +260,9 @@ cs::BytesView cs::DataStream::bytesView() {
   if (isAvailable(size)) {
     bytesView = cs::BytesView(reinterpret_cast<cs::Byte*>(data_), size);
     index_ += size;
+  }
+  else {
+    badState();
   }
 
   return bytesView;
