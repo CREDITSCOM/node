@@ -522,6 +522,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     csdebug() << "TRANSPORT> Ignore myself packs";
     return;
   }
+  if(type == MsgTypes::ThirdSmartStage) cslog() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
 
   // packets which transport may cut
   switch (type) {

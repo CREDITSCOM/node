@@ -13,7 +13,7 @@
 #include <optional>
 #include <vector>
 
-#define DEBUG_SMARTS
+//#define DEBUG_SMARTS
 
 class BlockChain;
 

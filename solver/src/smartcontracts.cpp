@@ -45,8 +45,8 @@ namespace cs
     // partial return result init:
     csdb::Transaction result(
       start_tr.innerID() + 1, // TODO: possible conflict with innerIDs!
-      start_tr.target(), // contracts' key
-      start_tr.target(), // contracts' key
+      start_tr.target(), // contracts' key - source
+      start_tr.target(), // contracts' key - target
       start_tr.currency(),
       0, // amount*/
       start_tr.max_fee(), // TODO:: how to calculate max fee?
@@ -191,7 +191,11 @@ namespace cs
     if(!tr.is_valid()) {
       return false;
     }
+    // to contain smart contract trx must contain either FLD"0" or FLD"-2":
     csdb::UserField f = tr.user_field(trx_uf::deploy::Code);
+    if (!f.is_valid()) {
+      f = tr.user_field(trx_uf::new_state::Value);
+    }
     return f.is_valid() && f.type() == csdb::UserField::Type::String;
   }
 

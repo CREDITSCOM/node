@@ -227,6 +227,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
       return;
     }
     cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+    currentSmartTransaction_ = transaction;
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);
@@ -271,11 +272,10 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartStageTwoStorage_.resize(cSize);
     smartStageThreeStorage_.clear();
     smartStageThreeStorage_.resize(cSize);
-    uint8_t undefinedSender = 255;
     for (int i = 0; i < cSize; ++i) {
-      smartStageOneStorage_.at(i).sender = undefinedSender;
-      smartStageTwoStorage_.at(i).sender = undefinedSender;
-      smartStageThreeStorage_.at(i).sender = undefinedSender;
+      smartStageOneStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
+      smartStageTwoStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
+      smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
     }
     memset(&st1,0,sizeof(st1));
     st2.signatures.clear();
@@ -284,9 +284,9 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     st2.hashes.resize(cSize);
     st3.realTrustedMask.clear();
     st3.realTrustedMask.resize(cSize);
-    st2.sender = undefinedSender;
-    st3.sender = undefinedSender;
-    st3.writer = undefinedSender;
+    st2.sender = cs::ConfidantConsts::InvalidConfidant;
+    st3.sender = cs::ConfidantConsts::InvalidConfidant;
+    st3.writer = cs::ConfidantConsts::InvalidConfidant;
     st2.sRoundNum = 0;
     st3.sRoundNum = 0;
     memset(st3.signature.data(),0,st3.signature.size());
@@ -335,7 +335,9 @@ void SolverCore::processStages() {
 }
 
   void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
+  cslog() << __func__;
     if (send) {
+      cslog() << "____ 1.";
       stage.sender = ownSmartsConfNum_;
       stage.sRoundNum = smartRoundNumber_;
       pnode->sendSmartStageThree(stage);
@@ -346,8 +348,19 @@ void SolverCore::processStages() {
     smartStageThreeStorage_.at(stage.sender) = stage;
     cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStageThreeStorage_.size();
     if (smartStageThreeEnough()) {
-      processStages();
+      createFinalTransactionSet();
     }
+  }
+
+  void SolverCore::createFinalTransactionSet() {
+    cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
+    if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
+      //currentSmartTransaction_.signature = 
+      cs::Conveyer::instance().addTransaction(currentSmartTransaction_);
+      cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
+      return;
+    }
+    cslog() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
   bool SolverCore::smartStageOneEnough() {
@@ -381,7 +394,7 @@ void SolverCore::processStages() {
       if (it.sender == i) ++stageSize;
       ++i;
     }
-    size_t cSize = smartConfidants_.size();
+    size_t cSize = smartConfidants_.size() / 2 +1;
     cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }

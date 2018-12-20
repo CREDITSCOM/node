@@ -160,7 +160,15 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+      cs::Byte byte;
+      if(transaction.user_field_ids().size() != 3) {
+        byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+      }
+      else {
+        //TODO: implement appropriate validation of smart-state transactions 
+        byte = static_cast<cs::Byte>(true);
+      }
+
 
       if (byte) {
         if (SmartContracts::is_smart_contract(transaction)) {
@@ -183,7 +191,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
       }
       else {
-        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
+        //csdebug() 
+        cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
       characteristicMask.push_back(byte);
@@ -220,16 +229,21 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
 bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
+  if(transaction.user_field_ids().size() != 3) {
+    if (transaction.source().is_wallet_id()) {
+      context.blockchain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
 
-  if (transaction.source().is_wallet_id()) {
-    context.blockchain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+      csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
+                                            data_to_fetch_pulic_key.address_.end());
+      return transaction.verify_signature(byte_array);
+    }
 
-    csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
-                                          data_to_fetch_pulic_key.address_.end());
-    return transaction.verify_signature(byte_array);
+    return transaction.verify_signature(transaction.source().public_key());
   }
-
-  return transaction.verify_signature(transaction.source().public_key());
+  else {
+    //TODO: add here code for validating the smart contract transaction 
+    return true;
+  }
 }
 
 }  // namespace slv2
