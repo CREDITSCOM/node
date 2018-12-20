@@ -451,7 +451,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   }
   // stage.realTrustedMask contains !0 on good nodes:
   int cnt = (int) context.cnt_trusted();
-  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidant);
+  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
   int idx_writer = k % cnt_active;
   if(cnt != cnt_active) {
     cslog() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
@@ -464,7 +464,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   int c = 0;
   for (int i = idx_writer; i < cnt + idx_writer; ++i) {
     c = i % cnt;
-    if (stage.realTrustedMask.at(c) != InvalidConfidant) {
+    if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
       stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
       if (i == idx_writer) {
         stage.writer = static_cast<uint8_t>(c);

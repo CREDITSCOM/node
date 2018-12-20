@@ -10,7 +10,7 @@ void WaitingState::on(SolverContext &context) {
   const auto ptr = context.stage3((uint8_t)context.own_conf_number());
   writingQueueNumber_ = ptr->realTrustedMask.at(ptr->sender);  
   //(int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer)) % (int)context.cnt_trusted();
-  if (writingQueueNumber_ == InvalidConfidant) {
+  if (writingQueueNumber_ == InvalidConfidantIndex) {
     return;
   }
   std::ostringstream os;

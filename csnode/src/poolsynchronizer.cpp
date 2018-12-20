@@ -53,7 +53,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     return;
   }
 
-  csmeta(csdetails);
+  csmeta(csdetails) << "started";
 
   if (isSyncroStarted_ && roundNum > 0) {
     --roundNum;
