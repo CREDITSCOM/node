@@ -204,42 +204,17 @@ void BlockChain::writeGenesisBlock() {
   csdb::Transaction transaction;
   std::vector<unsigned char> vchRet;
 
-  transaction.set_target(startAddress_);
-  transaction.set_source(genesisAddress_);
-
-  transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100'000'000, 0));
-  transaction.set_max_fee(csdb::AmountCommission(0.0));
-  transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_innerID(0);
-
-  genesis.add_transaction(transaction);
-
-  csdb::Address test_address;
   std::string str_addr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
   std::vector<uint8_t> pub_key;
   DecodeBase58(str_addr, pub_key);
-  test_address = csdb::Address::from_public_key(pub_key);
+  csdb::Address test_address = csdb::Address::from_public_key(pub_key);
   transaction.set_target(test_address);
   transaction.set_source(genesisAddress_);
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100'000'000, 0));
+  transaction.set_amount(csdb::Amount(249'471'071, 0));
   transaction.set_max_fee(csdb::AmountCommission(0.0));
   transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_innerID(2);
-
-  genesis.add_transaction(transaction);
-
-  str_addr = "GWe8WZYLBxAqsfPZgejnysXQm5Q697VSsyr3x59RvYBf";
-  DecodeBase58(str_addr, pub_key);
-  test_address = csdb::Address::from_public_key(pub_key);
-  transaction.set_target(test_address);
-  transaction.set_source(genesisAddress_);
-  transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(100'000'000, 0));
-  transaction.set_max_fee(csdb::AmountCommission(0.0));
-  transaction.set_counted_fee(csdb::AmountCommission(0.0));
-  transaction.set_innerID(3);
+  transaction.set_innerID(0);
 
   genesis.add_transaction(transaction);
 
