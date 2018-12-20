@@ -165,8 +165,11 @@ cs::Sequence BlockChain::getLastWrittenSequence() const {
 const std::string CHEAT_FILENAME = "__integr.seq";
 
 std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
-  if (path.size() && path.back() != '/') path.push_back('/');
-  path+= CHEAT_FILENAME;
+  if (path.size() && path.back() != '/') {
+    path.push_back('/');
+  }
+
+  path += CHEAT_FILENAME;
 
   std::array<cscrypto::Byte, cscrypto::kHashSize + sizeof(NODE_VERSION)> data;
 
@@ -202,7 +205,6 @@ void BlockChain::writeGenesisBlock() {
 
   csdb::Pool genesis;
   csdb::Transaction transaction;
-  std::vector<unsigned char> vchRet;
 
   std::string str_addr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
   std::vector<uint8_t> pub_key;
@@ -226,8 +228,6 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis);
   flushBlockToDisk(genesis);
-
-  //deferredBlock_ = genesis;
 
   cslog() << genesis.hash().to_string();
 
@@ -332,6 +332,7 @@ void BlockChain::removeLastBlock() {
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
+  csunused(obsolete_block);
   std::unique_lock<decltype(dbLock_)> l(dbLock_);
   csdb::PoolHash res;
 
@@ -366,17 +367,24 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 
 void BlockChain::flushBlockToDisk(csdb::Pool& pool) {
   cslog() << "----------------------------- Flush block #" << pool.sequence() << " to disk ----------------------------";
-  cslog() << "see block info above";
-  //logBlockInfo(pool);
+
+  if (pool.sequence() > 0) {
+    cslog() << "see block info above";
+  }
+  else {
+    logBlockInfo(pool);
+  }
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
     pool.set_storage(storage_);
   }
+
   if(!pool.save()) {
-    cserror() << "Couldn't save block";
+    csmeta(cserror) << "Couldn't save block: " << pool.sequence();
     return;
   }
+
   emit writeBlockEvent(pool.sequence());
 
   {
@@ -404,12 +412,17 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
 }
 
 void BlockChain::finalizeBlock(csdb::Pool& pool) {
+  if(!pool.compose()) {
+    csmeta(cserror) << "Couldn't compose block: " << pool.sequence();
+    return;
+  }
+
 #ifdef TRANSACTIONS_INDEX
   createTransactionsIndex(pool);
 #endif
 
   if(!updateFromNextBlock(pool)) {
-    cserror() << "BLOCKCHAIN> error in updateFromNextBlock()";
+    csmeta(cserror) << "Error in updateFromNextBlock()";
   }
 
   // inspect transactions against smart contracts, raise special event on every item found:
@@ -857,10 +870,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   if (deferredBlock_.is_valid()) {
     flushBlockToDisk(deferredBlock_);
-  }
-
-  if(!pool.compose()) {
-    cserror() << __func__ << " Couldn't compose block";
   }
 
   // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
