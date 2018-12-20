@@ -73,8 +73,8 @@ enum SolverConsts : uint32_t {
 };
 
 enum ConfidantConsts : uint8_t {
-  FirstWriter = std::numeric_limits<uint8_t>::min(),
-  InvalidConfidant = std::numeric_limits<uint8_t>::max(),
+  FirstWriterIndex = std::numeric_limits<uint8_t>::min(),
+  InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
 };
 
 // all info about round
@@ -87,7 +87,7 @@ struct RoundTable {
   PublicKey general;
   ConfidantsKeys confidants;
   PacketsHashes hashes;
-  Characteristic charBytes;
+  Characteristic characteristic;
 };
 
 struct PoolMetaInfo {

@@ -1166,12 +1166,21 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
 }
 
 ////////new
-std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& addr, bool& present)
+{
   decltype(auto) smart_origin = lockedReference(this->smart_origin);
 
   auto it = smart_origin->find(addr);
-  if ((present = (it != smart_origin->end())))
-    return fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
+  if((present = (it != smart_origin->end())))
+    return fetch_smart(s_blockchain.loadTransaction(it->second));
+  return api::SmartContractInvocation {};
+}
+
+std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+  auto invocation = getSmartContract(addr, present);
+  if(present) {
+    return invocation.smartContractDeploy.byteCode;
+  }
 
   return std::string();
 }

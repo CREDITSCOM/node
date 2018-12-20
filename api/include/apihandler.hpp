@@ -126,6 +126,7 @@ public:
   ////////new
   void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
   ////////new
+  api::SmartContractInvocation getSmartContract(const csdb::Address&, bool&);
   std::string getSmartByteCode(const csdb::Address&, bool&);
   void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
   void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;

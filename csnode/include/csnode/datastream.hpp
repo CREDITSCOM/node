@@ -81,6 +81,7 @@ public:
   template <typename T>
   inline T streamField() {
     if (!isAvailable(sizeof(T))) {
+      badState();
       return T();
     }
 
@@ -117,6 +118,7 @@ public:
     std::array<char, size> array = {0};
 
     if (!isAvailable(size)) {
+      badState();
       return array;
     }
 
@@ -164,6 +166,7 @@ public:
     ByteArray<size> result = {0};
 
     if (!isAvailable(size)) {
+      badState();
       return result;
     }
 
@@ -198,6 +201,7 @@ public:
     FixedString<size> str;
 
     if (!isAvailable(size)) {
+      badState();
       return str;
     }
 
@@ -232,6 +236,7 @@ public:
   template <std::size_t size>
   inline void skip() {
     if (!isAvailable(size)) {
+      badState();
       return;
     }
 
@@ -348,12 +353,17 @@ private:
 
   std::size_t index_ = 0;
   std::size_t dataSize_ = 0;
+  bool state_ = true;
 
   cs::Bytes* bytes_ = nullptr;
 
   // creates template address
   template <typename T>
   T createAddress();
+
+  inline void badState() {
+    state_ = false;
+  }
 
   inline void insertBytes(const char* data, std::size_t index) {
     if (bytes_) {

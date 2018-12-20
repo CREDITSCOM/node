@@ -273,9 +273,9 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartStageThreeStorage_.clear();
     smartStageThreeStorage_.resize(cSize);
     for (int i = 0; i < cSize; ++i) {
-      smartStageOneStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
-      smartStageTwoStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
-      smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidant;
+      smartStageOneStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
+      smartStageTwoStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
+      smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
     }
     memset(&st1,0,sizeof(st1));
     st2.signatures.clear();
@@ -284,9 +284,9 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     st2.hashes.resize(cSize);
     st3.realTrustedMask.clear();
     st3.realTrustedMask.resize(cSize);
-    st2.sender = cs::ConfidantConsts::InvalidConfidant;
-    st3.sender = cs::ConfidantConsts::InvalidConfidant;
-    st3.writer = cs::ConfidantConsts::InvalidConfidant;
+    st2.sender = cs::ConfidantConsts::InvalidConfidantIndex;
+    st3.sender = cs::ConfidantConsts::InvalidConfidantIndex;
+    st3.writer = cs::ConfidantConsts::InvalidConfidantIndex;
     st2.sRoundNum = 0;
     st3.sRoundNum = 0;
     memset(st3.signature.data(),0,st3.signature.size());
