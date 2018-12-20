@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.10)
 
 project (cscrypto)
 
@@ -10,7 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(libsodium_dir ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libsodium/)
 
 if(WIN32)
-  set(libsodium_patch ${libsodium_dir}/../patches/msvs141_retargeting.patch)
+  if(${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION} MATCHES 10.0.17763.0)
+    set(libsodium_patch ${libsodium_dir}/../patches/msvs141_retargeting17763.patch)
+  else()
+    set(libsodium_patch ${libsodium_dir}/../patches/msvs141_retargeting17134.patch)
+  endif()
   execute_process(COMMAND git apply ${libsodium_patch}
                   WORKING_DIRECTORY ${libsodium_dir})
 				  
