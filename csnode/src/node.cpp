@@ -138,32 +138,34 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   istream_.init(data, size);
 
-  cs::Hash last_block_hash;
-  istream_ >> last_block_hash;
+  cs::Hash lastBlockHash;
+  istream_ >> lastBlockHash;
 
-  cs::RoundTable global_table;
-  global_table.round = rNum;
+  cs::RoundTable globalTable;
+  globalTable.round = rNum;
 
-  if (!readRoundData(global_table)) {
-    cserror() << "NODE> read round data from SS failed";
+  if (!readRoundData(globalTable)) {
+    cserror() << className() << " read round data from SS failed";
     return;
   }
 
-  while (getBlockChain().getLastWrittenSequence() >= rNum)
-    getBlockChain().removeLastBlock();
+  while (blockChain_.getLastWrittenSequence() >= rNum) {
+    blockChain_.removeLastBlock();
+  }
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   // resend all this round data available
   cslog() << "NODE> resend last block hash after BigBang";
 
-  onRoundStart(global_table);
-  conveyer.updateRoundTable(std::move(global_table));
+  onRoundStart(globalTable);
+  conveyer.updateRoundTable(std::move(globalTable));
 
-  poolSynchronizer_->processingSync(global_table.round, true);
+  poolSynchronizer_->processingSync(globalTable.round, true);
 
-  const auto& updated_table = conveyer.currentRoundTable();
-  if (updated_table.hashes.empty() || conveyer.isSyncCompleted()) {
+  const auto& updatedTable = conveyer.currentRoundTable();
+
+  if (updatedTable.hashes.empty() || conveyer.isSyncCompleted()) {
     startConsensus();
   }
   else {
@@ -185,7 +187,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   roundTable.round = rNum;
 
   // "normal" start
-  if(roundTable.round == 1) {
+  if (roundTable.round == 1) {
     cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
       onRoundStart(roundTable);
       cs::Conveyer::instance().setRound(std::move(roundTable));
@@ -1559,7 +1561,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 }
 
 void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1646,7 +1648,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     smartStageTemporary_.emplace_back(st);
   }
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     csdebug() << "NODE> ignore smartStage-1 as no confidant";
     return;
   }
@@ -1703,7 +1705,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1733,7 +1735,7 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
 void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csmeta(csdetails);
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     csdebug() << "NODE> ignore SmartStage two as no confidant";
     return;
   }
@@ -1786,7 +1788,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1815,7 +1817,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   csmeta(csdetails) << "started";
   csunused(sender);
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     csdebug() << "NODE> ignore SmartStage-3 as no confidant";
     return;
   }
@@ -1860,7 +1862,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 }
 
 void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) {
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1878,7 +1880,7 @@ void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t requi
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1921,7 +1923,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
