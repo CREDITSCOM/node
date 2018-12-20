@@ -13,7 +13,7 @@
 #include <optional>
 #include <vector>
 
-#define DEBUG_SMARTS
+//#define DEBUG_SMARTS
 
 class BlockChain;
 
@@ -122,7 +122,7 @@ namespace cs
 
     ~SmartContracts();
 
-    void init(const cs::PublicKey&, Node::api_handler_ptr_t);
+    void init(const cs::PublicKey&, csconnector::connector::ApiHandlerPtr);
 
     // test transaction methods
 

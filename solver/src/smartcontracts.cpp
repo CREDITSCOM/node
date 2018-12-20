@@ -15,7 +15,7 @@ namespace cs
   {
   public:
 
-    static void init(Node::api_handler_ptr_t api)
+    static void init(csconnector::connector::ApiHandlerPtr api)
     {
       papi = api;
     }
@@ -24,11 +24,11 @@ namespace cs
 
   private:
 
-    static Node::api_handler_ptr_t papi;
+    static csconnector::connector::ApiHandlerPtr papi;
   };
 
   /*static*/
-  Node::api_handler_ptr_t SmartContractsExecutor::papi;
+  csconnector::connector::ApiHandlerPtr SmartContractsExecutor::papi;
 
   /*static*/
   bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
@@ -45,8 +45,8 @@ namespace cs
     // partial return result init:
     csdb::Transaction result(
       start_tr.innerID() + 1, // TODO: possible conflict with innerIDs!
-      start_tr.target(), // contracts' key
-      start_tr.target(), // contracts' key
+      start_tr.target(), // contracts' key - source
+      start_tr.target(), // contracts' key - target
       start_tr.currency(),
       0, // amount*/
       start_tr.max_fee(), // TODO:: how to calculate max fee?
@@ -107,7 +107,7 @@ namespace cs
 
   SmartContracts::~SmartContracts() = default;
 
-  void SmartContracts::init(const cs::PublicKey& id, Node::api_handler_ptr_t api)
+  void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
   {
     node_id.resize(id.size());
     std::copy(id.cbegin(), id.cend(), node_id.begin());
@@ -191,7 +191,11 @@ namespace cs
     if(!tr.is_valid()) {
       return false;
     }
+    // to contain smart contract trx must contain either FLD"0" or FLD"-2":
     csdb::UserField f = tr.user_field(trx_uf::deploy::Code);
+    if (!f.is_valid()) {
+      f = tr.user_field(trx_uf::new_state::Value);
+    }
     return f.is_valid() && f.type() == csdb::UserField::Type::String;
   }
 

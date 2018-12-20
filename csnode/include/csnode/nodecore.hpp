@@ -72,6 +72,11 @@ enum SolverConsts : uint32_t {
   MaxPacketTransactions = 500,
 };
 
+enum ConfidantConsts : uint8_t {
+  FirstWriter = std::numeric_limits<uint8_t>::min(),
+  InvalidConfidant = std::numeric_limits<uint8_t>::max(),
+};
+
 // all info about round
 struct Characteristic {
   cs::Bytes mask;

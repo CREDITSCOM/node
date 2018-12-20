@@ -1559,7 +1559,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 }
 
 void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1607,25 +1607,26 @@ void Node::smartStagesStorageClear(size_t cSize)
   smartStageTwoMessage_.resize(cSize);
   smartStageThreeMessage_.clear();
   smartStageThreeMessage_.resize(cSize);
-  csmeta(csdetails) << "          SmartStagesStorage prepared";
-  for (int i = 0; i<smartStageTemporary_.size(); ++i) {
+  csmeta(csdetails) << "          SmartStagesStorage prepared, martStageTemporary_.size() = " << smartStageTemporary_.size();
+  for (int i = 0; i<smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
     if (it.msgRoundNum == solver_->smartRoundNumber()) {
       switch(it.msgType) {
         case (MsgTypes::FirstSmartStage):
-          getSmartStageOne(it.msgData.data(),it.msgData.size(),it.msgRoundNum, it.msgSender);
+          getSmartStageOne((uint8_t*)it.msgData.c_str(),it.msgData.size(),it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::SecondSmartStage):
-          getSmartStageTwo(it.msgData.data(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageTwo((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::ThirdSmartStage):
-          getSmartStageThree(it.msgData.data(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageThree((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         default: break;
       }
-      smartStageTemporary_.erase(smartStageTemporary_.begin() + i);
     }
   }
+  smartStageTemporary_.clear();
+
 }
 
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -1633,19 +1634,23 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   if (rNum != solver_->smartRoundNumber()) {
     cs::Stage st;
     st.msgType = MsgTypes::FirstSmartStage;
-    cs::DataStream stageStream(data,size);
-    stageStream >> st.msgData;
+    //std::copy(data, data+size, st.msgData.data());
+    st.msgData = std::string(cs::numeric_cast<const char*>((void*)data), size);
+    //TODO: replace this parcing with the propriate one
+    //stageStream >> st.msgData;
     st.msgRoundNum = rNum;
     st.msgSender = sender;
-    smartStageTemporary_.emplace_back(st);
+    cslog() << "Get SmartStageOne Message(saving): " << cs::Utils::byteStreamToHex(data,size);
+    cslog() << "Get SmartStageOne Message(saved) : " << cs::Utils::byteStreamToHex(st.msgData.data(), st.msgData.size());
     cslog() << "Stage stored in smartStageTemporary - won't be used until the correct SmartsRoundNumber comes";
+    smartStageTemporary_.emplace_back(st);
   }
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     csdebug() << "NODE> ignore smartStage-1 as no confidant";
     return;
   }
-
+  cslog() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
   csunused(sender);
 
   istream_.init(data, size);
@@ -1656,7 +1661,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   istream_ >>  stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageOne packet format";
+    cserror() << "Bad Smart Stage One packet format";
     return;
   }
 
@@ -1698,7 +1703,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1706,13 +1711,12 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   // TODO: fix it by logic changing
 
   size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
-  size_t stageBytesSize = sizeof(cs::Sequence) + sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
+  size_t stageBytesSize = sizeof(stageTwoInfo.sender) + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;
 
   cs::Bytes bytes;
   bytes.reserve(stageBytesSize);
 
   cs::DataStream stream(bytes);
-  stream << stageTwoInfo.sRoundNum;
   stream << stageTwoInfo.sender;
   stream << stageTwoInfo.signatures;
   stream << stageTwoInfo.hashes;
@@ -1726,10 +1730,10 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   csmeta(csdetails) << "done";
 }
 
-void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber /*rNum*/, const cs::PublicKey& sender) {
+void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csmeta(csdetails);
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     csdebug() << "NODE> ignore SmartStage two as no confidant";
     return;
   }
@@ -1737,6 +1741,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   csdebug() << "NODE> Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   istream_.init(data, size);
   cs::StageTwoSmarts stage;
+  stage.sRoundNum = rNum;
   cs::Bytes bytes;
   istream_ >> stage.signature;
   istream_ >> bytes;
@@ -1747,7 +1752,6 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   }
 
   cs::DataStream stream(bytes.data(), bytes.size());
-  stream >> stage.sRoundNum;
   stream >> stage.sender;
   stream >> stage.signatures;
   stream >> stage.hashes;
@@ -1782,7 +1786,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1795,43 +1799,44 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   bytes.reserve(stageSize);
 
   cs::DataStream stream(bytes);
-  stream << stageThreeInfo.sRoundNum;
   stream << stageThreeInfo.sender;
   stream << stageThreeInfo.writer;
   stream << stageThreeInfo.realTrustedMask;
 
   cscrypto::GenerateSignature(stageThreeInfo.signature, solver_->getPrivateKey(), bytes.data(), bytes.size());
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, roundNumber_, stageThreeInfo.signature, bytes);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
   
   // cach stage three
   smartStageThreeMessage_[myConfidantIndex_] = std::move(bytes);
   csmeta(csdetails) << "done";
 }
 
-void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber /*rNum*/, const cs::PublicKey& sender) {
-  csdetails() << "NODE> " << __func__ << "()";
+void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+  csmeta(csdetails) << "started";
   csunused(sender);
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     csdebug() << "NODE> ignore SmartStage-3 as no confidant";
     return;
   }
 
   istream_.init(data, size);
 
+  cs::StageThreeSmarts stage;
   cs::Bytes bytes;
+  istream_ >> stage.signature;
   istream_ >> bytes;
 
-  cs::StageThreeSmarts stage;
-  istream_ >> stage.signature;
+ 
+  stage.sRoundNum = rNum;
+
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "NODE> Bad StageTwo packet format";
+    cserror() << "NODE> Bad Smart Stage Three packet format";
     return;
   }
 
   cs::DataStream stream(bytes.data(), bytes.size());
-  stream >> stage.sRoundNum;
   stream >> stage.sender;
   stream >> stage.writer;
   stream >> stage.realTrustedMask;
@@ -1855,7 +1860,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 }
 
 void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) {
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1873,7 +1878,7 @@ void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t requi
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1916,7 +1921,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csmeta(csdetails) << "started";
 
-  if (solver_->ownSmartsConfidantNumber() == 255) {
+  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidant) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }

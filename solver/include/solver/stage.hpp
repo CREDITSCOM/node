@@ -65,7 +65,7 @@ struct StageThreeSmarts {
 
 struct Stage{
   uint8_t msgType;
-  cs::Bytes msgData;
+  std::string msgData;
   cs::RoundNumber msgRoundNum;
   cs::PublicKey msgSender;
 };

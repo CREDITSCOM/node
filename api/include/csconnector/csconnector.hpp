@@ -17,7 +17,7 @@
 #pragma warning(pop)
 #endif
 
-#include <solver/solvercore.hpp>
+#include <solvercore.hpp>
 
 #include <client/params.hpp>
 
@@ -33,14 +33,19 @@ struct Config {
 
 class connector {
 public:
+  using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
+
   explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
   ~connector();
 
   connector(const connector&) = delete;
   connector& operator=(const connector&) = delete;
 
+  // interface
+  ApiHandlerPtr apiHandler() const;
+
 private:
-  ::apache::thrift::stdcxx::shared_ptr<api::APIHandler> api_handler;
+  ApiHandlerPtr api_handler;
   ::api::custom::APIProcessor api_processor;
   ::apache::thrift::stdcxx::shared_ptr<api::SequentialProcessorFactory> p_api_processor_factory;
 #ifdef BINARY_TCP_API
@@ -52,7 +57,6 @@ private:
   std::thread ajax_thread;
 #endif
   friend class ::api::custom::APIProcessor;
-  friend class Node; // wants access to api_handler
 };
 }  // namespace csconnector
 

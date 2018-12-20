@@ -96,7 +96,7 @@ Transaction::Transaction(int64_t innerID, Address source, Address target, Curren
 bool Transaction::is_valid() const noexcept {
   const priv* data = d.constData();
   return data->source_.is_valid() && data->target_.is_valid() && data->currency_.is_valid() && (data->amount_ >= 0_c) &&
-         (data->source_ != data->target_);
+         (data->source_ != data->target_ || data->user_fields_.size() == 3); // user_fields_count == 3 from the smartcontracts.hpp
 }
 
 bool Transaction::is_read_only() const noexcept {

@@ -103,6 +103,7 @@ public:
   cs::Sequence smartRoundNumber();
   uint8_t calculateSmartsConfNum();
   uint8_t ownSmartsConfidantNumber();
+  void createFinalTransactionSet();
 
   std::vector<cs::PublicKey> smartConfidants();
 
@@ -283,7 +284,7 @@ private:
   std::vector<cs::PublicKey> smartConfidants_;
   uint8_t ownSmartsConfNum_ = 255;
   cs::Sequence smartRoundNumber_;
-
+  csdb::Transaction currentSmartTransaction_;
   cs::StageOneSmarts st1;
   cs::StageTwoSmarts st2;
   cs::StageThreeSmarts st3;

@@ -8,8 +8,11 @@ namespace cs {
 void WaitingState::on(SolverContext &context) {
   // TODO:: calculate my queue number starting from writing node:
   const auto ptr = context.stage3((uint8_t)context.own_conf_number());
-  writingQueueNumber_ = (int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer)) %
-                      (int)context.cnt_trusted();
+  writingQueueNumber_ = ptr->realTrustedMask.at(ptr->sender);  
+  //(int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer)) % (int)context.cnt_trusted();
+  if (writingQueueNumber_ == InvalidConfidant) {
+    return;
+  }
   std::ostringstream os;
   os << prefix_ << "-" << (size_t)writingQueueNumber_;
   myName_ = os.str();
