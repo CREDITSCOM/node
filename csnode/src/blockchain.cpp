@@ -343,21 +343,30 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
+
+  csdb::Pool pool {};
+
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  auto pool = storage_.pool_remove_last();
+  if(deferredBlock_.is_valid()) {
+    pool = deferredBlock_;
+    deferredBlock_ = csdb::Pool();
+  }
+  else {
+    pool = storage_.pool_remove_last();
+  }
+
   removeWalletsInPoolFromCache(pool);
   auto removedHash = blockHashes_->removeLast();
 
 #ifdef TRANSACTIONS_INDEX
-  total_transactions_count_-= pool.transactions().size();
+  total_transactions_count_ -= pool.transactions().size();
 #endif
 
   lastHash_ = pool.previous_hash();
   if (removedHash != pool.hash()) {
-    cserror() << "Error! Last pool hash mismatch";
+    cserror() << "BLOCKCHAIN> Error! Last pool hash mismatch";
   }
-  deferredBlock_ = csdb::Pool();
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -894,7 +903,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
   deferredBlock_ = pool;
-  finalizeBlock(pool);
+  finalizeBlock(deferredBlock_);
 
   // log cached block
   cslog() << "----------------------------- Defer block #" << pool.sequence() << " until next round ----------------------------";
