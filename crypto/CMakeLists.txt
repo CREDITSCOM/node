@@ -26,6 +26,9 @@ if(WIN32)
   
   execute_process(COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${msbuild_parallel} ${proj_to_build} ${msbuild_property} ${msbuild_platform}
 				  WORKING_DIRECTORY ${libsodium_dir})
+				  
+  execute_process(COMMAND git apply ${libsodium_patch} -R
+                  WORKING_DIRECTORY ${libsodium_dir})
 else()
 
 endif()
@@ -52,8 +55,8 @@ add_library(${PROJECT_NAME} STATIC
 
 target_link_libraries (${PROJECT_NAME} blake2 libsodium)
 target_compile_definitions(${PROJECT_NAME} PUBLIC SODIUM_STATIC)
-if(WIN32)
-  target_compile_definitions(${PROJECT_NAME} PUBLIC /wd4324)
+if(win32)
+  target_compile_options(${PROJECT_NAME} PUBLIC /wd4324)
 endif()
   
 target_include_directories(${PROJECT_NAME}
