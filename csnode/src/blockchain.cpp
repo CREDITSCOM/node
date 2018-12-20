@@ -856,8 +856,8 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   }
 
   fee_->CountFeesInPool(*this, &pool);
-  pool.set_previous_hash(deferredBlock_.hash());
-
+  pool.set_previous_hash(getLastHash());
+ 
   if (requireAddWallets) {
     csdebug() << "BLOCKCHAIN> record block #" << pool_seq << " to chain, add new wallets to pool";
     addNewWalletsToPool(pool);
