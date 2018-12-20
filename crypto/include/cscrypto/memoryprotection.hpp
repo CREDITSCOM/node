@@ -3,7 +3,14 @@
 
 #include <cstddef>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
+#endif
 #include <sodium.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 namespace cscrypto {
 
