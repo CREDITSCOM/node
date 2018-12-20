@@ -70,7 +70,7 @@ boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
 }
 
 bool cs::DataStream::isValid() const {
-  if (index_ >= dataSize_) {
+  if (index_ > dataSize_) { //tmp until Arew review
     return false;
   }
 

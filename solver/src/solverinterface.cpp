@@ -276,8 +276,8 @@ namespace cs
       return;
     }
     // dispatch transaction by its type
-    bool is_deploy = cs::SmartContracts::is_deploy(tr);
-    bool is_start = is_deploy ? false : cs::SmartContracts::is_start(tr);
+    bool is_deploy = psmarts->is_deploy(tr);
+    bool is_start = is_deploy ? false : psmarts->is_start(tr);
     if(is_deploy || is_start) {
       if(is_deploy) {
         csdebug() << "SolverCore: smart contract is deployed, enqueue it for execution";
@@ -287,7 +287,7 @@ namespace cs
       }
       psmarts->enqueue(block, trx_idx);
     }
-    else if(cs::SmartContracts::is_new_state(tr)) {
+    else if(psmarts->is_new_state(tr)) {
       csdebug() << "SolverCore: smart contract is executed, state updated with new one";
       psmarts->on_completed(block, trx_idx);
     }

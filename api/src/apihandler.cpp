@@ -541,17 +541,18 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   work_queues["TransactionFlow"].yield();
   contract_state_entry.get_position();
 
-  std::string contract_state;
-  if (!deploy) {
-    contract_state_entry.wait_till_front([&](std::string& state) {
-      if (state.empty())
-        return false;
-      contract_state = state;
-      return true;
-    });
-  }
-
   if (input_smart.forgetNewState) {
+    // -- prevent start transaction from flow to solver, so move it here:
+    std::string contract_state;
+    if(!deploy) {
+      contract_state_entry.wait_till_front([&](std::string& state) {
+        if(state.empty())
+          return false;
+        contract_state = state;
+        return true;
+      });
+    }
+    // --
     auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     executor::ExecuteByteCodeResult api_resp;
     const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
@@ -573,7 +574,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return;
   }
   //send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
-//#endif
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));  
   solver.send_wallet_transaction(send_transaction);

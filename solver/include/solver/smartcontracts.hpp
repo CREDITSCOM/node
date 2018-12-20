@@ -7,7 +7,6 @@
 #include <csdb/transaction.hpp>
 #include <lib/system/signals.hpp>
 #include <lib/system/common.hpp>
-#include <csnode/datastream.hpp>
 #include <csnode/node.hpp> // introduce Node::api_handler_ptr_t
 
 #include <optional>
@@ -39,11 +38,11 @@ namespace cs
     namespace start
     {
       // methods with args (string)
-      constexpr csdb::user_field_id_t Calls = 0;
+      constexpr csdb::user_field_id_t Methods = 0;
       // reference to last state transaction
       constexpr csdb::user_field_id_t RefState = 1;
-      // count of user fields
-      constexpr size_t Count = 2;
+      // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
+      //constexpr size_t Count = {1,2};
     }
     // new state transaction fields
     namespace new_state
@@ -81,20 +80,9 @@ namespace cs
 
     // "serialization" methods
 
-    csdb::UserField to_user_field() const
-    {
-      cs::Bytes data;
-      cs::DataStream stream(data);
-      stream << hash << sequence << transaction;
-      return csdb::UserField(std::string(data.cbegin(), data.cend()));
-    }
+    csdb::UserField to_user_field() const;
 
-    void from_user_field(csdb::UserField fld)
-    {
-      std::string data = fld.value<std::string>();
-      cs::DataStream stream(data.c_str(), data.size());
-      stream >> hash >> sequence >> transaction;
-    }
+    void from_user_field(const csdb::UserField fld);
   };
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
@@ -127,16 +115,16 @@ namespace cs
     // test transaction methods
 
     static bool is_smart_contract(const csdb::Transaction);
-    static bool is_deploy(const csdb::Transaction);
-    static bool is_start(const csdb::Transaction);
-    static bool is_new_state(const csdb::Transaction);
+    bool is_deploy(const csdb::Transaction) const;
+    bool is_start(const csdb::Transaction) const;
+    bool is_new_state(const csdb::Transaction) const;
 
     /* Assuming deployer.is_public_key() */
     static csdb::Address get_valid_smart_address(const csdb::Address& deployer,
                                                  const uint64_t trId,
                                                  const api::SmartContractDeploy&);
 
-    std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
+    std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr) const;
 
     static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
 
@@ -152,6 +140,11 @@ namespace cs
     void set_execution_result(csdb::Transaction tr)
     {
       emit signal_smart_executed(tr);
+    }
+
+    csconnector::connector::ApiHandlerPtr get_api() const
+    {
+      return papi;
     }
 
     const char* name() const
@@ -172,6 +165,7 @@ namespace cs
 
     BlockChain& bc;
     cs::Bytes node_id;
+    csconnector::connector::ApiHandlerPtr papi;
 
     struct QueueItem
     {

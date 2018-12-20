@@ -4,6 +4,7 @@
 #include <lib/system/logger.hpp>
 #include <csdb/currency.hpp>
 #include <ContractExecutor.h>
+#include <csnode/datastream.hpp>
 
 #include <optional>
 #include <memory>
@@ -15,27 +16,15 @@ namespace cs
   {
   public:
 
-    static void init(csconnector::connector::ApiHandlerPtr api)
-    {
-      papi = api;
-    }
-
     static bool execute(SmartContracts& contracts, const cs::SmartContractRef& item);
-
-  private:
-
-    static csconnector::connector::ApiHandlerPtr papi;
   };
-
-  /*static*/
-  csconnector::connector::ApiHandlerPtr SmartContractsExecutor::papi;
 
   /*static*/
   bool SmartContractsExecutor::execute(SmartContracts& contracts, const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = contracts.get_transaction(item);
-    bool is_deploy = SmartContracts::is_deploy(start_tr);
-    if(!is_deploy && !SmartContracts::is_start(start_tr)) {
+    bool is_deploy = contracts.is_deploy(start_tr);
+    if(!is_deploy && !contracts.is_start(start_tr)) {
       cserror() << contracts.name() << ": unable execute neither deploy nor start transaction";
       return false;
     }
@@ -72,7 +61,7 @@ namespace cs
       }
       std::string state;
       constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
-      SmartContractsExecutor::papi->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), code, state, contract.method, contract.params, MAX_EXECUTION_TIME);
+      contracts.get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), code, state, contract.method, contract.params, MAX_EXECUTION_TIME);
       if(resp.status.code == 0) {
         // USRFLD0 - new state
         result.add_user_field(trx_uf::new_state::Value, resp.contractState);
@@ -94,6 +83,27 @@ namespace cs
     return true;
   }
 
+  csdb::UserField SmartContractRef::to_user_field() const
+  {
+    cs::Bytes data;
+    cs::DataStream stream(data);
+    stream << hash << sequence << transaction;
+    return csdb::UserField(std::string(data.cbegin(), data.cend()));
+  }
+
+  void SmartContractRef::from_user_field(csdb::UserField fld)
+  {
+    std::string data = fld.value<std::string>();
+    cs::DataStream stream(data.c_str(), data.size());
+    stream >> hash >> sequence >> transaction;
+    if(!stream.isValid() || stream.isAvailable(1)) {
+      cserror() << "SmartCotractRef: read form malformed user field, abort!";
+      hash = csdb::PoolHash {};
+      sequence = std::numeric_limits<decltype(sequence)>().max();
+      transaction = std::numeric_limits<decltype(transaction)>().max();
+    }
+  }
+
   /*explicit*/
   SmartContracts::SmartContracts(BlockChain& blockchain)
     : bc(blockchain)
@@ -109,29 +119,41 @@ namespace cs
 
   void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
   {
+    papi = api;
     node_id.resize(id.size());
     std::copy(id.cbegin(), id.cend(), node_id.begin());
-    SmartContractsExecutor::init(api);
   }
 
-  /*static*/
-  bool SmartContracts::is_deploy(const csdb::Transaction tr)
+  bool SmartContracts::is_deploy(const csdb::Transaction tr) const
   {
     if(!is_smart_contract(tr)) {
       return false;
     }
-    // deploy -> 1 user field, start -> 2 user fields, new_state -> 3 user fields
-    return (tr.user_field_ids().size() == trx_uf::deploy::Count);
+    if(is_new_state(tr)) {
+      return false;
+    }
+    const auto invoke = get_smart_contract(tr);
+    if(!invoke.has_value()) {
+      return false;
+    }
+    // deploy ~ start but method in invoke info is empty
+    return invoke.value().method.empty();
   }
 
-  /*static*/
-  bool SmartContracts::is_start(const csdb::Transaction tr)
+  bool SmartContracts::is_start(const csdb::Transaction tr) const
   {
     if(!is_smart_contract(tr)) {
       return false;
     }
-    // deploy -> 1 user field, start -> 2 user fields, new_state -> 3 user fields
-    return tr.user_field_ids().size() == trx_uf::start::Count;
+    if(is_new_state(tr)) {
+      return false;
+    }
+    const auto invoke = get_smart_contract(tr);
+    if(!invoke.has_value()) {
+      return false;
+    }
+    // deploy ~ start but method in invoke info is empty
+    return ! invoke.value().method.empty();
   }
 
   /* static */
@@ -159,14 +181,13 @@ namespace cs
     return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
   }
 
-  /*static*/
-  bool SmartContracts::is_new_state(const csdb::Transaction tr)
+  bool SmartContracts::is_new_state(const csdb::Transaction tr) const
   {
     if(!is_smart_contract(tr)) {
       return false;
     }
-    // deploy -> 1 user field, start -> 2 user fields, new_state -> 3 user fields
-    return tr.user_field_ids().size() == trx_uf::new_state::Count;
+    // must contain user field trx_uf::new_state::Value
+    return tr.user_field_ids().count(trx_uf::new_state::Value) > 0;
   }
 
   /*static*/
@@ -182,6 +203,7 @@ namespace cs
     return block.transactions().at(contract.transaction);
   }
 
+  /*static*/
   bool SmartContracts::is_smart_contract(const csdb::Transaction tr)
   {
     // see apihandler.cpp #319:
@@ -191,7 +213,7 @@ namespace cs
     if(!tr.is_valid()) {
       return false;
     }
-    // to contain smart contract trx must contain either FLD"0" or FLD"-2":
+    // to contain smart contract trx must contain either FLD"0" (deploy, start) or FLD"-2" (new_state):
     csdb::UserField f = tr.user_field(trx_uf::deploy::Code);
     if (!f.is_valid()) {
       f = tr.user_field(trx_uf::new_state::Value);
@@ -199,12 +221,22 @@ namespace cs
     return f.is_valid() && f.type() == csdb::UserField::Type::String;
   }
 
-  std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction tr)
+  std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction tr) const
   {
-    if(SmartContracts::is_deploy(tr) || SmartContracts::is_new_state(tr)) {
+    if(SmartContracts::is_deploy(tr)) {
       const auto& smart_fld = tr.user_field(trx_uf::deploy::Code);
       if(smart_fld.is_valid()) {
         return deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
+      }
+    }
+    else if(SmartContracts::is_new_state(tr)) {
+      const auto& smart_fld = tr.user_field(trx_uf::new_state::Value);
+      if(smart_fld.is_valid()) {
+        bool present;
+        const auto tmp = papi->getSmartContract(tr.source(), present);
+        if(present) {
+          return tmp;
+        }
       }
     }
     else if(SmartContracts::is_start(tr)) {
@@ -255,7 +287,24 @@ namespace cs
 
   void SmartContracts::on_completed(csdb::Pool block, size_t trx_idx)
   {
-    auto it = find_in_queue(SmartContractRef { block.hash(), block.sequence(), trx_idx });
+    if(!block.is_valid() || trx_idx >= block.transactions_count()) {
+      cserror() << name() << ": incorrect new_state transaction specfied";
+      return;
+    }
+    auto new_state = get_transaction(SmartContractRef { block.hash(), block.sequence(), trx_idx });
+    if(!new_state.is_valid()) {
+      cserror() << name() << ": get new_state transaction failed";
+      return;
+    }
+    csdb::UserField fld_contract_ref = new_state.user_field(trx_uf::new_state::RefStart);
+    if(!fld_contract_ref.is_valid()) {
+      cserror() << name() << ": new_state transaction does not contain reference to contract";
+      return;
+    }
+
+    SmartContractRef contract_ref;
+    contract_ref.from_user_field(fld_contract_ref);
+    auto it = find_in_queue(contract_ref);
     if(it == exe_queue.cend()) {
       cserror() << name() << ": completed contract is not in queue";
       return;

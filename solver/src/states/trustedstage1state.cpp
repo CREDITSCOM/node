@@ -159,19 +159,19 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     uint8_t del1;
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
+      const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte;
-      if(transaction.user_field_ids().size() != 3) {
+      cs::Byte byte = static_cast<cs::Byte>(true);
+      if(!smarts.is_new_state( transaction)) {
         byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
       }
       else {
         //TODO: implement appropriate validation of smart-state transactions 
-        byte = static_cast<cs::Byte>(true);
       }
 
-
       if (byte) {
-        if (SmartContracts::is_smart_contract(transaction)) {
+        // yrtimd: test with get_valid_smart_address() only for deploy transactions:
+        if (smarts.is_deploy(transaction)) {
           auto sci = context.smart_contracts().get_smart_contract(transaction);
           if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
             csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY); 
