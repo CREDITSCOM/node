@@ -92,7 +92,6 @@ namespace cs
 
   enum class SmartContractStatus
   {
-    Finished = 0,
     Running,
     Waiting
   };
@@ -114,9 +113,15 @@ namespace cs
 
     // test transaction methods
 
+    // smart contract related transaction of any type
     static bool is_smart_contract(const csdb::Transaction);
+    // deploy or start contract
+    bool is_executable(const csdb::Transaction tr) const;
+    // deploy contract
     bool is_deploy(const csdb::Transaction) const;
+    // start contract
     bool is_start(const csdb::Transaction) const;
+    // new state of contract, result of invocation of executable transaction
     bool is_new_state(const csdb::Transaction) const;
 
     /* Assuming deployer.is_public_key() */
@@ -193,6 +198,9 @@ namespace cs
     }
 
     bool invoke_execution(const SmartContractRef& contract, csdb::Pool block);
+    // currently perform blocking execution via api to remote executor
+    // TODO: make an async execution
+    bool execute(const cs::SmartContractRef& item);
   };
 
 } // cs
