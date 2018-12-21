@@ -76,7 +76,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
                                   const cs::PublicKey& sender) {
   // get node status for useful logging
   cslog() << name() << ": <-- hash from " << context.sender_description(sender);
-  const auto& lwh = context.blockchain().getLastWrittenHash();
+  const auto& lwh = context.blockchain().getLastHash();
   if (stage.trustedCandidates.size() < Consensus::MinTrustedNodes) {
     if (pool_hash == lwh) {
       cslog() << name() << ": hash is OK";

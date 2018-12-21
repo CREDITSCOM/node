@@ -85,7 +85,7 @@ struct MockData
         ON_CALL(context, stage3(0)).WillByDefault(Return(&stage3_storage.at(0)));
 
         //unsigned counter = 0;
-        ON_CALL(bc, getLastWrittenHash())
+        ON_CALL(bc, getLastHash())
             //.WillByDefault(Invoke([&counter, this]() -> csdb::PoolHash& {
             //    switch(++counter) {
             //    case 1:

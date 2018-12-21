@@ -131,7 +131,7 @@ void Node::flushCurrentTasks() {
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   csunused(type);
-  cswarning() << "-----------------------------------------------------------\n"
+  cswarning() << "\n-----------------------------------------------------------\n"
     << "NODE> BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
     << ", current #" << roundNumber_
     << "\n-----------------------------------------------------------";
@@ -149,8 +149,9 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     return;
   }
 
-  while (getBlockChain().getLastWrittenSequence() >= rNum)
+  while (getBlockChain().getLastWrittenSequence() >= rNum) {
     getBlockChain().removeLastBlock();
+  }
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -1961,7 +1962,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     }
     catch (...) { }
   }
-  poolMetaInfo.previousHash = getBlockChain().getLastWrittenHash();
+  poolMetaInfo.previousHash = getBlockChain().getLastHash();
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
   cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2101,7 +2102,7 @@ void Node::sendHash(cs::RoundNumber round) {
     return;
   }
 
-  const auto& hash = getBlockChain().getLastWrittenHash();
+  const auto& hash = getBlockChain().getLastHash();
   // = personallyDamagedHash();
 
   cslog() << "Sending hash " << hash.to_string() << " to ALL";

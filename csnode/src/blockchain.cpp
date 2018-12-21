@@ -108,8 +108,6 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 #endif
     }
 
-    lastHash_ = getLastHash();
-
     res = true;
   }
   catch (std::exception& e) {
@@ -155,13 +153,14 @@ cs::Sequence BlockChain::getLastWrittenSequence() const {
   if (deferredBlock_.is_valid()) {
     return deferredBlock_.sequence();
   }
-  else if (blockHashes_->empty()) {
-    return static_cast<cs::Sequence> (-1);
-  }
-  else {
+  else if (!blockHashes_->empty()) {
     return blockHashes_->getDbStructure().last_;
   }
+  else {
+    return static_cast<cs::Sequence> (-1);
+  }
 }
+
 const std::string CHEAT_FILENAME = "__integr.seq";
 
 std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
@@ -343,7 +342,7 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
-
+  csmeta(csdebug);
   csdb::Pool pool {};
 
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
@@ -354,19 +353,20 @@ void BlockChain::removeLastBlock() {
   }
   else {
     pool = storage_.pool_remove_last();
+    const auto removedHash = blockHashes_->removeLast();
+
+    if (removedHash != pool.hash()) {
+      cserror() << "BLOCKCHAIN> Error! Last pool hash mismatch";
+    }
   }
 
-  removeWalletsInPoolFromCache(pool);
-  auto removedHash = blockHashes_->removeLast();
+  csmeta(csdebug) << "Seq: " << pool.sequence();
 
 #ifdef TRANSACTIONS_INDEX
   total_transactions_count_ -= pool.transactions().size();
 #endif
 
-  lastHash_ = pool.previous_hash();
-  if (removedHash != pool.hash()) {
-    cserror() << "BLOCKCHAIN> Error! Last pool hash mismatch";
-  }
+  removeWalletsInPoolFromCache(pool);
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
@@ -462,14 +462,9 @@ void BlockChain::finalizeBlock(csdb::Pool& pool) {
     }
   }
 
-  lastHash_ = pool.hash();
-  csdetails() << "BLOCKCHAIN> lastHash_ = " << lastHash_.to_string();
+  csmeta(csdetails) << "last hash: " << pool.hash().to_string();
 
   recount_trxns(pool);
-}
-
-csdb::PoolHash BlockChain::getLastWrittenHash() const {
-  return lastHash_;
 }
 
 const csdb::Storage& BlockChain::getStorage() const {
@@ -924,7 +919,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     return true;
   }
   if (pool_seq == last_seq + 1) {
-    if (pool.previous_hash() != getLastWrittenHash()) {
+    if (pool.previous_hash() != getLastHash()) {
       removeLastBlock();
       return false;
     }

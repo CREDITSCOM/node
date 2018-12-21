@@ -26,7 +26,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
   auto stats = currentStats;
   auto startTime = std::chrono::high_resolution_clock::now();
-  auto blockHash = blockchain.getLastWrittenHash();
+  auto blockHash = blockchain.getLastHash();
 
   PeriodStats periodStats;
   periodStats.timeStamp = std::chrono::system_clock::now();
@@ -159,7 +159,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   auto startCutTime = stats.first[currentCutIndex].timeStamp;
   auto endCutTime = stats.first[currentCutIndex + 1].timeStamp;
 
-  auto future_lastHash = blockchain.getLastWrittenHash();
+  auto future_lastHash = blockchain.getLastHash();
 
   while (!blockHash.is_empty() && !quit) {
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -226,7 +226,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
     blockHash = pool.previous_hash();
   }
 
-  //lastHash = blockchain.getLastWrittenHash();
+  //lastHash = blockchain.getLastHash();
   lastHash = future_lastHash;
 
   auto finishTime = std::chrono::system_clock::now();
