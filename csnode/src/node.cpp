@@ -1987,8 +1987,8 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   }
 
   std::vector<cs::Bytes> confs;
-
-  for (const auto& src : roundTable.confidants) {
+  // using current trusted nodes, not candidates to for next round:
+  for (const auto& src : conveyer.confidants()) {
     auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
     std::copy(src.cbegin(), src.cend(), tmp.begin());
   }
@@ -2098,8 +2098,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   roundTable.general = sender;
   csdebug() << "NODE> confidants: " << roundTable.confidants.size();
 
+  getCharacteristic(istream_.getCurrentPtr(), istream_.remainsBytes(), cs::Conveyer::instance().currentRoundNumber(), sender);
   cs::Conveyer::instance().setRound(std::move(roundTable));
-  getCharacteristic(istream_.getCurrentPtr(), istream_.remainsBytes(), rNum, sender);
 
   onRoundStart(cs::Conveyer::instance().currentRoundTable());
   blockchainSync();
