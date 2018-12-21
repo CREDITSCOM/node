@@ -82,7 +82,7 @@ add_library(${PROJECT_NAME} STATIC
 
 target_link_libraries (${PROJECT_NAME} blake2 libsodium)
 target_compile_definitions(${PROJECT_NAME} PUBLIC SODIUM_STATIC)
-if(win32)
+if(WIN32)
   target_compile_options(${PROJECT_NAME} PUBLIC /wd4324)
 endif()
   
