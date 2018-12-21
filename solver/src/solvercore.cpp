@@ -202,9 +202,9 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   table.confidants = nodes;
   table.hashes = hashes;
 
-  cslog() << "Applying next hashes to ROUND Table (" << hashes.size() << "):";
+  cslog() << "Applying " << hashes.size() << " hashes to ROUND Table";
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csdebug() << i << ". " << hashes[i].toString();
+    csdetails() << '\t' << i << ". " << hashes[i].toString();
   }
 
   pnode->prepareMetaForSending(table, currentTimeStamp);

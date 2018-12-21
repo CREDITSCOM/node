@@ -317,13 +317,14 @@ namespace cs
         if(requester == node) {
           if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
             cslog() << "SolverCore: requester is trusted next round, supply it with round info";
-            return;
           }
-          cslog() << "SolverCore: try but cannot send full round info";
-          break;
+          else {
+            cslog() << "SolverCore: try but cannot send full round info";
+          }
+          return;
         }
       }
-      cslog() << "SolverCore: inform requester next round has come";
+      cslog() << "SolverCore: inform requester next round has come and it is not in trusted list";
       pnode->sendRoundTableReply(requester, true);
     }
     else {

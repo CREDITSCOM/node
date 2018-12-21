@@ -93,31 +93,42 @@ Role SolverContext::role() const {
 }
 
 void SolverContext::spawn_next_round() {
-  LOG_NOTICE("SolverCore: spawn next round");
-  if (Consensus::Log) {
-    if (core.trusted_candidates.empty()) {
-      cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
-    }
-  }
-  cslog() << "SolverCore: new confidant nodes: ";
-  int i = 0;
-  for (auto& it : core.trusted_candidates) {
-    cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
-    ++i;
-  }
-
-  cslog() << "SolverCore: new hashes: " << core.hashes_candidates.size();
-  i = 0;
-  //for (auto& it : core.hashes_candidates) {
-  //  cslog() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
-  //  ++i;
-  //}
-
   std::string tStamp;
+  uint8_t writer_idx = InvalidConfidantIndex;
   const auto own_stage3 = stage3((uint8_t) own_conf_number());
   if(own_stage3 != nullptr) {
-    tStamp = stage1(own_stage3->writer)->roundTimeStamp;
+    writer_idx = own_stage3->writer;
   }
+  else {
+    for(const auto& s3 : stage3_data()) {
+      writer_idx = s3.writer;
+      if(writer_idx != InvalidConfidantIndex) {
+        break;
+      }
+    }
+  }
+  if(writer_idx != InvalidConfidantIndex) {
+    auto ptr = stage1(writer_idx);
+    if(ptr != nullptr) {
+      tStamp = ptr->roundTimeStamp;
+    }
+  }
+  if(tStamp.empty()) {
+    cswarning() << "SolverCore: cannot act as writer because lack writer timestamp";
+    return;
+  }
+
+  cslog() << "SolverCore: spawn next round";
+  if (core.trusted_candidates.empty()) {
+    cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
+  }
+  csdebug() << "SolverCore: new confidant nodes: ";
+  int i = 0;
+  for (auto& it : core.trusted_candidates) {
+    csdebug() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
+    ++i;
+  }
+  csdebug() << "SolverCore: new hashes count is " << core.hashes_candidates.size();
   core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
 }
 
@@ -188,9 +199,9 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
 }
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
-  cslog() << "SolverCore: ask [" << (int)respondent1 << "] for RoundInfo";
+  cslog() << "SolverCore: ask [" << (int)respondent1 << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent1);
-  cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundInfo";
+  cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent2);
 }
 

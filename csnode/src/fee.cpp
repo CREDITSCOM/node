@@ -178,7 +178,9 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
   }
 
   double time_stamp_diff = CountBlockTimeStampDifference(block_number_from, blockchain);
-  rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
+  if(fabs(time_stamp_diff) > DBL_EPSILON) {
+    rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
+  }
 }
 
 double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain) {
@@ -191,7 +193,15 @@ double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChai
 
   csdb::PoolHash block_to_hash = blockchain.getLastHash();
   csdb::Pool block_to = blockchain.loadBlock(block_to_hash);
-  double time_stamp_to = std::stod(block_to.user_field(0).value<std::string>());
+  double time_stamp_to = time_stamp_from;
+  const auto str = block_to.user_field(0).value<std::string>();
+  if(!str.empty()) {
+    try {
+      time_stamp_to = std::stod(str);
+    }
+    catch(...) {
+    }
+  }
 
   return time_stamp_to - time_stamp_from;
 }

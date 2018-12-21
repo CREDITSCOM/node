@@ -131,10 +131,10 @@ void Node::flushCurrentTasks() {
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type) {
   csunused(type);
-  cswarning() << "-----------------------------------------------------------\n"
-    << "NODE> BigBang #" << rNum << ": last written #" << getBlockChain().getLastWrittenSequence()
-    << ", current #" << roundNumber_
-    << "\n-----------------------------------------------------------";
+  cswarning() << "-----------------------------------------------------------";
+  cswarning() << "NODE> BigBang #" << rNum << ": last written #"
+    << getBlockChain().getLastWrittenSequence() << ", current #" << roundNumber_;
+  cswarning() << "-----------------------------------------------------------";
 
   istream_.init(data, size);
 
@@ -389,16 +389,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cslog() << "\tconveyer sync completed, parsing data size " << size;
 
-  istream_ >> time;
-  istream_ >> characteristicMask >> sequence;
-
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = sequence;
-  poolMetaInfo.timestamp = std::move(time);
+  istream_ >> poolMetaInfo.timestamp;
+  istream_ >> characteristicMask >> poolMetaInfo.sequenceNumber;
 
   cs::Signature signature;
   istream_ >> signature;
-
   istream_ >> poolMetaInfo.writerKey;
   istream_ >> poolMetaInfo.previousHash;
 
@@ -2165,7 +2161,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
   cslog() << "NODE> send request for next round info after #" << roundNumber_;
 
   // ask for next round info:
-  sendDefault(respondent, MsgTypes::RoundTableRequest, roundNumber_ + 1, myConfidantIndex_);
+  sendDefault(respondent, MsgTypes::RoundTableRequest, roundNumber_, myConfidantIndex_);
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
