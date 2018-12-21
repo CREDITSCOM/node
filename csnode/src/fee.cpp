@@ -140,7 +140,7 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 }
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
-  csdb::Pool pool = blockchain.loadBlock(blockchain.getLastWrittenHash());
+  csdb::Pool pool = blockchain.loadBlock(blockchain.getLastHash());
   std::set<std::vector<uint8_t>> unique_trusted_;
   if (blockchain.getLastWrittenSequence() < kBlocksNumForNodesQtyEstimation) {
     while (pool.is_valid()) {

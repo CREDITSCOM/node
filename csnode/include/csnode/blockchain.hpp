@@ -124,7 +124,6 @@ public:
   uint64_t getWalletsCount();
 
   csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
-  csdb::PoolHash getLastWrittenHash() const;
 
 #ifdef TRANSACTIONS_INDEX
   csdb::TransactionID getLastTransaction(const csdb::Address&);
@@ -212,8 +211,6 @@ private:
 
   mutable cs::SpinLock dbLock_;
   csdb::Storage storage_;
-
-  csdb::PoolHash lastHash_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
 
