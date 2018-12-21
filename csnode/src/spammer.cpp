@@ -67,8 +67,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   uint64_t round_spamming = 0;
   uint32_t tr_gen_in_round = 0;
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
-  const cs::RoundNumber currentRoundNumber = conveyer.currentRoundNumber();
-  cs::RoundNumber round_number = currentRoundNumber;
+  cs::RoundNumber round_number = conveyer.currentRoundNumber();
 
   while (true) {
     if (!node.isPoolsSyncroStarted()) {
@@ -100,15 +99,15 @@ void Spammer::SpamWithTransactions(Node& node) {
         inner_id_counter = round_spamming * kMaxTransactionsFromOneSource;
       }
     }
-    while (tr_gen_in_round == kMaxTransactionsInOneRound && round_number == currentRoundNumber) {
+    while (tr_gen_in_round == kMaxTransactionsInOneRound && round_number == conveyer.currentRoundNumber()) {
       std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
     }
     while (kMaxTransactionsInOneRound <= conveyer.blockTransactionsCount()) {
       std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
     }
-    if (round_number != currentRoundNumber) {
+    if (round_number != conveyer.currentRoundNumber()) {
       tr_gen_in_round = 0;
-      round_number = currentRoundNumber;
+      round_number = conveyer.currentRoundNumber();
     }
 
     std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
