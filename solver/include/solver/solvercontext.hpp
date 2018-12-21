@@ -263,7 +263,7 @@ public:
   }
 
   bool enough_stage3() const {
-    return (core.stageThreeStorage.size() >= (cnt_trusted() / 2 + 1));
+    return (core.stageThreeStorage.size() >= (cnt_trusted() / 2U + 1U) && stage3((uint8_t)own_conf_number()) != nullptr);
   }
 
   void request_stage1(uint8_t from, uint8_t required);

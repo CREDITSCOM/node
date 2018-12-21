@@ -298,7 +298,7 @@ private:
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
-
+  uint8_t subRound_;
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;

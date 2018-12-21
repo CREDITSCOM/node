@@ -195,6 +195,8 @@ bool SolverCore::stateCompleted(Result res) {
 void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp) {
   cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
+  pnode->becomeWriter();
+
   cs::RoundTable table;
   table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
   table.confidants = nodes;
@@ -292,6 +294,10 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     memset(st3.signature.data(),0,st3.signature.size());
     memset(st2.signature.data(),0,st3.signature.size());
     pnode->smartStagesStorageClear(cSize);
+    smartUntrusted.clear();
+    smartUntrusted.resize(cSize);
+    std::fill(smartUntrusted.begin(),smartUntrusted.end(),0);
+    startTimer(1);
   }
 
   void SolverCore::addSmartStageOne( cs::StageOneSmarts& stage, bool send) {
@@ -309,7 +315,9 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
+      killTimer(1);
       addSmartStageTwo(st2, true);
+      startTimer(2);
     }
   }
 
@@ -325,13 +333,86 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartStageTwoStorage_.at(stage.sender) = stage;
     cslog() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
     if (smartStageTwoEnough()) {
+      startTimer(2);
       processStages();
     }
   }
 
 void SolverCore::processStages() {
-  st3.writer = 0;
-  addSmartStageThree(st3, true);
+  cslog() << __func__ << "(): start";
+int cnt = (int)smartConfidants_.size();
+  //perform the evaluation og stages 1 & 2 to find out who is traitor 
+  int hashFrequency = 1;
+  for (auto& st : smartStageOneStorage_) {
+    if (st.sender == ownSmartsConfNum_) {
+      continue;
+    }
+    if (st.hash != smartStageOneStorage_.at(ownSmartsConfNum_).hash) {
+      ++(smartUntrusted.at(st.sender));
+      cslog() << "Confidant [" << (int)st.sender << "] is markt as UNTRUSTED: hash";
+    }
+    else {
+      ++hashFrequency;
+    }
+  }
+  cslog() << "Hash: " << cs::Utils::byteStreamToHex(smartStageOneStorage_.at(ownSmartsConfNum_).hash.data(), 
+    sizeof(smartStageOneStorage_.at(ownSmartsConfNum_).hash)) << ", Frequency = " << hashFrequency;
+  auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
+  for (auto& st : smartStageTwoStorage_) {
+    if (st.sender = ownSmartsConfNum_) continue;
+    for (int i = 0; i< cnt; ++i) {
+      if (st.signatures[i] != myStage2.signatures[i]) {
+        if (cscrypto::VerifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
+          ++(smartUntrusted.at(i));
+          cslog() << "Confidant [" << i << "] is markt as UNTRUSTED: hash";
+        }
+        else {
+          ++(smartUntrusted.at(st.sender));
+          cslog() << "Confidant [" << (int)st.sender << "] is markt as UNTRUSTED: signature";
+        }
+      }
+    }
+  }
+  int cnt_active = 0;
+  cs::StageThreeSmarts stage;
+  stage.realTrustedMask.resize(cnt);
+  for (int i = 0; i < cnt; ++i) {
+    stage.realTrustedMask[i] = (smartUntrusted[i] > 0 ? cs::ConfidantConsts::InvalidConfidantIndex : cs::ConfidantConsts::FirstWriterIndex);
+    if (stage.realTrustedMask[i] == cs::ConfidantConsts::FirstWriterIndex) {
+      ++cnt_active;
+    }
+  }
+  int lowerTrustedLimit = (int)(smartConfidants_.size() /2. + 1.);
+  if (cnt_active < lowerTrustedLimit) {
+    cslog() << "Smart's consensus NOT achieved, the state transaction won't send to the conveyer";
+    return;    
+  }
+  cslog() << "Smart's consensus achieved";
+
+  auto hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
+  if (hash_t.empty()) {
+    return;  // TODO: decide what to return
+  }
+  int k = *(unsigned int *)hash_t.data();
+  if (k < 0) {
+    k = -k;
+  }
+  int idx_writer = k % cnt_active;
+  int idx = 0;
+  int c = 0;
+  for (int i = idx_writer; i < cnt + idx_writer; ++i) {
+    c = i % cnt;
+    if (stage.realTrustedMask.at(c) != cs::ConfidantConsts::InvalidConfidantIndex) {
+      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+      if (i == idx_writer) {
+        stage.writer = static_cast<uint8_t>(c);
+      }
+      ++idx;
+    }
+  }
+  startTimer(3);
+  cslog() << __func__ << "(): done";
+  addSmartStageThree(stage, true);
 }
 
   void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
@@ -348,6 +429,7 @@ void SolverCore::processStages() {
     smartStageThreeStorage_.at(stage.sender) = stage;
     cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStageThreeStorage_.size();
     if (smartStageThreeEnough()) {
+      killTimer(3);
       createFinalTransactionSet();
     }
   }
@@ -394,10 +476,103 @@ void SolverCore::processStages() {
       if (it.sender == i) ++stageSize;
       ++i;
     }
-    size_t cSize = smartConfidants_.size() / 2 +1;
+    size_t cSize = smartConfidants_.size() / 2 + 1;
     cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }
 
+  void SolverCore::startTimer(int st) {
+    cslog() << __func__ << "(): start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    timeout_request_stage.start(
+      scheduler, Consensus::T_stage_request,
+      // timeout #1 handler:
+      [this, st]() {
+      cslog() << __func__<< "(): timeout for stages-" << st << " is expired, make requests";
+      request_stages(st);
+      // start subsequent track timeout for "wide" request
+      cslog() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
+        << " ms to request neighbors about stages-" << st;
+      timeout_request_neighbors.start(
+        scheduler, Consensus::T_stage_request,
+        // timeout #2 handler:
+        [this, st]() {
+        cslog() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
+        request_stages_neighbors(st);
+        // timeout #3 handler
+        timeout_force_transition.start(
+          scheduler, Consensus::T_stage_request,
+          [this, st]() {
+          cslog() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
+          mark_outbound_nodes();
+        },
+          true/*replace if exists*/);
+      },
+        true /*replace if exists*/);
+    },
+      true /*replace if exists*/);
+
+  }
+
+  void SolverCore::killTimer(int st) {
+    if (timeout_request_stage.cancel()) {
+      cslog() << __func__ << "(): cancel track timeout of stages-" << st;
+    }
+    if (timeout_request_neighbors.cancel()) {
+      cslog() << __func__ << "(): cancel track timeout to request neighbors about stages-" << st;
+    }
+    if (timeout_force_transition.cancel()) {
+      cslog() << __func__ << "(): cancel track timeout to force transition to next state";
+    }
+  }
+
+  void SolverCore::request_stages(int st) {
+    //uint8_t cnt = (uint8_t)context.cnt_trusted();
+    //int cnt_requested = 0;
+    //for (uint8_t i = 0; i < cnt; ++i) {
+    //  if (context.stage1(i) == nullptr) {
+    //    context.request_stage1(i, i);
+    //    ++cnt_requested;
+    //  }
+    //}
+    //if (0 == cnt_requested) {
+    //  csdebug() <<__func__ << ": no node to request";
+    //}
+  }
+
+  // requests stages from any available neighbor nodes
+  void SolverCore::request_stages_neighbors(int st) {
+    //const auto& stage2_data = context.stage2_data();
+    //uint8_t cnt = (uint8_t)context.cnt_trusted();
+    //int cnt_requested = 0;
+    //for (uint8_t i = 0; i < cnt; ++i) {
+    //  if (context.stage1(i) == nullptr) {
+    //    for (const auto& d : stage2_data) {
+    //      if (d.sender != context.own_conf_number()) {
+    //        context.request_stage1(d.sender, i);
+    //        ++cnt_requested;
+    //      }
+    //    }
+    //  }
+    //}
+    //if (0 == cnt_requested) {
+    //  csdebug() << __func__ << ": no node to request";
+    //}
+  }
+
+  // forces transition to next stage
+  void SolverCore::mark_outbound_nodes()
+  {
+    //uint8_t cnt = (uint8_t)context.cnt_trusted();
+    //for (uint8_t i = 0; i < cnt; ++i) {
+    //  if (context.stage1(i) == nullptr) {
+    //    // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+    //    fake_stage1(i);
+    //  }
+    //}
+  }
+
+  void SolverCore::fakeStage(uint8_t confIndex) {
+
+  }
 
 }  // namespace slv2
