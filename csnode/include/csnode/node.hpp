@@ -324,25 +324,6 @@ private:
 
   // round stat
   cs::RoundStat stat_;
-
-public:
-
-#ifdef NODE_API
-
-  using api_handler_ptr_t = decltype(csconnector::connector::api_handler);
-
-  api_handler_ptr_t get_api_handler()
-  {
-    return api_.api_handler;
-  }
-
-  //void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address,
-  //  const std::string& code, const std::string& state, const std::string& method,
-  //  const std::vector<general::Variant>& params)
-  //{
-  //  api_.api_handler->execute_byte_code(resp, address, code, state, method, params);
-  //}
-#endif
 };
 
 std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel);

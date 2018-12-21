@@ -201,7 +201,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
     cswarning() << "============================ CONSENSUS SUMMARY =================================";
     if (pool_solution_analysis(context)) {
-      stage.writer = take_urgent_decision(context); //to be redesigned
+      take_urgent_decision(context); //to be redesigned
       cswarning() << "\t==> [" << (int)stage.writer << "]";
     }
     else {
@@ -313,7 +313,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
-      stage.realTrustedMask.push_back(1); // set 1 if trusted and 0 if untrusted
+      stage.realTrustedMask.push_back(1); // set if trusted and 0 if untrusted
       auto ptr = context.stage1(i);
       if(ptr == nullptr) {
         continue;
@@ -440,10 +440,10 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   LOG_NOTICE(name() << ": end of trusted election");
 }
 
-uint8_t TrustedStage3State::take_urgent_decision(SolverContext& context) {
+void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   auto hash_t = context.blockchain().getHashBySequence(context.round() - 1).to_binary();
   if (hash_t.empty()) {
-    return 0;  // TODO: decide what to return
+    return;  // TODO: decide what to return
   }
   int k = *(unsigned int *)hash_t.data();
   if(k < 0) {
@@ -451,23 +451,39 @@ uint8_t TrustedStage3State::take_urgent_decision(SolverContext& context) {
   }
   // stage.realTrustedMask contains !0 on good nodes:
   int cnt = (int) context.cnt_trusted();
-  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), 0);
+  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
   int idx_writer = k % cnt_active;
   if(cnt != cnt_active) {
     cslog() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
   }
-  // count idx_writer through good nodes:
-  int idx = -1;
-  for(int i = 0; i < cnt; ++i) {
-    if(stage.realTrustedMask.at(i) > 0) {
-      ++idx;
-      if(idx == idx_writer) {
-        return static_cast<uint8_t>(i);
+  else {
+    cslog() << "\tselect #" << idx_writer << " from " << cnt << " nodes";
+  }
+  // count idx_writer through good nodes (optional):
+  int idx = 0;
+  int c = 0;
+  for (int i = idx_writer; i < cnt + idx_writer; ++i) {
+    c = i % cnt;
+    if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
+      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+      if (i == idx_writer) {
+        stage.writer = static_cast<uint8_t>(c);
       }
+      ++idx;
     }
   }
-  // how can we reach this? no way but...
-  return static_cast<uint8_t>(idx_writer);
+   // count idx_writer through good nodes:
+  //int idx = -1;
+  //for(int i = 0; i < cnt; ++i) {
+  //  if(stage.realTrustedMask.at(i) != InvalidConfidant) {
+  //    ++idx;
+  //    if(idx == idx_writer) {
+  //      return static_cast<uint8_t>(i);
+  //    }
+  //  }
+  //}
+  //// how can we reach this? no way but...
+  //return static_cast<uint8_t>(idx_writer);
 }
 
 }  // namespace slv2

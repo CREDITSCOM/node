@@ -41,7 +41,7 @@ bool operator==(const cs::RoundTable& left, const cs::RoundTable& right) {
        general_is_equal = left.general == right.general,
        confidants_is_equal = left.confidants == right.confidants,
        hashes_is_equal = left.hashes == right.hashes,
-       charBytes_is_equal = left.charBytes.mask == right.charBytes.mask;
+       charBytes_is_equal = left.characteristic.mask == right.characteristic.mask;
 
   return round_is_equal && general_is_equal && confidants_is_equal &&
          hashes_is_equal && charBytes_is_equal;
