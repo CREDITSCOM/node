@@ -344,8 +344,8 @@ namespace cs
       [this, stored_round]() {
       if(stored_round == cur_round) {
         // still did not receive next round info - become writer
-        cserror() << "SolverCore: re-assign writer node is not completely implemented yet, cancel";
-        //handleTransitions(SolverCore::Event::SetWriter);
+        cserror() << "SolverCore: re-assign writer node to me";
+        handleTransitions(SolverCore::Event::SetWriter);
       }
     },
       true);

@@ -195,6 +195,8 @@ bool SolverCore::stateCompleted(Result res) {
 void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp) {
   cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
+  pnode->becomeWriter();
+
   cs::RoundTable table;
   table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
   table.confidants = nodes;

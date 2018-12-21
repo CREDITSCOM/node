@@ -810,7 +810,7 @@ uint8_t Node::getConfidantNumber() {
 void Node::processTimer() {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
-  if (myLevel_ != NodeLevel::Normal || round <= cs::TransactionsFlushRound) {
+  if (myLevel_ == NodeLevel::Writer || round <= cs::TransactionsFlushRound) {
     return;
   }
 
