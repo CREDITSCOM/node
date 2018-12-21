@@ -105,6 +105,11 @@ public:
   uint8_t ownSmartsConfidantNumber();
   void createFinalTransactionSet();
 
+
+  void SolverCore::request_stages(int st);
+  void SolverCore::request_stages_neighbors(int st);
+  void SolverCore::mark_outbound_nodes();
+
   std::vector<cs::PublicKey> smartConfidants();
 
   /// <summary>   Adds a transaction passed to send pool </summary>
@@ -202,7 +207,17 @@ private:
   void flush_deferred_block();
   void drop_deferred_block();
 
-   /**
+  void startTimer(int st);
+  void killTimer(int st);
+  void fakeStage(uint8_t confIndex);
+
+  // timeout tracking
+
+  TimeoutTracking timeout_request_stage;
+  TimeoutTracking timeout_request_neighbors;
+  TimeoutTracking timeout_force_transition;
+  
+  /**
    * @fn  cs::StageOne* SolverCore::find_stage1(uint8_t sender);
    *
    * @brief   Searches for the stage 1 of given sender
@@ -288,6 +303,7 @@ private:
   cs::StageOneSmarts st1;
   cs::StageTwoSmarts st2;
   cs::StageThreeSmarts st3;
+  std::vector <int> smartUntrusted;
 
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;

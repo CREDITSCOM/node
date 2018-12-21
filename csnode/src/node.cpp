@@ -137,7 +137,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     << "\n-----------------------------------------------------------";
 
   istream_.init(data, size);
-
+  //subRound++;
+  istream_ >> subRound_;
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
 
@@ -148,7 +149,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cserror() << className() << " read round data from SS failed";
     return;
   }
-
+  // this evil code sould be removed after examination
   while (blockChain_.getLastWrittenSequence() >= rNum) {
     blockChain_.removeLastBlock();
   }
@@ -183,7 +184,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   if (!readRoundData(roundTable)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
-
+  subRound_ = 0;
   roundTable.round = rNum;
 
   // "normal" start
@@ -1243,14 +1244,14 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cscrypto::CalculateHash(stageOneInfo.messageHash, message.data(), message.size());
 
   cs::DataStream signStream(messageToSign);
-  signStream << roundNumber_ << stageOneInfo.messageHash;
+  signStream << roundNumber_ << subRound_<< stageOneInfo.messageHash;
 
   csdetails() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToConfidants(MsgTypes::FirstStage, roundNumber_, stageOneInfo.signature, message);
+  sendToConfidants(MsgTypes::FirstStage, roundNumber_, subRound_, stageOneInfo.signature, message);
 
   // cache
   stageOneMessage_[myConfidantIndex_] = std::move(message);
@@ -1271,10 +1272,15 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   cs::StageOne stage;
   cs::Bytes bytes;
-  istream_ >> stage.signature >> bytes;
+  uint8_t subRound;
+  istream_ >> subRound >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad stage-1 packet format";
+    return;
+  }
+  if (subRound != subRound_) {
+    cswarning() << "NODE> We got stage-1 for the Hode with SUBROUND, we don't have";
     return;
   }
 
@@ -1283,7 +1289,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   cs::Bytes signedMessage;
   cs::DataStream signedStream(signedMessage);
-  signedStream << roundNumber_ << stage.messageHash;
+  signedStream << roundNumber_ << subRound_ << stage.messageHash;
 
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
@@ -1345,7 +1351,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
   // create signature
   cscrypto::GenerateSignature(stageTwoInfo.signature, solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  sendToConfidants(MsgTypes::SecondStage, roundNumber_, stageTwoInfo.signature, bytes);
+  sendToConfidants(MsgTypes::SecondStage, roundNumber_, subRound_, stageTwoInfo.signature, bytes);
 
   // cash our stage two
   stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
@@ -1362,13 +1368,18 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   csdebug() << "NODE> getting stage-2 from " << getSenderText(sender);
   istream_.init(data, size);
-
+  uint8_t subRound;
   cs::StageTwo stage;
   cs::Bytes bytes;
-  istream_ >> stage.signature >> bytes;
+  istream_ >> subRound >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "NODE> bad stage-2 packet format";
+    return;
+  }
+
+  if (subRound != subRound_) {
+    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
     return;
   }
 
@@ -1379,10 +1390,11 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
+
   if (!conveyer.isConfidantExists(stage.sender)) {
     return;
   }
-
+  
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     cslog() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
@@ -1419,7 +1431,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
   cscrypto::GenerateSignature(stageThreeInfo.signature,solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, stageThreeInfo.signature, bytes);
+  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, subRound_, stageThreeInfo.signature, bytes);
 
   // cach stage three
   stageThreeMessage_[myConfidantIndex_] = std::move(bytes);
@@ -1436,23 +1448,30 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   }
 
   istream_.init(data, size);
-
+  uint8_t subRound;
   cs::StageThree stage;
   cs::Bytes bytes;
-  istream_  >> stage.signature >> bytes;
+  istream_  >> subRound >> stage.signature >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "NODE> Bad stage-3 packet format";
     return;
   }
 
+  if (subRound != subRound_) {
+    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
+    return;
+  }
+
   cs::DataStream stream(bytes.data(), bytes.size());
+  
   stream >> stage.sender;
   stream >> stage.writer;
   stream >> stage.hashBlock;
   stream >> stage.hashHashesList;
   stream >> stage.hashCandidatesList;
   stream >> stage.realTrustedMask;
+
 
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -1483,7 +1502,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) 
     return;
   }
 
-  sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_ , myConfidantIndex_, required);
+  sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_ , subRound_,  myConfidantIndex_, required);
   csmeta(csdetails) << "done";
 }
 
@@ -1498,8 +1517,13 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 
   uint8_t requesterNumber = 0;
   uint8_t requiredNumber = 0;
-  istream_ >> requesterNumber >> requiredNumber;
+  uint8_t subRound;
+  istream_ >> subRound >> requesterNumber >> requiredNumber;
 
+  if (subRound != subRound_) {
+    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
+    return;
+  }
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isConfidantExists(requesterNumber)) {
@@ -2041,7 +2065,7 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
   cslog() << "Hashes count: " << hashes.size();
 
   transport_->clearTasks();
-
+  subRound_ = 0;
   onRoundStart(table);
   startConsensus();
 }
@@ -2054,7 +2078,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cserror() << "NODE> writers don't receive round table";
     return;
   }
-
+  subRound_ = 0;
   istream_.init(data, size);
 
   // RoundTable evocation
@@ -2119,7 +2143,7 @@ void Node::sendHash(cs::RoundNumber round) {
   // = personallyDamagedHash();
 
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
-  sendToConfidants(MsgTypes::BlockHash, round, hash);
+  sendToConfidants(MsgTypes::BlockHash, round, subRound_, hash);
 #endif
 }
 
@@ -2134,13 +2158,16 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   istream_.init(data, size);
 
   csdb::PoolHash tmp;
-  istream_ >> tmp;
+  uint8_t subRound;
+  istream_ >> subRound >> tmp;
 
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "NODE> bad hash packet format";
     return;
   }
-
+  if (subRound > subRound_) {
+    cswarning() << "NODE> We got hash for the Hode with SUBROUND, we don't have";
+  }
   solver_->gotHash(std::move(tmp), sender);
 }
 
@@ -2286,7 +2313,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   width += padWidth;
-  line1 << " ROUND " << roundNumber_ << ". ";
+  line1 << " ROUND " << roundNumber_ << "." << (int) subRound_ << " ";
   width += 9;
 
   if (NodeLevel::Normal == myLevel_) {
