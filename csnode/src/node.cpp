@@ -479,7 +479,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
 void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                               const cs::Characteristic& characteristic, const cs::Signature& signature) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::RoundTable << roundNumber_;
+  ostream_ << MsgTypes::RoundTable << roundNumber_ << subRound_;
   ostream_ << roundTable.confidants.size();
   ostream_ << roundTable.hashes.size();
 
@@ -2083,12 +2083,18 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   // RoundTable evocation
   std::size_t confidantsCount = 0;
-  istream_ >> confidantsCount;
+  uint8_t subRound;
+  istream_ >> subRound >> confidantsCount;
 
   if (confidantsCount == 0) {
     csmeta(cserror) << "illegal confidants count in round table";
     return;
   }
+  if (subRound < subRound_) {
+    cswarning() << "NODE> We got RoundTable with Last wrong last SUBROUND, we don't have";
+    return;//here we have to run syncronizer
+  }
+
 
   std::size_t hashesCount = 0;
   istream_ >> hashesCount;

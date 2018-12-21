@@ -483,32 +483,34 @@ int cnt = smartConfidants_.size();
 
   void SolverCore::startTimer(int st) {
     //cslog() << __func__ << "(): start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    //auto& pctx = pcontext;
+    //cslog() << __func__ << "(): start track timeout " << Consensus::T_stage_request << " ms of stages-1 received";
     //timeout_request_stage.start(
-    //  scheduler(), Consensus::T_stage_request,
+    //  pctx->scheduler(), Consensus::T_stage_request,
     //  // timeout #1 handler:
-    //  [this, st]() {
-    //    cslog() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
-    //      request_stages(1);
-    //    // start subsequent track timeout for "wide" request
-    //    cslog() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
-    //      << " ms to request neighbors about stages-" << st;
-    //    timeout_request_neighbors.start(
-    //      scheduler(), Consensus::T_stage_request,
-    //      // timeout #2 handler:
-    //      [this, st]() {
-    //        cslog() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
-    //          request_stages_neighbors(1);
-    //        // timeout #3 handler
-    //        timeout_force_transition.start(
-    //          scheduler(), Consensus::T_stage_request,
-    //          [this, st]() {
-    //            cslog() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
-    //            mark_outbound_nodes();
-    //          },
-    //          true/*replace if exists*/);
-    //      },
-    //      true /*replace if exists*/);
+    //  [pctx, this]() {
+    //  cslog() << __func__<< "(): timeout for stages-1 is expired, make requests";
+    //  request_stages(*pctx);
+    //  // start subsequent track timeout for "wide" request
+    //  cslog() << __func__ << ": start subsequent track timeout " << Consensus::T_stage_request
+    //    << " ms to request neighbors about stages-1";
+    //  timeout_request_neighbors.start(
+    //    pctx->scheduler(), Consensus::T_stage_request,
+    //    // timeout #2 handler:
+    //    [pctx, this]() {
+    //    cslog() << __func__ << ": timeout for requested stages is expired, make requests to neighbors";
+    //    request_stages_neighbors(*pctx);
+    //    // timeout #3 handler
+    //    timeout_force_transition.start(
+    //      pctx->scheduler(), Consensus::T_stage_request,
+    //      [pctx, this]() {
+    //      cslog() << __func__ << ": timeout for transition is expired, mark silent nodes as outbound";
+    //      mark_outbound_nodes();
+    //    },
+    //      true/*replace if exists*/);
     //  },
+    //    true /*replace if exists*/);
+    //},
     //  true /*replace if exists*/);
 
   }
@@ -525,7 +527,7 @@ int cnt = smartConfidants_.size();
     }
   }
 
-  void SolverCore::request_stages(int st) {
+  void SolverCore::request_stages(cs::SolverContext context) {
     //uint8_t cnt = (uint8_t)context.cnt_trusted();
     //int cnt_requested = 0;
     //for (uint8_t i = 0; i < cnt; ++i) {
@@ -535,12 +537,12 @@ int cnt = smartConfidants_.size();
     //  }
     //}
     //if (0 == cnt_requested) {
-    //  csdebug() << name() << ": no node to request";
+    //  csdebug() <<__func__ << ": no node to request";
     //}
   }
 
   // requests stages from any available neighbor nodes
-  void SolverCore::request_stages_neighbors(int st) {
+  void SolverCore::request_stages_neighbors(cs::SolverContext context) {
     //const auto& stage2_data = context.stage2_data();
     //uint8_t cnt = (uint8_t)context.cnt_trusted();
     //int cnt_requested = 0;
@@ -555,7 +557,7 @@ int cnt = smartConfidants_.size();
     //  }
     //}
     //if (0 == cnt_requested) {
-    //  csdebug() << name() << ": no node to request";
+    //  csdebug() << __func__ << ": no node to request";
     //}
   }
 

@@ -106,8 +106,8 @@ public:
   void createFinalTransactionSet();
 
 
-  void SolverCore::request_stages(int st);
-  void SolverCore::request_stages_neighbors(int st);
+  void SolverCore::request_stages(cs::SolverContext context);
+  void SolverCore::request_stages_neighbors(cs::SolverContext st);
   void SolverCore::mark_outbound_nodes();
 
   std::vector<cs::PublicKey> smartConfidants();
