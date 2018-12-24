@@ -304,31 +304,39 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
-  csmeta(csdebug);
+  csmeta(csdebug) << "begin";
   csdb::Pool pool {};
 
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if(deferredBlock_.is_valid()) {
+  if (deferredBlock_.is_valid()) {
     pool = deferredBlock_;
     deferredBlock_ = csdb::Pool();
   }
   else {
     pool = storage_.pool_remove_last();
-    const auto removedHash = blockHashes_->removeLast();
-
-    if (removedHash != pool.hash()) {
-      cserror() << "BLOCKCHAIN> Error! Last pool hash mismatch";
-    }
   }
 
-  csmeta(csdebug) << "Seq: " << pool.sequence();
+  const auto lastHash = blockHashes_->getLast();
+  const csdb::PoolHash ph = pool.hash();
+
+  if (lastHash == ph) {
+    blockHashes_->removeLast();
+    csmeta(cslog) << "Remove last hash is ok, sequence: " << pool.sequence();
+  }
+  else {
+    csmeta(cserror) << "Error! Last pool hash mismatch";
+    csmeta(cserror) << "Block hashes size: " << blockHashes_->getHashesSize() << ", Pool sequence: " << pool.sequence()
+                    << ", in Block hashes sequence: " << blockHashes_->find(ph);
+  }
 
 #ifdef TRANSACTIONS_INDEX
   total_transactions_count_ -= pool.transactions().size();
 #endif
 
   removeWalletsInPoolFromCache(pool);
+
+  csmeta(csdebug) << "done";
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {

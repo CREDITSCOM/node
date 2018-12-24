@@ -667,6 +667,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
         sendReply();
       }
     }
+    else {
+      csmeta(cserror) << "Load block: " << sequence << " from blockchain is Invalid";
+    }
   }
 
   if (!isOneBlockReply) {

@@ -592,8 +592,6 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t &cnt) const {
 }
 
 Pool Storage::pool_remove_last() {
-  Pool empty_Pool{};
-
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
