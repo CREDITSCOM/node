@@ -49,6 +49,9 @@ else()
   execute_process(COMMAND make
                   WORKING_DIRECTORY ${libsodium_dir})
 
+  execute_process(COMMAND make check
+                  WORKING_DIRECTORY ${libsodium_dir})
+
   execute_process(COMMAND make install 
                   WORKING_DIRECTORY ${libsodium_dir})
     
