@@ -261,8 +261,14 @@ namespace cs
       cserror() << name() << ": contract new state does not contain state value";
     }
     else {
-      contract_state[absolute_address(new_state.target())] = fld_state_value.value<std::string>();
-      csdebug() << name() << ": contract state updated, there are " << contract_state.size() << " items in states cache";
+      std::string state_value = fld_state_value.value<std::string>();
+      if(!state_value.empty()) {
+        contract_state[absolute_address(new_state.target())] = state_value;
+        csdebug() << name() << ": contract state updated, there are " << contract_state.size() << " items in states cache";
+      }
+      else {
+        cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
+      }
     }
 
     // remove from exe_queue
@@ -367,7 +373,8 @@ namespace cs
 
     csdebug() << name() << ": imitate execution of start contract transaction";
 
-    // result does not contain USRFLD[state::Value] (contract state)
+    // result contains empty USRFLD[state::Value]
+    result.add_user_field(trx_uf::new_state::Value, std::string {});
     set_execution_result(result);
     return true;
   }
