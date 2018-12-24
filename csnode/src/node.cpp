@@ -133,7 +133,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   csunused(type);
   cswarning() << "-----------------------------------------------------------";
   cswarning() << "NODE> BigBang #" << rNum << ": last written #"
-    << getBlockChain().getLastWrittenSequence() << ", current #" << roundNumber_;
+    << getBlockChain().getLastSequence() << ", current #" << roundNumber_;
   cswarning() << "-----------------------------------------------------------";
 
   istream_.init(data, size);
@@ -149,7 +149,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     return;
   }
   // this evil code sould be removed after examination
-  while (blockChain_.getLastWrittenSequence() >= rNum) {
+  while (blockChain_.getLastSequence() >= rNum) {
     blockChain_.removeLastBlock();
   }
 
@@ -230,7 +230,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
   }
 
   // local round is behind global one
-  const auto last_block = getBlockChain().getLastWrittenSequence();
+  const auto last_block = getBlockChain().getLastSequence();
   if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
     // activate pool synchronizer
     poolSynchronizer_->processingSync(globalTable.round);
@@ -405,7 +405,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csdebug() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristic.mask.size();
   csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
-  if (getBlockChain().getLastWrittenSequence() <= poolMetaInfo.sequenceNumber) {
+  if (getBlockChain().getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
 
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
@@ -637,7 +637,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     return;
   }
 
-  if (sequences.front() > blockChain_.getLastWrittenSequence()) {
+  if (sequences.front() > blockChain_.getLastSequence()) {
     cswarning() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond last written sequence";
     return;
   }
@@ -762,7 +762,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
     }
 
     // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
-    if(getBlockChain().getLastWrittenSequence() + 1 == getRoundNumber()) {
+    if(getBlockChain().getLastSequence() + 1 == getRoundNumber()) {
       cslog() << "NODE> got all blocks written in current round";
       startConsensus();
     }
@@ -913,7 +913,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
       return MessageActions::Drop;
     }
 
-    if (rNum > getBlockChain().getLastWrittenSequence() + cs::Conveyer::HashTablesStorageCapacity) {
+    if (rNum > getBlockChain().getLastSequence() + cs::Conveyer::HashTablesStorageCapacity) {
       // too many rounds behind the global round
       return MessageActions::Drop;
     }
@@ -1978,7 +1978,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
 
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
-  poolMetaInfo.sequenceNumber = blockChain_.getLastWrittenSequence() + 1;  // change for roundNumber
+  poolMetaInfo.sequenceNumber = blockChain_.getLastSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = timeStamp;
 
   auto st3 = solver_->find_stage3(myConfidantIndex_);
@@ -2132,7 +2132,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
 void Node::sendHash(cs::RoundNumber round) {
 #if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
-  if (getBlockChain().getLastWrittenSequence() != round - 1) {
+  if (getBlockChain().getLastSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
   }
@@ -2341,7 +2341,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
   cslog() << s;
   cslog() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
-  cslog() << " last written sequence = " << getBlockChain().getLastWrittenSequence();
+  cslog() << " last written sequence = " << getBlockChain().getLastSequence();
 
   std::ostringstream line2;
 
@@ -2386,7 +2386,7 @@ void Node::startConsensus() {
   transport_->processPostponed(roundNumber);
 
   // claim the trusted role only if have got proper blockchain:
-  if (roundNumber == getBlockChain().getLastWrittenSequence() + 1) {
+  if (roundNumber == getBlockChain().getLastSequence() + 1) {
     sendHash(roundNumber);
   }
 }

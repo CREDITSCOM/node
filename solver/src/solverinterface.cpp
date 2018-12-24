@@ -95,7 +95,7 @@ namespace cs
 
   void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
   {
-    cs::Sequence delta = cur_round - pnode->getBlockChain().getLastWrittenSequence();
+    cs::Sequence delta = cur_round - pnode->getBlockChain().getLastSequence();
     if(delta > 1) {
       recv_hash.push_back(std::make_pair<>(hash, sender));
       csdebug() << "SolverCore: cache hash until last block ready";

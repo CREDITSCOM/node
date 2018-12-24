@@ -110,7 +110,7 @@ public:
   static csdb::Address getAddressFromKey(const std::string&);
   csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
 
-  cs::Sequence getLastWrittenSequence() const;
+  cs::Sequence getLastSequence() const;
 
   cs::Sequence getRequestedBlockNumber() const;
 

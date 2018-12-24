@@ -73,7 +73,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
   }
 
-  cslog() << "BLOCKCHAIN> max loaded block #" << getLastWrittenSequence();
+  cslog() << "BLOCKCHAIN> max loaded block #" << getLastSequence();
   good_ = true;
 }
 
@@ -99,8 +99,8 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
       const auto& confidants = prev_pool.confidants();
       initer.loadPrevBlock(pool, confidants);
-      if (!blockHashes_->initFromPrevBlock(pool))
-        return false;
+
+      blockHashes_->initFromPrevBlock(pool);
 
       ++current_sequence;
 #ifdef TRANSACTIONS_INDEX
@@ -149,7 +149,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 }
 #endif
 
-cs::Sequence BlockChain::getLastWrittenSequence() const {
+cs::Sequence BlockChain::getLastSequence() const {
   if (deferredBlock_.is_valid()) {
     return deferredBlock_.sequence();
   }
@@ -220,7 +220,7 @@ void BlockChain::writeGenesisBlock() {
   genesis.add_transaction(transaction);
 
   genesis.set_previous_hash(csdb::PoolHash());
-  genesis.set_sequence(getLastWrittenSequence() + 1);
+  genesis.set_sequence(getLastSequence() + 1);
   addNewWalletsToPool(genesis);
 
   cslog() << "Genesis block completed ... trying to save";
@@ -465,7 +465,7 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
 }
 
 cs::Sequence BlockChain::getRequestedBlockNumber() const {
-  return getLastWrittenSequence() + 1;
+  return getLastSequence() + 1;
 }
 
 uint64_t BlockChain::getWalletsCount() {
@@ -849,7 +849,7 @@ const BlockChain::AddrTrnxCount& BlockChain::get_trxns_count(const csdb::Address
 }
 
 std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets) {
-  const auto last_seq = getLastWrittenSequence();
+  const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
 
@@ -889,7 +889,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 }
 
 bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
-  const auto last_seq = getLastWrittenSequence();
+  const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq <= last_seq) {
     // ignore
@@ -926,7 +926,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
 }
 
 std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool) {
-  const auto last_seq = getLastWrittenSequence();
+  const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq != last_seq + 1) {
     return std::nullopt;
@@ -941,7 +941,7 @@ void BlockChain::testCachedBlocks() {
   }
   // retrieve blocks until cache empty or block sequence is interrupted
   while (!cachedBlocks_.empty()) {
-    size_t desired_seq = getLastWrittenSequence() + 1;
+    size_t desired_seq = getLastSequence() + 1;
     const auto oldest = cachedBlocks_.cbegin();
     if (oldest->first < desired_seq) {
       // clear outdated block and select next one:
@@ -978,7 +978,7 @@ std::size_t BlockChain::getCachedBlocksSize() const {
 
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
-  const auto firstSequence = getLastWrittenSequence() + 1;
+  const auto firstSequence = getLastSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
   const auto roundNumber = currentRoundNumber ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 

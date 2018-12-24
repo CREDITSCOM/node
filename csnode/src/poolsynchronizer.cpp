@@ -39,7 +39,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     return;
   }
 
-  const cs::Sequence lastWrittenSequence = blockChain_->getLastWrittenSequence();
+  const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
 
   if (lastWrittenSequence >= roundNum) {
     const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
@@ -112,7 +112,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
           << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "], id: " << packetNum;
 
   /// TODO Fix numeric cast from RoundNum to cs::Sequence
-  cs::Sequence lastWrittenSequence = blockChain_->getLastWrittenSequence();
+  cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
   const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
   const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
 
@@ -132,7 +132,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
 
     if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
       blockChain_->testCachedBlocks();
-      lastWrittenSequence = blockChain_->getLastWrittenSequence();
+      lastWrittenSequence = blockChain_->getLastSequence();
     }
   }
 
@@ -314,7 +314,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   }
 
   const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
-  const cs::Sequence lastWrittenSequence = blockChain_->getLastWrittenSequence();
+  const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
 
   for (const auto& el : requiredBlocks) {
     csmeta(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
@@ -481,7 +481,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 }
 
 bool cs::PoolSynchronizer::isLastRequest() const {
-  const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastWrittenSequence() -
+  const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
                    blockChain_->getCachedBlocksSize();
   return sum <= syncData_.blockPoolsCount;
 }

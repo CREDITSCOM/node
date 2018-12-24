@@ -295,7 +295,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastWrittenSequence(), node_->getBlockChain().getLastHash());
+      gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash());
       break;
     case NetworkCommand::SSSpecificBlock: {
       try {
@@ -1052,7 +1052,7 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 void Transport::sendPingPack(const Connection& conn) {
   cs::SpinGuard lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastWrittenSequence() << myPublicKey_;
+  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastSequence() << myPublicKey_;
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }
