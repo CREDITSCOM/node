@@ -411,8 +411,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
-    assert(sequence <= this->getRoundNumber());
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
