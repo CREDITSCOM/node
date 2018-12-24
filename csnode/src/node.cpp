@@ -137,7 +137,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   cswarning() << "-----------------------------------------------------------";
 
   istream_.init(data, size);
-  //subRound++;
   istream_ >> subRound_;
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
@@ -472,7 +471,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
 void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                               const cs::Characteristic& characteristic, const cs::Signature& signature) {
   ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::RoundTable << roundNumber_ /*<< subRound_*/;
+  ostream_ << MsgTypes::RoundTable << roundNumber_ << subRound_;
   ostream_ << roundTable.confidants.size();
   ostream_ << roundTable.hashes.size();
 
@@ -2075,7 +2074,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   // RoundTable evocation
   std::size_t confidantsCount = 0;
   uint8_t subRound = subRound_;
-  istream_ /*>> subRound*/ >> confidantsCount;
+  istream_ >> subRound >> confidantsCount;
 
   if (confidantsCount == 0) {
     csmeta(cserror) << "illegal confidants count in round table";
@@ -2083,11 +2082,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   if(subRound_ > subRound) {
-    cswarning() << "NODE> We got RoundTable with Last wrong last SUBROUND, we don't have";
+    cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
     return;
   }
 
-  subRound_ = 0; // subRound;
+  subRound_ = subRound;
   std::size_t hashesCount = 0;
   istream_ >> hashesCount;
 
