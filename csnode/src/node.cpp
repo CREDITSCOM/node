@@ -370,7 +370,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   if (!conveyer.isSyncCompleted(round)) {
-    cslog() << "\tpacket sync not finished, saving characteristic meta to call after sync";
+    csdebug() << "\tpacket sync not finished, saving characteristic meta to call after sync";
 
     cs::Bytes characteristicBytes(data, data + size);
 
@@ -384,15 +384,14 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   istream_.init(data, size);
 
-  std::string time;
   cs::Bytes characteristicMask;
-  cs::Sequence sequence = 0;
 
-  cslog() << "\tconveyer sync completed, parsing data size " << size;
+  csdebug() << "\tconveyer sync completed, parsing data size " << size;
 
+  cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
   istream_ >> poolMetaInfo.timestamp;
-  istream_ >> characteristicMask >> poolMetaInfo.sequenceNumber;
+  istream_ >> characteristic.mask >> poolMetaInfo.sequenceNumber;
 
   cs::Signature signature;
   istream_ >> signature;
@@ -404,13 +403,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  cslog() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristicMask.size();
+  csdebug() << "\tsequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristic.mask.size();
   csdebug() << "\ttime = " << poolMetaInfo.timestamp;
 
-  if (getBlockChain().getLastWrittenSequence() <= sequence) {
+  if (getBlockChain().getLastWrittenSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
-    cs::Characteristic characteristic;
-    characteristic.mask = std::move(characteristicMask);
 
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
 

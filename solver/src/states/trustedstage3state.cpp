@@ -70,7 +70,7 @@ void TrustedStage3State::on(SolverContext& context) {
                   mark_outbound_nodes(*pctx);
                 },
                 true/*replace if exists*/);
-        },
+            },
             true /*replace if exists*/);
       },
       true /*replace if exists*/);
