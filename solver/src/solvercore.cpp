@@ -359,7 +359,9 @@ int cnt = (int)smartConfidants_.size();
     sizeof(smartStageOneStorage_.at(ownSmartsConfNum_).hash)) << ", Frequency = " << hashFrequency;
   auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
   for (auto& st : smartStageTwoStorage_) {
-    if (st.sender = ownSmartsConfNum_) continue;
+    if(st.sender == ownSmartsConfNum_) {
+      continue;
+    }
     for (int i = 0; i< cnt; ++i) {
       if (st.signatures[i] != myStage2.signatures[i]) {
         if (cscrypto::VerifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
