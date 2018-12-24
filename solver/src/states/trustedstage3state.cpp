@@ -174,7 +174,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         }
 
         bool toBreak = false;
-        size_t tCandSize = context.stage1(it.sender)->trustedCandidates.size();
+        size_t tCandSize = 0;
+        const auto ptrStage1 = context.stage1(it.sender);
+        if(ptrStage1 != nullptr){
+          tCandSize =  ptrStage1->trustedCandidates.size();
+        }
+
         if(tCandSize > 0) {
           for(size_t outer = 0; outer < tCandSize - 1; outer++) {
             for(size_t inner = outer + 1; inner < tCandSize; inner++) {

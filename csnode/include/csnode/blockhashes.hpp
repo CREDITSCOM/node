@@ -27,7 +27,13 @@ public:
 
   bool find(cs::Sequence seq, csdb::PoolHash& res) const;
 
+  cs::Sequence find(csdb::PoolHash hash) const;
+
   csdb::PoolHash removeLast();
+
+  csdb::PoolHash getLast() const;
+
+  std::size_t getHashesSize() const;
 
 private:
   std::vector<csdb::PoolHash> hashes_;

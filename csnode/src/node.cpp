@@ -410,8 +410,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
 
-    assert(sequence <= this->getRoundNumber());
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
@@ -668,6 +666,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
         sendReply();
       }
     }
+    else {
+      csmeta(cserror) << "Load block: " << sequence << " from blockchain is Invalid";
+    }
   }
 
   if (!isOneBlockReply) {
@@ -758,12 +759,12 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
       getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
+    }
 
-      // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
-      if(getBlockChain().getLastWrittenSequence() + 1 == getRoundNumber()) {
-        cslog() << "NODE> got all blocks written in current round";
-        startConsensus();
-      }
+    // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
+    if(getBlockChain().getLastWrittenSequence() + 1 == getRoundNumber()) {
+      cslog() << "NODE> got all blocks written in current round";
+      startConsensus();
     }
   }
 }
@@ -774,7 +775,6 @@ void Node::processTransactionsPacket(cs::TransactionsPacket&& packet) {
 
 void Node::reviewConveyerHashes() {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  //conveyer.setRound(std::move(roundTable));
   const auto& table = conveyer.currentRoundTable();
 
   if (table.hashes.empty() || conveyer.isSyncCompleted()) {
@@ -2062,7 +2062,7 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-  csdebug() << "\nNODE> next round table received";
+  csdebug() << "NODE> next round table received, round: " << rNum;
   csmeta(csdetails) << "started";
 
   if (myLevel_ == NodeLevel::Writer) {
@@ -2119,6 +2119,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   roundTable.general = sender;
   csdebug() << "NODE> confidants: " << roundTable.confidants.size();
 
+  // create pool by previous round, then change conveyer state.
   getCharacteristic(istream_.getCurrentPtr(), istream_.remainsBytes(), cs::Conveyer::instance().currentRoundNumber(), sender);
   cs::Conveyer::instance().setRound(std::move(roundTable));
 

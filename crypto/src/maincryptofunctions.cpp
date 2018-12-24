@@ -8,7 +8,6 @@ namespace cscrypto {
 
 void CalculateHash(Hash& hash, const Byte* data, size_t data_size,
                    const Byte* key, size_t key_size) {
-  assert(data != nullptr);
   blake2s(hash.data(), BLAKE2S_OUTBYTES, data, data_size, key, key_size);
 }
 
