@@ -87,7 +87,18 @@ namespace cs
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
   {
-    return (l.transaction == r.transaction && l.hash == r.hash);
+    return (l.transaction == r.transaction && l.sequence == r.sequence /*&& l.hash == r.hash*/);
+  }
+
+  inline bool operator<(const SmartContractRef& l, const SmartContractRef& r)
+  {
+    if(l.sequence < r.sequence) {
+      return true;
+    }
+    if(l.sequence > r.sequence) {
+      return false;
+    }
+    return (l.transaction < r.transaction);
   }
 
   enum class SmartContractStatus
@@ -157,6 +168,11 @@ namespace cs
       return "Smarts";
     }
 
+    csdb::Address absolute_address(csdb::Address optimized_address) const
+    {
+      return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    }
+
     bool execution_allowed;
     bool force_execution;
 
@@ -172,6 +188,9 @@ namespace cs
     cs::Bytes node_id;
     csconnector::connector::ApiHandlerPtr papi;
 
+    // last contract's state storage
+    std::map<csdb::Address, std::string> contract_state;
+
     struct QueueItem
     {
       SmartContractRef contract;
@@ -179,6 +198,7 @@ namespace cs
       cs::RoundNumber round;
     };
 
+    // executiom queue
     std::vector<QueueItem> exe_queue;
 
     std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item)
