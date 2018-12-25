@@ -301,7 +301,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       try {
         cs::RoundNumber round = 0;
         iPackStream_ >> round;
-        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO: 
       }
       catch (std::out_of_range&) { }
       break;
@@ -543,11 +543,11 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::SecondStage:
     return node_->getStageTwo(data, size, firstPack.getSender());
   case MsgTypes::FirstStageRequest:
-    return node_->getStageRequest(MsgTypes::FirstStageRequest, data, size, firstPack.getSender());
+    return node_->getStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::SecondStageRequest:
-    return node_->getStageRequest(MsgTypes::SecondStageRequest, data, size, firstPack.getSender());
+    return node_->getStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::ThirdStageRequest:
-    return node_->getStageRequest(MsgTypes::ThirdStageRequest, data, size, firstPack.getSender());
+    return node_->getStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::ThirdStage:
     return node_->getStageThree(data, size, firstPack.getSender());
   case MsgTypes::FirstSmartStage:
@@ -556,6 +556,12 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getSmartStageTwo(data, size, rNum, firstPack.getSender());
   case MsgTypes::ThirdSmartStage:
     return node_->getSmartStageThree(data, size, rNum, firstPack.getSender());
+  case MsgTypes::SmartFirstStageRequest:
+    return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+  case MsgTypes::SmartSecondStageRequest:
+    return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+  case MsgTypes::SmartThirdStageRequest:
+    return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::RoundTable:
     return node_->getRoundTable(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:

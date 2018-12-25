@@ -1886,13 +1886,11 @@ void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t requi
     return;
   }
 
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (!conveyer.isConfidantExists(respondent)) {
+  if (!solver_->smartConfidantExist(respondent)) {
     return;
   }
-
-  sendDefault(conveyer.confidantByIndex(respondent), msgType, roundNumber_, myConfidantIndex_, required);
+  auto confidant = solver_->smartConfidants().at(respondent);
+  sendDefault(confidant, msgType, roundNumber_, myConfidantIndex_, required);
   csmeta(csdetails) << "done";
 }
 
@@ -1910,13 +1908,11 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   uint8_t requiredNumber = 0;
   istream_ >> requesterNumber >> requiredNumber;
 
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (!conveyer.isConfidantExists(requesterNumber)) {
+  if (!solver_->smartConfidantExist(requiredNumber)) {
     return;
   }
 
-  if (requester != conveyer.confidantByIndex(requesterNumber)) {
+  if (requester != solver_->smartConfidants().at(requesterNumber)) {
     return;
   }
 
@@ -1924,19 +1920,8 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     cserror() << "Bad StageThree packet format";
     return;
   }
+  solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 
-  switch (msgType) {
-  case MsgTypes::FirstStageRequest:
-    solver_->gotStageOneRequest(requesterNumber, requiredNumber);
-    break;
-  case MsgTypes::SecondStageRequest:
-    solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
-    break;
-  case MsgTypes::ThirdStageRequest:
-    solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
-    break;
-  default: break;
-  }
 }
 
 void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
@@ -1947,29 +1932,27 @@ void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& 
     return;
   }
 
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-  if (!conveyer.isConfidantExists(requester)) {
+  if (!solver_->smartConfidantExist(requester)) {
     return;
   }
 
-  const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
+  const cs::PublicKey& confidant = solver_->smartConfidants().at(requester);
   cs::Bytes message;
 
   switch (msgType) {
-  case MsgTypes::FirstStage:
-    message = stageOneMessage_[sender];
+  case MsgTypes::FirstSmartStage:
+    message = smartStageOneMessage_[sender];
     break;
-  case MsgTypes::SecondStage:
-    message = stageTwoMessage_[sender];
+  case MsgTypes::SecondSmartStage:
+    message = smartStageTwoMessage_[sender];
     break;
-  case MsgTypes::ThirdStage:
-    message = stageThreeMessage_[sender];
+  case MsgTypes::ThirdSmartStage:
+    message = smartStageThreeMessage_[sender];
     break;
   default: break;
   }
 
-  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  sendDefault(confidant, msgType, solver_->smartRoundNumber(), signature, message);
   csmeta(csdetails) << "done";
 }
 
@@ -2140,10 +2123,10 @@ void Node::sendHash(cs::RoundNumber round) {
   }
 
   const auto& hash = getBlockChain().getLastHash();
-  // = personallyDamagedHash();
-
+  csdb::PoolHash spoiledHash;
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
-  sendToConfidants(MsgTypes::BlockHash, round, subRound_, hash);
+  spoileHash(hash, solver_->getPublicKey(), spoiledHash);
+  sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
 #endif
 }
 
@@ -2168,7 +2151,12 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   if (subRound > subRound_) {
     cswarning() << "NODE> We got hash for the Hode with SUBROUND, we don't have";
   }
-  solver_->gotHash(std::move(tmp), sender);
+  csdb::PoolHash spoiledHash;
+  csdb::PoolHash lwh = blockChain_.getLastHash();
+  spoileHash(lwh, sender, spoiledHash);
+  if(spoiledHash == tmp) {
+    solver_->gotHash(std::move(lwh), sender);
+  }
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
@@ -2406,4 +2394,26 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
   os << "N (" << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ")";
   return os.str();
+}
+
+void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
+{
+  cscrypto::Hash hash;
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
+  cs::Bytes bytesHash(sizeof(cscrypto::Hash));
+  std::copy(hash.begin(),hash.end(),bytesHash.begin());
+  spoiledHash = csdb::PoolHash::from_binary(bytesHash);
+}
+
+void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
+  cslog() << __func__;
+  cscrypto::Hash hash;
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
+  cs::Bytes bytesHash(sizeof(cscrypto::Hash));
+  std::copy(hash.begin(), hash.end(), bytesHash.begin());  
+  spoiledHash = csdb::PoolHash::from_binary(bytesHash);
+}
+
+void Node::smartStageEmptyReply(uint8_t requesterNumber) {
+  cslog() << "Here should be the smart refusal for the SmartStageRequest";
 }

@@ -104,11 +104,12 @@ public:
   uint8_t calculateSmartsConfNum();
   uint8_t ownSmartsConfidantNumber();
   void createFinalTransactionSet();
+  bool smartConfidantExist(uint8_t);
+  void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
 
-
-  void SolverCore::request_stages(int);
-  void SolverCore::request_stages_neighbors(int);
-  void SolverCore::mark_outbound_nodes();
+  void requestSmartStages(int st);
+  void requestSmartStagesNeighbors(int st);
+  void markSmartOutboundNodes();
 
   std::vector<cs::PublicKey> smartConfidants();
 
