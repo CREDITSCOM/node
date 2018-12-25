@@ -315,6 +315,7 @@ namespace cs
   bool SmartContracts::execute(const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = get_transaction(item);
+    cslog() << "Start transaction: UserFields Number *= " << start_tr.user_field_ids().size();
     if(!is_executable(start_tr)) {
       cserror() << name() << ": unable execute neither deploy nor start transaction";
       return false;
@@ -338,7 +339,7 @@ namespace cs
     result.add_user_field(trx_uf::new_state::RefStart, item.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(start_tr.max_fee().to_double())));
-
+    cslog() << "Finish transaction: UserFields Number *= " << result.user_field_ids().size();
     auto maybe_contract = get_smart_contract(start_tr);
     if(maybe_contract.has_value()) {
       const auto contract = maybe_contract.value();

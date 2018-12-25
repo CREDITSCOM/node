@@ -451,7 +451,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
  void Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
   cslog() << __func__;
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале
-  auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber+1);
+  auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber);
   if (ptr == nullptr) {
     cs::PublicKey c1;
     csdb::Pool tmpPool = blockChain_.loadBlock(startSmartRoundNumber);
@@ -1696,7 +1696,7 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::SecondSmartStage, stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
 
   // cash our stage two
-  smartStageTwoMessage_[myConfidantIndex_] = std::move(bytes);
+  smartStageTwoMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdetails) << "done";
 }
 

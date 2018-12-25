@@ -247,7 +247,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     pack.makeHash();
     auto tmp = pack.hash().toBinary();
     std::copy(tmp.cbegin(),tmp.cend(), st1.hash.begin());
-    //currentSmartTransaction_ = transaction;
+    currentSmartTransactionPack_ = pack;
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);
@@ -457,8 +457,9 @@ int cnt = (int)smartConfidants_.size();
   void SolverCore::createFinalTransactionSet() {
     cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
-      //currentSmartTransaction_.signature = 
-      cs::Conveyer::instance().addTransaction(currentSmartTransaction_);
+      cs::Conveyer::instance().addTransactionsPacket(currentSmartTransactionPack_);
+      size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
+      cslog() << "Transaction user fields = " << fieldsNumber;
       cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
       return;
     }
