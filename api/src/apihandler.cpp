@@ -756,6 +756,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     auto& trs = p.transactions();
     for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
       auto& tr = *i_tr;
+
       if (is_smart(tr)) {
         pending_smart_transactions->queue.push(std::move(tr));
       }
