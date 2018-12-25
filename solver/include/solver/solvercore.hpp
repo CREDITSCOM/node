@@ -73,7 +73,7 @@ public:
   void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
   void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
   void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
-  void getSmartResultTransaction(const csdb::Transaction& transaction);
+  void getSmartResult(const cs::TransactionsPacket pack);
   void refreshSmartStagesStorage();
   void processStages();
   bool stageOneEnough();
@@ -104,11 +104,12 @@ public:
   uint8_t calculateSmartsConfNum();
   uint8_t ownSmartsConfidantNumber();
   void createFinalTransactionSet();
+  bool smartConfidantExist(uint8_t);
+  void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
 
-
-  void SolverCore::request_stages(int);
-  void SolverCore::request_stages_neighbors(int);
-  void SolverCore::mark_outbound_nodes();
+  void requestSmartStages(int st);
+  void requestSmartStagesNeighbors(int st);
+  void markSmartOutboundNodes();
 
   std::vector<cs::PublicKey> smartConfidants();
 
@@ -299,7 +300,7 @@ private:
   std::vector<cs::PublicKey> smartConfidants_;
   uint8_t ownSmartsConfNum_ = 255;
   cs::Sequence smartRoundNumber_;
-  csdb::Transaction currentSmartTransaction_;
+  cs::TransactionsPacket currentSmartTransactionPack_;
   cs::StageOneSmarts st1;
   cs::StageTwoSmarts st2;
   cs::StageThreeSmarts st3;
