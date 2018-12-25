@@ -365,6 +365,7 @@ namespace cs
       }
       else {
         cserror() << name() << ": failed to execute smart contract";
+        return false;
       }
     }
     else {

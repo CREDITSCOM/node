@@ -356,12 +356,18 @@ private:
     CallsQueue::instance().insert(callBack);
   }
 
+  static boost::asio::thread_pool& threadPoolInstance() noexcept {
+    static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
+    return threadPool;
+  }
+
 public:
+
   ///
   /// Calls std::function after ms time in another thread
   ///
   static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
-    static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
+    static boost::asio::thread_pool& threadPool = threadPoolInstance();
 
     auto timePoint = std::chrono::steady_clock::now() + ms;
     auto closure = [=] {
