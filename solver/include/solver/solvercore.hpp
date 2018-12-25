@@ -73,7 +73,7 @@ public:
   void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
   void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
   void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
-  void getSmartResultTransaction(const csdb::Transaction& transaction);
+  void getSmartResult(const cs::TransactionsPacket pack);
   void refreshSmartStagesStorage();
   void processStages();
   bool stageOneEnough();

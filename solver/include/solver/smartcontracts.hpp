@@ -107,7 +107,7 @@ namespace cs
     Waiting
   };
 
-  using SmartContractExecutedSignal = cs::Signal<void(csdb::Transaction)>;
+  using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
   class SmartContracts final
   {
@@ -153,9 +153,9 @@ namespace cs
     SmartContractStatus enqueue(csdb::Pool block, size_t trx_idx);
     void on_completed(csdb::Pool block, size_t trx_idx);
 
-    void set_execution_result(csdb::Transaction tr)
+    void set_execution_result(cs::TransactionsPacket pack)
     {
-      emit signal_smart_executed(tr);
+      emit signal_smart_executed(pack);
     }
 
     csconnector::connector::ApiHandlerPtr get_api() const

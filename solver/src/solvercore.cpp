@@ -88,7 +88,7 @@ SolverCore::SolverCore()
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc);
     // bind signals
-    cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResultTransaction);
+    cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
   }
 
 SolverCore::~SolverCore() {
@@ -214,11 +214,11 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     return smartConfidants_;
   }
 
-  void SolverCore::getSmartResultTransaction(const csdb::Transaction& transaction) {
+  void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
     cs::SmartContractRef smartRef;
     smartConfidants_.clear();
-    smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
-    smartRoundNumber_ = smartRef.sequence;
+    //smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
+    //smartRoundNumber_ = smartRef.sequence;
     pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
@@ -228,8 +228,11 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     if (ownSmartsConfNum_ == 255) {
       return;
     }
-    cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
-    currentSmartTransaction_ = transaction;
+    //cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+    pack.makeHash();
+    auto tmp = pack.hash().toBinary();
+    std::copy(tmp.cbegin(),tmp.cend(), st1.hash.begin());
+    //currentSmartTransaction_ = transaction;
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);
