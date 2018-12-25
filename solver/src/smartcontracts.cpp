@@ -181,10 +181,23 @@ namespace cs
         }
         else {
           // is start
-          bool present;
-          const auto tmp = papi->getSmartContract(tr.target(), present);
-          if(present) {
-            return tmp;
+          // currently invoke_info contains all info required to execute contract, so
+          // we need not acquire origin
+          constexpr bool api_pass_code_and_methods = true;
+          if constexpr(api_pass_code_and_methods)
+          {
+            return invoke_info;
+          }
+          // if api is refactored, we may need to acquire contract origin separately:
+          if constexpr(!api_pass_code_and_methods)
+          {
+            bool present;
+            auto tmp = papi->getSmartContract(tr.target(), present);
+            if(present) {
+              tmp.method = invoke_info.method;
+              tmp.params = invoke_info.params;
+              return tmp;
+            }
           }
         }
       }
@@ -208,17 +221,16 @@ namespace cs
       new_status = SmartContractStatus::Waiting;
       csdebug() << name() << ": enqueue contract for future execution";
     }
-    else {
-      // place new_item to queue with status Running, wait until executed
-      // new_status = SmartContractStatus::Running already
-    }
+    //else {
+    //  new_status = SmartContractStatus::Running already
+    //}
     // enqueue to end
     exe_queue.emplace_back(QueueItem { new_item, new_status, block.sequence() });
 
     if(SmartContractStatus::Running == new_status) {
       // execute immediately
       if(!invoke_execution(new_item, block)) {
-        cserror() << name() << ": execution failed";
+        cserror() << name() << ": execution canceled";
       }
     }
     return new_status;
@@ -240,9 +252,26 @@ namespace cs
       cserror() << name() << ": new_state transaction does not contain reference to contract";
       return;
     }
-
     SmartContractRef contract_ref;
     contract_ref.from_user_field(fld_contract_ref);
+
+    // update state
+    csdb::UserField fld_state_value = new_state.user_field(trx_uf::new_state::Value);
+    if(!fld_state_value.is_valid()) {
+      cserror() << name() << ": contract new state does not contain state value";
+    }
+    else {
+      std::string state_value = fld_state_value.value<std::string>();
+      if(!state_value.empty()) {
+        contract_state[absolute_address(new_state.target())] = state_value;
+        csdebug() << name() << ": contract state updated, there are " << contract_state.size() << " items in states cache";
+      }
+      else {
+        cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
+      }
+    }
+
+    // remove from exe_queue
     auto it = find_in_queue(contract_ref);
     if(it == exe_queue.cend()) {
       cserror() << name() << ": completed contract is not in queue";
@@ -251,6 +280,7 @@ namespace cs
     if(it != exe_queue.cbegin()) {
       cswarning() << name() << ": completed contract is not at the top of queue";
     }
+    csdebug() << name() << ": remove finished execution from queue";
     exe_queue.erase(it);
     if(!exe_queue.empty()) {
       csdebug() << name() << ": set running status to next contract in queue";
@@ -312,19 +342,21 @@ namespace cs
     auto maybe_contract = get_smart_contract(start_tr);
     if(maybe_contract.has_value()) {
       const auto contract = maybe_contract.value();
-      //APIHandler::smart_transaction_flow():
       executor::ExecuteByteCodeResult resp;
-      std::string methods;
+      std::string state;
       if(!deploy) {
-        const auto fld = start_tr.user_field(trx_uf::start::Methods);
-        if(fld.is_valid()) {
-          methods = fld.value<std::string>();
+        // does not work properly
+        //bool dummy = false;
+        //state = papi->getSmartState(start_tr.target(), dummy);
+        
+        const auto it = contract_state.find(absolute_address(start_tr.target()));
+        if(it != contract_state.cend()) {
+          state = it->second;
         }
       }
-      std::string state;
       constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
       get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(),
-        contract.smartContractDeploy.byteCode, state, methods, contract.params, MAX_EXECUTION_TIME);
+        contract.smartContractDeploy.byteCode, state, contract.method, contract.params, MAX_EXECUTION_TIME);
       if(resp.status.code == 0) {
         // USRFLD[new_state::Value] - new state
         result.add_user_field(trx_uf::new_state::Value, resp.contractState);
@@ -341,7 +373,8 @@ namespace cs
 
     csdebug() << name() << ": imitate execution of start contract transaction";
 
-    // result does not contain USRFLD[state::Value] (contract state)
+    // result contains empty USRFLD[state::Value]
+    result.add_user_field(trx_uf::new_state::Value, std::string {});
     set_execution_result(result);
     return true;
   }
