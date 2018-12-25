@@ -314,10 +314,18 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   }
 
   const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
+
+  if (requiredBlocks.empty()) {
+    return true;
+  }
+
   const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
 
   for (const auto& el : requiredBlocks) {
     csmeta(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
+  }
+  for (const auto& el : requestedSequences_) {
+    csmeta(csdetails) << "requestedSequences: [" << el.first << ", " << el.second << "]";
   }
 
   if (!requestedSequences_.empty()) {
