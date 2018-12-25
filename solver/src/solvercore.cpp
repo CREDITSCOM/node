@@ -216,6 +216,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
 
   void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
     if(pack.transactionsCount() == 0) {
+      //TODO: fix failure of smart execution, clear it from exe_queue
       cserror() << "SolverCore: empty packet must not finish smart contract execution";
       return;
     }
@@ -229,6 +230,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
       }
     }
     if(0 == smartRoundNumber_) {
+      //TODO: fix failure of smart execution, clear it from exe_queue
       cserror() << "SolverCore: smart contract result packet must contain new state transaction";
       return;
     }
