@@ -440,26 +440,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       getBlockChain().testCachedBlocks();
     }
   }
-  else /*getBlockChain().getLastSequence() > poolMetaInfo.sequenceNumber*/ {
-    if (poolMetaInfo.sequenceNumber > 0) {
-      const auto block = blockChain_.loadBlock(poolMetaInfo.sequenceNumber);
-      if (block.is_valid()) {
-        if (block.previous_hash() == poolMetaInfo.previousHash) {
-          // rewind outrunning blocks until poolMetaInfo.sequenceNumber
-          while (blockChain_.getLastSequence() > poolMetaInfo.sequenceNumber) {
-            blockChain_.removeLastBlock();
-          }
-        }
-        else {
-          cserror() << className() << "> Stop working, incompatible blockchain detected";
-          // TODO: stop working, incompatible blockchain detected
-          cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
-            stop();
-          });
-        }
-      }
-    }
-  }
 
   csmeta(csdetails) << "done";
 }
@@ -2100,7 +2080,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     return;
   }
 
-  if(subRound_ > subRound) {
+  if(rNum == roundNumber_ && subRound_ > subRound) {
     cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
     return;
   }
