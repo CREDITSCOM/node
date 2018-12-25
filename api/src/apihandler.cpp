@@ -639,7 +639,7 @@ APIHandler::PoolListGet(api::PoolListGetResult& _return,
 {
   if (!validatePagination(_return, *this, offset, const_limit)) return;
 
-  uint64_t sequence = s_blockchain.getLastWrittenSequence();
+  uint64_t sequence = s_blockchain.getLastSequence();
   if ((uint64_t)offset > sequence) return;
 
   _return.pools.reserve(const_limit);

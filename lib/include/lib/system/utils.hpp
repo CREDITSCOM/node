@@ -46,12 +46,14 @@ using namespace std::literals::string_literals;
 // if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
 #define className typeid(*this).name
 #define classNameString() std::string(className()) + " "s
-#define classNameStream() className() << " "
 
 #define funcName() __func__
-#define methodName() funcName()
 
-#define csreflection() className() << ", method " << methodName() << ": "
+// pseudo definitions
+#define csname() className() << "> "
+#define csfunc() funcName() << "(): "
+
+#define csreflection() className() << ", method " << csfunc()
 #define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {

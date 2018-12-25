@@ -41,7 +41,7 @@ cs::PacketFlushSignal& cs::ConveyerBase::flushSignal() {
 
 void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
   if (!transaction.is_valid()) {
-    cswarning() << className() << " Can not add no valid transaction to conveyer";
+    cswarning() << csname() << "Can not add no valid transaction to conveyer";
     return;
   }
 
@@ -62,7 +62,7 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
     pimpl_->packetsTable.emplace(std::move(hash), packet);
   }
   else {
-    cswarning() << className() << " Same hash already exists at table: " << hash.toString();
+    cswarning() << csname() << "Same hash already exists at table: " << hash.toString();
   }
 }
 
@@ -78,7 +78,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (!meta) {
-    cserror() << className() << " Can not create transactions packet";
+    cserror() << csname() << "Can not create transactions packet";
     return std::nullopt;
   }
 
@@ -90,7 +90,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
     const auto iterator = table.find(hash);
 
     if (iterator == table.end()) {
-      cserror() << className() << ": PACKET CREATION HASH NOT FOUND";
+      cserror() << csname() << "PACKET CREATION HASH NOT FOUND";
       return std::nullopt;
     }
 
@@ -98,7 +98,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 
     for (const auto& transaction : transactions) {
       if (!packet.addTransaction(transaction)) {
-        cserror() << className() << " Can not add transaction at packet creation";
+        cserror() << csname() << "Can not add transaction at packet creation";
       }
     }
   }
@@ -107,7 +107,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
 }
 
 void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
-  cslog() << className() << " updateRoundTable";
+  cslog() << csname() << "updateRoundTable";
 
   {
     cs::Lock lock(sharedMutex_);
@@ -124,7 +124,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   csmeta(csdebug) << "started";
 
   if (table.round <= currentRoundNumber()) {
-    cserror() << classNameStream() << "Setting round in conveyer failed";
+    cserror() << csname() << "Setting round in conveyer failed";
     return;
   }
 
@@ -138,10 +138,10 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
     });
   }
 
-  csdebug() << className() << " Needed round hashes count " << neededHashes.size();
+  csdebug() << csname() << "Needed round hashes count " << neededHashes.size();
 
   for (const auto& hash : neededHashes) {
-    csdetails() << className() <<  " Need hash " << hash.toString();
+    csdetails() << csname() <<  "Need hash " << hash.toString();
   }
 
   {
@@ -161,11 +161,11 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
       pimpl_->metaStorage.append(std::move(element));
     }
     else {
-      csfatal() << className() << " Meta round currently in conveyer";
+      csfatal() << csname() << "Meta round currently in conveyer";
     }
   }
 
-  csmeta(csdebug) << "done, current table size" << pimpl_->packetsTable.size();
+  csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
@@ -186,7 +186,7 @@ bool cs::ConveyerBase::isConfidantExists(size_t index) const {
 
   if (confidantsReference.size() <= index) {
     csmeta(cserror) << ", index " << index << " out of range , confidants count " << confidantsReference.size()
-                          << ", on round " << pimpl_->currentRound;
+                    << ", on round " << pimpl_->currentRound;
     return false;
   }
 
@@ -233,7 +233,7 @@ const cs::PacketsHashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) c
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
-    cserror() << className() << " Bad needed hashes, check node logic";
+    cserror() << csname() << "Bad needed hashes, check node logic";
     return nullptr;
   }
 
@@ -247,21 +247,21 @@ void cs::ConveyerBase::addFoundPacket(cs::RoundNumber round, cs::TransactionsPac
   cs::TransactionsPacketTable* tablePointer = nullptr;
 
   if (metaPointer == nullptr) {
-    cserror() << className() << " Can not add sync packet because meta pointer do not exist";
+    cserror() << csname() << "Can not add sync packet because meta pointer do not exist";
     return;
   }
 
   tablePointer = (round == pimpl_->currentRound) ? &pimpl_->packetsTable : &metaPointer->hashTable;
 
   if (tablePointer == nullptr) {
-    cserror() << className() << " Can not add sync packet because table pointer do not exist";
+    cserror() << csname() << "Can not add sync packet because table pointer do not exist";
     return;
   }
 
   cs::PacketsHashes& hashes = metaPointer->neededHashes;
 
   if (auto iterator = std::find(hashes.begin(), hashes.end(), packet.hash()); iterator != hashes.end()) {
-    csdebug() << className() << " Adding synced packet";
+    csdebug() << csname() << "Adding synced packet";
     hashes.erase(iterator);
 
     // add to current table
@@ -278,7 +278,7 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
-    cserror() << className() << " Needed hashes of " << round << " round not found";
+    cserror() << csname() << "Needed hashes of " << round << " round not found";
     return true;
   }
 
@@ -294,7 +294,7 @@ void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (meta) {
-    csdebug() << className() << " Writer notification added";
+    csdebug() << csname() << "Writer notification added";
     meta->notifications.push_back(bytes);
   }
 }
@@ -307,7 +307,7 @@ std::size_t cs::ConveyerBase::neededNotificationsCount() const {
     return (meta->roundTable.confidants.size() / 2) + 1;
   }
 
-  csdebug() << className() << " No notifications at current round";
+  csdebug() << csname() << "No notifications at current round";
   return 0;
 }
 
@@ -317,8 +317,8 @@ bool cs::ConveyerBase::isEnoughNotifications(cs::ConveyerBase::NotificationState
   const std::size_t neededConfidantsCount = neededNotificationsCount();
   const std::size_t notificationsCount = notifications().size();
 
-  cslog() << className() << " Current notifications count - " << notificationsCount;
-  cslog() << className() << " Needed confidans count - " << neededConfidantsCount;
+  cslog() << csname() << "Current notifications count - " << notificationsCount;
+  cslog() << csname() << "Needed confidans count - " << neededConfidantsCount;
 
   if (state == NotificationState::Equal) {
     return notificationsCount == neededConfidantsCount;
@@ -336,13 +336,13 @@ void cs::ConveyerBase::addCharacteristicMeta(RoundNumber round, CharacteristicMe
     pimpl_->characteristicMetas.append(std::move(metaElement));
   }
   else {
-    csdebug() << className() << " Received meta is currently in meta stack";
+    csdebug() << csname() << "Received meta is currently in meta stack";
   }
 }
 
 std::optional<cs::CharacteristicMeta> cs::ConveyerBase::characteristicMeta(const cs::RoundNumber round) {
   if (!pimpl_->characteristicMetas.contains(round)) {
-    csdebug() << className() << " Characteristic meta not received";
+    csdebug() << csname() << "Characteristic meta not received";
     return std::nullopt;
   }
 
@@ -354,7 +354,7 @@ void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, c
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (meta) {
-    csdebug() << className() << " Characteristic set to conveyer, #" << round;
+    csdebug() << csname() << "Characteristic set to conveyer, #" << round;
     meta->characteristic = characteristic;
   }
 }
@@ -363,7 +363,7 @@ const cs::Characteristic* cs::ConveyerBase::characteristic(cs::RoundNumber round
   auto meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
-    cserror() << className() << " Get characteristic, logic error, can not find characteristic, #" << round;
+    cserror() << csname() << "Get characteristic, logic error, can not find characteristic, #" << round;
     return nullptr;
   }
 
@@ -374,7 +374,7 @@ cs::Hash cs::ConveyerBase::characteristicHash(cs::RoundNumber round) const {
   const Characteristic* pointer = characteristic(round);
 
   if (!pointer) {
-    cserror() << className() << " Null pointer of characteristic, return empty Hash, #" << round;
+    cserror() << csname() << "Null pointer of characteristic, return empty Hash, #" << round;
     return cs::Hash();
   }
 
@@ -389,7 +389,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
   if (!meta) {
-    cserror() << className() << " Apply characteristic failed, no meta in meta storage";
+    cserror() << csname() << "Apply characteristic failed, no meta in meta storage";
     return std::nullopt;
   }
 
@@ -539,14 +539,14 @@ void cs::ConveyerBase::flushTransactions() {
       auto hash = packet.hash();
 
       if (hash.isEmpty()) {
-        cserror() << className() << " Transaction packet hashing failed";
+        cserror() << csname() << "Transaction packet hashing failed";
       }
 
       if (pimpl_->packetsTable.count(hash) == 0u) {
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
       }
       else {
-        cserror() << className() << " Logical error, adding transactions packet more than one time";
+        cserror() << csname() << "Logical error, adding transactions packet more than one time";
       }
 
       allTransactionsCount += transactionsCount;

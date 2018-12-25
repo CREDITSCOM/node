@@ -51,19 +51,15 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   stage.hash = build_vector(context, pack);
 
   {
-    bool found = false;
     cs::SharedLock lock(conveyer.sharedMutex());
+    const cs::RoundTable& roundTable = conveyer.currentRoundTable();
+
     for (const auto& element : conveyer.transactionsPacketTable()) {
-      found = false;
-      const auto rt = conveyer.roundTable(context.round());
-      if(rt != nullptr) {
-        for(const auto& it : rt->hashes) {
-          if(memcmp(it.toBinary().data(), element.first.toBinary().data(), cscrypto::kHashSize) == 0) {
-            found = true;
-          }
-        }
+      const cs::PacketsHashes& hashes = roundTable.hashes;
+
+      if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
+        stage.hashesCandidates.push_back(element.first);
       }
-      if (!found) stage.hashesCandidates.push_back(element.first);
     }
   }
 

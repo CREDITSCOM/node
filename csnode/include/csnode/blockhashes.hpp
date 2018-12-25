@@ -25,7 +25,7 @@ public:
   void initFinish();
   bool loadNextBlock(csdb::Pool nextBlock);
 
-  bool find(cs::Sequence seq, csdb::PoolHash& res) const;
+  csdb::PoolHash find(cs::Sequence seq) const;
 
   cs::Sequence find(csdb::PoolHash hash) const;
 
@@ -33,7 +33,7 @@ public:
 
   csdb::PoolHash getLast() const;
 
-  std::size_t getHashesSize() const;
+  const std::vector<csdb::PoolHash>& getHashes() const;
 
 private:
   std::vector<csdb::PoolHash> hashes_;
