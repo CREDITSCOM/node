@@ -240,7 +240,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
     cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
-    if (ownSmartsConfNum_ == 255) {
+    if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
       return;
     }
     //cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
@@ -256,18 +256,18 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   uint8_t SolverCore::calculateSmartsConfNum()
   {
     uint8_t i = 0 ;
-    uint8_t ownSmartConfNumber = 255;
+    uint8_t ownSmartConfNumber = cs::InvalidConfidantIndex;
     for (auto& e : smartConfidants_) {
       if (e == pnode->getNodeIdKey()) {
         ownSmartConfNumber = i;
       }
       cslog() << "[" << (int)i << "] "
-        << (ownSmartConfNumber != 255 && i == ownSmartConfNumber
+        << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber
           ? "me"
           : cs::Utils::byteStreamToHex(e.data(), e.size()));
       ++i;
     }
-    if (ownSmartConfNumber == 255) {
+    if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
       cslog() << "          This NODE is not a confidant one for this smart-contract consensus round";
     }
     return ownSmartConfNumber;
@@ -457,7 +457,10 @@ int cnt = (int)smartConfidants_.size();
   void SolverCore::createFinalTransactionSet() {
     cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
-      cs::Conveyer::instance().addTransactionsPacket(currentSmartTransactionPack_);
+      auto& conv = cs::Conveyer::instance();
+      for(const auto& tr : currentSmartTransactionPack_.transactions()) {
+        conv.addTransaction(tr);
+      }
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       cslog() << "Transaction user fields = " << fieldsNumber;
       cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";

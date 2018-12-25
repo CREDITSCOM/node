@@ -173,6 +173,8 @@ namespace cs
       return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
     }
 
+    bool is_running_smart_contract(csdb::Address addr) const;
+
     bool execution_allowed;
     bool force_execution;
 

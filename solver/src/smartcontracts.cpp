@@ -293,6 +293,20 @@ namespace cs
     }
   }
 
+  bool SmartContracts::is_running_smart_contract(csdb::Address addr) const
+  {
+    if(!exe_queue.empty()) {
+      const auto& current = exe_queue.front();
+      if(current.status == SmartContractStatus::Running) {
+        auto tr = get_transaction(current.contract);
+        if(tr.is_valid()) {
+          return (absolute_address(tr.target()) == absolute_address(addr));
+        }
+      }
+    }
+    return false;
+  }
+
   bool SmartContracts::invoke_execution(const SmartContractRef& contract, csdb::Pool block)
   {
     // call to executor only if currently is trusted
