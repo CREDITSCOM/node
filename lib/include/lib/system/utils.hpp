@@ -53,7 +53,7 @@ using namespace std::literals::string_literals;
 #define csname() className() << "> "
 #define csfunc() funcName() << "(): "
 
-#define csreflection() className() << ", method " << methodName() << ": "
+#define csreflection() className() << ", method " << csfunc()
 #define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
