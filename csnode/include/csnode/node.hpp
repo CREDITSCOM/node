@@ -302,6 +302,7 @@ private:
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;
+    uint8_t subRound;
     cs::PoolMetaInfo poolMetaInfo;
     cs::Characteristic characteristic;
     cs::Signature poolSignature;

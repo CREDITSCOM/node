@@ -466,54 +466,6 @@ const cs::ConfidantsKeys& Node::confidants() const {
   confs = ptr->confidants;
 }
 
-void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                              const cs::Characteristic& characteristic, const cs::Signature& signature) {
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::RoundTable << roundNumber_ << subRound_;
-  ostream_ << roundTable.confidants.size();
-  ostream_ << roundTable.hashes.size();
-
-  for (const auto& confidant : roundTable.confidants) {
-    ostream_ << confidant;
-  }
-
-  for (const auto& hash : roundTable.hashes) {
-    ostream_ << hash;
-  }
-
-  ostream_ << poolMetaInfo.timestamp;
-
-  if (!characteristic.mask.empty()) {
-    cslog() << "NODE> packing " << characteristic.mask.size() << " bytes of char. mask to send";
-  }
-
-  ostream_ << characteristic.mask;
-  ostream_ << poolMetaInfo.sequenceNumber;
-  ostream_ << signature;
-  ostream_ << poolMetaInfo.writerKey;
-  ostream_ << poolMetaInfo.previousHash;
-}
-
-void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                                 const cs::Characteristic& characteristic, const cs::Signature& signature) {
-  lastSentRoundData_.roundTable.round = roundTable.round;
-
-  // no general stored!
-  lastSentRoundData_.roundTable.confidants.resize(roundTable.confidants.size());
-  std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(),
-            lastSentRoundData_.roundTable.confidants.begin());
-  lastSentRoundData_.roundTable.hashes.resize(roundTable.hashes.size());
-  std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), lastSentRoundData_.roundTable.hashes.begin());
-
-  lastSentRoundData_.characteristic.mask.resize(characteristic.mask.size());
-  std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), lastSentRoundData_.characteristic.mask.begin());
-  lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
-  lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
-  lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
-  lastSentRoundData_.poolMetaInfo.previousHash = poolMetaInfo.previousHash;
-  lastSentRoundData_.poolSignature = signature;
-}
-
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
   if (packet.hash().isEmpty()) {
     cswarning() << "Send transaction packet with empty hash failed";
@@ -2027,9 +1979,60 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   sendRoundTable(roundTable, poolMetaInfo, poolSignature);
 }
 
+void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+  const cs::Characteristic& characteristic, const cs::Signature& signature)
+{
+  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
+  ostream_ << MsgTypes::RoundTable << roundNumber_ << subRound_;
+  ostream_ << roundTable.confidants.size();
+  ostream_ << roundTable.hashes.size();
+
+  for(const auto& confidant : roundTable.confidants) {
+    ostream_ << confidant;
+  }
+
+  for(const auto& hash : roundTable.hashes) {
+    ostream_ << hash;
+  }
+
+  ostream_ << poolMetaInfo.timestamp;
+
+  if(!characteristic.mask.empty()) {
+    cslog() << "NODE> packing " << characteristic.mask.size() << " bytes of char. mask to send";
+  }
+
+  ostream_ << characteristic.mask;
+  ostream_ << poolMetaInfo.sequenceNumber;
+  ostream_ << signature;
+  ostream_ << poolMetaInfo.writerKey;
+  ostream_ << poolMetaInfo.previousHash;
+}
+
+void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+  const cs::Characteristic& characteristic, const cs::Signature& signature)
+{
+  lastSentRoundData_.roundTable.round = roundTable.round;
+  lastSentRoundData_.subRound = subRound_;
+  // no general stored!
+  lastSentRoundData_.roundTable.confidants.resize(roundTable.confidants.size());
+  std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(),
+    lastSentRoundData_.roundTable.confidants.begin());
+  lastSentRoundData_.roundTable.hashes.resize(roundTable.hashes.size());
+  std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), lastSentRoundData_.roundTable.hashes.begin());
+
+  lastSentRoundData_.characteristic.mask.resize(characteristic.mask.size());
+  std::copy(characteristic.mask.cbegin(), characteristic.mask.cend(), lastSentRoundData_.characteristic.mask.begin());
+  lastSentRoundData_.poolMetaInfo.sequenceNumber = poolMetaInfo.sequenceNumber;
+  lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
+  lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
+  lastSentRoundData_.poolMetaInfo.previousHash = poolMetaInfo.previousHash;
+  lastSentRoundData_.poolSignature = signature;
+}
+
 void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNumber_ = roundTable.round;
+  subRound_ = 0;
 
   const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
 
@@ -2056,7 +2059,6 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
   cslog() << "Hashes count: " << hashes.size();
 
   transport_->clearTasks();
-  subRound_ = 0;
   onRoundStart(table);
   startConsensus();
 }
