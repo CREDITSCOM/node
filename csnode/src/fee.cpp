@@ -58,13 +58,13 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
 inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
   current_pool_ = pool;
   transactions_packet_ = nullptr;
-  num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
+  num_of_last_block_ = blockchain.getLastSequence() + 1;
 }
 
 inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) {
   transactions_packet_ = packet;
   current_pool_ = nullptr;
-  num_of_last_block_ = blockchain.getLastWrittenSequence() + 1;
+  num_of_last_block_ = blockchain.getLastSequence() + 1;
 }
 
 void Fee::SetCountedFee() {
@@ -142,7 +142,7 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   csdb::Pool pool = blockchain.loadBlock(blockchain.getLastHash());
   std::set<std::vector<uint8_t>> unique_trusted_;
-  if (blockchain.getLastWrittenSequence() < kBlocksNumForNodesQtyEstimation) {
+  if (blockchain.getLastSequence() < kBlocksNumForNodesQtyEstimation) {
     while (pool.is_valid()) {
       for (uint32_t i = 0; i < pool.confidants().size(); ++i) {
         unique_trusted_.insert(pool.confidants()[i]);
