@@ -989,6 +989,11 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 {
   const auto firstSequence = getLastSequence() + 1;
   const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
+
+  if (firstSequence >= currentRoundNumber) {
+    return std::vector<SequenceInterval>();
+  }
+
   const auto roundNumber = currentRoundNumber ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
   // return at least [next, 0] or [next, currentRoundNumber]:
