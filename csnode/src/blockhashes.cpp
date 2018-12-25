@@ -30,8 +30,9 @@ void BlockHashes::initFinish() {
   if (hashes_.size() >= 2) {
     size_t lh = 0;
     size_t rh = hashes_.size() - 1;
-    while (lh < rh)
+    while (lh < rh) {
       std::swap(hashes_[lh++], hashes_[rh--]);
+    }
   }
 
   for (const auto& hash : hashes_) {
@@ -46,33 +47,34 @@ bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
     db_.last_ = seq;
     isDbInited_ = true;
   }
-  else if (seq <= db_.last_)
+  else if (seq <= db_.last_) {
     return false;
+  }
 
-  if (seq != hashes_.size())
+  if (seq != hashes_.size()) {
     return false;  // see BlockChain::putBlock
+  }
 
   hashes_.emplace_back(nextBlock.hash());
   db_.last_ = seq;
   return true;
 }
 
-bool BlockHashes::find(cs::Sequence seq, csdb::PoolHash& res) const {
-  if (empty())
-    return false;
+csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
+  if (empty()) {
+    return csdb::PoolHash();
+  }
   const auto& range = getDbStructure();
-  if (seq < range.first_ || range.last_ < seq)
-    return false;
-  res = hashes_[seq];
-  return true;
+  if (seq < range.first_ || range.last_ < seq) {
+    return csdb::PoolHash();
+  }
+  return hashes_[seq];
 }
 
 cs::Sequence BlockHashes::find(csdb::PoolHash hash) const {
-  const auto result = std::find_if(hashes_.cbegin(), hashes_.cend(), [hash] (const csdb::PoolHash& h){
-    return hash == h;
-  });
+  const auto result = std::find(hashes_.cbegin(), hashes_.cend(), hash);
 
-  if (result != hashes_.end()) {
+  if (result != hashes_.cend()) {
     return std::distance(hashes_.cbegin(), result);
   }
 
@@ -96,8 +98,8 @@ csdb::PoolHash BlockHashes::getLast() const {
   return hashes_.back();
 }
 
-std::size_t BlockHashes::getHashesSize() const {
-  return hashes_.size();
+const std::vector<csdb::PoolHash>& BlockHashes::getHashes() const {
+  return hashes_;
 }
 
 }  // namespace cs

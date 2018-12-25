@@ -172,8 +172,7 @@ std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
 
   std::array<cscrypto::Byte, cscrypto::kHashSize + sizeof(NODE_VERSION)> data;
 
-  csdb::PoolHash genHash;
-  bh.find(0, genHash);
+  csdb::PoolHash genHash = bh.find(0);
   auto hb = genHash.to_binary();
 
   memcpy(data.data(), hb.data(), cscrypto::kHashSize);
@@ -317,17 +316,29 @@ void BlockChain::removeLastBlock() {
     pool = storage_.pool_remove_last();
   }
 
-  const auto lastHash = blockHashes_->getLast();
-  const csdb::PoolHash ph = pool.hash();
+  if (!pool.is_valid()) {
+    csmeta(cserror) << "Error! Removed pool is not valid";
+    return;
+  }
 
-  if (lastHash == ph) {
+  const auto lastHash = blockHashes_->getLast();
+  const csdb::PoolHash poolHash = pool.hash();
+
+  if (lastHash == poolHash) {
     blockHashes_->removeLast();
     csmeta(cslog) << "Remove last hash is ok, sequence: " << pool.sequence();
   }
   else {
     csmeta(cserror) << "Error! Last pool hash mismatch";
-    csmeta(cserror) << "Block hashes size: " << blockHashes_->getHashesSize() << ", Pool sequence: " << pool.sequence()
-                    << ", in Block hashes sequence: " << blockHashes_->find(ph);
+    const auto findSequence = blockHashes_->find(poolHash);
+    const auto& bh = blockHashes_->getHashes();
+    csmeta(cserror) << "Block hashes size: " << bh.size() << ", Pool sequence: " << pool.sequence()
+                    << ", in Block hashes sequence: " << findSequence;
+    if (findSequence == 0) {
+      for (std::size_t i = 0; i < bh.size(); ++i) {
+        csmeta(csdebug) << "Block hash [" << i << "]: " << bh[i].to_string();
+      }
+    }
   }
 
 #ifdef TRANSACTIONS_INDEX
@@ -455,13 +466,11 @@ const csdb::Storage& BlockChain::getStorage() const {
 }
 
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
-  csdb::PoolHash res{};
   if (deferredBlock_.sequence() == seq) {
     return deferredBlock_.hash();
   }
-  if (!blockHashes_->find(seq, res))
-    return csdb::PoolHash{};
-  return res;
+
+  return blockHashes_->find(seq);
 }
 
 cs::Sequence BlockChain::getRequestedBlockNumber() const {
