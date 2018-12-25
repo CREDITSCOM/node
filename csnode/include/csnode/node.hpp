@@ -88,7 +88,7 @@ public:
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature);
+  void sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Signature& poolSignature);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   //smart-contracts consensus stages sending and getting
