@@ -440,6 +440,26 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       getBlockChain().testCachedBlocks();
     }
   }
+  else /*getBlockChain().getLastSequence() > poolMetaInfo.sequenceNumber*/ {
+    if (poolMetaInfo.sequenceNumber > 0) {
+      const auto block = blockChain_.loadBlock(poolMetaInfo.sequenceNumber);
+      if (block.is_valid()) {
+        if (block.previous_hash() == poolMetaInfo.previousHash) {
+          // rewind outrunning blocks until poolMetaInfo.sequenceNumber
+          while (blockChain_.getLastSequence() > poolMetaInfo.sequenceNumber) {
+            blockChain_.removeLastBlock();
+          }
+        }
+        else {
+          cserror() << className() << "> Stop working, incompatible blockchain detected";
+          // TODO: stop working, incompatible blockchain detected
+          cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
+            stop();
+          });
+        }
+      }
+    }
+  }
 
   csmeta(csdetails) << "done";
 }
@@ -657,9 +677,6 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
 
     if (pool.is_valid()) {
-      /*auto prev_hash = csdb::PoolHash::from_string("");
-        pool.set_previous_hash(prev_hash);*/
-
       poolsBlock.push_back(std::move(pool));
 
       if (isOneBlockReply) {
@@ -871,7 +888,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
     else {
       // more then 1 round lag, request round info
-      if (round > 1) {
+      if (round > 1 && subRound_ == 0) {
         // not on the very start
         cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << "), request round info";
         cs::RoundTable emptyRoundTable;
