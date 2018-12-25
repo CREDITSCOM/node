@@ -19,6 +19,7 @@ add_library(lib
   include/lib/system/signals.hpp
   include/lib/system/metastorage.hpp
   include/lib/system/progressbar.hpp
+  include/lib/system/concurrent.hpp
 )
 
 

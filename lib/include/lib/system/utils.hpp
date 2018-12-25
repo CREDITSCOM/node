@@ -28,9 +28,6 @@
 
 #include <time.h>
 
-#include <boost/asio/post.hpp>
-#include <boost/asio/thread_pool.hpp>
-#include <boost/bind.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <lib/system/common.hpp>
@@ -348,34 +345,7 @@ public:
     return cs::Utils::debugByteStreamToHex(reinterpret_cast<const char*>(stream), length);
   }
 
-private:
-  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, const std::function<void()>& callBack) {
-    std::this_thread::sleep_until(timePoint);
-
-    // TODO: call callback without Queue
-    CallsQueue::instance().insert(callBack);
-  }
-
-  static boost::asio::thread_pool& threadPoolInstance() noexcept {
-    static boost::asio::thread_pool threadPool(std::thread::hardware_concurrency());
-    return threadPool;
-  }
-
 public:
-
-  ///
-  /// Calls std::function after ms time in another thread
-  ///
-  static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
-    static boost::asio::thread_pool& threadPool = threadPoolInstance();
-
-    auto timePoint = std::chrono::steady_clock::now() + ms;
-    auto closure = [=] {
-      cs::Utils::runAfterHelper(timePoint, callBack);
-    };
-
-    boost::asio::post(threadPool, closure);
-  }
 
   ///
   /// Signs data with security key
