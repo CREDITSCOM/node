@@ -215,10 +215,23 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   }
 
   void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
-    cs::SmartContractRef smartRef;
+    if(pack.transactionsCount() == 0) {
+      cserror() << "SolverCore: empty packet must not finish smart contract execution";
+      return;
+    }
     smartConfidants_.clear();
-    //smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
-    //smartRoundNumber_ = smartRef.sequence;
+    smartRoundNumber_ = 0;
+    for(const auto tr : pack.transactions()) {
+      if(psmarts->is_new_state(tr)) {
+        cs::SmartContractRef smartRef;
+        smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+        smartRoundNumber_ = smartRef.sequence;
+      }
+    }
+    if(0 == smartRoundNumber_) {
+      cserror() << "SolverCore: smart contract result packet must contain new state transaction";
+      return;
+    }
     pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
