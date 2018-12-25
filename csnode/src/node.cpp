@@ -2044,9 +2044,10 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   sendRoundTable(roundTable, poolMetaInfo, poolSignature);
 }
 
-void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature) {
+void Node::sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Signature& poolSignature) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNumber_ = roundTable.round;
+  subRound_ = 0;
 
   const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
 
@@ -2073,9 +2074,10 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaI
   cslog() << "Hashes count: " << hashes.size();
 
   transport_->clearTasks();
-  subRound_ = 0;
   onRoundStart(table);
-  startConsensus();
+
+  // writer sometimes could not have all hashes, need check
+  reviewConveyerHashes();
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {

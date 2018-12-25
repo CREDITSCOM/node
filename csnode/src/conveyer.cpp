@@ -165,7 +165,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
     }
   }
 
-  csmeta(csdebug) << "done, current table size" << pimpl_->packetsTable.size();
+  csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
