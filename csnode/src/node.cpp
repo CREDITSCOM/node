@@ -2009,7 +2009,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::Poo
   lastSentRoundData_.poolSignature = signature;
 }
 
-void Node::sendRoundTable(cs::RoundTable& roundTable, cs::PoolMetaInfo poolMetaInfo, const cs::Signature& poolSignature) {
+void Node::sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Signature& poolSignature) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   roundNumber_ = roundTable.round;
   subRound_ = 0;

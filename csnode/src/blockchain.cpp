@@ -225,7 +225,7 @@ void BlockChain::writeGenesisBlock() {
   cslog() << "Genesis block completed ... trying to save";
 
   finalizeBlock(genesis);
-  flushBlockToDisk(genesis);
+  deferredBlock_ = genesis;
 
   cslog() << genesis.hash().to_string();
 

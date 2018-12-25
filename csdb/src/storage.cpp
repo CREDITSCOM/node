@@ -18,6 +18,7 @@
 #include "csdb/internal/utils.hpp"
 #include "csdb/pool.hpp"
 #include "csdb/wallet.hpp"
+#include <lib/system/logger.hpp>
 
 namespace {
 struct last_error_struct {
@@ -165,6 +166,14 @@ void Storage::priv::set_last_error(Storage::Error error, const char *message, ..
   }
   else {
     les.last_error_message_.clear();
+  }
+  if(error != Storage::Error::NoError) {
+    if(!les.last_error_message_.empty()) {
+      cserror() << "Storage> error #" << (int) error << ": " << les.last_error_message_;
+    }
+    else {
+      cserror() << "Storage> error #" << (int) error;
+    }
   }
 }
 
@@ -597,16 +606,16 @@ Pool Storage::pool_remove_last() {
     return Pool{};
   }
 
+  Pool res {};
+  bool found = write_queue_pop(res);
+  if(found) {
+    d->last_hash = res.previous_hash();
+    return res;
+  }
+
   if (last_hash().is_empty()) {
     d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
     return Pool{};
-  }
-
-  Pool res{};
-  bool found = write_queue_pop(res);
-  if (found) {
-    d->last_hash = res.previous_hash();
-    return res;
   }
 
   ::csdb::internal::byte_array data;
