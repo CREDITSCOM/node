@@ -390,8 +390,13 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 }
 
 bool is_smart(const csdb::Transaction& tr) {
-  csdb::UserField uf = tr.user_field(0);
-  return uf.type() == csdb::UserField::Type::String;
+  //csdb::UserField uf = tr.user_field(0);
+  //return uf.type() == csdb::UserField::Type::String;
+  return tr.user_field(0).type() == csdb::UserField::Type::String;
+}
+
+bool is_smart_state(const csdb::Transaction& tr) {
+  return tr.user_field(-2).type() == csdb::UserField::Type::String;
 }
 
 bool is_smart_deploy(const api::SmartContractInvocation& smart) {
@@ -756,52 +761,51 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     auto& trs = p.transactions();
     for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
       auto& tr = *i_tr;
-      if (is_smart(tr)) {
+      if (is_smart(tr) || is_smart_state(tr))
         pending_smart_transactions->queue.push(std::move(tr));
-      }
     }
   }
   if (!pending_smart_transactions->queue.empty()) {
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
-    const auto smart = fetch_smart(tr);
     auto address = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-    if (!init) {
-      auto& e = [&]() -> decltype(auto) {
-        auto smart_last_trxn = lockedReference(this->smart_last_trxn);
-        return (*smart_last_trxn)[address];
-      }();
-      std::unique_lock<decltype(e.lock)> l(e.lock);
-      e.trid_queue.push_back(tr.id());
-      e.new_trxn_cv.notify_all();
-    }
-    {
-      auto& e = [&]() -> decltype(auto) {
-        auto smart_state(lockedReference(this->smart_state));
-        return (*smart_state)[address];
-      }();
-      e.update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
-    }
 
-    auto source_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-    auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-
-    if (is_smart_deploy(smart)) {
-      {
-        auto smart_origin = lockedReference(this->smart_origin);
-        (*smart_origin)[address] = tr.id();
-      }
-      {
-        auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-        (*deployed_by_creator)[source_pk].push_back(tr.id());
+    if (is_smart_state(tr)) {
+      auto smart_state(lockedReference(this->smart_state));
+      (*smart_state)[address].update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
+    }
+    else {
+      const auto smart = fetch_smart(tr);
+      if (!init) {
+        auto& e = [&]() -> decltype(auto) {
+          auto smart_last_trxn = lockedReference(this->smart_last_trxn);
+          return (*smart_last_trxn)[address];
+        }();
+        std::unique_lock<decltype(e.lock)> l(e.lock);
+        e.trid_queue.push_back(tr.id());
+        e.new_trxn_cv.notify_all();
       }
 
-      tm.checkNewDeploy(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
-    }
-    else
-      tm.checkNewState(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
+      auto source_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+      auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
 
-    return true;
+      if (is_smart_deploy(smart)) {
+        {
+          auto smart_origin = lockedReference(this->smart_origin);
+          (*smart_origin)[address] = tr.id();
+        }
+        {
+          auto deployed_by_creator = lockedReference(this->deployed_by_creator);
+          (*deployed_by_creator)[source_pk].push_back(tr.id());
+        }
+
+        tm.checkNewDeploy(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
+      }
+      else
+        tm.checkNewState(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
+
+      return true;
+    }
   }
 
   return false;
