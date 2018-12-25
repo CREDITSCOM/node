@@ -360,7 +360,9 @@ namespace cs
       if(resp.status.code == 0) {
         // USRFLD[new_state::Value] - new state
         result.add_user_field(trx_uf::new_state::Value, resp.contractState);
-        set_execution_result(result);
+        cs::TransactionsPacket p;
+        p.addTransaction(result);
+        set_execution_result(p);
         return true;
       }
       else {
@@ -376,7 +378,9 @@ namespace cs
 
     // result contains empty USRFLD[state::Value]
     result.add_user_field(trx_uf::new_state::Value, std::string {});
-    set_execution_result(result);
+    cs::TransactionsPacket p;
+    p.addTransaction(result);
+    set_execution_result(p);
     return true;
   }
 

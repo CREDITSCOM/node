@@ -99,7 +99,7 @@ void Spammer::SpamWithTransactions(Node& node) {
         inner_id_counter = round_spamming * kMaxTransactionsFromOneSource;
       }
     }
-    while (tr_gen_in_round == kMaxTransactionsInOneRound && round_number == conveyer.currentRoundNumber()) {
+    while (tr_gen_in_round >= kMaxTransactionsInOneRound && round_number == conveyer.currentRoundNumber()) {
       std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
     }
     while (kMaxTransactionsInOneRound <= conveyer.blockTransactionsCount()) {

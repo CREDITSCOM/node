@@ -75,11 +75,13 @@ public:
   void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
   void sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo);
   void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
-
+  void smartStageEmptyReply(uint8_t requesterNumber);
   void smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
+  void spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash);
+  void spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash);
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   const cs::ConfidantsKeys& confidants() const;
@@ -302,6 +304,7 @@ private:
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;
+    uint8_t subRound;
     cs::PoolMetaInfo poolMetaInfo;
     cs::Characteristic characteristic;
     cs::Signature poolSignature;

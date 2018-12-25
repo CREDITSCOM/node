@@ -77,6 +77,11 @@ enum ConfidantConsts : uint8_t {
   InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
 };
 
+enum SpoilingConsts : uint8_t {
+  SpoilByRoundNumber,
+  SpoilByPublicKey,
+};
+
 // all info about round
 struct Characteristic {
   cs::Bytes mask;

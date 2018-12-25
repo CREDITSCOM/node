@@ -65,7 +65,9 @@ enum MsgTypes : uint8_t {
   SecondSmartStage,
   RoundTable = 22,
   ThirdSmartStage,
-  SmartStageRequest,
+  SmartFirstStageRequest,
+  SmartSecondStageRequest,
+  SmartThirdStageRequest,
   BigBang = 35,
   NodeStopRequest = 255
 };
