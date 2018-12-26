@@ -608,7 +608,6 @@ int cnt = (int)smartConfidants_.size();
     cslog() << __func__;
     uint8_t cnt = (uint8_t)smartConfidants_.size();
     int cnt_requested = 0;
-    auto& ptr = smartStageOneStorage_;
     switch (st) {
       case 1:
         for (uint8_t i = 0; i < cnt; ++i) {
