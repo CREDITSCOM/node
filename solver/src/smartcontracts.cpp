@@ -374,7 +374,7 @@ namespace cs
       auto runEntity = [=]() mutable {
         get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
                                                  state, contract.method, contract.params, MAX_EXECUTION_TIME);
-        auto toProcessing = [&] {
+        auto toProcessing = [=]() mutable {
           if (resp.status.code == 0) {
             result.add_user_field(trx_uf::new_state::Value, resp.contractState);
 
