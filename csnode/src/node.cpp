@@ -2400,6 +2400,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
 {
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
@@ -2408,11 +2409,11 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  cslog() << __func__;
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
-  std::copy(hash.begin(), hash.end(), bytesHash.begin());  
+  std::copy(hash.begin(), hash.end(), bytesHash.begin());
   spoiledHash = csdb::PoolHash::from_binary(bytesHash);
 }
 
