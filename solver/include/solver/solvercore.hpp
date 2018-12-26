@@ -300,7 +300,7 @@ private:
   std::vector<cs::PublicKey> smartConfidants_;
   uint8_t ownSmartsConfNum_ = 255;
   cs::Sequence smartRoundNumber_;
-  csdb::Transaction currentSmartTransaction_;
+  cs::TransactionsPacket currentSmartTransactionPack_;
   cs::StageOneSmarts st1;
   cs::StageTwoSmarts st2;
   cs::StageThreeSmarts st3;
