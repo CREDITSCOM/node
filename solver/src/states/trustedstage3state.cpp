@@ -462,7 +462,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   int cnt = (int) context.cnt_trusted();
   int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
   if (cnt_active * 2 < cnt + 1) {
-    cswarnig() << name() << ": not enough active confidants to make a decision, BigBang required";
+    cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
     return;
   }
   int idx_writer = k % cnt_active;
