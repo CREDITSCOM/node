@@ -2158,6 +2158,10 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   spoileHash(lwh, sender, spoiledHash);
   if(spoiledHash == tmp) {
     solver_->gotHash(std::move(lwh), sender);
+  } 
+  else {
+    cswarning() << ": hash from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " DOES NOT MATCH to my value "
+      << lwh.to_string();
   }
 }
 
