@@ -176,6 +176,16 @@ bool cs::PoolSynchronizer::isOneBlockReply() const {
   return syncData_.oneReplyBlock;
 }
 
+bool cs::PoolSynchronizer::isSilentMode() const {
+  if (!isSyncroStarted_) {
+    return false;
+  }
+
+  const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
+                   blockChain_->getCachedBlocksSize();
+  return sum > 20;
+}
+
 //
 // Slots
 //

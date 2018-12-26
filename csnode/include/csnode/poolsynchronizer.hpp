@@ -36,6 +36,8 @@ public:  // Interface
 
   bool isOneBlockReply() const;
 
+  bool isSilentMode() const;
+
 public signals:  // Signals
 
   PoolSynchronizerRequestSignal sendRequest;

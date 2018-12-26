@@ -782,6 +782,16 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Drop;
   }
 
+  if (poolSynchronizer_->isSilentMode()) {
+    if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
+      // which round would not be on the remote we may require the requested block or get block request
+      return MessageActions::Process;
+    }
+    else {
+      return MessageActions::Drop;
+    }
+  }
+
   if (type == MsgTypes::FirstSmartStage || type == MsgTypes::SecondSmartStage || type == MsgTypes::ThirdSmartStage) {
     return MessageActions::Process;
   }

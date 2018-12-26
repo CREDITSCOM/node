@@ -893,7 +893,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   logBlockInfo(pool);
   cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
 
-
   return std::make_pair(true, deferredBlock_);
 }
 
