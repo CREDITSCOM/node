@@ -8,6 +8,7 @@
 #include <cinttypes>
 #include <string>
 #include <vector>
+#include <limits>
 #include <set>
 
 #include <csdb/amount_commission.hpp>
@@ -178,7 +179,7 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
   }
 
   double time_stamp_diff = CountBlockTimeStampDifference(block_number_from, blockchain);
-  if(fabs(time_stamp_diff) > DBL_EPSILON) {
+  if(fabs(time_stamp_diff) > std::numeric_limits<double>::epsilon()) {
     rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
   }
 }

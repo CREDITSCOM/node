@@ -355,17 +355,22 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 
     csmeta(csdetails) << "From needed help: " << sequence;
 
+    auto needyNeighbour =
+        std::find_if(neighbours_.begin(), neighbours_.end(), [sequence](const NeighboursSetElemet& el) {
+          return (!el.sequences().empty() && el.sequences().front() == sequence);
+        });
+
+    if (needyNeighbour == neighbours_.end()) {
+      csmeta(cserror) << "Needy neighbour is not valid";
+      return false;
+    }
+
     if (!neighbour.sequences().empty() && sequence != neighbour.sequences().front()) {
       for (const auto& seq : neighbour.sequences()) {
         requestedSequences_.erase(seq);
       }
       neighbour.reset();
     }
-
-    auto needyNeighbour =
-        std::find_if(neighbours_.begin(), neighbours_.end(), [sequence](const NeighboursSetElemet& el) {
-          return (!el.sequences().empty() && el.sequences().front() == sequence);
-        });
 
     neighbour.setSequences(needyNeighbour->sequences());
     return true;
