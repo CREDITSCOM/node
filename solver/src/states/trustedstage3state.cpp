@@ -183,8 +183,8 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         if(tCandSize > 0) {
           for(size_t outer = 0; outer < tCandSize - 1; outer++) {
             for(size_t inner = outer + 1; inner < tCandSize; inner++) {
-              if(context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
-                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted";
+              if(ptrStage1->trustedCandidates.at(outer) == ptrStage1->trustedCandidates.at(inner)) {
+                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (duplicated candidates)";
                 context.mark_untrusted(it.sender);
                 toBreak = true;
                 break;

@@ -1221,7 +1221,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got stage-1 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got stage-1 for the Node with SUBROUND, we don't have";
     return;
   }
 
@@ -1507,10 +1507,12 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   if (!conveyer.isConfidantExists(requester)) {
     return;
   }
-
   const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
   cs::Bytes message;
 
+  if(!conveyer.isConfidantExists(sender)) {
+    return;
+  }
   switch (msgType) {
   case MsgTypes::FirstStage:
     message = stageOneMessage_[sender];
@@ -1524,7 +1526,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   default: break;
   }
 
-  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  sendDefault(confidant, msgType, roundNumber_, subRound_, signature, message);
   csmeta(csdetails) << "done";
 }
 
