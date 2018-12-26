@@ -155,10 +155,10 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
               continue;
             }
             cs::Bytes toVerify;
-            size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
+            size_t messageSize = sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
             cs::DataStream stream(toVerify);
-            stream << (uint32_t)context.round(); // Attention!!! the uint32_t type
+            stream << context.round() << context.subRound(); // Attention!!! the uint32_t type
             stream << it.hashes[j];
 
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
@@ -461,6 +461,10 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   // stage.realTrustedMask contains !0 on good nodes:
   int cnt = (int) context.cnt_trusted();
   int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
+  if (cnt_active * 2 < cnt + 1) {
+    cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
+    return;
+  }
   int idx_writer = k % cnt_active;
   if(cnt != cnt_active) {
     cslog() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
