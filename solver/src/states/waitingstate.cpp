@@ -9,7 +9,6 @@ void WaitingState::on(SolverContext &context) {
   // TODO:: calculate my queue number starting from writing node:
   const auto ptr = context.stage3((uint8_t)context.own_conf_number());
   writingQueueNumber_ = ptr->realTrustedMask.at(ptr->sender);  
-  //(int)(((uint8_t)ptr->sender + (uint8_t)context.cnt_trusted() - (uint8_t)ptr->writer)) % (int)context.cnt_trusted();
   if (writingQueueNumber_ == InvalidConfidantIndex) {
     return;
   }
@@ -17,7 +16,8 @@ void WaitingState::on(SolverContext &context) {
   os << prefix_ << "-" << (size_t)writingQueueNumber_;
   myName_ = os.str();
 
-  cslog() << name() << ": my order " << (int)ptr->sender << ", trusted amount " << (int)context.cnt_trusted()
+  size_t cnt_active = ptr->realTrustedMask.size() - std::count(ptr->realTrustedMask.cbegin(), ptr->realTrustedMask.cend(), InvalidConfidantIndex);
+  cslog() << name() << ": my order " << (int)ptr->sender << ", trusted " << (int)context.cnt_trusted() << " (good " << cnt_active << ")"
           << ", writer " << (int)ptr->writer;
   if (writingQueueNumber_ == 0) {
     cslog() << name() << ": becoming WRITER";

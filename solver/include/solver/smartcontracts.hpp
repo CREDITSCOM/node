@@ -152,7 +152,7 @@ namespace cs
       return SmartContracts::get_transaction(bc, contract);
     }
 
-    SmartContractStatus enqueue(csdb::Pool block, size_t trx_idx);
+    void enqueue(csdb::Pool block, size_t trx_idx);
     void on_completed(csdb::Pool block, size_t trx_idx);
 
     void set_execution_result(cs::TransactionsPacket pack)
@@ -205,7 +205,7 @@ namespace cs
     // executiom queue
     std::vector<QueueItem> exe_queue;
 
-    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item)
+    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item) const
     {
       auto it = exe_queue.cbegin();
       for(; it != exe_queue.cend(); ++it) {
@@ -216,15 +216,26 @@ namespace cs
       return it;
     }
 
-    bool contains_me(const std::vector<cs::Bytes>& list)
+    void remove_from_queue(const SmartContractRef& item);
+
+    void test_exe_queue();
+
+    bool contains_me(const std::vector<cs::Bytes>& list) const
     {
       return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }
 
-    bool invoke_execution(const SmartContractRef& contract, csdb::Pool block);
-    // currently perform blocking execution via api to remote executor
-    // TODO: make an async execution
-    void execute(const cs::SmartContractRef& item);
+    // returns false if execution canceled, so caller is responsible to call remove_from_queue(item) method
+    bool invoke_execution(const SmartContractRef& contract);
+
+    // perform async execution via api to remote executor
+    // is called from invoke_execution() method only
+    // returns false if execution is canceled
+    bool execute(const cs::SmartContractRef& item);
+
+    // makes a transaction to store new_state of smart contract invoked by src
+    // caller is responsible to test src is a smart-contract-invoke transaction
+    csdb::Transaction result_from_smart_invoke(const SmartContractRef& contract) const;
   };
 
 } // cs
