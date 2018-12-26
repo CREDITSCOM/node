@@ -157,7 +157,14 @@ public:
   }
 
   cs::RoundNumber getRoundNumber();
-  uint8_t getConfidantNumber();
+
+  uint8_t getConfidantNumber() {
+    return myConfidantIndex_;
+  }
+
+  uint8_t subRound() {
+    return subRound_;
+  }
 
   BlockChain& getBlockChain() {
     return blockChain_;

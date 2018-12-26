@@ -745,10 +745,6 @@ bool Node::isPoolsSyncroStarted() {
   return poolSynchronizer_->isSyncroStarted();
 }
 
-uint8_t Node::getConfidantNumber() {
-  return myConfidantIndex_;
-}
-
 void Node::processTimer() {
   const auto round = cs::Conveyer::instance().currentRoundNumber();
 
@@ -1172,7 +1168,10 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   message.reserve(expectedMessageSize);
 
   cs::Bytes messageToSign;
-  messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(cs::Hash));
+  messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
+  if (myConfidantIndex_ == 0) {
+    stageOneInfo.hash.at(0) = 255;
+  }
 
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;

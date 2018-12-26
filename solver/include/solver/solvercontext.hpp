@@ -358,6 +358,23 @@ public:
   }
 
   /**
+ * @fn  uint32_t SolverContext::subRound() const;
+ *
+ * @brief   Gets the current subround.
+ *
+ * @author  dc
+ * @date    26.10.2018
+ *
+ * @return  uint8_t.
+ *
+ * ### remarks  ???
+ */
+
+  uint8_t subRound() const {
+    return core.subRound();
+  }
+
+  /**
    * @fn  uint8_t SolverContext::own_conf_number() const;
    *
    * @brief   Gets the own number among confidant (trusted) nodes.

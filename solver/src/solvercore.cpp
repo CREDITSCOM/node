@@ -608,15 +608,42 @@ int cnt = (int)smartConfidants_.size();
     cslog() << __func__;
     uint8_t cnt = (uint8_t)smartConfidants_.size();
     int cnt_requested = 0;
-    for (uint8_t i = 0; i < cnt; ++i) {
-      if (smartStageThreeStorage_[i].sender == cs::ConfidantConsts::InvalidConfidantIndex) {
-        for (const auto& d : smartStageTwoStorage_) {
-          if (d.sender != ownSmartsConfNum_) {
-              pnode->stageRequest(MsgTypes::FirstStage, d.sender, i);
-          }
-          ++cnt_requested;
+    auto& ptr = smartStageOneStorage_;
+    switch (st) {
+      case 1:
+        for (uint8_t i = 0; i < cnt; ++i) {
+          auto required = smartStageOneStorage_[i].sender;
+          if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
+            if (i != ownSmartsConfNum_ && i!=required) {
+                pnode->smartStageRequest(MsgTypes::SmartFirstStageRequest, i , required);
+                ++cnt_requested;
+            }
+          } 
         }
-      }
+        break;
+      case 2:
+        for (uint8_t i = 0; i < cnt; ++i) {
+          auto required = smartStageTwoStorage_[i].sender;
+          if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
+            if (i != ownSmartsConfNum_ && i != required) {
+              pnode->smartStageRequest(MsgTypes::SmartSecondStageRequest, i, required);
+              ++cnt_requested;
+            }
+          }
+        }
+        break;
+      case 3:
+        for (uint8_t i = 0; i < cnt; ++i) {
+          auto required = smartStageThreeStorage_[i].sender;
+          if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
+            if (i != ownSmartsConfNum_ && i != required) {
+              pnode->smartStageRequest(MsgTypes::SmartThirdStageRequest, i, required);
+              ++cnt_requested;
+            }
+          }
+        }
+        break;
+        
     }
     if (0 == cnt_requested) {
       csdebug() << __func__ << ": no node to request";
@@ -646,4 +673,7 @@ int cnt = (int)smartConfidants_.size();
     return false;
   }
 
+  uint8_t SolverCore::subRound() {
+    return (pnode->subRound());
+  }
 }  // namespace slv2
