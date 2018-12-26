@@ -227,21 +227,22 @@ TEST(Conveyer, MainLogic) {
   created_packet.value().makeHash();
   ASSERT_EQ(packet.hash(), created_packet.value().hash());
 
-  const auto characteristic{cs::Characteristic{
-      {0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
+  const auto characteristic{cs::Characteristic{{0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
   conveyer.setCharacteristic(characteristic, kRoundNumber);
+
+  cs::Hash expectedHash = generateHash(characteristic.mask.data(), characteristic.mask.size());
+
   ASSERT_EQ(characteristic, *conveyer.characteristic(kRoundNumber));
-  auto characteristic_hash{conveyer.characteristicHash(kRoundNumber)};
-  const cs::Hash kCharacteristicHash{
-      0xc8, 0xb0, 0xaa, 0x4c, 0x78, 0x28, 0xb8, 0xe2, 0x04, 0x69, 0x23,
-      0x3a, 0x47, 0x7e, 0x12, 0x56, 0x63, 0x33, 0x82, 0x1b, 0x0c, 0xd4,
-      0x9d, 0xd4, 0x99, 0xd1, 0x87, 0x9c, 0x41, 0xff, 0xf1, 0x1f};
-  ASSERT_EQ(characteristic_hash, kCharacteristicHash);
+
+  auto characteristic_hash = conveyer.characteristicHash(kRoundNumber);
+
+  ASSERT_EQ(characteristic_hash, expectedHash);
 
   cs::PublicKey pk;
   csdb::PoolHash ph;
   cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber};
   auto pool{conveyer.applyCharacteristic(pool_meta_info)};
+
   ASSERT_TRUE(pool.has_value());
   ASSERT_EQ(3, pool.value().transactions_count());
   ASSERT_EQ(packet.transactions().at(2), pool.value().transaction(0));
