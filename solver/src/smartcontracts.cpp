@@ -366,6 +366,7 @@ namespace cs
                                                  state, contract.method, contract.params, MAX_EXECUTION_TIME);
         auto toProcessing = [=] () mutable {
           csdb::Transaction result = result_from_smart_invoke(item);
+
           if (resp.status.code == 0) {
             result.add_user_field(trx_uf::new_state::Value, resp.contractState);
           }
@@ -374,8 +375,10 @@ namespace cs
             // result contains empty USRFLD[state::Value]
             result.add_user_field(trx_uf::new_state::Value, std::string {});
           }
+
           cs::TransactionsPacket packet;
           packet.addTransaction(result);
+
           set_execution_result(packet);
         };
 

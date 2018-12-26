@@ -13,6 +13,7 @@ void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
   stage.realTrustedMask.clear();
+  stage.realTrustedMask.resize(context.cnt_trusted());
   stage.sender = (uint8_t)context.own_conf_number();
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
@@ -322,7 +323,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
-      stage.realTrustedMask.push_back(cs::ConfidantConsts::FirstWriterIndex);
+      stage.realTrustedMask.at(i) = cs::ConfidantConsts::FirstWriterIndex;
       auto ptr = context.stage1(i);
       if(ptr == nullptr) {
         continue;
@@ -361,7 +362,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       }
     }
     else {
-      stage.realTrustedMask.push_back(cs::ConfidantConsts::InvalidConfidantIndex);
+      stage.realTrustedMask.at(i) = cs::ConfidantConsts::InvalidConfidantIndex;
     }
   }
 
@@ -436,7 +437,8 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
       }
-      for (size_t i = 0; i < max_conf - next_round_trust.size(); i++) {
+      size_t toAdd = max_conf - next_round_trust.size();
+      for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
