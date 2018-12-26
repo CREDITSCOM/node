@@ -1169,9 +1169,6 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   cs::Bytes messageToSign;
   messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-  if (myConfidantIndex_ == 0) {
-    stageOneInfo.hash.at(0) = 255;
-  }
 
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
@@ -1186,7 +1183,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cs::DataStream signStream(messageToSign);
   signStream << roundNumber_ << subRound_<< stageOneInfo.messageHash;
 
-  csdetails() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
+  csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
@@ -2401,9 +2398,8 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
   return os.str();
 }
 
-void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
-{
-  csmeta(cslog) << "begin";
+void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash) {
+  csmeta(csdebug);
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
@@ -2412,7 +2408,7 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  csmeta(cslog) << "begin";
+  csmeta(csdebug);
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
