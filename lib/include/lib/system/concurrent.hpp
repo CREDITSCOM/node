@@ -32,6 +32,24 @@ public:
   }
 };
 
+template <typename T>
+class FutureWatcher;
+class Concurrent;
+
+// concurrent private helper
+class Worker {
+private:
+  template <typename Func>
+  inline static void execute(Func&& function) {
+    Threads& threadPool = ThreadPool::instance();
+    boost::asio::post(threadPool, std::forward<Func>(function));
+  }
+
+  template<typename T>
+  friend class FutureWatcher;
+  friend class Concurrent;
+};
+
 // future entity
 template<typename T>
 using Future = std::future<T>;
@@ -82,7 +100,7 @@ private:
       future_ = Future<Result>();
     };
 
-    Concurrent::execute(closure);
+    Worker::execute(closure);
   }
 
 public signals:
@@ -100,7 +118,7 @@ public:
 
   template<typename Func>
   static void run(Func&& function) {
-    Concurrent::execute(std::forward<Func>(function));
+    Worker::execute(std::forward<Func>(function));
   }
 
   // calls std::function after ms time in another thread
@@ -110,7 +128,7 @@ public:
       Concurrent::runAfterHelper(timePoint, callBack);
     };
 
-    Concurrent::execute(closure);
+    Worker::execute(closure);
   }
 
 private:
@@ -119,12 +137,6 @@ private:
 
     // TODO: call callback without Queue
     CallsQueue::instance().insert(callBack);
-  }
-
-  template<typename Func>
-  inline static void execute(Func&& func) {
-    Threads& threadPool = ThreadPool::instance();
-    boost::asio::post(threadPool, std::forward<Func>(func));
   }
 };
 }
