@@ -1231,7 +1231,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got stage-1 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got stage-1 for the Node with SUBROUND, we don't have";
     return;
   }
 
@@ -1517,10 +1517,12 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   if (!conveyer.isConfidantExists(requester)) {
     return;
   }
-
   const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
   cs::Bytes message;
 
+  if(!conveyer.isConfidantExists(sender)) {
+    return;
+  }
   switch (msgType) {
   case MsgTypes::FirstStage:
     message = stageOneMessage_[sender];
@@ -1534,7 +1536,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   default: break;
   }
 
-  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  sendDefault(confidant, msgType, roundNumber_, subRound_, signature, message);
   csmeta(csdetails) << "done";
 }
 
@@ -2408,6 +2410,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
 {
+  csmeta(cslog)) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
@@ -2416,11 +2419,11 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  cslog() << __func__;
+  csmeta(cslog)) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
-  std::copy(hash.begin(), hash.end(), bytesHash.begin());  
+  std::copy(hash.begin(), hash.end(), bytesHash.begin());
   spoiledHash = csdb::PoolHash::from_binary(bytesHash);
 }
 
