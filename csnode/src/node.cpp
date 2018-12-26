@@ -2125,6 +2125,7 @@ void Node::sendHash(cs::RoundNumber round) {
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
   spoileHash(hash, solver_->getPublicKey(), spoiledHash);
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
+  cslog() << "Hash sent";
 #endif
 }
 
@@ -2414,6 +2415,7 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csd
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
   std::copy(hash.begin(), hash.end(), bytesHash.begin());
   spoiledHash = csdb::PoolHash::from_binary(bytesHash);
+  csmeta(cslog) << "end";
 }
 
 void Node::smartStageEmptyReply(uint8_t requesterNumber) {

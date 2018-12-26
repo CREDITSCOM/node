@@ -68,7 +68,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   return (enough_hashes ? Result::Finish : Result::Ignore);
 }
 
-Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
+Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& /*pool_hash*/,
                                   const cs::PublicKey& sender) {
   // get node status for useful logging
   cslog() << name() << ": <-- hash from " << context.sender_description(sender);
