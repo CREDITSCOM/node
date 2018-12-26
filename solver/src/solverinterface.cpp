@@ -262,6 +262,9 @@ namespace cs
     }
 #endif
     cs::Conveyer::instance().addTransaction(tr);
+    if(psmarts->is_running_smart_contract(tr.source())) {
+      cslog() << "SolverCore: running smart contract emits transaction";
+    }
   }
 
   void SolverCore::gotSmartContractEvent(const csdb::Pool block, size_t trx_idx)

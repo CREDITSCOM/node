@@ -293,6 +293,20 @@ namespace cs
     }
   }
 
+  bool SmartContracts::is_running_smart_contract(csdb::Address addr) const
+  {
+    if(!exe_queue.empty()) {
+      const auto& current = exe_queue.front();
+      if(current.status == SmartContractStatus::Running) {
+        auto tr = get_transaction(current.contract);
+        if(tr.is_valid()) {
+          return (absolute_address(tr.target()) == absolute_address(addr));
+        }
+      }
+    }
+    return false;
+  }
+
   bool SmartContracts::invoke_execution(const SmartContractRef& contract, csdb::Pool block)
   {
     // call to executor only if currently is trusted
@@ -315,6 +329,7 @@ namespace cs
   void SmartContracts::execute(const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = get_transaction(item);
+    cslog() << "Start transaction: UserFields Number *= " << start_tr.user_field_ids().size();
     if(!is_executable(start_tr)) {
       cserror() << name() << ": unable execute neither deploy nor start transaction";
       return;
@@ -338,7 +353,7 @@ namespace cs
     result.add_user_field(trx_uf::new_state::RefStart, item.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(start_tr.max_fee().to_double())));
-
+    cslog() << "Finish transaction: UserFields Number *= " << result.user_field_ids().size();
     auto maybe_contract = get_smart_contract(start_tr);
     if(maybe_contract.has_value()) {
       const auto contract = maybe_contract.value();

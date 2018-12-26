@@ -451,7 +451,7 @@ const cs::ConfidantsKeys& Node::confidants() const {
  void Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
   cslog() << __func__;
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале
-  auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber+1);
+  auto ptr = cs::Conveyer::instance().roundTable(startSmartRoundNumber);
   if (ptr == nullptr) {
     cs::PublicKey c1;
     csdb::Pool tmpPool = blockChain_.loadBlock(startSmartRoundNumber);
@@ -1221,7 +1221,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got stage-1 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got stage-1 for the Node with SUBROUND, we don't have";
     return;
   }
 
@@ -1507,10 +1507,12 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   if (!conveyer.isConfidantExists(requester)) {
     return;
   }
-
   const cs::PublicKey& confidant = conveyer.confidantByIndex(requester);
   cs::Bytes message;
 
+  if(!conveyer.isConfidantExists(sender)) {
+    return;
+  }
   switch (msgType) {
   case MsgTypes::FirstStage:
     message = stageOneMessage_[sender];
@@ -1524,11 +1526,12 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   default: break;
   }
 
-  sendDefault(confidant, msgType, roundNumber_, signature, message);
+  sendDefault(confidant, msgType, roundNumber_, subRound_, signature, message);
   csmeta(csdetails) << "done";
 }
 
 void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
+  cslog() << __func__ << "(): started";
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
@@ -1566,7 +1569,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
 
   // cache
   smartStageOneMessage_[solver_->ownSmartsConfidantNumber()] = std::move(message);
-  csmeta(csdetails) << "(): done";
+  csmeta(csdebug) << "(): done";
 }
 
 void Node::smartStagesStorageClear(size_t cSize)
@@ -1671,7 +1674,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 }
 
 void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
-  csmeta(csdetails) << "started";
+  csmeta(csdebug) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "Only confidant nodes can send smart-contract consensus stages";
@@ -1696,12 +1699,12 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::SecondSmartStage, stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
 
   // cash our stage two
-  smartStageTwoMessage_[myConfidantIndex_] = std::move(bytes);
-  csmeta(csdetails) << "done";
+  smartStageTwoMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
+  csmeta(csdebug) << "done";
 }
 
 void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-  csmeta(csdetails);
+  csmeta(csdebug);
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     csdebug() << "NODE> ignore SmartStage two as no confidant";
@@ -1754,7 +1757,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 }
 
 void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
-  csmeta(csdetails) << "started";
+  csmeta(csdebug) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
@@ -1778,7 +1781,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   
   // cach stage three
   smartStageThreeMessage_[myConfidantIndex_] = std::move(bytes);
-  csmeta(csdetails) << "done";
+  csmeta(csdebug) << "done";
 }
 
 void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2397,6 +2400,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
 {
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
@@ -2405,11 +2409,11 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  cslog() << __func__;
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
-  std::copy(hash.begin(), hash.end(), bytesHash.begin());  
+  std::copy(hash.begin(), hash.end(), bytesHash.begin());
   spoiledHash = csdb::PoolHash::from_binary(bytesHash);
 }
 

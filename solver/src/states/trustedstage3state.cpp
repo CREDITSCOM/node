@@ -183,8 +183,8 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         if(tCandSize > 0) {
           for(size_t outer = 0; outer < tCandSize - 1; outer++) {
             for(size_t inner = outer + 1; inner < tCandSize; inner++) {
-              if(context.stage1(it.sender)->trustedCandidates.at(outer) == context.stage1(it.sender)->trustedCandidates.at(inner)) {
-                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted";
+              if(ptrStage1->trustedCandidates.at(outer) == ptrStage1->trustedCandidates.at(inner)) {
+                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (duplicated candidates)";
                 context.mark_untrusted(it.sender);
                 toBreak = true;
                 break;
@@ -275,6 +275,10 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
     }
     else {
       ++liarNumber;
+      context.mark_untrusted(it.sender);
+      if (stage.realTrustedMask.at(it.sender) != cs::ConfidantConsts::InvalidConfidantIndex) {
+        stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
+      }
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
       cslog() << "[" << (int)it.sender << "] IS " << (is_lost ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
@@ -318,7 +322,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
-      stage.realTrustedMask.push_back(1); // set if trusted and 0 if untrusted
+      stage.realTrustedMask.push_back(cs::ConfidantConsts::FirstWriterIndex);
       auto ptr = context.stage1(i);
       if(ptr == nullptr) {
         continue;
@@ -357,7 +361,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       }
     }
     else {
-      stage.realTrustedMask.push_back(0);
+      stage.realTrustedMask.push_back(cs::ConfidantConsts::InvalidConfidantIndex);
     }
   }
 
