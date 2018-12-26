@@ -436,7 +436,8 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
       }
-      for (size_t i = 0; i < max_conf - next_round_trust.size(); i++) {
+      size_t toAdd = max_conf - next_round_trust.size();
+      for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
