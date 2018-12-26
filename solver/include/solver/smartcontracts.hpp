@@ -7,6 +7,8 @@
 #include <csdb/transaction.hpp>
 #include <lib/system/signals.hpp>
 #include <lib/system/common.hpp>
+#include <lib/system/concurrent.hpp>
+
 #include <csnode/node.hpp> // introduce Node::api_handler_ptr_t
 
 #include <optional>
@@ -220,7 +222,7 @@ namespace cs
     bool invoke_execution(const SmartContractRef& contract, csdb::Pool block);
     // currently perform blocking execution via api to remote executor
     // TODO: make an async execution
-    bool execute(const cs::SmartContractRef& item);
+    void execute(const cs::SmartContractRef& item);
   };
 
 } // cs

@@ -312,12 +312,12 @@ namespace cs
     return false;
   }
 
-  bool SmartContracts::execute(const cs::SmartContractRef& item)
+  void SmartContracts::execute(const cs::SmartContractRef& item)
   {
     csdb::Transaction start_tr = get_transaction(item);
     if(!is_executable(start_tr)) {
       cserror() << name() << ": unable execute neither deploy nor start transaction";
-      return false;
+      return;
     }
     bool deploy = is_deploy(start_tr);
 
@@ -354,21 +354,29 @@ namespace cs
           state = it->second;
         }
       }
+
       constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
-      get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(),
-        contract.smartContractDeploy.byteCode, state, contract.method, contract.params, MAX_EXECUTION_TIME);
-      if(resp.status.code == 0) {
-        // USRFLD[new_state::Value] - new state
-        result.add_user_field(trx_uf::new_state::Value, resp.contractState);
-        cs::TransactionsPacket p;
-        p.addTransaction(result);
-        set_execution_result(p);
-        return true;
-      }
-      else {
-        cserror() << name() << ": failed to execute smart contract";
-        return false;
-      }
+      auto runEntity = [=]() mutable {
+        get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
+                                                 state, contract.method, contract.params, MAX_EXECUTION_TIME);
+        auto toProcessing = [&] {
+          if (resp.status.code == 0) {
+            result.add_user_field(trx_uf::new_state::Value, resp.contractState);
+
+            cs::TransactionsPacket packet;
+            packet.addTransaction(result);
+
+            set_execution_result(packet);
+          }
+          else {
+            cserror() << name() << ": failed to execute smart contract";
+          }
+        };
+
+        CallsQueue::instance().insert(toProcessing);
+      };
+
+      cs::Concurrent::run(runEntity);
     }
     else {
       cserror() << name() << ": failed get smart contract from transaction";
@@ -381,7 +389,7 @@ namespace cs
     cs::TransactionsPacket p;
     p.addTransaction(result);
     set_execution_result(p);
-    return true;
+    return;
   }
 
 } // cs
