@@ -1,5 +1,5 @@
 #include "lib/system/timer.hpp"
-#include <lib/system/utils.hpp>
+#include <lib/system/concurrent.hpp>
 
 cs::Timer::Timer()
 : isRunning_(false)
@@ -37,7 +37,7 @@ bool cs::Timer::isRunning() {
 }
 
 void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback) {
-  cs::Utils::runAfter(std::chrono::milliseconds(msec), callback);
+  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), callback);
 }
 
 void cs::Timer::loop() {
