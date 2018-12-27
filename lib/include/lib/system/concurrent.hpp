@@ -67,15 +67,21 @@ template<typename Result>
 class FutureWatcher {
 public:
   using FinishSignal = cs::Signal<void(Result)>;
+  using Id = uint64_t;
 
-  FutureWatcher() = default;
-  ~FutureWatcher() = default;
+  FutureWatcher() {
+    ++producedId;
+    id_ = producedId;
+  }
 
   FutureWatcher(FutureWatcher&) = delete;
+  ~FutureWatcher() = default;
 
   explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
-  : future_(std::move(future))
-  , policy_(policy) {
+  : FutureWatcher() {
+    future_ = std::move(future);
+    policy_ = policy;
+
     watch<Result>();
   }
 
@@ -93,6 +99,8 @@ public:
 
     future_ = std::move(watcher.future_);
     policy_ = watcher.policy_;
+    id_ = watcher.id_;
+
     watch<Result>();
   }
 
@@ -102,10 +110,17 @@ public:
     return state_;
   }
 
+  Id id() const noexcept {
+    return id_;
+  }
+
 private:
   Future<Result> future_;
   RunPolicy policy_;
   WatcherState state_ = WatcherState::Idle;
+  Id id_;
+
+  inline static Id producedId = 0;
 
   template<typename T>
   void watch() {
@@ -194,5 +209,15 @@ private:
     CallsQueue::instance().insert(callBack);
   }
 };
+
+template<typename T>
+inline bool operator<(const FutureWatcher<T>& lhs, const FutureWatcher<T>& rhs) {
+  return lhs.id() < rhs.id();
+}
+
+template<typename T>
+inline bool operator==(const FutureWatcher<T>& watcher, uint64_t value) {
+  return watcher.id() == value;
+}
 }
 #endif  //  CONCURRENT_HPP
