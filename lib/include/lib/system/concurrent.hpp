@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <future>
+#include <type_traits>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -116,6 +117,13 @@ public:
     return FutureWatcher(policy, std::async(std::launch::async, function));
   }
 
+  // runs not binded function with args async
+  template<typename Function, typename... Args>
+  static FutureWatcher<std::invoke_result_t<std::decay_t<Function>, std::decay_t<Args>...>> run(RunPolicy policy, Function&& function, Args&&... args) {
+    return Concurrent::run(policy, std::bind(std::forward<Function>(function), args...));
+  }
+
+  // runs function entity in thread pool
   template<typename Func>
   static void run(Func&& function) {
     Worker::execute(std::forward<Func>(function));
