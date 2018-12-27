@@ -1149,11 +1149,11 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
   
-  csmeta(csdetails) << "Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csmeta(cslog) << "Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
-    << ", Time Stamp: " << stageOneInfo.roundTimeStamp << std::endl
-    << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
+    << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
+    csmeta(csdetails) << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
   size_t expectedMessageSize = sizeof(stageOneInfo.sender)
                   + sizeof(stageOneInfo.hash)
@@ -1183,7 +1183,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cs::DataStream signStream(messageToSign);
   signStream << roundNumber_ << subRound_<< stageOneInfo.messageHash;
 
-  csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
+  //csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
@@ -1316,7 +1316,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   }
 
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
     return;
   }
 
@@ -1396,7 +1396,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
   }
 
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
     return;
   }
 
@@ -1458,7 +1458,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
   istream_ >> subRound >> requesterNumber >> requiredNumber;
 
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got Stage-2 for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
     return;
   }
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2148,7 +2148,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     return;
   }
   if (subRound > subRound_) {
-    cswarning() << "NODE> We got hash for the Hode with SUBROUND, we don't have";
+    cswarning() << "NODE> We got hash for the Node with SUBROUND, we don't have";
   }
   csdb::PoolHash spoiledHash;
   csdb::PoolHash lwh = blockChain_.getLastHash();
@@ -2159,6 +2159,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   else {
     cswarning() << ": hash from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " DOES NOT MATCH to my value "
       << lwh.to_string();
+      sendHashReply(std::move(tmp), sender);
   }
 }
 
@@ -2286,7 +2287,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if (!found) {
     myLevel_ = NodeLevel::Normal;
   }
-
+  badHashReplyCounter = 0;
   // TODO: think how to improve this code.
   stageOneMessage_.clear();
   stageOneMessage_.resize(roundTable.confidants.size());
@@ -2420,4 +2421,42 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csd
 
 void Node::smartStageEmptyReply(uint8_t requesterNumber) {
   cslog() << "Here should be the smart refusal for the SmartStageRequest";
+}
+
+void Node::sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent) {
+  csmeta(csdebug);
+  if (myLevel_ != NodeLevel::Confidant) {
+    csmeta(cswarning) << "Only confidant nodes can send hash reply to other nodes";
+    return;
+  }
+  cscrypto::Signature signature;
+  cscrypto::GenerateSignature(signature, solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
+  sendDefault(respondent, MsgTypes::HashReply, roundNumber_, subRound_, signature, hash);
+}
+
+void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
+
+  uint8_t subRound;
+  cscrypto::Signature signature;
+  csdb::PoolHash hash;
+  istream_.init(data, size);
+  istream_ >> subRound;
+  istream_ >> signature;
+  istream_ >> hash;
+
+  auto& confidants = cs::Conveyer::instance().roundTable(roundNumber_)->confidants;
+  if (std::find(confidants.cbegin(), confidants.cend(), sender) == confidants.cend()) {
+    csmeta(cswarning) << ": The message of WRONG HASH was sent by false confidant!";
+    return;
+  }
+  if(!cscrypto::VerifySignature(signature, solver_->getPublicKey(), hash.to_binary().data(), hash.size())) { 
+    csmeta(cswarning) << ": The message of WRONG HASH has WRONG SIGNATURE!";
+    return;
+  }
+  ++badHashReplyCounter;
+  if (badHashReplyCounter > confidants.size() / 2 + 1) {
+    csmeta(cswarning) << ": This node really have not valid HASH!!! Deleting last block from DB and trying to syncronize";
+    //TODO: call the necessary function here
+  }
+  
 }
