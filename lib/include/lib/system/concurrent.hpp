@@ -85,16 +85,16 @@ private:
     auto closure = [=] {
       Result result = future_.get();
 
-      auto lambda = [=] {
+      auto signal = [=] {
         emit finished_(result);
       };
 
       // insert in call queue or call direct
       if (policy_ == RunPolicy::CallQueuePolicy) {
-        CallsQueue::instance().insert(lambda);
+        CallsQueue::instance().insert(signal);
       }
       else {
-        lambda();
+        signal();
       }
 
       future_ = Future<Result>();
@@ -112,7 +112,7 @@ public:
   // runs function in another thread, returns future watcher
   // that generates finished signal by run policy
   template<typename Result, typename... Args>
-  static FutureWatcher<Result> runWatcher(RunPolicy policy, const std::function<Result(Args...)>& function) {
+  static FutureWatcher<Result> run(RunPolicy policy, const std::function<Result(Args...)>& function) {
     return FutureWatcher(policy, std::async(std::launch::async, function));
   }
 
@@ -124,11 +124,7 @@ public:
   // calls std::function after ms time in another thread
   static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
     auto timePoint = std::chrono::steady_clock::now() + ms;
-    auto closure = [=] {
-      Concurrent::runAfterHelper(timePoint, callBack);
-    };
-
-    Worker::execute(closure);
+    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, callBack));
   }
 
 private:
