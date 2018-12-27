@@ -120,13 +120,18 @@ public:
   // runs not binded function with args async
   template<typename Function, typename... Args>
   static FutureWatcher<std::invoke_result_t<std::decay_t<Function>, std::decay_t<Args>...>> run(RunPolicy policy, Function&& function, Args&&... args) {
-    return Concurrent::run(policy, std::bind(std::forward<Function>(function), args...));
+    return Concurrent::run(policy, std::bind(std::forward<Function>(function), std::forward<Args>(args)...));
   }
 
   // runs function entity in thread pool
   template<typename Func>
   static void run(Func&& function) {
     Worker::execute(std::forward<Func>(function));
+  }
+
+  template<typename Func, typename... Args>
+  static void run(Func&& func, Args&&... args) {
+    Concurrent::run(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
   }
 
   // calls std::function after ms time in another thread
