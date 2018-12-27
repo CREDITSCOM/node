@@ -1938,44 +1938,39 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   sendRoundTable(roundTable, poolMetaInfo, poolSignature);
 }
 
-void Node::createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-  const cs::Characteristic& characteristic, const cs::Signature& signature)
+void Node::sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
+                            const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+                            const cs::Signature& signature)
 {
-  ostream_.init(BaseFlags::Broadcast | BaseFlags::Compressed | BaseFlags::Fragmented);
-  ostream_ << MsgTypes::RoundTable << roundNumber_ << subRound_;
-  ostream_ << roundTable.confidants.size();
-  ostream_ << roundTable.hashes.size();
+  sendDefault(target, MsgTypes::RoundTable, roundNumber_, subRound_, roundTable.confidants, roundTable.hashes,
+              poolMetaInfo.timestamp, characteristic.mask, poolMetaInfo.sequenceNumber, signature,
+              poolMetaInfo.writerKey, poolMetaInfo.previousHash);
 
-  for(const auto& confidant : roundTable.confidants) {
-    ostream_ << confidant;
+  if (!characteristic.mask.empty()) {
+    csmeta(csdebug) << "Packing " << characteristic.mask.size() << " bytes of char. mask to send";
   }
+}
 
-  for(const auto& hash : roundTable.hashes) {
-    ostream_ << hash;
+void Node::sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                                 const cs::Characteristic& characteristic, const cs::Signature& signature)
+{
+  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, roundTable.confidants, roundTable.hashes,
+              poolMetaInfo.timestamp, characteristic.mask, poolMetaInfo.sequenceNumber, signature,
+              poolMetaInfo.writerKey, poolMetaInfo.previousHash);
+
+  if (!characteristic.mask.empty()) {
+    csmeta(csdebug) << "Packing " << characteristic.mask.size() << " bytes of char. mask to send";
   }
-
-  ostream_ << poolMetaInfo.timestamp;
-
-  if(!characteristic.mask.empty()) {
-    cslog() << "NODE> packing " << characteristic.mask.size() << " bytes of char. mask to send";
-  }
-
-  ostream_ << characteristic.mask;
-  ostream_ << poolMetaInfo.sequenceNumber;
-  ostream_ << signature;
-  ostream_ << poolMetaInfo.writerKey;
-  ostream_ << poolMetaInfo.previousHash;
 }
 
 void Node::storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-  const cs::Characteristic& characteristic, const cs::Signature& signature)
-{
+                                 const cs::Characteristic& characteristic, const cs::Signature& signature) {
   lastSentRoundData_.roundTable.round = roundTable.round;
   lastSentRoundData_.subRound = subRound_;
   // no general stored!
   lastSentRoundData_.roundTable.confidants.resize(roundTable.confidants.size());
   std::copy(roundTable.confidants.cbegin(), roundTable.confidants.cend(),
-    lastSentRoundData_.roundTable.confidants.begin());
+            lastSentRoundData_.roundTable.confidants.begin());
   lastSentRoundData_.roundTable.hashes.resize(roundTable.hashes.size());
   std::copy(roundTable.hashes.cbegin(), roundTable.hashes.cend(), lastSentRoundData_.roundTable.hashes.begin());
 
@@ -2003,10 +1998,8 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& po
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
-  createRoundPackage(conveyer.currentRoundTable(), poolMetaInfo, *block_characteristic, poolSignature);
+  sendRoundPackageToAll(conveyer.currentRoundTable(), poolMetaInfo, *block_characteristic, poolSignature);
   storeRoundPackageData(conveyer.currentRoundTable(), poolMetaInfo, *block_characteristic, poolSignature);
-
-  flushCurrentTasks();
 
   /////////////////////////////////////////////////////////////////////////// screen output
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
@@ -2050,8 +2043,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   subRound_ = subRound;
-  std::size_t hashesCount = 0;
-  istream_ >> hashesCount;
 
   cs::RoundTable roundTable;
   roundTable.round = rNum;
@@ -2066,6 +2057,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     confidants.push_back(std::move(key));
   }
+
+  std::size_t hashesCount = 0;
+  istream_ >> hashesCount;
 
   cs::PacketsHashes hashes;
   hashes.reserve(hashesCount);
@@ -2162,7 +2156,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
-  csmeta(csdetails) << "started, rNum=" << rNum;
+  csmeta(csdetails) << "started, round:" << rNum;
 
   istream_.init(data, size);
 
@@ -2196,19 +2190,17 @@ void Node::sendRoundTableReply(const cs::PublicKey& target, bool has_requested_i
   sendDefault(target, MsgTypes::RoundTableReply, roundNumber_, request);
 }
 
-bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum) {
-  csunused(respondent);
-
+bool Node::tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum) {
   if (lastSentRoundData_.roundTable.round != rNum || lastSentRoundData_.subRound != subRound_) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
   }
 
-  //TODO: use respondent.value() to send info directly, otherwise broadcast info
-  createRoundPackage(lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo, lastSentRoundData_.characteristic, lastSentRoundData_.poolSignature);
-  flushCurrentTasks();
+  cslog() << "NODE> Re-send last round info #" << rNum << " to ALL";
 
-  cslog() << "NODE> re-send last round info #" << rNum << " to ALL";
+  sendRoundPackage(target, lastSentRoundData_.roundTable, lastSentRoundData_.poolMetaInfo,
+                   lastSentRoundData_.characteristic, lastSentRoundData_.poolSignature);
+
   return true;
 }
 

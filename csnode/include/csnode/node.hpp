@@ -107,7 +107,7 @@ public:
   void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
   // called by solver, review required:
-  bool tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
+  bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -193,8 +193,11 @@ public slots:
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                          const cs::Characteristic& characteristic, const cs::Signature& signature);
+  void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
+                        const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+                        const cs::Signature& signature);
+  void sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                             const cs::Characteristic& characteristic, const cs::Signature& signature);
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, const cs::Signature& signature);
