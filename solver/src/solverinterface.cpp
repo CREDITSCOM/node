@@ -141,6 +141,7 @@ namespace cs
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();
+    trueStageThreeStorage.clear();
     trusted_candidates.clear();
 
     if(!pstate) {
@@ -235,15 +236,48 @@ namespace cs
     }
   }
 
-  void SolverCore::gotStageThree(const cs::StageThree& stage)
+  void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   {
     if(find_stage3(stage.sender) != nullptr) {
       // duplicated
       return;
     }
+    switch (flagg) {
+      case 0:
+        stageThreeStorage.push_back(stage);
+        break;
+      case 1:
+        for (auto& st : stageThreeStorage) {
+          if(st.hashBlock == stage.hashBlock 
+            && st.hashCandidatesList == stage.hashCandidatesList
+            && st.hashHashesList == stage.hashHashesList
+            && st.realTrustedMask == stage.realTrustedMask
+            && st.writer == stage.writer) {
+            trueStageThreeStorage.push_back(st);
+          }
+        }
+        trueStageThreeStorage.push_back(stage);
+        stageThreeStorage.push_back(stage);
+        break;
+      case 2:
+        cs::StageThree st;
+        for(auto& it : trueStageThreeStorage) {
+          if(it.sender == pnode->getConfidantNumber()) {
+            st = it;
+          }
+        }
+        if (st.hashBlock == stage.hashBlock
+          && st.hashCandidatesList == stage.hashCandidatesList
+          && st.hashHashesList == stage.hashHashesList
+          && st.realTrustedMask == stage.realTrustedMask
+          && st.writer == stage.writer) {
+          trueStageThreeStorage.push_back(stage);
+        }
+        stageThreeStorage.push_back(stage);
+      break;
+    }
 
-    stageThreeStorage.push_back(stage);
-    LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size());
+    LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size());
 
     if(!pstate) {
       return;

@@ -56,7 +56,7 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
   /*the order is important! the signature is created in node
   before sending stage and then is inserted in the field .sig
   now we can add it to stages storage*/
-  core.gotStageThree(stage);
+  core.gotStageThree(stage, 1);
 }
 
 size_t SolverContext::own_conf_number() const {
