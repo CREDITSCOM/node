@@ -48,7 +48,7 @@ protected:
 
   void trusted_election(SolverContext& context);
   bool pool_solution_analysis(SolverContext& context);
-  void take_urgent_decision(SolverContext& context);
+  bool take_urgent_decision(SolverContext& context);
 
   void request_stages(SolverContext& context);
   void request_stages_neighbors(SolverContext& context);

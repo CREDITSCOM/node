@@ -55,7 +55,8 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-
+  void sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent);
+  void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   //consensus communication
   void sendStageOne(cs::StageOne&);
   void sendStageTwo(cs::StageTwo&);
@@ -107,7 +108,7 @@ public:
   void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
   // called by solver, review required:
-  bool tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
+  bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -193,8 +194,11 @@ public slots:
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                          const cs::Characteristic& characteristic, const cs::Signature& signature);
+  void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
+                        const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+                        const cs::Signature& signature);
+  void sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                             const cs::Characteristic& characteristic, const cs::Signature& signature);
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, const cs::Signature& signature);
@@ -319,6 +323,7 @@ private:
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
   std::vector<cs::Bytes> stageThreeMessage_;
+  size_t badHashReplyCounter = 0;
 
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;

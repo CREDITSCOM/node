@@ -309,7 +309,7 @@ namespace cs
       const auto ptr = /*cur_round == 10 ? nullptr :*/ find_stage3(pnode->getConfidantNumber());
       if(ptr != nullptr) {
         if(ptr->sender == ptr->writer) {
-          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, cur_round)) {
             cslog() << "SolverCore: re-send full round info #" << cur_round << " completed";
             return;
           }
@@ -321,7 +321,7 @@ namespace cs
     else if(requester_round < cur_round) {
       for(const auto& node : pnode->confidants()) {
         if(requester == node) {
-          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, cur_round)) {
             cslog() << "SolverCore: requester is trusted next round, supply it with round info";
           }
           else {
