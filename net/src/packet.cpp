@@ -117,6 +117,10 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
 
     if (msg->packetsTotal_ >= 20) {
       if (msg->packetsLeft_ != 0) {
+        // the 1st fragment contains full info:
+        if(pack.getFragmentId() == 0) {
+          csdetails() << "COLLECT> get packet type " << (int) pack.getType() << " of " << msg->packetsTotal_ << "-fragments pack";
+        }
         csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
       }
       else {
