@@ -153,6 +153,41 @@ namespace cs
     return block.transactions().at(contract.transaction);
   }
 
+  void SmartContracts::onExecutionFinished(const SmartExecutionData& data) {
+    csdb::Transaction result = result_from_smart_invoke(data.smartContract);
+
+    if (data.result.status.code == 0) {
+      csdebug() << name() << ": execution of smart contract is successful";
+      result.add_user_field(trx_uf::new_state::Value, data.result.contractState);
+    }
+    else {
+      cserror() << name() << ": failed to execute smart contract";
+      // result contains empty USRFLD[state::Value]
+      result.add_user_field(trx_uf::new_state::Value, std::string{});
+    }
+
+    cs::TransactionsPacket packet;
+    packet.addTransaction(result);
+
+    set_execution_result(packet);
+    checkAllExecutions();
+  }
+
+  void SmartContracts::checkAllExecutions() {
+    using Watcher = cs::FutureWatcher<SmartExecutionData>;
+    std::vector<std::list<Watcher>::iterator> iterators;
+
+    for (auto iter = executions_.begin(); iter != executions_.end(); ++iter) {
+      if (iter->state() == cs::WatcherState::Compeleted) {
+        iterators.push_back(iter);
+      }
+    }
+
+    for (auto iter : iterators) {
+      executions_.erase(iter);
+    }
+  }
+
   std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction tr) const
   {
     // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
@@ -385,48 +420,43 @@ namespace cs
     csdebug() << name() << ": invoke api to remote executor to " << (deploy ? "deploy" : "execute") << " contract";
 
     auto maybe_contract = get_smart_contract(start_tr);
-    if(maybe_contract.has_value()) {
+    if (maybe_contract.has_value()) {
       const auto contract = maybe_contract.value();
-      executor::ExecuteByteCodeResult resp;
       std::string state;
-      if(!deploy) {
+      if (!deploy) {
         const auto it = contract_state.find(absolute_address(start_tr.target()));
-        if(it != contract_state.cend()) {
+        if (it != contract_state.cend()) {
           state = it->second;
         }
       }
 
       constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
-      auto runEntity = [=]() mutable {
+
+      // create runnable object
+      std::function<SmartExecutionData()> runnable = [=]() mutable {
+        executor::ExecuteByteCodeResult resp;
         get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
                                                  state, contract.method, contract.params, MAX_EXECUTION_TIME);
-        auto toProcessing = [=] () mutable {
-          csdb::Transaction result = result_from_smart_invoke(item);
 
-          if (resp.status.code == 0) {
-            csdebug() << name() << ": execution of smart contract is successful";
-            result.add_user_field(trx_uf::new_state::Value, resp.contractState);
-          }
-          else {
-            cserror() << name() << ": failed to execute smart contract";
-            // result contains empty USRFLD[state::Value]
-            result.add_user_field(trx_uf::new_state::Value, std::string {});
-          }
-
-          cs::TransactionsPacket packet;
-          packet.addTransaction(result);
-
-          set_execution_result(packet);
+        SmartExecutionData data = {
+          start_tr,
+          state,
+          item,
+          resp
         };
 
-        CallsQueue::instance().insert(toProcessing);
+        return data;
       };
 
-      cs::Concurrent::run(runEntity);
+      // run async and watch result
+      auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, std::move(runnable));
+      cs::Connector::connect(&watcher.finished, this, &SmartContracts::onExecutionFinished);
+
+      executions_.push_back(std::move(watcher));
 
       csdb::Address addr = start_tr.target();
-      auto cleanupOnTimeout = [this, addr]() {
-        if(is_running_smart_contract(addr)) {
+      auto cleanupOnTimeout = [=]() {
+        if (is_running_smart_contract(addr)) {
           cswarning() << name() << ": timeout of smart contract execution, cancel";
           cancel_running_smart_contract();
         }
@@ -434,8 +464,8 @@ namespace cs
           cslog() << name() << ": unexpected smart contract address, cannot cancel execution";
         }
       };
-      cs::Concurrent::runAfter(std::chrono::milliseconds(MAX_EXECUTION_TIME + MAX_EXECUTION_TIME), cleanupOnTimeout);
 
+      cs::Timer::singleShot(static_cast<int>(MAX_EXECUTION_TIME << 1), cleanupOnTimeout);
       return true;
     }
     else {
