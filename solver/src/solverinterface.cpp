@@ -345,8 +345,7 @@ namespace cs
       cslog() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
       return;
     }
-    cswarning() << "SolverCore: round info reply means next round is not started, become writer in " << Consensus::T_round / 1000U << " sec";
-    cserror() << "SolverCore: re-assign writer node to me";
+    cswarning() << "SolverCore: round info reply means next round is not started, become writer";
     handleTransitions(SolverCore::Event::SetWriter);
   }
   

@@ -1128,8 +1128,8 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   }
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
-  
-  csmeta(csdetails) << "Round = " << roundNumber_ << "." << subRound_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+
+  csmeta(csdetails) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)<< ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
@@ -2105,7 +2105,7 @@ void Node::sendHash(cs::RoundNumber round) {
   cslog() << "Sending hash " << hash.to_string() << " to ALL";
   spoileHash(hash, solver_->getPublicKey(), spoiledHash);
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
-  cslog() << "Hash sent";
+  cslog() << "NODE> Hash sent, round: " << round << "(" << subRound_<< ")";
 #endif
 }
 
@@ -2398,7 +2398,6 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& 
 }
 
 void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
-
   uint8_t subRound;
   cscrypto::Signature signature;
   csdb::PoolHash hash;
@@ -2419,7 +2418,6 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
   ++badHashReplyCounter;
   if (badHashReplyCounter > confidants.size() / 2 + 1) {
     csmeta(cswarning) << ": This node really have not valid HASH!!! Deleting last block from DB and trying to syncronize";
-    //TODO: call the necessary function here
+    blockChain_.removeLastBlock();
   }
-  
 }

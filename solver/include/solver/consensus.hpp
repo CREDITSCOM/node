@@ -33,7 +33,7 @@ public:
   constexpr static uint32_t T_round = 2000;
 
   /** @brief   Max timeout (msec) to wait stages (Trusted-2,3) */
-  constexpr static uint32_t T_stage_request = 2000;
+  constexpr static uint32_t T_stage_request = 4000;
 
   /** @brief   Max timeout (msec) to force further transition (Trusted-2) */
   // constexpr static uint32_t T_stage_force = 5000;
