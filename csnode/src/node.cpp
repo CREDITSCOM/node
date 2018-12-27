@@ -1129,7 +1129,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
   
-  csmeta(cslog) << "Round = " << roundNumber_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csmeta(csdetails) << "Round = " << roundNumber_ << "." << subRound_ << ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
@@ -1169,6 +1169,8 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
   sendToConfidants(MsgTypes::FirstStage, roundNumber_, subRound_, stageOneInfo.signature, message);
+
+  csmeta(csdetails) << "sent message size " << message.size();
 
   // cache
   stageOneMessage_[myConfidantIndex_] = std::move(message);
@@ -1271,6 +1273,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
   sendToConfidants(MsgTypes::SecondStage, roundNumber_, subRound_, stageTwoInfo.signature, bytes);
 
   // cash our stage two
+  csmeta(csdetails) << "bytes size " << bytes.size();
   stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
   csmeta(csdetails) << "done";
 }
@@ -1351,6 +1354,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   sendToConfidants(MsgTypes::ThirdStage, roundNumber_, subRound_, stageThreeInfo.signature, bytes);
 
   // cach stage three
+  csmeta(csdetails) << "bytes size " << bytes.size();
   stageThreeMessage_[myConfidantIndex_] = std::move(bytes);
   csmeta(csdetails) << "done";
 }
