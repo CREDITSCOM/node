@@ -1776,7 +1776,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
   
   // cach stage three
-  smartStageThreeMessage_[myConfidantIndex_] = std::move(bytes);
+  smartStageThreeMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdebug) << "done";
 }
 
