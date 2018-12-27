@@ -662,7 +662,7 @@ int cnt = (int)smartConfidants_.size();
   }
 
   void SolverCore::fakeStage(uint8_t confIndex) {
-
+    csunused(confIndex);
   }
 
   bool SolverCore::smartConfidantExist(uint8_t confidantIndex) {

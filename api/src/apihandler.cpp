@@ -446,7 +446,6 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
   if (!transaction.userFields.empty())
     tr.add_user_field(1, transaction.userFields);
 
-  csmeta(csdetails) << ": trx: src " << tr.source().to_string() << ", tgt " << tr.target().to_string();
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -581,7 +580,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));  
 
-  csmeta(csdetails) << ": trx: src " << send_transaction.source().to_string() << ", tgt " << send_transaction.target().to_string();
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy) {

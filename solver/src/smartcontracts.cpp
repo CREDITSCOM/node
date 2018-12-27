@@ -294,7 +294,6 @@ namespace cs
       const auto& current = exe_queue.front();
       if(current.status == SmartContractStatus::Running) {
         const csdb::Address tmp = absolute_address(addr);
-        csmeta(csdebug) << name() << ": tmp " << tmp.to_string() << ", current.abs_addr " << current.abs_addr.to_string();
         return (current.abs_addr == tmp);
       }
     }
@@ -303,9 +302,17 @@ namespace cs
 
   bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
   {
-    if(is_running_smart_contract(tr.source())) {
-      exe_queue.front().created_transactions.push_back(tr);
+    csdb::Address abs_addr = absolute_address(tr.source());
+    if(is_running_smart_contract(abs_addr)) {
+      auto& v = exe_queue.front().created_transactions;
+      v.push_back(tr);
+      cslog() << name() << ": running smart contract emits transaction, add, total " << v.size();
       return true;
+    }
+    else {
+      if(contract_state.count(abs_addr)) {
+        cslog() << name() << ": finished smart contract emits transaction, ignore";
+      }
     }
     return false;
   }
@@ -358,6 +365,12 @@ namespace cs
     // call to executor only if currently is trusted
     if(force_execution || (execution_allowed && contains_me(block.confidants()))) {
       csdebug() << name() << ": execute current contract in queue now";
+      cslog() << "  _____";
+      cslog() << " /     \\";
+      cslog() << "/  S.C  \\";
+      cslog() << "\\       /";
+      cslog() << " \\_____/";
+
       return execute(contract);
     }
     else {
@@ -396,12 +409,20 @@ namespace cs
         }
       }
 
-      constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
       auto runEntity = [=]() mutable {
         get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
-                                                 state, contract.method, contract.params, MAX_EXECUTION_TIME);
+                                                 state, contract.method, contract.params, Consensus::T_smart_contract);
         auto toProcessing = [=] () mutable {
           csdb::Transaction result = result_from_smart_invoke(item);
+
+          const auto it = find_in_queue(item);
+          const QueueItem* pqueue_item = nullptr;          
+          if(it != exe_queue.cend()) {
+            pqueue_item = &(*it);
+          }
+          else {
+            cserror() << name() << ": cannot find in queue just completed contract";
+          }
 
           if (resp.status.code == 0) {
             csdebug() << name() << ": execution of smart contract is successful";
@@ -409,13 +430,30 @@ namespace cs
           }
           else {
             cserror() << name() << ": failed to execute smart contract";
+            if(pqueue_item != nullptr) {
+              if(!pqueue_item->created_transactions.empty()) {
+                cswarning() << name() << ": drop " << pqueue_item->created_transactions.size() << " emitted trx";
+              }
+              // drop trx:
+              pqueue_item = nullptr;
+            }
             // result contains empty USRFLD[state::Value]
             result.add_user_field(trx_uf::new_state::Value, std::string {});
           }
 
           cs::TransactionsPacket packet;
           packet.addTransaction(result);
-
+          if(pqueue_item != nullptr) {
+            if(!pqueue_item->created_transactions.empty()) {
+              for(const auto& tr : pqueue_item->created_transactions) {
+                packet.addTransaction(tr);
+              }
+              cslog() << name() << ": add " << pqueue_item->created_transactions.size() << " emitted trx to contract state";
+            }
+            else {
+              cslog() << name() << ": no emitted trx added to contract state";
+            }
+          }
           set_execution_result(packet);
         };
 
@@ -434,7 +472,7 @@ namespace cs
           cslog() << name() << ": unexpected smart contract address, cannot cancel execution";
         }
       };
-      cs::Concurrent::runAfter(std::chrono::milliseconds(MAX_EXECUTION_TIME + MAX_EXECUTION_TIME), cleanupOnTimeout);
+      cs::Concurrent::runAfter(std::chrono::milliseconds(Consensus::T_smart_contract + Consensus::T_stage_request), cleanupOnTimeout);
 
       return true;
     }
@@ -467,4 +505,34 @@ namespace cs
 
     return result;
   }
+
+  void SmartContracts::set_execution_result(cs::TransactionsPacket pack) const
+  {
+    emit signal_smart_executed(pack);
+
+    cslog() << "  _____";
+    cslog() << " /     \\";
+    cslog() << "/  S.C  \\";
+
+    bool ok = true;
+    if(pack.transactionsCount() > 0) {
+      for(const auto& tr : pack.transactions()) {
+        if(is_new_state(tr)) {
+          if(tr.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
+            ok = false;
+            break;
+          }
+        }
+      }
+    }
+    if(ok) {
+      cslog() << "\\   +   /";
+    }
+    else {
+      cslog() << "\\ ERROR /";
+    }
+    cslog() << " \\_____/";
+
+  }
+
 } // cs
