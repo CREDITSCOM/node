@@ -4,7 +4,6 @@
 #include <functional>
 #include <future>
 #include <type_traits>
-#include <mutex>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -69,14 +68,10 @@ class FutureWatcher {
 public:
   using FinishSignal = cs::Signal<void(Result)>;
 
-  FutureWatcher()
-  : state_(WatcherState::Idle) {
-  }
-
+  FutureWatcher() = default;
   ~FutureWatcher() = default;
 
   FutureWatcher(FutureWatcher&) = delete;
-  FutureWatcher(FutureWatcher&&) = delete;
 
   explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
   : future_(std::move(future))
@@ -84,7 +79,18 @@ public:
     watch<Result>();
   }
 
+  FutureWatcher(FutureWatcher&& watcher)
+  : future_(std::move(watcher.future_))
+  , policy_(watcher.policy_)
+  , state_(watcher.state_) {
+    watcher.state_ = WatcherState::Idle;
+  }
+
   FutureWatcher& operator=(FutureWatcher&& watcher) {
+    if (state_ == WatcherState::Running) {
+      cserror() << csname() << "Trying to use operator= in watcher running state";
+    }
+
     future_ = std::move(watcher.future_);
     policy_ = watcher.policy_;
     watch<Result>();
@@ -99,7 +105,7 @@ public:
 private:
   Future<Result> future_;
   RunPolicy policy_;
-  WatcherState state_;
+  WatcherState state_ = WatcherState::Idle;
 
   template<typename T>
   void watch() {
