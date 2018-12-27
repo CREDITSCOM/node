@@ -87,7 +87,7 @@ private:
       Result result = future_.get();
 
       auto signal = [=] {
-        emit finished_(result);
+        emit finished(result);
       };
 
       // insert in call queue or call direct
@@ -105,13 +105,14 @@ private:
   }
 
 public signals:
-  cs::Signal<void(Result)> finished_;
+  cs::Signal<void(Result)> finished;
 };
 
 class Concurrent {
 public:
   // runs function in another thread, returns future watcher
   // that generates finished signal by run policy
+  // if does not stoge watcher object, then main thread will wait async entity in blocking mode
   template<typename Result, typename... Args>
   static FutureWatcher<Result> run(RunPolicy policy, const std::function<Result(Args...)>& function) {
     return FutureWatcher(policy, std::async(std::launch::async, function));
@@ -129,6 +130,7 @@ public:
     Worker::execute(std::forward<Func>(function));
   }
 
+  // runs non-binded function in thread pool
   template<typename Func, typename... Args>
   static void run(Func&& func, Args&&... args) {
     Concurrent::run(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
