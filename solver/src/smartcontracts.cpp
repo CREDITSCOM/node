@@ -219,7 +219,11 @@ namespace cs
       }
     }
     // enqueue to end
-    csdebug() << name() << ": enqueue contract for execution";
+    cslog() << "  _____";
+    cslog() << " /     \\";
+    cslog() << "/  S.C  \\";
+    cslog() << "\\   .   /";
+    cslog() << " \\_____/";
     csdb::Address addr {};
     if(trx_idx < block.transactions_count()) {
       addr = absolute_address(block.transaction(trx_idx).target());
@@ -311,7 +315,7 @@ namespace cs
     }
     else {
       if(contract_state.count(abs_addr)) {
-        cslog() << name() << ": finished smart contract emits transaction, ignore";
+        cslog() << name() << ": inactive smart contract emits transaction, ignore";
       }
     }
     return false;
@@ -327,7 +331,11 @@ namespace cs
     if(it != exe_queue.cbegin()) {
       cswarning() << name() << ": completed contract is not at the top of queue";
     }
-    csdebug() << name() << ": remove finished execution from queue";
+    cslog() << "  _____";
+    cslog() << " /     \\";
+    cslog() << "/   .   \\";
+    cslog() << "\\  S.C  /";
+    cslog() << " \\_____/";
     exe_queue.erase(it);
   }
 
@@ -364,13 +372,7 @@ namespace cs
     }
     // call to executor only if currently is trusted
     if(force_execution || (execution_allowed && contains_me(block.confidants()))) {
-      csdebug() << name() << ": execute current contract in queue now";
-      cslog() << "  _____";
-      cslog() << " /     \\";
-      cslog() << "/  S.C  \\";
-      cslog() << "\\       /";
-      cslog() << " \\_____/";
-
+      csdebug() << name() << ": execute current contract now";
       return execute(contract);
     }
     else {
