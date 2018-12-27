@@ -154,18 +154,18 @@ namespace cs
     }
 
     // start timeout tracking
-    auto round = cur_round;
-    track_next_round.start(
-      scheduler,
-      Consensus::PostConsensusTimeout,
-      [this, round]() {
-        if(this->cur_round == round) {
-          // round have not been changed yet
-          cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
-          pnode->sendNextRoundRequest();
-        }
-      },
-      true /*replace exisiting*/);
+    //auto round = cur_round;
+    //track_next_round.start(
+    //  scheduler,
+    //  Consensus::PostConsensusTimeout,
+    //  [this, round]() {
+    //    if(this->cur_round == round) {
+    //      // round have not been changed yet
+    //      cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
+    //      pnode->sendNextRoundRequest();
+    //    }
+    //  },
+    //  true /*replace exisiting*/);
 
     if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
       handleTransitions(Event::RoundTable);
