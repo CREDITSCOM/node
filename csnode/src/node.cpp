@@ -2409,13 +2409,13 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  csmeta(csdebug);
+  //csmeta(csdebug);
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
   std::copy(hash.begin(), hash.end(), bytesHash.begin());
   spoiledHash = csdb::PoolHash::from_binary(bytesHash);
-  csmeta(cslog) << "end";
+  //csmeta(cslog) << "end";
 }
 
 void Node::smartStageEmptyReply(uint8_t requesterNumber) {
