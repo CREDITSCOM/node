@@ -22,8 +22,6 @@ TEST(TransactionsPacket, createPacket) {
 TEST(TransactionsPacket, addTransactions) {
   auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
   cscrypto::PublicKey myPublicForSig;
-  cscrypto::PrivateKey myPrivateForSig;
-  cscrypto::GenerateKeyPair(myPublicForSig, myPrivateForSig);
 
   csdb::Transaction transaction;
   transaction.set_target(csdb::Address::from_public_key((char*)myPublicForSig.data()));
