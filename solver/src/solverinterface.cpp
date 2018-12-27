@@ -261,7 +261,7 @@ namespace cs
       psmarts->force_execution = true;
     }
 #endif
-    csmeta(cslog) << ": trx: src " << tr.source().to_string() << ", tgt " << tr.target().to_string();
+    csmeta(csdetails) << ": trx: src " << tr.source().to_string() << ", tgt " << tr.target().to_string();
     if(psmarts->test_smart_contract_emits(tr)) {
       // avoid pass to conveyer until execution of emitter contract has finished
       cslog() << "SolverCore: running smart contract emits transaction";
