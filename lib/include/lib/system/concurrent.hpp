@@ -97,7 +97,7 @@ public:
   }
 
   // returns current watcher state, if watcher never watched runnable entity
-  // then his state Idle
+  // then his state is Idle
   WatcherState state() const noexcept {
     return state_;
   }

@@ -207,11 +207,17 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
     cswarning() << "============================ CONSENSUS SUMMARY =================================";
     if (pool_solution_analysis(context)) {
-      take_urgent_decision(context); //to be redesigned
-      cswarning() << "\t==> [" << (int)stage.writer << "]";
+      if(take_urgent_decision(context)) { //to be redesigned
+        cswarning() << "\t==> [" << (int)stage.writer << "]";
+      }
+      else {
+        cswarning() << "\tconsensus failed waiting for BigBang";
+        return Result::Failure;
+      }
     }
     else {
       cswarning() << "\tconsensus is not achieved";
+      return Result::Failure;
       /*the action is needed*/
     }
     cswarning() << "================================================================================";
@@ -271,15 +277,18 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
   uint8_t liarNumber = 0;
   /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, cscrypto::kHashSize);*/
   for (const auto& it : context.stage1_data()) {
-    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
+    if (it.sender >= stage.realTrustedMask.size()) {
+      cserror() << name() << ": index of sender is greater than the container size";
+      return false;
+    }
+    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin()) && stage.realTrustedMask.size()!= cs::ConfidantConsts::InvalidConfidantIndex) {
       cslog() << "[" << (int)it.sender << "] is not liar";
     }
     else {
       ++liarNumber;
       context.mark_untrusted(it.sender);
-      if (stage.realTrustedMask.at(it.sender) != cs::ConfidantConsts::InvalidConfidantIndex) {
         stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
-      }
+
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
       cslog() << "[" << (int)it.sender << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
@@ -451,10 +460,10 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   LOG_NOTICE(name() << ": end of trusted election");
 }
 
-void TrustedStage3State::take_urgent_decision(SolverContext& context) {
+bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
   auto hash_t = context.blockchain().getHashBySequence(context.round() - 1).to_binary();
   if (hash_t.empty()) {
-    return;  // TODO: decide what to return
+    return false;  // TODO: decide what to return
   }
   int k = *(unsigned int *)hash_t.data();
   if(k < 0) {
@@ -465,7 +474,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
   if (cnt_active * 2 < cnt + 1) {
     cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
-    return;
+    return false;
   }
   int idx_writer = k % cnt_active;
   if(cnt != cnt_active) {
@@ -487,6 +496,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
       ++idx;
     }
   }
+  return true;
    // count idx_writer through good nodes:
   //int idx = -1;
   //for(int i = 0; i < cnt; ++i) {

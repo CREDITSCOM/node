@@ -141,6 +141,7 @@ namespace cs
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();
+    trueStageThreeStorage.clear();
     trusted_candidates.clear();
 
     if(!pstate) {
@@ -154,18 +155,18 @@ namespace cs
     }
 
     // start timeout tracking
-    auto round = cur_round;
-    track_next_round.start(
-      scheduler,
-      Consensus::PostConsensusTimeout,
-      [this, round]() {
-        if(this->cur_round == round) {
-          // round have not been changed yet
-          cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
-          pnode->sendNextRoundRequest();
-        }
-      },
-      true /*replace exisiting*/);
+    //auto round = cur_round;
+    //track_next_round.start(
+    //  scheduler,
+    //  Consensus::PostConsensusTimeout,
+    //  [this, round]() {
+    //    if(this->cur_round == round) {
+    //      // round have not been changed yet
+    //      cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
+    //      pnode->sendNextRoundRequest();
+    //    }
+    //  },
+    //  true /*replace exisiting*/);
 
     if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
       handleTransitions(Event::RoundTable);
@@ -235,15 +236,48 @@ namespace cs
     }
   }
 
-  void SolverCore::gotStageThree(const cs::StageThree& stage)
+  void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   {
     if(find_stage3(stage.sender) != nullptr) {
       // duplicated
       return;
     }
+    switch (flagg) {
+      case 0:
+        stageThreeStorage.push_back(stage);
+        break;
+      case 1:
+        for (auto& st : stageThreeStorage) {
+          if(st.hashBlock == stage.hashBlock 
+            && st.hashCandidatesList == stage.hashCandidatesList
+            && st.hashHashesList == stage.hashHashesList
+            && st.realTrustedMask == stage.realTrustedMask
+            && st.writer == stage.writer) {
+            trueStageThreeStorage.push_back(st);
+          }
+        }
+        trueStageThreeStorage.push_back(stage);
+        stageThreeStorage.push_back(stage);
+        break;
+      case 2:
+        cs::StageThree st;
+        for(auto& it : trueStageThreeStorage) {
+          if(it.sender == pnode->getConfidantNumber()) {
+            st = it;
+          }
+        }
+        if (st.hashBlock == stage.hashBlock
+          && st.hashCandidatesList == stage.hashCandidatesList
+          && st.hashHashesList == stage.hashHashesList
+          && st.realTrustedMask == stage.realTrustedMask
+          && st.writer == stage.writer) {
+          trueStageThreeStorage.push_back(stage);
+        }
+        stageThreeStorage.push_back(stage);
+      break;
+    }
 
-    stageThreeStorage.push_back(stage);
-    LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size());
+    LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size());
 
     if(!pstate) {
       return;
@@ -309,7 +343,7 @@ namespace cs
       const auto ptr = /*cur_round == 10 ? nullptr :*/ find_stage3(pnode->getConfidantNumber());
       if(ptr != nullptr) {
         if(ptr->sender == ptr->writer) {
-          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, cur_round)) {
             cslog() << "SolverCore: re-send full round info #" << cur_round << " completed";
             return;
           }
@@ -321,7 +355,7 @@ namespace cs
     else if(requester_round < cur_round) {
       for(const auto& node : pnode->confidants()) {
         if(requester == node) {
-          if(pnode->tryResendRoundTable(requester, (cs::RoundNumber)cur_round)) {
+          if(pnode->tryResendRoundTable(requester, cur_round)) {
             cslog() << "SolverCore: requester is trusted next round, supply it with round info";
           }
           else {
@@ -345,8 +379,7 @@ namespace cs
       cslog() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
       return;
     }
-    cswarning() << "SolverCore: round info reply means next round is not started, become writer in " << Consensus::T_round / 1000U << " sec";
-    cserror() << "SolverCore: re-assign writer node to me";
+    cswarning() << "SolverCore: round info reply means next round is not started, become writer";
     handleTransitions(SolverCore::Event::SetWriter);
   }
   

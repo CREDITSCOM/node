@@ -43,7 +43,7 @@ bool Packet::isHeaderValid() const {
     cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")"
       << (this->isNetwork() ? ", network" : "")
       << (this->isFragmented() ? ", fragmeted" : "")
-      <<  ", type " << (int) this->getType();
+              <<  ", type " << getMsgTypesString(this->getType()) << "(" << (int) this->getType() << ")";
     return false;
   }
   return true;
@@ -117,6 +117,10 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
 
     if (msg->packetsTotal_ >= 20) {
       if (msg->packetsLeft_ != 0) {
+        // the 1st fragment contains full info:
+        if(pack.getFragmentId() == 0) {
+          csdetails() << "COLLECT> get packet " << getMsgTypesString(pack.getType()) << " of " << msg->packetsTotal_ << " fragments";
+        }
         csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
       }
       else {
@@ -166,8 +170,6 @@ Message::~Message() {
 
 const char* getMsgTypesString(MsgTypes messageType) {
   switch (messageType) {
-    default:
-      return "-";
     case RoundTableSS:
       return "RoundTableSS";
     case Transactions:
@@ -182,10 +184,22 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "BlockRequest";
     case RequestedBlock:
       return "RequestedBlock";
+    case FirstStage:
+      return "FirstStage";
+    case SecondStage:
+      return "SecondStage";
+    case ThirdStage:
+      return "ThirdStage";
+    case FirstStageRequest:
+      return "FirstStageRequest";
+    case SecondStageRequest:
+      return "SecondStageRequest";
+    case ThirdStageRequest:
+      return "ThirdStageRequest";
     case RoundTableRequest:
       return "RoundTableRequest";
-    case BigBang:
-      return "BigBang";
+    case RoundTableReply:
+      return "RoundTableReply";
     case TransactionPacket:
       return "TransactionPacket";
     case TransactionsPacketRequest:
@@ -194,12 +208,30 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "TransactionsPacketReply";
     case NewCharacteristic:
       return "NewCharacteristic";
-    case RoundTable:
-      return "RoundTable";
     case WriterNotification:
       return "WriterNotification";
+    case FirstSmartStage:
+      return "FirstSmartStage";
+    case SecondSmartStage:
+      return "SecondSmartStage";
+    case RoundTable:
+      return "RoundTable";
+    case ThirdSmartStage:
+      return "ThirdSmartStage";
+    case SmartFirstStageRequest:
+      return "SmartFirstStageRequest";
+    case SmartSecondStageRequest:
+      return "SmartSecondStageRequest";
+    case SmartThirdStageRequest:
+      return "SmartThirdStageRequest";
+    case HashReply:
+      return "HashReply";
+    case BigBang:
+      return "BigBang";
     case NodeStopRequest:
       return "NodeStopRequest";
+    default:
+      return std::to_string(static_cast<int>(messageType)).c_str();
   }
 }
 

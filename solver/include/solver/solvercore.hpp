@@ -92,7 +92,7 @@ public:
   // Solver3 "public" extension
   void gotStageOne(const cs::StageOne& stage);
   void gotStageTwo(const cs::StageTwo& stage);
-  void gotStageThree(const cs::StageThree& stage);
+  void gotStageThree(const cs::StageThree& stage, const uint8_t flagg);
 
   void gotStageOneRequest(uint8_t requester, uint8_t required);
   void gotStageTwoRequest(uint8_t requester, uint8_t required);
@@ -292,6 +292,7 @@ private:
   std::vector<cs::StageOne> stageOneStorage;
   std::vector<cs::StageTwo> stageTwoStorage;
   std::vector<cs::StageThree> stageThreeStorage;
+  std::vector<cs::StageThree> trueStageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
   std::vector<cs::StageOneSmarts> smartStageOneStorage_;

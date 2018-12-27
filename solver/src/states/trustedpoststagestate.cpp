@@ -76,8 +76,13 @@ void TrustedPostStageState::off(SolverContext& /*context*/) {
 // requests stages from corresponded nodes
 void TrustedPostStageState::request_stages(SolverContext& context) {
   uint8_t cnt = (uint8_t)context.cnt_trusted();
+  auto& realTrusted = context.stage3(context.own_conf_number())->realTrustedMask;
+  if (realTrusted.size() != cnt) {
+    csmeta(cserror) << ": The size of real Trusted doesn't match the size of Confidants!" ;
+    return;
+  }
   for (uint8_t i = 0; i < cnt; ++i) {
-    if (context.stage3(i) == nullptr) {
+    if (context.stage3(i) == nullptr  && realTrusted.at(i) != cs::ConfidantConsts::InvalidConfidantIndex) {
       context.request_stage3(i, i);
     }
   }
