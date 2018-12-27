@@ -177,6 +177,9 @@ namespace cs
 
     bool is_running_smart_contract(csdb::Address addr) const;
 
+    // return true if currently executed smart contract emits passed transaction
+    bool test_smart_contract_emits(csdb::Transaction tr);
+
     bool execution_allowed;
     bool force_execution;
 
@@ -197,9 +200,16 @@ namespace cs
 
     struct QueueItem
     {
+      // reference to smart in blockchain (block/transaction) that spawns execution
       SmartContractRef contract;
+      // current status (running/waiting)
       SmartContractStatus status;
+      // start round
       cs::RoundNumber round;
+      // smart contract wallet/pub.key absolute address
+      csdb::Address abs_addr;
+      // emitted transactions if any while execution running
+      std::vector<csdb::Transaction> created_transactions;
     };
 
     // executiom queue
@@ -217,6 +227,8 @@ namespace cs
     }
 
     void remove_from_queue(const SmartContractRef& item);
+
+    void cancel_running_smart_contract();
 
     void test_exe_queue();
 

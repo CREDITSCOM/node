@@ -215,8 +215,9 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
     // TODO: in case of bigbang, rollback round(s), then accept global_table, then start round again
 
     if (localTable.round - globalTable.round == 1) {
-      cslog() << "NODE> re-send last round info may help others to go to round #" << localTable.round;
-      tryResendRoundTable(std::nullopt, localTable.round);  // broadcast round info
+      csdebug() << "NODE> we are a one round forward, wait";
+      //cslog() << "NODE> re-send last round info may help others to go to round #" << localTable.round;
+      //tryResendRoundTable(std::nullopt, localTable.round);  // broadcast round info
     }
     else {
       // TODO: Test if we are in proper blockchain
@@ -236,27 +237,6 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
     poolSynchronizer_->processingSync(globalTable.round);
     // no return, ask for next round info
   }
-
-  // broadcast request round info, on the start with timeout to let transport setup connections
-  if (localTable.round == 0) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this]() mutable {
-      if (cs::Conveyer::instance().currentRoundNumber() != 0) {
-        // not need already
-        return;
-      }
-
-      cswarning() << "NODE> broadcast request round info";
-      sendNextRoundRequest();
-    });
-
-    return;
-  }
-  else {
-    cswarning() << "NODE> broadcast request round info";
-    sendNextRoundRequest();
-  }
-
-  return;
 }
 
 cs::RoundNumber Node::getRoundNumber() {
@@ -2175,11 +2155,6 @@ void Node::sendRoundTableRequest(uint8_t respondent) {
   }
 }
 
-void Node::sendNextRoundRequest() {
-  // 0xFF means we ask for last writer node simply to repeat round info
-  sendBroadcast(MsgTypes::RoundTableRequest, roundNumber_, cs::InvalidConfidantIndex);
-}
-
 void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
   cslog() << "NODE> send request for next round info after #" << roundNumber_;
 
@@ -2188,7 +2163,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
-  csmeta(csdetails) << "started";
+  csmeta(csdetails) << "started, rNum=" << rNum;
 
   istream_.init(data, size);
 
@@ -2201,18 +2176,8 @@ void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs
   }
 
   // special request to re-send again handling
-  if (requesterNumber == cs::InvalidConfidantIndex) {
-    csdebug() << "NODE> some node asks for last round info to repeat";
-
-    if (lastSentRoundData_.roundTable.round == rNum) {
-      if (tryResendRoundTable(requester, rNum)) {
-        cslog() << "NODE> round info #" << rNum << " has sent again";
-      }
-      else {
-        cslog() << "NODE> unable to send round info #" << rNum << " again";
-      }
-    }
-
+  if (requesterNumber >= cs::Conveyer::instance().confidantsCount()) {
+    cserror() << "NODE> incorrect T[" << (int)requesterNumber << "] asks for round table";
     return;
   }
 
@@ -2235,7 +2200,7 @@ void Node::sendRoundTableReply(const cs::PublicKey& target, bool has_requested_i
 bool Node::tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum) {
   csunused(respondent);
 
-  if (lastSentRoundData_.roundTable.round != rNum) {
+  if (lastSentRoundData_.roundTable.round != rNum || lastSentRoundData_.subRound != subRound_) {
     cswarning() << "NODE> unable to repeat round data #" << rNum;
     return false;
   }

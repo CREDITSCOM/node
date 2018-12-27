@@ -154,18 +154,18 @@ namespace cs
     }
 
     // start timeout tracking
-    auto round = cur_round;
-    track_next_round.start(
-      scheduler,
-      Consensus::PostConsensusTimeout,
-      [this, round]() {
-        if(this->cur_round == round) {
-          // round have not been changed yet
-          cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
-          pnode->sendNextRoundRequest();
-        }
-      },
-      true /*replace exisiting*/);
+    //auto round = cur_round;
+    //track_next_round.start(
+    //  scheduler,
+    //  Consensus::PostConsensusTimeout,
+    //  [this, round]() {
+    //    if(this->cur_round == round) {
+    //      // round have not been changed yet
+    //      cswarning() << "SolverCore: request next round info due to timeout " << Consensus::PostConsensusTimeout / 1000 << " sec";
+    //      pnode->sendNextRoundRequest();
+    //    }
+    //  },
+    //  true /*replace exisiting*/);
 
     if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
       handleTransitions(Event::RoundTable);
@@ -261,10 +261,13 @@ namespace cs
       psmarts->force_execution = true;
     }
 #endif
-    cs::Conveyer::instance().addTransaction(tr);
-    if(psmarts->is_running_smart_contract(tr.source())) {
+    csmeta(cslog) << ": trx: src " << tr.source().to_string() << ", tgt " << tr.target().to_string();
+    if(psmarts->test_smart_contract_emits(tr)) {
+      // avoid pass to conveyer until execution of emitter contract has finished
       cslog() << "SolverCore: running smart contract emits transaction";
+      return;
     }
+    cs::Conveyer::instance().addTransaction(tr);
   }
 
   void SolverCore::gotSmartContractEvent(const csdb::Pool block, size_t trx_idx)

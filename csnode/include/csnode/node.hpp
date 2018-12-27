@@ -99,9 +99,6 @@ public:
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
   void handleRoundMismatch(const cs::RoundTable& global_table);
 
-  // broadcast request for next round, to call after long timeout
-  void sendNextRoundRequest();
-
   // send request for next round info from trusted node specified by index in list
   void sendRoundTableRequest(uint8_t respondent);
 
@@ -110,6 +107,7 @@ public:
   void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
+  // called by solver, review required:
   bool tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
 
   // transaction's pack syncro
