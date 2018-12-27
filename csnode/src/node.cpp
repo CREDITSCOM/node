@@ -1356,6 +1356,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   // cach stage three
   csmeta(csdetails) << "bytes size " << bytes.size();
   stageThreeMessage_[myConfidantIndex_] = std::move(bytes);
+  stageThreeSent = true;
   csmeta(csdetails) << "done";
 }
 
@@ -1404,11 +1405,16 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
-
+ 
   stageThreeMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
-  solver_->gotStageThree(std::move(stage));
+  if(stageThreeSent) {
+    solver_->gotStageThree(std::move(stage), 2);
+  }
+  else {
+    solver_->gotStageThree(std::move(stage), 0);
+  }
 }
 
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) {
@@ -2258,7 +2264,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   stageTwoMessage_.resize(roundTable.confidants.size());
   stageThreeMessage_.clear();
   stageThreeMessage_.resize(roundTable.confidants.size());
-
+  stageThreeSent = false;
   constexpr int padWidth = 30;
   int width = 0;
 
