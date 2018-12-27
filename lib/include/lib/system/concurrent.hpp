@@ -4,6 +4,7 @@
 #include <functional>
 #include <future>
 #include <type_traits>
+#include <mutex>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -16,6 +17,12 @@ namespace cs {
 enum class RunPolicy {
   CallQueuePolicy,
   ThreadPoolPolicy
+};
+
+enum class WatcherState {
+  Idle,
+  Running,
+  Compeleted
 };
 
 // aliasing
@@ -60,52 +67,88 @@ using Future = std::future<T>;
 template<typename Result>
 class FutureWatcher {
 public:
-  FutureWatcher() = default;
+  using FinishSignal = cs::Signal<void(Result)>;
+
+  FutureWatcher()
+  : state_(WatcherState::Idle) {
+  }
+
   ~FutureWatcher() = default;
 
   FutureWatcher(FutureWatcher&) = delete;
   FutureWatcher(FutureWatcher&&) = delete;
 
-  explicit FutureWatcher(RunPolicy policy, Future<Result>& future)
+  explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
   : future_(std::move(future))
   , policy_(policy) {
-    watch();
+    watch<Result>();
   }
 
   FutureWatcher& operator=(FutureWatcher&& watcher) {
     future_ = std::move(watcher.future_);
     policy_ = watcher.policy_;
-    watch();
+    watch<Result>();
+  }
+
+  // returns current watcher state, if watcher never watched runnable entity
+  // then his state Idle
+  WatcherState state() const noexcept {
+    return state_;
   }
 
 private:
   Future<Result> future_;
   RunPolicy policy_;
+  WatcherState state_;
 
+  template<typename T>
   void watch() {
     auto closure = [=] {
-      Result result = future_.get();
+      T result = future_.get();
 
       auto signal = [=] {
         emit finished(result);
       };
 
-      // insert in call queue or call direct
-      if (policy_ == RunPolicy::CallQueuePolicy) {
-        CallsQueue::instance().insert(signal);
-      }
-      else {
-        signal();
-      }
-
-      future_ = Future<Result>();
+      callSignal(signal);
     };
 
-    Worker::execute(closure);
+    state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
+
+  template <>
+  void watch<void>() {
+    auto closure = [=] {
+      future_.get();
+
+      auto signal = [=] {
+        emit finished();
+      };
+
+      callSignal(signal);
+    };
+
+    state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
+
+  template <typename Func>
+  void callSignal(Func&& func) {
+    // insert in call queue or call direct
+    if (policy_ == RunPolicy::CallQueuePolicy) {
+      CallsQueue::instance().insert(std::forward<Func>(func));
+    }
+    else {
+      func();
+    }
+
+    future_ = Future<Result>();
+    state_ = WatcherState::Compeleted;
   }
 
 public signals:
-  cs::Signal<void(Result)> finished;
+  FinishSignal finished;
 };
 
 class Concurrent {
@@ -113,15 +156,10 @@ public:
   // runs function in another thread, returns future watcher
   // that generates finished signal by run policy
   // if does not stoge watcher object, then main thread will wait async entity in blocking mode
-  template<typename Result, typename... Args>
-  static FutureWatcher<Result> run(RunPolicy policy, const std::function<Result(Args...)>& function) {
-    return FutureWatcher(policy, std::async(std::launch::async, function));
-  }
-
-  // runs not binded function with args async
-  template<typename Function, typename... Args>
-  static FutureWatcher<std::invoke_result_t<std::decay_t<Function>, std::decay_t<Args>...>> run(RunPolicy policy, Function&& function, Args&&... args) {
-    return Concurrent::run(policy, std::bind(std::forward<Function>(function), std::forward<Args>(args)...));
+  template<typename Func, typename... Args>
+  static FutureWatcher<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
+    using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
+    return FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
   }
 
   // runs function entity in thread pool
