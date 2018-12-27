@@ -76,7 +76,7 @@ void TrustedPostStageState::off(SolverContext& /*context*/) {
 // requests stages from corresponded nodes
 void TrustedPostStageState::request_stages(SolverContext& context) {
   uint8_t cnt = (uint8_t)context.cnt_trusted();
-  auto& realTrusted = context.stage3(context.own_conf_number())->realTrustedMask;
+  auto& realTrusted = context.stage3((uint8_t)context.own_conf_number())->realTrustedMask;
   if (realTrusted.size() != cnt) {
     csmeta(cserror) << ": The size of real Trusted doesn't match the size of Confidants!" ;
     return;
