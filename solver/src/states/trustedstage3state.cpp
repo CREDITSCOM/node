@@ -163,11 +163,11 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
             stream << it.hashes[j];
 
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
-              cslog() << name() << ": [" << (int)j << "] marked as untrusted";
+              cslog() << name() << ": [" << (int)j << "] marked as untrusted (bad hash)";
               context.mark_untrusted((uint8_t)j);
             }
             else {
-              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted";
+              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted (bad signature)";
               context.mark_untrusted(it.sender);
             }
 
@@ -281,7 +281,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
         stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
       }
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
-      cslog() << "[" << (int)it.sender << "] IS " << (is_lost ? "LOST" : "LIAR") <<" with hash "
+      cslog() << "[" << (int)it.sender << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
     }
   }
