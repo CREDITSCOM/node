@@ -1946,6 +1946,7 @@ void Node::sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& r
                             const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                             const cs::Signature& signature)
 {
+  csmeta(csdetails) << "Send round table";
   sendDefault(target, MsgTypes::RoundTable, roundNumber_, subRound_, roundTable.confidants, roundTable.hashes,
               poolMetaInfo.timestamp, characteristic.mask, poolMetaInfo.sequenceNumber, signature,
               poolMetaInfo.writerKey, poolMetaInfo.previousHash);
@@ -1958,6 +1959,7 @@ void Node::sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& r
 void Node::sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                                  const cs::Characteristic& characteristic, const cs::Signature& signature)
 {
+  csmeta(csdetails) << "Send round table to all";
   sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, roundTable.confidants, roundTable.hashes,
               poolMetaInfo.timestamp, characteristic.mask, poolMetaInfo.sequenceNumber, signature,
               poolMetaInfo.writerKey, poolMetaInfo.previousHash);
