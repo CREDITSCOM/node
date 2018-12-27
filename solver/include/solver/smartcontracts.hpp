@@ -13,6 +13,7 @@
 
 #include <optional>
 #include <vector>
+#include <list>
 
 //#define DEBUG_SMARTS
 
@@ -85,6 +86,13 @@ namespace cs
     csdb::UserField to_user_field() const;
 
     void from_user_field(const csdb::UserField fld);
+  };
+
+  struct SmartExecutionData {
+    csdb::Transaction transaction;
+    std::string state;
+    SmartContractRef smartContract;
+    executor::ExecuteByteCodeResult result;
   };
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
@@ -181,8 +189,10 @@ namespace cs
     bool force_execution;
 
   public signals:
-
     SmartContractExecutedSignal signal_smart_executed;
+
+  public slots:
+    void onExecutionFinished(const SmartExecutionData& data);
 
   private:
 
@@ -194,6 +204,9 @@ namespace cs
 
     // last contract's state storage
     std::map<csdb::Address, std::string> contract_state;
+
+    // async watchers
+    std::list<cs::FutureWatcher<SmartExecutionData>> executions_;
 
     struct QueueItem
     {
@@ -222,6 +235,8 @@ namespace cs
       }
       return it;
     }
+
+    void checkAllExecutions();
 
     void remove_from_queue(const SmartContractRef& item);
 

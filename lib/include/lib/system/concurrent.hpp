@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <future>
+#include <type_traits>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -15,6 +16,12 @@ namespace cs {
 enum class RunPolicy {
   CallQueuePolicy,
   ThreadPoolPolicy
+};
+
+enum class WatcherState {
+  Idle,
+  Running,
+  Compeleted
 };
 
 // aliasing
@@ -59,76 +66,139 @@ using Future = std::future<T>;
 template<typename Result>
 class FutureWatcher {
 public:
-  FutureWatcher() = default;
-  ~FutureWatcher() = default;
+  using FinishSignal = cs::Signal<void(Result)>;
+  using Id = uint64_t;
+
+  FutureWatcher() {
+    ++producedId;
+    id_ = producedId;
+  }
 
   FutureWatcher(FutureWatcher&) = delete;
-  FutureWatcher(FutureWatcher&&) = delete;
+  ~FutureWatcher() = default;
 
-  explicit FutureWatcher(RunPolicy policy, Future<Result>& future)
-  : future_(std::move(future))
-  , policy_(policy) {
-    watch();
+  explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
+  : FutureWatcher() {
+    future_ = std::move(future);
+    policy_ = policy;
+
+    watch<Result>();
+  }
+
+  FutureWatcher(FutureWatcher&& watcher)
+  : future_(std::move(watcher.future_))
+  , policy_(watcher.policy_)
+  , state_(watcher.state_) {
+    watcher.state_ = WatcherState::Idle;
   }
 
   FutureWatcher& operator=(FutureWatcher&& watcher) {
+    if (state_ == WatcherState::Running) {
+      cserror() << csname() << "Trying to use operator= in watcher running state";
+    }
+
     future_ = std::move(watcher.future_);
     policy_ = watcher.policy_;
-    watch();
+    id_ = watcher.id_;
+
+    watch<Result>();
+  }
+
+  // returns current watcher state, if watcher never watched runnable entity
+  // then his state is Idle
+  WatcherState state() const noexcept {
+    return state_;
+  }
+
+  Id id() const noexcept {
+    return id_;
   }
 
 private:
   Future<Result> future_;
   RunPolicy policy_;
+  WatcherState state_ = WatcherState::Idle;
+  Id id_;
 
+  inline static Id producedId = 0;
+
+  template<typename T>
   void watch() {
     auto closure = [=] {
-      Result result = future_.get();
+      T result = future_.get();
 
-      auto lambda = [=] {
-        emit finished_(result);
+      auto signal = [=] {
+        emit finished(result);
       };
 
-      // insert in call queue or call direct
-      if (policy_ == RunPolicy::CallQueuePolicy) {
-        CallsQueue::instance().insert(lambda);
-      }
-      else {
-        lambda();
-      }
-
-      future_ = Future<Result>();
+      callSignal(signal);
     };
 
-    Worker::execute(closure);
+    state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
+
+  template <>
+  void watch<void>() {
+    auto closure = [=] {
+      future_.get();
+
+      auto signal = [=] {
+        emit finished();
+      };
+
+      callSignal(signal);
+    };
+
+    state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
+
+  template <typename Func>
+  void callSignal(Func&& func) {
+    // insert in call queue or call direct
+    if (policy_ == RunPolicy::CallQueuePolicy) {
+      CallsQueue::instance().insert(std::forward<Func>(func));
+    }
+    else {
+      func();
+    }
+
+    future_ = Future<Result>();
+    state_ = WatcherState::Compeleted;
   }
 
 public signals:
-  cs::Signal<void(Result)> finished_;
+  FinishSignal finished;
 };
 
 class Concurrent {
 public:
   // runs function in another thread, returns future watcher
   // that generates finished signal by run policy
-  template<typename Result, typename... Args>
-  static FutureWatcher<Result> runWatcher(RunPolicy policy, const std::function<Result(Args...)>& function) {
-    return FutureWatcher(policy, std::async(std::launch::async, function));
+  // if does not stoge watcher object, then main thread will wait async entity in blocking mode
+  template<typename Func, typename... Args>
+  static FutureWatcher<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
+    using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
+    return FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
   }
 
+  // runs function entity in thread pool
   template<typename Func>
   static void run(Func&& function) {
     Worker::execute(std::forward<Func>(function));
   }
 
+  // runs non-binded function in thread pool
+  template<typename Func, typename... Args>
+  static void run(Func&& func, Args&&... args) {
+    Concurrent::run(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+  }
+
   // calls std::function after ms time in another thread
   static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
     auto timePoint = std::chrono::steady_clock::now() + ms;
-    auto closure = [=] {
-      Concurrent::runAfterHelper(timePoint, callBack);
-    };
-
-    Worker::execute(closure);
+    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, callBack));
   }
 
 private:
@@ -139,5 +209,15 @@ private:
     CallsQueue::instance().insert(callBack);
   }
 };
+
+template<typename T>
+inline bool operator<(const FutureWatcher<T>& lhs, const FutureWatcher<T>& rhs) {
+  return lhs.id() < rhs.id();
+}
+
+template<typename T>
+inline bool operator==(const FutureWatcher<T>& watcher, uint64_t value) {
+  return watcher.id() == value;
+}
 }
 #endif  //  CONCURRENT_HPP

@@ -323,7 +323,7 @@ private:
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
   std::vector<cs::Bytes> stageThreeMessage_;
-  size_t badHashReplyCounter = 0;
+  bool stageThreeSent = false;
 
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;

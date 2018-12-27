@@ -170,8 +170,6 @@ Message::~Message() {
 
 const char* getMsgTypesString(MsgTypes messageType) {
   switch (messageType) {
-    default:
-      return "-";
     case RoundTableSS:
       return "RoundTableSS";
     case Transactions:
@@ -186,10 +184,22 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "BlockRequest";
     case RequestedBlock:
       return "RequestedBlock";
+    case FirstStage:
+      return "FirstStage";
+    case SecondStage:
+      return "SecondStage";
+    case ThirdStage:
+      return "ThirdStage";
+    case FirstStageRequest:
+      return "FirstStageRequest";
+    case SecondStageRequest:
+      return "SecondStageRequest";
+    case ThirdStageRequest:
+      return "ThirdStageRequest";
     case RoundTableRequest:
       return "RoundTableRequest";
-    case BigBang:
-      return "BigBang";
+    case RoundTableReply:
+      return "RoundTableReply";
     case TransactionPacket:
       return "TransactionPacket";
     case TransactionsPacketRequest:
@@ -198,12 +208,30 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "TransactionsPacketReply";
     case NewCharacteristic:
       return "NewCharacteristic";
-    case RoundTable:
-      return "RoundTable";
     case WriterNotification:
       return "WriterNotification";
+    case FirstSmartStage:
+      return "FirstSmartStage";
+    case SecondSmartStage:
+      return "SecondSmartStage";
+    case RoundTable:
+      return "RoundTable";
+    case ThirdSmartStage:
+      return "ThirdSmartStage";
+    case SmartFirstStageRequest:
+      return "SmartFirstStageRequest";
+    case SmartSecondStageRequest:
+      return "SmartSecondStageRequest";
+    case SmartThirdStageRequest:
+      return "SmartThirdStageRequest";
+    case HashReply:
+      return "HashReply";
+    case BigBang:
+      return "BigBang";
     case NodeStopRequest:
       return "NodeStopRequest";
+    default:
+      return std::to_string(static_cast<int>(messageType)).c_str();
   }
 }
 
