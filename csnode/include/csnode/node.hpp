@@ -55,7 +55,8 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-
+  void sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent);
+  void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   //consensus communication
   void sendStageOne(cs::StageOne&);
   void sendStageTwo(cs::StageTwo&);
@@ -322,6 +323,7 @@ private:
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
   std::vector<cs::Bytes> stageThreeMessage_;
+  size_t badHashReplyCounter = 0;
 
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;

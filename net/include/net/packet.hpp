@@ -68,6 +68,7 @@ enum MsgTypes : uint8_t {
   SmartFirstStageRequest,
   SmartSecondStageRequest,
   SmartThirdStageRequest,
+  HashReply,
   BigBang = 35,
   NodeStopRequest = 255
 };
