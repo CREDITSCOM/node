@@ -43,6 +43,7 @@ const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
 const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
+const std::string PARAM_NAME_POOL_SYNC_FAST_MODE = "fast_mode";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
 const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
@@ -535,17 +536,20 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
 }
 
 void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config) {
-  if (!config.count(BLOCK_NAME_POOL_SYNC)) {
+  const std::string& block = BLOCK_NAME_POOL_SYNC;
+
+  if (!config.count(block)) {
     return;
   }
 
-  const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_POOL_SYNC);
+  const boost::property_tree::ptree& data = config.get_child(block);
 
-  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
-  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
-  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
-  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
-  checkAndSaveValue(data, BLOCK_NAME_POOL_SYNC, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_FAST_MODE, poolSyncData_.isFastMode);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
+  checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
 }
 
 void Config::readApiData(const boost::property_tree::ptree& config) {

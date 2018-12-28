@@ -782,7 +782,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Drop;
   }
 
-  if (poolSynchronizer_->isSilentMode()) {
+  if (poolSynchronizer_->isFastMode()) {
     if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
       // which round would not be on the remote we may require the requested block or get block request
       return MessageActions::Process;
@@ -2410,7 +2410,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash)
 {
-  csmeta(cslog)) << "begin";
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash),(const cscrypto::Byte*) (roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));
@@ -2419,7 +2419,7 @@ void Node::spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiled
 }
 
 void Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash) {
-  csmeta(cslog)) << "begin";
+  csmeta(cslog) << "begin";
   cscrypto::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), sizeof(cs::Hash), pKey.data(), sizeof(cs::PublicKey));
   cs::Bytes bytesHash(sizeof(cscrypto::Hash));

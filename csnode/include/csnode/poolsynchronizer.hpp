@@ -36,7 +36,7 @@ public:  // Interface
 
   bool isOneBlockReply() const;
 
-  bool isSilentMode() const;
+  bool isFastMode() const;
 
 public signals:  // Signals
 
@@ -44,6 +44,7 @@ public signals:  // Signals
 
 private slots:
   void onTimeOut();
+  void onFastModeTimeOut();
 
   void onWriteBlock(const cs::Sequence sequence);
 
@@ -182,6 +183,7 @@ private:  // Members
   std::vector<NeighboursSetElemet> neighbours_;
 
   cs::Timer timer_;
+  cs::Timer fastModeTimer_;
 
   friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType&);
 };

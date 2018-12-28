@@ -993,7 +993,7 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
     return std::vector<SequenceInterval>();
   }
 
-  const auto roundNumber = currentRoundNumber ? std::max(firstSequence, currentRoundNumber - 1) : 0;
+  const auto roundNumber = currentRoundNumber > 0 ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
   // return at least [next, 0] or [next, currentRoundNumber]:
   std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };

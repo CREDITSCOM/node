@@ -17,11 +17,13 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   refreshNeighbours();
 
   cs::Connector::connect(&timer_.timeOut, this, &cs::PoolSynchronizer::onTimeOut);
+  cs::Connector::connect(&fastModeTimer_.timeOut, this, &cs::PoolSynchronizer::onFastModeTimeOut);
 
   // Print Pool Sync Data Info
   const uint8_t hl = 25;
   const uint8_t vl = 6;
   cslog() << "POOL SYNCHRONIZER> Pool sync data : \n"
+          << std::setw(hl) << "Fast mode:        " << std::setw(vl) << syncData_.isFastMode << "\n"
           << std::setw(hl) << "One reply block:  " << std::setw(vl) << syncData_.oneReplyBlock << "\n"
           << std::setw(hl) << "Block pools:      " << std::setw(vl) << cs::numeric_cast<int>(syncData_.blockPoolsCount)
           << "\n"
@@ -91,6 +93,9 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
     if (isBigBand || useTimer) {
       timer_.start(cs::numeric_cast<int>(delay));
+    }
+    if (syncData_.isFastMode) {
+      fastModeTimer_.start(5000);
     }
   }
   else if (syncData_.requestRepeatRoundCount > 0) {
@@ -176,14 +181,14 @@ bool cs::PoolSynchronizer::isOneBlockReply() const {
   return syncData_.oneReplyBlock;
 }
 
-bool cs::PoolSynchronizer::isSilentMode() const {
-  if (!isSyncroStarted_) {
+bool cs::PoolSynchronizer::isFastMode() const {
+  if (!isSyncroStarted_ || !syncData_.isFastMode) {
     return false;
   }
 
-  const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
-                   blockChain_->getCachedBlocksSize();
-  return sum > 20;
+  const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
+                           blockChain_->getCachedBlocksSize();
+  return sum > cs::numeric_cast<cs::Sequence>(syncData_.blockPoolsCount + 1);  // roundDifferentForSync_
 }
 
 //
@@ -197,6 +202,25 @@ void cs::PoolSynchronizer::onTimeOut() {
     }
     csmeta(csdetails) << "onTimeOut: " << syncData_.sequencesVerificationFrequency;
     const bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+
+    if (isAvailable) {
+      sendBlockRequest();
+    }
+  });
+}
+
+void cs::PoolSynchronizer::onFastModeTimeOut() {
+  CallsQueue::instance().insert([this] {
+    csmeta(csdetails) << "onFastModeTimeOut: round: ";
+    if (!isFastMode() && fastModeTimer_.isRunning()) {
+      fastModeTimer_.stop();
+      return;
+    }
+    if (!isSyncroStarted_) {
+      return;
+    }
+    csmeta(csdetails) << "onFastModeTimeOute: round: " << 5000;
+    const bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
 
     if (isAvailable) {
       sendBlockRequest();
@@ -335,7 +359,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     csmeta(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
   }
   for (const auto& el : requestedSequences_) {
-    csmeta(csdetails) << "requestedSequences: [" << el.first << ", " << el.second << "]";
+    csmeta(csdetails) << "requestedSequences: " << el.first << "(" << el.second << ")";
   }
 
   if (!requestedSequences_.empty()) {
@@ -517,6 +541,9 @@ void cs::PoolSynchronizer::synchroFinished() {
   cs::Connector::disconnect(blockChain_->writeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();
+  }
+  if (fastModeTimer_.isRunning()) {
+    fastModeTimer_.stop();
   }
   isSyncroStarted_ = false;
   requestedSequences_.clear();
