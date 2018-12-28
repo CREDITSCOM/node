@@ -183,6 +183,38 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in build_vector()";
     }
 
+    // test if smart-emitted transaction rejected, reject all transactions from this smart
+    // 1. collect rejected smart addresses
+    const auto& smarts = context.smart_contracts();
+    std::set<csdb::Address> smart_rejected;
+    size_t mask_size = characteristicMask.size();
+    size_t i = 0;
+    for(const auto& tr : transactions) {
+      if(i < mask_size && *(characteristicMask.cbegin() + i) == 0) {
+        if(smarts.is_known_smart_contract(tr.source())) {
+          smart_rejected.insert(tr.source());
+        }
+      }
+      ++i;
+    }
+    if(!smart_rejected.empty()) {
+      cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
+      // 2. reject all trxs from those smarts
+      size_t cnt_add_rejected = 0;
+      for(auto it = transactions.begin(); it != transactions.end(); ++it) {
+        if(smart_rejected.count(it->source()) > 0) {
+          auto itm = characteristicMask.begin() + (it - transactions.cbegin());
+          if(*itm > 0) {
+            *itm = 0;
+            ++cnt_add_rejected;
+          }
+        }
+      }
+      if(cnt_add_rejected > 0) {
+        cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+      }
+    }
+
     characteristic.mask = std::move(characteristicMask);
   }
 

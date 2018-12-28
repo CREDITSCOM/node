@@ -184,6 +184,11 @@ namespace cs
 
     bool is_running_smart_contract(csdb::Address addr) const;
 
+    bool is_known_smart_contract(csdb::Address addr) const
+    {
+      return (contract_state.find(absolute_address(addr)) != contract_state.cend());
+    }
+
     // return true if currently executed smart contract emits passed transaction
     bool test_smart_contract_emits(csdb::Transaction tr);
 
