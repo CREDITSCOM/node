@@ -32,7 +32,7 @@ void cs::Timer::stop() {
   }
 }
 
-bool cs::Timer::isRunning() {
+bool cs::Timer::isRunning() const {
   return isRunning_;
 }
 

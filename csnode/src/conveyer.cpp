@@ -44,6 +44,7 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     cswarning() << csname() << "Can not add no valid transaction to conveyer";
     return;
   }
+  csdetails() << csname() << "Add valid transaction to conveyer id: " << transaction.innerID() << ", block size: " << pimpl_->transactionsBlock.size();
 
   cs::Lock lock(sharedMutex_);
 

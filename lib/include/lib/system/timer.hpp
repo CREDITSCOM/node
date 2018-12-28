@@ -44,7 +44,7 @@ public:
   ///
   /// @brief Returns timer status.
   ///
-  bool isRunning();
+  bool isRunning() const;
 
   ///
   /// @brief Calls callback once in another thread after msec time.

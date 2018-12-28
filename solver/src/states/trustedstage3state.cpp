@@ -490,7 +490,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
     c = i % cnt;
     if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
       stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
-      if (i == idx_writer) {
+      if (idx == idx_writer) {
         stage.writer = static_cast<uint8_t>(c);
       }
       ++idx;
