@@ -89,15 +89,16 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
   try {
     csdb::Pool pool = loadBlock(getLastHash());
     const cs::Sequence last_written_sequence = pool.sequence();
-    cs::Sequence current_sequence = 1;
+    cs::Sequence current_sequence = 0;
 
-    while (current_sequence <= last_written_sequence + 1) {
+    while (current_sequence <= last_written_sequence) {
       pool = loadBlock(current_sequence);
       if (!updateWalletIds(pool, initer)) {
         return false;
       }
-      csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
-      const auto& confidants = prev_pool.confidants();
+      // currently confidants are stored in related pool, not in previous one:
+      //csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
+      const auto& confidants = pool.confidants();
       initer.loadPrevBlock(pool, confidants);
 
       blockHashes_->initFromPrevBlock(pool);
@@ -273,6 +274,9 @@ size_t BlockChain::getSize() const {
 }
 
 csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
+  if(ph.is_empty()) {
+    return csdb::Pool {};
+  }
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   if (deferredBlock_.hash() == ph) {
     return deferredBlock_;
@@ -282,10 +286,11 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
 
 csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  if (deferredBlock_.sequence() == sequence) {
+  if (deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence) {
     return deferredBlock_;
   }
-  return storage_.pool_load(sequence);
+  // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
+  return storage_.pool_load(sequence + 1);
 }
 
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
@@ -745,7 +750,8 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
 
   try {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-    csdb::Pool pool = this->loadBlock(nextPool.previous_hash());
+    // currently block stores own round confidants, not next round:
+    csdb::Pool pool = this->loadBlock(nextPool.hash());
     const auto& currentRoundConfidants = pool.confidants();
     walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants);
     walletsPools_->loadNextBlock(nextPool);
@@ -893,7 +899,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   logBlockInfo(pool);
   cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
 
-
   return std::make_pair(true, deferredBlock_);
 }
 
@@ -994,7 +999,7 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
     return std::vector<SequenceInterval>();
   }
 
-  const auto roundNumber = currentRoundNumber ? std::max(firstSequence, currentRoundNumber - 1) : 0;
+  const auto roundNumber = currentRoundNumber > 0 ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
   // return at least [next, 0] or [next, currentRoundNumber]:
   std::vector<SequenceInterval> vec { std::make_pair(firstSequence, roundNumber) };

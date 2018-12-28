@@ -586,7 +586,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
   };
 
   for (auto& sequence : sequences) {
-    csdb::Pool pool = blockChain_.loadBlock(blockChain_.getHashBySequence(sequence));
+    csdb::Pool pool = blockChain_.loadBlock(sequence);
 
     if (pool.is_valid()) {
       poolsBlock.push_back(std::move(pool));
@@ -756,6 +756,16 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
   if (!good_) {
     return MessageActions::Drop;
+  }
+
+  if (poolSynchronizer_->isFastMode()) {
+    if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
+      // which round would not be on the remote we may require the requested block or get block request
+      return MessageActions::Process;
+    }
+    else {
+      return MessageActions::Drop;
+    }
   }
 
   if (type == MsgTypes::FirstSmartStage || type == MsgTypes::SecondSmartStage || type == MsgTypes::ThirdSmartStage) {
@@ -1122,7 +1132,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
 }
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-  corruptionLevel = 0;
+  corruptionLevel = 31;
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
@@ -1130,7 +1140,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
 
-  csmeta(csdetails) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)<< ", Sender: " << static_cast<int>(stageOneInfo.sender)
+  csmeta(cslog) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)<< ", Sender: " << static_cast<int>(stageOneInfo.sender)
     << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
     << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
     << ", Time Stamp: " << stageOneInfo.roundTimeStamp;

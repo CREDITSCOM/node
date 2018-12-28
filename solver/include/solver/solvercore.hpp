@@ -97,6 +97,7 @@ public:
   void gotStageOneRequest(uint8_t requester, uint8_t required);
   void gotStageTwoRequest(uint8_t requester, uint8_t required);
   void gotStageThreeRequest(uint8_t requester, uint8_t required);
+  void printStage3(const cs::StageThree& stage);
 
   bool smartStageOneEnough();
   bool smartStageTwoEnough();

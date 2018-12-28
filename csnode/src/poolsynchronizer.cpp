@@ -22,6 +22,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   const uint8_t hl = 25;
   const uint8_t vl = 6;
   cslog() << "POOL SYNCHRONIZER> Pool sync data : \n"
+          << std::setw(hl) << "Fast mode:        " << std::setw(vl) << syncData_.isFastMode << "\n"
           << std::setw(hl) << "One reply block:  " << std::setw(vl) << syncData_.oneReplyBlock << "\n"
           << std::setw(hl) << "Block pools:      " << std::setw(vl) << cs::numeric_cast<int>(syncData_.blockPoolsCount)
           << "\n"
@@ -64,6 +65,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   cslog() << "POOL SYNCHRONIZER> Blocks remaining: " << blocksRemaining;
 
   if (blocksRemaining == 0) {
+    showSyncronizationProgress(lastWrittenSequence);
     synchroFinished();
     return;
   }
@@ -176,17 +178,45 @@ bool cs::PoolSynchronizer::isOneBlockReply() const {
   return syncData_.oneReplyBlock;
 }
 
+bool cs::PoolSynchronizer::isFastMode() const {
+  if (!isSyncroStarted_ || !syncData_.isFastMode) {
+    return false;
+  }
+
+  const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
+                           blockChain_->getCachedBlocksSize();
+  return sum > cs::numeric_cast<cs::Sequence>(syncData_.blockPoolsCount * 3);  // roundDifferentForSync_
+}
+
 //
 // Slots
 //
 
 void cs::PoolSynchronizer::onTimeOut() {
   CallsQueue::instance().insert([this] {
+    static uint16_t fastCounter = 0;
     if (!isSyncroStarted_) {
       return;
     }
-    csmeta(csdetails) << "onTimeOut: " << syncData_.sequencesVerificationFrequency;
-    const bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+
+    bool isAvailable = false;
+
+    if (isFastMode()) {
+      ++fastCounter;
+      if (fastCounter > 20) {
+        fastCounter = 0;
+        csmeta(csdetails) << "onTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
+        isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
+      }
+    }
+    else {
+      fastCounter = 0;
+    }
+
+    if (!isAvailable) {
+      csmeta(csdetails) << "onTimeOut: " << syncData_.sequencesVerificationFrequency;
+      isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+    }
 
     if (isAvailable) {
       sendBlockRequest();
@@ -241,13 +271,13 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
 
   switch (counterType) {
     case CounterType::ROUND:
-      printNeighbours("Activity:");
       for (auto& neighbour : neighbours_) {
         neighbour.increaseRoundCounter();
         if (!isNeedRequest && isAvailableRequest(neighbour)) {
           isNeedRequest = true;
         }
       }
+      printNeighbours("Activity Round:");
       break;
     case CounterType::TIMER:
       for (auto& neighbour : neighbours_) {
@@ -325,7 +355,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     csmeta(csdetails) << "requiredBlocks: [" << el.first << ", " << el.second << "]";
   }
   for (const auto& el : requestedSequences_) {
-    csmeta(csdetails) << "requestedSequences: [" << el.first << ", " << el.second << "]";
+    csmeta(csdetails) << "requestedSequences: " << el.first << "(" << el.second << ")";
   }
 
   if (!requestedSequences_.empty()) {
@@ -363,6 +393,10 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     if (needyNeighbour == neighbours_.end()) {
       csmeta(cserror) << "Needy neighbour is not valid";
       return false;
+    }
+
+    if (neighbour.sequences() == needyNeighbour->sequences()) {
+      return true;
     }
 
     if (!neighbour.sequences().empty() && sequence != neighbour.sequences().front()) {
