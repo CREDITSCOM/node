@@ -68,6 +68,7 @@ template<typename Result>
 class FutureWatcher {
 public:
   using FinishSignal = cs::Signal<void(Result)>;
+  using FailedSignal = cs::Signal<void()>;
   using Id = uint64_t;
 
   FutureWatcher() {
@@ -126,13 +127,19 @@ private:
   template<typename T>
   void watch() {
     auto closure = [=] {
-      T result = future_.get();
+      try {
+        T result = future_.get();
 
-      auto signal = [=] {
-        emit finished(result);
-      };
+        auto signal = [=] {
+          emit finished(result);
+        };
 
-      callSignal(signal);
+        callSignal(signal);
+      }
+      catch (std::exception& e) {
+        cserror() << "Concurrent execution with" << typeid(T).name() << "failed, " << e.what();
+        emit failed();
+      }
     };
 
     state_ = WatcherState::Running;
@@ -142,13 +149,19 @@ private:
   template <>
   void watch<void>() {
     auto closure = [=] {
-      future_.get();
+      try {
+        future_.get();
 
-      auto signal = [=] {
-        emit finished();
-      };
+        auto signal = [=] {
+          emit finished();
+        };
 
-      callSignal(signal);
+        callSignal(signal);
+      }
+      catch (std::exception& e) {
+        cserror() << "Concurrent execution with void result failed, " << e.what();
+        emit failed();
+      }
     };
 
     state_ = WatcherState::Running;
@@ -171,6 +184,7 @@ private:
 
 public signals:
   FinishSignal finished;
+  FailedSignal failed;
 };
 
 template<typename T>
