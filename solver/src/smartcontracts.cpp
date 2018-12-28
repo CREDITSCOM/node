@@ -143,7 +143,7 @@ namespace cs
   /*static*/
   csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const SmartContractRef& contract)
   {
-    csdb::Pool block = storage.loadBlock(contract.hash);
+    csdb::Pool block = storage.loadBlock(contract.sequence);
     if(!block.is_valid()) {
       return csdb::Transaction {};
     }
@@ -156,9 +156,11 @@ namespace cs
   void SmartContracts::onExecutionFinished(const SmartExecutionData& data) {
     csdb::Transaction result = result_from_smart_invoke(data.smartContract);
     const QueueItem* pqueue_item = nullptr;
-    const auto it = find_in_queue(data.smartContract);
+    auto it = find_in_queue(data.smartContract);
     if(it != exe_queue.cend()) {
       pqueue_item = &(*it);
+      auto pmutable = const_cast<QueueItem*>(pqueue_item);
+      pmutable->status = SmartContractStatus::Finished;
     }
     else {
       cserror() << name() << ": cannot find in queue just completed contract";
@@ -171,6 +173,9 @@ namespace cs
     else {
       cserror() << name() << ": failed to execute smart contract";
       if(pqueue_item != nullptr) {
+
+        std::lock_guard<std::mutex> lock(mtx_emit_transaction);
+
         if(!pqueue_item->created_transactions.empty()) {
           cswarning() << name() << ": drop " << pqueue_item->created_transactions.size() << " emitted trx";
         }
@@ -184,6 +189,9 @@ namespace cs
     cs::TransactionsPacket packet;
     packet.addTransaction(result);
     if(data.result.status.code == 0) {
+
+      std::lock_guard<std::mutex> lock(mtx_emit_transaction);
+
       if(!pqueue_item->created_transactions.empty()) {
         for(const auto& tr : pqueue_item->created_transactions) {
           packet.addTransaction(tr);
@@ -270,10 +278,14 @@ namespace cs
   //  const csdb::PoolHash blk_hash, cs::Sequence blk_seq, size_t trx_idx, cs::RoundNumber round
   void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx)
   {
+    if(trx_idx >= block.transactions_count()) {
+      cserror() << name() << ": incorrect trx index in block to enqueue smart contract";
+      return;
+    }
     SmartContractRef new_item { block.hash(), block.sequence(), trx_idx };
     if(!exe_queue.empty()) {
       auto it = find_in_queue(new_item);
-      // test the same contract
+      // test duplicated contract call
       if(it != exe_queue.cend()) {
         cserror() << name() << ": attempt to queue duplicated contract transaction, already queued on round #" << it->round;
         return;
@@ -283,12 +295,9 @@ namespace cs
     cslog() << "  _____";
     cslog() << " /     \\";
     cslog() << "/  S.C  \\";
-    cslog() << "\\   .   /";
+    cslog() << "\\       /";
     cslog() << " \\_____/";
-    csdb::Address addr {};
-    if(trx_idx < block.transactions_count()) {
-      addr = absolute_address(block.transaction(trx_idx).target());
-    }
+    csdb::Address addr = absolute_address(block.transaction(trx_idx).target());
     exe_queue.emplace_back(QueueItem { new_item, SmartContractStatus::Waiting, block.sequence(), addr, std::vector<csdb::Transaction>() });
     test_exe_queue();
   }
@@ -341,10 +350,28 @@ namespace cs
         // some contract is already running
         break;
       }
+      if(next->status == SmartContractStatus::Finished) {
+        cswarning() << name() << ": finished contract still in queue, wait until is cleared";
+        csdb::Address addr = next->abs_addr;
+        auto remove_proc = [=]() {
+          auto current = exe_queue.begin();
+          if(current->abs_addr == addr && current->status == SmartContractStatus::Finished) {
+            // finished, still in queue
+            cswarning() << name() << ": timeout to clear finished smart contract is expired, remove";
+            remove_from_queue(exe_queue.cbegin());
+            test_exe_queue();
+          }
+          else {
+            csdebug() << name() << ": smart contract has already removed, no remove required";
+          }
+        };
+        cs::Timer::singleShot(static_cast<int>(Consensus::T_smart_contract), remove_proc);
+        break;
+      }
       csdebug() << name() << ": set running status to next contract in queue";
       next->status = SmartContractStatus::Running;
       if(!invoke_execution(next->contract)) {
-        exe_queue.erase(next);
+        remove_from_queue(next);
       }
     }
 
@@ -376,7 +403,7 @@ namespace cs
 
       auto& v = exe_queue.front().created_transactions;
       v.push_back(tr);
-      cslog() << name() << ": running smart contract emits transaction, add, total " << v.size();
+      cslog() << name() << ": smart contract emits transaction, add, total " << v.size();
       return true;
     }
     else {
@@ -388,9 +415,8 @@ namespace cs
     return false;
   }
 
-  void SmartContracts::remove_from_queue(const SmartContractRef & item)
+  void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
   {
-    auto it = find_in_queue(item);
     if(it == exe_queue.cend()) {
       cserror() << name() << ": contract to remove is not in queue";
       return;
@@ -412,10 +438,10 @@ namespace cs
       const auto& current = exe_queue.front();
       if(current.status == SmartContractStatus::Running) {
         csdb::Transaction tr = result_from_smart_invoke(current.contract);
+        // result contains empty USRFLD[state::Value]
+        tr.add_user_field(trx_uf::new_state::Value, std::string {});
         if(tr.is_valid()) {
           cswarning() << name() << ": cancel execution of smart contract";
-          // result contains empty USRFLD[state::Value]
-          tr.add_user_field(trx_uf::new_state::Value, std::string {});
           cs::TransactionsPacket packet;
           packet.addTransaction(tr);
           set_execution_result(packet);
@@ -423,13 +449,13 @@ namespace cs
         else {
           cserror() << name() << ": failed to cancel execution of smart contract";
         }
-        exe_queue.erase(exe_queue.cbegin());
+        remove_from_queue(exe_queue.cbegin());
       }
     }
     test_exe_queue();
   }
 
-  // returns false if caller must call to remove_from_queue()
+  // returns false if failed, and caller must remove_from_queue() the item
   bool SmartContracts::invoke_execution(const SmartContractRef& contract)
   {
     csdb::Pool block = bc.loadBlock(contract.sequence);
@@ -477,13 +503,11 @@ namespace cs
         }
       }
 
-      constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
-
       // create runnable object
       auto runnable = [=]() mutable {
         executor::ExecuteByteCodeResult resp;
         get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
-                                                 state, contract.method, contract.params, MAX_EXECUTION_TIME);
+                                                 state, contract.method, contract.params, Consensus::T_smart_contract);
 
         std::lock_guard<std::mutex> lock(mtx_emit_transaction);
 
@@ -506,17 +530,16 @@ namespace cs
       executions_.push_back(std::move(watcher));
 
       csdb::Address addr = start_tr.target();
-      auto cleanupOnTimeout = [=]() {
+      auto cancel_proc = [=]() {
         if (is_running_smart_contract(addr)) {
           cswarning() << name() << ": timeout of smart contract execution, cancel";
           cancel_running_smart_contract();
         }
         else {
-          cslog() << name() << ": unexpected smart contract address, cannot cancel execution";
+          csdebug() << name() << ": smart contract has already finished, no cancel required";
         }
       };
-
-      cs::Timer::singleShot(static_cast<int>(MAX_EXECUTION_TIME << 1), cleanupOnTimeout);
+      cs::Timer::singleShot(static_cast<int>(Consensus::T_smart_contract << 1), cancel_proc);
       return true;
     }
     else {
@@ -568,12 +591,7 @@ namespace cs
         }
       }
     }
-    if(ok) {
-      cslog() << "\\   +   /";
-    }
-    else {
-      cslog() << "\\ ERROR /";
-    }
+    cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
     cslog() << " \\_____/";
 
   }

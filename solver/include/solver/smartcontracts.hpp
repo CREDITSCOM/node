@@ -115,7 +115,8 @@ namespace cs
   enum class SmartContractStatus
   {
     Running,
-    Waiting
+    Waiting,
+    Finished
   };
 
   using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
@@ -240,9 +241,14 @@ namespace cs
       return it;
     }
 
-    void checkAllExecutions();
+    void remove_from_queue(std::vector<QueueItem>::const_iterator it);
 
-    void remove_from_queue(const SmartContractRef& item);
+    void remove_from_queue(const SmartContractRef& item)
+    {
+      remove_from_queue(find_in_queue(item));
+    }
+
+    void checkAllExecutions();
 
     void cancel_running_smart_contract();
 
