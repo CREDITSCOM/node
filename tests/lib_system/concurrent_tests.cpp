@@ -22,7 +22,8 @@ void print(Types&& ...args) {
   ThreadId mainId = std::this_thread::get_id();\
   ThreadId concurrentId;\
   static std::atomic<bool> called = false;\
-  print("Main thread id: ", mainId)
+  print("Main thread id: ", mainId);\
+  (void)called
 
 TEST(Concurrent, SimpleRunWithBinding) {
   GENERATE_THREAD_VALUES();
