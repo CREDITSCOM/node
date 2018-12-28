@@ -111,8 +111,8 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   std::string message = "Finished";
   auto binder = std::bind(&Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
 
-  cs::FutureWatcher<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
-  cs::Connector::connect(&watcher.finished, &demo, &Demo::onWatcherFinished);
+  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
+  cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -146,8 +146,8 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   Demo demo;
   std::string message = "Finished";
 
-  cs::FutureWatcher<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
-  cs::Connector::connect(&watcher.finished, &demo, &Demo::onWatcherFinished);
+  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
+  cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));

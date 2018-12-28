@@ -4,6 +4,7 @@
 #include <functional>
 #include <future>
 #include <type_traits>
+#include <memory>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -135,7 +136,7 @@ private:
     };
 
     state_ = WatcherState::Running;
-    Worker::execute(std::move(closure));
+    Worker::execute(closure);
   }
 
   template <>
@@ -151,7 +152,7 @@ private:
     };
 
     state_ = WatcherState::Running;
-    Worker::execute(std::move(closure));
+    Worker::execute(closure);
   }
 
   template <typename Func>
@@ -172,15 +173,18 @@ public signals:
   FinishSignal finished;
 };
 
+template<typename T>
+using FutureWatcherPtr = std::shared_ptr<FutureWatcher<T>>;
+
 class Concurrent {
 public:
   // runs function in another thread, returns future watcher
   // that generates finished signal by run policy
   // if does not stoge watcher object, then main thread will wait async entity in blocking mode
   template<typename Func, typename... Args>
-  static FutureWatcher<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
+  static auto run(RunPolicy policy, Func&& function, Args&&... args) {
     using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
-    return FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
+    return FutureWatcherPtr<ReturnType>(new FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...)));
   }
 
   // runs function entity in thread pool

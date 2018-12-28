@@ -200,11 +200,11 @@ namespace cs
   }
 
   void SmartContracts::checkAllExecutions() {
-    using Watcher = cs::FutureWatcher<SmartExecutionData>;
+    using Watcher = cs::FutureWatcherPtr<SmartExecutionData>;
     std::vector<std::list<Watcher>::iterator> iterators;
 
     for (auto iter = executions_.begin(); iter != executions_.end(); ++iter) {
-      if (iter->state() == cs::WatcherState::Compeleted) {
+      if ((*iter)->state() == cs::WatcherState::Compeleted) {
         iterators.push_back(iter);
       }
     }
@@ -368,7 +368,12 @@ namespace cs
   bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
   {
     csdb::Address abs_addr = absolute_address(tr.source());
+
     if(is_running_smart_contract(abs_addr)) {
+
+      // expect calls from api when trxs received
+      std::lock_guard<std::mutex> lock(mtx_emit_transaction);
+
       auto& v = exe_queue.front().created_transactions;
       v.push_back(tr);
       cslog() << name() << ": running smart contract emits transaction, add, total " << v.size();
@@ -379,6 +384,7 @@ namespace cs
         cslog() << name() << ": inactive smart contract emits transaction, ignore";
       }
     }
+
     return false;
   }
 
@@ -474,10 +480,14 @@ namespace cs
       constexpr const uint32_t MAX_EXECUTION_TIME = 1000;
 
       // create runnable object
-      std::function<SmartExecutionData()> runnable = [=]() mutable {
+      auto runnable = [=]() mutable {
         executor::ExecuteByteCodeResult resp;
         get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
                                                  state, contract.method, contract.params, MAX_EXECUTION_TIME);
+
+        std::lock_guard<std::mutex> lock(mtx_emit_transaction);
+
+        csdebug() << name() << ": smart contract call completed";
 
         SmartExecutionData data = {
           start_tr,
@@ -490,8 +500,8 @@ namespace cs
       };
 
       // run async and watch result
-      auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, std::move(runnable));
-      cs::Connector::connect(&watcher.finished, this, &SmartContracts::onExecutionFinished);
+      auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
+      cs::Connector::connect(&(watcher->finished), this, &SmartContracts::onExecutionFinished);
 
       executions_.push_back(std::move(watcher));
 

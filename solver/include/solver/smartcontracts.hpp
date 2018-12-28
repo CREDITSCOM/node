@@ -14,6 +14,7 @@
 #include <optional>
 #include <vector>
 #include <list>
+#include <mutex>
 
 //#define DEBUG_SMARTS
 
@@ -206,7 +207,7 @@ namespace cs
     std::map<csdb::Address, std::string> contract_state;
 
     // async watchers
-    std::list<cs::FutureWatcher<SmartExecutionData>> executions_;
+    std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
 
     struct QueueItem
     {
@@ -224,6 +225,9 @@ namespace cs
 
     // executiom queue
     std::vector<QueueItem> exe_queue;
+
+    // locks exe_queue when transaction emitted by smart contract
+    std::mutex mtx_emit_transaction;
 
     std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item) const
     {
