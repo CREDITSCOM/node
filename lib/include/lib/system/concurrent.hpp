@@ -3,8 +3,8 @@
 
 #include <functional>
 #include <future>
-#include <type_traits>
 #include <memory>
+#include <type_traits>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -143,7 +143,7 @@ private:
     };
 
     state_ = WatcherState::Running;
-    Worker::execute(closure);
+    Worker::execute(std::move(closure));
   }
 
   template <>
@@ -165,7 +165,7 @@ private:
     };
 
     state_ = WatcherState::Running;
-    Worker::execute(closure);
+    Worker::execute(std::move(closure));
   }
 
   template <typename Func>
@@ -187,6 +187,7 @@ public signals:
   FailedSignal failed;
 };
 
+// safe pointer to watcher
 template<typename T>
 using FutureWatcherPtr = std::shared_ptr<FutureWatcher<T>>;
 
@@ -198,7 +199,9 @@ public:
   template<typename Func, typename... Args>
   static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
     using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
-    return FutureWatcherPtr<ReturnType>(new FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...)));
+    using WatcherType = FutureWatcher<ReturnType>;
+
+    return std::make_shared<WatcherType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
   }
 
   // runs function entity in thread pool
