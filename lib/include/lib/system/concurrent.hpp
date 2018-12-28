@@ -14,12 +14,12 @@
 #include <boost/bind.hpp>
 
 namespace cs {
-enum class RunPolicy {
+enum class RunPolicy : cs::Byte {
   CallQueuePolicy,
   ThreadPoolPolicy
 };
 
-enum class WatcherState {
+enum class WatcherState : cs::Byte {
   Idle,
   Running,
   Compeleted
@@ -73,6 +73,7 @@ public:
   FutureWatcher() {
     ++producedId;
     id_ = producedId;
+    state_ = WatcherState::Idle;
   }
 
   FutureWatcher(FutureWatcher&) = delete;
@@ -90,7 +91,6 @@ public:
   : future_(std::move(watcher.future_))
   , policy_(watcher.policy_)
   , state_(watcher.state_) {
-    watcher.state_ = WatcherState::Idle;
   }
 
   FutureWatcher& operator=(FutureWatcher&& watcher) {
@@ -182,7 +182,7 @@ public:
   // that generates finished signal by run policy
   // if does not stoge watcher object, then main thread will wait async entity in blocking mode
   template<typename Func, typename... Args>
-  static auto run(RunPolicy policy, Func&& function, Args&&... args) {
+  static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
     using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
     return FutureWatcherPtr<ReturnType>(new FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...)));
   }
