@@ -10,6 +10,8 @@ using ThreadId = std::thread::id;
 template<typename T>
 using Ref = std::reference_wrapper<T>;
 
+static const uint64_t sleepTimeMs = 1500;
+
 template<typename... Types>
 void print(Types&& ...args) {
   (std::cout << ... << std::forward<Types>(args)) << std::endl;
@@ -19,7 +21,9 @@ void print(Types&& ...args) {
   std::atomic<bool> isRunningFinished = false;\
   ThreadId mainId = std::this_thread::get_id();\
   ThreadId concurrentId;\
-  print("Main thread id: ", mainId)
+  static std::atomic<bool> called = false;\
+  print("Main thread id: ", mainId);\
+  (void)called
 
 TEST(Concurrent, SimpleRunWithBinding) {
   GENERATE_THREAD_VALUES();
@@ -87,7 +91,6 @@ TEST(Concurrent, SimpleRunLambda) {
 
 TEST(Concurrent, VoidFutureWatcherBindedRun) {
   GENERATE_THREAD_VALUES();
-  static bool called = false;
 
   class Demo {
   public:
@@ -112,10 +115,14 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   auto binder = std::bind(&Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
-  cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
+  cs::Connector::connect(watcher->finished, &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+
+  if (!called && isRunningFinished) {
+    print("Method executed, but does not generate finished signal");
+  }
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);
@@ -123,7 +130,6 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
 
 TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   GENERATE_THREAD_VALUES();
-  static bool called = false;
 
   class Demo {
   public:
@@ -141,16 +147,27 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
       print("Watcher finished slot activated");
       called = true;
     }
+
+    void onFailed() {
+      print("Execution failed");
+    }
   };
 
   Demo demo;
   std::string message = "Finished";
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
-  cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
+
+  // look at watcher
+  cs::Connector::connect(watcher->finished, &demo, &Demo::onWatcherFinished);
+  cs::Connector::connect(watcher->failed, &demo, &Demo::onFailed);
 
   while(!isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+
+  if (!called && isRunningFinished) {
+    print("Method executed, but does not generate finished signal");
+  }
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);

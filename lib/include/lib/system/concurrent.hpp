@@ -3,8 +3,8 @@
 
 #include <functional>
 #include <future>
-#include <type_traits>
 #include <memory>
+#include <type_traits>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
@@ -14,12 +14,12 @@
 #include <boost/bind.hpp>
 
 namespace cs {
-enum class RunPolicy {
+enum class RunPolicy : cs::Byte {
   CallQueuePolicy,
   ThreadPoolPolicy
 };
 
-enum class WatcherState {
+enum class WatcherState : cs::Byte {
   Idle,
   Running,
   Compeleted
@@ -62,38 +62,34 @@ private:
 template<typename T>
 using Future = std::future<T>;
 
-// object to get future result from concurrent
-// and generate signal when finished
-template<typename Result>
-class FutureWatcher {
+template <typename Result>
+class FutureBase {
 public:
-  using FinishSignal = cs::Signal<void(Result)>;
   using Id = uint64_t;
 
-  FutureWatcher() {
+protected:
+  FutureBase() {
     ++producedId;
     id_ = producedId;
+    state_ = WatcherState::Idle;
   }
 
-  FutureWatcher(FutureWatcher&) = delete;
-  ~FutureWatcher() = default;
+  FutureBase(FutureBase&) = delete;
+  ~FutureBase() = default;
 
-  explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
-  : FutureWatcher() {
+  explicit FutureBase(RunPolicy policy, Future<Result>&& future)
+  : FutureBase() {
     future_ = std::move(future);
     policy_ = policy;
-
-    watch<Result>();
   }
 
-  FutureWatcher(FutureWatcher&& watcher)
+  FutureBase(FutureBase&& watcher)
   : future_(std::move(watcher.future_))
   , policy_(watcher.policy_)
   , state_(watcher.state_) {
-    watcher.state_ = WatcherState::Idle;
   }
 
-  FutureWatcher& operator=(FutureWatcher&& watcher) {
+  FutureBase& operator=(FutureBase&& watcher) {
     if (state_ == WatcherState::Running) {
       cserror() << csname() << "Trying to use operator= in watcher running state";
     }
@@ -102,8 +98,10 @@ public:
     policy_ = watcher.policy_;
     id_ = watcher.id_;
 
-    watch<Result>();
+    return *this;
   }
+
+public:
 
   // returns current watcher state, if watcher never watched runnable entity
   // then his state is Idle
@@ -115,45 +113,13 @@ public:
     return id_;
   }
 
-private:
+protected:
   Future<Result> future_;
   RunPolicy policy_;
   WatcherState state_ = WatcherState::Idle;
   Id id_;
 
   inline static Id producedId = 0;
-
-  template<typename T>
-  void watch() {
-    auto closure = [=] {
-      T result = future_.get();
-
-      auto signal = [=] {
-        emit finished(result);
-      };
-
-      callSignal(signal);
-    };
-
-    state_ = WatcherState::Running;
-    Worker::execute(closure);
-  }
-
-  template <>
-  void watch<void>() {
-    auto closure = [=] {
-      future_.get();
-
-      auto signal = [=] {
-        emit finished();
-      };
-
-      callSignal(signal);
-    };
-
-    state_ = WatcherState::Running;
-    Worker::execute(closure);
-  }
 
   template <typename Func>
   void callSignal(Func&& func) {
@@ -168,11 +134,113 @@ private:
     future_ = Future<Result>();
     state_ = WatcherState::Compeleted;
   }
+};
+
+// object to get future result from concurrent
+// and generate signal when finished
+template<typename Result>
+class FutureWatcher : public FutureBase<Result> {
+public:
+  using FinishSignal = cs::Signal<void(Result)>;
+  using FailedSignal = cs::Signal<void()>;
+
+  explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
+  : FutureBase<Result>(policy, std::move(future)) {
+    watch();
+  }
+
+  FutureWatcher() = default;
+  ~FutureWatcher() = default;
+  FutureWatcher(FutureWatcher&&) = default;
+
+  FutureWatcher& operator=(FutureWatcher&& watcher) {
+    FutureBase<Result>::operator=(std::move(watcher));
+
+    watch();
+    return  *this;
+  }
+
+protected:
+  using Super = FutureBase<Result>;
+
+  void watch() {
+    auto closure = [=] {
+      try {
+        Result result = Super::future_.get();
+
+        auto signal = [=] {
+          emit finished(result);
+        };
+
+        Super::callSignal(signal);
+      }
+      catch (std::exception& e) {
+        cserror() << "Concurrent execution with" << typeid(Result).name() << "failed, " << e.what();
+        emit failed();
+      }
+    };
+
+    this->state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
 
 public signals:
   FinishSignal finished;
+  FailedSignal failed;
 };
 
+template<>
+class FutureWatcher<void> : public FutureBase<void> {
+public:
+  using FinishSignal = cs::Signal<void()>;
+  using FailedSignal = cs::Signal<void()>;
+
+  explicit FutureWatcher(RunPolicy policy, Future<void>&& future)
+  : FutureBase<void>(policy, std::move(future)) {
+    watch();
+  }
+
+  FutureWatcher() = default;
+  ~FutureWatcher() = default;
+  FutureWatcher(FutureWatcher&& watcher) = default;
+
+  FutureWatcher& operator=(FutureWatcher&& watcher) {
+    FutureBase<void>::operator=(std::move(watcher));
+
+    watch();
+    return *this;
+  }
+
+protected:
+  using Super = FutureBase<void>;
+
+  void watch() {
+    auto closure = [=] {
+      try {
+        Super::future_.get();
+
+        auto signal = [=] {
+          emit finished();
+        };
+
+        Super::callSignal(signal);
+      }
+      catch (std::exception& e) {
+        cserror() << "Concurrent execution with void result failed, " << e.what();
+        emit failed();
+      }
+    };
+
+    state_ = WatcherState::Running;
+    Worker::execute(std::move(closure));
+  }
+
+public signals:
+  FinishSignal finished;
+  FailedSignal failed;
+};
+
+// safe pointer to watcher
 template<typename T>
 using FutureWatcherPtr = std::shared_ptr<FutureWatcher<T>>;
 
@@ -182,9 +250,11 @@ public:
   // that generates finished signal by run policy
   // if does not stoge watcher object, then main thread will wait async entity in blocking mode
   template<typename Func, typename... Args>
-  static auto run(RunPolicy policy, Func&& function, Args&&... args) {
+  static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
     using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
-    return FutureWatcherPtr<ReturnType>(new FutureWatcher<ReturnType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...)));
+    using WatcherType = FutureWatcher<ReturnType>;
+
+    return std::make_shared<WatcherType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
   }
 
   // runs function entity in thread pool

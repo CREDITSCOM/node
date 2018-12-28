@@ -1122,6 +1122,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
 }
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
+  corruptionLevel = 0;
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
@@ -1168,7 +1169,14 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToConfidants(MsgTypes::FirstStage, roundNumber_, subRound_, stageOneInfo.signature, message);
+  int k1 = (corruptionLevel / 1) % 2;
+  uint8_t k2 = static_cast<uint8_t>(corruptionLevel / 16);
+  if(k1 == 1 && k2 == myConfidantIndex_) {
+    cslog() << "STAGE ONE ##############> NOTHING WILL BE SENT";
+  }
+  else {
+    sendToConfidants(MsgTypes::FirstStage, roundNumber_, subRound_, stageOneInfo.signature, message);
+  }
 
   csmeta(csdetails) << "sent message size " << message.size();
 
@@ -1269,12 +1277,20 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 
   // create signature
   cscrypto::GenerateSignature(stageTwoInfo.signature, solver_->getPrivateKey(), bytes.data(), bytes.size());
-
-  sendToConfidants(MsgTypes::SecondStage, roundNumber_, subRound_, stageTwoInfo.signature, bytes);
-
+  int k1 = (corruptionLevel / 2) % 2;
+  uint8_t k2 = static_cast<uint8_t>(corruptionLevel / 16);
+  if (k1 == 1 && k2 == myConfidantIndex_) {
+    cslog() << "STAGE TWO ##############> NOTHING WILL BE SENT";
+  }
+  else {
+    sendToConfidants(MsgTypes::SecondStage, roundNumber_, subRound_, stageTwoInfo.signature, bytes);
+  }
   // cash our stage two
   csmeta(csdetails) << "bytes size " << bytes.size();
-  stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
+
+    stageTwoMessage_[myConfidantIndex_] = std::move(bytes);
+
+
   csmeta(csdetails) << "done";
 }
 
@@ -1351,7 +1367,16 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
   cscrypto::GenerateSignature(stageThreeInfo.signature,solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-  sendToConfidants(MsgTypes::ThirdStage, roundNumber_, subRound_, stageThreeInfo.signature, bytes);
+  int k1 = (corruptionLevel / 4) % 2;
+  uint8_t k2 = static_cast<uint8_t>(corruptionLevel / 16);
+  if (k1 == 1 && k2 == myConfidantIndex_) {
+    cslog() << "STAGE THREE ##############> NOTHING WILL BE SENT"; 
+  }
+  else {
+    sendToConfidants(MsgTypes::ThirdStage, roundNumber_, subRound_, stageThreeInfo.signature, bytes);
+  }
+
+
 
   // cach stage three
   csmeta(csdetails) << "bytes size " << bytes.size();
@@ -1512,7 +1537,15 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   default: break;
   }
 
-  sendDefault(confidant, msgType, roundNumber_, subRound_, signature, message);
+  int k1 = (corruptionLevel / 8) % 2;
+  uint8_t k2 = static_cast<uint8_t>(corruptionLevel / 16);
+  if (k1 == 1 && k2 == myConfidantIndex_) {
+    cslog() << "STAGE REPLY ##############> NOTHING WILL BE SENT";
+   }
+  else {
+    sendDefault(confidant, msgType, roundNumber_, subRound_, signature, message);
+  }
+
   csmeta(csdetails) << "done";
 }
 

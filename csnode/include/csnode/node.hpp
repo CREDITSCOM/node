@@ -330,7 +330,7 @@ private:
   std::vector<cs::Bytes> smartStageThreeMessage_;
 
   bool isSmartStageStorageCleared_ = false;
-
+  int corruptionLevel = 0;
   std::vector<cs::Stage> smartStageTemporary_;
 
   SentRoundData lastSentRoundData_;

@@ -281,13 +281,13 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
       cserror() << name() << ": index of sender is greater than the container size";
       return false;
     }
-    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin()) && stage.realTrustedMask.size()!= cs::ConfidantConsts::InvalidConfidantIndex) {
+    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin()) && stage.realTrustedMask.at(it.sender)!= cs::ConfidantConsts::InvalidConfidantIndex) {
       cslog() << "[" << (int)it.sender << "] is not liar";
     }
     else {
       ++liarNumber;
       context.mark_untrusted(it.sender);
-        stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
+      stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
 
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
       cslog() << "[" << (int)it.sender << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "

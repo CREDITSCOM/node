@@ -34,7 +34,9 @@ public:
   template <typename... Args>
   inline void operator()(Args&&... args) const {
     for (auto& elem : slots_) {
-      elem(std::forward<Args>(args)...);
+      if (elem) {
+        elem(std::forward<Args>(args)...);
+      }
     }
   }
 
