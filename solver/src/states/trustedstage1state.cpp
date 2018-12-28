@@ -125,7 +125,6 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   const std::size_t transactionsCount = packet.transactionsCount();
   const auto& transactions = packet.transactions();
 
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::Characteristic characteristic;
 
   if (transactionsCount > 0) {
@@ -186,6 +185,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     characteristic.mask = std::move(characteristicMask);
   }
 
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   conveyer.setCharacteristic(characteristic, context.round());
 
   if (characteristic.mask.size() != transactionsCount) {
@@ -195,7 +195,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   cs::Hash hash;
 
   if (characteristic.mask.empty()) {
-    auto round = cs::Conveyer::instance().currentRoundNumber();
+    auto round = conveyer.currentRoundNumber();
     cscrypto::CalculateHash(hash, reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
   }
   else {

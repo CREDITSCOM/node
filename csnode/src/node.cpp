@@ -153,10 +153,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     blockChain_.removeLastBlock();
   }
 
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
-
   // resend all this round data available
   cslog() << "NODE> resend last block hash after BigBang";
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  globalTable.hashes = conveyer.currentRoundTable().hashes;
+  csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
   onRoundStart(globalTable);
   conveyer.updateRoundTable(std::move(globalTable));
@@ -630,7 +632,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
   poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNum);
 }
 
-void Node::sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
+void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
   for (const auto& pool : poolsBlock) {
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
@@ -1071,7 +1073,7 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
   ostream_.clear();
 }
 
-RegionPtr Node::compressPoolsBlock(cs::PoolsBlock& poolsBlock, std::size_t& realBinSize) {
+RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize) {
   cs::Bytes bytes;
   cs::DataStream stream(bytes);
 
@@ -1140,20 +1142,21 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
 
-  csmeta(csdetails) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)<< ", Sender: " << static_cast<int>(stageOneInfo.sender)
-    << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
-    << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
-    << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
-    csmeta(csdetails) << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
+  csmeta(csdetails) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)
+                    << ", Sender: " << static_cast<int>(stageOneInfo.sender)
+                    << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
+                    << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
+                    << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
+  csmeta(csdetails) << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
   size_t expectedMessageSize = sizeof(stageOneInfo.sender)
-                  + sizeof(stageOneInfo.hash)
-                  + sizeof(size_t)
-                  + sizeof(cs::PublicKey) * stageOneInfo.trustedCandidates.size()
-                  + sizeof(stageOneInfo.hashesCandidates.size())
-                  + sizeof(cs::Hash) * stageOneInfo.hashesCandidates.size()
-                  + sizeof(size_t)
-                  + stageOneInfo.roundTimeStamp.size();
+                             + sizeof(stageOneInfo.hash)
+                             + sizeof(size_t)
+                             + sizeof(cs::PublicKey) * stageOneInfo.trustedCandidates.size()
+                             + sizeof(stageOneInfo.hashesCandidates.size())
+                             + sizeof(cs::Hash) * stageOneInfo.hashesCandidates.size()
+                             + sizeof(size_t)
+                             + stageOneInfo.roundTimeStamp.size();
 
   cs::Bytes message;
   message.reserve(expectedMessageSize);

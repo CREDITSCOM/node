@@ -130,7 +130,7 @@ public:
   //smarts consensus additional functions:
 
   // syncro send functions
-  void sendBlockReply(cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
+  void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
   void flushCurrentTasks();
   void becomeWriter();
@@ -259,7 +259,7 @@ private:
   template <typename... Args>
   void writeDefaultStream(Args&&... args);
 
-  RegionPtr compressPoolsBlock(cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
+  RegionPtr compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
   cs::PoolsBlock decompressPoolsBlock(const uint8_t* data, const size_t size);
 
   // TODO: C++ 17 static inline?
