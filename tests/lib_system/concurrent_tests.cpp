@@ -10,6 +10,8 @@ using ThreadId = std::thread::id;
 template<typename T>
 using Ref = std::reference_wrapper<T>;
 
+static const uint64_t sleepTimeMs = 1000;
+
 template<typename... Types>
 void print(Types&& ...args) {
   (std::cout << ... << std::forward<Types>(args)) << std::endl;
@@ -115,7 +117,7 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);
@@ -150,7 +152,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   cs::Connector::connect(&(watcher->finished), &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);
