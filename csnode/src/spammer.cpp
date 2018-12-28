@@ -26,7 +26,7 @@ constexpr auto kMyWalletsNum = 10u;
 // spamming starts after this timeout
 constexpr auto kTimeStartSleepSec = 5u;
 // increase this value to make spammer slower, otherwise decrease
-constexpr auto kSpammerSleepTimeMicrosec = 350000u;
+constexpr auto kSpammerSleepTimeMicrosec = 350u;
 // from this address public_key_ will be fund, genesis block address for test purposes
 std::string kGenesisPublic = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
 std::string kGenesisPrivate =
@@ -70,7 +70,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   cs::RoundNumber round_number = conveyer.currentRoundNumber();
 
   while (true) {
-    if (!node.isPoolsSyncroStarted()) {
+    if (!node.isPoolsSyncroStarted() && node.subRound() == 0) {
       if (target_wallet_counter == spammer_index) {
         ++target_wallet_counter;
         if (target_wallet_counter == kMyWalletsNum) {
@@ -100,17 +100,17 @@ void Spammer::SpamWithTransactions(Node& node) {
       }
     }
     while (tr_gen_in_round >= kMaxTransactionsInOneRound && round_number == conveyer.currentRoundNumber()) {
-      std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSpammerSleepTimeMicrosec * 2));
     }
     while (kMaxTransactionsInOneRound <= conveyer.blockTransactionsCount()) {
-      std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec * 2));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSpammerSleepTimeMicrosec * 2));
     }
     if (round_number != conveyer.currentRoundNumber()) {
       tr_gen_in_round = 0;
       round_number = conveyer.currentRoundNumber();
     }
 
-    std::this_thread::sleep_for(std::chrono::microseconds(kSpammerSleepTimeMicrosec));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kSpammerSleepTimeMicrosec));
   }
 }
 
