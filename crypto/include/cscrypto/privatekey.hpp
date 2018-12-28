@@ -21,10 +21,10 @@ public:
   PrivateKeyGuard access() const;
   operator bool() const { return mem_; }
 
-  static PrivateKey readFromBytes(const std::vector<Byte>&);
-  static PrivateKey readFromEncrypted(const std::vector<Byte>&, const char* passwd);
+  static PrivateKey readFromBytes(const Bytes&);
+  static PrivateKey readFromEncrypted(const Bytes&, const char* passwd);
 
-  std::vector<Byte> getEncrypted(const char* passwd) const;
+  Bytes getEncrypted(const char* passwd) const;
   static PrivateKey generateWithPair(PublicKey&);
 
 private:

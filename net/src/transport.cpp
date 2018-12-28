@@ -530,6 +530,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, rNum, firstPack.getSender());
+  case MsgTypes::HashReply:
+    return node_->getHashReply(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionPacket:
     return node_->getTransactionsPacket(data, size);
   case MsgTypes::TransactionsPacketRequest:

@@ -13,6 +13,7 @@ void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
   stage.realTrustedMask.clear();
+  stage.realTrustedMask.resize(context.cnt_trusted());
   stage.sender = (uint8_t)context.own_conf_number();
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
@@ -155,18 +156,18 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
               continue;
             }
             cs::Bytes toVerify;
-            size_t messageSize = sizeof(cs::RoundNumber) + sizeof(cs::Hash);
+            size_t messageSize = sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
             cs::DataStream stream(toVerify);
-            stream << (uint32_t)context.round(); // Attention!!! the uint32_t type
+            stream << context.round() << context.subRound(); // Attention!!! the uint32_t type
             stream << it.hashes[j];
 
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
-              cslog() << name() << ": [" << (int)j << "] marked as untrusted";
+              cslog() << name() << ": [" << (int)j << "] marked as untrusted (bad hash)";
               context.mark_untrusted((uint8_t)j);
             }
             else {
-              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted";
+              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted (bad signature)";
               context.mark_untrusted(it.sender);
             }
 
@@ -206,11 +207,17 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
     cswarning() << "============================ CONSENSUS SUMMARY =================================";
     if (pool_solution_analysis(context)) {
-      take_urgent_decision(context); //to be redesigned
-      cswarning() << "\t==> [" << (int)stage.writer << "]";
+      if(take_urgent_decision(context)) { //to be redesigned
+        cswarning() << "\t==> [" << (int)stage.writer << "]";
+      }
+      else {
+        cswarning() << "\tconsensus failed waiting for BigBang";
+        return Result::Failure;
+      }
     }
     else {
       cswarning() << "\tconsensus is not achieved";
+      return Result::Failure;
       /*the action is needed*/
     }
     cswarning() << "================================================================================";
@@ -270,13 +277,20 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
   uint8_t liarNumber = 0;
   /* cslog() <<  "Most Frequent hash: " << byteStreamToHex((const char*)mostFrequentHash.val, cscrypto::kHashSize);*/
   for (const auto& it : context.stage1_data()) {
-    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin())) {
+    if (it.sender >= stage.realTrustedMask.size()) {
+      cserror() << name() << ": index of sender is greater than the container size";
+      return false;
+    }
+    if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin()) && stage.realTrustedMask.at(it.sender)!= cs::ConfidantConsts::InvalidConfidantIndex) {
       cslog() << "[" << (int)it.sender << "] is not liar";
     }
     else {
       ++liarNumber;
+      context.mark_untrusted(it.sender);
+      stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
+
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
-      cslog() << "[" << (int)it.sender << "] IS " << (is_lost ? "LOST" : "LIAR") <<" with hash "
+      cslog() << "[" << (int)it.sender << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "
               << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
     }
   }
@@ -318,7 +332,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
-      stage.realTrustedMask.push_back(1); // set if trusted and 0 if untrusted
+      stage.realTrustedMask.at(i) = cs::ConfidantConsts::FirstWriterIndex;
       auto ptr = context.stage1(i);
       if(ptr == nullptr) {
         continue;
@@ -357,7 +371,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       }
     }
     else {
-      stage.realTrustedMask.push_back(0);
+      stage.realTrustedMask.at(i) = cs::ConfidantConsts::InvalidConfidantIndex;
     }
   }
 
@@ -432,7 +446,8 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
       }
-      for (size_t i = 0; i < max_conf - next_round_trust.size(); i++) {
+      size_t toAdd = max_conf - next_round_trust.size();
+      for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
         LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
@@ -445,10 +460,10 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   LOG_NOTICE(name() << ": end of trusted election");
 }
 
-void TrustedStage3State::take_urgent_decision(SolverContext& context) {
+bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
   auto hash_t = context.blockchain().getHashBySequence(context.round() - 1).to_binary();
   if (hash_t.empty()) {
-    return;  // TODO: decide what to return
+    return false;  // TODO: decide what to return
   }
   int k = *(unsigned int *)hash_t.data();
   if(k < 0) {
@@ -457,6 +472,10 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
   // stage.realTrustedMask contains !0 on good nodes:
   int cnt = (int) context.cnt_trusted();
   int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
+  if (cnt_active * 2 < cnt + 1) {
+    cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
+    return false;
+  }
   int idx_writer = k % cnt_active;
   if(cnt != cnt_active) {
     cslog() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
@@ -477,6 +496,7 @@ void TrustedStage3State::take_urgent_decision(SolverContext& context) {
       ++idx;
     }
   }
+  return true;
    // count idx_writer through good nodes:
   //int idx = -1;
   //for(int i = 0; i < cnt; ++i) {

@@ -65,7 +65,7 @@ static auto getKeyFromPassword(const char* passwd) {
   return key;
 }
 
-PrivateKey PrivateKey::readFromBytes(const std::vector<Byte>& bytes) {
+PrivateKey PrivateKey::readFromBytes(const Bytes& bytes) {
   if (bytes.size() != kPrivateKeySize) return PrivateKey();
 
   PrivateKey result;
@@ -75,7 +75,7 @@ PrivateKey PrivateKey::readFromBytes(const std::vector<Byte>& bytes) {
   return result;
 }
 
-PrivateKey PrivateKey::readFromEncrypted(const std::vector<Byte>& bytes, const char* passwd) {
+PrivateKey PrivateKey::readFromEncrypted(const Bytes& bytes, const char* passwd) {
   if (bytes.size() < crypto_aead_chacha20poly1305_NPUBBYTES)
     return PrivateKey();
 
@@ -105,8 +105,8 @@ PrivateKey PrivateKey::readFromEncrypted(const std::vector<Byte>& bytes, const c
   return result;
 }
 
-std::vector<Byte> PrivateKey::getEncrypted(const char* passwd) const {
-  std::vector<Byte> result;
+Bytes PrivateKey::getEncrypted(const char* passwd) const {
+  Bytes result;
 
   auto key = getKeyFromPassword(passwd);
   auto pk = access();

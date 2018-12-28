@@ -390,8 +390,6 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 }
 
 bool is_smart(const csdb::Transaction& tr) {
-  //csdb::UserField uf = tr.user_field(0);
-  //return uf.type() == csdb::UserField::Type::String;
   return tr.user_field(0).type() == csdb::UserField::Type::String;
 }
 
@@ -447,6 +445,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
   auto tr = make_transaction(transaction);
   if (!transaction.userFields.empty())
     tr.add_user_field(1, transaction.userFields);
+
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -578,9 +577,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     contract_state_entry.yield();
     return;
   }
-  //send_transaction.add_user_field(smart_state_idx, api_resp.contractState);
 
   send_transaction.add_user_field(0, serialize(transaction.smartContract));  
+
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy) {
@@ -605,37 +604,6 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
 
   _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
 }
-
-/*void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
-  const int MAX_LIMIT = 100;
-  if (offset > MAX_LIMIT)
-    const_cast<int64_t&>(offset) = MAX_LIMIT;
-  if (const_limit > MAX_LIMIT)
-    const_cast<int64_t&>(const_limit) = MAX_LIMIT;
-  _return.pools.reserve(const_limit);
-
-  csdb::Pool pool;
-  csdb::PoolHash hash     = s_blockchain.getLastHash();
-  const uint64_t sequence = s_blockchain.getSize();
-  const uint64_t lower    = sequence - std::min(sequence, (uint64_t)(offset + const_limit));
-  for (uint64_t it = sequence; it > lower; --it) {
-    auto cch = poolCache.find(hash);
-    if (cch == poolCache.end()) {
-      pool = s_blockchain.loadBlock(hash);
-      api::Pool apiPool = convertPool(pool);
-
-      if (it <= sequence - std::min(sequence, (uint64_t)offset))
-        _return.pools.push_back(apiPool);
-
-      poolCache.insert(cch, std::make_pair(hash, apiPool));
-      hash = pool.previous_hash();
-    }
-    else {
-      _return.pools.push_back(cch->second);
-      hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
-    }
-  }
-}*/
 
 void
 APIHandler::PoolListGet(api::PoolListGetResult& _return,
@@ -841,31 +809,6 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
   return;
 }
 
-/*void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& hash, const int64_t limit) {
-  const int MAX_LIMIT = 100;
-  csdb::PoolHash cur_hash = csdb::PoolHash::from_binary(toByteArray(hash));
-  if (limit > MAX_LIMIT)
-    const_cast<int64_t&>(limit) = MAX_LIMIT;
-
-  _return.pools.reserve(limit);
-
-  csdb::Pool pool;
-  for (size_t pools_left = limit; pools_left && !cur_hash.is_empty(); --pools_left) {
-    auto cch = poolCache.find(cur_hash);
-    if (cch == poolCache.end()) {
-      pool = s_blockchain.loadBlock(cur_hash);
-      api::Pool apiPool = convertPool(pool);
-      _return.pools.push_back(apiPool);
-      poolCache.insert(cch, std::make_pair(cur_hash, apiPool));
-      cur_hash = pool.previous_hash();
-    }
-    else {
-      _return.pools.push_back(cch->second);
-      cur_hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
-    }
-  }
-}*/
-
 void
 APIHandler::PoolListGetStable(api::PoolListGetResult& _return,
   const api::PoolHash& api_hash,
@@ -963,15 +906,6 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
 void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete) {
   _return = fromByteArray(s_blockchain.wait_for_block(csdb::PoolHash::from_binary(toByteArray(obsolete))).to_binary());
 }
-
-/*bool APIHandler::convertAddrToPublicKey(const csdb::Address& addr) {
-  if (addr.is_wallet_id()) {
-    const WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(const_cast<csdb::Address&>(addr).to_api_addr().data());
-    if (!s_blockchain.findAddrByWalletId(id, const_cast<csdb::Address&>(addr)))
-      return false;
-  }
-  return true;
-}*/
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address, const std::vector<int64_t>& v) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
@@ -1641,16 +1575,8 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 
   for (; ptr != lst.end(); ++ptr) {
     api::WalletInfo wi;
-
-    //wi.address = fromByteArray(*(ptr->first));
-    //
     const ::csdb::internal::byte_array addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
     wi.address = fromByteArray(addr_b);
-    /*std::string res;
-    std::transform((*(ptr->first)).begin(), (*(ptr->first)).end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    wi.address = res;*/
-    //
-
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();
 #ifdef MONITOR_NODE

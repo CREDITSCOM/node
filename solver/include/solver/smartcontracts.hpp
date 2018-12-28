@@ -7,10 +7,14 @@
 #include <csdb/transaction.hpp>
 #include <lib/system/signals.hpp>
 #include <lib/system/common.hpp>
+#include <lib/system/concurrent.hpp>
+
 #include <csnode/node.hpp> // introduce Node::api_handler_ptr_t
 
 #include <optional>
 #include <vector>
+#include <list>
+#include <mutex>
 
 //#define DEBUG_SMARTS
 
@@ -85,6 +89,13 @@ namespace cs
     void from_user_field(const csdb::UserField fld);
   };
 
+  struct SmartExecutionData {
+    csdb::Transaction transaction;
+    std::string state;
+    SmartContractRef smartContract;
+    executor::ExecuteByteCodeResult result;
+  };
+
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
   {
     return (l.transaction == r.transaction && l.sequence == r.sequence /*&& l.hash == r.hash*/);
@@ -150,13 +161,10 @@ namespace cs
       return SmartContracts::get_transaction(bc, contract);
     }
 
-    SmartContractStatus enqueue(csdb::Pool block, size_t trx_idx);
+    void enqueue(csdb::Pool block, size_t trx_idx);
     void on_completed(csdb::Pool block, size_t trx_idx);
 
-    void set_execution_result(cs::TransactionsPacket pack)
-    {
-      emit signal_smart_executed(pack);
-    }
+    void set_execution_result(cs::TransactionsPacket pack) const;
 
     csconnector::connector::ApiHandlerPtr get_api() const
     {
@@ -175,12 +183,17 @@ namespace cs
 
     bool is_running_smart_contract(csdb::Address addr) const;
 
+    // return true if currently executed smart contract emits passed transaction
+    bool test_smart_contract_emits(csdb::Transaction tr);
+
     bool execution_allowed;
     bool force_execution;
 
   public signals:
-
     SmartContractExecutedSignal signal_smart_executed;
+
+  public slots:
+    void onExecutionFinished(const SmartExecutionData& data);
 
   private:
 
@@ -193,17 +206,30 @@ namespace cs
     // last contract's state storage
     std::map<csdb::Address, std::string> contract_state;
 
+    // async watchers
+    std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
+
     struct QueueItem
     {
+      // reference to smart in blockchain (block/transaction) that spawns execution
       SmartContractRef contract;
+      // current status (running/waiting)
       SmartContractStatus status;
+      // start round
       cs::RoundNumber round;
+      // smart contract wallet/pub.key absolute address
+      csdb::Address abs_addr;
+      // emitted transactions if any while execution running
+      std::vector<csdb::Transaction> created_transactions;
     };
 
     // executiom queue
     std::vector<QueueItem> exe_queue;
 
-    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item)
+    // locks exe_queue when transaction emitted by smart contract
+    std::mutex mtx_emit_transaction;
+
+    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item) const
     {
       auto it = exe_queue.cbegin();
       for(; it != exe_queue.cend(); ++it) {
@@ -214,15 +240,30 @@ namespace cs
       return it;
     }
 
-    bool contains_me(const std::vector<cs::Bytes>& list)
+    void checkAllExecutions();
+
+    void remove_from_queue(const SmartContractRef& item);
+
+    void cancel_running_smart_contract();
+
+    void test_exe_queue();
+
+    bool contains_me(const std::vector<cs::Bytes>& list) const
     {
       return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }
 
-    bool invoke_execution(const SmartContractRef& contract, csdb::Pool block);
-    // currently perform blocking execution via api to remote executor
-    // TODO: make an async execution
+    // returns false if execution canceled, so caller is responsible to call remove_from_queue(item) method
+    bool invoke_execution(const SmartContractRef& contract);
+
+    // perform async execution via api to remote executor
+    // is called from invoke_execution() method only
+    // returns false if execution is canceled
     bool execute(const cs::SmartContractRef& item);
+
+    // makes a transaction to store new_state of smart contract invoked by src
+    // caller is responsible to test src is a smart-contract-invoke transaction
+    csdb::Transaction result_from_smart_invoke(const SmartContractRef& contract) const;
   };
 
 } // cs

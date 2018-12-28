@@ -68,40 +68,23 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   return (enough_hashes ? Result::Finish : Result::Ignore);
 }
 
-Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
+Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& /*pool_hash*/,
                                   const cs::PublicKey& sender) {
   // get node status for useful logging
   cslog() << name() << ": <-- hash from " << context.sender_description(sender);
-  const auto& lwh = context.blockchain().getLastHash();
-  if (stage.trustedCandidates.size() < Consensus::MinTrustedNodes) {
-    if (pool_hash == lwh) {
-      cslog() << name() << ": hash is OK";
-
-      bool keyFound = false;
-      for (auto& it : stage.trustedCandidates) {
-        if (it == sender) {
-          keyFound = true;
-          break;
-        }
-      }
-      if (!keyFound) {
-        stage.trustedCandidates.push_back(sender);
-      }
-    }
-    else {
-      // hash does not match to own hash
-      cswarning() << name() << ": hash " << pool_hash.to_string() << " from "
-                  << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " DOES NOT MATCH to my value "
-                  << lwh.to_string();
-      return Result::Ignore;
+  if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
+    cslog() << name() << ": hash is OK";
+    if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
+      stage.trustedCandidates.push_back(sender);
     }
   }
-  if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
+  if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes)  {
     // enough hashes
     // flush deferred block to blockchain if any
     enough_hashes = true;
     return (transactions_checked ? Result::Finish : Result::Ignore);
   }
+
   return Result::Ignore;
 }
 

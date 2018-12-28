@@ -55,7 +55,8 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-
+  void sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent);
+  void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   //consensus communication
   void sendStageOne(cs::StageOne&);
   void sendStageTwo(cs::StageTwo&);
@@ -98,9 +99,6 @@ public:
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
   void handleRoundMismatch(const cs::RoundTable& global_table);
 
-  // broadcast request for next round, to call after long timeout
-  void sendNextRoundRequest();
-
   // send request for next round info from trusted node specified by index in list
   void sendRoundTableRequest(uint8_t respondent);
 
@@ -109,7 +107,8 @@ public:
   void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
   void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
-  bool tryResendRoundTable(std::optional<const cs::PublicKey> respondent, cs::RoundNumber rNum);
+  // called by solver, review required:
+  bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -157,7 +156,14 @@ public:
   }
 
   cs::RoundNumber getRoundNumber();
-  uint8_t getConfidantNumber();
+
+  uint8_t getConfidantNumber() {
+    return myConfidantIndex_;
+  }
+
+  uint8_t subRound() {
+    return subRound_;
+  }
 
   BlockChain& getBlockChain() {
     return blockChain_;
@@ -188,8 +194,11 @@ public slots:
 
 private:
   bool init();
-  void createRoundPackage(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                          const cs::Characteristic& characteristic, const cs::Signature& signature);
+  void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
+                        const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
+                        const cs::Signature& signature);
+  void sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
+                             const cs::Characteristic& characteristic, const cs::Signature& signature);
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, const cs::Signature& signature);
@@ -314,13 +323,14 @@ private:
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
   std::vector<cs::Bytes> stageThreeMessage_;
+  bool stageThreeSent = false;
 
   std::vector<cs::Bytes> smartStageOneMessage_;
   std::vector<cs::Bytes> smartStageTwoMessage_;
   std::vector<cs::Bytes> smartStageThreeMessage_;
 
   bool isSmartStageStorageCleared_ = false;
-
+  int corruptionLevel = 0;
   std::vector<cs::Stage> smartStageTemporary_;
 
   SentRoundData lastSentRoundData_;
