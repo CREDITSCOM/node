@@ -158,6 +158,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   globalTable.hashes = conveyer.currentRoundTable().hashes;
+
   csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
   onRoundStart(globalTable);
@@ -1142,11 +1143,10 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
 
-  csmeta(csdetails) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)
-                    << ", Sender: " << static_cast<int>(stageOneInfo.sender)
-                    << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
-                    << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
-                    << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
+  csmeta(cslog) << "Round = " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_)<< ", Sender: " << static_cast<int>(stageOneInfo.sender)
+                              << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
+                              << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size()
+                              << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
   csmeta(csdetails) << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
   size_t expectedMessageSize = sizeof(stageOneInfo.sender)

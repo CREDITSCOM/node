@@ -236,6 +236,16 @@ namespace cs
     }
   }
 
+  void SolverCore::printStage3(const cs::StageThree& stage) {
+      cslog() << "     " << cs::Utils::byteStreamToHex(stage.hashBlock.data(), stage.hashBlock.size()) << std::endl
+              << "     " << cs::Utils::byteStreamToHex(stage.hashCandidatesList.data(), stage.hashCandidatesList.size()) << std::endl
+              << "     " << cs::Utils::byteStreamToHex(stage.hashHashesList.data(), stage.hashCandidatesList.size());
+      cslog() << "     WRITER = " << (int)stage.writer << ", RealTrusted = ";
+      for (auto& i : stage.realTrustedMask) {
+        cslog() << "[" << (int)i << "] ";
+      }
+  }
+
   void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   {
     if(find_stage3(stage.sender) != nullptr) {
@@ -248,7 +258,11 @@ namespace cs
         break;
       case 1:
         for (auto& st : stageThreeStorage) {
-          if(st.hashBlock == stage.hashBlock 
+          //cslog() << "OUR:";
+          //printStage3(stage);
+          //cslog() << "GOT:";
+          //printStage3(st);
+          if(st.hashBlock == stage.hashBlock
             && st.hashCandidatesList == stage.hashCandidatesList
             && st.hashHashesList == stage.hashHashesList
             && st.realTrustedMask == stage.realTrustedMask
@@ -260,17 +274,16 @@ namespace cs
         stageThreeStorage.push_back(stage);
         break;
       case 2:
-        cs::StageThree st;
-        for(auto& it : trueStageThreeStorage) {
-          if(it.sender == pnode->getConfidantNumber()) {
-            st = it;
-          }
-        }
-        if (st.hashBlock == stage.hashBlock
-          && st.hashCandidatesList == stage.hashCandidatesList
-          && st.hashHashesList == stage.hashHashesList
-          && st.realTrustedMask == stage.realTrustedMask
-          && st.writer == stage.writer) {
+        const auto st = find_stage3(pnode->getConfidantNumber());
+        //cslog() << "OUR:";
+        //printStage3(*st);
+        //cslog() << "GOT:";
+        //printStage3(stage);
+        if (st->hashBlock == stage.hashBlock
+          && st->hashCandidatesList == stage.hashCandidatesList
+          && st->hashHashesList == stage.hashHashesList
+          && st->realTrustedMask == stage.realTrustedMask
+          && st->writer == stage.writer) {
           trueStageThreeStorage.push_back(stage);
         }
         stageThreeStorage.push_back(stage);
