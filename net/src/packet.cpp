@@ -119,12 +119,14 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
       if (msg->packetsLeft_ != 0) {
         // the 1st fragment contains full info:
         if(pack.getFragmentId() == 0) {
-          csdetails() << "COLLECT> get packet " << getMsgTypesString(pack.getType()) << " of " << msg->packetsTotal_ << " fragments";
+          csdetails() << "COLLECT> recv pack " << getMsgTypesString(pack.getType()) << " of " << msg->packetsTotal_
+            << ", round " << pack.getRoundNum();
         }
         csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
       }
       else {
-        csdetails() << "COLLECT> complete " << msg->packetsTotal_;
+        csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << getMsgTypesString(msg->getFirstPack().getType())
+          << ", round " << msg->getFirstPack().getRoundNum();
       }
     }
   }
