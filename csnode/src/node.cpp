@@ -811,7 +811,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
       // more then 1 round lag, request round info
       if (round > 1 && subRound_ == 0) {
         // not on the very start
-        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << "), request round info";
+        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
         cs::RoundTable emptyRoundTable;
         emptyRoundTable.round = rNum;
         handleRoundMismatch(emptyRoundTable);
