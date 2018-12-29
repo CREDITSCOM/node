@@ -34,26 +34,27 @@ void TrustedStage2State::on(SolverContext& context) {
   //  - create fake stages-1 from outbound nodes and force to next state
 
   SolverContext* pctx = &context;
-  cslog() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-1 received";
+  auto dt = 2 * Consensus::T_stage_request;
+  cslog() << name() << ": start track timeout " << dt << " ms of stages-1 received";
   timeout_request_stage.start(
-      context.scheduler(), Consensus::T_stage_request,
+      context.scheduler(), dt,
       // timeout #1 handler:
-      [pctx, this]() {
+      [pctx, this, dt]() {
         cslog() << name() << ": timeout for stages-1 is expired, (now) skip make requests";
         //request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        cslog() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+        cslog() << name() << ": start subsequent track timeout " << dt
                           << " ms to request neighbors about stages-1";
         timeout_request_neighbors.start(
-            pctx->scheduler(), Consensus::T_stage_request,
+            pctx->scheduler(), dt,
             // timeout #2 handler:
-            [pctx, this]() {
+            [pctx, this, dt]() {
               cslog() << name() << ": timeout for requested stages is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
               // timeout #3 handler
               timeout_force_transition.start(
-                pctx->scheduler(), Consensus::T_stage_request,
-                [pctx, this]() {
+                pctx->scheduler(), dt,
+                [pctx, this ,dt]() {
                   cslog() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
                   mark_outbound_nodes(*pctx);
                 },

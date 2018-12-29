@@ -42,5 +42,5 @@ public:
   constexpr static uint32_t T_coll_trans = 500;
 
   /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
-  constexpr static size_t maxStageOneHashes = 500;
+  constexpr static size_t maxStageOneHashes = 250;
 };
