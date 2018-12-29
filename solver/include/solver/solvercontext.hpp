@@ -278,6 +278,9 @@ public:
     stage.hash.fill(0);
     stage.messageHash.fill(0);
     stage.signature.fill(0);
+    stage.hashesCandidates.clear();
+    stage.trustedCandidates.clear();
+    stage.roundTimeStamp.clear();
   }
 
   void init_zero(cs::StageTwo & stage)

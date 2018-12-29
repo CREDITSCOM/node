@@ -39,8 +39,8 @@ void TrustedStage2State::on(SolverContext& context) {
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [pctx, this]() {
-        cslog() << name() << ": timeout for stages-1 is expired, make requests";
-        request_stages(*pctx);
+        cslog() << name() << ": timeout for stages-1 is expired, (now) skip make requests";
+        //request_stages(*pctx);
         // start subsequent track timeout for "wide" request
         cslog() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
                           << " ms to request neighbors about stages-1";
