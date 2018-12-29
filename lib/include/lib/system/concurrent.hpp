@@ -180,7 +180,7 @@ protected:
       }
     };
 
-    this->state_ = WatcherState::Running;
+    Super::state_ = WatcherState::Running;
     Worker::execute(std::move(closure));
   }
 
@@ -231,7 +231,7 @@ protected:
       }
     };
 
-    state_ = WatcherState::Running;
+    Super::state_ = WatcherState::Running;
     Worker::execute(std::move(closure));
   }
 
