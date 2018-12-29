@@ -1135,7 +1135,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
 }
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-  corruptionLevel = 31;
+  corruptionLevel = 0;
   if (myLevel_ != NodeLevel::Confidant) {
     cswarning() << "NODE> Only confidant nodes can send consensus stages";
     return;
