@@ -66,9 +66,9 @@ enum NodeConsts : uint32_t {
   NeighboursRequestDelay = 350
 };
 
-enum SolverConsts : uint32_t {
+enum ConveyerConsts : uint32_t {
   TransactionsFlushRound = 2,
-  TransactionsPacketInterval = 100,
+  TransactionsPacketInterval = 1000,
   MaxPacketTransactions = 500,
 };
 

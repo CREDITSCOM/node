@@ -147,9 +147,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     const size_t cnt = context.cnt_trusted();
     for (auto& it : context.stage2_data()) {
       if ( it.sender != context.own_conf_number()) {
+        cslog() << "Comparing with T(" << (int)it.sender << "):";
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
           if (ptr->signatures[j] != it.signatures[j]) {
+            cslog() << "Signature of T(" << j << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size()) << "stage-2 from T(" << (int)it.sender << ") is not equal to mine:" << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
+
             if(it.hashes[j] == SolverContext::zeroHash) {
               cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (silent)";
               context.mark_untrusted(it.sender);
@@ -485,30 +488,24 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
   }
   // count idx_writer through good nodes (optional):
   int idx = 0;
-  int c = 0;
-  for (int i = idx_writer; i < cnt + idx_writer; ++i) {
-    c = i % cnt;
-    if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
-      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+  for (int i = 0; i < cnt; ++i) {
+    if (stage.realTrustedMask.at(i) != InvalidConfidantIndex) {
       if (idx == idx_writer) {
-        stage.writer = static_cast<uint8_t>(c);
+        stage.writer = static_cast<uint8_t>(i);
       }
       ++idx;
     }
   }
+  int c = 0;
+  idx = 0;
+  for (int i = stage.writer; i < cnt + stage.writer; ++i) {
+    c = i % cnt;
+    if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
+      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+      ++idx;
+    }
+  }
   return true;
-   // count idx_writer through good nodes:
-  //int idx = -1;
-  //for(int i = 0; i < cnt; ++i) {
-  //  if(stage.realTrustedMask.at(i) != InvalidConfidant) {
-  //    ++idx;
-  //    if(idx == idx_writer) {
-  //      return static_cast<uint8_t>(i);
-  //    }
-  //  }
-  //}
-  //// how can we reach this? no way but...
-  //return static_cast<uint8_t>(idx_writer);
 }
 
 }  // namespace slv2

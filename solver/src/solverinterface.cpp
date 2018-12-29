@@ -62,38 +62,7 @@ namespace cs
     return SolverContext::zeroKey;
   }
 
-  void SolverCore::gotBigBang()
-  {
-    // in case of bigbang resend all info we have got
-    // assume normal (ordinary) nodes does not store stages
-    const auto own_num = pnode->getConfidantNumber();
-    const auto pstage1 = find_stage1(own_num);
-    if(pstage1 != nullptr) {
-      cslog() << "SolverCore: resend stage-1 after BigBang";
-      pnode->sendStageOne(*pstage1);
-    }
-    else {
-      cslog() << "SolverCore: stage-1 not ready to re-send after BigBang";
-    }
-    const auto pstage2 = find_stage2(own_num);
-    if(pstage2 != nullptr) {
-      cslog() << "SolverCore: resend stage-2 after BigBang";
-      pnode->sendStageTwo(*pstage2);
-    }
-    else {
-      cslog() << "SolverCore: stage-2 not ready to re-send after BigBang";
-    }
-    const auto pstage3 = find_stage3(own_num);
-    if(pstage3 != nullptr) {
-      cslog() << "SolverCore: resend stage-3 after BigBang";
-      pnode->sendStageThree(*pstage3);
-    }
-    else {
-      cslog() << "SolverCore: stage-3 not ready yet to re-send after BigBang";
-    }
-  }
-
-  void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
+    void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender)
   {
     cs::Sequence delta = cur_round - pnode->getBlockChain().getLastSequence();
     if(delta > 1) {
