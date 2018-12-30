@@ -803,7 +803,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     return -1;
   }
 
-  const int neighbourCount = static_cast<int>(neighbours_.size() - 1);
+  const size_t neighbourCount = static_cast<int>(neighbours_.size() - 1U);
 
   if (attemptCount > (neighbourCount * 3)) {
     int index = 0;
