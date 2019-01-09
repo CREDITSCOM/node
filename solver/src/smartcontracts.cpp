@@ -537,6 +537,7 @@ namespace cs
         }
         else {
           csdebug() << name() << ": smart contract has already finished, no cancel required";
+          test_exe_queue();
         }
       };
       cs::Timer::singleShot(static_cast<int>(Consensus::T_smart_contract << 1), cancel_proc);
@@ -574,14 +575,13 @@ namespace cs
 
   void SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const
   {
-    emit signal_smart_executed(pack);
-
     cslog() << "  _____";
     cslog() << " /     \\";
     cslog() << "/  S.C  \\";
     cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
     cslog() << " \\_____/";
 
+    emit signal_smart_executed(pack);
   }
 
 } // cs
