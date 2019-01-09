@@ -28,6 +28,7 @@ void TrustedStage2State::on(SolverContext& context) {
     }
     if(finish) {
       context.complete_stage2();
+      return;
     }
   }
 

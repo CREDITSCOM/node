@@ -26,6 +26,7 @@ void TrustedPostStageState::on(SolverContext& context) {
     }
     if(finish) {
       context.complete_post_stage();
+      return;
     }
   }
 

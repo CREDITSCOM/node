@@ -33,6 +33,7 @@ void TrustedStage3State::on(SolverContext& context) {
     }
     if(finish) {
       context.complete_stage3();
+      return;
     }
   }
 
