@@ -34,9 +34,9 @@ namespace cs
 
   /*explicit*/
   SmartContracts::SmartContracts(BlockChain& blockchain)
-    : bc(blockchain)
-    , execution_allowed(true)
+    : execution_allowed(true)
     , force_execution(false)
+    , bc(blockchain)
   {
 #if defined(DEBUG_SMARTS)
     execution_allowed = false;
@@ -580,12 +580,10 @@ namespace cs
     cslog() << " /     \\";
     cslog() << "/  S.C  \\";
 
-    bool ok = true;
     if(pack.transactionsCount() > 0) {
       for(const auto& tr : pack.transactions()) {
         if(is_new_state(tr)) {
           if(tr.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
-            ok = false;
             break;
           }
         }

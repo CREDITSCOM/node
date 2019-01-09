@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef> // : for size_t
 
 class Consensus {
 public:

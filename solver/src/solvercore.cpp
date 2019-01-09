@@ -292,7 +292,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     smartStageTwoStorage_.resize(cSize);
     smartStageThreeStorage_.clear();
     smartStageThreeStorage_.resize(cSize);
-    for (int i = 0; i < cSize; ++i) {
+    for (size_t i = 0; i < cSize; ++i) {
       smartStageOneStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
       smartStageTwoStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
       smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
@@ -326,7 +326,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
       return;
     }
     smartStageOneStorage_.at(stage.sender) = stage;
-    for (int i=0; i<smartConfidants_.size(); ++i) {
+    for (size_t i=0; i<smartConfidants_.size(); ++i) {
       cslog() << "[" << i << "] - " << (int)smartStageOneStorage_.at(i).sender;
     }
     cslog() << "          <-- SMART-Stage-1 [" << (int)stage.sender << "]";

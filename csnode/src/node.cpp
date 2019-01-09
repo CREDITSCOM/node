@@ -1611,7 +1611,7 @@ void Node::smartStagesStorageClear(size_t cSize)
   smartStageThreeMessage_.clear();
   smartStageThreeMessage_.resize(cSize);
   csmeta(csdetails) << "          SmartStagesStorage prepared, martStageTemporary_.size() = " << smartStageTemporary_.size();
-  for (int i = 0; i<smartStageTemporary_.size(); i++) {
+  for (size_t i = 0; i<smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
     if (it.msgRoundNum == solver_->smartRoundNumber()) {
       switch(it.msgType) {

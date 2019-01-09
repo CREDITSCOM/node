@@ -2,6 +2,7 @@ build/
 build64/
 .dir-locals.el
 /.vs
+/.vscode
 /local
 /CMakeSettings.json
 js-client/js/*
