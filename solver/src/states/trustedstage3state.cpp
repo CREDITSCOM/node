@@ -12,6 +12,7 @@ namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
+  cnt_recv_stages = 0;
   stage.realTrustedMask.clear();
   stage.realTrustedMask.resize(context.cnt_trusted());
   stage.sender = (uint8_t)context.own_conf_number();
@@ -146,7 +147,8 @@ void TrustedStage3State::mark_outbound_nodes(SolverContext& context)
 
 Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&) {
   const auto ptr = context.stage2((uint8_t)context.own_conf_number());
-  if (ptr != nullptr && context.enough_stage2()) {
+  ++cnt_recv_stages;
+  if (ptr != nullptr && cnt_recv_stages == context.cnt_trusted()) {
     cslog() << name() << ": enough stage-2 received";
     const size_t cnt = context.cnt_trusted();
     for (auto& it : context.stage2_data()) {

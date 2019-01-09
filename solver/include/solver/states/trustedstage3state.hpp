@@ -42,6 +42,7 @@ protected:
   TimeoutTracking timeout_request_neighbors;
   TimeoutTracking timeout_force_transition;
   
+  size_t cnt_recv_stages;
   cs::StageThree stage;
   std::vector<cs::PublicKey> next_round_trust;
   std::vector<cs::TransactionsPacketHash> next_round_hashes;

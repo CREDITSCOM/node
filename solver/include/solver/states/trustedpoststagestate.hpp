@@ -34,6 +34,9 @@ public:
   void request_stages_neighbors(SolverContext& context);
 
 protected:
+
+  size_t cnt_recv_stages;
+
   TimeoutTracking timeout_request_stage;
   TimeoutTracking timeout_request_neighbors;
   TimeoutTracking timeout_force_transition;

@@ -6,6 +6,7 @@
 namespace cs {
 void TrustedStage2State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
+  cnt_recv_stages = 0;
   context.init_zero(stage);
   stage.sender = (uint8_t)context.own_conf_number();
   const auto ptr = context.stage1(stage.sender);
@@ -84,7 +85,8 @@ void TrustedStage2State::off(SolverContext& /*context*/) {
 Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& st) {
   stage.signatures[st.sender] = st.signature;
   stage.hashes[st.sender] = st.messageHash;
-  if (context.enough_stage1()) {
+  ++cnt_recv_stages;
+  if (cnt_recv_stages == context.cnt_trusted()) {
     cslog() << name() << ": enough stage-1 received";
     /*signing of the second stage should be placed here*/
     cslog() << name() << ": --> stage-2 [" << (int)stage.sender << "]";

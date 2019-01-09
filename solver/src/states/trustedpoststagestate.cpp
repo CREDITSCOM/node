@@ -6,6 +6,7 @@ namespace cs {
 void TrustedPostStageState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
+  cnt_recv_stages = 0;
   //// decide to write
   // const auto ptr = context.stage3((uint8_t) context.own_conf_number());
   // if(ptr != nullptr) {
@@ -109,7 +110,8 @@ void TrustedPostStageState::request_stages_neighbors(SolverContext& context) {
 }
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
-  if (context.enough_stage3()) {
+  ++cnt_recv_stages;
+  if (cnt_recv_stages == context.cnt_trusted()) {
     LOG_NOTICE(name() << ": enough stage-3 received");
     return Result::Finish;
   }
