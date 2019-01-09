@@ -19,12 +19,15 @@ void TrustedStage2State::on(SolverContext& context) {
   // if have already received stage-1, make possible to go further (to stage-3)
   if (!context.stage1_data().empty()) {
     cslog() << name() << ": handle early received stages-1";
+    bool finish = false;
     for (const auto& st : context.stage1_data()) {
       csdebug() << name() << ": stage-1 [" << (int) st.sender << "]";
       if (Result::Finish == onStage1(context, st)) {
-        context.complete_stage2();
-        return;
+        finish = true;
       }
+    }
+    if(finish) {
+      context.complete_stage2();
     }
   }
 

@@ -16,17 +16,21 @@ void TrustedPostStageState::on(SolverContext& context) {
   //}
 
   // process already received stage-3, possible to go further to waiting/writting state
-  for (const auto& st : context.stage3_data()) {
-    if (Result::Finish == onStage3(context, st)) {
+  if(!context.stage3_data().empty()) {
+    cslog() << name() << ": handle early received stages-3";
+    bool finish = false;
+    for(const auto& st : context.stage3_data()) {
+      if(Result::Finish == onStage3(context, st)) {
+        finish = true;
+      }
+    }
+    if(finish) {
       context.complete_post_stage();
-      return;
     }
   }
 
   SolverContext* pctx = &context;
-  if (Consensus::Log) {
-    LOG_NOTICE(name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received");
-  }
+  cslog() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received";
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
