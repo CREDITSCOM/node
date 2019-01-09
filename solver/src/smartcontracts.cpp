@@ -572,23 +572,13 @@ namespace cs
     return result;
   }
 
-  void SmartContracts::set_execution_result(cs::TransactionsPacket pack) const
+  void SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const
   {
     emit signal_smart_executed(pack);
 
     cslog() << "  _____";
     cslog() << " /     \\";
     cslog() << "/  S.C  \\";
-
-    if(pack.transactionsCount() > 0) {
-      for(const auto& tr : pack.transactions()) {
-        if(is_new_state(tr)) {
-          if(tr.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
-            break;
-          }
-        }
-      }
-    }
     cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
     cslog() << " \\_____/";
 

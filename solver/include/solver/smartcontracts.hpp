@@ -165,7 +165,7 @@ namespace cs
     void enqueue(csdb::Pool block, size_t trx_idx);
     void on_completed(csdb::Pool block, size_t trx_idx);
 
-    void set_execution_result(cs::TransactionsPacket pack) const;
+    void set_execution_result(cs::TransactionsPacket& pack) const;
 
     csconnector::connector::ApiHandlerPtr get_api() const
     {
