@@ -1,5 +1,6 @@
 #include "solvercontext.hpp"
 #include "solvercore.hpp"
+#include "smartcontracts.hpp"
 
 #include <csnode/conveyer.hpp>
 #include <csnode/node.hpp>
@@ -203,6 +204,11 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
   core.pnode->sendRoundTableRequest(respondent1);
   cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent2);
+}
+
+void SolverContext::on_reject(cs::TransactionsPacket& pack) const
+{
+  core.psmarts->on_reject(pack);
 }
 
 }  // namespace slv2

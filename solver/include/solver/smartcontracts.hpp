@@ -167,6 +167,10 @@ namespace cs
 
     void set_execution_result(cs::TransactionsPacket& pack) const;
 
+    // get & handle rejected transactions
+    // usually ordinary consensus may reject smart-related transactions
+    void on_reject(cs::TransactionsPacket& pack);
+
     csconnector::connector::ApiHandlerPtr get_api() const
     {
       return papi;
@@ -174,7 +178,7 @@ namespace cs
 
     const char* name() const
     {
-      return "Smarts";
+      return "Smart";
     }
 
     csdb::Address absolute_address(csdb::Address optimized_address) const
@@ -274,7 +278,7 @@ namespace cs
 
     // makes a transaction to store new_state of smart contract invoked by src
     // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction result_from_smart_invoke(const SmartContractRef& contract) const;
+    csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
   };
 
 } // cs

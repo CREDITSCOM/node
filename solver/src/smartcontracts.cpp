@@ -154,10 +154,11 @@ namespace cs
   }
 
   void SmartContracts::onExecutionFinished(const SmartExecutionData& data) {
-    csdb::Transaction result = result_from_smart_invoke(data.smartContract);
+    csdb::Transaction result = result_from_smart_ref(data.smartContract);
     auto it = find_in_queue(data.smartContract);
     if(it != exe_queue.end()) {
       it->status = SmartContractStatus::Finished;
+      cserror() << name() << ": update contract status to Finished";
     }
     else {
       cserror() << name() << ": cannot find in queue just completed contract";
@@ -343,6 +344,7 @@ namespace cs
       auto next = exe_queue.begin();
       if(next->status == SmartContractStatus::Running) {
         // some contract is already running
+        csdebug() << name() << ": there is running contract in queue";
         break;
       }
       if(next->status == SmartContractStatus::Finished) {
@@ -432,7 +434,7 @@ namespace cs
     if(!exe_queue.empty()) {
       const auto& current = exe_queue.front();
       if(current.status == SmartContractStatus::Running) {
-        csdb::Transaction tr = result_from_smart_invoke(current.contract);
+        csdb::Transaction tr = result_from_smart_ref(current.contract);
         // result contains empty USRFLD[state::Value]
         tr.add_user_field(trx_uf::new_state::Value, std::string {});
         if(tr.is_valid()) {
@@ -544,7 +546,7 @@ namespace cs
     return false;
   }
 
-  csdb::Transaction SmartContracts::result_from_smart_invoke(const SmartContractRef& contract) const
+  csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& contract) const
   {
     csdb::Transaction src = get_transaction(contract);
     if(!src.is_valid()) {
@@ -572,11 +574,59 @@ namespace cs
   {
     cslog() << "  _____";
     cslog() << " /     \\";
-    cslog() << "/  S.C  \\";
+    cslog() << "/       \\";
     cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
     cslog() << " \\_____/";
 
     emit signal_smart_executed(pack);
+  }
+
+  // get & handle rejected transactions
+  // usually ordinary consensus may reject smart-related transactions
+  void SmartContracts::on_reject(cs::TransactionsPacket & pack)
+  {
+    if(exe_queue.empty()) {
+      cserror() << name() << ": get rejected smart transactions but execution queue is empty";
+      return;
+    }
+
+    const auto cnt = pack.transactionsCount();
+    if(cnt > 0) {
+      csdebug() << name() << ": " << cnt << " trxs are rejected";
+      std::vector<csdb::Address> done;
+      for(const auto t : pack.transactions()) {
+        csdb::Address abs_addr = absolute_address(t.source());
+        if(std::find(done.cbegin(), done.cend(), abs_addr) != done.cend()) {
+          continue;
+        }
+
+        // find source contract in queue
+        for(auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {
+          if(it->abs_addr == abs_addr) {
+            done.push_back(abs_addr);
+            csdebug() << name() << ": send to conveyer smart contract failed status (related trxs or state are rejected)";
+            // send to consensus
+            csdb::Transaction tr = result_from_smart_ref(it->contract);
+            // result contains empty USRFLD[state::Value]
+            tr.add_user_field(trx_uf::new_state::Value, std::string {});
+            if(tr.is_valid()) {
+              Conveyer::instance().addTransaction(tr);
+            }
+            else {
+              cserror() << name() << ": failed to fix smart contract failure, remove from execution queue";
+              remove_from_queue(it);
+              test_exe_queue();
+            }
+            break;
+          }
+        }
+
+        auto it = contract_state.find(absolute_address(t.source()));
+      }
+    }
+    else {
+      cserror() << name() << ": trxs ar erejected but no one is available";
+    }
   }
 
 } // cs

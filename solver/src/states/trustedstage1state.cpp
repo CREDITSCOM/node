@@ -180,7 +180,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in build_vector()";
+      cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart
@@ -199,7 +199,9 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     }
     if(!smart_rejected.empty()) {
       cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
-      // 2. reject all trxs from those smarts
+      cs::TransactionsPacket rejected;
+
+      // 2. reject all trxs from those smarts & collect all rejected trxs
       size_t cnt_add_rejected = 0;
       for(auto it = transactions.begin(); it != transactions.end(); ++it) {
         if(smart_rejected.count(it->source()) > 0) {
@@ -208,10 +210,16 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
             *itm = 0;
             ++cnt_add_rejected;
           }
+          rejected.addTransaction(*it);
         }
       }
       if(cnt_add_rejected > 0) {
         cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+      }
+
+      // 3. signal SmartContracts service some trxs are rejected
+      if(rejected.transactionsCount() > 0) {
+        context.on_reject(rejected);
       }
     }
 
@@ -222,7 +230,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   conveyer.setCharacteristic(characteristic, context.round());
 
   if (characteristic.mask.size() != transactionsCount) {
-    cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";
+    cserror() << name() << ": characteristic mask size not equals transactions count in build_vector()";
   }
 
   cs::Hash hash;

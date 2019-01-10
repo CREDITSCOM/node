@@ -309,7 +309,7 @@ namespace cs
       psmarts->enqueue(block, trx_idx);
     }
     else if(psmarts->is_new_state(tr)) {
-      csdebug() << "SolverCore: smart contract is executed, state updated with new one";
+      csdebug() << "SolverCore: smart contract state updated";
       psmarts->on_completed(block, trx_idx);
     }
     
