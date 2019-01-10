@@ -42,7 +42,7 @@ bool Packet::isHeaderValid() const {
   if(size() <= getHeadersLength()) {
     cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")"
       << (this->isNetwork() ? ", network" : "")
-      << (this->isFragmented() ? ", fragmeted" : "")
+      << (this->isFragmented() ? ", fragmented" : "")
               <<  ", type " << getMsgTypesString(this->getType()) << "(" << (int) this->getType() << ")";
     return false;
   }
