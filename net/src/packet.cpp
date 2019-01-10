@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #include <lz4.h>
 
 #include <lib/system/utils.hpp>
@@ -232,14 +231,14 @@ const char* getMsgTypesString(MsgTypes messageType) {
     case NodeStopRequest:
       return "NodeStopRequest";
     default:
-      return std::to_string(static_cast<int>(messageType)).c_str();
+      return "Unknown";
   }
 }
 
 const char* getNetworkCommandString(NetworkCommand command) {
   switch (command) {
     default:
-      return "-";
+      return "Unknown";
     case NetworkCommand::Registration:
       return "Registration";
     case NetworkCommand::ConfirmationRequest:
@@ -330,9 +329,18 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
     return os;
   }
 
-  os << getMsgTypesString(packet.getType()) << "(" << packet.getType() << "), ";
+  if (packet.isFragmented()) {
+    if (packet.getFragmentId() == 0) {
+      os << getMsgTypesString(packet.getType()) << "(" << packet.getType() << "), ";
+      os << "round " << packet.getRoundNum() << ", ";
+    }
+    else {
+      os << "fragment id: " << packet.getFragmentId() << ", ";
+    }
+  }
+
   os << "flags: " << PacketFlags(packet);
-  os << ", round " << packet.getRoundNum() << ", id: " << packet.getId() << std::endl;
+  os << ", id: " << packet.getId() << std::endl;
   os << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size());
 
   if (!packet.isBroadcast()) {

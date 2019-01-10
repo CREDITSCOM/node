@@ -864,16 +864,18 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
 }
 
 void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
-  if (!pack.isFragmented())
+  if (!pack.isFragmented()) {
     return;
+  }
 
   nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
   ConnectionPtr conn = nh_.getConnection(sender);
-  if (!conn)
+  if (!conn) {
     return;
+  }
 
   sendPackInform(pack, **conn);
 
