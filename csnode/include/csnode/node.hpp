@@ -46,8 +46,8 @@ public:
   std::string getSenderText(const cs::PublicKey& sender);
 
   // incoming requests processing
-  void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, uint8_t type);
-  void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber, uint8_t type = 0);
+  void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
+  void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
@@ -63,7 +63,7 @@ public:
   void sendStageThree(cs::StageThree&);
   void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-  void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+  void getStageThree(const uint8_t* data, const size_t size);
 
   void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
@@ -81,11 +81,10 @@ public:
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
-  void spoileHash(const csdb::PoolHash& hashToSpoil, csdb::PoolHash& spoiledHash);
-  void spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey, csdb::PoolHash& spoiledHash);
+  csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
+  csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey);
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
-  const cs::ConfidantsKeys& confidants() const;
   void retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
@@ -105,7 +104,7 @@ public:
   // send request for next round info from node specified node
   void sendRoundTableRequest(const cs::PublicKey& respondent);
   void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
-  void sendRoundTableReply(const cs::PublicKey& target, bool has_requested_info);
+  void sendRoundTableReply(const cs::PublicKey& target, bool hasRequestedInfo);
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
   // called by solver, review required:
   bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
@@ -125,7 +124,6 @@ public:
   void sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
   void sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round);
   void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
-  void resetNeighbours();
 
   //smarts consensus additional functions:
 
@@ -155,13 +153,13 @@ public:
     return myLevel_;
   }
 
-  cs::RoundNumber getRoundNumber();
+  cs::RoundNumber getRoundNumber() const;
 
-  uint8_t getConfidantNumber() {
+  uint8_t getConfidantNumber() const{
     return myConfidantIndex_;
   }
 
-  uint8_t subRound() {
+  uint8_t subRound() const {
     return subRound_;
   }
 
@@ -202,9 +200,6 @@ private:
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, const cs::Signature& signature);
-
-  // pool sync helpers
-  void blockchainSync();
 
   bool readRoundData(cs::RoundTable& roundTable);
   void reviewConveyerHashes();

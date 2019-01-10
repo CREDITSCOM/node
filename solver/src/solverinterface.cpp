@@ -53,7 +53,7 @@ namespace cs
     // As analogue, found writer's index in stage3 if exists, otherwise return empty object as prev. solver does
     auto ptr = find_stage3(pnode->getConfidantNumber());
     if(ptr != nullptr) {
-      const auto& trusted = cs::Conveyer::instance().currentRoundTable().confidants;
+      const auto& trusted = cs::Conveyer::instance().confidants();
       if(trusted.size() >= ptr->writer) {
         return *(trusted.cbegin() + ptr->writer);
       }
@@ -118,7 +118,7 @@ namespace cs
     }
 
     // update desired count of trusted nodes
-    size_t cnt_trusted = cs::Conveyer::instance().currentRoundTable().confidants.size();
+    size_t cnt_trusted = cs::Conveyer::instance().confidantsCount();
     if(cnt_trusted > cnt_trusted_desired) {
       cnt_trusted_desired = cnt_trusted;
     }
@@ -334,7 +334,7 @@ namespace cs
       pnode->sendRoundTableReply(requester, false);
     }
     else if(requester_round < cur_round) {
-      for(const auto& node : pnode->confidants()) {
+      for(const auto& node : cs::Conveyer::instance().confidants()) {
         if(requester == node) {
           if(pnode->tryResendRoundTable(requester, cur_round)) {
             cslog() << "SolverCore: requester is trusted next round, supply it with round info";

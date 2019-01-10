@@ -502,7 +502,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     case MsgTypes::RequestedBlock:
       return node_->getBlockReply(data, size);
     case MsgTypes::BigBang: // any round (in theory) may be set
-      return node_->getBigBang(data, size, rNum, type);
+      return node_->getBigBang(data, size, rNum);
     case MsgTypes::RoundTableRequest: // old-round node may ask for round info
       return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
     case MsgTypes::NodeStopRequest:
@@ -552,7 +552,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   case MsgTypes::ThirdStageRequest:
     return node_->getStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::ThirdStage:
-    return node_->getStageThree(data, size, firstPack.getSender());
+    return node_->getStageThree(data, size);
   case MsgTypes::FirstSmartStage:
     return node_->getSmartStageOne(data, size, rNum, firstPack.getSender());
   case MsgTypes::SecondSmartStage:

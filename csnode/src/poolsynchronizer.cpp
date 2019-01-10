@@ -74,14 +74,17 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   const uint32_t delay =
       useTimer ? cs::numeric_cast<uint32_t>(syncData_.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
 
-  // already synchro start, no BigBang, but no use timer
-  if (isSyncroStarted_ && !useTimer && !isBigBand && timer_.isRunning()) {
-    timer_.stop();
-  }
+  // already synchro start
+  if (isSyncroStarted_ && !useTimer) {
+    // no BigBang, but no use timer
+    if (!isBigBand && timer_.isRunning()) {
+      timer_.stop();
+    }
 
-  // already synchro start, but BigBang received
-  if (isSyncroStarted_ && !useTimer && isBigBand && !timer_.isRunning()) {
-    timer_.start(cs::numeric_cast<int>(delay));
+    // BigBang received
+    if (isBigBand && !timer_.isRunning()) {
+      timer_.start(cs::numeric_cast<int>(delay));
+    }
   }
 
   if (!isSyncroStarted_) {
@@ -194,7 +197,7 @@ bool cs::PoolSynchronizer::isFastMode() const {
 
 void cs::PoolSynchronizer::onTimeOut() {
   CallsQueue::instance().insert([this] {
-    static uint16_t fastCounter = 0;
+    static uint8_t fastCounter = 0;
     if (!isSyncroStarted_) {
       return;
     }
