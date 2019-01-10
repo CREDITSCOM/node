@@ -8,6 +8,7 @@ add_library(net
   include/net/packet.hpp
   include/net/pacmans.hpp
   include/net/transport.hpp
+  include/net/logger.hpp
   src/neighbourhood.cpp
   src/network.cpp
   src/packet.cpp

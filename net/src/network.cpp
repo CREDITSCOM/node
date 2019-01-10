@@ -111,17 +111,11 @@ void Network::readerRoutine(const Config& config) {
 
     if (!lastError) {
       iPacMan_.enQueueLast();
-      csdebug(logger::Net) << "Received packet" << std::endl << task.pack;
+      csdebug(logger::Net) << "Received " << packetSize << " bytes from " << task.sender << " " << task.pack;
     }
     else {
       cserror() << "Cannot receive packet. Error " << lastError;
     }
-
-    csdebug(logger::Net)
-      << "Received packet" << std::endl
-      << task.pack << std::endl
-      << "Read " << packetSize << std::endl
-      << "Returned " << lastError;
   }
 
   cswarning() << "readerRoutine STOPPED!!!\n";
@@ -152,12 +146,9 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   if (lastError || size < encodedSize) {
     cserror() << "Cannot send packet. Error " << lastError;
   }
-
-  csdebug(logger::Net)
-    << "Sent packet" << std::endl
-    << task->pack << std::endl
-    << "Wrote " << size << " bytes of " << encodedSize << std::endl
-    << "Returned " << lastError;
+  else {
+    csdebug(logger::Net) << "Sent " << size << " bytes to " << ep << " " << task->pack;
+  }
 }
 
 void Network::writerRoutine(const Config& config) {
@@ -169,7 +160,6 @@ void Network::writerRoutine(const Config& config) {
 
   while (stopWriterRoutine == false) { //changed from true
     auto task = oPacMan_.getNextTask();
-    csdebug(logger::Net) << "Sent packet" << std::endl << task->pack;
     sendPack(*sock, task, task->endpoint);
   }
 
@@ -232,7 +222,7 @@ void Network::processorRoutine() {
     transport_->redirectPacket(task->pack, remoteSender);
     ++recCounter;
   }
-  LOG_WARN("processorRoutine STOPPED!!!\n");
+  cswarning() << "processorRoutine STOPPED!!!\n";
 }
 
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
