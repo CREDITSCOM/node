@@ -155,48 +155,43 @@ namespace cs
 
   void SmartContracts::onExecutionFinished(const SmartExecutionData& data) {
     csdb::Transaction result = result_from_smart_invoke(data.smartContract);
-    const QueueItem* pqueue_item = nullptr;
     auto it = find_in_queue(data.smartContract);
-    if(it != exe_queue.cend()) {
-      pqueue_item = &(*it);
-      auto pmutable = const_cast<QueueItem*>(pqueue_item);
-      pmutable->status = SmartContractStatus::Finished;
+    if(it != exe_queue.end()) {
+      it->status = SmartContractStatus::Finished;
     }
     else {
       cserror() << name() << ": cannot find in queue just completed contract";
     }
 
-    if (data.result.status.code == 0) {
-      csdebug() << name() << ": execution of smart contract is successful";
-      result.add_user_field(trx_uf::new_state::Value, data.result.contractState);
-    }
-    else {
+    cs::TransactionsPacket packet;
+
+    if(data.result.status.code != 0) {
       cserror() << name() << ": failed to execute smart contract";
-      if(pqueue_item != nullptr) {
+      if(it != exe_queue.end()) {
 
         std::lock_guard<std::mutex> lock(mtx_emit_transaction);
 
-        if(!pqueue_item->created_transactions.empty()) {
-          cswarning() << name() << ": drop " << pqueue_item->created_transactions.size() << " emitted trx";
+        if(!it->created_transactions.empty()) {
+          cswarning() << name() << ": drop " << it->created_transactions.size() << " emitted trx";
+          it->created_transactions.clear();
         }
-        // ignore emitted transactions even if any:
-        pqueue_item = nullptr;
       }
       // result contains empty USRFLD[state::Value]
       result.add_user_field(trx_uf::new_state::Value, std::string {});
+      packet.addTransaction(result);
     }
-
-    cs::TransactionsPacket packet;
-    packet.addTransaction(result);
-    if(data.result.status.code == 0) {
+    else {
+      csdebug() << name() << ": execution of smart contract is successful";
+      result.add_user_field(trx_uf::new_state::Value, data.result.contractState);
+      packet.addTransaction(result);
 
       std::lock_guard<std::mutex> lock(mtx_emit_transaction);
 
-      if(!pqueue_item->created_transactions.empty()) {
-        for(const auto& tr : pqueue_item->created_transactions) {
+      if(it != exe_queue.end() && !it->created_transactions.empty()) {
+        for(const auto& tr : it->created_transactions) {
           packet.addTransaction(tr);
         }
-        cslog() << name() << ": add " << pqueue_item->created_transactions.size() << " emitted trx to contract state";
+        cslog() << name() << ": add " << it->created_transactions.size() << " emitted trx to contract state";
       }
       else {
         cslog() << name() << ": no emitted trx added to contract state";

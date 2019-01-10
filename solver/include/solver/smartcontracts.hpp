@@ -235,10 +235,10 @@ namespace cs
     // locks exe_queue when transaction emitted by smart contract
     std::mutex mtx_emit_transaction;
 
-    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item) const
+    std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
     {
-      auto it = exe_queue.cbegin();
-      for(; it != exe_queue.cend(); ++it) {
+      auto it = exe_queue.begin();
+      for(; it != exe_queue.end(); ++it) {
         if(it->contract == item) {
           break;
         }
