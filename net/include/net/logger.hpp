@@ -5,6 +5,8 @@
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
 
+//#define USE_LOG_NET
+
 namespace logger {
 #ifndef USE_LOG_NET
   using Net = None;
