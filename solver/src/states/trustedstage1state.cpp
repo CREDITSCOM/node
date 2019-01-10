@@ -144,7 +144,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
       }
       else {
-        //TODO: implement appropriate validation of smart-state transactions 
+        //TODO: implement appropriate validation of smart-state transactions
+        cslog() << name() << ": smart new_state trx[" << i << "] included in consensus";
       }
 
       if (byte) {

@@ -254,17 +254,17 @@ public:
     return core.find_stage3(sender);
   }
 
-  bool enough_stage1() const {
-    return (core.stageOneStorage.size() == cnt_trusted());
-  }
+  //bool enough_stage1() const {
+  //  return (core.stageOneStorage.size() == cnt_trusted());
+  //}
 
-  bool enough_stage2() const {
-    return (core.stageTwoStorage.size() == cnt_trusted());
-  }
+  //bool enough_stage2() const {
+  //  return (core.stageTwoStorage.size() == cnt_trusted());
+  //}
 
-  bool enough_stage3() const {
-    return (core.trueStageThreeStorage.size() >= (cnt_trusted() / 2U + 1U) && stage3((uint8_t)own_conf_number()) != nullptr);
-  }
+  //bool enough_stage3() const {
+  //  return (core.trueStageThreeStorage.size() >= (cnt_trusted() / 2U + 1U) && stage3((uint8_t)own_conf_number()) != nullptr);
+  //}
 
   void request_stage1(uint8_t from, uint8_t required);
 

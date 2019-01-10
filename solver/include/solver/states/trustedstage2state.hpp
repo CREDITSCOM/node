@@ -46,6 +46,8 @@ public:
 private:
   cs::StageTwo stage;
 
+  size_t cnt_recv_stages;
+
   // timeout tracking
 
   TimeoutTracking timeout_request_stage;
