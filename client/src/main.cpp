@@ -53,16 +53,16 @@ extern "C" void sigHandler(int sig) {
   std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
   switch (sig) {
     case SIGINT:
-      LOG_WARN("Signal SIGINT received, exiting");
+      cswarning() << "Signal SIGINT received, exiting";
       break;
     case SIGTERM:
-      LOG_WARN("Signal SIGTERM received, exiting");
+      cswarning() << "Signal SIGTERM received, exiting";
       break;
     case SIGHUP:
-      LOG_WARN("Signal SIGHUP received, exiting");
+      cswarning() << "Signal SIGHUP received, exiting";
       break;
     default:
-      LOG_WARN("Uncknown signal received!!!");
+      cswarning() << "Uncknown signal received!!!";
       break;
   }
 }
@@ -70,15 +70,15 @@ extern "C" void sigHandler(int sig) {
 void installSignalHandler() {
   if (SIG_ERR == signal(SIGTERM, sigHandler)) {
     // Handle error
-    LOG_ERROR("Error to set SIGTERM!");
+    cserror() << "Error to set SIGTERM!";
     _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGINT, sigHandler)) {
-    LOG_ERROR("Error to set SIGINT!");
+    cserror() << "Error to set SIGINT!";
     _exit(EXIT_FAILURE);
   }
   if (SIG_ERR == signal(SIGHUP, sigHandler)) {
-    LOG_ERROR("Error to set SIGHUP!");
+    cserror() << "Error to set SIGHUP!";
     _exit(EXIT_FAILURE);
   }
 }
@@ -89,25 +89,25 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   switch (fdwCtrlType) {
       // Handle the CTRL-C signal.
     case CTRL_C_EVENT:
-      LOG_WARN("Ctrl-C event\n\n");
+      cswarning() << "Ctrl-C event\n\n";
       return TRUE;
 
     // CTRL-CLOSE: confirm that the user wants to exit.
     case CTRL_CLOSE_EVENT:
-      LOG_WARN("Ctrl-Close event\n\n");
+      cswarning() << "Ctrl-Close event\n\n";
       return TRUE;
 
       // Pass other signals to the next handler.
     case CTRL_BREAK_EVENT:
-      LOG_WARN("Ctrl-Break event\n\n");
+      cswarning() << "Ctrl-Break event\n\n";
       return TRUE;
 
     case CTRL_LOGOFF_EVENT:
-      LOG_WARN("Ctrl-Logoff event\n\n");
+      cswarning() << "Ctrl-Logoff event\n\n";
       return FALSE;
 
     case CTRL_SHUTDOWN_EVENT:
-      LOG_WARN("Ctrl-Shutdown event\n\n");
+      cswarning() << "Ctrl-Shutdown event\n\n";
       return FALSE;
 
     default:
@@ -198,10 +198,10 @@ int main(int argc, char* argv[]) {
 
   node.run();
 
-  LOG_WARN("+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++");
+  cswarning() << "+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++";
   node.stop();
 
-  LOG_WARN("Exiting Main Function");
+  cswarning() << "Exiting Main Function";
 
   logger::cleanup();
 

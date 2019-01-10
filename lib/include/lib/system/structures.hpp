@@ -370,8 +370,6 @@ inline void CallsQueue::insert(std::function<void()> f) {
   do {
     newElt->next.store(head, std::memory_order_relaxed);
   } while (!head_.compare_exchange_weak(head, newElt, std::memory_order_acquire, std::memory_order_relaxed));
-
-  // LOG_WARN("The head is now " << head_.load(std::memory_order_relaxed));
 }
 
 template <size_t Length>

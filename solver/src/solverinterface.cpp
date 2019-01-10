@@ -103,7 +103,7 @@ namespace cs
 
     // as store result of current round:
     if(Consensus::Log) {
-      LOG_DEBUG("SolverCore: clear all stored round data (block hashes, stages-1..3)");
+      csdebug() << "SolverCore: clear all stored round data (block hashes, stages-1..3)";
     }
 
     recv_hash.clear();
@@ -150,7 +150,7 @@ namespace cs
     }
 
     stageOneStorage.push_back(stage);
-    LOG_NOTICE("SolverCore: <-- stage-1 [" << (int) stage.sender << "] = " << stageOneStorage.size());
+    csinfo() << "SolverCore: <-- stage-1 [" << (int) stage.sender << "] = " << stageOneStorage.size();
 
     if(!pstate) {
       return;
@@ -162,7 +162,7 @@ namespace cs
 
   void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required)
   {
-    LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]");
+    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]";
     const auto ptr = find_stage1(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender,ptr->signature, MsgTypes::FirstStage , requester);
@@ -171,7 +171,7 @@ namespace cs
 
   void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required)
   {
-    LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]");
+    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]";
     const auto ptr = find_stage2(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester);
@@ -180,7 +180,7 @@ namespace cs
 
   void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required)
   {
-    LOG_NOTICE("SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]");
+    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]";
     const auto ptr = find_stage3(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::ThirdStage, requester);
@@ -195,7 +195,7 @@ namespace cs
     }
 
     stageTwoStorage.push_back(stage);
-    LOG_NOTICE("SolverCore: <-- stage-2 [" << (int) stage.sender << "] = " << stageTwoStorage.size());
+    csinfo() << "SolverCore: <-- stage-2 [" << (int) stage.sender << "] = " << stageTwoStorage.size();
 
     if(!pstate) {
       return;
@@ -259,7 +259,7 @@ namespace cs
       break;
     }
 
-    LOG_NOTICE("SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size());
+    csinfo() << "SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size();
 
     if(!pstate) {
       return;

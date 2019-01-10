@@ -276,7 +276,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
     bool encFlag = false;
     if (sk.size() < cscrypto::kPrivateKeySize) {
-      LOG_ERROR("Bad private key file in " << pathToSk);
+      cserror() << "Bad private key file in " << pathToSk;
       return false;
     }
     else if (sk.size() > cscrypto::kPrivateKeySize) {
@@ -301,7 +301,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
       privateKey_ = cscrypto::PrivateKey::readFromBytes(sk);
 
       if (!privateKey_) {
-        LOG_ERROR("Bad private key in " << pathToSk);
+        cserror() << "Bad private key in " << pathToSk;
         return false;
       }
 
@@ -317,10 +317,10 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
           writeFile(pathToSk, sk58tmp);
           cscrypto::FillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
-          LOG_EVENT("Key in " << pathToSk << " has been encrypted successfully");
+          cslog() << "Key in " << pathToSk << " has been encrypted successfully";
         }
         else {
-          LOG_WARN("Not encrypting the private key file due to errors");
+          cslog() << "Not encrypting the private key file due to errors";
         }
       }
     }
@@ -372,7 +372,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
         cscrypto::FillWithZeros(const_cast<uint8_t*>(skBytes.data()), skBytes.size());
 
-        LOG_EVENT("Keys generated");
+        cslog() << "Keys generated";
         break;
       }
       else if (flag == 'q')
@@ -489,26 +489,26 @@ Config Config::readFromFile(const std::string& fileName) {
     result.good_ = true;
   }
   catch (boost::property_tree::ini_parser_error& e) {
-    LOG_ERROR("Couldn't read config file \"" << fileName << "\": " << e.what());
+    cserror() << "Couldn't read config file \"" << fileName << "\": " << e.what();
     result.good_ = false;
   }
   catch (boost::property_tree::ptree_bad_data& e) {
-    LOG_ERROR(e.what() << ": " << e.data<std::string>());
+    cserror() << e.what() << ": " << e.data<std::string>();
   }
   catch (boost::property_tree::ptree_error& e) {
-    LOG_ERROR("Errors in config file: " << e.what());
+    cserror() << "Errors in config file: " << e.what();
   }
   catch (std::invalid_argument& e) {
-    LOG_ERROR("Parsing error at \"" << e.what() << "\".");
+    cserror() << "Parsing error at \"" << e.what() << "\".";
   }
   catch (std::ifstream::failure& e) {
-    LOG_ERROR("Cannot open file: " << e.what());
+    cserror() << "Cannot open file: " << e.what();
   }
   catch (std::exception& e) {
-    LOG_ERROR(e.what());
+    cserror() << e.what();
   }
   catch (...) {
-    LOG_ERROR("Errors in config file");
+    cserror() << "Errors in config file";
   }
 
   return result;

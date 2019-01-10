@@ -19,7 +19,7 @@ void TrustedStage3State::on(SolverContext& context) {
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
     if (Consensus::Log) {
-      LOG_WARN(name() << ": stage one result not found");
+      cswarning() << name() << ": stage one result not found";
     }
   }
   // process already received stage-2, possible to go further to stage-3
@@ -45,27 +45,27 @@ void TrustedStage3State::on(SolverContext& context) {
 
   SolverContext* pctx = &context;
   if (Consensus::Log) {
-    LOG_NOTICE(name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-2 received");
+    csinfo() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-2 received";
   }
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [pctx, this]() {
         if (Consensus::Log) {
-          LOG_NOTICE(name() << ": timeout for stages-2 is expired, make requests");
+          csinfo() << name() << ": timeout for stages-2 is expired, make requests";
         }
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
         if (Consensus::Log) {
-          LOG_NOTICE(name() << ": start subsequent track timeout " << Consensus::T_stage_request
-                            << " ms to request neighbors about stages-2");
+          csinfo() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+                            << " ms to request neighbors about stages-2";
         }
         timeout_request_neighbors.start(
             pctx->scheduler(), Consensus::T_stage_request,
             // timeout #2 handler:
             [pctx, this]() {
               if (Consensus::Log) {
-                LOG_NOTICE(name() << ": timeout for transition is expired, make requests to neighbors");
+                csinfo() << name() << ": timeout for transition is expired, make requests to neighbors";
               }
               request_stages_neighbors(*pctx);
               // timeout #3 handler
@@ -85,12 +85,12 @@ void TrustedStage3State::on(SolverContext& context) {
 void TrustedStage3State::off(SolverContext& /*context*/) {
   if (timeout_request_stage.cancel()) {
     if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout of stages-2");
+      csinfo() << name() << ": cancel track timeout of stages-2";
     }
   }
   if (timeout_request_neighbors.cancel()) {
     if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout to request neighbors about stages-2");
+      csinfo() << name() << ": cancel track timeout to request neighbors about stages-2";
     }
   }
   if(timeout_force_transition.cancel()) {
@@ -232,12 +232,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     cswarning() << "================================================================================";
 
     // all trusted nodes must send stage3 data
-    LOG_NOTICE(name() << ": --> stage-3 [" << (int)stage.sender << "]");
+    csinfo() << name() << ": --> stage-3 [" << (int)stage.sender << "]";
     context.add_stage3(stage);  //, stage.writer != stage.sender);
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
     return Result::Finish;
   }
-  LOG_DEBUG(name() << ": continue to receive stages-2");
+  csdebug() << name() << ": continue to receive stages-2";
   return Result::Ignore;
 }
 
@@ -384,11 +384,11 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
   }
 
-  LOG_NOTICE(name() << ": election table ready");
+  csinfo() << name() << ": election table ready";
   unsigned int max_conf = int(4. + 1.85 * log(candidatesElection.size() / 4.));
   if (candidatesElection.size() < 4) {
     max_conf = (unsigned int)candidatesElection.size();
-    LOG_WARN(name() << ": too few TRUSTED NODES, but we continue at the minimum ...");
+    cswarning() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
   }
 
   for (auto& it : candidatesElection) {
@@ -401,7 +401,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
   }
 
-  //LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
+  //csinfo() << name() << ": HASHES election table ready (" << hashesElection.size() << "):";
   for (auto& it : hashesElection) {
   //  cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), cscrypto::kHashSize) << " - " << (int)it.second;
     if (it.second > cr) {
@@ -453,20 +453,20 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       for (size_t i = 0; i < aboveThreshold.size(); i++) {
         const auto& tmp = aboveThreshold.at(i);
         next_round_trust.push_back(tmp);
-        LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+        csinfo() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
       size_t toAdd = max_conf - next_round_trust.size();
       for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
-        LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+        csinfo() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
     }
     else {
-      LOG_WARN(name() << ": cannot create list of trusted, too few candidates.");
+      cswarning() << name() << ": cannot create list of trusted, too few candidates.";
     }
   }
-  LOG_NOTICE(name() << ": end of trusted election");
+  csinfo() << name() << ": end of trusted election";
 }
 
 bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
