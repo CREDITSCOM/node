@@ -54,7 +54,7 @@ protected:
   void request_stages(SolverContext& context);
   void request_stages_neighbors(SolverContext& context);
   // forces transition to next stage
-  void mark_outbound_nodes(SolverContext& context);
+  void mark_outbound_nodes(SolverContext& context, cs::RoundNumber round);
 
 };
 

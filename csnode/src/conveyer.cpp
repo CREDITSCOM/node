@@ -44,8 +44,8 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     cswarning() << csname() << "Can not add no valid transaction to conveyer";
     return;
   }
-  csdetails() << csname() << "Add valid transaction to conveyer id: " << transaction.innerID() << ", block size: " << pimpl_->transactionsBlock.size();
 
+  csdetails() << csname() << "Add valid transaction to conveyer id: " << transaction.innerID() << ", block size: " << pimpl_->transactionsBlock.size();
   cs::Lock lock(sharedMutex_);
 
   if (pimpl_->transactionsBlock.empty() || (pimpl_->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
@@ -53,6 +53,17 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
   }
 
   pimpl_->transactionsBlock.back().addTransaction(transaction);
+}
+
+void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+  csdebug() << csname() << "Add separate transaction to conveyer";
+  cs::Lock lock(sharedMutex_);
+
+  // add current packet
+  pimpl_->transactionsBlock.push_back(packet);
+
+  // create new to split packets
+  pimpl_->transactionsBlock.push_back(cs::TransactionsPacket());
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {

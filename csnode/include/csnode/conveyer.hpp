@@ -50,6 +50,12 @@ public:
   void addTransaction(const csdb::Transaction& transaction);
 
   ///
+  /// @brief Adds packet to transactions block as monolith entity.
+  /// @param packet Created from outside packet with transactions.
+  ///
+  void addSeparatePacket(const cs::TransactionsPacket& packet);
+
+  ///
   /// @brief Adds transactions packet received by network.
   /// @param packet Created from network transactions packet.
   ///

@@ -88,7 +88,7 @@ Role SolverContext::role() const {
     default:
       break;
   }
-  LOG_ERROR("SolverCore: unknown NodeLevel value " << static_cast<int>(v) << " was returned by Node");
+  cserror() << "SolverCore: unknown NodeLevel value " << static_cast<int>(v) << " was returned by Node";
   // TODO: how to handle "unknown" node level value?
   return Role::Normal;
 }
@@ -163,7 +163,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]");
+  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required);
 }
 
@@ -172,7 +172,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]");
+  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required);
 }
 
@@ -181,7 +181,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  LOG_NOTICE("SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]");
+  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required);
 }
 

@@ -18,9 +18,7 @@ void TrustedStage3State::on(SolverContext& context) {
   stage.sender = (uint8_t)context.own_conf_number();
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
-    if (Consensus::Log) {
-      LOG_WARN(name() << ": stage one result not found");
-    }
+    cswarning() << name() << ": stage one result not found";
   }
   // process already received stage-2, possible to go further to stage-3
   if (!context.stage2_data().empty()) {
@@ -44,36 +42,29 @@ void TrustedStage3State::on(SolverContext& context) {
   //  - create fake stages-2 from outbound nodes and force to next state
 
   SolverContext* pctx = &context;
-  if (Consensus::Log) {
-    LOG_NOTICE(name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-2 received");
-  }
+  csinfo() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-2 received";
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [pctx, this]() {
-        if (Consensus::Log) {
-          LOG_NOTICE(name() << ": timeout for stages-2 is expired, make requests");
-        }
+        csinfo() << name() << ": timeout for stages-2 is expired, make requests";
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        if (Consensus::Log) {
-          LOG_NOTICE(name() << ": start subsequent track timeout " << Consensus::T_stage_request
-                            << " ms to request neighbors about stages-2");
-        }
+        csinfo() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+                            << " ms to request neighbors about stages-2";
         timeout_request_neighbors.start(
             pctx->scheduler(), Consensus::T_stage_request,
             // timeout #2 handler:
             [pctx, this]() {
-              if (Consensus::Log) {
-                LOG_NOTICE(name() << ": timeout for transition is expired, make requests to neighbors");
-              }
+              csinfo() << name() << ": timeout for transition is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
+              cs::RoundNumber rnum = pctx->round();
               // timeout #3 handler
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
-                [pctx, this]() {
+                [pctx, this, rnum]() {
                   cslog() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-                  mark_outbound_nodes(*pctx);
+                  mark_outbound_nodes(*pctx, rnum);
                 },
                 true/*replace if exists*/);
             },
@@ -85,12 +76,12 @@ void TrustedStage3State::on(SolverContext& context) {
 void TrustedStage3State::off(SolverContext& /*context*/) {
   if (timeout_request_stage.cancel()) {
     if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout of stages-2");
+      csinfo() << name() << ": cancel track timeout of stages-2";
     }
   }
   if (timeout_request_neighbors.cancel()) {
     if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout to request neighbors about stages-2");
+      csinfo() << name() << ": cancel track timeout to request neighbors about stages-2";
     }
   }
   if(timeout_force_transition.cancel()) {
@@ -134,13 +125,19 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
 }
 
 // forces transition to next stage
-void TrustedStage3State::mark_outbound_nodes(SolverContext& context)
+void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNumber round)
 {
+  cslog() << name() << ": mark outbound nodes in round #" << round;
   uint8_t cnt = (uint8_t) context.cnt_trusted();
   for(uint8_t i = 0; i < cnt; ++i) {
     if(context.stage2(i) == nullptr) {
       // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+      cslog() << name() << ": making fake stage-2 in round " << round;
       context.fake_stage2(i);
+      // this procedute can cause the round change
+      if (round != context.round()) { 
+        return;
+      }
     }
   }
 }
@@ -156,8 +153,10 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         cslog() << "Comparing with T(" << (int)it.sender << "):";
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
+          cslog() << "Signature of T(" << j << ") in my storage is: " << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
           if (ptr->signatures[j] != it.signatures[j]) {
-            cslog() << "Signature of T(" << j << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size()) << "stage-2 from T(" << (int)it.sender << ") is not equal to mine:" << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
+            cslog() << "Signature of T(" << j << ") sent by T(" << (int)it.sender << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size()) 
+                    << " from stage-2 is not equal to mine";
 
             if(it.hashes[j] == SolverContext::zeroHash) {
               cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (silent)";
@@ -172,7 +171,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
             stream << it.hashes[j];
 
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
-              cslog() << name() << ": [" << (int)j << "] marked as untrusted (bad hash)";
+              cslog() << name() << ": [" << (int)j << "] marked as untrusted (sent bad hash-signature pair of [" << (int)it.sender << "])";
               context.mark_untrusted((uint8_t)j);
             }
             else {
@@ -232,12 +231,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     cswarning() << "================================================================================";
 
     // all trusted nodes must send stage3 data
-    LOG_NOTICE(name() << ": --> stage-3 [" << (int)stage.sender << "]");
+    csinfo() << name() << ": --> stage-3 [" << (int)stage.sender << "]";
     context.add_stage3(stage);  //, stage.writer != stage.sender);
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
     return Result::Finish;
   }
-  LOG_DEBUG(name() << ": continue to receive stages-2");
+  csdebug() << name() << ": continue to receive stages-2";
   return Result::Ignore;
 }
 
@@ -384,11 +383,11 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
   }
 
-  LOG_NOTICE(name() << ": election table ready");
+  csinfo() << name() << ": election table ready";
   unsigned int max_conf = int(4. + 1.85 * log(candidatesElection.size() / 4.));
   if (candidatesElection.size() < 4) {
     max_conf = (unsigned int)candidatesElection.size();
-    LOG_WARN(name() << ": too few TRUSTED NODES, but we continue at the minimum ...");
+    cswarning() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
   }
 
   for (auto& it : candidatesElection) {
@@ -401,7 +400,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
   }
 
-  //LOG_NOTICE(name() << ": HASHES election table ready (" << hashesElection.size() << "):");
+  //csinfo() << name() << ": HASHES election table ready (" << hashesElection.size() << "):";
   for (auto& it : hashesElection) {
   //  cslog() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), cscrypto::kHashSize) << " - " << (int)it.second;
     if (it.second > cr) {
@@ -453,20 +452,20 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
       for (size_t i = 0; i < aboveThreshold.size(); i++) {
         const auto& tmp = aboveThreshold.at(i);
         next_round_trust.push_back(tmp);
-        LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+        csinfo() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
       size_t toAdd = max_conf - next_round_trust.size();
       for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
         next_round_trust.push_back(tmp);
-        LOG_NOTICE(cs::Utils::byteStreamToHex(tmp.data(), tmp.size()));
+        csinfo() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
     }
     else {
-      LOG_WARN(name() << ": cannot create list of trusted, too few candidates.");
+      cswarning() << name() << ": cannot create list of trusted, too few candidates.";
     }
   }
-  LOG_NOTICE(name() << ": end of trusted election");
+  csinfo() << name() << ": end of trusted election";
 }
 
 bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
