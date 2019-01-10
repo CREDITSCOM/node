@@ -337,8 +337,6 @@ public:
     return 0;
   }
 
-  void on_reject(cs::TransactionsPacket& pack) const;
-
   /**
    * @fn  uint32_t SolverContext::round() const;
    *

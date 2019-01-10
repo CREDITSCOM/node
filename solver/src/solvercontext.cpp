@@ -206,9 +206,4 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
   core.pnode->sendRoundTableRequest(respondent2);
 }
 
-void SolverContext::on_reject(cs::TransactionsPacket& pack) const
-{
-  core.psmarts->on_reject(pack);
-}
-
 }  // namespace slv2

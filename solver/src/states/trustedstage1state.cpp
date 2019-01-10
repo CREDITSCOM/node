@@ -219,7 +219,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
       // 3. signal SmartContracts service some trxs are rejected
       if(rejected.transactionsCount() > 0) {
-        context.on_reject(rejected);
+        context.smart_contracts().on_reject(rejected);
       }
     }
 
@@ -249,16 +249,19 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
 bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
-  if(transaction.user_field_ids().size() != 3) {
-    if (transaction.source().is_wallet_id()) {
-      context.blockchain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+  csdb::Address src = transaction.source();
+  //TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
+  // currently will be rejected
+  if(!context.smart_contracts().is_known_smart_contract(src)&& transaction.user_field_ids().size() != 3) {
+    if (src.is_wallet_id()) {
+      context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
 
       csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
                                             data_to_fetch_pulic_key.address_.end());
       return transaction.verify_signature(byte_array);
     }
 
-    return transaction.verify_signature(transaction.source().public_key());
+    return transaction.verify_signature(src.public_key());
   }
   else {
     //TODO: add here code for validating the smart contract transaction 

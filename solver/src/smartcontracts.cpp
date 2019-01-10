@@ -578,6 +578,17 @@ namespace cs
     cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
     cslog() << " \\_____/";
 
+    if(pack.transactionsCount() > 0) {
+      const auto tr = pack.transactions().front();
+      csdb::UserField f = tr.user_field(trx_uf::new_state::Value);
+      if(f.is_valid()) {
+        csdebug() << name() << ": new state size " << f.value<std::string>().size();
+      }
+      else {
+        cserror() << name() << ": trx[0] in packet is not new_state transaction";
+      }
+    }
+
     emit signal_smart_executed(pack);
   }
 
@@ -589,6 +600,9 @@ namespace cs
       cserror() << name() << ": get rejected smart transactions but execution queue is empty";
       return;
     }
+
+    // will contain "unchanged" states of rejected smart contract calls:
+    cs::TransactionsPacket unchanged_pack;
 
     const auto cnt = pack.transactionsCount();
     if(cnt > 0) {
@@ -610,7 +624,7 @@ namespace cs
             // result contains empty USRFLD[state::Value]
             tr.add_user_field(trx_uf::new_state::Value, std::string {});
             if(tr.is_valid()) {
-              Conveyer::instance().addTransaction(tr);
+              unchanged_pack.addTransaction(tr);
             }
             else {
               cserror() << name() << ": failed to fix smart contract failure, remove from execution queue";
@@ -622,6 +636,10 @@ namespace cs
         }
 
         auto it = contract_state.find(absolute_address(t.source()));
+      }
+
+      if(unchanged_pack.transactionsCount() > 0) {
+        Conveyer::instance().addSeparatePacket(unchanged_pack);
       }
     }
     else {

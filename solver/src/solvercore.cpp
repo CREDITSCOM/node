@@ -461,6 +461,8 @@ int cnt = (int)smartConfidants_.size();
       for(const auto& tr : currentSmartTransactionPack_.transactions()) {
         conv.addTransaction(tr);
       }
+      // alternative is correct but does not work - currentSmartTransactionPack_'s hash must be empty:
+      //conv.addSeparatePacket(currentSmartTransactionPack_);
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       cslog() << "Transaction user fields = " << fieldsNumber;
       cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";

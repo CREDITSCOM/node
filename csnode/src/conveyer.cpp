@@ -56,7 +56,8 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
 }
 
 void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
-  csdebug() << csname() << "Add separate transaction to conveyer";
+  csdebug() << csname() << "Add separate transactions packet to conveyer, trxs " << packet.transactionsCount() << ", hash is "
+    << (packet.isHashEmpty() ? "empty" : "not empty");
   cs::Lock lock(sharedMutex_);
 
   // add current packet
