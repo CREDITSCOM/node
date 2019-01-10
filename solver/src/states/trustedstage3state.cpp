@@ -68,12 +68,13 @@ void TrustedStage3State::on(SolverContext& context) {
                 csinfo() << name() << ": timeout for transition is expired, make requests to neighbors";
               }
               request_stages_neighbors(*pctx);
+              cs::RoundNumber rnum = pctx->round();
               // timeout #3 handler
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
-                [pctx, this]() {
+                [pctx, this, rnum]() {
                   cslog() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-                  mark_outbound_nodes(*pctx);
+                  mark_outbound_nodes(*pctx, rnum);
                 },
                 true/*replace if exists*/);
             },
@@ -134,13 +135,19 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
 }
 
 // forces transition to next stage
-void TrustedStage3State::mark_outbound_nodes(SolverContext& context)
+void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNumber round)
 {
+  cslog() << name() << ": mark outbound nodes in round #" << round;
   uint8_t cnt = (uint8_t) context.cnt_trusted();
   for(uint8_t i = 0; i < cnt; ++i) {
     if(context.stage2(i) == nullptr) {
       // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+      cslog() << name() << ": making fake stage-2 in round " << round;
       context.fake_stage2(i);
+      // this procedute can cause the round change
+      if (round != context.round()) { 
+        return;
+      }
     }
   }
 }
@@ -156,8 +163,10 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         cslog() << "Comparing with T(" << (int)it.sender << "):";
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
+          cslog() << "Signature of T(" << j << ") in my storage is: " << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
           if (ptr->signatures[j] != it.signatures[j]) {
-            cslog() << "Signature of T(" << j << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size()) << "stage-2 from T(" << (int)it.sender << ") is not equal to mine:" << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
+            cslog() << "Signature of T(" << j << ") sent by T(" << (int)it.sender << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size()) 
+                    << " from stage-2 is not equal to mine";
 
             if(it.hashes[j] == SolverContext::zeroHash) {
               cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (silent)";
@@ -172,7 +181,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
             stream << it.hashes[j];
 
             if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
-              cslog() << name() << ": [" << (int)j << "] marked as untrusted (bad hash)";
+              cslog() << name() << ": [" << (int)j << "] marked as untrusted (sent bad hash-signature pair of [" << (int)it.sender << "])";
               context.mark_untrusted((uint8_t)j);
             }
             else {
