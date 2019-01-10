@@ -84,26 +84,4 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
 // alias
 #define cslog(...) csinfo(__VA_ARGS__)
 
-// deprecated (useless legacy macros)
-
-#define csfile() csdebug(logger::File)
-
-#define csderror(...) cserror(__VA_ARGS__)
-
-#define csdinfo(...) csinfo(__VA_ARGS__)
-
-#define csdwarning(...) cswarning(__VA_ARGS__)
-
-#define LOG_DEBUG(TEXT) csdebug() << TEXT
-
-#define LOG_NOTICE(TEXT) csinfo() << TEXT
-#define LOG_EVENT(TEXT) csinfo() << TEXT
-
-#define LOG_WARN(TEXT) cswarning() << TEXT
-
-#define LOG_ERROR(TEXT) cserror() << TEXT
-
-#define LOG_IN_PACK(DATA, SIZE) csdebug() << "-!> " << logging::dump((const char*)(DATA), (SIZE))
-#define LOG_OUT_PACK(DATA, SIZE) csdebug() << "<!- " << logging::dump((const char*)(DATA), (SIZE))
-
 #endif  // LOGGER_HPP

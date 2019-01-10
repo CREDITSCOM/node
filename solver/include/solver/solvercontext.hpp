@@ -164,6 +164,17 @@ public:
     return *core.pws;
   }
 
+  /**
+   * @fn    cs::SmartContracts& SolverContext::smart_contracts() const
+   *
+   * @brief Smart contracts
+   *
+   * @author    Alexander Avramenko
+   * @date  10.01.2019
+   *
+   * @return    A reference to the cs::SmartContracts.
+   */
+
   cs::SmartContracts& smart_contracts() const
   {
     return *core.psmarts;
@@ -254,18 +265,6 @@ public:
     return core.find_stage3(sender);
   }
 
-  bool enough_stage1() const {
-    return (core.stageOneStorage.size() == cnt_trusted());
-  }
-
-  bool enough_stage2() const {
-    return (core.stageTwoStorage.size() == cnt_trusted());
-  }
-
-  bool enough_stage3() const {
-    return (core.trueStageThreeStorage.size() >= (cnt_trusted() / 2U + 1U) && stage3((uint8_t)own_conf_number()) != nullptr);
-  }
-
   void request_stage1(uint8_t from, uint8_t required);
 
   void request_stage2(uint8_t from, uint8_t required);
@@ -330,11 +329,6 @@ public:
       }
     }
   }
-
-  // bool is_untrusted(uint8_t sender) const
-  //{
-  //    return untrusted_value(sender) > 0;
-  //}
 
   uint8_t untrusted_value(uint8_t sender) const {
     if (sender < Consensus::MaxTrustedNodes) {

@@ -14,9 +14,7 @@ void HandleRTState::on(SolverContext& context) {
       context.request_role(Role::Normal);
       break;
     default:
-      if (Consensus::Log) {
-        LOG_ERROR(name() << ": unknown role requested");
-      }
+      cserror() << name() << ": unknown role requested";
       break;
   }
 }

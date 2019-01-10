@@ -6,6 +6,7 @@ namespace cs {
 void TrustedPostStageState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
+  cnt_recv_stages = 0;
   //// decide to write
   // const auto ptr = context.stage3((uint8_t) context.own_conf_number());
   // if(ptr != nullptr) {
@@ -16,24 +17,27 @@ void TrustedPostStageState::on(SolverContext& context) {
   //}
 
   // process already received stage-3, possible to go further to waiting/writting state
-  for (const auto& st : context.stage3_data()) {
-    if (Result::Finish == onStage3(context, st)) {
+  if(!context.stage3_data().empty()) {
+    cslog() << name() << ": handle early received stages-3";
+    bool finish = false;
+    for(const auto& st : context.stage3_data()) {
+      if(Result::Finish == onStage3(context, st)) {
+        finish = true;
+      }
+    }
+    if(finish) {
       context.complete_post_stage();
       return;
     }
   }
 
   SolverContext* pctx = &context;
-  if (Consensus::Log) {
-    LOG_NOTICE(name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received");
-  }
+  cslog() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received";
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [pctx, this]() {
-        if (Consensus::Log) {
-          LOG_NOTICE(name() << ": timeout for stages-3 is expired, make requests");
-        }
+        csinfo() << name() << ": timeout for stages-3 is expired, make requests";
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
         cslog() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
@@ -59,14 +63,10 @@ void TrustedPostStageState::on(SolverContext& context) {
 
 void TrustedPostStageState::off(SolverContext& /*context*/) {
   if (timeout_request_stage.cancel()) {
-    if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout of stages-3");
-    }
+    csinfo() << name() << ": cancel track timeout of stages-3";
   }
   if (timeout_request_neighbors.cancel()) {
-    if (Consensus::Log) {
-      LOG_NOTICE(name() << ": cancel track timeout to request neighbors about stages-3");
-    }
+    csinfo() << name() << ": cancel track timeout to request neighbors about stages-3";
   }
   if(timeout_force_transition.cancel()) {
     cslog() << name() << ": cancel track timeout to force transition to next state";
@@ -104,8 +104,9 @@ void TrustedPostStageState::request_stages_neighbors(SolverContext& context) {
 }
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
-  if (context.enough_stage3()) {
-    LOG_NOTICE(name() << ": enough stage-3 received");
+  ++cnt_recv_stages;
+  if(cnt_recv_stages >= context.cnt_trusted() / 2U + 1U) {
+    csinfo() << name() << ": enough stage-3 received";
     return Result::Finish;
   }
   return Result::Ignore;

@@ -1176,7 +1176,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   istream_ >> subRound;
 
   if (subRound != subRound_) {
-    cswarning() << "NODE> We got stage-1 for the Node with SUBROUND, we don't have";
+    cswarning() << "NODE> ignore stage-1 with subround #" << subRound << ", required #" << subRound_;
     return;
   }
 

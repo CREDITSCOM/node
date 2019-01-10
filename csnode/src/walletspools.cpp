@@ -69,12 +69,12 @@ WalletsPoolsImpl::WalletsPoolsImpl(csdb::Address genesisAddress, csdb::Address s
 : genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletsIds_(walletsIds) {
-  /*LOG_NOTICE(__FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash));
-  LOG_NOTICE(__FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
-  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData)); LOG_NOTICE(__FUNCTION__ << ":
+  /*csinfo() << __FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash);
+  csinfo() << __FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
+  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData); csinfo() << __FUNCTION__ << ":
   sizeof(WalletData::PoolsHashes)=" << sizeof(WalletData::PoolsHashes) << " alignof(WalletData::PoolsHashes)=" <<
-  alignof(WalletData::PoolsHashes)); LOG_NOTICE(__FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
-  alignof(WalletData)=" << alignof(WalletData));*/
+  alignof(WalletData::PoolsHashes); csinfo() << __FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
+  alignof(WalletData)=" << alignof(WalletData);*/
 }
 
 WalletsPoolsImpl::~WalletsPoolsImpl() {
@@ -84,8 +84,8 @@ template <Direction Dir>
 void WalletsPoolsImpl::load(csdb::Pool& curr) {
   PoolHash poolHash;
   WalletsPools::convert(curr.hash(), poolHash);
-  // LOG_NOTICE(__FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
-  // curr.transactions_count());
+  // csinfo() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
+  // curr.transactions_count();
 
   for (size_t i = 0; i < curr.transactions_count(); i++) {
     csdb::Transaction tr = curr.transaction(i);
@@ -107,7 +107,7 @@ void WalletsPoolsImpl::loadTrxForSource(csdb::Transaction& tr, const PoolHash& p
     return;
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
-    LOG_ERROR("Cannot find source wallet");
+    cserror() << "Cannot find source wallet";
     return;
   }
   auto* walData = findWalletData(id);
@@ -125,7 +125,7 @@ void WalletsPoolsImpl::loadTrxForTarget(csdb::Transaction& tr, const PoolHash& p
     return;
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
-    LOG_ERROR("Cannot find target wallet");
+    cserror() << "Cannot find target wallet";
     return;
   }
   auto* walData = findWalletData(id);

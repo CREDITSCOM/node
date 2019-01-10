@@ -19,7 +19,7 @@ WalletsIds::Normal::Normal(WalletsIds& norm)
 bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id) {
   if (address.is_wallet_id()) {
     if (id != address.wallet_id()) {
-      LOG_ERROR("Wrong address");
+      cserror() << "Wrong address";
     }
     return false;
   }
@@ -33,7 +33,7 @@ bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id) {
     }
     return res.second;
   }
-  LOG_ERROR("Wrong address");
+  cserror() << "Wrong address";
   return false;
 }
 
@@ -49,7 +49,7 @@ bool WalletsIds::Normal::find(const WalletAddress& address, WalletId& id) const 
     id = it->second;
     return true;
   }
-  LOG_ERROR("Wrong address");
+  cserror() << "Wrong address";
   return false;
 }
 
@@ -65,7 +65,7 @@ bool WalletsIds::Normal::findaddr(const WalletId& id, WalletAddress& address) co
   if (flgfind)
     return true;
 
-  LOG_ERROR("Wrong WalletId");
+  cserror() << "Wrong WalletId";
   return false;
 }
 
@@ -84,7 +84,7 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
     id = res.first->second;
     return res.second;
   }
-  LOG_ERROR("Wrong address");
+  cserror() << "Wrong address";
   return false;
 }
 
@@ -146,7 +146,7 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
     }
     return true;
   }
-  LOG_ERROR("Wrong address");
+  cserror() << "Wrong address";
   return false;
 }
 
@@ -165,7 +165,7 @@ bool WalletsIds::Special::findAnyOrInsertSpecial(const WalletAddress& address, W
     id = res.first->second;
     return true;
   }
-  LOG_ERROR("Wrong address");
+  cserror() << "Wrong address";
   return false;
 }
 

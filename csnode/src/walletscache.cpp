@@ -117,7 +117,7 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, 
     WalletId confidantId{};
     csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
     if (!findWalletId(confidantAddress, confidantId)) {
-      LOG_ERROR("Cannot find confidant wallet, source is " << confidantAddress.to_string());
+      cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
       return;
     }
     WalletData& walletData = getWalletData(confidantId, confidantAddress);
@@ -138,7 +138,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     return 0;
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
-    LOG_ERROR("Cannot find source wallet, source is " << wallAddress.to_string());
+    cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
     return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
@@ -166,7 +166,7 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
     return;
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
-    LOG_ERROR("Cannot find target wallet, target is " << wallAddress.to_string());
+    cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
     return;
   }
 
@@ -229,7 +229,7 @@ void WalletsCache::Initer::setModified(WalletId) {
 void WalletsCache::Updater::setModified(WalletId id) {
   modified_.resize(data_.wallets_.size());
   if (id >= modified_.size()) {
-    LOG_ERROR("id >= modified_.size: id=" << id << " modified_.size=" << modified_.size());
+    cserror() << "id >= modified_.size: id=" << id << " modified_.size=" << modified_.size();
     return;
   }
   modified_.set(id);
@@ -243,14 +243,14 @@ bool WalletsCache::Initer::moveData(WalletId srcIdSpecial, WalletId destIdNormal
   if (srcIdSpecial >= walletsSpecial_.size())
     return false;
   if (!walletsSpecial_[srcIdSpecial]) {
-    LOG_ERROR("Src wallet data should not be empty");
+    cserror() << "Src wallet data should not be empty";
     return false;
   }
 
   if (destIdNormal >= data_.wallets_.size())
     data_.wallets_.resize(destIdNormal + 1);
   if (data_.wallets_[destIdNormal]) {
-    LOG_ERROR("Dest wallet data should be empty");
+    cserror() << "Dest wallet data should be empty";
     //        return false; // examine it
   }
   data_.wallets_[destIdNormal] = walletsSpecial_[srcIdSpecial];
@@ -261,7 +261,7 @@ bool WalletsCache::Initer::moveData(WalletId srcIdSpecial, WalletId destIdNormal
 bool WalletsCache::Initer::isFinishedOk() const {
   for (const auto& ptr : walletsSpecial_) {
     if (ptr) {
-      LOG_ERROR("Some new wallet was not added to block");
+      cserror() << "Some new wallet was not added to block";
       return false;
     }
   }
@@ -299,7 +299,7 @@ void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData:
 {
   PoolHash poolHash;
   convert(curr.hash(), poolHash);
-  //LOG_NOTICE(__FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count());
+  //csinfo() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count();
 
   const uint64_t timeStamp = atoll(curr.user_field(0).value<std::string>().c_str());
 

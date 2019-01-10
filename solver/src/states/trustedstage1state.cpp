@@ -144,7 +144,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
       }
       else {
-        //TODO: implement appropriate validation of smart-state transactions 
+        //TODO: implement appropriate validation of smart-state transactions
+        cslog() << name() << ": smart new_state trx[" << i << "] included in consensus";
       }
 
       if (byte) {
@@ -179,7 +180,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in build_vector()";
+      cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart
@@ -198,7 +199,9 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     }
     if(!smart_rejected.empty()) {
       cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
-      // 2. reject all trxs from those smarts
+      cs::TransactionsPacket rejected;
+
+      // 2. reject all trxs from those smarts & collect all rejected trxs
       size_t cnt_add_rejected = 0;
       for(auto it = transactions.begin(); it != transactions.end(); ++it) {
         if(smart_rejected.count(it->source()) > 0) {
@@ -207,10 +210,16 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
             *itm = 0;
             ++cnt_add_rejected;
           }
+          rejected.addTransaction(*it);
         }
       }
       if(cnt_add_rejected > 0) {
         cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+      }
+
+      // 3. signal SmartContracts service some trxs are rejected
+      if(rejected.transactionsCount() > 0) {
+        context.smart_contracts().on_reject(rejected);
       }
     }
 
@@ -221,7 +230,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   conveyer.setCharacteristic(characteristic, context.round());
 
   if (characteristic.mask.size() != transactionsCount) {
-    cserror() << "Trusted-1: characteristic mask size not equals transactions count in build_vector()";
+    cserror() << name() << ": characteristic mask size not equals transactions count in build_vector()";
   }
 
   cs::Hash hash;
@@ -240,16 +249,19 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
 bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
-  if(transaction.user_field_ids().size() != 3) {
-    if (transaction.source().is_wallet_id()) {
-      context.blockchain().findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
+  csdb::Address src = transaction.source();
+  //TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
+  // currently will be rejected
+  if(!context.smart_contracts().is_known_smart_contract(src)&& transaction.user_field_ids().size() != 3) {
+    if (src.is_wallet_id()) {
+      context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
 
       csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
                                             data_to_fetch_pulic_key.address_.end());
       return transaction.verify_signature(byte_array);
     }
 
-    return transaction.verify_signature(transaction.source().public_key());
+    return transaction.verify_signature(src.public_key());
   }
   else {
     //TODO: add here code for validating the smart contract transaction 

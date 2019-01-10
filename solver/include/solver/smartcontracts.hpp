@@ -165,7 +165,11 @@ namespace cs
     void enqueue(csdb::Pool block, size_t trx_idx);
     void on_completed(csdb::Pool block, size_t trx_idx);
 
-    void set_execution_result(cs::TransactionsPacket pack) const;
+    void set_execution_result(cs::TransactionsPacket& pack) const;
+
+    // get & handle rejected transactions
+    // usually ordinary consensus may reject smart-related transactions
+    void on_reject(cs::TransactionsPacket& pack);
 
     csconnector::connector::ApiHandlerPtr get_api() const
     {
@@ -174,7 +178,7 @@ namespace cs
 
     const char* name() const
     {
-      return "Smarts";
+      return "Smart";
     }
 
     csdb::Address absolute_address(csdb::Address optimized_address) const
@@ -235,10 +239,10 @@ namespace cs
     // locks exe_queue when transaction emitted by smart contract
     std::mutex mtx_emit_transaction;
 
-    std::vector<QueueItem>::const_iterator find_in_queue(const SmartContractRef& item) const
+    std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
     {
-      auto it = exe_queue.cbegin();
-      for(; it != exe_queue.cend(); ++it) {
+      auto it = exe_queue.begin();
+      for(; it != exe_queue.end(); ++it) {
         if(it->contract == item) {
           break;
         }
@@ -274,7 +278,7 @@ namespace cs
 
     // makes a transaction to store new_state of smart contract invoked by src
     // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction result_from_smart_invoke(const SmartContractRef& contract) const;
+    csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
   };
 
 } // cs

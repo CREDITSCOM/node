@@ -42,6 +42,7 @@ protected:
   TimeoutTracking timeout_request_neighbors;
   TimeoutTracking timeout_force_transition;
   
+  size_t cnt_recv_stages;
   cs::StageThree stage;
   std::vector<cs::PublicKey> next_round_trust;
   std::vector<cs::TransactionsPacketHash> next_round_hashes;
@@ -53,7 +54,7 @@ protected:
   void request_stages(SolverContext& context);
   void request_stages_neighbors(SolverContext& context);
   // forces transition to next stage
-  void mark_outbound_nodes(SolverContext& context);
+  void mark_outbound_nodes(SolverContext& context, cs::RoundNumber round);
 
 };
 
