@@ -3,7 +3,6 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/keys.hpp>
 #include <lib/system/utils.hpp>
-#include <logger.hpp>
 
 #include "network.hpp"
 #include "transport.hpp"

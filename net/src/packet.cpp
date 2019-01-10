@@ -7,8 +7,7 @@
 
 RegionAllocator Message::allocator_(1 << 26, 4);
 
-enum Lengths
-{
+enum Lengths {
   FragmentedHeader = 36
 };
 
@@ -39,13 +38,13 @@ bool Packet::isHeaderValid() const {
     }
   }
 
-  if(size() <= getHeadersLength()) {
+  if (size() <= getHeadersLength()) {
     cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")"
-      << (this->isNetwork() ? ", network" : "")
-      << (this->isFragmented() ? ", fragmeted" : "")
-              <<  ", type " << getMsgTypesString(this->getType()) << "(" << (int) this->getType() << ")";
+              << (this->isNetwork() ? ", network" : "") << (this->isFragmented() ? ", fragmeted" : "") << ", type "
+              << getMsgTypesString(this->getType()) << "(" << (int)this->getType() << ")";
     return false;
   }
+
   return true;
 }
 

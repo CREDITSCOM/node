@@ -6,6 +6,7 @@
 #define NODE_API
 #define AJAX_IFACE
 #define SPAMMER
+//#define LOG_NET
 
 #define BOTTLENECKED_SMARTS
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
