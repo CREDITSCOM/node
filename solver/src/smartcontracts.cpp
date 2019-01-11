@@ -543,7 +543,7 @@ namespace cs
 
       // run async and watch result
       auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-      cs::Connector::connect(watcher->finished, this, &SmartContracts::onExecutionFinished);
+      cs::Connector::connect(&watcher->finished, this, &SmartContracts::onExecutionFinished);
 
       executions_.push_back(std::move(watcher));
 

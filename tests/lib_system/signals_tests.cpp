@@ -40,11 +40,90 @@ TEST(Signals, BaseSignalUsingByPointer) {
 
   cs::Connector::connect(&a.signal, &b, &B::onSignalSlot);
 
-  std::cout << cs::Connector::callbacks(a.signal) << std::endl;
-  ASSERT_EQ(cs::Connector::callbacks(a.signal), 1);
+  std::cout << cs::Connector::callbacks(&a.signal) << std::endl;
+  ASSERT_EQ(cs::Connector::callbacks(&a.signal), 1);
 
   a.generateSignal(expectedString);
   a.generateSignal(expectedString);
 
   ASSERT_EQ(b.callsCount(), expectedCalls);
+}
+
+TEST(Signals, ConnectAndDisconnect) {
+  struct Signaller {
+  public signals:
+    cs::Signal<void()> signal;
+  };
+
+  class A {
+  public:
+    size_t callsCount() const {
+      return callsCount_;
+    }
+
+  private:
+    size_t callsCount_ = 0;
+
+  public slots:
+    void onSignal() {
+      ++callsCount_;
+      std::cout << "OnSignal A, count " << callsCount_ << std::endl;
+    }
+  };
+
+  class B {
+  public:
+    size_t callsCount() const {
+      return callsCount_;
+    }
+
+  private:
+    size_t callsCount_ = 0;
+
+  public slots:
+    void onSignal() {
+      ++callsCount_;
+      std::cout << "OnSignal B, count " << callsCount_ << std::endl;
+    }
+  };
+
+  Signaller signaller;
+  A a;
+  B b;
+
+  cs::Connector::connect(&signaller.signal, &a, &A::onSignal);
+  cs::Connector::connect(&signaller.signal, &b, &B::onSignal);
+
+  // generate signal
+  emit signaller.signal();
+
+  ASSERT_EQ(a.callsCount(), 1);
+  ASSERT_EQ(b.callsCount(), 1);
+
+  bool result = cs::Connector::disconnect(&signaller.signal, &a, &A::onSignal);
+  ASSERT_EQ(result, true);
+
+  emit signaller.signal();
+
+  ASSERT_EQ(a.callsCount(), 1);
+  ASSERT_EQ(b.callsCount(), 2);
+
+  ASSERT_EQ(cs::Connector::callbacks(&signaller.signal), 1);
+
+  result = cs::Connector::disconnect(&signaller.signal, &b, &B::onSignal);
+  ASSERT_EQ(result, true);
+
+  emit signaller.signal();
+
+  ASSERT_EQ(a.callsCount(), 1);
+  ASSERT_EQ(b.callsCount(), 2);
+
+  ASSERT_EQ(cs::Connector::callbacks(&signaller.signal), 0);
+
+  cs::Connector::connect(&signaller.signal, &a, &A::onSignal);
+
+  emit signaller.signal();
+
+  ASSERT_EQ(a.callsCount(), 2);
+  ASSERT_EQ(b.callsCount(), 2);
 }

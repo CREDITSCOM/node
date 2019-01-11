@@ -544,7 +544,7 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
-  cs::Connector::disconnect(blockChain_->writeBlockEvent);
+  cs::Connector::disconnect(&blockChain_->writeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();
   }

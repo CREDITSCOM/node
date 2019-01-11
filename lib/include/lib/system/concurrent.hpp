@@ -175,7 +175,7 @@ protected:
         Super::callSignal(signal);
       }
       catch (std::exception& e) {
-        cserror() << "Concurrent execution with" << typeid(Result).name() << "failed, " << e.what();
+        cserror() << "Concurrent execution with " << typeid(Result).name() << " failed, " << e.what();
         emit failed();
       }
     };
