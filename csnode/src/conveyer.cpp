@@ -56,8 +56,7 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
 }
 
 void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
-  csdebug() << csname() << "Add separate transactions packet to conveyer, trxs " << packet.transactionsCount() << ", hash is "
-    << (packet.isHashEmpty() ? "empty" : "not empty");
+  csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
   cs::Lock lock(sharedMutex_);
 
   // add current packet
@@ -543,7 +542,7 @@ void cs::ConveyerBase::flushTransactions() {
   for (auto& packet : pimpl_->transactionsBlock) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
-    if ((transactionsCount != 0u) && packet.isHashEmpty()) {
+    if ((transactionsCount != 0u)) {
       packet.makeHash();
 
       // try to send save in node
