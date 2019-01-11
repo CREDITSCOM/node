@@ -239,8 +239,11 @@ TEST(Conveyer, MainLogic) {
   ASSERT_EQ(characteristic_hash, expectedHash);
 
   cs::PublicKey pk;
+  std::fill(pk.begin(), pk.end(), 0);
+
   csdb::PoolHash ph;
   cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber};
+
   auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 
   ASSERT_TRUE(pool.has_value());
