@@ -210,6 +210,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   pnode->prepareMetaForSending(table, currentTimeStamp);
 }
 
+//smart-part begin VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
   std::vector<cs::PublicKey> SolverCore::smartConfidants() {
     return smartConfidants_;
   }
@@ -384,11 +385,11 @@ int cnt = (int)smartConfidants_.size();
       if (st.signatures[i] != myStage2.signatures[i]) {
         if (cscrypto::VerifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
           ++(smartUntrusted.at(i));
-          cslog() << "Confidant [" << i << "] is markt as UNTRUSTED: hash";
+          cslog() << "Confidant [" << i << "] is marked as UNTRUSTED: hash";
         }
         else {
           ++(smartUntrusted.at(st.sender));
-          cslog() << "Confidant [" << (int)st.sender << "] is markt as UNTRUSTED: signature";
+          cslog() << "Confidant [" << (int)st.sender << "] is marked as UNTRUSTED: signature";
         }
       }
     }
@@ -456,7 +457,7 @@ int cnt = (int)smartConfidants_.size();
 
   void SolverCore::createFinalTransactionSet() {
     cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
-    if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
+    //if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
       auto& conv = cs::Conveyer::instance();
       
       //for(const auto& tr : currentSmartTransactionPack_.transactions()) {
@@ -469,8 +470,8 @@ int cnt = (int)smartConfidants_.size();
       cslog() << "Transaction user fields = " << fieldsNumber;
       cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
       return;
-    }
-    cslog() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
+    //}
+    //cslog() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
   void SolverCore::gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber) {
@@ -675,6 +676,8 @@ int cnt = (int)smartConfidants_.size();
     }
     return false;
   }
+
+  //smart-part end AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
   uint8_t SolverCore::subRound() {
     return (pnode->subRound());
