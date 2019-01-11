@@ -121,6 +121,9 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
   const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
   const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
 
+  // TODO Think, do really need this here?!
+  // refreshNeighbours();
+
   for (auto& pool : poolsBlock) {
     const auto sequence = pool.sequence();
 
@@ -556,6 +559,14 @@ void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
   for (const auto& neighbour : neighbours_) {
     ConnectionPtr target = transport_->getNeighbourByNumber(neighbour.index());
 
-    csdebug() << "POOL SYNCHRONIZER> " << funcName << " neighbour: " << target->getOut() << ", " << neighbour;
+    if (target) {
+      csdebug() << "POOL SYNCHRONIZER> " << funcName
+                << " neighbour: " << target->getOut() << ", " << neighbour;
+    }
+    else {
+      csdebug() << "POOL SYNCHRONIZER> " << funcName
+                << " Neighbour index: " << neighbour.index()
+                << ", does not contained in transport. Neighbours сount: " << transport_->getNeighboursCount();
+    }
   }
 }
