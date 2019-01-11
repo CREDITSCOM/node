@@ -543,16 +543,17 @@ void cs::ConveyerBase::flushTransactions() {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     if ((transactionsCount != 0u)) {
-      packet.makeHash();
+      if (packet.isHashEmpty()) {
+        if (!packet.makeHash()) {
+          cserror() << csname() << "Transaction packet hashing failed";
+          continue;
+        }
+      }
 
       // try to send save in node
       pimpl_->flushPacket(packet);
 
       auto hash = packet.hash();
-
-      if (hash.isEmpty()) {
-        cserror() << csname() << "Transaction packet hashing failed";
-      }
 
       if (pimpl_->packetsTable.count(hash) == 0u) {
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));

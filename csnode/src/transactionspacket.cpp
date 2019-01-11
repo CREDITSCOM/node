@@ -126,8 +126,13 @@ cs::Bytes TransactionsPacket::toBinary() const noexcept {
 }
 
 bool TransactionsPacket::makeHash() {
-  m_hash = TransactionsPacketHash::calcFromData(toBinary());
-  return !isHashEmpty();
+  bool isEmpty = isHashEmpty();
+
+  if (isEmpty) {
+    m_hash = TransactionsPacketHash::calcFromData(toBinary());
+  }
+
+  return isEmpty;
 }
 
 bool TransactionsPacket::isHashEmpty() const noexcept {
