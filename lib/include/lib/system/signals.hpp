@@ -1,6 +1,8 @@
 #ifndef SIGNALS_HPP
 #define SIGNALS_HPP
 
+#include <lib/system/utils.hpp>
+
 #include <functional>
 #include <vector>
 
@@ -25,7 +27,7 @@ class Signal<Return(InArgs...)> {
 public:
   using Argument = std::function<Return(InArgs...)>;
   using Signature = Return(InArgs...);
-  using Slots = std::vector<Argument>;
+  using Slots = std::vector<std::pair<void*, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -33,9 +35,10 @@ public:
   ///
   template <typename... Args>
   inline void operator()(Args&&... args) const {
-    for (auto& elem : slots_) {
-      if (elem) {
-        elem(std::forward<Args>(args)...);
+    for ([[maybe_unused]] auto& [obj, func] : slots_) {
+      csunused(obj);
+      if (func) {
+        func(std::forward<Args>(args)...);
       }
     }
   }
@@ -63,14 +66,14 @@ public:
 private:
   // adds slot to signal
   template <typename T>
-  auto& add(T&& s) {
+  auto& add(T&& s, void* obj = nullptr) {
     Argument arg = s;
 
     if (!arg) {
       return *this;
     }
 
-    slots_.push_back(arg);
+    slots_.push_back(std::make_pair(obj, std::move(arg)));
     return *this;
   }
 
@@ -83,9 +86,16 @@ private:
     return *this;
   }
 
-  // returns size of slots
   std::size_t size() const noexcept {
     return slots_.size();
+  }
+
+  Slots& content() noexcept {
+    return slots_;
+  }
+
+  const Slots& content() const noexcept {
+    return slots_;
   }
 
   // all connected slots
@@ -105,7 +115,7 @@ class Signal<std::function<T>> {
 public:
   using Argument = std::function<T>;
   using Signature = T;
-  using Slots = std::vector<Argument>;
+  using Slots = std::vector<std::pair<void*, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -137,20 +147,27 @@ public:
 private:
   // adds slot to signal
   template <typename U>
-  inline auto& add(U&& s) {
-    signal_.add(std::forward<U>(s));
+  auto& add(U&& s, void* obj = nullptr) {
+    signal_.add(std::forward<U>(s), obj);
     return *this;
   }
 
   // clears all slots
-  inline auto& operator=(void* ptr) {
+  auto& operator=(void* ptr) {
     signal_ = ptr;
     return *this;
   }
 
-  // returns size of signal slots
-  inline std::size_t size() const noexcept {
+  std::size_t size() const noexcept {
     return signal_.size();
+  }
+
+  Slots& content() noexcept {
+    return signal_.content();
+  }
+
+  const Slots& content() const noexcept {
+    return signal_.content();
   }
 
   Signal<Signature> signal_;
@@ -305,68 +322,13 @@ public:
   ~Connector() = default;
 
   ///
-  /// @brief Connects signal with callback.
-  /// @param signal Any signal object.
-  /// @param slotObj Method object owner.
-  /// @param slot Pointer to method.
-  ///
-  template <typename Signal, typename T, typename Slot>
-  inline static void connect(Signal& signal, const T& slotObj, Slot&& slot) {
-    constexpr int size = Args::GetArguments<Slot>();
-    signal.add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)));
-  }
-
-  ///
-  /// @brief Connects signal with callback.
-  /// @param signal Any signal object.
-  /// @param slotObj Method object owner.
-  /// @param slot Pointer to method.
-  ///
-  template <typename Signal, typename T, typename Slot>
-  inline static void connect(const Signal& signal, const T& slotObj, Slot&& slot) {
-    constexpr int size = Args::GetArguments<Slot>();
-    const_cast<Signal*>(&signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)));
-  }
-
-  ///
-  /// @brief Connects signal with callback.
-  /// @param signal Any signal object.
-  /// @param slot Function/lambda/closure.
-  ///
-  template <typename Signal>
-  inline static void connect(Signal& signal, typename Signal::Argument slot) {
-    signal.add(slot);
-  }
-
-  ///
-  /// @brief Connects signal with lambda or function.
-  /// @param signal Any signal object.
-  /// @param slot Function or lambda/closure.
-  ///
-  template <typename Signal>
-  inline static void connect(const Signal& signal, typename Signal::Argument slot) {
-    const_cast<Signal*>(&signal)->add(slot);
-  }
-
-  ///
   /// @brief Connects signal pointer with lambda or function.
   /// @param signal Any signal pointer.
   /// @param slot Function or lambda/closure.
   ///
-  template <typename Signal>
-  inline static void connect(Signal* signal, typename Signal::Argument slot) {
-    cs::Connector::connect(*signal, slot);
-  }
-
-  ////
-  /// @brief Connects signal pointer with objects method.
-  /// @param signal Any signal pointer.
-  /// @param slotObj Pointer to slot object.
-  /// @param slot Method pointer.
-  ///
-  template <typename Signal, typename T, typename Slot>
-  inline static void connect(Signal* signal, const T& slotObj, Slot&& slot) {
-    cs::Connector::connect(*signal, slotObj, std::forward<Slot>(slot));
+  template <template <typename> typename Signal, typename T>
+  static void connect(const Signal<T>* signal, typename Signal<T>::Argument slot) {
+    const_cast<Signal<T>*>(signal)->add(slot);
   }
 
   ///
@@ -375,9 +337,11 @@ public:
   /// @param slotObj Pointer to slot object.
   /// @param slot Method pointer.
   ///
-  template <typename Signal, typename T, typename Slot>
-  inline static void connect(const Signal* signal, const T& slotObj, Slot&& slot) {
-    cs::Connector::connect(*signal, slotObj, std::forward<Slot>(slot));
+  template <template <typename> typename Signal, typename T, typename Object, typename Slot>
+  static void connect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
+    constexpr int size = Args::GetArguments<Slot>();
+    auto obj = reinterpret_cast<void*>(const_cast<Object&>(slotObj));
+    const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
   }
 
   ///
@@ -401,22 +365,55 @@ public:
     cs::Connector::connect(lhs, std::move(func));
   }
 
+  template <template <typename> typename Signal, typename T, typename Object, typename Slot>
+  static bool disconnect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
+    if (!slotObj) {
+      return false;
+    }
+
+    constexpr int size = Args::GetArguments<Slot>();
+    std::function<T> binder = Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot));
+
+    auto& content = const_cast<Signal<T>*>(signal)->content();
+    auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
+      auto& [object, function] = pair;
+      auto result = function.target_type().hash_code() == binder.target_type().hash_code();
+
+      if (object) {
+        if (object != (slotObj)) {
+          return false;
+        }
+      }
+
+      return result;
+    });
+
+    if (iterator != content.end()) {
+      content.erase(iterator);
+      return true;
+    }
+
+    return false;
+  }
+
   ///
   /// @brief Drops all signal connections.
   /// @param signal Any signal object.
   ///
-  template <typename Signal>
-  inline static void disconnect(Signal& signal) {
-    signal = nullptr;
+  template <template <typename> typename Signal, typename T>
+  static bool disconnect(const Signal<T>* signal) {
+    auto signalPtr = const_cast<Signal<T>*>(signal);
+    *(signalPtr) = nullptr;
+    return signalPtr->content().empty();
   }
 
   ///
   /// @brief Returns signal callbacks size.
   /// @return Returns any signal object callbacks count.
   ///
-  template <typename Signal>
-  inline static std::size_t callbacks(Signal& signal) {
-    return signal.size();
+  template <template <typename> typename Signal, typename T>
+  static std::size_t callbacks(const Signal<T>* signal) {
+    return signal->size();
   }
 };
 }  // namespace cs
