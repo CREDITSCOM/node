@@ -1,0 +1,111 @@
+diff --git a/libsodium.vcxproj b/libsodium.vcxproj
+index eec2a525..62f1ffe1 100644
+--- a/libsodium.vcxproj
++++ b/libsodium.vcxproj
+@@ -1,5 +1,5 @@
+ ﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+   <ItemGroup Label="ProjectConfigurations">
+     <ProjectConfiguration Include="DebugDLL|Win32">
+       <Configuration>DebugDLL</Configuration>
+@@ -38,6 +38,7 @@
+     <ProjectGuid>{A185B162-6CB6-4502-B03F-B56F7699A8D9}</ProjectGuid>
+     <Keyword>Win32Proj</Keyword>
+     <RootNamespace>libsodium</RootNamespace>
++    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+   </PropertyGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+@@ -45,56 +46,56 @@
+     <UseDebugLibraries>true</UseDebugLibraries>
+     <CharacterSet>MultiByte</CharacterSet>
+     <WholeProgramOptimization>false</WholeProgramOptimization>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|Win32'" Label="Configuration">
+     <ConfigurationType>DynamicLibrary</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+     <CharacterSet>MultiByte</CharacterSet>
+     <WholeProgramOptimization>false</WholeProgramOptimization>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+     <ConfigurationType>StaticLibrary</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+     <CharacterSet>MultiByte</CharacterSet>
+     <WholeProgramOptimization>false</WholeProgramOptimization>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'" Label="Configuration">
+     <ConfigurationType>DynamicLibrary</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+     <CharacterSet>MultiByte</CharacterSet>
+     <WholeProgramOptimization>false</WholeProgramOptimization>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+     <ConfigurationType>StaticLibrary</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+     <WholeProgramOptimization>true</WholeProgramOptimization>
+     <CharacterSet>MultiByte</CharacterSet>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|Win32'" Label="Configuration">
+     <ConfigurationType>DynamicLibrary</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+     <WholeProgramOptimization>true</WholeProgramOptimization>
+     <CharacterSet>MultiByte</CharacterSet>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+     <ConfigurationType>StaticLibrary</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+     <WholeProgramOptimization>true</WholeProgramOptimization>
+     <CharacterSet>MultiByte</CharacterSet>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'" Label="Configuration">
+     <ConfigurationType>DynamicLibrary</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+     <WholeProgramOptimization>true</WholeProgramOptimization>
+     <CharacterSet>MultiByte</CharacterSet>
+-    <PlatformToolset>v140</PlatformToolset>
++    <PlatformToolset>v141</PlatformToolset>
+   </PropertyGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+   <ImportGroup Label="ExtensionSettings">
+@@ -559,4 +560,4 @@
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+   <ImportGroup Label="ExtensionTargets">
+   </ImportGroup>
+-</Project>
++</Project>
+\ No newline at end of file
+diff --git a/libsodium.vcxproj.filters b/libsodium.vcxproj.filters
+index 8325e43c..d43187c1 100644
+--- a/libsodium.vcxproj.filters
++++ b/libsodium.vcxproj.filters
+@@ -716,5 +716,13 @@
+     <ClInclude Include="src\libsodium\crypto_core\ed25519\ref10\fe_51\base.h">
+       <Filter>Header Files</Filter>
+     </ClInclude>
++    <ClInclude Include="builds\msvc\resource.h">
++      <Filter>Header Files</Filter>
++    </ClInclude>
++  </ItemGroup>
++  <ItemGroup>
++    <ResourceCompile Include="builds\msvc\resource.rc">
++      <Filter>Resource Files</Filter>
++    </ResourceCompile>
+   </ItemGroup>
+-</Project>
++</Project>
+\ No newline at end of file
