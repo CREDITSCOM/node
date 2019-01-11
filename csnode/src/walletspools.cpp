@@ -69,11 +69,11 @@ WalletsPoolsImpl::WalletsPoolsImpl(csdb::Address genesisAddress, csdb::Address s
 : genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletsIds_(walletsIds) {
-  /*csinfo() << __FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash);
-  csinfo() << __FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
-  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData); csinfo() << __FUNCTION__ << ":
+  /*csdebug() << __FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash);
+  csdebug() << __FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
+  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData); csdebug() << __FUNCTION__ << ":
   sizeof(WalletData::PoolsHashes)=" << sizeof(WalletData::PoolsHashes) << " alignof(WalletData::PoolsHashes)=" <<
-  alignof(WalletData::PoolsHashes); csinfo() << __FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
+  alignof(WalletData::PoolsHashes); csdebug() << __FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
   alignof(WalletData)=" << alignof(WalletData);*/
 }
 
@@ -84,7 +84,7 @@ template <Direction Dir>
 void WalletsPoolsImpl::load(csdb::Pool& curr) {
   PoolHash poolHash;
   WalletsPools::convert(curr.hash(), poolHash);
-  // csinfo() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
+  // csdebug() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
   // curr.transactions_count();
 
   for (size_t i = 0; i < curr.transactions_count(); i++) {

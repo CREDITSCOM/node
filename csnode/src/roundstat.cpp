@@ -53,7 +53,9 @@ void RoundStat::onRoundStart(RoundNumber round) {
       os << ave_round_ms << "ms";
     }
 
-    os << ", " << totalReceivedTransactions_ << " viewed transactions, " << totalAcceptedTransactions_ << " stored transactions.";
+    os << ", "
+      //<< totalReceivedTransactions_ << " viewed transactions, "
+      << totalAcceptedTransactions_ << " stored transactions.";
     cslog() << os.str();
   }
 }

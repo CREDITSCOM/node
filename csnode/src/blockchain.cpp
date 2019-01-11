@@ -42,9 +42,9 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
   blockHashes_ = std::make_unique<cs::BlockHashes>();
 
   if (storage_.last_hash().is_empty()) {
-    cslog() << "Last hash is empty...";
+    csdebug() << "Last hash is empty...";
     if (storage_.size()) {
-      cslog() << "failed!!! Delete the Database!!! It will be restored from nothing...";
+      cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
       return;
     }
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -52,7 +52,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     generateCheatDbFile(path, *blockHashes_);
   }
   else {
-    cslog() << "Last hash is not empty...";
+    csdebug() << "Last hash is not empty...";
 
     {
       std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
@@ -60,7 +60,7 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
         return;
 
       if (!initer->isFinishedOk()) {
-        cslog() << "Initialization from DB finished with error";
+        cserror() << "Initialization from DB finished with error";
         return;
       }
     }
@@ -223,12 +223,12 @@ void BlockChain::writeGenesisBlock() {
   genesis.set_sequence(getLastSequence() + 1);
   addNewWalletsToPool(genesis);
 
-  cslog() << "Genesis block completed ... trying to save";
+  csdebug() << "Genesis block completed ... trying to save";
 
   finalizeBlock(genesis);
   deferredBlock_ = genesis;
 
-  cslog() << genesis.hash().to_string();
+  csdebug() << genesis.hash().to_string();
 
   uint32_t bSize;
   genesis.to_byte_stream(bSize);
@@ -331,7 +331,7 @@ void BlockChain::removeLastBlock() {
 
   if (lastHash == poolHash) {
     blockHashes_->removeLast();
-    csmeta(cslog) << "Remove last hash is ok, sequence: " << pool.sequence();
+    csmeta(csdebug) << "Remove last hash is ok, sequence: " << pool.sequence();
   }
   else {
     csmeta(cserror) << "Error! Last pool hash mismatch";
@@ -390,10 +390,10 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 }
 
 void BlockChain::flushBlockToDisk(csdb::Pool& pool) {
-  cslog() << "----------------------------- Flush block #" << pool.sequence() << " to disk ----------------------------";
+  csdebug() << "---------------------------- Flush block #" << pool.sequence() << " to disk ---------------------------";
 
   if (pool.sequence() > 0) {
-    cslog() << "see block info above";
+    csdebug() << "see block info above";
   }
   else {
     logBlockInfo(pool);
@@ -416,13 +416,13 @@ void BlockChain::flushBlockToDisk(csdb::Pool& pool) {
     newBlockCv_.notify_all();
   }
 
-  cslog() << "----------------------------------------- #" << pool.sequence() << " ------------------------------------";
+  csdebug() << "----------------------------------------------------------------------------------";
 }
 
 void BlockChain::logBlockInfo(csdb::Pool& pool)
 {
   const auto& trusted = pool.confidants();
-  cslog() << " trusted count " << trusted.size();
+  csdebug() << " trusted count " << trusted.size();
   for(const auto& t : trusted) {
     csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
   }
@@ -895,9 +895,9 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   finalizeBlock(deferredBlock_);
 
   // log cached block
-  cslog() << "----------------------------- Defer block #" << pool.sequence() << " until next round ----------------------------";
+  csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
   logBlockInfo(pool);
-  cslog() << "------------------------------------------#" << pool.sequence() << " ---------------------------------------------";
+  csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
   return std::make_pair(true, deferredBlock_);
 }

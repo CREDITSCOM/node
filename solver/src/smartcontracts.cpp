@@ -195,10 +195,10 @@ namespace cs
         for(const auto& tr : it->created_transactions) {
           packet.addTransaction(tr);
         }
-        cslog() << name() << ": add " << it->created_transactions.size() << " emitted trx to contract state";
+        csdebug() << name() << ": add " << it->created_transactions.size() << " emitted trx to contract state";
       }
       else {
-        cslog() << name() << ": no emitted trx added to contract state";
+        csdebug() << name() << ": no emitted trx added to contract state";
       }
     }
 
@@ -407,12 +407,12 @@ namespace cs
 
       auto& v = exe_queue.front().created_transactions;
       v.push_back(tr);
-      cslog() << name() << ": smart contract emits transaction, add, total " << v.size();
+      csdebug() << name() << ": smart contract emits transaction, add, total " << v.size();
       return true;
     }
     else {
       if(contract_state.count(abs_addr)) {
-        cslog() << name() << ": inactive smart contract emits transaction, ignore";
+        csdebug() << name() << ": inactive smart contract emits transaction, ignore";
       }
     }
 

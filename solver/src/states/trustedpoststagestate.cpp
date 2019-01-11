@@ -18,7 +18,7 @@ void TrustedPostStageState::on(SolverContext& context) {
 
   // process already received stage-3, possible to go further to waiting/writting state
   if(!context.stage3_data().empty()) {
-    cslog() << name() << ": handle early received stages-3";
+    csdebug() << name() << ": handle early received stages-3";
     bool finish = false;
     for(const auto& st : context.stage3_data()) {
       if(Result::Finish == onStage3(context, st)) {
@@ -32,27 +32,27 @@ void TrustedPostStageState::on(SolverContext& context) {
   }
 
   SolverContext* pctx = &context;
-  cslog() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received";
+  csdebug() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received";
   timeout_request_stage.start(
       context.scheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [pctx, this]() {
-        csinfo() << name() << ": timeout for stages-3 is expired, make requests";
+        csdebug() << name() << ": timeout for stages-3 is expired, make requests";
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        cslog() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+        csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
                           << " ms to request neighbors about stages-3";
         timeout_request_neighbors.start(
             pctx->scheduler(), Consensus::T_stage_request,
             // timeout #2 handler:
             [pctx, this]() {
-              cslog() << name() << ": timeout for transition is expired, make requests to neighbors";
+              csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
               // timeout #3 handler
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
                 [pctx, this]() {
-                  cslog() << name() << ": timeout for transition is expired, cannot proceed further, BigBang required";
+                  csdebug() << name() << ": timeout for transition is expired, cannot proceed further, BigBang required";
                 },
                 true/*replace if exists*/);
         },
@@ -63,13 +63,13 @@ void TrustedPostStageState::on(SolverContext& context) {
 
 void TrustedPostStageState::off(SolverContext& /*context*/) {
   if (timeout_request_stage.cancel()) {
-    csinfo() << name() << ": cancel track timeout of stages-3";
+    csdebug() << name() << ": cancel track timeout of stages-3";
   }
   if (timeout_request_neighbors.cancel()) {
-    csinfo() << name() << ": cancel track timeout to request neighbors about stages-3";
+    csdebug() << name() << ": cancel track timeout to request neighbors about stages-3";
   }
   if(timeout_force_transition.cancel()) {
-    cslog() << name() << ": cancel track timeout to force transition to next state";
+    csdebug() << name() << ": cancel track timeout to force transition to next state";
   }
 }
 
@@ -106,7 +106,7 @@ void TrustedPostStageState::request_stages_neighbors(SolverContext& context) {
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
   ++cnt_recv_stages;
   if(cnt_recv_stages >= context.cnt_trusted() / 2U + 1U) {
-    csinfo() << name() << ": enough stage-3 received";
+    csdebug() << name() << ": enough stage-3 received";
     return Result::Finish;
   }
   return Result::Ignore;

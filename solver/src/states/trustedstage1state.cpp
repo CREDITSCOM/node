@@ -26,7 +26,7 @@ void TrustedStage1State::on(SolverContext& context) {
 }
 
 void TrustedStage1State::off(SolverContext& context) {
-  cslog() << name() << ": --> stage-1 [" << (int)stage.sender << "]";
+  csdebug() << name() << ": --> stage-1 [" << (int)stage.sender << "]";
   context.add_stage1(stage, true);
 }
 
@@ -35,7 +35,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     cserror() << name() << ": cannot handle previous round transactions";
     return Result::Ignore;
   }
-  cslog() << name() << ": -------> STARTING CONSENSUS #" << context.round() << " <------- ";
+  csdebug() << name() << ": -------> STARTING CONSENSUS #" << context.round() << " <------- ";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   auto maybe_pack = conveyer.createPacket();
   if (!maybe_pack.has_value()) {
@@ -44,7 +44,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     return Result::Ignore;
   }
   cs::TransactionsPacket pack = std::move(maybe_pack.value());
-  cslog() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
+  csdebug() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
 
   // review & validate transactions
   context.blockchain().setTransactionsFees(pack);
@@ -71,9 +71,9 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& /*pool_hash*/,
                                   const cs::PublicKey& sender) {
   // get node status for useful logging
-  cslog() << name() << ": <-- hash from " << context.sender_description(sender);
+  csdebug() << name() << ": <-- hash from " << context.sender_description(sender);
   if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
-    cslog() << name() << ": hash is OK";
+    csdebug() << name() << ": hash is OK";
     if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
       stage.trustedCandidates.push_back(sender);
     }
@@ -145,7 +145,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       }
       else {
         //TODO: implement appropriate validation of smart-state transactions
-        cslog() << name() << ": smart new_state trx[" << i << "] included in consensus";
+        csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
       }
 
       if (byte) {
@@ -170,8 +170,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
       }
       else {
-        //csdebug() 
-        cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
+        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
       characteristicMask.push_back(byte);
@@ -180,7 +179,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      cslog() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
+      csdebug() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart

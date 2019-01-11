@@ -19,7 +19,7 @@ void TrustedStage2State::on(SolverContext& context) {
   }
   // if have already received stage-1, make possible to go further (to stage-3)
   if (!context.stage1_data().empty()) {
-    cslog() << name() << ": handle early received stages-1";
+    csdebug() << name() << ": handle early received stages-1";
     bool finish = false;
     for (const auto& st : context.stage1_data()) {
       csdebug() << name() << ": stage-1 [" << (int) st.sender << "]";
@@ -40,27 +40,27 @@ void TrustedStage2State::on(SolverContext& context) {
 
   SolverContext* pctx = &context;
   auto dt = 2 * Consensus::T_stage_request;
-  cslog() << name() << ": start track timeout " << dt << " ms of stages-1 received";
+  csdebug() << name() << ": start track timeout " << dt << " ms of stages-1 received";
   timeout_request_stage.start(
       context.scheduler(), dt,
       // timeout #1 handler:
       [pctx, this, dt]() {
-        cslog() << name() << ": timeout for stages-1 is expired, (now) skip make requests";
+        csdebug() << name() << ": timeout for stages-1 is expired, (now) skip make requests";
         //request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        cslog() << name() << ": start subsequent track timeout " << dt
+        csdebug() << name() << ": start subsequent track timeout " << dt
                           << " ms to request neighbors about stages-1";
         timeout_request_neighbors.start(
             pctx->scheduler(), dt,
             // timeout #2 handler:
             [pctx, this, dt]() {
-              cslog() << name() << ": timeout for requested stages is expired, make requests to neighbors";
+              csdebug() << name() << ": timeout for requested stages is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
               // timeout #3 handler
               timeout_force_transition.start(
                 pctx->scheduler(), dt,
                 [pctx, this ,dt]() {
-                  cslog() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
+                  csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
                   mark_outbound_nodes(*pctx);
                 },
                 true/*replace if exists*/);
@@ -72,13 +72,13 @@ void TrustedStage2State::on(SolverContext& context) {
 
 void TrustedStage2State::off(SolverContext& /*context*/) {
   if (timeout_request_stage.cancel()) {
-    cslog() << name() << ": cancel track timeout of stages-1";
+    csdebug() << name() << ": cancel track timeout of stages-1";
   }
   if (timeout_request_neighbors.cancel()) {
-    cslog() << name() << ": cancel track timeout to request neighbors about stages-1";
+    csdebug() << name() << ": cancel track timeout to request neighbors about stages-1";
   }
   if(timeout_force_transition.cancel()) {
-    cslog() << name() << ": cancel track timeout to force transition to next state";
+    csdebug() << name() << ": cancel track timeout to force transition to next state";
   }
 }
 
@@ -87,9 +87,9 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
   stage.hashes[st.sender] = st.messageHash;
   ++cnt_recv_stages;
   if (cnt_recv_stages == context.cnt_trusted()) {
-    cslog() << name() << ": enough stage-1 received";
+    csdebug() << name() << ": enough stage-1 received";
     /*signing of the second stage should be placed here*/
-    cslog() << name() << ": --> stage-2 [" << (int)stage.sender << "]";
+    csdebug() << name() << ": --> stage-2 [" << (int)stage.sender << "]";
     context.add_stage2(stage, true);
     return Result::Finish;
   }

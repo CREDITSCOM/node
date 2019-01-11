@@ -299,7 +299,7 @@ void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData:
 {
   PoolHash poolHash;
   convert(curr.hash(), poolHash);
-  //csinfo() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count();
+  //csdebug() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count();
 
   const uint64_t timeStamp = atoll(curr.user_field(0).value<std::string>().c_str());
 
