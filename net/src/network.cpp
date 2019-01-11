@@ -113,7 +113,7 @@ void Network::readerRoutine(const Config& config) {
     if (!lastError) {
       iPacMan_.enQueueLast();
 #ifdef LOG_NET
-      csdebug(logger::Net) << "Received " << packetSize << " bytes from " << task.sender << " " << task.pack;
+      csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
     }
     else {
@@ -151,7 +151,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   }
 #ifdef LOG_NET
   else {
-    csdebug(logger::Net) << "Sent " << size << " bytes to " << ep << " " << task->pack;
+    csdebug(logger::Net) << "--> " << size << " bytes to " << ep << " " << task->pack;
   }
 #endif
 }
