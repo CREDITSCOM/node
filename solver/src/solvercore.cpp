@@ -458,11 +458,13 @@ int cnt = (int)smartConfidants_.size();
     cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
       auto& conv = cs::Conveyer::instance();
-      for(const auto& tr : currentSmartTransactionPack_.transactions()) {
-        conv.addTransaction(tr);
-      }
+      
+      //for(const auto& tr : currentSmartTransactionPack_.transactions()) {
+      //  conv.addTransaction(tr);
+      //}
       // alternative is correct but does not work - currentSmartTransactionPack_'s hash must be empty:
-      //conv.addSeparatePacket(currentSmartTransactionPack_);
+      conv.addSeparatePacket(currentSmartTransactionPack_);
+      
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       cslog() << "Transaction user fields = " << fieldsNumber;
       cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
