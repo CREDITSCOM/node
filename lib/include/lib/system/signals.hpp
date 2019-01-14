@@ -360,7 +360,7 @@ public:
 
     auto closure = [=](auto... args) -> void {
       if (rhs) {
-        (*rhs)(std::forward<decltype(args)>(args)...)
+        (*rhs)(std::forward<decltype(args)>(args)...);
       }
     };
 
