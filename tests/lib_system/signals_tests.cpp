@@ -160,3 +160,47 @@ TEST(Signals, MoveTest) {
 
   ASSERT_EQ(isCalled, true);
 }
+
+void func(const std::string& message, std::reference_wrapper<bool> wrapper) {
+  wrapper.get() = true;
+  std::cout << message << std::endl;
+}
+
+TEST(Signals, LambdaAndFuncConnections) {
+  static bool isLambdaCalled = false;
+  static bool isFunctionCalled = false;
+
+  cs::Signal<void(const std::string&, std::reference_wrapper<bool>)> signal1;
+  cs::Connector::connect(&signal1, &func);
+
+  auto lambda = [&](const std::string& message, std::reference_wrapper<bool> wrapper) {
+    wrapper.get() = true;
+    std::cout << "Lambda message - " << message << std::endl;
+  };
+
+  cs::Signal<void(const std::string&, std::reference_wrapper<bool>)> signal2;
+  cs::Connector::connect(&signal2, lambda);
+
+  emit signal1("Hello, world!", std::ref(isFunctionCalled));
+  emit signal2("Credits tests", std::ref(isLambdaCalled));
+
+  ASSERT_EQ(isFunctionCalled, true);
+  ASSERT_EQ(isLambdaCalled, true);
+}
+
+TEST(Signals, SignalToSignalConnection) {
+  static bool isCalled = false;
+  cs::Signal<void()> signal1;
+  cs::Signal<void()> signal2;
+
+  cs::Connector::connect(&signal2, [&] {
+    isCalled = true;
+    std::cout << "Lambda called\n";
+  });
+
+  cs::Connector::connect(&signal1, &signal2);
+
+  emit signal1();
+
+  ASSERT_EQ(isCalled, true);
+}
