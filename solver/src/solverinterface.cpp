@@ -21,7 +21,13 @@ namespace cs
   {
     public_key = pub;
     private_key = priv;
-    psmarts->init(pub, pnode->getConnector().apiHandler());
+    auto pconnector = pnode->getConnector();
+    if(pconnector != nullptr) {
+      psmarts->init(pub, pconnector->apiHandler());
+    }
+    else {
+      psmarts->init(pub, nullptr);
+    }
   }
 
   void SolverCore::gotConveyerSync(cs::RoundNumber rNum)

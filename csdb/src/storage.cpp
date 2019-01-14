@@ -142,6 +142,10 @@ private:
   // TODO: Добавить кеш для хранения последних вычитанных пулов транзакций
 
   friend class ::csdb::Storage;
+  
+
+private signals:
+  ReadBlockSignal read_block_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string &message) {
@@ -215,6 +219,15 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
                      "Data integrity error: key does not match real hash "
                      "(key: '%s'; real hash: '%s')",
                      p.hash().to_string().c_str(), real_hash.to_string().c_str());
+      return false;
+    }
+
+    bool test_failed = false;
+    emit read_block_event(p, &test_failed);
+    if(test_failed) {
+      set_last_error(Storage::DataIntegrityError,
+        "Data integrity error: client reported violation of logic in pool %d",
+        p.sequence());
       return false;
     }
 
@@ -344,6 +357,11 @@ Database::Error Storage::db_last_error() const {
     return d->db->last_error_message();
   }
   return ::std::string{"Database not specified"};
+}
+
+ReadBlockSignal* Storage::read_block_event() const
+{
+  return &d->read_block_event;
 }
 
 bool Storage::open(const OpenOptions &opt, OpenCallback callback) {

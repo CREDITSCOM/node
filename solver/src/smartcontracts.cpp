@@ -47,7 +47,7 @@ namespace cs
 
     // signals subscription
     cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::onStoreBlock);
-
+    cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::onReadBlock);
   }
 
   SmartContracts::~SmartContracts() = default;
@@ -236,10 +236,12 @@ namespace cs
       // new state contains unique field id
       const auto& smart_fld = tr.user_field(trx_uf::new_state::Value);
       if(smart_fld.is_valid()) {
-        bool present;
-        const auto tmp = papi->getSmartContract(tr.source(), present); // tr.target() is also allowed
-        if(present) {
-          return tmp;
+        if(papi != nullptr) {
+          bool present;
+          const auto tmp = papi->getSmartContract(tr.source(), present); // tr.target() is also allowed
+          if(present) {
+            return tmp;
+          }
         }
       }
     }
@@ -265,11 +267,13 @@ namespace cs
           if constexpr(!api_pass_code_and_methods)
           {
             bool present;
-            auto tmp = papi->getSmartContract(tr.target(), present);
-            if(present) {
-              tmp.method = invoke_info.method;
-              tmp.params = invoke_info.params;
-              return tmp;
+            if(papi != nullptr) {
+              auto tmp = papi->getSmartContract(tr.target(), present);
+              if(present) {
+                tmp.method = invoke_info.method;
+                tmp.params = invoke_info.params;
+                return tmp;
+              }
             }
           }
         }
@@ -453,7 +457,7 @@ namespace cs
     }
   }
 
-  void SmartContracts::onReadBlock(csdb::Pool block)
+  void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
   {}
 
   void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)

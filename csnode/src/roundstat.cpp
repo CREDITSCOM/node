@@ -59,4 +59,8 @@ void RoundStat::onRoundStart(RoundNumber round) {
     cslog() << os.str();
   }
 }
+void RoundStat::onReadBlock(csdb::Pool block, bool * /*should_stop*/)
+{
+  totalAcceptedTransactions_ += block.transactions_count();
+}
 }  // namespace cs

@@ -52,8 +52,10 @@ public:
   using WalletData    = cs::WalletsCache::WalletData;
   using Mask          = boost::dynamic_bitset<uint64_t>;
 
-  explicit BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
+  explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
+
+  bool init(const std::string& path);
 
   bool isGood() const;
 
