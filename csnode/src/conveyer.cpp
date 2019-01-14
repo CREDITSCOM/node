@@ -74,7 +74,7 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
     pimpl_->packetsTable.emplace(std::move(hash), packet);
   }
   else {
-    cswarning() << csname() << "Same hash already exists at table: " << hash.toString();
+    csdebug() << csname() << "Same hash already exists at table: " << hash.toString();
   }
 }
 

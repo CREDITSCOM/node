@@ -15,6 +15,7 @@
 #include "csdb/transaction.hpp"
 
 #include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
 
 namespace csdb {
 
@@ -24,6 +25,9 @@ class Address;
 class Wallet;
 class Transaction;
 class TransactionID;
+
+/** @brief The read block signal, caller may assign test_failed to true if block is logically corrupted */
+using ReadBlockSignal = cs::Signal<void(const csdb::Pool block, bool* test_failed)>;
 
 /**
  * @brief Объект хранилища.
@@ -98,6 +102,8 @@ public:
    * @return true, если операцию необходимо прервать.
    */
   typedef ::std::function<bool(const OpenProgress &)> OpenCallback;
+
+  ReadBlockSignal* read_block_event() const;
 
   /**
    * @brief Открывает хранилище по набору параметров.

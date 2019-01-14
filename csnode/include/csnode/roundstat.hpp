@@ -1,7 +1,9 @@
 #pragma once
 
-#include <chrono>
 #include <lib/system/common.hpp>
+#include <csdb/pool.hpp>
+
+#include <chrono>
 #include <set>
 
 namespace cs {
@@ -12,6 +14,8 @@ public:
   RoundStat();
 
   void onRoundStart(cs::RoundNumber round);
+
+  void onReadBlock(csdb::Pool block, bool* should_stop);
 
   // amount of transactions received (to verify or not or to ignore)
   size_t totalReceivedTransactions_;

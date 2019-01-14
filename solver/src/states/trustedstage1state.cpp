@@ -229,7 +229,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   conveyer.setCharacteristic(characteristic, context.round());
 
   if (characteristic.mask.size() != transactionsCount) {
-    cserror() << name() << ": characteristic mask size not equals transactions count in build_vector()";
+    cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
   }
 
   cs::Hash hash;

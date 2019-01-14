@@ -123,8 +123,6 @@ public:
 
   void send_wallet_transaction(const csdb::Transaction& tr);
 
-  void gotSmartContractEvent(const csdb::Pool block, size_t trx_idx);
-
 private:
   // to use private data while serve for states as SolverCore context:
   friend class SolverContext;
