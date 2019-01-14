@@ -32,12 +32,20 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 , fee_(std::make_unique<cs::Fee>()) {
   cslog() << "Trying to open DB...";
 
-  if (!storage_.open(path)) {
+  size_t total_loaded = 0;
+  csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
+    ++total_loaded;
+    if(progress.poolsProcessed % 1000 == 0) {
+      std::cout << '\r' << progress.poolsProcessed << "";
+    }
+    return false;
+  };
+  if (!storage_.open(path, progress)) {
     cserror() << "Couldn't open database at " << path;
     return;
   }
 
-  cslog() << "DB is opened";
+  cslog() << "\rDB is opened, loaded " << total_loaded << " blocks";
 
   blockHashes_ = std::make_unique<cs::BlockHashes>();
 
@@ -73,7 +81,6 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
     }
   }
 
-  cslog() << "BLOCKCHAIN> max loaded block #" << getLastSequence();
   good_ = true;
 }
 
@@ -426,7 +433,7 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   for(const auto& t : trusted) {
     csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
   }
-  cslog() << " transactions count " << pool.transactions_count();
+  csdebug() << " transactions count " << pool.transactions_count();
   if(pool.user_field_ids().count(0) > 0) {
     csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   }
@@ -449,20 +456,9 @@ void BlockChain::finalizeBlock(csdb::Pool& pool) {
     csmeta(cserror) << "Error in updateFromNextBlock()";
   }
 
-  // inspect transactions against smart contracts, raise special event on every item found:
-  if(pool.transactions_count() > 0) {
-    size_t idx = 0;
-    for(const auto& t : pool.transactions()) {
-      if(cs::SmartContracts::is_smart_contract(t)) {
-        csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
-        emit smartContractEvent_(pool, idx);
-      }
-      ++idx;
-    }
-  }
+  emit storeBlockEvent_(pool);
 
   csmeta(csdetails) << "last hash: " << pool.hash().to_string();
-
   recount_trxns(pool);
 }
 

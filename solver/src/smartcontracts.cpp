@@ -44,6 +44,10 @@ namespace cs
 #if defined(DEBUG_SMARTS)
     execution_allowed = false;
 #endif
+
+    // signals subscription
+    cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::onStoreBlock);
+
   }
 
   SmartContracts::~SmartContracts() = default;
@@ -418,6 +422,39 @@ namespace cs
 
     return false;
   }
+
+  void SmartContracts::onStoreBlock(csdb::Pool block)
+  {
+    // inspect transactions against smart contracts, raise special event on every item found:
+    if(block.transactions_count() > 0) {
+      size_t tr_idx = 0;
+      for(const auto& tr : block.transactions()) {
+        if(is_smart_contract(tr)) {
+          csdebug() << name() << ": smart contract trx #" << block.sequence() << "." << tr_idx;
+          // dispatch transaction by its type
+          bool is_deploy = this->is_deploy(tr);
+          bool is_start = is_deploy ? false : this->is_start(tr);
+          if(is_deploy || is_start) {
+            if(is_deploy) {
+              csdebug() << name() << ": smart contract is deployed, enqueue it for execution";
+            }
+            else {
+              csdebug() << name() << ": smart contract is started, enqueue it for execution";
+            }
+            enqueue(block, tr_idx);
+          }
+          else if(is_new_state(tr)) {
+            csdebug() << "SolverCore: smart contract state updated";
+            on_completed(block, tr_idx);
+          }
+        }
+        ++tr_idx;
+      }
+    }
+  }
+
+  void SmartContracts::onReadBlock(csdb::Pool block)
+  {}
 
   void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
   {

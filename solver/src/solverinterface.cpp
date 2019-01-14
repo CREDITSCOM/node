@@ -285,36 +285,6 @@ namespace cs
     cs::Conveyer::instance().addTransaction(tr);
   }
 
-  void SolverCore::gotSmartContractEvent(const csdb::Pool block, size_t trx_idx)
-  {
-    if(trx_idx >= block.transactions_count()) {
-      cserror() << "SolverCore: incorrect transaction index related to smart contract";
-      return;
-    }
-    csdb::Transaction tr = * (block.transactions().cbegin() + trx_idx);
-    if(!SmartContracts::is_smart_contract(tr)) {
-      cserror() << "SolverCore: incorrect transaction type related to smart contract";
-      return;
-    }
-    // dispatch transaction by its type
-    bool is_deploy = psmarts->is_deploy(tr);
-    bool is_start = is_deploy ? false : psmarts->is_start(tr);
-    if(is_deploy || is_start) {
-      if(is_deploy) {
-        csdebug() << "SolverCore: smart contract is deployed, enqueue it for execution";
-      }
-      else {
-        csdebug() << "SolverCore: smart contract is started, enqueue it for execution";
-      }
-      psmarts->enqueue(block, trx_idx);
-    }
-    else if(psmarts->is_new_state(tr)) {
-      csdebug() << "SolverCore: smart contract state updated";
-      psmarts->on_completed(block, trx_idx);
-    }
-    
-  }
-
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)
   {
     csdebug() << "SolverCore: got round info request from "

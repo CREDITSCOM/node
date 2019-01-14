@@ -37,7 +37,10 @@ class WalletsIds;
 class Fee;
 class TransactionsPacket;
 
-using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
+/** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
+using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
+
+/** @brief   The write block signal emits when flushBlockToDisk() occurs */
 using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
@@ -285,11 +288,11 @@ public:
 
 public signals:
 
-  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.
-  *   Connected to SolverCore::gotStartSmartContract() method
-  */
-  cs::SmartContractStartSignal smartContractEvent_;
+  /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
+  cs::StoreBlockSignal storeBlockEvent_;
 
+
+  /** @brief The write block event. Raised when the next block is flushed to storage */
   cs::WriteBlockSignal writeBlockEvent;
 
 private:

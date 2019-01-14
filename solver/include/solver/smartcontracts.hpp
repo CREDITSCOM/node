@@ -206,6 +206,11 @@ namespace cs
   public slots:
     void onExecutionFinished(const SmartExecutionData& data);
 
+    // called when next block is stored
+    void onStoreBlock(csdb::Pool block);
+    // called when next block is read from database
+    void onReadBlock(csdb::Pool block);
+
   private:
 
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
