@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
-#include "lib/system/signals.hpp"
+
+#include "lib/system/timer.hpp"
+
 #include <string>
 
 TEST(Signals, BaseSignalUsingByPointer) {
@@ -126,4 +128,35 @@ TEST(Signals, ConnectAndDisconnect) {
 
   ASSERT_EQ(a.callsCount(), 2);
   ASSERT_EQ(b.callsCount(), 2);
+}
+
+TEST(Signals, MoveTest) {
+  static std::atomic<bool> isCalled = false;
+  cs::Signal<void()> signal1;
+
+  class A {
+  public slots:
+    void onSignal() {
+      isCalled = true;
+      std::cout << "A on signal method\n";
+    }
+  };
+
+  A a;
+  cs::Connector::connect(&signal1, &a, &A::onSignal);
+
+  cs::Signal<void()> signal2 = std::move(signal1);
+
+  cs::Timer::singleShot(1000, cs::RunPolicy::ThreadPoolPolicy, [&] {
+    std::cout << "Calling signal2\n";
+    emit signal2();
+    std::cout << "Signal2 called\n";
+  });
+
+  ASSERT_EQ(cs::Connector::callbacks(&signal2), 1);
+  ASSERT_EQ(cs::Connector::callbacks(&signal1), 0);
+
+  while(!isCalled);
+
+  ASSERT_EQ(isCalled, true);
 }

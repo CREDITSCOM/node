@@ -184,7 +184,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
   // "normal" start
   if (roundTable.round == 1) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, cs::RunPolicy::CallQueuePolicy, [this, roundTable]() mutable {
       onRoundStart(roundTable);
       cs::Conveyer::instance().setRound(std::move(roundTable));
       reviewConveyerHashes();
@@ -273,7 +273,7 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 
   cswarning() << "NODE> Get stop request, node will be closed...";
 
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
     stop();
   });
 }
@@ -458,7 +458,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
   };
 
   // send request again
-  cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), requestClosure);
+  cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {

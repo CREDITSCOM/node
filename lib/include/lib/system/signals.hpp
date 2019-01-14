@@ -27,7 +27,8 @@ class Signal<Return(InArgs...)> {
 public:
   using Argument = std::function<Return(InArgs...)>;
   using Signature = Return(InArgs...);
-  using Slots = std::vector<std::pair<void*, Argument>>;
+  using ObjectPointer = void*;
+  using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -66,7 +67,7 @@ public:
 private:
   // adds slot to signal
   template <typename T>
-  auto& add(T&& s, void* obj = nullptr) {
+  auto& add(T&& s, ObjectPointer obj = nullptr) {
     Argument arg = s;
 
     if (!arg) {
@@ -115,7 +116,8 @@ class Signal<std::function<T>> {
 public:
   using Argument = std::function<T>;
   using Signature = T;
-  using Slots = std::vector<std::pair<void*, Argument>>;
+  using ObjectPointer = void*;
+  using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -147,7 +149,7 @@ public:
 private:
   // adds slot to signal
   template <typename U>
-  auto& add(U&& s, void* obj = nullptr) {
+  auto& add(U&& s, ObjectPointer obj = nullptr) {
     signal_.add(std::forward<U>(s), obj);
     return *this;
   }
@@ -339,8 +341,9 @@ public:
   ///
   template <template <typename> typename Signal, typename T, typename Object, typename Slot>
   static void connect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
+    using ObjectPointer = void*;
     constexpr int size = Args::GetArguments<Slot>();
-    auto obj = reinterpret_cast<void*>(const_cast<Object&>(slotObj));
+    auto obj = reinterpret_cast<ObjectPointer>(const_cast<Object&>(slotObj));
     const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
   }
 
