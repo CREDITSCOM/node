@@ -206,6 +206,12 @@ namespace cs
   public slots:
     void onExecutionFinished(const SmartExecutionData& data);
 
+    // called when next block is stored
+    void onStoreBlock(csdb::Pool block);
+
+    // called when next block is read from database
+    void onReadBlock(csdb::Pool block, bool* should_stop);
+
   private:
 
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
@@ -213,6 +219,7 @@ namespace cs
     BlockChain& bc;
     CallsQueueScheduler& scheduler;
     cs::Bytes node_id;
+    // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
     csconnector::connector::ApiHandlerPtr papi;
 
     CallsQueueScheduler::CallTag tag_remove_finished_contract;

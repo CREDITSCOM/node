@@ -23,7 +23,7 @@
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-
+#include <lib/system/signals.hpp>
 #include <poolsynchronizer.hpp>
 
 const unsigned MIN_CONFIDANTS = 3;
@@ -35,23 +35,15 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
-, blockChain_(config.getPathToDB(), genesisAddress_, startAddress_)
+, blockChain_(genesisAddress_, startAddress_)
 , solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
-,
-#ifdef NODE_API
-  api_(blockChain_, solver_, csconnector::Config {
-   config.getApiSettings().port,
-   config.getApiSettings().ajaxPort,
-   config.getApiSettings().executorPort
-  })
-,
-#endif
-  allocator_(1 << 24, 5)
+, allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_) {
   transport_ = new Transport(config, this);
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
-  good_ = init();
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
+  good_ = init(config);
 }
 
 Node::~Node() {
@@ -62,20 +54,31 @@ Node::~Node() {
   delete poolSynchronizer_;
 }
 
-bool Node::init() {
+bool Node::init(const Config& config) {
+  if(!blockChain_.init(config.getPathToDB())) {
+    return false;
+  }
+  cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+
+#ifdef NODE_API
+  papi_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
+    csconnector::Config {
+     config.getApiSettings().port,
+     config.getApiSettings().ajaxPort,
+     config.getApiSettings().executorPort
+    });
+#endif
+
   if (!transport_->isGood()) {
     return false;
   }
 
-  if (!blockChain_.isGood()) {
-    return false;
-  }
 
   if (!solver_) {
     return false;
   }
 
-  csdebug() << "Everything init";
+  csdebug() << "Everything is init";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
@@ -86,7 +89,6 @@ bool Node::init() {
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
   cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
   cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-  cs::Connector::connect(&blockChain_.smartContractEvent_, solver_, &cs::SolverCore::gotSmartContractEvent);
 
   return true;
 }
@@ -185,7 +187,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
   // "normal" start
   if (roundTable.round == 1) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, [this, roundTable]() mutable {
+    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, cs::RunPolicy::CallQueuePolicy, [this, roundTable]() mutable {
       onRoundStart(roundTable);
       cs::Conveyer::instance().setRound(std::move(roundTable));
       reviewConveyerHashes();
@@ -274,7 +276,7 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 
   cswarning() << "NODE> Get stop request, node will be closed...";
 
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, [this] {
+  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
     stop();
   });
 }
@@ -459,7 +461,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
   };
 
   // send request again
-  cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), requestClosure);
+  cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {

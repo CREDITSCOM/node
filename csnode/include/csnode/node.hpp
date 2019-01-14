@@ -180,8 +180,8 @@ public:
   }
 
 #ifdef NODE_API
-  csconnector::connector& getConnector() {
-    return api_;
+  csconnector::connector *getConnector() {
+    return papi_.get();
   }
 #endif
 
@@ -191,7 +191,7 @@ public slots:
   void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
 
 private:
-  bool init();
+  bool init(const Config& config);
   void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
                         const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
                         const cs::Signature& signature);
@@ -284,7 +284,7 @@ private:
   std::unique_ptr<cs::Spammer> spammer_;
 
 #ifdef NODE_API
-  csconnector::connector api_;
+  std::unique_ptr<csconnector::connector> papi_;
 #endif
 
   RegionAllocator allocator_;

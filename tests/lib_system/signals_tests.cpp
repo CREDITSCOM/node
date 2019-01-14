@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
-#include "lib/system/signals.hpp"
+
+#include "lib/system/timer.hpp"
+
 #include <string>
 
 TEST(Signals, BaseSignalUsingByPointer) {
@@ -126,4 +128,145 @@ TEST(Signals, ConnectAndDisconnect) {
 
   ASSERT_EQ(a.callsCount(), 2);
   ASSERT_EQ(b.callsCount(), 2);
+}
+
+TEST(Signals, MoveTest) {
+  static std::atomic<bool> isCalled = false;
+  cs::Signal<void()> signal1;
+
+  class A {
+  public slots:
+    void onSignal() {
+      isCalled = true;
+      std::cout << "A on signal method\n";
+    }
+  };
+
+  A a;
+  cs::Connector::connect(&signal1, &a, &A::onSignal);
+
+  cs::Signal<void()> signal2 = std::move(signal1);
+
+  cs::Timer::singleShot(1000, cs::RunPolicy::ThreadPoolPolicy, [&] {
+    std::cout << "Calling signal2\n";
+    emit signal2();
+    std::cout << "Signal2 called\n";
+  });
+
+  ASSERT_EQ(cs::Connector::callbacks(&signal2), 1);
+  ASSERT_EQ(cs::Connector::callbacks(&signal1), 0);
+
+  while(!isCalled);
+
+  ASSERT_EQ(isCalled, true);
+}
+
+void func(const std::string& message, std::reference_wrapper<bool> wrapper) {
+  wrapper.get() = true;
+  std::cout << message << std::endl;
+}
+
+TEST(Signals, LambdaAndFuncConnections) {
+  static bool isLambdaCalled = false;
+  static bool isFunctionCalled = false;
+
+  cs::Signal<void(const std::string&, std::reference_wrapper<bool>)> signal1;
+  cs::Connector::connect(&signal1, &func);
+
+  auto lambda = [&](const std::string& message, std::reference_wrapper<bool> wrapper) {
+    wrapper.get() = true;
+    std::cout << "Lambda message - " << message << std::endl;
+  };
+
+  cs::Signal<void(const std::string&, std::reference_wrapper<bool>)> signal2;
+  cs::Connector::connect(&signal2, lambda);
+
+  emit signal1("Hello, world!", std::ref(isFunctionCalled));
+  emit signal2("Credits tests", std::ref(isLambdaCalled));
+
+  ASSERT_EQ(isFunctionCalled, true);
+  ASSERT_EQ(isLambdaCalled, true);
+}
+
+TEST(Signals, SignalToSignalConnection) {
+  static bool isCalled = false;
+  cs::Signal<void()> signal1;
+  cs::Signal<void()> signal2;
+
+  cs::Connector::connect(&signal2, [&] {
+    isCalled = true;
+    std::cout << "Lambda called\n";
+  });
+
+  cs::Connector::connect(&signal1, &signal2);
+
+  emit signal1();
+
+  ASSERT_EQ(isCalled, true);
+}
+
+size_t foo() {
+  static size_t callsCount = 0;
+  std::cout << "Foo calls count " << ++callsCount << std::endl;
+
+  return callsCount;
+}
+
+TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
+  class A {
+  public signals:
+    cs::Signal<void()> signal;
+  };
+
+  auto a = std::make_shared<A>();
+  cs::Connector::connect(&(a->signal), &foo);
+
+  auto lambda = []() {
+    static size_t callsCount = 0;
+    std::cout << "Lambda calls count " << ++callsCount << std::endl;
+
+    return callsCount;
+  };
+
+  cs::Connector::connect(&(a->signal), lambda);
+
+  emit a->signal();
+
+  ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 2);
+  ASSERT_EQ(foo(), 2);
+  ASSERT_EQ(lambda(), 2);
+
+  bool result = cs::Connector::disconnect(&(a->signal), &foo);
+  ASSERT_EQ(result, true);
+
+  emit a->signal();
+
+  ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 1);
+  ASSERT_EQ(foo(), 3);
+  ASSERT_EQ(lambda(), 4);
+
+  cs::Connector::connect(&(a->signal), &foo);
+
+  emit a->signal();
+
+  ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 2);
+  ASSERT_EQ(foo(), 5);
+  ASSERT_EQ(lambda(), 6);
+
+  result = cs::Connector::disconnect(&(a->signal), lambda);
+  ASSERT_EQ(result, true);
+
+  emit a->signal();
+
+  ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 1);
+  ASSERT_EQ(foo(), 7);
+  ASSERT_EQ(lambda(), 7);
+
+  cs::Connector::disconnect(&(a->signal));
+
+  emit a->signal();
+
+  ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 0);
+  ASSERT_EQ(foo(), 8);
+  ASSERT_EQ(lambda(), 8);
 }

@@ -19,7 +19,7 @@ using namespace cs;
 void generateCheatDbFile(std::string, const BlockHashes&);
 bool validateCheatDbFile(std::string, const BlockHashes&);
 
-BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress)
+BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
 , dbLock_()
 , genesisAddress_(genesisAddress)
@@ -30,54 +30,67 @@ BlockChain::BlockChain(const std::string& path, csdb::Address genesisAddress, cs
 , cacheMutex_()
 , waitersLocker_()
 , fee_(std::make_unique<cs::Fee>()) {
+}
+
+BlockChain::~BlockChain() {
+}
+
+bool BlockChain::init(const std::string& path)
+{
   cslog() << "Trying to open DB...";
 
-  if (!storage_.open(path)) {
+  size_t total_loaded = 0;
+  csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
+    ++total_loaded;
+    if(progress.poolsProcessed % 1000 == 0) {
+      std::cout << '\r' << progress.poolsProcessed << "";
+    }
+    return false;
+  };
+  if(!storage_.open(path, progress)) {
     cserror() << "Couldn't open database at " << path;
-    return;
+    return false;
   }
 
-  cslog() << "DB is opened";
+  cslog() << "\rDB is opened, loaded " << total_loaded << " blocks";
 
   blockHashes_ = std::make_unique<cs::BlockHashes>();
 
-  if (storage_.last_hash().is_empty()) {
+  if(storage_.last_hash().is_empty()) {
     csdebug() << "Last hash is empty...";
-    if (storage_.size()) {
+    if(storage_.size()) {
       cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
-      return;
+      return false;
     }
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     writeGenesisBlock();
     generateCheatDbFile(path, *blockHashes_);
   }
   else {
-    csdebug() << "Last hash is not empty...";
-
+    csdebug() << "Last hash is not empty. Reading wallets";
+    std::cout << "Reading wallets... ";
     {
       std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
-      if (!initFromDB(*initer))
-        return;
+      if(!initFromDB(*initer))
+        return false;
 
-      if (!initer->isFinishedOk()) {
+      if(!initer->isFinishedOk()) {
         cserror() << "Initialization from DB finished with error";
-        return;
+        return false;
       }
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
 
-    if (!validateCheatDbFile(path, *blockHashes_)) {
+    if(!validateCheatDbFile(path, *blockHashes_)) {
       cserror() << "Bad database version";
-      return;
+      return false;
     }
+    std::cout << "Done\n";
   }
 
-  cslog() << "BLOCKCHAIN> max loaded block #" << getLastSequence();
   good_ = true;
-}
-
-BlockChain::~BlockChain() {
+  return true;
 }
 
 bool BlockChain::isGood() const {
@@ -426,7 +439,7 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   for(const auto& t : trusted) {
     csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
   }
-  cslog() << " transactions count " << pool.transactions_count();
+  csdebug() << " transactions count " << pool.transactions_count();
   if(pool.user_field_ids().count(0) > 0) {
     csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   }
@@ -449,20 +462,9 @@ void BlockChain::finalizeBlock(csdb::Pool& pool) {
     csmeta(cserror) << "Error in updateFromNextBlock()";
   }
 
-  // inspect transactions against smart contracts, raise special event on every item found:
-  if(pool.transactions_count() > 0) {
-    size_t idx = 0;
-    for(const auto& t : pool.transactions()) {
-      if(cs::SmartContracts::is_smart_contract(t)) {
-        csdebug() << "BLOCKCHAIN> smart contract trx #" << pool.sequence() << "." << idx;
-        emit smartContractEvent_(pool, idx);
-      }
-      ++idx;
-    }
-  }
+  emit storeBlockEvent_(pool);
 
   csmeta(csdetails) << "last hash: " << pool.hash().to_string();
-
   recount_trxns(pool);
 }
 

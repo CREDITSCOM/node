@@ -27,7 +27,8 @@ class Signal<Return(InArgs...)> {
 public:
   using Argument = std::function<Return(InArgs...)>;
   using Signature = Return(InArgs...);
-  using Slots = std::vector<std::pair<void*, Argument>>;
+  using ObjectPointer = void*;
+  using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -66,8 +67,8 @@ public:
 private:
   // adds slot to signal
   template <typename T>
-  auto& add(T&& s, void* obj = nullptr) {
-    Argument arg = s;
+  auto& add(T&& s, ObjectPointer obj = nullptr) {
+    Argument arg = std::forward<T>(s);
 
     if (!arg) {
       return *this;
@@ -115,7 +116,8 @@ class Signal<std::function<T>> {
 public:
   using Argument = std::function<T>;
   using Signature = T;
-  using Slots = std::vector<std::pair<void*, Argument>>;
+  using ObjectPointer = void*;
+  using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
   /// @brief Generates signal.
@@ -147,7 +149,7 @@ public:
 private:
   // adds slot to signal
   template <typename U>
-  auto& add(U&& s, void* obj = nullptr) {
+  auto& add(U&& s, ObjectPointer obj = nullptr) {
     signal_.add(std::forward<U>(s), obj);
     return *this;
   }
@@ -339,8 +341,9 @@ public:
   ///
   template <template <typename> typename Signal, typename T, typename Object, typename Slot>
   static void connect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
+    using ObjectPointer = void*;
     constexpr int size = Args::GetArguments<Slot>();
-    auto obj = reinterpret_cast<void*>(const_cast<Object&>(slotObj));
+    auto obj = reinterpret_cast<ObjectPointer>(const_cast<Object&>(slotObj));
     const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
   }
 
@@ -357,7 +360,7 @@ public:
 
     auto closure = [=](auto... args) -> void {
       if (rhs) {
-        rhs->operator()(args...);
+        (*rhs)(std::forward<decltype(args)>(args)...);
       }
     };
 
@@ -365,6 +368,14 @@ public:
     cs::Connector::connect(lhs, std::move(func));
   }
 
+  ///
+  /// @brief Disconnects signal with objcts slots.
+  /// @return Returns true if disconnection is okay and same object/method
+  /// was found at content.
+  /// @param signal Any signal object.
+  /// @param slotObj Any object that consider slot.
+  /// @param slot T prototype slot.
+  ///
   template <template <typename> typename Signal, typename T, typename Object, typename Slot>
   static bool disconnect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
     if (!slotObj) {
@@ -377,15 +388,40 @@ public:
     auto& content = const_cast<Signal<T>*>(signal)->content();
     auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
       auto& [object, function] = pair;
-      auto result = function.target_type().hash_code() == binder.target_type().hash_code();
 
       if (object) {
-        if (object != (slotObj)) {
-          return false;
+        if (object == (slotObj)) {
+          return function.target_type().hash_code() == binder.target_type().hash_code();
         }
       }
 
-      return result;
+      return false;
+    });
+
+    if (iterator != content.end()) {
+      content.erase(iterator);
+      return true;
+    }
+
+    return false;
+  }
+
+  ///
+  /// @brief Disconnects signal pointer with lambda or function.
+  /// @param signal Any signal pointer.
+  /// @param slot Function or lambda/closure.
+  ///
+  template <template <typename> typename Signal, typename T>
+  static bool disconnect(const Signal<T>* signal, typename Signal<T>::Argument slot) {
+    auto& content = const_cast<Signal<T>*>(signal)->content();
+    auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
+      auto& [object, function] = pair;
+
+      if (!object) {
+        return function.target_type().hash_code() == slot.target_type().hash_code();
+      }
+
+      return false;
     });
 
     if (iterator != content.end()) {

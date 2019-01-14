@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-#include <lib/system/signals.hpp>
+#include <lib/system/concurrent.hpp>
 
 namespace cs {
 using TimerCallbackSignature = void();
@@ -51,7 +51,7 @@ public:
   /// @param msec is time in msec to tick.
   /// @param callback is any functor, lambda, closure, function object.
   ///
-  static void singleShot(int msec, const TimerCallback& callback);
+  static void singleShot(int msec, cs::RunPolicy policy, const TimerCallback& callback);
 
 public signals:
 
