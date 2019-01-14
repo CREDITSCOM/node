@@ -478,7 +478,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
   bool successRequest = false;
 
   for (std::size_t i = 0; i < neighboursCount; ++i) {
-    ConnectionPtr connection = transport_->getNeighbourByNumber(i);
+    ConnectionPtr connection = transport_->getConnectionByNumber(i);
 
     if (connection && !connection->isSignal) {
       successRequest = true;

@@ -139,7 +139,7 @@ public:
   uint32_t getMaxNeighbours() const;
   ConnectionPtr getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
   ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
-  ConnectionPtr getNeighbourByNumber(const std::size_t number);
+  ConnectionPtr getConnectionByNumber(const std::size_t number);
   ConnectionPtr getRandomNeighbour();
 
   const Connections getNeighbours() const;
