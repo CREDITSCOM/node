@@ -68,7 +68,7 @@ private:
   // adds slot to signal
   template <typename T>
   auto& add(T&& s, ObjectPointer obj = nullptr) {
-    Argument arg = s;
+    Argument arg = std::forward<T>(s);
 
     if (!arg) {
       return *this;
@@ -360,7 +360,7 @@ public:
 
     auto closure = [=](auto... args) -> void {
       if (rhs) {
-        rhs->operator()(args...);
+        (*rhs)(std::forward<decltype(args)>(args)...)
       }
     };
 
