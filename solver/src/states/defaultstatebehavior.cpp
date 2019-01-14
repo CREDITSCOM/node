@@ -27,7 +27,7 @@ void DefaultStateBehavior::onRoundEnd(SolverContext& /*context*/, bool /*is_bigb
 }
 
 Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const cs::RoundNumber round) {
-  cslog() << name() << ": <-- round table #" << round;
+  csdebug() << name() << ": <-- round table #" << round;
   return Result::Finish;
 }
 

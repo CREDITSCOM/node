@@ -150,7 +150,7 @@ namespace cs
     }
 
     stageOneStorage.push_back(stage);
-    csinfo() << "SolverCore: <-- stage-1 [" << (int) stage.sender << "] = " << stageOneStorage.size();
+    csdebug() << "SolverCore: <-- stage-1 [" << (int) stage.sender << "] = " << stageOneStorage.size();
 
     if(!pstate) {
       return;
@@ -162,7 +162,7 @@ namespace cs
 
   void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required)
   {
-    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]";
+    csdebug() << "SolverCore: [" << (int) requester << "] asks for stage-1 of [" << (int) required << "]";
     const auto ptr = find_stage1(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender,ptr->signature, MsgTypes::FirstStage , requester);
@@ -171,7 +171,7 @@ namespace cs
 
   void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required)
   {
-    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]";
+    csdebug() << "SolverCore: [" << (int) requester << "] asks for stage-2 of [" << (int) required << "]";
     const auto ptr = find_stage2(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester);
@@ -180,7 +180,7 @@ namespace cs
 
   void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required)
   {
-    csinfo() << "SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]";
+    csdebug() << "SolverCore: [" << (int) requester << "] asks for stage-3 of [" << (int) required << "]";
     const auto ptr = find_stage3(required);
     if(ptr != nullptr) {
       pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::ThirdStage, requester);
@@ -195,7 +195,7 @@ namespace cs
     }
 
     stageTwoStorage.push_back(stage);
-    csinfo() << "SolverCore: <-- stage-2 [" << (int) stage.sender << "] = " << stageTwoStorage.size();
+    csdebug() << "SolverCore: <-- stage-2 [" << (int) stage.sender << "] = " << stageTwoStorage.size();
 
     if(!pstate) {
       return;
@@ -206,12 +206,12 @@ namespace cs
   }
 
   void SolverCore::printStage3(const cs::StageThree& stage) {
-      cslog() << "     " << cs::Utils::byteStreamToHex(stage.hashBlock.data(), stage.hashBlock.size()) << std::endl
+    csdebug() << "     " << cs::Utils::byteStreamToHex(stage.hashBlock.data(), stage.hashBlock.size()) << std::endl
               << "     " << cs::Utils::byteStreamToHex(stage.hashCandidatesList.data(), stage.hashCandidatesList.size()) << std::endl
               << "     " << cs::Utils::byteStreamToHex(stage.hashHashesList.data(), stage.hashCandidatesList.size());
-      cslog() << "     WRITER = " << (int)stage.writer << ", RealTrusted = ";
+    csdebug() << "     WRITER = " << (int)stage.writer << ", RealTrusted = ";
       for (auto& i : stage.realTrustedMask) {
-        cslog() << "[" << (int)i << "] ";
+        csdebug() << "[" << (int)i << "] ";
       }
   }
 
@@ -227,9 +227,9 @@ namespace cs
         break;
       case 1:
         for (auto& st : stageThreeStorage) {
-          //cslog() << "OUR:";
+          //csdebug() << "OUR:";
           //printStage3(stage);
-          //cslog() << "GOT:";
+          //csdebug() << "GOT:";
           //printStage3(st);
           if(st.hashBlock == stage.hashBlock
             && st.hashCandidatesList == stage.hashCandidatesList
@@ -244,9 +244,9 @@ namespace cs
         break;
       case 2:
         const auto st = find_stage3(pnode->getConfidantNumber());
-        //cslog() << "OUR:";
+        //csdebug() << "OUR:";
         //printStage3(*st);
-        //cslog() << "GOT:";
+        //csdebug() << "GOT:";
         //printStage3(stage);
         if (st->hashBlock == stage.hashBlock
           && st->hashCandidatesList == stage.hashCandidatesList
@@ -259,7 +259,7 @@ namespace cs
       break;
     }
 
-    csinfo() << "SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size();
+    csdebug() << "SolverCore: <-- stage-3 [" << (int) stage.sender << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size();
 
     if(!pstate) {
       return;
@@ -279,7 +279,7 @@ namespace cs
 #endif
     if(psmarts->test_smart_contract_emits(tr)) {
       // avoid pass to conveyer until execution of emitter contract has finished
-      cslog() << "SolverCore: running smart contract emits transaction";
+      csdebug() << "SolverCore: running smart contract emits transaction";
       return;
     }
     cs::Conveyer::instance().addTransaction(tr);
@@ -317,7 +317,7 @@ namespace cs
 
   void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round)
   {
-    cslog() << "SolverCore: got round info request from "
+    csdebug() << "SolverCore: got round info request from "
       << cs::Utils::byteStreamToHex(requester.data(), requester.size());
 
     if(requester_round == cur_round) {
@@ -325,42 +325,42 @@ namespace cs
       if(ptr != nullptr) {
         if(ptr->sender == ptr->writer) {
           if(pnode->tryResendRoundTable(requester, cur_round)) {
-            cslog() << "SolverCore: re-send full round info #" << cur_round << " completed";
+            csdebug() << "SolverCore: re-send full round info #" << cur_round << " completed";
             return;
           }
         }
       }
-      cslog() << "SolverCore: also on the same round, inform cannot help with";
+      csdebug() << "SolverCore: also on the same round, inform cannot help with";
       pnode->sendRoundTableReply(requester, false);
     }
     else if(requester_round < cur_round) {
       for(const auto& node : cs::Conveyer::instance().confidants()) {
         if(requester == node) {
           if(pnode->tryResendRoundTable(requester, cur_round)) {
-            cslog() << "SolverCore: requester is trusted next round, supply it with round info";
+            csdebug() << "SolverCore: requester is trusted next round, supply it with round info";
           }
           else {
-            cslog() << "SolverCore: try but cannot send full round info";
+            csdebug() << "SolverCore: try but cannot send full round info";
           }
           return;
         }
       }
-      cslog() << "SolverCore: inform requester next round has come and it is not in trusted list";
+      csdebug() << "SolverCore: inform requester next round has come and it is not in trusted list";
       pnode->sendRoundTableReply(requester, true);
     }
     else {
       // requester_round > cur_round, cannot help with!
-      cslog() << "SolverCore: cannot help with outrunning round info";
+      csdebug() << "SolverCore: cannot help with outrunning round info";
     }
   }
 
   void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey& /*respondent*/)
   {
     if(next_round_started) {
-      cslog() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
+      csdebug() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
       return;
     }
-    cswarning() << "SolverCore: round info reply means next round is not started, become writer";
+    csdebug() << "SolverCore: round info reply means next round is not started, become writer";
     handleTransitions(SolverCore::Event::SetWriter);
   }
   

@@ -33,10 +33,13 @@ namespace cs
   }
 
   /*explicit*/
-  SmartContracts::SmartContracts(BlockChain& blockchain)
+  SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
     : execution_allowed(true)
     , force_execution(false)
     , bc(blockchain)
+    , scheduler(calls_queue_scheduler)
+    , tag_remove_finished_contract(CallsQueueScheduler::no_tag)
+    , tag_cancel_running_contract(CallsQueueScheduler::no_tag)
   {
 #if defined(DEBUG_SMARTS)
     execution_allowed = false;
@@ -192,10 +195,10 @@ namespace cs
         for(const auto& tr : it->created_transactions) {
           packet.addTransaction(tr);
         }
-        cslog() << name() << ": add " << it->created_transactions.size() << " emitted trx to contract state";
+        csdebug() << name() << ": add " << it->created_transactions.size() << " emitted trx to contract state";
       }
       else {
-        cslog() << name() << ": no emitted trx added to contract state";
+        csdebug() << name() << ": no emitted trx added to contract state";
       }
     }
 
@@ -351,6 +354,10 @@ namespace cs
         cswarning() << name() << ": finished contract still in queue, wait until is cleared";
         csdb::Address addr = next->abs_addr;
         auto remove_proc = [=]() {
+          if(tag_remove_finished_contract == CallsQueueScheduler::no_tag) {
+            return; // was canceled while being in calls queue
+          }
+          tag_remove_finished_contract = CallsQueueScheduler::no_tag;
           auto current = exe_queue.begin();
           if(current->abs_addr == addr && current->status == SmartContractStatus::Finished) {
             // finished, still in queue
@@ -362,7 +369,7 @@ namespace cs
             csdebug() << name() << ": smart contract has already removed, no remove required";
           }
         };
-        cs::Timer::singleShot(static_cast<int>(Consensus::T_smart_contract), remove_proc);
+        tag_remove_finished_contract = scheduler.InsertOnce(Consensus::T_smart_contract, remove_proc); // do not replace existing if any
         break;
       }
       csdebug() << name() << ": set running status to next contract in queue";
@@ -400,12 +407,12 @@ namespace cs
 
       auto& v = exe_queue.front().created_transactions;
       v.push_back(tr);
-      cslog() << name() << ": smart contract emits transaction, add, total " << v.size();
+      csdebug() << name() << ": smart contract emits transaction, add, total " << v.size();
       return true;
     }
     else {
       if(contract_state.count(abs_addr)) {
-        cslog() << name() << ": inactive smart contract emits transaction, ignore";
+        csdebug() << name() << ": inactive smart contract emits transaction, ignore";
       }
     }
 
@@ -417,6 +424,14 @@ namespace cs
     if(it == exe_queue.cend()) {
       cserror() << name() << ": contract to remove is not in queue";
       return;
+    }
+    if(it->status == SmartContractStatus::Finished) {
+      if(tag_remove_finished_contract != scheduler.no_tag) {
+        if(scheduler.Remove(tag_remove_finished_contract)) {
+          csdebug() << name() << ": cancel timeout tracking to remove finished running from queue";
+        }
+        tag_remove_finished_contract = scheduler.no_tag;
+      }
     }
     if(it != exe_queue.cbegin()) {
       cswarning() << name() << ": completed contract is not at the top of queue";
@@ -431,6 +446,12 @@ namespace cs
 
   void SmartContracts::cancel_running_smart_contract()
   {
+    if(tag_cancel_running_contract != scheduler.no_tag) {
+      if(scheduler.Remove(tag_cancel_running_contract)) {
+        csdebug() << name() << ": cancel timeout tracking to remove contract running too long";
+      }
+      tag_cancel_running_contract = scheduler.no_tag;
+    }
     if(!exe_queue.empty()) {
       const auto& current = exe_queue.front();
       if(current.status == SmartContractStatus::Running) {
@@ -528,6 +549,10 @@ namespace cs
 
       csdb::Address addr = start_tr.target();
       auto cancel_proc = [=]() {
+        if(tag_cancel_running_contract == CallsQueueScheduler::no_tag) {
+          return;
+        }
+        tag_cancel_running_contract = CallsQueueScheduler::no_tag;
         if (is_running_smart_contract(addr)) {
           cswarning() << name() << ": timeout of smart contract execution, cancel";
           cancel_running_smart_contract();
@@ -537,7 +562,7 @@ namespace cs
           test_exe_queue();
         }
       };
-      cs::Timer::singleShot(static_cast<int>(Consensus::T_smart_contract << 1), cancel_proc);
+      tag_cancel_running_contract = scheduler.InsertOnce(Consensus::T_smart_contract << 1, cancel_proc); // do not replace existing
       return true;
     }
     else {

@@ -19,6 +19,7 @@
 //#define DEBUG_SMARTS
 
 class BlockChain;
+class CallsQueueScheduler;
 
 namespace csdb
 {
@@ -125,7 +126,7 @@ namespace cs
   {
   public:
 
-    explicit SmartContracts(BlockChain&);
+    explicit SmartContracts(BlockChain&, CallsQueueScheduler&);
 
     SmartContracts() = delete;
     SmartContracts(const SmartContracts&) = delete;
@@ -210,8 +211,12 @@ namespace cs
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
 
     BlockChain& bc;
+    CallsQueueScheduler& scheduler;
     cs::Bytes node_id;
     csconnector::connector::ApiHandlerPtr papi;
+
+    CallsQueueScheduler::CallTag tag_remove_finished_contract;
+    CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
     // last contract's state storage
     std::map<csdb::Address, std::string> contract_state;

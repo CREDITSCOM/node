@@ -119,7 +119,7 @@ void SolverContext::spawn_next_round() {
     return;
   }
 
-  cslog() << "SolverCore: spawn next round";
+  csdebug() << "SolverCore: spawn next round";
   if (core.trusted_candidates.empty()) {
     cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
   }
@@ -163,7 +163,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required);
 }
 
@@ -172,7 +172,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required);
 }
 
@@ -181,7 +181,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csinfo() << "SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]";
   core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required);
 }
 
@@ -200,9 +200,9 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
 }
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
-  cslog() << "SolverCore: ask [" << (int)respondent1 << "] for RoundTable";
+  csdebug() << "SolverCore: ask [" << (int)respondent1 << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent1);
-  cslog() << "SolverCore: ask [" << (int)respondent2 << "] for RoundTable";
+  csdebug() << "SolverCore: ask [" << (int)respondent2 << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent2);
 }
 

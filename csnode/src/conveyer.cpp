@@ -470,7 +470,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     cswarning() << "\tSome of transactions is not valid";
   }
 
-  cslog() << "\tsequence = " << metaPoolInfo.sequenceNumber;
+  csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
 
   // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
