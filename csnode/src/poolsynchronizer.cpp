@@ -299,7 +299,7 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
 }
 
 void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
-  ConnectionPtr target = transport_->getNeighbourByNumber(neighbour.index());
+  ConnectionPtr target = getConnection(neighbour);
 
   if (!target) {
     cserror() << "POOL SYNCHRONIZER> " << __func__ << " : Target is not valid";
@@ -483,26 +483,26 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence) {
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
-  const uint32_t neededNeighboursCount = transport_->getNeighboursCountWithoutSS();
-  const auto nSize = neighbours_.size();
+  const uint8_t neededNeighboursCount = cs::numeric_cast<uint8_t>(transport_->getNeighboursCountWithoutSS());
+  const uint8_t nSize = cs::numeric_cast<uint8_t>(neighbours_.size());
 
   if (nSize == neededNeighboursCount) {
     return;
   }
 
-  csmeta(csdetails) << "Neighbours count without ss: " << neededNeighboursCount;
+  csmeta(csdetails) << "Neighbours count without ss: " << cs::numeric_cast<int>(neededNeighboursCount);
 
-  const uint32_t allNeighboursCount = transport_->getNeighboursCount();
+  const uint8_t allNeighboursCount = cs::numeric_cast<uint8_t>(transport_->getNeighboursCount());
 
   // Add new neighbours
   if (nSize < neededNeighboursCount) {
-    for (uint8_t i = cs::numeric_cast<uint8_t>(nSize); i < cs::numeric_cast<uint8_t>(allNeighboursCount); ++i) {
-      ConnectionPtr neighbour = transport_->getNeighbourByNumber(i);
+    for (uint8_t i = nSize; i < allNeighboursCount; ++i) {
+      ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
       if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
         auto isAlreadyHave =
             std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == i; });
         if (isAlreadyHave == neighbours_.end()) {
-          neighbours_.emplace_back(NeighboursSetElemet(i, syncData_.blockPoolsCount));
+          neighbours_.emplace_back(NeighboursSetElemet(i, neighbour->key, syncData_.blockPoolsCount));
         }
       }
     }
@@ -512,16 +512,17 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
   // refresh neighbours index
   std::size_t currentNh = 0;
-  for (uint8_t i = 0; i < cs::numeric_cast<uint8_t>(allNeighboursCount); ++i) {
-    ConnectionPtr neighbour = transport_->getNeighbourByNumber(i);
+  for (uint8_t i = 0; i < allNeighboursCount; ++i) {
+    ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
     if (neighbour && !neighbour->isSignal) {
       neighbours_[currentNh].setIndex(i);
+      neighbours_[currentNh].setPublicKey(neighbour->key);
       ++currentNh;
     }
   }
 
   // remove extra neighbour
-  for (std::size_t i = neededNeighboursCount; i < nSize; ++i) {
+  for (uint8_t i = neededNeighboursCount; i < nSize; ++i) {
     const auto& seqs = neighbours_.back().sequences();
     for (const auto& seq : seqs) {
       requestedSequences_.erase(seq);
@@ -555,13 +556,26 @@ void cs::PoolSynchronizer::synchroFinished() {
   cslog() << "POOL SYNCHRONIZER> Synchro finished";
 }
 
+ConnectionPtr cs::PoolSynchronizer::getConnection(const NeighboursSetElemet& neighbour) const {
+  ConnectionPtr target = transport_->getConnectionByKey(neighbour.publicKey());
+
+  if (!target) {
+    target = transport_->getConnectionByNumber(neighbour.index());
+  }
+
+  return target;
+}
+
 void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
   for (const auto& neighbour : neighbours_) {
-    ConnectionPtr target = transport_->getNeighbourByNumber(neighbour.index());
+    ConnectionPtr target = getConnection(neighbour);
+
+    csdetails() << "POOL SYNCHRONIZER>, Neighbour key: "
+                << cs::Utils::byteStreamToHex(neighbour.publicKey().data(), neighbour.publicKey().size());
 
     if (target) {
       csdebug() << "POOL SYNCHRONIZER> " << funcName
-                << " neighbour: " << target->getOut() << ", " << neighbour;
+                << " Neighbour: " << target->getOut() << ", " << neighbour;
     }
     else {
       csdebug() << "POOL SYNCHRONIZER> " << funcName

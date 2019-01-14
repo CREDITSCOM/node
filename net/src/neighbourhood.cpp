@@ -718,7 +718,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const cs::Sequence seq, bool& 
 ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
   cs::SpinGuard lock(nLockFlag_);
 
-  if (number > neighbours_.size()) {
+  if (number >= neighbours_.size()) {
     return ConnectionPtr();
   }
 
