@@ -502,7 +502,8 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
   stream >> size;
 
   if (size == 0) {
-    cserror() << "Data stream parsing of vector: nothing to parse";
+    //cserror() << "Data stream parsing of vector: nothing to parse";
+    return;
   }
 
   std::vector<T, U> expectedEntities;
