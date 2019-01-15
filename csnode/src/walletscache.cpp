@@ -8,12 +8,12 @@ using namespace std;
 
 namespace cs {
 void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress) {
-  const csdb::internal::byte_array& addrVec = address.public_key();
+  const cs::Bytes& addrVec = address.public_key();
   copy(addrVec.begin(), addrVec.end(), walletAddress.begin());
 }
 
 void WalletsCache::convert(const WalletData::Address& walletAddress, csdb::Address& address) {
-  csdb::internal::byte_array hashBytes(walletAddress.begin(), walletAddress.end());
+  cs::Bytes hashBytes(walletAddress.begin(), walletAddress.end());
   address = csdb::Address::from_public_key(hashBytes);
 }
 

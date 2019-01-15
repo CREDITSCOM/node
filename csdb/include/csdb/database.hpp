@@ -30,7 +30,7 @@ public:
   };
 
 public:
-  using byte_array = ::csdb::internal::byte_array;
+  using byte_array = cs::Bytes;
 
 protected:
   Database();

@@ -179,7 +179,7 @@ void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const Ad
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-std::string fromByteArray(const ::csdb::internal::byte_array& bar) {
+std::string fromByteArray(const cs::Bytes& bar) {
   std::string res;
   {
     res.reserve(bar.size());
@@ -188,8 +188,8 @@ std::string fromByteArray(const ::csdb::internal::byte_array& bar) {
   return res;
 }
 
-::csdb::internal::byte_array toByteArray(const std::string& s) {
-  ::csdb::internal::byte_array res;
+cs::Bytes toByteArray(const std::string& s) {
+  cs::Bytes res;
   {
     res.reserve(s.size());
     std::transform(s.begin(), s.end(), std::back_inserter<decltype(res)>(res), [](uint8_t _) { return uint8_t(_); });
@@ -225,7 +225,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
     address = csdb::Address::from_public_key(
-        csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
   }
 
   csdb::Address target = transaction.target();
@@ -233,7 +233,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.target().wallet_id(), data_to_fetch_pulic_key);
     target = csdb::Address::from_public_key(
-        csdb::internal::byte_array(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
   }
 
   result.id = convert_transaction_id(transaction.id());
@@ -1575,7 +1575,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 
   for (; ptr != lst.end(); ++ptr) {
     api::WalletInfo wi;
-    const ::csdb::internal::byte_array addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
+    const cs::Bytes addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
     wi.address = fromByteArray(addr_b);
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();

@@ -113,7 +113,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
-  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
+  cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
 

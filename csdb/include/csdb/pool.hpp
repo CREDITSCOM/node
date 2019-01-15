@@ -48,8 +48,8 @@ public:
    */
   static PoolHash from_string(const ::std::string& str);
 
-  ::csdb::internal::byte_array to_binary() const noexcept;
-  static PoolHash from_binary(const ::csdb::internal::byte_array& data);
+  cs::Bytes to_binary() const noexcept;
+  static PoolHash from_binary(const cs::Bytes& data);
 
   bool operator==(const PoolHash& other) const noexcept;
   inline bool operator!=(const PoolHash& other) const noexcept;
@@ -62,7 +62,7 @@ public:
    */
   bool operator<(const PoolHash& other) const noexcept;
 
-  static PoolHash calc_from_data(const internal::byte_array& data);
+  static PoolHash calc_from_data(const cs::Bytes& data);
 
 private:
   void put(::csdb::priv::obstream&) const;
@@ -125,13 +125,13 @@ public:
 public:
   Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage = Storage());
 
-  static Pool from_binary(const ::csdb::internal::byte_array& data);
-  static Pool meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt);
+  static Pool from_binary(const cs::Bytes& data);
+  static Pool meta_from_binary(const cs::Bytes& data, size_t& cnt);
   static Pool load(const PoolHash& hash, Storage storage = Storage());
 
   static Pool from_byte_stream(const char* data, size_t size);
   char* to_byte_stream(uint32_t&);
-  ::csdb::internal::byte_array to_byte_stream_for_sig();
+  cs::Bytes to_byte_stream_for_sig();
 
   Pool meta_from_byte_stream(const char*, size_t);
   static Pool from_lz4_byte_stream(size_t);
@@ -208,7 +208,7 @@ public:
    * @return Бинарное представление пула, если пул находится в режиме read-only, и пустой
    *         массив в противном случае.
    */
-  ::csdb::internal::byte_array to_binary() const noexcept;
+  cs::Bytes to_binary() const noexcept;
 
   void update_confidants(const std::vector<::std::vector<uint8_t>>& confidants);
 

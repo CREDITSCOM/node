@@ -192,7 +192,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
   Storage::OpenProgress progress{0};
   for (it->seek_to_first(); it->is_valid(); it->next()) {
-    const ::csdb::internal::byte_array v = it->value();
+    const cs::Bytes v = it->value();
 
     // Хеш в ключе совпадает с реальным хешем блока?
     PoolHash real_hash = PoolHash::calc_from_data(v);
@@ -457,7 +457,7 @@ Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size
 
   Pool res;
   bool needParseData = true;
-  ::csdb::internal::byte_array data;
+  cs::Bytes data;
 
   if (!d->db->get(hash.to_binary(), &data)) {
     {
@@ -534,7 +534,7 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
 
   Pool res;
   bool needParseData = true;
-  ::csdb::internal::byte_array data;
+  cs::Bytes data;
 
   if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
 
@@ -585,7 +585,7 @@ Pool Storage::pool_load_meta(const PoolHash &hash, size_t &cnt) const {
     return res;
   }
 
-  ::csdb::internal::byte_array data;
+  cs::Bytes data;
   if (!d->db->get(hash.to_binary(), &data)) {
     d->set_last_error(DatabaseError);
     return Pool{};
@@ -620,7 +620,7 @@ Pool Storage::pool_remove_last() {
     return Pool{};
   }
 
-  ::csdb::internal::byte_array data;
+  cs::Bytes data;
   if (!d->db->get(last_hash().to_binary(), &data)) {
     d->set_last_error(DatabaseError);
     return Pool{};
