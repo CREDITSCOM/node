@@ -897,9 +897,9 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   finalizeBlock(deferredBlock_);
 
   // log cached block
-  csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
-  logBlockInfo(pool);
-  csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
+  csdebug() << "----------------------- Defer block #" << deferredBlock_.sequence() << " until next round ----------------------";
+  logBlockInfo(deferredBlock_);
+  csdebug() << "----------------------------------- " << deferredBlock_.sequence() << " --------------------------------------";
 
   return std::make_pair(true, deferredBlock_);
 }
