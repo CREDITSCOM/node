@@ -219,16 +219,16 @@ UserField Transaction::user_field(user_field_id_t id) const noexcept {
   return res;
 }
 
-::csdb::internal::byte_array Transaction::to_binary() {
+cs::Bytes Transaction::to_binary() {
   if (!is_valid()) {
-    return ::csdb::internal::byte_array();
+    return cs::Bytes();
   }
   ::csdb::priv::obstream os;
   put(os);
   return os.buffer();
 }
 
-Transaction Transaction::from_binary(const ::csdb::internal::byte_array data) {
+Transaction Transaction::from_binary(const cs::Bytes data) {
   Transaction t;
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!t.get(is)) {
@@ -256,7 +256,7 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
   return os.buffer();
 }
 
-bool Transaction::verify_signature(const internal::byte_array& public_key) const {
+bool Transaction::verify_signature(const cs::Bytes& public_key) const {
   return cscrypto::VerifySignature(reinterpret_cast<const uint8_t*>(this->signature().data()),
     public_key.data(), this->to_byte_stream_for_sig().data(),
     this->to_byte_stream_for_sig().size());

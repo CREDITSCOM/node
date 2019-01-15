@@ -40,8 +40,8 @@ private:
 };
 
 template <>
-struct Dbt_copy<::csdb::internal::byte_array> : public Dbt {
-  explicit Dbt_copy(const ::csdb::internal::byte_array &data) {
+struct Dbt_copy<cs::Bytes> : public Dbt {
+  explicit Dbt_copy(const cs::Bytes &data) {
     set_data(const_cast<unsigned char *>(data.data()));
     set_size(static_cast<uint32_t>(data.size()));
     set_ulen(static_cast<uint32_t>(data.size()));
@@ -343,7 +343,7 @@ public:
     assert(false);
   }
 
-  void seek(const ::csdb::internal::byte_array&) final {
+  void seek(const cs::Bytes&) final {
     assert(false);
   }
 
@@ -369,15 +369,15 @@ public:
     assert(false);
   }
 
-  ::csdb::internal::byte_array key() const final {
-    return ::csdb::internal::byte_array{};
+  cs::Bytes key() const final {
+    return cs::Bytes{};
   }
 
-  ::csdb::internal::byte_array value() const final {
+  cs::Bytes value() const final {
     if (valid_) {
       return value_;
     }
-    return ::csdb::internal::byte_array{};
+    return cs::Bytes{};
   }
 
 private:
@@ -388,7 +388,7 @@ private:
 
   Dbc *it_;
   bool valid_;
-  internal::byte_array value_;
+  cs::Bytes value_;
 };
 
 DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {

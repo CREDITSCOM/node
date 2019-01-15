@@ -24,7 +24,7 @@ struct crypto {
   static const size_t hash_size = sizeof(size_t);
   static const size_t public_key_size = 20;
 #endif
-  static internal::byte_array calc_hash(const internal::byte_array &buffer) noexcept;
+  static cs::Bytes calc_hash(const cs::Bytes &buffer) noexcept;
 };
 
 }  // namespace priv

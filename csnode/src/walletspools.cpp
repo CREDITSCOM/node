@@ -219,12 +219,12 @@ const WalletsPools::WalletData* WalletsPools::findWallet(WalletId id) const {
 }
 
 void WalletsPools::convert(const csdb::PoolHash& poolHashDb, PoolHash& poolHashCache) {
-  const csdb::internal::byte_array& phVec = poolHashDb.to_binary();
+  const cs::Bytes& phVec = poolHashDb.to_binary();
   copy(phVec.begin(), phVec.end(), poolHashCache.begin());
 }
 
 void WalletsPools::convert(const PoolHash& poolHashCache, csdb::PoolHash& poolHashDb) {
-  csdb::internal::byte_array hashBytes(poolHashCache.begin(), poolHashCache.end());
+  cs::Bytes hashBytes(poolHashCache.begin(), poolHashCache.end());
   poolHashDb = csdb::PoolHash::from_binary(hashBytes);
 }
 

@@ -49,7 +49,7 @@ void Spammer::GenerateMyWallets() {
   for (auto i = 0u; i < kMyWalletsNum; ++i) {
     cscrypto::GenerateKeyPair(public_key, private_key);
     my_wallets_.push_back(std::pair<csdb::Address, cscrypto::PrivateKey>(
-        csdb::Address::from_public_key(csdb::internal::byte_array(public_key.begin(), public_key.end())), private_key));
+        csdb::Address::from_public_key(cs::Bytes(public_key.begin(), public_key.end())), private_key));
   }
 }
 

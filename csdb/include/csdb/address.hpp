@@ -30,11 +30,11 @@ public:
   ::std::string to_string() const noexcept;
   static Address from_string(const std::string &val);
 
-  ::csdb::internal::byte_array public_key() const noexcept;
+  cs::Bytes public_key() const noexcept;
   // returns (uint32_t)-1 if it is not WalletId
   WalletId wallet_id() const noexcept;
 
-  static Address from_public_key(const ::csdb::internal::byte_array &key);
+  static Address from_public_key(const cs::Bytes &key);
   static Address from_public_key(const char *key);
   static Address from_wallet_id(WalletId id);
   std::string to_api_addr();
