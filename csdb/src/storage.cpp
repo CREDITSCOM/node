@@ -133,7 +133,6 @@ private:
   bool quit = false;
 
   std::mutex data_lock;
-  std::mutex bc_lock;
 
   std::deque<Pool> write_queue;
   std::mutex write_lock;
@@ -142,7 +141,7 @@ private:
   // TODO: Добавить кеш для хранения последних вычитанных пулов транзакций
 
   friend class ::csdb::Storage;
-  
+
 
 private signals:
   ReadBlockSignal read_block_event;
@@ -193,17 +192,8 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
   Storage::OpenProgress progress{0};
   for (it->seek_to_first(); it->is_valid(); it->next()) {
-    //    const ::csdb::internal::byte_array k = it->key();
     const ::csdb::internal::byte_array v = it->value();
-    /*
-        PoolHash hash = PoolHash::from_binary(k);
-        if(hash.is_empty())
-        {
-          set_last_error(Storage::DataIntegrityError, "Data integrity error: key '%s' is not a valid hash value",
-                         ::csdb::internal::to_hex(k).c_str());
-          return false;
-        }
-    */
+
     // Хеш в ключе совпадает с реальным хешем блока?
     PoolHash real_hash = PoolHash::calc_from_data(v);
 
@@ -289,10 +279,7 @@ void Storage::priv::write_routine() {
       const PoolHash hash = pool.hash();
 
       db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
-      ++count_pool;
-      if (last_hash == pool.previous_hash()) {
-        last_hash = hash;
-      }
+
       write_queue.pop_front();
     }
   }
@@ -410,10 +397,12 @@ bool Storage::isOpen() const {
 }
 
 PoolHash Storage::last_hash() const noexcept {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   return d->last_hash;
 }
 
 size_t Storage::size() const noexcept {
+  std::unique_lock<std::mutex> lock(d->data_lock);
   return d->count_pool;
 }
 
@@ -435,9 +424,19 @@ bool Storage::pool_save(Pool pool) {
     return false;
   }
 
-  std::unique_lock<std::mutex> lock(d->write_lock);
-  d->write_queue.push_back(pool);
-  d->write_cond_var.notify_one();
+  {
+    std::unique_lock<std::mutex> lock(d->write_lock);
+    d->write_queue.push_back(pool);
+    d->write_cond_var.notify_one();
+  }
+
+  {
+    std::unique_lock<std::mutex> lock(d->data_lock);
+    ++d->count_pool;
+    if (d->last_hash == pool.previous_hash()) {
+      d->last_hash = hash;
+    }
+  }
 
   d->set_last_error();
   return true;
@@ -445,7 +444,6 @@ bool Storage::pool_save(Pool pool) {
 
 Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const
 {
-  std::unique_lock<std::mutex> lock(d->bc_lock);
   if (!isOpen()) {
     d->set_last_error(NotOpen);
     return Pool{};
@@ -526,39 +524,6 @@ bool Storage::write_queue_pop(Pool &res_pool) {
 Pool Storage::pool_load(const PoolHash &hash) const {
   size_t _;
   return pool_load_internal(hash, false, _);
-  /*Pool empty_Pool{};
-
-  if (!isOpen()) {
-    d->set_last_error(NotOpen);
-    return Pool{};
-  }
-
-  if (hash.is_empty()) {
-    d->set_last_error(InvalidParameter, "%s: Empty hash passed", __func__);
-    return Pool{};
-  }
-
-  Pool res{};
-  bool found = write_queue_search(hash, res);
-  if (found) {
-    return res;
-  }
-
-  ::csdb::internal::byte_array data;
-  if (!d->db->get(hash.to_binary(), &data)) {
-    d->set_last_error(DatabaseError);
-    return Pool{};
-  }
-
-  res = Pool::from_binary(data);
-  if (!res.is_valid()) {
-    d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", __func__, hash.to_string().c_str());
-  }
-  else {
-    d->set_last_error();
-  }
-
-  return res;*/
 }
 
 Pool Storage::pool_load(const cs::Sequence sequence) const {
@@ -567,13 +532,32 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
     return Pool{};
   }
 
+  Pool res;
+  bool needParseData = true;
   ::csdb::internal::byte_array data;
+
   if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
-    d->set_last_error(DatabaseError);
-    return Pool{};
+
+    {
+      std::unique_lock<std::mutex> lock2(d->write_lock);
+      for (auto& poolToWrite : d->write_queue) {
+        if (poolToWrite.sequence() == sequence) {
+          res = poolToWrite;
+          needParseData = false;
+          break;
+        }
+      }
+    }
+
+    if (needParseData && !d->db->get(static_cast<uint32_t>(sequence), &data)) {
+      d->set_last_error(DatabaseError);
+      return Pool{};
+    }
   }
 
-  Pool res = Pool::from_binary(data);
+  if (needParseData)
+    res = Pool::from_binary(data);
+
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError);
   }

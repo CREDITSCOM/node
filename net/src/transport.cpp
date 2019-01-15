@@ -146,7 +146,7 @@ void Transport::run() {
     ++ctr;
 
     bool askMissing = true;
-    bool resendPacks = ctr % 5 == 0;
+    bool resendPacks = ctr % 10 == 0;
     bool sendPing = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending = ctr % 100 == 0;
@@ -301,7 +301,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       try {
         cs::RoundNumber round = 0;
         iPackStream_ >> round;
-        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO: 
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO:
       }
       catch (std::out_of_range&) { }
       break;

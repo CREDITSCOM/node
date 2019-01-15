@@ -19,7 +19,7 @@ class Transport;
 class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
-const uint32_t MaxResendTimes = 32;
+const uint32_t MaxResendTimes = 8;
 const cs::Sequence MaxSyncAttempts = 8;
 
 const cs::Sequence BlocksToSync = 16;
