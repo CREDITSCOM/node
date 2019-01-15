@@ -69,6 +69,8 @@ private:  // Service
 
   void synchroFinished();
 
+  ConnectionPtr getConnection(const NeighboursSetElemet& neighbour) const;
+
   void printNeighbours(const std::string& funcName) const;
 
 private:  // struct
@@ -80,8 +82,9 @@ private:  // struct
 
   class NeighboursSetElemet {
   public:
-    explicit NeighboursSetElemet(uint8_t neighbourIndex, uint8_t blockPoolsCount)
+    explicit NeighboursSetElemet(uint8_t neighbourIndex, const cs::PublicKey& publicKey, uint8_t blockPoolsCount)
     : neighbourIndex_(neighbourIndex)
+    , key_(publicKey)
     , roundCounter_(0) {
       sequences_.reserve(blockPoolsCount);
     }
@@ -116,9 +119,15 @@ private:  // struct
     inline void setIndex(const uint8_t num) {
       neighbourIndex_ = num;
     }
+    inline void setPublicKey(const cs::PublicKey& publicKey) {
+      key_ = publicKey;
+    }
 
     inline uint8_t index() const {
       return neighbourIndex_;
+    }
+    inline const cs::PublicKey& publicKey() const {
+      return key_;
     }
     inline const PoolsRequestedSequences& sequences() const {
       return sequences_;
@@ -160,6 +169,7 @@ private:  // struct
 
   private:
     uint8_t neighbourIndex_;             // neighbour number
+    cs::PublicKey key_;                  // neighbour public key
     PoolsRequestedSequences sequences_;  // requested sequence
     cs::RoundNumber roundCounter_;
   };

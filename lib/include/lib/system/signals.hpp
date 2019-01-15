@@ -368,6 +368,14 @@ public:
     cs::Connector::connect(lhs, std::move(func));
   }
 
+  ///
+  /// @brief Disconnects signal with objcts slots.
+  /// @return Returns true if disconnection is okay and same object/method
+  /// was found at content.
+  /// @param signal Any signal object.
+  /// @param slotObj Any object that consider slot.
+  /// @param slot T prototype slot.
+  ///
   template <template <typename> typename Signal, typename T, typename Object, typename Slot>
   static bool disconnect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
     if (!slotObj) {
@@ -380,15 +388,40 @@ public:
     auto& content = const_cast<Signal<T>*>(signal)->content();
     auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
       auto& [object, function] = pair;
-      auto result = function.target_type().hash_code() == binder.target_type().hash_code();
 
       if (object) {
-        if (object != (slotObj)) {
-          return false;
+        if (object == (slotObj)) {
+          return function.target_type().hash_code() == binder.target_type().hash_code();
         }
       }
 
-      return result;
+      return false;
+    });
+
+    if (iterator != content.end()) {
+      content.erase(iterator);
+      return true;
+    }
+
+    return false;
+  }
+
+  ///
+  /// @brief Disconnects signal pointer with lambda or function.
+  /// @param signal Any signal pointer.
+  /// @param slot Function or lambda/closure.
+  ///
+  template <template <typename> typename Signal, typename T>
+  static bool disconnect(const Signal<T>* signal, typename Signal<T>::Argument slot) {
+    auto& content = const_cast<Signal<T>*>(signal)->content();
+    auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
+      auto& [object, function] = pair;
+
+      if (!object) {
+        return function.target_type().hash_code() == slot.target_type().hash_code();
+      }
+
+      return false;
     });
 
     if (iterator != content.end()) {

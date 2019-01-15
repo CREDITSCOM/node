@@ -40,7 +40,9 @@ Node::Node(const Config& config)
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_) {
+  std::cout << "Start transport... ";
   transport_ = new Transport(config, this);
+  std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   good_ = init(config);
@@ -61,29 +63,33 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
 
 #ifdef NODE_API
+  std::cout << "Init API... ";
   papi_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
     csconnector::Config {
      config.getApiSettings().port,
      config.getApiSettings().ajaxPort,
      config.getApiSettings().executorPort
     });
+  std::cout << "Done\n";
 #endif
 
   if (!transport_->isGood()) {
     return false;
   }
-
+  std::cout << "Transport is init\n";
 
   if (!solver_) {
     return false;
   }
+  std::cout << "Solver is init\n";
 
-  csdebug() << "Everything is init";
+  std::cout << "Everything is init\n";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
+  std::cout << "Spammer is init\n";
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -94,6 +100,7 @@ bool Node::init(const Config& config) {
 }
 
 void Node::run() {
+  std::cout << "Running transport\n";
   transport_->run();
 }
 
@@ -471,7 +478,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
   bool successRequest = false;
 
   for (std::size_t i = 0; i < neighboursCount; ++i) {
-    ConnectionPtr connection = transport_->getNeighbourByNumber(i);
+    ConnectionPtr connection = transport_->getConnectionByNumber(i);
 
     if (connection && !connection->isSignal) {
       successRequest = true;

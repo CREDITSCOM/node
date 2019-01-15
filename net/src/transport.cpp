@@ -620,7 +620,7 @@ ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
   return nh_.getNeighbourByKey(pk);
 }
 
-ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number) {
+ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
   return nh_.getNeighbour(number);
 }
 

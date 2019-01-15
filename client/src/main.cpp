@@ -196,6 +196,7 @@ int main(int argc, char* argv[]) {
     panic();
   }
 
+  std::cout << "Running Node\n";
   node.run();
 
   cswarning() << "+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++";
