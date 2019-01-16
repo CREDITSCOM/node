@@ -126,12 +126,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
   for (auto& pool : poolsBlock) {
     const auto sequence = pool.sequence();
 
-    checkNeighbourSequence(sequence);
-
-    auto it = requestedSequences_.find(sequence);
-    if (it != requestedSequences_.end()) {
-      requestedSequences_.erase(it);
-    }
+    removeExistingSequence(sequence);
 
     if (lastWrittenSequence > sequence) {
       continue;
@@ -234,12 +229,7 @@ void cs::PoolSynchronizer::onTimeOut() {
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
-  auto it = requestedSequences_.find(sequence);
-
-  if (it != requestedSequences_.end()) {
-    checkNeighbourSequence(sequence);
-    requestedSequences_.erase(it);
-  }
+  removeExistingSequence(sequence);
 }
 
 //
@@ -363,17 +353,8 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 
   const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
 
-  for (const auto& el : requiredBlocks) {
-    csmeta(csdetails) << "RequiredBlocks: [" << el.first << ", " << el.second << "]";
-  }
-
-  if (!requestedSequences_.empty()) {
-    // remove unnecessary sequnces
-    requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(lastWrittenSequence));
-  }
-  else {
-    csmeta(csdetails) << "Requested storage: size: 0";
-  }
+  // remove unnecessary sequnces
+  removeExistingSequence(lastWrittenSequence, true);
 
   cs::Sequence sequence = lastWrittenSequence;
 
@@ -468,11 +449,11 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   return true;
 }
 
-void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence) {
+void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, const bool includingSmaller) {
   csmeta(csdetails) << sequence;
 
   for (auto& neighbour : neighbours_) {
-    neighbour.removeSequnce(sequence);
+    neighbour.removeSequnce(sequence, includingSmaller);
 
     if (neighbour.sequences().empty()) {
       neighbour.resetRoundCounter();
@@ -482,6 +463,22 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence) {
   std::sort(neighbours_.begin(), neighbours_.end());
 
   printNeighbours("Check seq:");
+}
+
+void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const bool includingSmaller) {
+  checkNeighbourSequence(sequence, includingSmaller);
+
+  if (!requestedSequences_.empty()) {
+    if (includingSmaller) {
+      requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(sequence));
+    }
+    else {
+      auto it = requestedSequences_.find(sequence);
+      if (it != requestedSequences_.end()) {
+        requestedSequences_.erase(it);
+      }
+    }
+  }
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
@@ -501,8 +498,10 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     for (uint8_t i = nSize; i < allNeighboursCount; ++i) {
       ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
       if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-        auto isAlreadyHave =
-            std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == i; });
+        auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) {
+          return el.index() == i;
+        });
+
         if (isAlreadyHave == neighbours_.end()) {
           neighbours_.emplace_back(NeighboursSetElemet(i, neighbour->key, syncData_.blockPoolsCount));
         }
