@@ -531,8 +531,8 @@ size_t cs::ConveyerBase::blockTransactionsCount() const {
   return count;
 }
 
-cs::SharedMutex& cs::ConveyerBase::sharedMutex() const {
-  return sharedMutex_;
+std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
+  return std::unique_lock<cs::SharedMutex>(sharedMutex_);
 }
 
 void cs::ConveyerBase::flushTransactions() {
