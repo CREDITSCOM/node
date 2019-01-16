@@ -17,7 +17,7 @@ TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& s
   }
 
   TransactionsPacketHash res;
-  const ::csdb::internal::byte_array hash = ::csdb::internal::from_hex(str);
+  const cs::Bytes hash = ::csdb::internal::from_hex(str);
 
   if (::csdb::priv::crypto::hash_size == hash.size()) {
     res.m_bytes = hash;

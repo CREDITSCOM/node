@@ -21,7 +21,7 @@ namespace csdb {
 
 class PoolHash::priv : public ::csdb::internal::shared_data {
 public:
-  internal::byte_array value;
+  cs::Bytes value;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(PoolHash)
 
@@ -37,11 +37,11 @@ std::string PoolHash::to_string() const noexcept {
   return internal::to_hex(d->value);
 }
 
-::csdb::internal::byte_array PoolHash::to_binary() const noexcept {
+cs::Bytes PoolHash::to_binary() const noexcept {
   return d->value;
 }
 
-PoolHash PoolHash::from_binary(const ::csdb::internal::byte_array& data) {
+PoolHash PoolHash::from_binary(const cs::Bytes& data) {
   const size_t sz = data.size();
   PoolHash res;
   if ((0 == sz) || (::csdb::priv::crypto::hash_size == sz)) {
@@ -59,7 +59,7 @@ bool PoolHash::operator<(const PoolHash& other) const noexcept {
 }
 
 PoolHash PoolHash::from_string(const ::std::string& str) {
-  const ::csdb::internal::byte_array hash = ::csdb::internal::from_hex(str);
+  const cs::Bytes hash = ::csdb::internal::from_hex(str);
   const size_t sz = hash.size();
   PoolHash res;
   if ((0 == sz) || (::csdb::priv::crypto::hash_size == sz)) {
@@ -68,7 +68,7 @@ PoolHash PoolHash::from_string(const ::std::string& str) {
   return res;
 }
 
-PoolHash PoolHash::calc_from_data(const internal::byte_array& data) {
+PoolHash PoolHash::calc_from_data(const cs::Bytes& data) {
   PoolHash res;
   res.d->value = ::csdb::priv::crypto::calc_hash(data);
   return res;
@@ -83,7 +83,11 @@ bool PoolHash::get(::csdb::priv::ibstream& is) {
 }
 
 class Pool::priv : public ::csdb::internal::shared_data {
-  priv() = default;
+  priv() :
+    ::csdb::internal::shared_data()
+  {
+    writer_public_key_.fill(0);
+  }
 
   priv(PoolHash previous_hash, cs::Sequence sequence, ::csdb::Storage::WeakPtr storage)
   : is_valid_(true)
@@ -192,7 +196,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     next_confidants_.clear();
     next_confidants_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      ::std::vector<uint8_t> conf;
+      cs::PublicKey conf;
       if (!is.get(conf)) {
         return false;
       }
@@ -287,7 +291,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   void update_binary_representation() {
     ::csdb::priv::obstream os;
     put(os);
-    binary_representation_ = std::move(const_cast<internal::byte_array&>(os.buffer()));
+    binary_representation_ = std::move(const_cast<cs::Bytes&>(os.buffer()));
   }
 
   void update_transactions() {
@@ -316,17 +320,16 @@ class Pool::priv : public ::csdb::internal::shared_data {
   PoolHash hash_;
   PoolHash previous_hash_;
   cs::Sequence sequence_ {};
-  ::std::vector<::std::vector<uint8_t>> next_confidants_;
+  std::vector<cs::PublicKey> next_confidants_;
   ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   std::vector<uint8_t> realTrusted_;
-  std::vector<uint8_t> writer_public_key_;
-  //::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
+  cs::PublicKey writer_public_key_;
   ::std::vector<std::pair<int, ::std::string>> signatures_;
-  ::csdb::internal::byte_array binary_representation_;
+  cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
 };
@@ -448,7 +451,7 @@ cs::Sequence Pool::sequence() const noexcept {
   return d->sequence_;
 }
 
-std::vector<uint8_t> Pool::writer_public_key() const noexcept {
+const cs::PublicKey& Pool::writer_public_key() const noexcept {
   return d->writer_public_key_;
 }
 
@@ -456,7 +459,7 @@ std::string Pool::signature() const noexcept {
   return d->signature_;
 }
 
-const ::std::vector<::std::vector<uint8_t>>& Pool::confidants() const noexcept {
+const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
   return d->next_confidants_;
 }
 
@@ -484,13 +487,14 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
   data->previous_hash_ = std::move(previous_hash);
 }
 
-void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept {
-  if (d.constData()->read_only_)
+void Pool::set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept {
+  if (d.constData()->read_only_) {
     return;
-  
+  }
+
   priv* data = d.data();
   data->is_valid_ = true;
-  data->writer_public_key_ = std::move(writer_public_key);
+  data->writer_public_key_ = writer_public_key;
 }
 
 void Pool::set_signature(const std::string& signature) noexcept {
@@ -503,7 +507,7 @@ void Pool::set_signature(const std::string& signature) noexcept {
   data->signature_ = signature;
 }
 
-void Pool::set_confidants(const std::vector<::std::vector<uint8_t>>& confidants) noexcept {
+void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept {
   if (d.constData()->read_only_) {
     return;
   }
@@ -585,15 +589,8 @@ bool Pool::compose() {
   return d.constData()->is_valid_;
 }
 
-::csdb::internal::byte_array Pool::to_binary() const noexcept {
+cs::Bytes Pool::to_binary() const noexcept {
   return d->binary_representation_;
-}
-
-void Pool::update_confidants(const std::vector<::std::vector<uint8_t>>& confidants) {
-  priv* data = d.data();
-  data->read_only_ = false;
-  data->next_confidants_ = confidants;
-  compose();
 }
 
 uint64_t Pool::get_time() const noexcept
@@ -601,7 +598,7 @@ uint64_t Pool::get_time() const noexcept
   return atoll(user_field(0).value<std::string>().c_str());
 }
 
-Pool Pool::from_binary(const ::csdb::internal::byte_array& data) {
+Pool Pool::from_binary(const cs::Bytes& data) {
     std::unique_ptr<priv> p { new priv() };
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!p->get(is)) {
@@ -612,7 +609,7 @@ Pool Pool::from_binary(const ::csdb::internal::byte_array& data) {
   return Pool(p.release());
 }
 
-Pool Pool::meta_from_binary(const ::csdb::internal::byte_array& data, size_t& cnt) {
+Pool Pool::meta_from_binary(const cs::Bytes& data, size_t& cnt) {
   std::unique_ptr<priv> p(new priv());
   ::csdb::priv::ibstream is(data.data(), data.size());
 
@@ -682,10 +679,10 @@ bool Pool::save(Storage storage) {
   return false;
 }
 
-::csdb::internal::byte_array Pool::to_byte_stream_for_sig() const {
+cs::Bytes Pool::to_byte_stream_for_sig() {
   ::csdb::priv::obstream os;
   d->put_for_sig(os);
-  ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+  cs::Bytes result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
   return result;
 }
 

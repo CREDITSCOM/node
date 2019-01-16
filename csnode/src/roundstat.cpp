@@ -53,8 +53,14 @@ void RoundStat::onRoundStart(RoundNumber round) {
       os << ave_round_ms << "ms";
     }
 
-    os << ", " << totalReceivedTransactions_ << " viewed transactions, " << totalAcceptedTransactions_ << " stored transactions.";
+    os << ", "
+      //<< totalReceivedTransactions_ << " viewed transactions, "
+      << totalAcceptedTransactions_ << " stored transactions.";
     cslog() << os.str();
   }
+}
+void RoundStat::onReadBlock(csdb::Pool block, bool * /*should_stop*/)
+{
+  totalAcceptedTransactions_ += block.transactions_count();
 }
 }  // namespace cs

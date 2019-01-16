@@ -12,7 +12,7 @@ namespace csdb {
 
 class Address::priv : public ::csdb::internal::shared_data {
   union {
-    std::array<uint8_t, cscrypto::kPublicKeySize> public_key;
+    cs::PublicKey public_key;
     WalletId wallet_id;
   } data_{};
 
@@ -73,7 +73,7 @@ size_t Address::calcHash() const noexcept {
 
 ::std::string Address::to_string() const noexcept {
   if (is_public_key()) {
-    return internal::to_hex(::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end()));
+    return internal::to_hex(cs::Bytes(d->data_.public_key.begin(), d->data_.public_key.end()));
   }
   if (is_wallet_id()) {
     return std::to_string(wallet_id());
@@ -85,7 +85,7 @@ Address Address::from_string(const ::std::string &val) {
   Address res;
 
   if (val.size() == 2 * ::csdb::priv::crypto::public_key_size) {
-    const ::csdb::internal::byte_array data = ::csdb::internal::from_hex(val);
+    const cs::Bytes data = ::csdb::internal::from_hex(val);
     if (::csdb::priv::crypto::public_key_size == data.size()) {
       memcpy(res.d->data_.public_key.data(), data.data(), ::csdb::priv::crypto::public_key_size);
       res.d->is_wallet_id_ = false;
@@ -106,27 +106,32 @@ Address Address::from_string(const ::std::string &val) {
   return res;
 }
 
-::csdb::internal::byte_array Address::public_key() const noexcept {
-  if (is_public_key()) {
-    return ::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end());
-  }
-  return {};
+const cs::PublicKey& Address::public_key() const noexcept {
+  return d->data_.public_key;
 }
 
 Address::WalletId Address::wallet_id() const noexcept {
   if (is_wallet_id()) {
     return d->data_.wallet_id;
   }
-return static_cast<Address::WalletId>(-1);
+  return static_cast<Address::WalletId>(-1);
 }
 
-Address Address::from_public_key(const ::csdb::internal::byte_array &key) {
+Address Address::from_public_key(const cs::Bytes& key) {
   Address res;
 
   if (::csdb::priv::crypto::public_key_size == key.size()) {
-    memcpy(res.d->data_.public_key.data(), key.data(), ::csdb::priv::crypto::public_key_size);
+    std::copy(key.begin(), key.end(), res.d->data_.public_key.data());
     res.d->is_wallet_id_ = false;
   }
+
+  return res;
+}
+
+Address Address::from_public_key(const cs::PublicKey& key) {
+  Address res;
+  res.d->data_.public_key = key;
+  res.d->is_wallet_id_ = false;
 
   return res;
 }
@@ -149,20 +154,18 @@ Address Address::from_wallet_id(WalletId id) {
   return res;
 }
 
-void Address::put(::csdb::priv::obstream &os) const {
+void Address::put(::csdb::priv::obstream& os) const {
   if (is_public_key()) {
-    os.put(::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end()));
+    os.put(d->data_.public_key);
   }
   else {
     os.put(d->data_.wallet_id);
   }
 }
 
-bool Address::get(::csdb::priv::ibstream &is) {
+bool Address::get(::csdb::priv::ibstream& is) {
   if (is.size() == ::csdb::priv::crypto::public_key_size) {
-    ::csdb::internal::byte_array tmp;
-    bool ok = is.get(tmp);
-    memcpy(d->data_.public_key.data(), tmp.data(), ::csdb::priv::crypto::public_key_size);
+    bool ok = is.get(d->data_.public_key);
     return ok;
   }
   return is.get(d->data_.wallet_id);

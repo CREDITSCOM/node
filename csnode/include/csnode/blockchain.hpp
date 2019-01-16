@@ -37,7 +37,10 @@ class WalletsIds;
 class Fee;
 class TransactionsPacket;
 
-using SmartContractStartSignal = cs::Signal<void(const csdb::Pool, size_t)>;
+/** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
+using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
+
+/** @brief   The write block signal emits when block is flushed to disk */
 using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
@@ -49,8 +52,10 @@ public:
   using WalletData    = cs::WalletsCache::WalletData;
   using Mask          = boost::dynamic_bitset<uint64_t>;
 
-  explicit BlockChain(const std::string& path, csdb::Address genesisAddress, csdb::Address startAddress);
+  explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
   ~BlockChain();
+
+  bool init(const std::string& path);
 
   bool isGood() const;
 
@@ -108,7 +113,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
-  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
+  cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
 
@@ -157,8 +162,6 @@ public:
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
 
-  void updateLastBlockConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants);
-
   const csdb::Storage& getStorage() const;
 
   struct AddrTrnxCount {
@@ -177,9 +180,9 @@ private:
   void createTransactionsIndex(csdb::Pool&);
 #endif
 
-  void flushBlockToDisk(csdb::Pool& pool);
   void logBlockInfo(csdb::Pool& pool);
 
+  // Thread unsafe
   void finalizeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
@@ -285,11 +288,11 @@ public:
 
 public signals:
 
-  /** @brief The "smart contract started" event. Raised when every special "start smart contract" transaction included in block and stored.
-  *   Connected to SolverCore::gotStartSmartContract() method
-  */
-  cs::SmartContractStartSignal smartContractEvent_;
+  /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
+  cs::StoreBlockSignal storeBlockEvent_;
 
+
+  /** @brief The write block event. Raised when the next block is flushed to storage */
   cs::WriteBlockSignal writeBlockEvent;
 
 private:

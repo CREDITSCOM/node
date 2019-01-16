@@ -146,7 +146,7 @@ void Transport::run() {
     ++ctr;
 
     bool askMissing = true;
-    bool resendPacks = ctr % 5 == 0;
+    bool resendPacks = ctr % 10 == 0;
     bool sendPing = ctr % 20 == 0;
     bool refreshLimits = ctr % 20 == 0;
     bool checkPending = ctr % 100 == 0;
@@ -301,7 +301,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       try {
         cs::RoundNumber round = 0;
         iPackStream_ >> round;
-        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO: 
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO:
       }
       catch (std::out_of_range&) { }
       break;
@@ -620,7 +620,7 @@ ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
   return nh_.getNeighbourByKey(pk);
 }
 
-ConnectionPtr Transport::getNeighbourByNumber(const std::size_t number) {
+ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
   return nh_.getNeighbour(number);
 }
 
@@ -654,7 +654,7 @@ void Transport::resetNeighbours() {
 void Transport::sendRegistrationRequest(Connection& conn) {
   cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
-  cs::SpinGuard l(oLock_);
+  cs::SpinGuard lock(oLock_);
   Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
@@ -666,7 +666,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
   cslog() << "Confirming registration with " << conn.getOut();
 
-  cs::SpinGuard l(oLock_);
+  cs::SpinGuard lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::RegistrationConfirmed << requestedId << conn.id << myPublicKey_;
 

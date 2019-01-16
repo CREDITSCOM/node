@@ -12,9 +12,9 @@ namespace cs
         SolverContext * pctx = &context;
 
         if(context.round() == 0) {
-            csinfo() << name() << ": start track timeout " << Consensus::T_round << " ms to spawn first round";
+          csdebug() << name() << ": start track timeout " << Consensus::T_round << " ms to spawn first round";
             context.scheduler().InsertOnce(Consensus::T_round, [pctx, this]() {
-                csinfo() << name() << ": it is time to spawn first round";
+              csdebug() << name() << ": it is time to spawn first round";
                 trusted_candidates.assign(Consensus::MinTrustedNodes, pctx->public_key());
                 std::vector <cs::TransactionsPacketHash> hashes_candidates;
                 pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
@@ -24,11 +24,9 @@ namespace cs
             return;
         }
 
-        if(Consensus::Log) {
-            csinfo() << name() << ": start track timeout " << Consensus::DefaultStateTimeout << " ms to complete round";
-        }
+        csdebug() << name() << ": start track timeout " << Consensus::DefaultStateTimeout << " ms to complete round";
         tag_timeout = context.scheduler().InsertPeriodic(Consensus::DefaultStateTimeout, [pctx, this]() {
-            csinfo() << name() << ": round duration is expired";
+          csdebug() << name() << ": round duration is expired";
             // "complete" trusted candidates with own key
             if(Consensus::MinTrustedNodes > trusted_candidates.size()) {
                 size_t cnt = Consensus::MinTrustedNodes - trusted_candidates.size();

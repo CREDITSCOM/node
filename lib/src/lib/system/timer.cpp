@@ -1,5 +1,4 @@
 #include "lib/system/timer.hpp"
-#include <lib/system/concurrent.hpp>
 
 cs::Timer::Timer()
 : isRunning_(false)
@@ -36,8 +35,8 @@ bool cs::Timer::isRunning() const {
   return isRunning_;
 }
 
-void cs::Timer::singleShot(int msec, const cs::TimerCallback& callback) {
-  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), callback);
+void cs::Timer::singleShot(int msec, cs::RunPolicy policy, const cs::TimerCallback& callback) {
+  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, callback);
 }
 
 void cs::Timer::loop() {
@@ -58,8 +57,7 @@ void cs::Timer::loop() {
 void cs::Timer::rehabilitation() {
   isRehabilitation_ = true;
 
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
-                                                                        rehabilitationStartValue_);
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - rehabilitationStartValue_);
   auto difference = duration - realMs_;
 
   if (difference >= realMs_) {

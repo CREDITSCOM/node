@@ -19,6 +19,7 @@
 //#define DEBUG_SMARTS
 
 class BlockChain;
+class CallsQueueScheduler;
 
 namespace csdb
 {
@@ -125,7 +126,7 @@ namespace cs
   {
   public:
 
-    explicit SmartContracts(BlockChain&);
+    explicit SmartContracts(BlockChain&, CallsQueueScheduler&);
 
     SmartContracts() = delete;
     SmartContracts(const SmartContracts&) = delete;
@@ -205,13 +206,24 @@ namespace cs
   public slots:
     void onExecutionFinished(const SmartExecutionData& data);
 
+    // called when next block is stored
+    void onStoreBlock(csdb::Pool block);
+
+    // called when next block is read from database
+    void onReadBlock(csdb::Pool block, bool* should_stop);
+
   private:
 
     using trx_innerid_t = int64_t; // see csdb/transaction.hpp near #101
 
     BlockChain& bc;
-    cs::Bytes node_id;
+    CallsQueueScheduler& scheduler;
+    cs::PublicKey node_id;
+    // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
     csconnector::connector::ApiHandlerPtr papi;
+
+    CallsQueueScheduler::CallTag tag_remove_finished_contract;
+    CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
     // last contract's state storage
     std::map<csdb::Address, std::string> contract_state;
@@ -263,7 +275,7 @@ namespace cs
 
     void test_exe_queue();
 
-    bool contains_me(const std::vector<cs::Bytes>& list) const
+    bool contains_me(const std::vector<cs::PublicKey>& list) const
     {
       return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }

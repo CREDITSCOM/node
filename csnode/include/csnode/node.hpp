@@ -55,7 +55,7 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-  void sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent);
+  void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
   void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   //consensus communication
   void sendStageOne(cs::StageOne&);
@@ -181,8 +181,8 @@ public:
   }
 
 #ifdef NODE_API
-  csconnector::connector& getConnector() {
-    return api_;
+  csconnector::connector *getConnector() {
+    return papi_.get();
   }
 #endif
 
@@ -192,7 +192,7 @@ public slots:
   void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
 
 private:
-  bool init();
+  bool init(const Config& config);
   void sendRoundPackage(const cs::PublicKey& target);
   void sendRoundPackageToAll();
 
@@ -282,7 +282,7 @@ private:
   std::unique_ptr<cs::Spammer> spammer_;
 
 #ifdef NODE_API
-  csconnector::connector api_;
+  std::unique_ptr<csconnector::connector> papi_;
 #endif
 
   RegionAllocator allocator_;

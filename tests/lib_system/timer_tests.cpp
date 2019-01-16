@@ -34,7 +34,7 @@ TEST(Timer, BaseTimerUsage) {
   // run timer
   timer.start(100);
 
-  cs::Timer::singleShot(awaitTime, [&] {
+  cs::Timer::singleShot(awaitTime, cs::RunPolicy::ThreadPoolPolicy, [&] {
     if (counter != expectedCalls) {
       print("Timer bad call, counts: ", counter);
       isFailed = true;

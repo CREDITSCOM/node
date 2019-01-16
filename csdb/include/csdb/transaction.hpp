@@ -62,7 +62,7 @@ public:
   sequence_t index() const noexcept;
 
   std::string to_string() const noexcept;
-  ::csdb::internal::byte_array to_byte_stream() const noexcept;
+  cs::Bytes to_byte_stream() const noexcept;
 
   /**
    * @brief Получение идентификатора транзакции из строкового представления
@@ -119,14 +119,14 @@ public:
   void set_counted_fee_unsafe(AmountCommission counted_fee);
   void set_signature(std::string signature);
 
-  ::csdb::internal::byte_array to_binary();
-  static Transaction from_binary(const ::csdb::internal::byte_array data);
+  cs::Bytes to_binary();
+  static Transaction from_binary(const cs::Bytes data);
 
   static Transaction from_byte_stream(const char* data, size_t m_size);
   std::vector<uint8_t> to_byte_stream() const;
   std::vector<uint8_t> to_byte_stream_for_sig() const;
 
-  bool verify_signature(const internal::byte_array& public_key) const;
+  bool verify_signature(const cs::PublicKey& public_key) const;
 
   /**
    * @brief Добавляет дополнительное произвольное поле к транзакции

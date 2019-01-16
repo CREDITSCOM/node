@@ -53,6 +53,19 @@ private:
     boost::asio::post(threadPool, std::forward<Func>(function));
   }
 
+  template <typename Func>
+  inline static void policyRun(cs::RunPolicy policy, Func&& function) {
+    if (policy == cs::RunPolicy::CallQueuePolicy) {
+      CallsQueue::instance().insert(std::forward<Func>(function));
+    }
+    else {
+      function();
+    }
+  }
+
+  template<typename T>
+  friend class FutureBase;
+
   template<typename T>
   friend class FutureWatcher;
   friend class Concurrent;
@@ -123,13 +136,7 @@ protected:
 
   template <typename Func>
   void callSignal(Func&& func) {
-    // insert in call queue or call direct
-    if (policy_ == RunPolicy::CallQueuePolicy) {
-      CallsQueue::instance().insert(std::forward<Func>(func));
-    }
-    else {
-      func();
-    }
+    Worker::policyRun(policy_, std::forward<Func>(func));
 
     future_ = Future<Result>();
     state_ = WatcherState::Compeleted;
@@ -175,7 +182,7 @@ protected:
         Super::callSignal(signal);
       }
       catch (std::exception& e) {
-        cserror() << "Concurrent execution with" << typeid(Result).name() << "failed, " << e.what();
+        cserror() << "Concurrent execution with " << typeid(Result).name() << " failed, " << e.what();
         emit failed();
       }
     };
@@ -270,17 +277,15 @@ public:
   }
 
   // calls std::function after ms time in another thread
-  static void runAfter(const std::chrono::milliseconds& ms, const std::function<void()>& callBack) {
+  static void runAfter(const std::chrono::milliseconds& ms, cs::RunPolicy policy, const std::function<void()>& callBack) {
     auto timePoint = std::chrono::steady_clock::now() + ms;
-    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, callBack));
+    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, policy, callBack));
   }
 
 private:
-  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, const std::function<void()>& callBack) {
+  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, cs::RunPolicy policy, const std::function<void()>& callBack) {
     std::this_thread::sleep_until(timePoint);
-
-    // TODO: call callback without Queue
-    CallsQueue::instance().insert(callBack);
+    Worker::policyRun(policy, callBack);
   }
 };
 

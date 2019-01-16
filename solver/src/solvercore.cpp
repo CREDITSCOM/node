@@ -86,7 +86,7 @@ SolverCore::SolverCore()
     pnode = pNode;
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
-    psmarts = std::make_unique<cs::SmartContracts>(bc);
+    psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
     // bind signals
     cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
   }
@@ -134,7 +134,7 @@ void SolverCore::setState(const StatePtr& pState) {
     pstate->off(*pcontext);
   }
   if (Consensus::Log) {
-    cslog() << "SolverCore: switch " << (pstate ? pstate->name() : "null") << " -> "
+    csdebug() << "SolverCore: switch " << (pstate ? pstate->name() : "null") << " -> "
             << (pState ? pState->name() : "null");
   }
   pstate = pState;
@@ -144,7 +144,7 @@ void SolverCore::setState(const StatePtr& pState) {
   pstate->on(*pcontext);
 
   auto closure = [this]() {
-    cslog() << "SolverCore: state " << pstate->name() << " is expired";
+    csdebug() << "SolverCore: state " << pstate->name() << " is expired";
     // clear flag to know timeout expired
     tag_state_expired = CallsQueueScheduler::no_tag;
     // control state switch
@@ -152,7 +152,7 @@ void SolverCore::setState(const StatePtr& pState) {
     pstate->expired(*pcontext);
     if (pstate == p1.lock()) {
       // expired state did not change to another one, do it now
-      cslog() << "SolverCore: there is no state set on expiration of " << pstate->name();
+      csdebug() << "SolverCore: there is no state set on expiration of " << pstate->name();
       // setNormalState();
     }
   };
@@ -200,7 +200,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   table.confidants = nodes;
   table.hashes = hashes;
 
-  cslog() << "Applying " << hashes.size() << " hashes to ROUND Table";
+  csdebug() << "Applying " << hashes.size() << " hashes to ROUND Table";
   for (std::size_t i = 0; i < hashes.size(); ++i) {
     csdetails() << '\t' << i << ". " << hashes[i].toString();
   }
@@ -213,7 +213,7 @@ void SolverCore::sendRoundTable() {
 
 
 //smart-part begin VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-  std::vector<cs::PublicKey> SolverCore::smartConfidants() {
+  const std::vector<cs::PublicKey>& SolverCore::smartConfidants() const {
     return smartConfidants_;
   }
 
@@ -240,8 +240,8 @@ void SolverCore::sendRoundTable() {
     pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
-    cslog() << "WWWWWWWWWWWWWWWWWWWWWWWWWWW  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
-    cslog() << "SMART confidants (" << smartConfidants_.size() << "):";
+    cslog() << "======================  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] =========================";
+    csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
       return;
@@ -264,14 +264,14 @@ void SolverCore::sendRoundTable() {
       if (e == pnode->getNodeIdKey()) {
         ownSmartConfNumber = i;
       }
-      cslog() << "[" << (int)i << "] "
+      csdebug() << "[" << (int)i << "] "
         << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber
           ? "me"
           : cs::Utils::byteStreamToHex(e.data(), e.size()));
       ++i;
     }
     if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
-      cslog() << "          This NODE is not a confidant one for this smart-contract consensus round";
+      csdebug() << "          This NODE is not a confidant one for this smart-contract consensus round";
     }
     return ownSmartConfNumber;
   }
@@ -287,7 +287,7 @@ void SolverCore::sendRoundTable() {
 
   void SolverCore::refreshSmartStagesStorage()
   {
-    cslog() << "          " << __func__;
+    csdetails() << "          " << __func__;
     size_t cSize = smartConfidants_.size();
     smartStageOneStorage_.clear();
     smartStageOneStorage_.resize(cSize);
@@ -331,9 +331,9 @@ void SolverCore::sendRoundTable() {
     }
     smartStageOneStorage_.at(stage.sender) = stage;
     for (size_t i=0; i<smartConfidants_.size(); ++i) {
-      cslog() << "[" << i << "] - " << (int)smartStageOneStorage_.at(i).sender;
+      csdebug() << "[" << i << "] - " << (int)smartStageOneStorage_.at(i).sender;
     }
-    cslog() << "          <-- SMART-Stage-1 [" << (int)stage.sender << "]";
+    csdebug() << "          <-- SMART-Stage-1 [" << (int)stage.sender << "]";
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
@@ -353,7 +353,7 @@ void SolverCore::sendRoundTable() {
       return;
     }
     smartStageTwoStorage_.at(stage.sender) = stage;
-    cslog() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
+    csdebug() << ": <-- SMART-Stage-2 [" << (int)stage.sender << "] = " << smartStageTwoStorage_.size();
     if (smartStageTwoEnough()) {
       startTimer(2);
       processStages();
@@ -361,8 +361,8 @@ void SolverCore::sendRoundTable() {
   }
 
 void SolverCore::processStages() {
-  cslog() << __func__ << "(): start";
-int cnt = (int)smartConfidants_.size();
+  csdetails() << __func__ << "(): start";
+  int cnt = (int)smartConfidants_.size();
   //perform the evaluation og stages 1 & 2 to find out who is traitor 
   int hashFrequency = 1;
   for (auto& st : smartStageOneStorage_) {
@@ -371,13 +371,13 @@ int cnt = (int)smartConfidants_.size();
     }
     if (st.hash != smartStageOneStorage_.at(ownSmartsConfNum_).hash) {
       ++(smartUntrusted.at(st.sender));
-      cslog() << "Confidant [" << (int)st.sender << "] is markt as UNTRUSTED: hash";
+      cslog() << "Confidant [" << (int)st.sender << "] is markt as untrusted (wrong hash)";
     }
     else {
       ++hashFrequency;
     }
   }
-  cslog() << "Hash: " << cs::Utils::byteStreamToHex(smartStageOneStorage_.at(ownSmartsConfNum_).hash.data(), 
+  csdebug() << "Hash: " << cs::Utils::byteStreamToHex(smartStageOneStorage_.at(ownSmartsConfNum_).hash.data(),
     sizeof(smartStageOneStorage_.at(ownSmartsConfNum_).hash)) << ", Frequency = " << hashFrequency;
   auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
   for (auto& st : smartStageTwoStorage_) {
@@ -388,11 +388,11 @@ int cnt = (int)smartConfidants_.size();
       if (st.signatures[i] != myStage2.signatures[i]) {
         if (cscrypto::VerifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
           ++(smartUntrusted.at(i));
-          cslog() << "Confidant [" << i << "] is marked as UNTRUSTED: hash";
+          cslog() << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
         }
         else {
           ++(smartUntrusted.at(st.sender));
-          cslog() << "Confidant [" << (int)st.sender << "] is marked as UNTRUSTED: signature";
+          cslog() << "Confidant [" << (int)st.sender << "] is marked as untrusted (wrong signature)";
         }
       }
     }
@@ -411,7 +411,7 @@ int cnt = (int)smartConfidants_.size();
     cslog() << "Smart's consensus NOT achieved, the state transaction won't send to the conveyer";
     return;    
   }
-  cslog() << "Smart's consensus achieved";
+  csdebug() << "Smart's consensus achieved";
 
   auto hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
   if (hash_t.empty()) {
@@ -449,9 +449,9 @@ int cnt = (int)smartConfidants_.size();
 }
 
   void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
-  cslog() << __func__;
+    csdetails() << __func__;
     if (send) {
-      cslog() << "____ 1.";
+      csdebug() << "____ 1.";
       stage.sender = ownSmartsConfNum_;
       stage.sRoundNum = smartRoundNumber_;
       pnode->sendSmartStageThree(stage);
@@ -483,7 +483,7 @@ int cnt = (int)smartConfidants_.size();
   }
 
   void SolverCore::createFinalTransactionSet() {
-    cslog() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
+    csdetails() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     //if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
       auto& conv = cs::Conveyer::instance();
       
@@ -498,11 +498,11 @@ int cnt = (int)smartConfidants_.size();
       conv.addSeparatePacket(currentSmartTransactionPack_);
       
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
-      cslog() << "Transaction user fields = " << fieldsNumber;
-      cslog() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
+      csdetails() << "Transaction user fields = " << fieldsNumber;
+      csdebug() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
       return;
     //}
-    //cslog() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
+    //csdebug() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
   void SolverCore::gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber) {
@@ -538,7 +538,7 @@ int cnt = (int)smartConfidants_.size();
       ++i;
     }
     size_t cSize = smartConfidants_.size();
-    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    csdetails() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }
 
@@ -550,7 +550,7 @@ int cnt = (int)smartConfidants_.size();
       ++i;
     }
     size_t cSize = smartConfidants_.size();
-    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    csdetails() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }
 
@@ -561,57 +561,57 @@ int cnt = (int)smartConfidants_.size();
       if (it.sender == i) ++stageSize;
       ++i;
     }
-    size_t cSize = smartConfidants_.size(); // /2 + 1; - this is usefull only when we demand all signatues to be collected
-    cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
+    size_t cSize = smartConfidants_.size() / 2 + 1;
+    csdetails() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }
 
-  void SolverCore::startTimer(int st) {
-    cslog() << __func__ << "(): start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+  void SolverCore::startTimer(int st)
+  {
+    csdetails() << __func__ << "(): start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
     timeout_request_stage.start(
       scheduler, Consensus::T_stage_request,
       // timeout #1 handler:
       [this, st]() {
-      cslog() << __func__<< "(): timeout for stages-" << st << " is expired, make requests";
-      requestSmartStages(st);
-      // start subsequent track timeout for "wide" request
-      cslog() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
-        << " ms to request neighbors about stages-" << st;
-      timeout_request_neighbors.start(
-        scheduler, Consensus::T_stage_request,
-        // timeout #2 handler:
-        [this, st]() {
-        cslog() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
-        requestSmartStagesNeighbors(st);
-        // timeout #3 handler
-        timeout_force_transition.start(
+        csdebug() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
+        requestSmartStages(st);
+        // start subsequent track timeout for "wide" request
+        csdebug() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
+          << " ms to request neighbors about stages-" << st;
+        timeout_request_neighbors.start(
           scheduler, Consensus::T_stage_request,
+          // timeout #2 handler:
           [this, st]() {
-          cslog() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
-          markSmartOutboundNodes();
+            csdebug() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
+            requestSmartStagesNeighbors(st);
+            // timeout #3 handler
+            timeout_force_transition.start(
+              scheduler, Consensus::T_stage_request,
+              [this, st]() {
+                csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
+                markSmartOutboundNodes();
+              },
+            true/*replace if exists*/);
+          },
+         true /*replace if exists*/);
         },
-          true/*replace if exists*/);
-      },
-        true /*replace if exists*/);
-    },
       true /*replace if exists*/);
-
   }
 
   void SolverCore::killTimer(int st) {
     if (timeout_request_stage.cancel()) {
-      cslog() << __func__ << "(): cancel track timeout of stages-" << st;
+      csdebug() << __func__ << "(): cancel track timeout of stages-" << st;
     }
     if (timeout_request_neighbors.cancel()) {
-      cslog() << __func__ << "(): cancel track timeout to request neighbors about stages-" << st;
+      csdebug() << __func__ << "(): cancel track timeout to request neighbors about stages-" << st;
     }
     if (timeout_force_transition.cancel()) {
-      cslog() << __func__ << "(): cancel track timeout to force transition to next state";
+      csdebug() << __func__ << "(): cancel track timeout to force transition to next state";
     }
   }
 
   void SolverCore::requestSmartStages(int st) {
-  cslog() << __func__;
+    csdetails() << __func__;
     uint8_t cnt = (uint8_t) smartConfidants_.size();
     int cnt_requested = 0;
     for (uint8_t i = 0; i < cnt; ++i) {
@@ -641,7 +641,7 @@ int cnt = (int)smartConfidants_.size();
 
   // requests stages from any available neighbor nodes
   void SolverCore::requestSmartStagesNeighbors(int st) {
-    cslog() << __func__;
+    csdetails() << __func__;
     uint8_t cnt = (uint8_t)smartConfidants_.size();
     int cnt_requested = 0;
     switch (st) {

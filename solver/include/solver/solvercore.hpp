@@ -115,7 +115,7 @@ public:
   void requestSmartStagesNeighbors(int st);
   void markSmartOutboundNodes();
 
-  std::vector<cs::PublicKey> smartConfidants();
+  const std::vector<cs::PublicKey>& smartConfidants() const;
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -124,8 +124,6 @@ public:
   /// <param name="tr">   The transaction </param>
 
   void send_wallet_transaction(const csdb::Transaction& tr);
-
-  void gotSmartContractEvent(const csdb::Pool block, size_t trx_idx);
 
 private:
   // to use private data while serve for states as SolverCore context:

@@ -17,7 +17,7 @@ void obstream::put(const std::string &value)
   buffer_.insert(buffer_.end(), value.begin(), value.end());
 }
 
-void obstream::put(const internal::byte_array &value)
+void obstream::put(const cs::Bytes &value)
 {
   put(value.size());
   buffer_.insert(buffer_.end(), value.begin(), value.end());
@@ -53,7 +53,7 @@ bool ibstream::get(std::string &value)
   return true;
 }
 
-bool ibstream::get(internal::byte_array &value)
+bool ibstream::get(cs::Bytes &value)
 {
   size_t size;
   if (!get(size)) {

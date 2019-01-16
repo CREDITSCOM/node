@@ -74,7 +74,7 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
     pimpl_->packetsTable.emplace(std::move(hash), packet);
   }
   else {
-    cswarning() << csname() << "Same hash already exists at table: " << hash.toString();
+    csdebug() << csname() << "Same hash already exists at table: " << hash.toString();
   }
 }
 
@@ -470,13 +470,13 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     cswarning() << "\tSome of transactions is not valid";
   }
 
-  cslog() << "\tsequence = " << metaPoolInfo.sequenceNumber;
+  csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
 
   // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-  newPool.set_writer_public_key(cs::Bytes(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_writer_public_key(metaPoolInfo.writerKey);
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csmeta(csdetails) << "done";

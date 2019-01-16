@@ -24,7 +24,7 @@ TEST(TransactionsPacket, addTransactions) {
   cscrypto::PublicKey myPublicForSig;
 
   csdb::Transaction transaction;
-  transaction.set_target(csdb::Address::from_public_key((char*)myPublicForSig.data()));
+  transaction.set_target(csdb::Address::from_public_key(myPublicForSig));
   transaction.set_source(startAddress);
   transaction.set_currency(1);
   transaction.set_amount(csdb::Amount(10000, 0));

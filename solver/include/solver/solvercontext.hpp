@@ -16,7 +16,7 @@ class TransactionsPacket;
 namespace cs {
 
 class SolverCore;
-using KeyType = csdb::internal::byte_array;
+using KeyType = cs::Bytes;
 
 /**
  * @enum    Role
@@ -445,7 +445,7 @@ public:
    * @return  Null if it fails, else a pointer to a const uint8_t.
    */
 
-  csdb::internal::byte_array last_block_hash() const;
+  cs::Bytes last_block_hash() const;
 
   /**
    * @fn  void SolverContext::request_round_table() const;

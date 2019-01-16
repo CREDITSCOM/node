@@ -219,16 +219,16 @@ UserField Transaction::user_field(user_field_id_t id) const noexcept {
   return res;
 }
 
-::csdb::internal::byte_array Transaction::to_binary() {
+cs::Bytes Transaction::to_binary() {
   if (!is_valid()) {
-    return ::csdb::internal::byte_array();
+    return cs::Bytes();
   }
   ::csdb::priv::obstream os;
   put(os);
   return os.buffer();
 }
 
-Transaction Transaction::from_binary(const ::csdb::internal::byte_array data) {
+Transaction Transaction::from_binary(const cs::Bytes data) {
   Transaction t;
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!t.get(is)) {
@@ -256,7 +256,7 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
   return os.buffer();
 }
 
-bool Transaction::verify_signature(const internal::byte_array& public_key) const {
+bool Transaction::verify_signature(const cs::PublicKey& public_key) const {
   return cscrypto::VerifySignature(reinterpret_cast<const uint8_t*>(this->signature().data()),
     public_key.data(), this->to_byte_stream_for_sig().data(),
     this->to_byte_stream_for_sig().size());
@@ -277,13 +277,13 @@ std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const {
     os.put(data->source_.wallet_id());
   }
   else {
-    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->source_.public_key());
   }
   if (data->target_.is_wallet_id()) {
     os.put(data->target_.wallet_id());
   }
   else {
-    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->target_.public_key());
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
@@ -316,13 +316,13 @@ void Transaction::put(::csdb::priv::obstream& os) const {
     os.put(data->source_.wallet_id());
   }
   else {
-    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->source_.public_key());
   }
   if (data->target_.is_wallet_id()) {
     os.put(data->target_.wallet_id());
   }
   else {
-    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->target_.public_key());
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
@@ -366,10 +366,9 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
 
       data->source_ = Address::from_wallet_id(id);
     }
-
     else {
-      char key[::csdb::priv::crypto::public_key_size];
-      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      cs::PublicKey key;
+      res = is.get(key);
 
       if (!res) {
         return res;
@@ -389,8 +388,8 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
       data->target_ = Address::from_wallet_id(id);
     }
     else {
-      char key[::csdb::priv::crypto::public_key_size];
-      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      cs::PublicKey key;
+      res = is.get(key);
 
       if (!res) {
         return res;

@@ -69,11 +69,11 @@ WalletsPoolsImpl::WalletsPoolsImpl(csdb::Address genesisAddress, csdb::Address s
 : genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletsIds_(walletsIds) {
-  /*csinfo() << __FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash);
-  csinfo() << __FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
-  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData); csinfo() << __FUNCTION__ << ":
+  /*csdebug() << __FUNCTION__ << ": sizeof(PoolHash)=" << sizeof(PoolHash) << " alignof(PoolHash)=" << alignof(PoolHash);
+  csdebug() << __FUNCTION__ << ": sizeof(WalletData::PoolHashData)=" << sizeof(WalletData::PoolHashData) << "
+  alignof(WalletData::PoolHashData)=" << alignof(WalletData::PoolHashData); csdebug() << __FUNCTION__ << ":
   sizeof(WalletData::PoolsHashes)=" << sizeof(WalletData::PoolsHashes) << " alignof(WalletData::PoolsHashes)=" <<
-  alignof(WalletData::PoolsHashes); csinfo() << __FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
+  alignof(WalletData::PoolsHashes); csdebug() << __FUNCTION__ << ": sizeof(WalletData)=" << sizeof(WalletData) << "
   alignof(WalletData)=" << alignof(WalletData);*/
 }
 
@@ -84,7 +84,7 @@ template <Direction Dir>
 void WalletsPoolsImpl::load(csdb::Pool& curr) {
   PoolHash poolHash;
   WalletsPools::convert(curr.hash(), poolHash);
-  // csinfo() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
+  // csdebug() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" <<
   // curr.transactions_count();
 
   for (size_t i = 0; i < curr.transactions_count(); i++) {
@@ -219,12 +219,12 @@ const WalletsPools::WalletData* WalletsPools::findWallet(WalletId id) const {
 }
 
 void WalletsPools::convert(const csdb::PoolHash& poolHashDb, PoolHash& poolHashCache) {
-  const csdb::internal::byte_array& phVec = poolHashDb.to_binary();
+  const cs::Bytes& phVec = poolHashDb.to_binary();
   copy(phVec.begin(), phVec.end(), poolHashCache.begin());
 }
 
 void WalletsPools::convert(const PoolHash& poolHashCache, csdb::PoolHash& poolHashDb) {
-  csdb::internal::byte_array hashBytes(poolHashCache.begin(), poolHashCache.end());
+  cs::Bytes hashBytes(poolHashCache.begin(), poolHashCache.end());
   poolHashDb = csdb::PoolHash::from_binary(hashBytes);
 }
 
