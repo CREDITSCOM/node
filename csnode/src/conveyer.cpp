@@ -476,7 +476,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
-  newPool.set_writer_public_key(cs::Bytes(metaPoolInfo.writerKey.begin(), metaPoolInfo.writerKey.end()));
+  newPool.set_writer_public_key(metaPoolInfo.writerKey);
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csmeta(csdetails) << "done";

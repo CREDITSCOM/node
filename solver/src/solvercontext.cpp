@@ -65,11 +65,11 @@ size_t SolverContext::own_conf_number() const {
 }
 
 size_t SolverContext::cnt_trusted() const {
-  return cs::Conveyer::instance().currentRoundTable().confidants.size();  // core.pnode->getConfidants().size();
+  return cs::Conveyer::instance().confidantsCount();
 }
 
 const std::vector<cs::PublicKey>& SolverContext::trusted() const {
-  return cs::Conveyer::instance().currentRoundTable().confidants;
+  return cs::Conveyer::instance().confidants();
 }
 
 void SolverContext::request_round_table() const {

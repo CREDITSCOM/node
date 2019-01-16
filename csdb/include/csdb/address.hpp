@@ -9,6 +9,8 @@
 #include <functional>
 #include <string>
 
+#include <lib/system/common.hpp>
+
 #include "csdb/internal/shared_data.hpp"
 #include "csdb/internal/types.hpp"
 
@@ -34,7 +36,8 @@ public:
   // returns (uint32_t)-1 if it is not WalletId
   WalletId wallet_id() const noexcept;
 
-  static Address from_public_key(const ::csdb::internal::byte_array &key);
+  static Address from_public_key(const ::csdb::internal::byte_array& key);
+  static Address from_public_key(const cs::PublicKey& key);
   static Address from_public_key(const char *key);
   static Address from_wallet_id(WalletId id);
   std::string to_api_addr();

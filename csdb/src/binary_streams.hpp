@@ -16,6 +16,8 @@
 
 #include "integral_encdec.hpp"
 
+#include <lib/system/common.hpp>
+
 namespace csdb {
 namespace priv {
 
@@ -40,6 +42,9 @@ public:
 
   template<class K, class T, class C, class A>
   void put(const ::std::map<K, T, C, A>& value);
+
+  template <std::size_t Size>
+  void put(const cs::ByteArray<Size>& value);
 
   template<class K, class T, class C, class A>
   void put_smart(const ::std::map<K, T, C, A>& value);
@@ -72,6 +77,9 @@ public:
 
   template<class K, class T, class C, class A>
   bool get(::std::map<K, T, C, A>& value);
+
+  template <std::size_t Size>
+  bool get(::cs::ByteArray<Size>& value);
 
   inline size_t size() const noexcept
   {
@@ -126,6 +134,12 @@ void obstream::put(const ::std::map<K, T, C, A>& value)
   }
 }
 
+template <std::size_t Size>
+void obstream::put(const cs::ByteArray<Size>& value)
+{
+  buffer_.insert(buffer_.end(), value.begin(), value.end());
+}
+
 template<class K, class T, class C, class A>
 void obstream::put_smart(const ::std::map<K, T, C, A>& value)
 {
@@ -177,6 +191,21 @@ bool ibstream::get(::std::map<K, T, C, A>& value)
     }
     value.emplace(key, val);
   }
+
+  return true;
+}
+
+template <std::size_t Size>
+bool ibstream::get(::cs::ByteArray<Size>& value)
+{
+  if (Size > size_) {
+    return false;
+  }
+
+  auto data = static_cast<const cs::Byte*>(data_);
+  std::memmove(value.data(), data, Size);
+  size_ -= Size;
+  data_ = static_cast<const void*>(data + Size);
 
   return true;
 }

@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include <lib/system/common.hpp>
+
 #include "csdb/address.hpp"
 #include "csdb/internal/shared_data.hpp"
 #include "csdb/internal/types.hpp"
@@ -142,17 +144,17 @@ public:
   cs::Sequence sequence() const noexcept;
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
-  std::vector<uint8_t> writer_public_key() const noexcept;
+  const cs::PublicKey& writer_public_key() const noexcept;
   std::string signature() const noexcept;
-  const ::std::vector<::std::vector<uint8_t>>& confidants() const noexcept;
+  const std::vector<cs::PublicKey>& confidants() const noexcept;
   const ::std::vector<std::pair<int, ::std::string>>& signatures() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
   void set_storage(const Storage& storage) noexcept;
-  void set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept;
+  void set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept;
   void set_signature(const std::string& signature) noexcept;
-  void set_confidants(const std::vector<::std::vector<uint8_t>>& confidants) noexcept;
+  void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void add_signature(int index, ::std::string& signature) noexcept;
 
   Transactions& transactions();
@@ -209,8 +211,6 @@ public:
    *         массив в противном случае.
    */
   ::csdb::internal::byte_array to_binary() const noexcept;
-
-  void update_confidants(const std::vector<::std::vector<uint8_t>>& confidants);
 
   /**
    * @brief Сохранение пула в хранилище.
