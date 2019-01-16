@@ -123,7 +123,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   }
 
-  void put_for_sig(::csdb::priv::obstream& os) {
+  void put_for_sig(::csdb::priv::obstream& os) const {
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -323,7 +323,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
   std::vector<uint8_t> realTrusted_;
-  //::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
+  ::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
   ::std::vector<std::pair<int, ::std::string>> signatures_;
   ::csdb::internal::byte_array binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -345,7 +345,7 @@ bool Pool::is_read_only() const noexcept {
 
 PoolHash Pool::hash() const noexcept {
   if (d->hash_.is_empty()) {
-    const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(d->binary_representation_);
+    const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(to_byte_stream_for_sig());
   }
   return d->hash_;
 }
@@ -670,7 +670,7 @@ bool Pool::save(Storage storage) {
   }
 
   if (d->hash_.is_empty()) {
-    d->hash_ = PoolHash::calc_from_data(d->binary_representation_);
+    d->hash_ = PoolHash::calc_from_data(to_byte_stream_for_sig());
   }
 
   if (s.pool_save(*this)) {
@@ -681,7 +681,7 @@ bool Pool::save(Storage storage) {
   return false;
 }
 
-::csdb::internal::byte_array Pool::to_byte_stream_for_sig() {
+::csdb::internal::byte_array Pool::to_byte_stream_for_sig() const {
   ::csdb::priv::obstream os;
   d->put_for_sig(os);
   ::csdb::internal::byte_array result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
