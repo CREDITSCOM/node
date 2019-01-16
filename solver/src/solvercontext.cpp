@@ -93,7 +93,7 @@ Role SolverContext::role() const {
   return Role::Normal;
 }
 
-void SolverContext::spawn_next_round() {
+void SolverContext::spawn_next_round(cs::StageThree& st3) {
   std::string tStamp;
   uint8_t writer_idx = InvalidConfidantIndex;
   const auto own_stage3 = stage3((uint8_t) own_conf_number());
@@ -130,7 +130,7 @@ void SolverContext::spawn_next_round() {
     ++i;
   }
   csdebug() << "SolverCore: new hashes count is " << core.hashes_candidates.size();
-  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
+  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp), st3);
 }
 
 void SolverContext::sendRoundTable() {

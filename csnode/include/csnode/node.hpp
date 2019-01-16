@@ -91,7 +91,7 @@ public:
   void startConsensus();
 
   void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree st3);
-  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
+  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3);
 
   //smart-contracts consensus stages sending and getting
 
@@ -193,9 +193,7 @@ public slots:
 
 private:
   bool init();
-  void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
-                        const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
-                        const cs::Signature& signature);
+  void sendRoundPackage(const cs::PublicKey& target);
   void sendRoundPackageToAll();
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
