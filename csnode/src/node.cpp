@@ -1969,7 +1969,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
 
   // array
-  cs::Signature poolSignature;
+
   pool.value().sign(solver_->getPrivateKey());
   const auto& signature = pool.value().signature();
   std::copy(signature.begin(), signature.end(), st3.blockSignature.begin());
@@ -2056,7 +2056,8 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
 
   cs::Bytes messageToSign;
   messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-
+  lastRoundTableMessage_.clear();
+  lastRoundTableMessage_.reserve(expectedMessageSize);
   cs::DataStream stream(lastRoundTableMessage_);
   stream << lastSentRoundData_.roundTable.confidants;
   stream << lastSentRoundData_.roundTable.hashes;

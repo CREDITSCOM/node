@@ -349,7 +349,7 @@ bool Pool::is_read_only() const noexcept {
 
 PoolHash Pool::hash() const noexcept {
   if (d->hash_.is_empty()) {
-    const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(to_byte_stream_for_sig());
+    const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(d->binary_representation_);
   }
   return d->hash_;
 }
