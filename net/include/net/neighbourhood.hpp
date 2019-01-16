@@ -153,12 +153,14 @@ public:
 
   // no thread safe
   Connections getNeigbours() const;
-
-  // no thread safe
   Connections getNeighboursWithoutSS() const;
 
   // uses to iterate connections
   std::unique_lock<cs::SpinLock> getNeighboursLock() const;
+
+  // thread safe
+  void forEachNeighbour(std::function<void(ConnectionPtr)> func);
+  void forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func);
 
   void pingNeighbours();
   bool isPingDone();

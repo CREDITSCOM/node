@@ -144,6 +144,11 @@ public:
 
   std::unique_lock<cs::SpinLock> getNeighboursLock() const;
 
+  // thread safe negihbours methods
+  void forEachNeighbour(std::function<void(ConnectionPtr)> func);
+  void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
+
+  // no thread safe
   const Connections getNeighbours() const;
   const Connections getNeighboursWithoutSS() const;
 

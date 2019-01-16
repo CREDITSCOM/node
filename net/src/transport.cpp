@@ -633,6 +633,14 @@ std::unique_lock<cs::SpinLock> Transport::getNeighboursLock() const {
   return nh_.getNeighboursLock();
 }
 
+void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
+  nh_.forEachNeighbour(std::move(func));
+}
+
+void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func) {
+  nh_.forEachNeighbourWithoutSS(std::move(func));
+}
+
 const Connections Transport::getNeighbours() const {
   return nh_.getNeigbours();
 }

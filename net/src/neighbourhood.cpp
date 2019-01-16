@@ -264,6 +264,24 @@ std::unique_lock<cs::SpinLock> Neighbourhood::getNeighboursLock() const {
   return std::unique_lock<cs::SpinLock>(nLockFlag_);
 }
 
+void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
+  cs::SpinGuard lock(nLockFlag_);
+  for (const ConnectionPtr connection : neighbours_) {
+    if (connection) {
+      func(connection);
+    }
+  }
+}
+
+void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func) {
+  cs::SpinGuard lock(nLockFlag_);
+  for (const ConnectionPtr connection : neighbours_) {
+    if (connection && !connection->isSignal) {
+      func(connection);
+    }
+  }
+}
+
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
   cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_);
 
