@@ -277,13 +277,13 @@ std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const {
     os.put(data->source_.wallet_id());
   }
   else {
-    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->source_.public_key());
   }
   if (data->target_.is_wallet_id()) {
     os.put(data->target_.wallet_id());
   }
   else {
-    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->target_.public_key());
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
@@ -316,13 +316,13 @@ void Transaction::put(::csdb::priv::obstream& os) const {
     os.put(data->source_.wallet_id());
   }
   else {
-    os.put(data->source_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->source_.public_key());
   }
   if (data->target_.is_wallet_id()) {
     os.put(data->target_.wallet_id());
   }
   else {
-    os.put(data->target_.public_key().data(), ::csdb::priv::crypto::public_key_size);
+    os.put(data->target_.public_key());
   }
   os.put(data->amount_);
   os.put(data->max_fee_);
@@ -366,10 +366,9 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
 
       data->source_ = Address::from_wallet_id(id);
     }
-
     else {
-      char key[::csdb::priv::crypto::public_key_size];
-      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      cs::PublicKey key;
+      res = is.get(key);
 
       if (!res) {
         return res;
@@ -389,8 +388,8 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
       data->target_ = Address::from_wallet_id(id);
     }
     else {
-      char key[::csdb::priv::crypto::public_key_size];
-      res = is.get(key, ::csdb::priv::crypto::public_key_size);
+      cs::PublicKey key;
+      res = is.get(key);
 
       if (!res) {
         return res;
