@@ -54,6 +54,8 @@ public:
     return req_stop;
   }
 
+  void sendRoundTable();
+
   uint8_t subRound(); 
   // Solver "public" interface,
   // below are the "required" methods to be implemented by Solver-compatibility issue:

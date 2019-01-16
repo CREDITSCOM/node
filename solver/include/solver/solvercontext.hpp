@@ -126,6 +126,8 @@ public:
     //TODO: implement method
   }
 
+  void sendRoundTable();
+
   void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes)
   {
     std::vector<cs::PublicKey> tmp(nodes);

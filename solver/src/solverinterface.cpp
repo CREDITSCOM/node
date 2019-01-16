@@ -206,9 +206,8 @@ namespace cs
   }
 
   void SolverCore::printStage3(const cs::StageThree& stage) {
-      cslog() << "     " << cs::Utils::byteStreamToHex(stage.hashBlock.data(), stage.hashBlock.size()) << std::endl
-              << "     " << cs::Utils::byteStreamToHex(stage.hashCandidatesList.data(), stage.hashCandidatesList.size()) << std::endl
-              << "     " << cs::Utils::byteStreamToHex(stage.hashHashesList.data(), stage.hashCandidatesList.size());
+      cslog() << "     " << cs::Utils::byteStreamToHex(stage.blockHash.data(), stage.blockHash.size()) << std::endl
+              << "     " << cs::Utils::byteStreamToHex(stage.roundHash.data(), stage.roundHash.size()) << std::endl;
       cslog() << "     WRITER = " << (int)stage.writer << ", RealTrusted = ";
       for (auto& i : stage.realTrustedMask) {
         cslog() << "[" << (int)i << "] ";
@@ -217,6 +216,7 @@ namespace cs
 
   void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   {
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
     if(find_stage3(stage.sender) != nullptr) {
       // duplicated
       return;
@@ -231,9 +231,9 @@ namespace cs
           //printStage3(stage);
           //cslog() << "GOT:";
           //printStage3(st);
-          if(st.hashBlock == stage.hashBlock
-            && st.hashCandidatesList == stage.hashCandidatesList
-            && st.hashHashesList == stage.hashHashesList
+          //to change the routine of pool signing
+          if(cscrypto::VerifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size())
+            && cscrypto::VerifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender), stage.roundHash.data(), stage.roundHash.size())
             && st.realTrustedMask == stage.realTrustedMask
             && st.writer == stage.writer) {
             trueStageThreeStorage.push_back(st);
@@ -248,9 +248,8 @@ namespace cs
         //printStage3(*st);
         //cslog() << "GOT:";
         //printStage3(stage);
-        if (st->hashBlock == stage.hashBlock
-          && st->hashCandidatesList == stage.hashCandidatesList
-          && st->hashHashesList == stage.hashHashesList
+        if (cscrypto::VerifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size())
+          && cscrypto::VerifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender), st->roundHash.data(), st->roundHash.size())
           && st->realTrustedMask == stage.realTrustedMask
           && st->writer == stage.writer) {
           trueStageThreeStorage.push_back(stage);

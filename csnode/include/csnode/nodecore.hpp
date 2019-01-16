@@ -44,7 +44,7 @@ using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 
 // array of notifications
 using Notifications = std::vector<cs::Bytes>;
-
+using Signatures = std::vector<cscrypto::Signature>;
 // round data
 using PublicKeys = std::vector<PublicKey>;
 using PrivateKeys = std::vector<PrivateKey>;
@@ -100,6 +100,7 @@ struct PoolMetaInfo {
   cs::PublicKey writerKey;
   csdb::PoolHash previousHash;
   cs::Sequence sequenceNumber;
+  std::vector<uint8_t> realTrustedMask;
 };
 
 struct HashVector {

@@ -10,7 +10,7 @@
 
 #include <csnode/spammer.hpp>
 #include <csnode/walletsstate.hpp>
-
+#include <csnode/datastream.hpp>
 #include <lib/system/logger.hpp>
 
 #include <functional>
@@ -195,8 +195,6 @@ bool SolverCore::stateCompleted(Result res) {
 void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp) {
   cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
-  pnode->becomeWriter();
-
   cs::RoundTable table;
   table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
   table.confidants = nodes;
@@ -206,9 +204,14 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
   for (std::size_t i = 0; i < hashes.size(); ++i) {
     csdetails() << '\t' << i << ". " << hashes[i].toString();
   }
-
   pnode->prepareMetaForSending(table, currentTimeStamp);
 }
+
+void SolverCore::sendRoundTable() {
+  pnode->becomeWriter();
+  pnode->sendRoundPackageToAll();
+}
+
 
 //smart-part begin VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
   std::vector<cs::PublicKey> SolverCore::smartConfidants() {
@@ -305,6 +308,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     st2.hashes.resize(cSize);
     st3.realTrustedMask.clear();
     st3.realTrustedMask.resize(cSize);
+    st3.packageSignature.fill(0);
     st2.sender = cs::ConfidantConsts::InvalidConfidantIndex;
     st3.sender = cs::ConfidantConsts::InvalidConfidantIndex;
     st3.writer = cs::ConfidantConsts::InvalidConfidantIndex;
@@ -420,18 +424,27 @@ int cnt = (int)smartConfidants_.size();
   }
   int idx_writer = k % cnt_active;
   int idx = 0;
-  int c = 0;
-  for (int i = idx_writer; i < cnt + idx_writer; ++i) {
-    c = i % cnt;
-    if (stage.realTrustedMask.at(c) != cs::ConfidantConsts::InvalidConfidantIndex) {
-      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
-      if (i == idx_writer) {
-        stage.writer = static_cast<uint8_t>(c);
+  for (int i = 0; i < cnt; ++i) {
+    if (stage.realTrustedMask.at(i) != InvalidConfidantIndex) {
+      if (idx == idx_writer) {
+        stage.writer = static_cast<uint8_t>(i);
       }
       ++idx;
     }
   }
+  int c = 0;
+  idx = 0;
+  for (int i = stage.writer; i < cnt + stage.writer; ++i) {
+    c = i % cnt;
+    if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
+      stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+      ++idx;
+    }
+  }
   startTimer(3);
+  cscrypto::GenerateSignature(stage.packageSignature, getPrivateKey(), 
+    smartStageOneStorage_.at(ownSmartsConfNum_).hash.data(), 
+    smartStageOneStorage_.at(ownSmartsConfNum_).hash.size());
   cslog() << __func__ << "(): done";
   addSmartStageThree(stage, true);
 }
@@ -445,10 +458,25 @@ int cnt = (int)smartConfidants_.size();
       pnode->sendSmartStageThree(stage);
     }
     if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
-      return;
+      return; 
     }
+    if (stage.sender != ownSmartsConfNum_) {
+      if (!cscrypto::VerifySignature(stage.packageSignature, smartConfidants().at(stage.sender),
+        smartStageOneStorage_.at(stage.sender).hash.data(),
+        smartStageOneStorage_.at(stage.sender).hash.size())) {
+        cslog() << "____ The signature is not valid";
+        return; //returns this function of the signature of smart confidant is not corresponding to its the previously sent hash
+      }
+    }
+
     smartStageThreeStorage_.at(stage.sender) = stage;
-    cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStageThreeStorage_.size();
+    size_t smartStorageSize = 0;
+    for (auto& it : smartStageThreeStorage_) {
+      if (it.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
+        ++smartStorageSize;
+      }
+    }
+    cslog() << ": <-- SMART-Stage-3 [" << (int)stage.sender << "] = " << smartStorageSize;
     if (smartStageThreeEnough()) {
       killTimer(3);
       createFinalTransactionSet();
@@ -460,10 +488,14 @@ int cnt = (int)smartConfidants_.size();
     //if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
       auto& conv = cs::Conveyer::instance();
       
-      //for(const auto& tr : currentSmartTransactionPack_.transactions()) {
-      //  conv.addTransaction(tr);
-      //}
-      // alternative is correct but does not work - currentSmartTransactionPack_'s hash must be empty:
+      for (auto& st : smartStageThreeStorage_) {
+        if (st.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
+          if(currentSmartTransactionPack_.addSignature(st.packageSignature)) {
+            cslog() << "Signature added to the Transactions Packet";
+          }
+        }
+      }
+      cslog() << "Adding separate package with " << currentSmartTransactionPack_.signatures().size() << " signatures";
       conv.addSeparatePacket(currentSmartTransactionPack_);
       
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
@@ -530,7 +562,7 @@ int cnt = (int)smartConfidants_.size();
       if (it.sender == i) ++stageSize;
       ++i;
     }
-    size_t cSize = smartConfidants_.size() / 2 + 1;
+    size_t cSize = smartConfidants_.size(); // /2 + 1; - this is usefull only when we demand all signatues to be collected
     cslog() << __func__ << ":         Completed " << stageSize << " of " << cSize;
     return (stageSize == cSize ? true : false);
   }

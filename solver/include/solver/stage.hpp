@@ -27,13 +27,24 @@ struct StageTwo {
   Signature signature;
 };
 
+//struct StageThree {
+//  uint8_t sender;
+//  uint8_t writer;
+//  std::vector<uint8_t> realTrustedMask;
+//  Hash hashBlock;
+//  Hash hashHashesList;
+//  Hash hashCandidatesList;
+//  Signature signature;
+//};
+
 struct StageThree {
   uint8_t sender;
   uint8_t writer;
   std::vector<uint8_t> realTrustedMask;
-  Hash hashBlock;
-  Hash hashHashesList;
-  Hash hashCandidatesList;
+  Signature blockSignature;
+  Hash blockHash;
+  Signature roundSignature;
+  Hash roundHash;
   Signature signature;
 };
 
@@ -59,7 +70,7 @@ struct StageThreeSmarts {
   cs::Sequence sRoundNum;
   uint8_t writer;
   std::vector<uint8_t> realTrustedMask;
-  Hash finalHash;
+  Signature packageSignature;
   Signature signature;
 };
 

@@ -119,8 +119,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it.second);
     }
 
-    os.put(writer_public_key_);
-    os.put(signature_);
+    os.put(realTrusted_);
+
   }
 
   void put_for_sig(::csdb::priv::obstream& os) {
@@ -144,7 +144,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it);
     }
 
-    os.put(writer_public_key_);
+    os.put(realTrusted_);
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
@@ -265,11 +265,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    if (!is.get(writer_public_key_)) {
-      return false;
-    }
-
-    if (!is.get(signature_)) {
+    if (!is.get(realTrusted_)) {
       return false;
     }
 
@@ -326,7 +322,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
-  std::vector<uint8_t> writer_public_key_;
+  std::vector<uint8_t> realTrusted_;
   //::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
   ::std::vector<std::pair<int, ::std::string>> signatures_;
   ::csdb::internal::byte_array binary_representation_;

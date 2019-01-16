@@ -133,6 +133,10 @@ void SolverContext::spawn_next_round() {
   core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
 }
 
+void SolverContext::sendRoundTable() {
+  core.sendRoundTable();
+}
+
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {
   csdb::internal::WalletId id;
   if (core.pnode->getBlockChain().findWalletId(address, id)) {
