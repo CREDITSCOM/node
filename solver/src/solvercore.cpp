@@ -208,8 +208,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
 }
 
 void SolverCore::sendRoundTable() {
-  pnode->becomeWriter();
-  pnode->sendRoundPackageToAll();
+  pnode->sendRoundTable();
 }
 
 

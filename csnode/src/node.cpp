@@ -1994,20 +1994,19 @@ void Node::sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& r
 
 void Node::sendRoundPackageToAll()
 {
+
   //add signatures// blockSignatures, roundSignatures);
   csmeta(csdetails) << "Send round table to all";
-  sendBroadcast(MsgTypes::RoundTable, lastSentRoundData_.roundTable.round, lastSentRoundData_.subRound, //signatures!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-              lastSentRoundData_.roundTable.confidants, lastSentRoundData_.roundTable.hashes,
-              lastSentRoundData_.poolMetaInfo.timestamp, lastSentRoundData_.characteristic.mask, 
-              lastSentRoundData_.poolMetaInfo.sequenceNumber, lastSentRoundData_.poolMetaInfo.realTrustedMask, 
-              lastSentRoundData_.poolMetaInfo.writerKey, lastSentRoundData_.poolMetaInfo.previousHash);
+  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_, 
+                lastSentSignatures_.poolSignatures,lastSentSignatures_.roundSignatures);
 
-  if (!characteristic.mask.empty()) {
-    csmeta(csdebug) << "Packing " << characteristic.mask.size() << " bytes of char. mask to send";
+  if (!lastSentRoundData_.characteristic.mask.empty()) {
+    csmeta(csdebug) << "Packing " << lastSentRoundData_.characteristic.mask.size() << " bytes of char. mask to send";
   }
   /////////////////////////////////////////////////////////////////////////// screen output
   cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::RoundTable table = conveyer.roundTable();
   cslog() << "Round " << roundNumber_ << ", Confidants count " << table.confidants.size();
   cslog() << "Hashes count: " << table.hashes.size();
 
@@ -2018,8 +2017,20 @@ void Node::sendRoundPackageToAll()
   reviewConveyerHashes();
 }
 
+void Node::sendRoundTable() {
+  becomeWriter();
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  roundNumber_ = lastSentRoundData_.roundTable.round;
+  subRound_ = 0;
+  cs::RoundTable table;
+  table.round = roundNumber_;
+  roundTable.confidants = lastSentRoundData_.table.confidants;
+  roundTable.hashes = lastSentRoundData_.table.hashes;
+  conveyer.setRound(std::move(table));
+  sendRoundPackageToAll();
+}
 void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                                 const cs::Characteristic& characteristic, const cs::Signature& signature, cs::StageThree st3) {
+                                 const cs::Characteristic& characteristic, cs::StageThree st3) {
   lastSentRoundData_.roundTable.round = newRoundTable.round;
   lastSentRoundData_.subRound = subRound_;
   // no general stored!
@@ -2079,9 +2090,6 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
 void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree st3) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  roundNumber_ = roundTable.round; //here should be no round change, only when the round table is sent!!!
-  subRound_ = 0;
-
   const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
 
   if (!block_characteristic) {
@@ -2091,10 +2099,7 @@ void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo&
 
   stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
-  conveyer.setRound(std::move(roundTable));
-
-  const cs::RoundTable& table = conveyer.currentRoundTable();
-  storeRoundPackageData(table, poolMetaInfo, *block_characteristic, poolSignature, st3); 
+  storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3); 
   }
 
 

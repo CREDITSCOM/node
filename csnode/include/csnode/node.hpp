@@ -108,6 +108,7 @@ public:
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
   // called by solver, review required:
   bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
+  void sendRoundTable();
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -198,7 +199,7 @@ private:
   void sendRoundPackageToAll();
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                             const cs::Characteristic& characteristic, const cs::Signature& signature, cs::StageThree st3);
+                             const cs::Characteristic& characteristic, cs::StageThree st3);
 
   bool readRoundData(cs::RoundTable& roundTable);
   void reviewConveyerHashes();
