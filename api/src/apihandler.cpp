@@ -931,7 +931,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
       _return.states[inner_id] = VALID;
     else {
       cs::Conveyer& conveyer = cs::Conveyer::instance();
-      cs::SharedLock sharedLock(conveyer.sharedMutex());
+      auto lock = conveyer.lock();
       for (decltype(auto) it : conveyer.transactionsBlock()) {
         const auto& transactions = it.transactions();
         for (decltype(auto) transaction : transactions) {

@@ -87,7 +87,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 
   auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
 #ifdef MONITOR_NODE
-  setWalletTime(addr, timeStamp);
+  setWalletTime(wrWall, timeStamp);
 #endif
 }
 #ifdef MONITOR_NODE
