@@ -49,8 +49,9 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   // review & validate transactions
   context.blockchain().setTransactionsFees(pack);
   stage.hash = build_vector(context, pack);
+
   {
-    cs::SharedLock lock(conveyer.sharedMutex());
+    std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
     const cs::RoundTable& roundTable = conveyer.currentRoundTable();
 
     for (const auto& element : conveyer.transactionsPacketTable()) {
@@ -58,7 +59,10 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 
       if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
         stage.hashesCandidates.push_back(element.first);
-        if(stage.hashesCandidates.size() > Consensus::maxStageOneHashes) break;
+
+        if (stage.hashesCandidates.size() > Consensus::maxStageOneHashes) {
+          break;
+        }
       }
     }
   }

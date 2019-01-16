@@ -497,6 +497,7 @@ void SolverCore::processStages() {
       cslog() << "Adding separate package with " << currentSmartTransactionPack_.signatures().size() << " signatures";
       conv.addSeparatePacket(currentSmartTransactionPack_);
       
+      // TODO: найти транзакцию с new_state просмотром пакета
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       csdetails() << "Transaction user fields = " << fieldsNumber;
       csdebug() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";

@@ -276,7 +276,8 @@ csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
   if (deferredBlock_.is_valid()) {
-    return csdb::PoolHash::from_binary(deferredBlock_.hash().to_binary());
+    auto tmp = deferredBlock_.hash().to_binary();
+    return csdb::PoolHash::from_binary(tmp);
   }
   return storage_.last_hash();
 }
@@ -296,7 +297,8 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
   
   if(deferredBlock_.hash() == ph) {
-    return csdb::Pool::from_binary(deferredBlock_.to_binary());
+    auto tmp = deferredBlock_.to_binary();
+    return csdb::Pool::from_binary(tmp);
   }
   return storage_.pool_load(ph);
 }
@@ -307,7 +309,8 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
   
   if (deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence) {
     // deferredBlock already composed:
-    return csdb::Pool::from_binary(deferredBlock_.to_binary());
+    auto tmp = deferredBlock_.to_binary();
+    return csdb::Pool::from_binary(tmp);
   }
   // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
   return storage_.pool_load(sequence + 1);
@@ -318,7 +321,8 @@ csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) cons
 
   if(deferredBlock_.hash() == ph) {
     size_t not_used = 0;
-    return csdb::Pool::meta_from_binary(deferredBlock_.to_binary(), not_used);
+    auto tmp = deferredBlock_.to_binary();
+    return csdb::Pool::meta_from_binary(tmp, not_used);
   }
   return storage_.pool_load_meta(ph, cnt);
 }

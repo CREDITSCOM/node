@@ -609,7 +609,7 @@ void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumb
   cs::Packets packets;
 
   const auto& conveyer = cs::Conveyer::instance();
-  cs::SharedLock lock(conveyer.sharedMutex());
+  std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
 
   for (const auto& hash : hashes) {
     std::optional<cs::TransactionsPacket> packet = conveyer.findPacket(hash, round);

@@ -8,6 +8,7 @@
 #define _CREDITS_CSDB_PRIVATE_BINARY_STREAMS_H_H_INCLUDED_
 
 #include <cinttypes>
+#include <cstring>
 #include <string>
 #include <type_traits>
 #include <utility>
