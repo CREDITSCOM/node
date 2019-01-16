@@ -22,6 +22,7 @@ namespace csdb {
 class PoolHash::priv : public ::csdb::internal::shared_data {
 public:
   cs::Bytes value;
+  DEFAULT_PRIV_CLONE();
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(PoolHash)
 
@@ -317,6 +318,35 @@ class Pool::priv : public ::csdb::internal::shared_data {
     }
 
     return ::csdb::defaultStorage();
+  }
+
+  priv clone() const {
+    priv result;
+
+    result.is_valid_ = is_valid_;
+    result.hash_ = hash_.clone();
+    result.previous_hash_ = previous_hash_.clone();
+    result.sequence_ = sequence_;
+    result.next_confidants_ = next_confidants_;
+
+    result.transactions_.reserve(transactions_.size());
+    for (auto& t : transactions_)
+      result.transactions_.push_back(t.clone());
+
+    result.transactionsCount_ = transactionsCount_;
+    result.newWallets_ = newWallets_;
+
+    for (auto& uf : user_fields_)
+      result.user_fields_[uf.first] = uf.second.clone();
+
+    result.signature_ = signature_;
+    result.writer_public_key_ = writer_public_key_;
+    result.signatures_ = signatures_;
+    result.binary_representation_ = binary_representation_;
+
+    result.storage_ = storage_;
+
+    return result;
   }
 
   bool is_valid_ = false;

@@ -275,10 +275,9 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.is_valid()) {
-    auto tmp = deferredBlock_.hash().to_binary();
-    return csdb::PoolHash::from_binary(tmp);
-  }
+  if (deferredBlock_.is_valid())
+    return deferredBlock_.hash().clone();
+
   return storage_.last_hash();
 }
 
@@ -293,24 +292,22 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   if(ph.is_empty()) {
     return csdb::Pool {};
   }
-  
+
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
-  if(deferredBlock_.hash() == ph) {
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::from_binary(tmp);
-  }
+
+  if(deferredBlock_.hash() == ph)
+    return deferredBlock_.clone();
+
   return storage_.pool_load(ph);
 }
 
 csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
 
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
+
   if (deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence) {
     // deferredBlock already composed:
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::from_binary(tmp);
+    return deferredBlock_.clone();
   }
   // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
   return storage_.pool_load(sequence + 1);
@@ -319,20 +316,18 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if(deferredBlock_.hash() == ph) {
-    size_t not_used = 0;
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::meta_from_binary(tmp, not_used);
-  }
+  if(deferredBlock_.hash() == ph)
+    return deferredBlock_.clone();
+
   return storage_.pool_load_meta(ph, cnt);
 }
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
-  if (deferredBlock_.hash() == transId.pool_hash()) {
-    return csdb::Transaction::from_binary(deferredBlock_.transaction(transId).to_binary());
-  }
+
+  if (deferredBlock_.hash() == transId.pool_hash())
+    return deferredBlock_.transaction(transId).clone();
+
   return storage_.transaction(transId);
 }
 
@@ -459,9 +454,9 @@ const csdb::Storage& BlockChain::getStorage() const {
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.sequence() == seq) {
-    return csdb::PoolHash::from_binary(deferredBlock_.hash().to_binary());
-  }
+  if (deferredBlock_.sequence() == seq)
+    return deferredBlock_.hash().clone();
+
   return blockHashes_->find(seq);
 }
 

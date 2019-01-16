@@ -138,6 +138,9 @@ inline void shared_data_ptr<T>::detach() {
   class_name& class_name::operator =(class_name &&o) noexcept { d = std::move(o.d); return *this; } \
   class_name::class_name(priv* source) : d(source) {} \
   class_name::~class_name() {} \
+  class_name class_name::clone() const { return class_name(new priv(d->clone())); } \
   UNIT_TEST_METHODS_IMPLEMENTATION(class_name)
+
+#define DEFAULT_PRIV_CLONE() priv clone() const { return priv(*this); }
 
 #endif // _CREDITS_CSDB_SHARED_DATA_PTR_IMPLEMENTATION_H_INCLUDED_

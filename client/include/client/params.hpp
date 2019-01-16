@@ -5,7 +5,7 @@
 //#define WEB_WALLET_NODE
 #define NODE_API
 #define AJAX_IFACE
-#define SPAMMER
+//#define SPAMMER
 //#define LOG_NET
 
 #define BOTTLENECKED_SMARTS
