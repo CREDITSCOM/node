@@ -98,17 +98,18 @@ void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::Tran
   auto cnt_filtered = 0;
   for (auto it = vec.begin(); it != vec.end(); ++it) {
     const auto& src = it->source();
-    cs::Bytes pk;
+    bool verifyResult = false;
+
     if (src.is_wallet_id()) {
       BlockChain::WalletData data_to_fetch_pulic_key;
       bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-      pk.assign(data_to_fetch_pulic_key.address_.cbegin(), data_to_fetch_pulic_key.address_.cend());
+      verifyResult = it->verify_signature(data_to_fetch_pulic_key.address_);
     }
     else {
-      const auto& tmpref = src.public_key();
-      pk.assign(tmpref.cbegin(), tmpref.cend());
+      verifyResult = it->verify_signature(src.public_key());
     }
-    if (!it->verify_signature(pk)) {
+
+    if (!verifyResult) {
       it = vec.erase(it);
       ++cnt_filtered;
       if (it == vec.end()) {
@@ -116,6 +117,7 @@ void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::Tran
       }
     }
   }
+
   if (cnt_filtered > 0) {
     cswarning() << name() << ": " << cnt_filtered << " trans. filtered while test signatures";
   }
@@ -254,10 +256,7 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
   if(!context.smart_contracts().is_known_smart_contract(src)&& transaction.user_field_ids().size() != 3) {
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-
-      cs::Bytes byte_array(data_to_fetch_pulic_key.address_.begin(),
-                                            data_to_fetch_pulic_key.address_.end());
-      return transaction.verify_signature(byte_array);
+      return transaction.verify_signature(data_to_fetch_pulic_key.address_);
     }
 
     return transaction.verify_signature(src.public_key());

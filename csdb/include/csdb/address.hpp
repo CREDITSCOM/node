@@ -32,7 +32,7 @@ public:
   ::std::string to_string() const noexcept;
   static Address from_string(const std::string &val);
 
-  cs::Bytes public_key() const noexcept;
+  const cs::PublicKey& public_key() const noexcept;
   // returns (uint32_t)-1 if it is not WalletId
   WalletId wallet_id() const noexcept;
 

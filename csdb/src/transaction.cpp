@@ -256,7 +256,7 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
   return os.buffer();
 }
 
-bool Transaction::verify_signature(const cs::Bytes& public_key) const {
+bool Transaction::verify_signature(const cs::PublicKey& public_key) const {
   return cscrypto::VerifySignature(reinterpret_cast<const uint8_t*>(this->signature().data()),
     public_key.data(), this->to_byte_stream_for_sig().data(),
     this->to_byte_stream_for_sig().size());

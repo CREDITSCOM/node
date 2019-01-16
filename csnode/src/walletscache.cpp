@@ -8,8 +8,7 @@ using namespace std;
 
 namespace cs {
 void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress) {
-  const cs::Bytes& addrVec = address.public_key();
-  copy(addrVec.begin(), addrVec.end(), walletAddress.begin());
+  walletAddress = address.public_key();
 }
 
 void WalletsCache::convert(const WalletData::Address& walletAddress, csdb::Address& address) {

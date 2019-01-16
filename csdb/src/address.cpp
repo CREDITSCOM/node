@@ -106,18 +106,15 @@ Address Address::from_string(const ::std::string &val) {
   return res;
 }
 
-cs::Bytes Address::public_key() const noexcept {
-  if (is_public_key()) {
-    return cs::Bytes(d->data_.public_key.begin(), d->data_.public_key.end());
-  }
-  return {};
+const cs::PublicKey& Address::public_key() const noexcept {
+  return d->data_.public_key;
 }
 
 Address::WalletId Address::wallet_id() const noexcept {
   if (is_wallet_id()) {
     return d->data_.wallet_id;
   }
-return static_cast<Address::WalletId>(-1);
+  return static_cast<Address::WalletId>(-1);
 }
 
 Address Address::from_public_key(const cs::Bytes& key) {

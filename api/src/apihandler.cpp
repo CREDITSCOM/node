@@ -188,6 +188,15 @@ std::string fromByteArray(const cs::Bytes& bar) {
   return res;
 }
 
+std::string fromByteArray(const cs::PublicKey& bar) {
+  std::string res;
+  {
+    res.reserve(bar.size());
+    std::transform(bar.begin(), bar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
+  }
+  return res;
+}
+
 cs::Bytes toByteArray(const std::string& s) {
   cs::Bytes res;
   {
