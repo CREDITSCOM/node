@@ -151,8 +151,14 @@ public:
   uint32_t size() const;
   uint32_t getNeighboursCountWithoutSS() const;
 
+  // no thread safe
   Connections getNeigbours() const;
+
+  // no thread safe
   Connections getNeighboursWithoutSS() const;
+
+  // uses to iterate connections
+  std::unique_lock<cs::SpinLock> getNeighboursLock() const;
 
   void pingNeighbours();
   bool isPingDone();

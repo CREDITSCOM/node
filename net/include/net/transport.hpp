@@ -142,6 +142,8 @@ public:
   ConnectionPtr getConnectionByNumber(const std::size_t number);
   ConnectionPtr getRandomNeighbour();
 
+  std::unique_lock<cs::SpinLock> getNeighboursLock() const;
+
   const Connections getNeighbours() const;
   const Connections getNeighboursWithoutSS() const;
 
