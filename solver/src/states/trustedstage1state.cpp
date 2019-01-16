@@ -98,7 +98,7 @@ void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::Tran
   auto cnt_filtered = 0;
   for (auto it = vec.begin(); it != vec.end(); ++it) {
     const auto& src = it->source();
-    csdb::internal::byte_array pk;
+    cs::Bytes pk;
     if (src.is_wallet_id()) {
       BlockChain::WalletData data_to_fetch_pulic_key;
       bc.findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
@@ -255,7 +255,7 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
 
-      csdb::internal::byte_array byte_array(data_to_fetch_pulic_key.address_.begin(),
+      cs::Bytes byte_array(data_to_fetch_pulic_key.address_.begin(),
                                             data_to_fetch_pulic_key.address_.end());
       return transaction.verify_signature(byte_array);
     }

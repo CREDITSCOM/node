@@ -73,7 +73,7 @@ size_t Address::calcHash() const noexcept {
 
 ::std::string Address::to_string() const noexcept {
   if (is_public_key()) {
-    return internal::to_hex(::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end()));
+    return internal::to_hex(cs::Bytes(d->data_.public_key.begin(), d->data_.public_key.end()));
   }
   if (is_wallet_id()) {
     return std::to_string(wallet_id());
@@ -85,7 +85,7 @@ Address Address::from_string(const ::std::string &val) {
   Address res;
 
   if (val.size() == 2 * ::csdb::priv::crypto::public_key_size) {
-    const ::csdb::internal::byte_array data = ::csdb::internal::from_hex(val);
+    const cs::Bytes data = ::csdb::internal::from_hex(val);
     if (::csdb::priv::crypto::public_key_size == data.size()) {
       memcpy(res.d->data_.public_key.data(), data.data(), ::csdb::priv::crypto::public_key_size);
       res.d->is_wallet_id_ = false;
@@ -106,9 +106,9 @@ Address Address::from_string(const ::std::string &val) {
   return res;
 }
 
-::csdb::internal::byte_array Address::public_key() const noexcept {
+cs::Bytes Address::public_key() const noexcept {
   if (is_public_key()) {
-    return ::csdb::internal::byte_array(d->data_.public_key.begin(), d->data_.public_key.end());
+    return cs::Bytes(d->data_.public_key.begin(), d->data_.public_key.end());
   }
   return {};
 }
@@ -120,7 +120,7 @@ Address::WalletId Address::wallet_id() const noexcept {
 return static_cast<Address::WalletId>(-1);
 }
 
-Address Address::from_public_key(const ::csdb::internal::byte_array& key) {
+Address Address::from_public_key(const cs::Bytes& key) {
   Address res;
 
   if (::csdb::priv::crypto::public_key_size == key.size()) {

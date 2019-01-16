@@ -179,7 +179,7 @@ void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const Ad
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-std::string fromByteArray(const ::csdb::internal::byte_array& bar) {
+std::string fromByteArray(const cs::Bytes& bar) {
   std::string res;
   {
     res.reserve(bar.size());
@@ -188,8 +188,8 @@ std::string fromByteArray(const ::csdb::internal::byte_array& bar) {
   return res;
 }
 
-::csdb::internal::byte_array toByteArray(const std::string& s) {
-  ::csdb::internal::byte_array res;
+cs::Bytes toByteArray(const std::string& s) {
+  cs::Bytes res;
   {
     res.reserve(s.size());
     std::transform(s.begin(), s.end(), std::back_inserter<decltype(res)>(res), [](uint8_t _) { return uint8_t(_); });
@@ -283,7 +283,7 @@ APIHandler::convertPool(const csdb::Pool& pool)
                                           // TRANSACTIONS, EVEN AT NIGHT
 
     const auto& wpk = pool.writer_public_key();
-    result.writer = fromByteArray(::csdb::internal::byte_array(wpk.begin(), wpk.end()));
+    result.writer = fromByteArray(cs::Bytes(wpk.begin(), wpk.end()));
 
     double totalFee = 0;
     const auto& transs = const_cast<csdb::Pool&>(pool).transactions();
@@ -1573,7 +1573,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 
   for (; ptr != lst.end(); ++ptr) {
     api::WalletInfo wi;
-    const ::csdb::internal::byte_array addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
+    const cs::Bytes addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
     wi.address = fromByteArray(addr_b);
     wi.balance.integral = ptr->second->balance_.integral();
     wi.balance.fraction = ptr->second->balance_.fraction();

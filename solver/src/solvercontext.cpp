@@ -151,7 +151,7 @@ bool SolverContext::test_trusted_idx(uint8_t idx, const cs::PublicKey& sender) {
   return false;
 }
 
-csdb::internal::byte_array SolverContext::last_block_hash() const {
+cs::Bytes SolverContext::last_block_hash() const {
   // if(!core.is_block_deferred()) {
   return core.pnode->getBlockChain().getLastHash().to_binary();
   //}

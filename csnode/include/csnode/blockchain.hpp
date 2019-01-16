@@ -40,7 +40,7 @@ class TransactionsPacket;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
 
-/** @brief   The write block signal emits when flushBlockToDisk() occurs */
+/** @brief   The write block signal emits when block is flushed to disk */
 using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
@@ -113,7 +113,7 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
-  csdb::internal::byte_array getKeyFromAddress(csdb::Address&) const;
+  cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
 
@@ -180,9 +180,9 @@ private:
   void createTransactionsIndex(csdb::Pool&);
 #endif
 
-  void flushBlockToDisk(csdb::Pool& pool);
   void logBlockInfo(csdb::Pool& pool);
 
+  // Thread unsafe
   void finalizeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);

@@ -12,7 +12,7 @@ namespace csdb {
 namespace internal {
 
 template <typename Iterator>
-byte_array from_hex(Iterator beg, Iterator end) {
+cs::Bytes from_hex(Iterator beg, Iterator end) {
   auto digit_from_hex = [](char val, uint8_t &result) {
     val = static_cast<char>(toupper(val));
 
@@ -26,7 +26,7 @@ byte_array from_hex(Iterator beg, Iterator end) {
     return true;
   };
 
-  byte_array res;
+  cs::Bytes res;
   res.reserve(std::distance(beg, end) / 2);
   for (Iterator it = beg;;) {
     uint8_t hi, lo;
@@ -55,11 +55,11 @@ std::string to_hex(Iterator beg, Iterator end) {
   return res;
 }
 
-inline byte_array from_hex(const std::string &val) {
+inline cs::Bytes from_hex(const std::string &val) {
   return from_hex(val.begin(), val.end());
 }
 
-inline std::string to_hex(const byte_array &val) {
+inline std::string to_hex(const cs::Bytes &val) {
   return to_hex(val.begin(), val.end());
 }
 

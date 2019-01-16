@@ -101,7 +101,7 @@ public:
    * @brief Callback для операции открытия
    * @return true, если операцию необходимо прервать.
    */
-  typedef ::std::function<bool(const OpenProgress &)> OpenCallback;
+  typedef ::std::function<bool(const OpenProgress&)> OpenCallback;
 
   ReadBlockSignal* read_block_event() const;
 
@@ -115,7 +115,7 @@ public:
    * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
    * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
    */
-  bool open(const OpenOptions &opt, OpenCallback callback = nullptr);
+  bool open(const OpenOptions& opt, OpenCallback callback = nullptr);
 
   /**
    * @brief Открывает хранилище по пути к хранилищу
@@ -132,14 +132,14 @@ public:
    * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
    * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
    */
-  bool open(const ::std::string &path_to_base = ::std::string{}, OpenCallback callback = nullptr);
+  bool open(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
 
   /**
    * @brief Создание хранилища по набору параметров.
    *
    * Создаёт объект хранилища и пытается его открыть. См. \ref open(const OpenOptions &opt, OpenCallback callback);
    */
-  static inline Storage get(const OpenOptions &opt, OpenCallback callback = nullptr);
+  static inline Storage get(const OpenOptions& opt, OpenCallback callback = nullptr);
 
   /**
    * @brief Создание хранилища по пути к хранилищу.
@@ -147,7 +147,7 @@ public:
    * Создаёт объект хранилища и пытается его открыть.
    * См. \ref open(const ::std::string& path_to_base, OpenCallback callback);
    */
-  static inline Storage get(const ::std::string &path_to_base = ::std::string{}, OpenCallback callback = nullptr);
+  static inline Storage get(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
 
   /**
    * @brief Проверяет, открыто ли хранилище.
@@ -195,9 +195,9 @@ public:
    *
    * \sa ::csdb::Pool::load
    */
-  Pool pool_load(const PoolHash &hash) const;
+  Pool pool_load(const PoolHash& hash) const;
   Pool pool_load(const cs::Sequence sequence) const;
-  Pool pool_load_meta(const PoolHash &hash, size_t &cnt) const;
+  Pool pool_load_meta(const PoolHash& hash, size_t& cnt) const;
 
   Pool pool_remove_last();
 
@@ -244,7 +244,7 @@ public:
    * @param addr адрес кошелька
    * @return кошелек
    */
-  Wallet wallet(const Address &addr) const;
+  Wallet wallet(const Address& addr) const;
 
   /**
    * @brief transactions получить список транзакций для указанного адреса
@@ -255,7 +255,7 @@ public:
    *
    * \deprecated Функция будет удалена в последующих версиях.
    */
-  std::vector<Transaction> transactions(const Address &addr, size_t limit = 100, const TransactionID &offset = TransactionID()) const;
+  std::vector<Transaction> transactions(const Address& addr, size_t limit = 100, const TransactionID& offset = TransactionID()) const;
 
   /**
   * @brief get_from_blockchain возвращает true, если транзакция с addr и innerId есть в blockchain
@@ -267,11 +267,11 @@ public:
   * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
   * \используется для входного параметра addr в виде id кошелька
   */
-  bool get_from_blockchain(const Address &addr /*input*/, const int64_t &InnerId /*input*/, Transaction &trx /*output*/) const;
+  bool get_from_blockchain(const Address& addr /*input*/, const int64_t& InnerId /*input*/, Transaction& trx /*output*/) const;
 
 private:
-  static internal::byte_array get_trans_index_key(const Address&, const PoolHash&);
-  Pool pool_load_internal(const PoolHash &hash, const bool metaOnly, size_t& trxCnt) const;
+  static cs::Bytes get_trans_index_key(const Address&, const PoolHash&);
+  Pool pool_load_internal(const PoolHash& hash, const bool metaOnly, size_t& trxCnt) const;
 
   ::std::shared_ptr<priv> d;
 };

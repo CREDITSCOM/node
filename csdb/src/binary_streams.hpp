@@ -26,7 +26,7 @@ class obstream
 public:
   void put(const void *buf, size_t size);
   void put(const std::string &value);
-  void put(const internal::byte_array &value);
+  void put(const cs::Bytes &value);
 
   template<typename T>
   typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value, void>::type
@@ -49,10 +49,10 @@ public:
   template<class K, class T, class C, class A>
   void put_smart(const ::std::map<K, T, C, A>& value);
 
-  inline const internal::byte_array &buffer() const { return buffer_; }
+  inline const cs::Bytes &buffer() const { return buffer_; }
 
 private:
-  internal::byte_array buffer_;
+  cs::Bytes buffer_;
 };
 
 class ibstream
@@ -65,7 +65,7 @@ public:
 public:
   bool get(void *buf, size_t size);
   bool get(std::string &value);
-  bool get(internal::byte_array &value);
+  bool get(cs::Bytes &value);
 
   template<typename T>
   typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value, bool>::type
