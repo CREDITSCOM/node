@@ -224,16 +224,14 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   if (address.is_wallet_id()) {
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
-    address = csdb::Address::from_public_key(
-        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+    address = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
   }
 
   csdb::Address target = transaction.target();
   if (target.is_wallet_id()) {
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.target().wallet_id(), data_to_fetch_pulic_key);
-    target = csdb::Address::from_public_key(
-        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+    target = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
   }
 
   result.id = convert_transaction_id(transaction.id());
@@ -284,8 +282,8 @@ APIHandler::convertPool(const csdb::Pool& pool)
                                           // MORE THAN 2 BILLION
                                           // TRANSACTIONS, EVEN AT NIGHT
 
-    auto wpk = pool.writer_public_key();
-    result.writer = fromByteArray(wpk);
+    const auto& wpk = pool.writer_public_key();
+    result.writer = fromByteArray(cs::Bytes(wpk.begin(), wpk.end()));
 
     double totalFee = 0;
     const auto& transs = const_cast<csdb::Pool&>(pool).transactions();

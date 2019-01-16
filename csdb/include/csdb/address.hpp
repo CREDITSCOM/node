@@ -9,6 +9,8 @@
 #include <functional>
 #include <string>
 
+#include <lib/system/common.hpp>
+
 #include "csdb/internal/shared_data.hpp"
 #include "csdb/internal/types.hpp"
 
@@ -35,6 +37,7 @@ public:
   WalletId wallet_id() const noexcept;
 
   static Address from_public_key(const cs::Bytes &key);
+  static Address from_public_key(const cs::PublicKey& key);
   static Address from_public_key(const char *key);
   static Address from_wallet_id(WalletId id);
   std::string to_api_addr();

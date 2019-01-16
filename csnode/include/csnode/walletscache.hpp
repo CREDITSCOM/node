@@ -6,11 +6,14 @@
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
 #include <boost/dynamic_bitset.hpp>
+#include <csnode/nodecore.hpp>
 #include <csnode/transactionstail.hpp>
 #include <cscrypto/cscrypto.hpp>
 #include <memory>
 #include <vector>
 #include <map>
+
+#include <lib/system/common.hpp>
 
 namespace csdb {
 class Pool;
@@ -31,7 +34,7 @@ public:
 
 public:
   struct WalletData {
-    using Address = std::array<uint8_t, cscrypto::kPublicKeySize>;
+    using Address = cs::PublicKey;
 
     Address address_;
     csdb::Amount balance_;
@@ -76,10 +79,10 @@ private:
     virtual bool findWalletId(const csdb::Address& address, WalletId& id) = 0;
 
   protected:
-    void load(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
+    void load(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
     double load(const csdb::Transaction& tr);
     double loadTrxForSource(const csdb::Transaction& tr);
-    void fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants);
+    void fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants);
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
@@ -102,7 +105,7 @@ public:
   class Initer : protected ProcessorBase {
   public:
     Initer(WalletsCache& data);
-    void loadPrevBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
+    void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
     bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
     bool isFinishedOk() const;
 
@@ -118,7 +121,7 @@ public:
   class Updater : protected ProcessorBase {
   public:
     Updater(WalletsCache& data);
-    void loadNextBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants);
+    void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
     const WalletData* findWallet(WalletId id) const;
     const Mask& getModified() const {
       return modified_;

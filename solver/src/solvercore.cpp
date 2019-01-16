@@ -211,7 +211,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
 }
 
 //smart-part begin VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-  std::vector<cs::PublicKey> SolverCore::smartConfidants() {
+  const std::vector<cs::PublicKey>& SolverCore::smartConfidants() const {
     return smartConfidants_;
   }
 

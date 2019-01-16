@@ -13,8 +13,7 @@ void WalletsCache::convert(const csdb::Address& address, WalletData::Address& wa
 }
 
 void WalletsCache::convert(const WalletData::Address& walletAddress, csdb::Address& address) {
-  cs::Bytes hashBytes(walletAddress.begin(), walletAddress.end());
-  address = csdb::Address::from_public_key(hashBytes);
+  address = csdb::Address::from_public_key(walletAddress);
 }
 
 WalletsCache::WalletsCache(const Config& config, csdb::Address genesisAddress, csdb::Address startAddress,
@@ -45,7 +44,7 @@ WalletsCache::Initer::Initer(WalletsCache& data)
   walletsSpecial_.reserve(data_.config_.initialWalletsNum_);
 }
 
-void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants) {
+void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants) {
   load(curr, confidants);
 }
 
@@ -55,24 +54,21 @@ WalletsCache::Updater::Updater(WalletsCache& data)
   modified_.resize(data.wallets_.size(), false);
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const std::vector<std::vector<uint8_t>>& confidants) {
+void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants) {
   modified_.reset();
   load(curr, confidants);
 }
 
 // ProcessorBase
-void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const std::vector<std::vector<uint8_t>>& confidants) {
+void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
   double totalAmountOfCountedFee = 0;
 #ifdef MONITOR_NODE
   auto wrWall = pool.writer_public_key();
 
-  WalletData::Address addr;
-  std::copy(wrWall.begin(), wrWall.end(), addr.begin());
-
-  auto wrWrIt = data_.writers_.find(addr);
+  auto wrWrIt = data_.writers_.find(wrWall);
   if (wrWrIt == data_.writers_.end()) {
-    auto res = data_.writers_.insert(std::make_pair(addr, WriterData()));
+    auto res = data_.writers_.insert(std::make_pair(wrWall, WriterData()));
     wrWrIt = res.first;
   }
 
@@ -107,7 +103,7 @@ bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& addre
 }
 #endif
 
-void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const std::vector<std::vector<uint8_t>>& confidants) {
+void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants) {
   if (!confidants.size()) {
     cslog() << "WALLETS CACHE>> NO CONFIDANTS";
     return;

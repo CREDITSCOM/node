@@ -385,13 +385,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     if (ptable == nullptr) {
       cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
     }
-    else { // TODO: Fix me
-      std::vector<cs::Bytes> confs;
-      for (const auto& src : ptable->confidants) {
-        auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
-        std::copy(src.cbegin(), src.cend(), tmp.begin());
-      }
-      pool.value().set_confidants(confs);
+    else {
+      pool.value().set_confidants(ptable->confidants);
     }
 
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
@@ -411,13 +406,11 @@ void Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале
   const cs::RoundTable* table = cs::Conveyer::instance().roundTable(startSmartRoundNumber);
   if (table == nullptr) {
-    cs::PublicKey c1;
     csdb::Pool tmpPool = blockChain_.loadBlock(startSmartRoundNumber);
-    const auto& tmpKeys = tmpPool.confidants();
-    csdebug() << "___[" << startSmartRoundNumber << "] = [" << tmpPool.sequence() << "]: " << tmpKeys.size();
-    for (auto& e : tmpKeys) {
-      std::copy(e.begin(), e.end(), c1.begin());
-      confs.emplace_back(c1);
+    const auto& confidants = tmpPool.confidants();
+    csdebug() << "___[" << startSmartRoundNumber << "] = [" << tmpPool.sequence() << "]: " << confidants.size();
+    for (auto& key : confidants) {
+      confs.emplace_back(key);
     }
     return;
   }
@@ -980,7 +973,7 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
   const auto size = confidants.size();
 
   for (size_t i = 0; i < size; ++i) {
-    const auto& confidant = confidants[i];
+    const auto& confidant = confidants.at(i);
 
     if (myConfidantIndex_ == i && nodeIdKey_ == confidant) {
       continue;
@@ -1669,12 +1662,14 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   stream >> stage.sender;
   stream >> stage.hash;
 
-  if (stage.sender >= solver_->smartConfidants().size()) {
+  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+
+  if (stage.sender >= smartConfidants.size()) {
     cswarning() << "NODE> WRONG sender number";
     return;
   }
 
-  const cs::PublicKey& confidant = solver_->smartConfidants().at(stage.sender);
+  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
@@ -1758,12 +1753,14 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
   csmeta(csdebug) << "Sender:" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  if (stage.sender >= solver_->smartConfidants().size()) {
+  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+
+  if (stage.sender >= smartConfidants.size()) {
     cswarning() << "NODE> WRONG sender number";
     return;
   }
 
-  const cs::PublicKey& confidant = solver_->smartConfidants().at(stage.sender);
+  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "NODE> Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
@@ -1838,7 +1835,8 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     return;
   }
 
-  const cs::PublicKey& confidant = solver_->smartConfidants().at(stage.sender);
+  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
@@ -1861,7 +1859,8 @@ void Node::smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t requi
     return;
   }
 
-  auto confidant = solver_->smartConfidants().at(respondent);
+  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+  const cs::PublicKey& confidant = smartConfidants.at(respondent);
   sendDefault(confidant, msgType, roundNumber_, myConfidantIndex_, required);
   csmeta(csdetails) << "done";
 }
@@ -1941,8 +1940,10 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   const auto st3 = solver_->find_stage3(myConfidantIndex_);
 
+  const cs::ConfidantsKeys& confidants = conveyer.confidants();
+
   if (st3) {
-    poolMetaInfo.writerKey = conveyer.confidants().at(st3->writer);
+    poolMetaInfo.writerKey = confidants.at(st3->writer);
   }
 
   poolMetaInfo.previousHash = blockChain_.getLastHash();
@@ -1956,14 +1957,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     return;
   }
 
-  std::vector<cs::Bytes> confs;
-  // using current trusted nodes, not candidates to for next round:
-  for (const auto& src : conveyer.confidants()) {
-    auto& tmp = confs.emplace_back(cs::Bytes(src.size()));
-    std::copy(src.cbegin(), src.cend(), tmp.begin());
-  }
-
-  pool.value().set_confidants(confs);
+  pool.value().set_confidants(confidants);
   pool = blockChain_.createBlock(pool.value());
 
   if (!pool.has_value()) {
@@ -2396,7 +2390,7 @@ void Node::smartStageEmptyReply(uint8_t requesterNumber) {
   csdebug() << "Here should be the smart refusal for the SmartStageRequest";
 }
 
-void Node::sendHashReply(const csdb::PoolHash& hash, const cscrypto::PublicKey& respondent) {
+void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent) {
   csmeta(csdebug);
   if (myLevel_ != NodeLevel::Confidant) {
     csmeta(csdebug) << "Only confidant nodes can send hash reply to other nodes";
