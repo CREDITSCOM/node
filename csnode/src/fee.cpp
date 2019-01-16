@@ -142,12 +142,11 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   csdb::Pool pool = blockchain.loadBlock(blockchain.getLastHash());
-  const auto& confidants = pool.confidants();
   std::set<cs::PublicKey> unique_trusted_;
   if (blockchain.getLastSequence() < kBlocksNumForNodesQtyEstimation) {
     while (pool.is_valid()) {
-      for (uint32_t i = 0; i < confidants.size(); ++i) {
-        unique_trusted_.insert(confidants[i]);
+      for (uint32_t i = 0; i < pool.confidants().size(); ++i) {
+        unique_trusted_.insert(pool.confidants()[i]);
       }
       pool = blockchain.loadBlock(pool.previous_hash());
     }
@@ -155,8 +154,8 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   else {
     size_t i = kBlocksNumForNodesQtyEstimation;
     while (pool.is_valid() && i != 0) {
-      for (uint32_t j = 0; j < confidants.size(); ++j) {
-        unique_trusted_.insert(confidants[j]);
+      for (uint32_t j = 0; j < pool.confidants().size(); ++j) {
+        unique_trusted_.insert(pool.confidants()[j]);
       }
       pool = blockchain.loadBlock(pool.previous_hash());
       --i;
