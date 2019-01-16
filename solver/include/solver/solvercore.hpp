@@ -113,7 +113,7 @@ public:
   void requestSmartStagesNeighbors(int st);
   void markSmartOutboundNodes();
 
-  std::vector<cs::PublicKey> smartConfidants();
+  const std::vector<cs::PublicKey>& smartConfidants() const;
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///

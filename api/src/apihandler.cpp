@@ -188,6 +188,15 @@ std::string fromByteArray(const cs::Bytes& bar) {
   return res;
 }
 
+std::string fromByteArray(const cs::PublicKey& bar) {
+  std::string res;
+  {
+    res.reserve(bar.size());
+    std::transform(bar.begin(), bar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
+  }
+  return res;
+}
+
 cs::Bytes toByteArray(const std::string& s) {
   cs::Bytes res;
   {
@@ -224,16 +233,14 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   if (address.is_wallet_id()) {
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
-    address = csdb::Address::from_public_key(
-        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+    address = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
   }
 
   csdb::Address target = transaction.target();
   if (target.is_wallet_id()) {
     BlockChain::WalletData data_to_fetch_pulic_key;
     s_blockchain.findWalletData(transaction.target().wallet_id(), data_to_fetch_pulic_key);
-    target = csdb::Address::from_public_key(
-        cs::Bytes(data_to_fetch_pulic_key.address_.begin(), data_to_fetch_pulic_key.address_.end()));
+    target = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
   }
 
   result.id = convert_transaction_id(transaction.id());
@@ -284,8 +291,8 @@ APIHandler::convertPool(const csdb::Pool& pool)
                                           // MORE THAN 2 BILLION
                                           // TRANSACTIONS, EVEN AT NIGHT
 
-    auto wpk = pool.writer_public_key();
-    result.writer = fromByteArray(wpk);
+    const auto& wpk = pool.writer_public_key();
+    result.writer = fromByteArray(cs::Bytes(wpk.begin(), wpk.end()));
 
     double totalFee = 0;
     const auto& transs = const_cast<csdb::Pool&>(pool).transactions();
@@ -572,13 +579,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
     if (_return.__isset.smart_contract_result)
       _return.smart_contract_result = api_resp.ret_val;
-  
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     contract_state_entry.yield();
     return;
   }
 
-  send_transaction.add_user_field(0, serialize(transaction.smartContract));  
+  send_transaction.add_user_field(0, serialize(transaction.smartContract));
 
   solver.send_wallet_transaction(send_transaction);
 
@@ -1606,7 +1613,7 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
     if (offset == 0) {
       if (limit > 0) {
         api::WriterInfo wi;
-        const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
+        const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 
         wi.timesWriter = wd.times;

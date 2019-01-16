@@ -218,7 +218,7 @@ namespace cs
 
     BlockChain& bc;
     CallsQueueScheduler& scheduler;
-    cs::Bytes node_id;
+    cs::PublicKey node_id;
     // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
     csconnector::connector::ApiHandlerPtr papi;
 
@@ -275,7 +275,7 @@ namespace cs
 
     void test_exe_queue();
 
-    bool contains_me(const std::vector<cs::Bytes>& list) const
+    bool contains_me(const std::vector<cs::PublicKey>& list) const
     {
       return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }

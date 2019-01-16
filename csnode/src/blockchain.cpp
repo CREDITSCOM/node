@@ -1045,21 +1045,6 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
   return vec;
 }
 
-void BlockChain::updateLastBlockConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants) {
-  if (!deferredBlock_.is_valid()) {
-    return;
-  }
-
-  if (deferredBlock_.confidants() == confidants) {
-    cswarning() << "BLOCKCHAIN> confidants in new pool is same as cached pool";
-    return;
-  }
-
-  csmeta(csdetails);
-
-  deferredBlock_.update_confidants(confidants);
-}
-
 void BlockChain::setTransactionsFees(TransactionsPacket& packet)
 {
   if(!fee_ || packet.transactionsCount() == 0)

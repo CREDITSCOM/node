@@ -162,8 +162,6 @@ public:
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
 
-  void updateLastBlockConfidants(const ::std::vector<::std::vector<uint8_t>>& confidants);
-
   const csdb::Storage& getStorage() const;
 
   struct AddrTrnxCount {

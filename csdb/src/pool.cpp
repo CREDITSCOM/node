@@ -83,7 +83,11 @@ bool PoolHash::get(::csdb::priv::ibstream& is) {
 }
 
 class Pool::priv : public ::csdb::internal::shared_data {
-  priv() = default;
+  priv() :
+    ::csdb::internal::shared_data()
+  {
+    writer_public_key_.fill(0);
+  }
 
   priv(PoolHash previous_hash, cs::Sequence sequence, ::csdb::Storage::WeakPtr storage)
   : is_valid_(true)
@@ -192,7 +196,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     next_confidants_.clear();
     next_confidants_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      ::std::vector<uint8_t> conf;
+      cs::PublicKey conf;
       if (!is.get(conf)) {
         return false;
       }
@@ -320,14 +324,13 @@ class Pool::priv : public ::csdb::internal::shared_data {
   PoolHash hash_;
   PoolHash previous_hash_;
   cs::Sequence sequence_ {};
-  ::std::vector<::std::vector<uint8_t>> next_confidants_;
+  std::vector<cs::PublicKey> next_confidants_;
   ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   ::std::string signature_;
-  std::vector<uint8_t> writer_public_key_;
-  //::std::array<uint8_t, cscrypto::kPublicKeySize> writer_public_key_;
+  cs::PublicKey writer_public_key_;
   ::std::vector<std::pair<int, ::std::string>> signatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -451,7 +454,7 @@ cs::Sequence Pool::sequence() const noexcept {
   return d->sequence_;
 }
 
-std::vector<uint8_t> Pool::writer_public_key() const noexcept {
+const cs::PublicKey& Pool::writer_public_key() const noexcept {
   return d->writer_public_key_;
 }
 
@@ -459,7 +462,7 @@ std::string Pool::signature() const noexcept {
   return d->signature_;
 }
 
-const ::std::vector<::std::vector<uint8_t>>& Pool::confidants() const noexcept {
+const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
   return d->next_confidants_;
 }
 
@@ -487,13 +490,14 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
   data->previous_hash_ = std::move(previous_hash);
 }
 
-void Pool::set_writer_public_key(std::vector<uint8_t> writer_public_key) noexcept {
-  if (d.constData()->read_only_)
+void Pool::set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept {
+  if (d.constData()->read_only_) {
     return;
-  
+  }
+
   priv* data = d.data();
   data->is_valid_ = true;
-  data->writer_public_key_ = std::move(writer_public_key);
+  data->writer_public_key_ = writer_public_key;
 }
 
 void Pool::set_signature(const std::string& signature) noexcept {
@@ -506,7 +510,7 @@ void Pool::set_signature(const std::string& signature) noexcept {
   data->signature_ = signature;
 }
 
-void Pool::set_confidants(const std::vector<::std::vector<uint8_t>>& confidants) noexcept {
+void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept {
   if (d.constData()->read_only_) {
     return;
   }
@@ -590,13 +594,6 @@ bool Pool::compose() {
 
 cs::Bytes Pool::to_binary() const noexcept {
   return d->binary_representation_;
-}
-
-void Pool::update_confidants(const std::vector<::std::vector<uint8_t>>& confidants) {
-  priv* data = d.data();
-  data->read_only_ = false;
-  data->next_confidants_ = confidants;
-  compose();
 }
 
 uint64_t Pool::get_time() const noexcept

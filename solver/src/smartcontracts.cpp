@@ -55,8 +55,7 @@ namespace cs
   void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
   {
     papi = api;
-    node_id.resize(id.size());
-    std::copy(id.cbegin(), id.cend(), node_id.begin());
+    node_id = id;
   }
 
   /*static*/

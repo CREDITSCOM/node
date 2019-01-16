@@ -654,7 +654,7 @@ void Transport::resetNeighbours() {
 void Transport::sendRegistrationRequest(Connection& conn) {
   cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
-  cs::SpinGuard l(oLock_);
+  cs::SpinGuard lock(oLock_);
   Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
@@ -666,7 +666,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
   cslog() << "Confirming registration with " << conn.getOut();
 
-  cs::SpinGuard l(oLock_);
+  cs::SpinGuard lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::RegistrationConfirmed << requestedId << conn.id << myPublicKey_;
 
