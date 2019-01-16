@@ -271,7 +271,7 @@ public:
   ///
   /// @brief Returns shared mutex object reference to lock/unlock outside conveyer behaviour.
   ///
-  cs::SharedMutex& sharedMutex() const;
+  std::unique_lock<cs::SharedMutex> lock() const;
 
 public slots:
 
