@@ -579,13 +579,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
     if (_return.__isset.smart_contract_result)
       _return.smart_contract_result = api_resp.ret_val;
-  
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     contract_state_entry.yield();
     return;
   }
 
-  send_transaction.add_user_field(0, serialize(transaction.smartContract));  
+  send_transaction.add_user_field(0, serialize(transaction.smartContract));
 
   solver.send_wallet_transaction(send_transaction);
 
@@ -1613,7 +1613,7 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
     if (offset == 0) {
       if (limit > 0) {
         api::WriterInfo wi;
-        const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
+        const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 
         wi.timesWriter = wd.times;
