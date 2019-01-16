@@ -260,7 +260,9 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   for (auto& h : holders) {
     general::Variant var;
     //var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
-    var.__set_v_string(EncodeBase58(h.public_key()));
+    auto key = h.public_key();
+    cs::Bytes pk(key.begin(), key.end());
+    var.__set_v_string(EncodeBase58(pk));
     holderKeysParams.push_back(std::vector<general::Variant>(1, var));
   }
 
