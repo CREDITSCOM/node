@@ -122,7 +122,7 @@ public:
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
 #ifdef MONITOR_NODE
-  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)>);
+  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
   void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
 #endif
 

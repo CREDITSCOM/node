@@ -1243,6 +1243,7 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const api::
         api::TokenBalance tb;
         tb.token = fromByteArray(tokenIt->first.public_key());
         tb.code = tokenIt->second.symbol;
+        tb.name = tokenIt->second.name;
 
         auto hi = tokenIt->second.holders.find(addr);
         if (hi != tokenIt->second.holders.end())
@@ -1598,7 +1599,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 }
 
 void
-APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
+APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 #ifdef MONITOR_NODE
   const static uint32_t PER_PAGE = 256;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1608,11 +1609,12 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t limit = PER_PAGE;
   uint32_t total = 0;
 
-  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WriterData& wd) {
+  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::TrustedData& wd) {
     if (addr.empty()) return true;
     if (offset == 0) {
       if (limit > 0) {
-        api::WriterInfo wi;
+        api::TrustedInfo wi;
+        //const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
         const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 
@@ -1636,6 +1638,7 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 #endif
 }
+
 ////////new
 
 void APIHandler::SyncStateGet(api::SyncStateResult& _return) {

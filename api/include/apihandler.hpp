@@ -144,7 +144,7 @@ public:
   void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
 #endif
   void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
-  void WritersGet(api::WritersGetResult& _return, int32_t page) override;
+  void TrustedGet(api::TrustedGetResult& _return, int32_t page) override;
   ////////new
 
   void SyncStateGet(api::SyncStateResult& _return) override;

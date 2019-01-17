@@ -278,7 +278,7 @@ void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCa
 }
 
 #ifdef MONITOR_NODE
-void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)> func) {
+void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   walletsCacheStorage_->iterateOverWriters(func);
 }
