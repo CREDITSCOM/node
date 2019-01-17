@@ -162,7 +162,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
   cs::Connector::connect(&watcher->failed, &demo, &Demo::onFailed);
 
-  while(!isRunningFinished);
+  while(!called && !isRunningFinished);
   std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
 
   if (!called && isRunningFinished) {

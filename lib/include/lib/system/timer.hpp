@@ -26,14 +26,20 @@ public:
     RangeDeltaInPercents = 10
   };
 
+  enum class Type {
+    Standard,
+    HighPrecise
+  };
+
   Timer();
   ~Timer();
 
   ///
   /// @brief Starts timer with milliseconds period.
   /// @param msec is time in msec to tick.
+  /// @param type is timer type to use.
   ///
-  void start(int msec);
+  void start(int msec, Type type = Type::Standard);
 
   ///
   /// @brief Stops timer.
@@ -45,6 +51,11 @@ public:
   /// @brief Returns timer status.
   ///
   bool isRunning() const;
+
+  ///
+  /// @brief Returns current timer type.
+  ///
+  Type type() const;
 
   ///
   /// @brief Calls callback once in another thread after msec time.
@@ -61,6 +72,7 @@ public signals:
 protected:
   // timer main loop
   void loop();
+  void preciseLoop();
 
   // timer rehabilitation when timer degradate
   void rehabilitation();
@@ -68,13 +80,15 @@ protected:
 private:
   bool isRunning_;
   bool isRehabilitation_;
-
   std::atomic<bool> interruption_;
+
   std::thread timerThread_;
-  std::vector<TimerCallback> callbacks_;
+  Type type_;
 
   unsigned int allowDifference_;
   std::chrono::milliseconds ms_;
+  std::chrono::nanoseconds ns_;
+
   std::chrono::milliseconds realMs_;
   std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;
 };
