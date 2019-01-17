@@ -14,6 +14,8 @@
 
 #include <client/config.hpp>
 
+//#define RECREATE_INDEX
+
 using namespace cs;
 
 void generateCheatDbFile(std::string, const BlockHashes&);
@@ -89,8 +91,18 @@ bool BlockChain::init(const std::string& path)
     std::cout << "Done\n";
   }
 
+#if defined(TRANSACTIONS_INDEX) && defined(RECREATE_INDEX)
+  for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
+    auto pool = loadBlock(seq + 1);
+    createTransactionsIndex(pool);
+  }
+
+  cslog() << "Recreated the index 0->" << getLastSequence() << ". Finishing with error now. Because we can";
+  return false;
+#else
   good_ = true;
   return true;
+#endif
 }
 
 bool BlockChain::isGood() const {
@@ -136,13 +148,23 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
 #ifdef TRANSACTIONS_INDEX
 void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
+#ifdef RECREATE_INDEX
+  static std::map<csdb::Address, csdb::PoolHash> lapoos;
+#endif
+
   // Update
   std::set<csdb::Address> indexedAddrs;
 
   auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
     if (indexedAddrs.insert(addr).second) {
+      auto key = get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY);
+#ifdef RECREATE_INDEX
+      csdb::PoolHash lapoo = lapoos[key];
+      lapoos[key] = pool.hash();
+#else
       csdb::PoolHash lapoo = getLastTransaction(addr).pool_hash();
-      storage_.set_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), pool.hash(), lapoo);
+#endif
+      storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
     }
   };
 
