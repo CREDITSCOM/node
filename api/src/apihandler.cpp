@@ -1262,6 +1262,35 @@ void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const api
   tokenTransactionsInternal(_return, *this, tm, token, true, false, offset, limit);
 }
 
+void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const api::Address& token, const TransactionId& id) {
+  const csdb::PoolHash      poolhash = csdb::PoolHash::from_binary(toByteArray(id.poolHash));
+  const csdb::TransactionID trxn_id = csdb::TransactionID(poolhash, id.index);
+  const csdb::Transaction   trxn = s_blockchain.loadTransaction(trxn_id);
+  const csdb::Address       addr = BlockChain::getAddressFromKey(token);
+
+  std::string code{};
+  tm.applyToInternal([&addr, &code](const TokensMap& tm, const HoldersMap&) {
+    const auto it = tm.find(addr);
+    if (it != tm.cend())
+      code = it->second.symbol;
+  });
+
+  if (code.empty()) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  const auto pool = s_blockchain.loadBlock(trxn.id().pool_hash());
+  const auto smart = fetch_smart(trxn);
+  const auto addr_pk = s_blockchain.get_addr_by_type(trxn.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+  const auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
+
+  _return.count = 1;
+
+  addTokenResult(_return, addr, code, pool, trxn, smart, addrPair, s_blockchain);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
 #ifdef TRANSACTIONS_INDEX
 void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return,
   int64_t offset,
@@ -1327,7 +1356,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
         const auto smart = fetch_smart(t);
         if (!TokensMaster::isTransfer(smart.method, smart.params)) continue;
         if (--offset >= 0) continue;
-        csdb::Address target_pk = s_blockchain.get_addr_by_type(t.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        csdb::Address target_pk = s_blockchain.get_addr_by_type(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
         auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
         addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
         if (--limit == 0) break;
