@@ -38,6 +38,18 @@ struct StageTwo {
 //};
 
 struct StageThree {
+  void print() {
+    std::string realTrustedString;
+    for (auto& i : realTrustedMask) {
+      realTrustedString = realTrustedString + "[" + std::to_string((int)i) + "] ";
+    }
+    csdebug() << "     SENDER = " << (int)sender << ", WRITER = " << (int)writer << ", RealTrusted = " << realTrustedString;
+    csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(blockHash.data(), blockHash.size());
+    csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(blockSignature.data(), blockSignature.size());
+    csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(roundHash.data(), roundHash.size());
+    csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(roundSignature.data(), roundSignature.size());
+  }
+
   uint8_t sender;
   uint8_t writer;
   std::vector<uint8_t> realTrustedMask;

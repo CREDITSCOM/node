@@ -326,7 +326,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
   processPacketsReply(std::move(packets), round);
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, const std::vector<cs::SignaturePair> poolSignatures) {
   csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -338,25 +338,28 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     cs::CharacteristicMeta meta;
     meta.bytes = std::move(characteristicBytes);
     meta.sender = sender;
+    std::copy(poolSignatures.cbegin(), poolSignatures.cend(), meta.signatures.begin()) ;
 
     conveyer.addCharacteristicMeta(round, std::move(meta));
     return;
   }
 
-  istream_.init(data, size);
+  //istream_.init(data, size);
+  // istream_ >> roundBytes; 
 
+  cs::DataStream poolStream(data, size);
   csdebug() << "NODE> Conveyer sync completed, parsing data size " << size;
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
   cs::Signature signature;
 
-  istream_ >> poolMetaInfo.timestamp;
-  istream_ >> characteristic.mask;
-  istream_ >> poolMetaInfo.sequenceNumber;
-  istream_ >> signature;
-  istream_ >> poolMetaInfo.writerKey;
-  istream_ >> poolMetaInfo.previousHash;
+  poolStream >> poolMetaInfo.timestamp;
+  poolStream >> characteristic.mask;
+  poolStream >> poolMetaInfo.sequenceNumber;
+  //istream_ >> signature;
+  poolStream >> poolMetaInfo.realTrustedMask;
+  poolStream >> poolMetaInfo.previousHash;
 
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -643,7 +646,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender);
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender, meta->signatures);
     }
 
     // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
@@ -1967,15 +1970,30 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   }
 
   stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
-
   // array
+  const auto lastHash = blockChain_.getLastHash().to_binary();
+  std::copy(lastHash.cbegin(), lastHash.cend(), st3.blockHash.begin());
+  cscrypto::GenerateSignature(st3.blockSignature, solver_->getPrivateKey(),st3.blockHash.data(),st3.blockHash.size());
+  //csdebug() << "Hash acquired:"; 
+  //csdebug() << "Last Hash to stage3 = " << cs::Utils::byteStreamToHex(st3.blockHash.data(), st3.blockHash.size());  
+  //csdebug() << "Signature in stage3 = " << cs::Utils::byteStreamToHex(st3.blockSignature.data(), st3.blockSignature.size());
 
-  pool.value().sign(solver_->getPrivateKey());
-  const auto& signature = pool.value().signature();
-  std::copy(signature.begin(), signature.end(), st3.blockSignature.begin());
+  //pool.value().sign(solver_->getPrivateKey());
+  //const auto& signature = pool.value().signature();
+  //std::copy(signature.cbegin(), signature.cend(), st3.blockSignature.begin());
 
   //logPool(pool.value());
   prepareRoundTable(roundTable, poolMetaInfo, st3);
+}
+
+void Node::addRoundSignature(const cs::StageThree& st3) {
+  cs::SignaturePair stage3Pair;
+  stage3Pair.sender = st3.sender;
+  std::copy(st3.blockSignature.cbegin(), st3.blockSignature.cend(), stage3Pair.signature.begin());
+  lastSentSignatures_.poolSignatures.push_back(stage3Pair);
+  std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend(), stage3Pair.signature.begin());
+  lastSentSignatures_.roundSignatures.push_back(stage3Pair);
+  csdebug() << "adding signatures of stage3 from T(" << (int)st3.sender << ") = " << lastSentSignatures_.roundSignatures.size();
 }
 
 void Node::sendRoundPackage(const cs::PublicKey& target)
@@ -1989,13 +2007,28 @@ void Node::sendRoundPackage(const cs::PublicKey& target)
   }
 }
 
-void Node::sendRoundPackageToAll()
-{
+void Node::sendRoundPackageToAll() {
 
   //add signatures// blockSignatures, roundSignatures);
   csmeta(csdetails) << "Send round table to all";
-  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_, 
-                lastSentSignatures_.poolSignatures,lastSentSignatures_.roundSignatures);
+
+  //bytes.reserve(stageSize);
+  lastSignaturesMessage_.clear();
+  cs::DataStream stream(lastSignaturesMessage_);
+  stream << lastSentSignatures_.poolSignatures.size();
+  for (auto it : lastSentSignatures_.poolSignatures) {
+    stream << it.sender;
+    stream << it.signature;
+  }
+  stream << lastSentSignatures_.roundSignatures.size();
+  for (auto it : lastSentSignatures_.roundSignatures) {
+    stream << it.sender;
+    stream << it.signature;
+  }
+  csdebug() << "Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
+  csdebug() << "Send RoundData : " << cs::Utils::byteStreamToHex(lastSignaturesMessage_.data(), lastSignaturesMessage_.size()) << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
+  
+  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastSignaturesMessage_, lastRoundTableMessage_);
 
   if (!lastSentRoundData_.characteristic.mask.empty()) {
     csmeta(csdebug) << "Packing " << lastSentRoundData_.characteristic.mask.size() << " bytes of char. mask to send";
@@ -2027,7 +2060,7 @@ void Node::sendRoundTable() {
   sendRoundPackageToAll();
 }
 void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                                 const cs::Characteristic& characteristic, cs::StageThree st3) {
+                                 const cs::Characteristic& characteristic, cs::StageThree& st3) {
   lastSentRoundData_.roundTable.round = newRoundTable.round;
   lastSentRoundData_.subRound = subRound_;
   // no general stored!
@@ -2054,8 +2087,8 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
                              + sizeof(cs::Hash) + sizeof(size_t) 
                              + poolMetaInfo.realTrustedMask.size() + sizeof(size_t);
 
-  cs::Bytes messageToSign;
-  messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
+  //cs::Bytes messageToSign;
+  //messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
   lastRoundTableMessage_.clear();
   lastRoundTableMessage_.reserve(expectedMessageSize);
   cs::DataStream stream(lastRoundTableMessage_);
@@ -2069,23 +2102,24 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   //stream << lastSentRoundData_.poolMetaInfo.writerKey; -- we don't need to send this
 
   cscrypto::CalculateHash(st3.roundHash, lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
+  //cs::DataStream signStream(messageToSign);
+  //signStream << roundNumber_;
+  //signStream << subRound_;
+  //signStream << st3.roundHash;
+  cscrypto::GenerateSignature(st3.roundSignature, solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
 
-  cs::DataStream signStream(messageToSign);
-  signStream << roundNumber_;
-  signStream << subRound_;
-  signStream << st3.roundHash;
-  cscrypto::GenerateSignature(st3.roundSignature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
+  //csdebug() << "Round Signature calculated:";
+  //csdebug() << "Last Hash to stage3 = " << cs::Utils::byteStreamToHex(st3.roundHash.data(), st3.roundHash.size());
+  //csdebug() << "Signature in stage3 = " << cs::Utils::byteStreamToHex(st3.roundSignature.data(), st3.roundSignature.size());
 
   //here should be placed parcing of round table
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   size_t confidantsAmount = conveyer.roundTable(roundNumber_)->confidants.size();
   lastSentSignatures_.poolSignatures.clear();
-  lastSentSignatures_.poolSignatures.reserve(confidantsAmount);
   lastSentSignatures_.roundSignatures.clear();
-  lastSentSignatures_.roundSignatures.reserve(confidantsAmount);
 }
 
-void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree st3) {
+void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
@@ -2098,6 +2132,8 @@ void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo&
   stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
   storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3); 
+  csdebug() << "StageThree prepared:";
+  st3.print();
   }
 
 
@@ -2110,6 +2146,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     return;
   }
 
+  csdebug() << "Got RoundData : " << cs::Utils::byteStreamToHex(data,size);
   istream_.init(data, size);
 
   // RoundTable evocation
@@ -2122,9 +2159,37 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   subRound_ = subRound;
+  cs::Bytes bytes;
+  istream_ >> bytes;
+  cs::DataStream stream(bytes.data(), bytes.size());
 
+  std::vector<cs::SignaturePair> poolSignatures;
+  std::vector<cs::SignaturePair> roundSignatures;
+  cs::SignaturePair tmp;
+  size_t count;
+  stream >> count;
+  csdebug() << "PoolSignatures Amount = " << count;
+  poolSignatures.reserve(count);
+  for (int i = 0; i < count; ++i) {
+    stream >> tmp.sender;
+    stream >> tmp.signature;
+    poolSignatures.push_back(tmp);
+  }
+  stream >> count;
+  csdebug() << "RoundSignatures Amount = " << count;
+
+  roundSignatures.reserve(count);
+  for (int i = 0; i < count; ++i) {
+    stream >> tmp.sender;
+    stream >> tmp.signature;
+    roundSignatures.push_back(tmp);
+  }
+
+  cs::Bytes roundBytes;
+  istream_ >> roundBytes;
+  cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
-  istream_ >> confidants;
+  roundStream >> confidants;
 
   if (confidants.empty()) {
     csmeta(cserror) << "Illegal confidants count in round table";
@@ -2132,7 +2197,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   cs::PacketsHashes hashes;
-  istream_ >> hashes;
+  roundStream >> hashes;
 
   cs::RoundTable roundTable;
   roundTable.round = rNum;
@@ -2143,7 +2208,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   // create pool by previous round, then change conveyer state.
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  getCharacteristic(istream_.getCurrentPtr(), istream_.remainsBytes(), conveyer.currentRoundNumber(), sender);
+
+  getCharacteristic(reinterpret_cast<uint8_t*>(roundStream.data()), roundStream.size(), conveyer.currentRoundNumber(), sender, poolSignatures);
   conveyer.setRound(std::move(roundTable));
 
   onRoundStart(conveyer.currentRoundTable());

@@ -135,10 +135,18 @@ struct ConveyerMeta {
   cs::TransactionsPacket invalidTransactions;
 };
 
+struct SignaturePair {
+  uint8_t sender;
+  cs::Signature signature;
+};
+
 struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
+  std::vector<cs::SignaturePair> signatures;
 };
+
+
 
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;

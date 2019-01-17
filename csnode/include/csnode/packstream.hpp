@@ -95,7 +95,7 @@ public:
   IPackStream& operator>>(std::vector<T, A>& vector) {
     std::size_t size;
     (*this) >> size;
-
+    csdebug() << "Number of confidants in the table = " << size;
     if (size == 0) {
       return *this;
     }

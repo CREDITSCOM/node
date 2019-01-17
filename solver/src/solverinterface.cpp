@@ -212,12 +212,16 @@ namespace cs
   }
 
   void SolverCore::printStage3(const cs::StageThree& stage) {
-      cslog() << "     " << cs::Utils::byteStreamToHex(stage.blockHash.data(), stage.blockHash.size()) << std::endl
-              << "     " << cs::Utils::byteStreamToHex(stage.roundHash.data(), stage.roundHash.size()) << std::endl;
-      cslog() << "     WRITER = " << (int)stage.writer << ", RealTrusted = ";
+      std::string realTrustedString;
       for (auto& i : stage.realTrustedMask) {
-        csdebug() << "[" << (int)i << "] ";
+        realTrustedString = realTrustedString + "[" + std::to_string((int)i) + "] ";
       }
+      csdebug() << "     SENDER = " << (int)stage.sender << ", WRITER = " << (int)stage.writer << ", RealTrusted = " << realTrustedString;
+      csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(stage.blockHash.data(), stage.blockHash.size()); 
+      csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(stage.blockSignature.data(), stage.blockSignature.size());
+      csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(stage.roundHash.data(), stage.roundHash.size());
+      csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(stage.roundSignature.data(), stage.roundSignature.size());
+
   }
 
   void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
@@ -227,38 +231,70 @@ namespace cs
       // duplicated
       return;
     }
+    //if()
     switch (flagg) {
       case 0:
         stageThreeStorage.push_back(stage);
         break;
       case 1:
         for (auto& st : stageThreeStorage) {
-          //csdebug() << "OUR:";
-          //printStage3(stage);
-          //csdebug() << "GOT:";
-          //printStage3(st);
-          //to change the routine of pool signing
-          if(cscrypto::VerifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size())
-            && cscrypto::VerifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender), stage.roundHash.data(), stage.roundHash.size())
-            && st.realTrustedMask == stage.realTrustedMask
-            && st.writer == stage.writer) {
+          csdebug() << "OUR:";
+          printStage3(stage);
+          csdebug() << "GOT:";
+          st.print();
+          //TODO: change the routine of pool signing
+          bool blockSignaturesOk = cscrypto::VerifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size());
+          if (!blockSignaturesOk) {
+            csdebug() << "Block Signatures are not ok";
+          }
+          bool roundSignaturesOk = cscrypto::VerifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender), stage.roundHash.data(), stage.roundHash.size());
+          if (!roundSignaturesOk) {
+            csdebug() << "Round Signatures are not ok";
+          }
+          bool realTrustedOk = (st.realTrustedMask == stage.realTrustedMask);
+          if (!realTrustedOk) {
+            csdebug() << "Real Trusted are not ok";
+          }
+          bool writerOk = st.writer == stage.writer;
+          if (!writerOk) {
+            csdebug() << "Writer is not ok";
+          }
+          if (blockSignaturesOk && roundSignaturesOk && realTrustedOk && writerOk) {
             trueStageThreeStorage.push_back(st);
+            pnode->addRoundSignature(st);
+            csdebug() << "Stage3 [" << (int)st.sender << "] - signatures are OK";
           }
         }
         trueStageThreeStorage.push_back(stage);
+        pnode->addRoundSignature(stage);
         stageThreeStorage.push_back(stage);
         break;
       case 2:
         const auto st = find_stage3(pnode->getConfidantNumber());
-        //csdebug() << "OUR:";
-        //printStage3(*st);
-        //csdebug() << "GOT:";
-        //printStage3(stage);
-        if (cscrypto::VerifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size())
-          && cscrypto::VerifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender), st->roundHash.data(), st->roundHash.size())
-          && st->realTrustedMask == stage.realTrustedMask
-          && st->writer == stage.writer) {
+        csdebug() << "OUR:";
+        st->print();
+        csdebug() << "GOT:";
+        printStage3(stage);
+        bool blockSignaturesOk = cscrypto::VerifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size());
+        if(!blockSignaturesOk) {
+          csdebug() << "Block Signatures are not ok";
+        }
+        bool roundSignaturesOk = cscrypto::VerifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender), st->roundHash.data(), st->roundHash.size());
+        if (!roundSignaturesOk) {
+          csdebug() << "Round Signatures are not ok";
+        }
+        bool realTrustedOk = (st->realTrustedMask == stage.realTrustedMask);
+        if (!realTrustedOk) {
+          csdebug() << "Real Trusted are not ok";
+        }
+        bool writerOk = st->writer == stage.writer;
+        if (!writerOk) {
+          csdebug() << "Writer is not ok";
+        }
+        if (blockSignaturesOk && roundSignaturesOk && realTrustedOk && writerOk) {
           trueStageThreeStorage.push_back(stage);
+          pnode->addRoundSignature(stage);
+          csdebug() << "Stage3 [" << (int)stage.sender << "] - signatures are OK";
         }
         stageThreeStorage.push_back(stage);
       break;

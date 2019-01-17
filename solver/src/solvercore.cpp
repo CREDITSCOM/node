@@ -192,7 +192,9 @@ bool SolverCore::stateCompleted(Result res) {
   return (Result::Finish == res);
 }
 
-void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp, cs::StageThree& st3) {
+void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, 
+                                  const std::vector<cs::TransactionsPacketHash>& hashes, 
+                                  std::string&& currentTimeStamp, cs::StageThree& st3) {
   //cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
 
   cs::RoundTable table;

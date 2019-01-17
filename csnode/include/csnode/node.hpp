@@ -90,9 +90,9 @@ public:
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree st3);
+  void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
   void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3);
-
+  void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -114,7 +114,7 @@ public:
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, const std::vector<cs::SignaturePair> poolSignatures);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -197,7 +197,7 @@ private:
   void sendRoundPackageToAll();
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                             const cs::Characteristic& characteristic, cs::StageThree st3);
+                             const cs::Characteristic& characteristic, cs::StageThree& st3);
 
   bool readRoundData(cs::RoundTable& roundTable);
   void reviewConveyerHashes();
@@ -311,12 +311,12 @@ private:
     cs::Characteristic characteristic;
   };
   struct SentSignatures {
-    cs::Signatures poolSignatures;
-    cs::Signatures roundSignatures;
+    std::vector<cs::SignaturePair> poolSignatures;
+    std::vector<cs::SignaturePair> roundSignatures;
   };
 
   cs::Bytes lastRoundTableMessage_;
-
+  cs::Bytes lastSignaturesMessage_;
 
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
