@@ -7,6 +7,7 @@ namespace csdb {
 class Currency::priv : public ::csdb::internal::shared_data {
 public:
   uint8_t id = 0;
+  DEFAULT_PRIV_CLONE()
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Currency)
 
