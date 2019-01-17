@@ -1,5 +1,4 @@
 #include <client/params.hpp>
-#include <lib/system/keys.hpp>
 
 #include <base58.h>
 

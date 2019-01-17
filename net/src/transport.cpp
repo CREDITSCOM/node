@@ -1,7 +1,6 @@
 /* Send blaming letters to @yrtimd */
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/utils.hpp>
 
 #include "network.hpp"

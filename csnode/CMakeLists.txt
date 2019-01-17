@@ -41,7 +41,6 @@ add_library(csnode
   include/csnode/packstream.hpp
   include/csnode/datastream.hpp
   include/csnode/dynamicbuffer.hpp
-  include/csnode/threading.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp

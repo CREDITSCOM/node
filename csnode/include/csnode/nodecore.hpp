@@ -12,7 +12,6 @@
 #include <csnode/transactionspacket.hpp>
 
 #include <lib/system/common.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/metastorage.hpp>
 
 // time in ms only
