@@ -1619,6 +1619,7 @@ APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
         wi.address = fromByteArray(addr_b);
 
         wi.timesWriter = wd.times;
+        wi.timesTrusted = wd.times_trusted;
         wi.feeCollected.integral = wd.totalFee.integral();
         wi.feeCollected.fraction = wd.totalFee.fraction();
 
