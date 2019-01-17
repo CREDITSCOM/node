@@ -7,6 +7,9 @@
 #define SOLVER_FEE_HPP
 
 #include <cstddef>
+#include <set>
+
+#include <lib/system/common.hpp>
 
 class BlockChain;
 
@@ -79,6 +82,7 @@ private:
   double rounds_frequency_;
   csdb::Pool* current_pool_;
   TransactionsPacket* transactions_packet_;
+  std::multiset<cs::PublicKey> last_trusted_;
 };
 }  // namespace cs
 

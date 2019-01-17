@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 #include <limits>
-#include <set>
+#include <algorithm>
 
 #include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
@@ -141,27 +141,31 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 }
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
-  csdb::Pool pool = blockchain.loadBlock(blockchain.getLastHash());
-  std::set<cs::PublicKey> unique_trusted_;
-  if (blockchain.getLastSequence() < kBlocksNumForNodesQtyEstimation) {
-    while (pool.is_valid()) {
-      for (uint32_t i = 0; i < pool.confidants().size(); ++i) {
-        unique_trusted_.insert(pool.confidants()[i]);
+  size_t last_sequence = blockchain.getLastSequence();
+  size_t sequence_gap = 5; // case of removing last block
+  csdb::Pool pool = blockchain.loadBlock(last_sequence - sequence_gap);
+  const auto& confidants = pool.confidants();
+  
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    last_trusted_.insert(confidants[i]);
+  }
+
+  if (last_sequence > kBlocksNumForNodesQtyEstimation) {
+    csdb::Pool pool_to_remove_conf = blockchain.loadBlock(last_sequence - kBlocksNumForNodesQtyEstimation);
+    const auto& confidants_to_remove = pool_to_remove_conf.confidants();
+    for (size_t i = 0; i < confidants_to_remove.size(); ++i) {
+      auto it = last_trusted_.find(confidants_to_remove[i]);
+      if (it != last_trusted_.end()) {
+        last_trusted_.erase(it);
       }
-      pool = blockchain.loadBlock(pool.previous_hash());
     }
   }
-  else {
-    size_t i = kBlocksNumForNodesQtyEstimation;
-    while (pool.is_valid() && i != 0) {
-      for (uint32_t j = 0; j < pool.confidants().size(); ++j) {
-        unique_trusted_.insert(pool.confidants()[j]);
-      }
-      pool = blockchain.loadBlock(pool.previous_hash());
-      --i;
-    }
+
+  std::set<cs::PublicKey> unique_trusted;
+  for (const auto& it : last_trusted_) {
+    unique_trusted.insert(it);
   }
-  return unique_trusted_.size();
+  return unique_trusted.size();
 }
 
 void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
