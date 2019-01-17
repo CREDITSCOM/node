@@ -13,7 +13,10 @@
 #include <boost/property_tree/xml_parser.hpp>
 
 #include <base58.h>
+
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+
 #include <cscrypto/cscrypto.hpp>
 #include "config.hpp"
 

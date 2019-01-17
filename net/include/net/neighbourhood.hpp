@@ -7,7 +7,6 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
-#include <lib/system/keys.hpp>
 
 #include "packet.hpp"
 

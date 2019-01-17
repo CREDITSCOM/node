@@ -4,7 +4,6 @@
 #include <consensus.hpp>
 #include <csnode/nodecore.hpp>
 #include <cstdint>
-#include <lib/system/keys.hpp>
 
 namespace cs {
 

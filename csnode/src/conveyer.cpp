@@ -4,8 +4,10 @@
 
 #include <exception>
 #include <iomanip>
+
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/hash.hpp>
 
 /// pointer implementation realization
 struct cs::ConveyerBase::Impl {
