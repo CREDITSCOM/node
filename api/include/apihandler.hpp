@@ -22,8 +22,8 @@
 #include <deque>
 #include <queue>
 
-#include <csnode/threading.hpp>
 #include <client/params.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include "tokens.hpp"
 

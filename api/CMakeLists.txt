@@ -17,11 +17,11 @@ add_library(csconnector
     src/apihandler.cpp
     include/apihandler.hpp
     include/debuglog.hpp
-	include/tokens.hpp
-	src/tokens.cpp
+    include/tokens.hpp
+    src/tokens.cpp
     )
 
-target_link_libraries (csconnector PUBLIC csdb csnode csconnector_gen csconnector_executor_gen variant_gen)
+target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)
 
 # INCLUDE DIRECTORIES лучше задавать не глобально, а для конкретного проекта.
 # INCLUDE DIRECTORIES из подключаемых библиотек (в данном случае thrift и csdb)

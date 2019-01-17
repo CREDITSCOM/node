@@ -23,10 +23,9 @@
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
-#include <csnode/threading.hpp>
 #include <csnode/nodecore.hpp>
 
-#include <lib/system/signals.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include <condition_variable>
 #include <mutex>

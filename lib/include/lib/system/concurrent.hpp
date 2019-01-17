@@ -5,9 +5,16 @@
 #include <future>
 #include <memory>
 #include <type_traits>
+#include <assert.h>
+#include <condition_variable>
+#include <list>
+#include <thread>
+#include <unordered_map>
 
-#include <lib/system/structures.hpp>
 #include <lib/system/signals.hpp>
+#include <lib/system/cache.hpp>
+#include <lib/system/common.hpp>
+#include <lib/system/logger.hpp>
 
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
@@ -297,6 +304,166 @@ inline bool operator<(const FutureWatcher<T>& lhs, const FutureWatcher<T>& rhs) 
 template<typename T>
 inline bool operator==(const FutureWatcher<T>& watcher, uint64_t value) {
   return watcher.id() == value;
+}
+
+// for api threading
+template <typename S>
+struct WorkerQueue {
+private:
+  using tids_t = std::list<std::tuple<>>;
+  tids_t tids_;
+  std::unordered_map<std::thread::id, typename tids_t::iterator> tidMap_;
+
+  std::condition_variable_any conditionalVariable_;
+  cs::SpinLock lock_;
+  S state_;
+
+public:
+  inline WorkerQueue() noexcept : lock_() {}
+
+  S get_state() const {
+    return state_;
+  }
+
+  void get_position() {
+    std::lock_guard<decltype(lock_)> l(lock_);
+    auto tid = std::this_thread::get_id();
+    tidMap_[tid] = tids_.insert(tids_.end(), std::make_tuple());
+  }
+
+  template <typename J>
+  void wait_till_front(const J& j) {
+    std::unique_lock<decltype(lock_)> l(lock_);
+
+    auto tid = std::this_thread::get_id();
+    auto tit = tidMap_.find(tid);
+    assert(tit != tidMap_.end());
+
+    conditionalVariable_.wait(l, [&]() {
+      if (tit->second == tids_.begin() && j(state_)) {
+        tids_.pop_front();
+        tidMap_.erase(tit);
+        conditionalVariable_.notify_all();
+
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  void yield() {
+    std::unique_lock<decltype(lock_)> l(lock_);
+
+    auto tid = std::this_thread::get_id();
+    auto tit = tidMap_.find(tid);
+
+    if (tit == tidMap_.end()) {
+      return;
+    }
+
+    bool needNotifyAll = tit->second == tids_.begin();
+    tids_.erase(tit->second);
+
+    tidMap_.erase(tit);
+
+    if (needNotifyAll) {
+      conditionalVariable_.notify_all();
+    }
+  }
+
+  template <typename State>
+  void update_state(const State& state) {
+    std::lock_guard<decltype(lock_)> lock(lock_);
+    state_ = state();
+    conditionalVariable_.notify_all();
+  }
+};
+
+// what is sweet spot?
+struct SweetSpot {
+private:
+  std::condition_variable_any conditionalVariable_;
+  cs::SpinLock lock_;
+  bool occupied_ = false;
+
+public:
+  inline SweetSpot() noexcept : lock_() {}
+
+  void occupy() {
+    std::unique_lock<decltype(lock_)> lock(lock_);
+
+    conditionalVariable_.wait(lock, [this]() {
+      auto res = !occupied_;
+      occupied_ = true;
+      return res;
+    });
+  }
+  void leave() {
+    std::lock_guard<decltype(lock_)> lock(lock_);
+    occupied_ = false;
+    conditionalVariable_.notify_one();
+  }
+};
+
+template <typename T>
+struct SpinLockedRef;
+
+template <typename T>
+struct SpinLockable {
+  using LockedType = T;
+
+  template <typename... Args>
+  SpinLockable(Args&&... args)
+  : t(std::forward<Args>(args)...) {
+  }
+
+private:
+  __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
+  T t;
+
+  friend struct SpinLockedRef<T>;
+};
+
+template <typename T>
+struct SpinLockedRef {
+private:
+  SpinLockable<T>* lockable_;
+
+public:
+  SpinLockedRef(SpinLockable<T>& lockable)
+  : lockable_(&lockable) {
+    while (this->lockable_->af.test_and_set(std::memory_order_acquire));
+  }
+
+  ~SpinLockedRef() {
+    if (lockable_) {
+      lockable_->af.clear(std::memory_order_release);
+    }
+  }
+
+  SpinLockedRef(const SpinLockedRef&) = delete;
+  SpinLockedRef(SpinLockedRef&& other)
+  : lockable_(other.lockable_) {
+    other.lockable_ = nullptr;
+  }
+
+  operator T*() {
+    return &(lockable_->t);
+  }
+
+  T* operator->() {
+    return *this;
+  }
+
+  T& operator*() {
+    return lockable_->t;
+  }
+};
+
+template <typename T>
+SpinLockedRef<T> lockedReference(SpinLockable<T>& lockable) {
+  return SpinLockedRef<T>(lockable);
 }
 }
 #endif  //  CONCURRENT_HPP
