@@ -13,11 +13,17 @@ cs::Timer::~Timer() {
   }
 }
 
-void cs::Timer::start(int msec) {
+void cs::Timer::start(int msec, Type type) {
   interruption_ = false;
   isRunning_ = true;
+
+  type_ = type;
+
   ms_ = std::chrono::milliseconds(msec);
-  timerThread_ = std::thread(&Timer::loop, this);
+  ns_ = std::chrono::nanoseconds(0);
+
+  timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
+
   realMs_ = ms_;
   allowDifference_ = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
 }
@@ -33,6 +39,10 @@ void cs::Timer::stop() {
 
 bool cs::Timer::isRunning() const {
   return isRunning_;
+}
+
+cs::Timer::Type cs::Timer::type() const {
+  return type_;
 }
 
 void cs::Timer::singleShot(int msec, cs::RunPolicy policy, const cs::TimerCallback& callback) {
@@ -51,6 +61,28 @@ void cs::Timer::loop() {
     rehabilitation();
 
     emit timeOut();
+  }
+}
+
+void cs::Timer::preciseLoop() {
+  std::chrono::high_resolution_clock::time_point previousTimePoint = std::chrono::high_resolution_clock::now();
+
+  while (!interruption_) {
+    auto now = std::chrono::high_resolution_clock::now();
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - previousTimePoint);
+    ns_ += ns;
+
+    auto needMsInNs = std::chrono::duration_cast<std::chrono::nanoseconds>(ms_);
+
+    if (needMsInNs <= ns_) {
+      ns_ = std::chrono::nanoseconds(0);
+
+      emit timeOut();
+    }
+
+    // recalc
+    previousTimePoint = now;
+    std::this_thread::yield();
   }
 }
 
