@@ -1637,3 +1637,10 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
 #endif
 }
 ////////new
+
+void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
+  auto pool = s_blockchain.loadBlock(s_blockchain.getLastHash());
+  _return.lastBlock = s_blockchain.loadBlock(s_blockchain.getLastHash()).sequence();
+  _return.currRound = cs::Conveyer::instance().currentRoundNumber();
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
