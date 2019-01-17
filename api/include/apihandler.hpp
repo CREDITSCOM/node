@@ -147,6 +147,8 @@ public:
   void WritersGet(api::WritersGetResult& _return, int32_t page) override;
   ////////new
 
+  void SyncStateGet(api::SyncStateResult& _return) override;
+
   BlockChain &get_s_blockchain() const noexcept { return s_blockchain; }
 private:
   struct smart_trxns_queue {
