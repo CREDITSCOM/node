@@ -40,6 +40,11 @@ bool Address::operator==(const Address &other) const noexcept {
   if (d == other.d) {
     return true;
   }
+
+  if(is_public_key() != other.is_public_key()) {
+    return false;
+  }
+
   if (is_public_key()) {
     return d->data_.public_key == other.d->data_.public_key;
   }

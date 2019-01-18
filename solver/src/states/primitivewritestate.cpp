@@ -37,8 +37,7 @@ namespace cs
             std::vector <cs::TransactionsPacketHash> hashes_candidates;
             pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
             trusted_candidates.clear();
-            cs::StageThree tmp {};
-            pctx->spawn_next_round(tmp);
+            pctx->spawn_next_round();
         });
     }
 

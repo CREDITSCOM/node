@@ -7,7 +7,7 @@ using namespace std;
 namespace cs {
 
 WalletsIds::WalletsIds()
-: nextId_(1) {
+: nextId_(0) {
   special_.reset(new Special(*this));
   norm_.reset(new Normal(*this));
 }

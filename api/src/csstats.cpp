@@ -52,7 +52,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
 #ifdef TRANSACTIONS_INDEX
         if (transaction.user_field(0).is_valid()) {
-          periodStats.transactionsSmartCount += blockchain.getTransactionsCount(transaction.target());// blockchain.get_trxns_count(transaction.source()).total_trxns_count;
+          periodStats.transactionsSmartCount += blockchain.getTransactionsCount();// blockchain.get_trxns_count(transaction.source()).total_trxns_count;
           //++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
         }                                        // smart contracts
 #endif
