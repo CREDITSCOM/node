@@ -125,11 +125,17 @@ cs::Bytes TransactionsPacket::toBinary() const noexcept {
   return os.buffer();
 }
 
+cs::Bytes TransactionsPacket::toHashBinary() const noexcept {
+  ::csdb::priv::obstream os;
+  hashPut(os);
+  return os.buffer();
+}
+
 bool TransactionsPacket::makeHash() {
   bool isEmpty = isHashEmpty();
 
   if (isEmpty) {
-    m_hash = TransactionsPacketHash::calcFromData(toBinary());
+    m_hash = TransactionsPacketHash::calcFromData(toHashBinary());
   }
 
   return isEmpty;
@@ -157,6 +163,18 @@ bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
   return true;
 }
 
+bool TransactionsPacket::addSignature(const cscrypto::Signature& signature) {
+  if (std::find(m_signatures.cbegin(), m_signatures.cend(), signature) == m_signatures.cend()) {
+    return false;
+  }
+  m_signatures.push_back(signature);
+  return true;
+}
+
+const std::vector<cscrypto::Signature>& TransactionsPacket::signatures() const noexcept {
+  return m_signatures;
+}
+
 const std::vector<csdb::Transaction>& TransactionsPacket::transactions() const noexcept {
   return m_transactions;
 }
@@ -174,6 +192,20 @@ void TransactionsPacket::clear() noexcept {
 //
 
 void TransactionsPacket::put(::csdb::priv::obstream& os) const {
+  os.put(m_transactions.size());
+
+  for (const auto& it : m_transactions) {
+    os.put(it);
+  }
+
+  os.put(m_signatures.size());
+  for (const auto& it : m_signatures) {
+    os.put(it);
+  }
+
+}
+
+void TransactionsPacket::hashPut(::csdb::priv::obstream& os) const {
   os.put(m_transactions.size());
 
   for (const auto& it : m_transactions) {
@@ -200,6 +232,26 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
 
     m_transactions.push_back(tran);
   }
+
+  std::size_t sigCount = 0;
+  if (!is.get(sigCount)) {
+    return false;
+  }
+
+  m_signatures.clear();
+  if (sigCount > 0) {
+    m_signatures.reserve(sigCount);
+    for (std::size_t i = 0; i < sigCount; ++i) {
+      cscrypto::Signature sig;
+
+      if (!is.get(sig)) {
+        return false;
+      }
+
+      m_signatures.push_back(sig);
+    }
+  }
+
 
   return true;
 }

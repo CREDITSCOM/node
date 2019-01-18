@@ -106,7 +106,7 @@ TEST(TransactionsPacket, makeTransactionsPacketFromByteStream) {
   const cs::TransactionsPacket hashFromStream =
       cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
 
-  ASSERT_EQ(mainPacketBin, hashFromStream.toBinary());
+  ASSERT_EQ(mainPacketBin, hashFromStream.toHashBinary());
   ASSERT_EQ(packet.transactionsCount(), hashFromStream.transactionsCount());
 
   const auto& mainHash = packet.hash();

@@ -145,17 +145,17 @@ public:
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
   const cs::PublicKey& writer_public_key() const noexcept;
-  std::string signature() const noexcept;
+  const cs::Signature& signature() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
-  const ::std::vector<std::pair<int, ::std::string>>& signatures() const noexcept;
+  const ::std::vector<std::pair<int, cs::Signature>>& signatures() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
   void set_storage(const Storage& storage) noexcept;
   void set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept;
-  void set_signature(const std::string& signature) noexcept;
+  void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
-  void add_signature(int index, ::std::string& signature) noexcept;
+  void add_signature(int index, const cs::Signature& signature) noexcept;
 
   Transactions& transactions();
   const Transactions& transactions() const;
@@ -289,7 +289,7 @@ public:
 
   void sign(const cscrypto::PrivateKey& private_key);
   bool verify_signature();
-  bool verify_signature(const std::string& signature);
+  bool verify_signature(const cs::Signature& signature);
 
   friend class Storage;
 };

@@ -119,12 +119,14 @@ public:
    * @param   nodes   The nodes.
    */
 
-  void spawn_next_round();
+  void spawn_next_round(cs::StageThree& st3);
 
   void spawn_first_round()
   {
     //TODO: implement method
   }
+
+  void sendRoundTable();
 
   void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes)
   {

@@ -73,6 +73,8 @@ bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
 
 csdb::Transaction CreateTestTransaction(const int64_t id,
                                         const uint8_t amount) {
+  cs::Signature sign;
+  sign.fill(0);
   csdb::Transaction transaction{
       id,
       csdb::Address::from_public_key(
@@ -87,8 +89,7 @@ csdb::Transaction CreateTestTransaction(const int64_t id,
       csdb::Amount{0, 0},
       csdb::AmountCommission{0.},
       csdb::AmountCommission{0.},
-      std::string(
-          "0000000000000000000000000000000000000000000000000000000000000000")};
+      sign};
   return transaction;
 }
 
@@ -192,7 +193,7 @@ TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
   auto packet = CreateTestPacket(2);
   conveyer.addTransactionsPacket(packet);
   auto& table{conveyer.transactionsPacketTable()};
-  ASSERT_EQ(table.at(packet.hash()).toBinary(), packet.toBinary());
+  ASSERT_EQ(table.at(packet.hash()).toHashBinary(), packet.toHashBinary());
 }
 
 TEST(Conveyer, CanAddTransactionToLastBlock) {

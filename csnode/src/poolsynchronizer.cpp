@@ -59,9 +59,11 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     --roundNum;
   }
 
-  const cs::Sequence last = lastWrittenSequence + blockChain_->getCachedBlocksSize();
+  const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
+  const cs::Sequence last = lastWrittenSequence + cachedBlocksSize;
   const cs::Sequence blocksRemaining = roundNum - last;
   cslog() << "SYNC: Blocks remaining: " << blocksRemaining;
+  csdebug() << "SYNC: Cached blocks size in blockchain: " << cachedBlocksSize;
 
   if (blocksRemaining == 0) {
     showSyncronizationProgress(lastWrittenSequence);
@@ -244,7 +246,8 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     return false;
   }
 
-  const float last = float(lastWrittenSequence + blockChain_->getCachedBlocksSize());
+  const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
+  const float last = float(lastWrittenSequence + cachedBlocksSize);
   const float global = float(globalSequence - 1);
   const float maxValue = 100.0f;
   const uint32_t syncStatus = cs::numeric_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
@@ -253,6 +256,7 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
   ProgressBar bar;
   std::cout << "\n";
   cslog() << "SYNC: Blocks remaining: " << remaining;
+  csdebug() << "SYNC: Cached blocks size in blockchain: " << cachedBlocksSize;
   cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
 
   return remaining == 0;

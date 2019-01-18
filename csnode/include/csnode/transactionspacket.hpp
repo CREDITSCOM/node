@@ -104,6 +104,8 @@ public:  // Interface
   ///
   cs::Bytes toBinary() const noexcept;
 
+  cs::Bytes toHashBinary() const noexcept;
+
   ///
   /// @brief Generates hash
   /// @return True if hash generated successed
@@ -129,9 +131,15 @@ public:  // Interface
   size_t transactionsCount() const noexcept;
 
   ///
-  /// @brief Adds transaction to transaction vector
-  /// @param transaction Any transaction to add
+  /// @brief Adds signature to transaction vector
+  /// @param signature Signature to add
   ///
+  bool addSignature(const cscrypto::Signature& signature);
+
+  ///
+/// @brief Adds transaction to transaction vector
+/// @param transaction Any transaction to add
+///
   bool addTransaction(const csdb::Transaction& transaction);
 
   ///
@@ -139,6 +147,12 @@ public:  // Interface
   /// @return Reference to transactions vector
   ///
   const std::vector<csdb::Transaction>& transactions() const noexcept;
+
+  ///
+/// @brief Returns transactions
+/// @return Reference to signatures vector
+///
+  const std::vector<cscrypto::Signature>& signatures() const noexcept;
 
   ///
   /// @brief Returns trabsactions, non const version
@@ -152,11 +166,13 @@ public:  // Interface
   void clear() noexcept;
 
 private:  // Service
+  void hashPut(::csdb::priv::obstream& os) const;
   void put(::csdb::priv::obstream& os) const;
   bool get(::csdb::priv::ibstream& is);
 
 private:  // Members
   TransactionsPacketHash m_hash;
+  std::vector<cscrypto::Signature> m_signatures;
   std::vector<csdb::Transaction> m_transactions;
 };
 }  // namespace cs
