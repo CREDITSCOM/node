@@ -2369,15 +2369,15 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 }
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
-  cscrypto::Hash hash;
-  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cscrypto::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
+  cs::Hash hash;
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cs::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(bytesHash);
 }
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey) {
-  cscrypto::Hash hash;
+  cs::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), pKey.data(), pKey.size());
   cs::Bytes bytesHash(hash.begin(), hash.end());
 

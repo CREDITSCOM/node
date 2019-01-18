@@ -8,6 +8,7 @@
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
 #include <csnode/conveyer.hpp>
+#include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -207,15 +208,13 @@ std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
 
   path += CHEAT_FILENAME;
 
-  std::array<cscrypto::Byte, cscrypto::kHashSize + sizeof(NODE_VERSION)> data;
-
   csdb::PoolHash genHash = bh.find(0);
-  auto hb = genHash.to_binary();
+  cs::Bytes hb = genHash.to_binary();
 
-  memcpy(data.data(), hb.data(), cscrypto::kHashSize);
-  memcpy(data.data() + cscrypto::kHashSize, reinterpret_cast<const cscrypto::Byte*>(&NODE_VERSION), sizeof(NODE_VERSION));
+  cs::DataStream stream(hb);
+  stream << NODE_VERSION;
 
-  return EncodeBase58(data.data(), data.data() + sizeof(data));
+  return EncodeBase58(hb);
 }
 
 void generateCheatDbFile(std::string path, const BlockHashes& bh) {

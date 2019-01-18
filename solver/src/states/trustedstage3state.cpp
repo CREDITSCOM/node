@@ -269,7 +269,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
   }
   size_t maxWeight = 0;
   cs::Hash mostFrequentHash;
-  std::fill(mostFrequentHash.begin(), mostFrequentHash.end(), (cs::Byte)0);
+  mostFrequentHash.fill(0);
 
   ////searching for most frequent hash
   for (auto& it : hWeight) {
