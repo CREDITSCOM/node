@@ -23,10 +23,9 @@
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
-#include <csnode/threading.hpp>
 #include <csnode/nodecore.hpp>
 
-#include <lib/system/signals.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include <condition_variable>
 #include <mutex>
@@ -122,7 +121,7 @@ public:
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
 #ifdef MONITOR_NODE
-  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)>);
+  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
   void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
 #endif
 

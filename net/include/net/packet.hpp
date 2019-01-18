@@ -6,7 +6,6 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/hash.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
 #include <cscrypto/cscrypto.hpp>
 #include "lib/system/utils.hpp"

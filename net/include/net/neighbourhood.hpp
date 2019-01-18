@@ -7,7 +7,6 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
-#include <lib/system/keys.hpp>
 
 #include "packet.hpp"
 
@@ -151,8 +150,16 @@ public:
   uint32_t size() const;
   uint32_t getNeighboursCountWithoutSS() const;
 
+  // no thread safe
   Connections getNeigbours() const;
   Connections getNeighboursWithoutSS() const;
+
+  // uses to iterate connections
+  std::unique_lock<cs::SpinLock> getNeighboursLock() const;
+
+  // thread safe
+  void forEachNeighbour(std::function<void(ConnectionPtr)> func);
+  void forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func);
 
   void pingNeighbours();
   bool isPingDone();

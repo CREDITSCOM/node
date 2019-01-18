@@ -65,20 +65,33 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 #ifdef MONITOR_NODE
   auto wrWall = pool.writer_public_key();
 
-  auto wrWrIt = data_.writers_.find(wrWall);
-  if (wrWrIt == data_.writers_.end()) {
-    auto res = data_.writers_.insert(std::make_pair(wrWall, WriterData()));
-    wrWrIt = res.first;
-  }
+  WalletData::Address addr;
+  std::copy(wrWall.begin(), wrWall.end(), addr.begin());
 
-  ++wrWrIt->second.times;
+  auto it_writer = data_.trusted_info_.find(addr);
+  if (it_writer == data_.trusted_info_.end()) {
+    auto res = data_.trusted_info_.insert(std::make_pair(addr, TrustedData()));
+    it_writer = res.first;
+  }
+  ++it_writer->second.times;
+
+  WalletData::Address addr_trusted;
+  for (const auto &it : confidants) {
+    std::copy(it.begin(), it.end(), addr_trusted.begin());
+    auto it_trusted = data_.trusted_info_.find(addr_trusted);
+    if (it_trusted == data_.trusted_info_.end()) {
+      const auto res = data_.trusted_info_.insert(std::make_pair(addr_trusted, TrustedData()));
+      it_trusted = res.first;
+    }
+    ++it_trusted->second.times_trusted;
+  }
 #endif
 
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
     totalAmountOfCountedFee += load(*itTrx);
   }
 #ifdef MONITOR_NODE
-  wrWrIt->second.totalFee += totalAmountOfCountedFee;
+  it_writer->second.totalFee += totalAmountOfCountedFee;
 #endif
 
   if (totalAmountOfCountedFee > 0) {
@@ -282,8 +295,8 @@ void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData:
 }
 
 #ifdef MONITOR_NODE
-void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)> func) {
-  for (const auto& wrd : writers_) {
+void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const TrustedData&)> func) {
+  for (const auto& wrd : trusted_info_) {
     if (!func(wrd.first, wrd.second))
       break;
   }
@@ -304,7 +317,7 @@ void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData:
   auto wrWall = curr.writer_public_key();
   auto wrWrIt = writers_.find(curr.writer_public_key());
   if (wrWrIt == writers_.end()) {
-    auto res = writers_.insert(std::make_pair(curr.writer_public_key(), WriterData()));
+    auto res = writers_.insert(std::make_pair(curr.writer_public_key(), TrustedData()));
     wrWrIt = res.first;
   }
 

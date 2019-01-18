@@ -9,7 +9,6 @@ add_library(lib
   include/lib/system/hash.hpp
   include/lib/system/queues.hpp
   include/lib/system/structures.hpp
-  include/lib/system/keys.hpp
   include/lib/system/logger.hpp
   include/lib/system/allocators.hpp
   include/lib/system/timer.hpp

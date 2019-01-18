@@ -1,7 +1,6 @@
 #include <base58.h>
 #include <csdb/currency.hpp>
 #include <lib/system/hash.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <limits>
@@ -13,6 +12,8 @@
 #include <solver/smartcontracts.hpp>
 
 #include <client/config.hpp>
+
+//#define RECREATE_INDEX
 
 using namespace cs;
 
@@ -89,8 +90,18 @@ bool BlockChain::init(const std::string& path)
     std::cout << "Done\n";
   }
 
+#if defined(TRANSACTIONS_INDEX) && defined(RECREATE_INDEX)
+  for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
+    auto pool = loadBlock(seq + 1);
+    createTransactionsIndex(pool);
+  }
+
+  cslog() << "Recreated the index 0->" << getLastSequence() << ". Finishing with error now. Because we can";
+  return false;
+#else
   good_ = true;
   return true;
+#endif
 }
 
 bool BlockChain::isGood() const {
@@ -136,13 +147,23 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
 #ifdef TRANSACTIONS_INDEX
 void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
+#ifdef RECREATE_INDEX
+  static std::map<csdb::Address, csdb::PoolHash> lapoos;
+#endif
+
   // Update
   std::set<csdb::Address> indexedAddrs;
 
   auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
     if (indexedAddrs.insert(addr).second) {
+      auto key = get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY);
+#ifdef RECREATE_INDEX
+      csdb::PoolHash lapoo = lapoos[key];
+      lapoos[key] = pool.hash();
+#else
       csdb::PoolHash lapoo = getLastTransaction(addr).pool_hash();
-      storage_.set_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), pool.hash(), lapoo);
+#endif
+      storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
     }
   };
 
@@ -256,7 +277,7 @@ void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCa
 }
 
 #ifdef MONITOR_NODE
-void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WriterData&)> func) {
+void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)> func) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   walletsCacheStorage_->iterateOverWriters(func);
 }
@@ -275,10 +296,9 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 csdb::PoolHash BlockChain::getLastHash() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.is_valid()) {
-    auto tmp = deferredBlock_.hash().to_binary();
-    return csdb::PoolHash::from_binary(tmp);
-  }
+  if (deferredBlock_.is_valid())
+    return deferredBlock_.hash().clone();
+
   return storage_.last_hash();
 }
 
@@ -293,24 +313,22 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
   if(ph.is_empty()) {
     return csdb::Pool {};
   }
-  
+
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
-  if(deferredBlock_.hash() == ph) {
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::from_binary(tmp);
-  }
+
+  if(deferredBlock_.hash() == ph)
+    return deferredBlock_.clone();
+
   return storage_.pool_load(ph);
 }
 
 csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
 
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
+
   if (deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence) {
     // deferredBlock already composed:
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::from_binary(tmp);
+    return deferredBlock_.clone();
   }
   // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
   return storage_.pool_load(sequence + 1);
@@ -319,20 +337,18 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if(deferredBlock_.hash() == ph) {
-    size_t not_used = 0;
-    auto tmp = deferredBlock_.to_binary();
-    return csdb::Pool::meta_from_binary(tmp, not_used);
-  }
+  if(deferredBlock_.hash() == ph)
+    return deferredBlock_.clone();
+
   return storage_.pool_load_meta(ph, cnt);
 }
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  
-  if (deferredBlock_.hash() == transId.pool_hash()) {
-    return csdb::Transaction::from_binary(deferredBlock_.transaction(transId).to_binary());
-  }
+
+  if (deferredBlock_.hash() == transId.pool_hash())
+    return deferredBlock_.transaction(transId).clone();
+
   return storage_.transaction(transId);
 }
 
@@ -459,9 +475,9 @@ const csdb::Storage& BlockChain::getStorage() const {
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.sequence() == seq) {
-    return csdb::PoolHash::from_binary(deferredBlock_.hash().to_binary());
-  }
+  if (deferredBlock_.sequence() == seq)
+    return deferredBlock_.hash().clone();
+
   return blockHashes_->find(seq);
 }
 

@@ -92,6 +92,7 @@ public:                                              \
   class_name& operator=(const class_name&) noexcept; \
   class_name& operator=(class_name&&) noexcept;      \
   ~class_name();                                     \
+  class_name clone() const;                          \
   UNIT_TEST_METHODS_DECLARE                          \
 private:                                             \
   class priv;                                        \

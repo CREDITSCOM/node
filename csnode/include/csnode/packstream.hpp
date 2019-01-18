@@ -12,7 +12,6 @@
 #include <csdb/transaction.hpp>
 
 #include <lib/system/hash.hpp>
-#include <lib/system/keys.hpp>
 
 #include <net/packet.hpp>
 

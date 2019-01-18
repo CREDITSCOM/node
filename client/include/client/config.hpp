@@ -8,7 +8,6 @@
 #include <string>
 
 #include <lib/system/common.hpp>
-#include <lib/system/keys.hpp>
 
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;

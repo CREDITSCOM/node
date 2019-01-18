@@ -49,8 +49,9 @@ public:
 #endif
   };
 
-  struct WriterData {
+  struct TrustedData {
     uint64_t times = 0;
+    uint64_t times_trusted = 0;
     csdb::Amount totalFee;
   };
 
@@ -61,7 +62,7 @@ public:
   void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
 
 #ifdef MONITOR_NODE
-  void iterateOverWriters(const std::function<bool(const WalletData::Address&, const WriterData&)>);
+  void iterateOverWriters(const std::function<bool(const WalletData::Address&, const TrustedData&)>);
 #endif
 
   uint64_t getCount() const { return wallets_.size(); }
@@ -154,7 +155,7 @@ private:
   const csdb::Address startAddress_;
 
 #ifdef MONITOR_NODE
-  std::map<WalletData::Address, WriterData> writers_; 
+  std::map<WalletData::Address, TrustedData> trusted_info_;
 #endif
 
   Data wallets_;

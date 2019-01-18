@@ -60,7 +60,10 @@ private:  // Service
 
   bool getNeededSequences(NeighboursSetElemet& neighbour);
 
-  void checkNeighbourSequence(const cs::Sequence sequence);
+  void checkNeighbourSequence(const cs::Sequence sequence, const bool includingSmaller);
+
+  void removeExistingSequence(const cs::Sequence sequence, const bool includingSmaller = false);
+
   void refreshNeighbours();
 
   bool isLastRequest() const;
@@ -89,13 +92,16 @@ private:  // struct
       sequences_.reserve(blockPoolsCount);
     }
 
-    inline void removeSequnce(const cs::Sequence sequence) {
+    inline void removeSequnce(const cs::Sequence sequence, const bool includingSmaller) {
       if (sequences_.empty()) {
         return;
       }
 
       const auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
       if (it != sequences_.end()) {
+        if (includingSmaller) {
+          sequences_.erase(sequences_.begin(), it);
+        }
         sequences_.erase(it);
       }
     }
