@@ -99,14 +99,15 @@ TEST(TransactionsPacket, makeTransactionsPacketFromBinary) {
 }
 
 TEST(TransactionsPacket, makeTransactionsPacketFromByteStream) {
-  const auto& mainPacketBin = packet.toBinary();
+  const auto mainPacketBin = packet.toBinary();
   const size_t rawSize = mainPacketBin.size();
   const void* rawData = mainPacketBin.data();
 
   const cs::TransactionsPacket hashFromStream =
       cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
 
-  ASSERT_EQ(mainPacketBin, hashFromStream.toHashBinary());
+  ASSERT_EQ(mainPacketBin, hashFromStream.toBinary());
+  ASSERT_EQ(packet.toHashBinary(), hashFromStream.toHashBinary());
   ASSERT_EQ(packet.transactionsCount(), hashFromStream.transactionsCount());
 
   const auto& mainHash = packet.hash();

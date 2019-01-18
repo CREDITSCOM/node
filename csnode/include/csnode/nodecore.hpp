@@ -131,8 +131,15 @@ struct ConveyerMeta {
 };
 
 struct SignaturePair {
-  uint8_t sender;
+  uint8_t sender = 0;
   cs::Signature signature;
+
+  SignaturePair() = default;
+
+  SignaturePair(const uint8_t Sender, const cs::Signature& Sign) :
+    sender(Sender)
+  , signature(Sign)
+  {}
 };
 
 struct CharacteristicMeta {

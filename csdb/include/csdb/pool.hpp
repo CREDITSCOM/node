@@ -51,7 +51,7 @@ public:
   static PoolHash from_string(const ::std::string& str);
 
   cs::Bytes to_binary() const noexcept;
-  static PoolHash from_binary(const cs::Bytes& data);
+  static PoolHash from_binary(cs::Bytes&& data);
 
   bool operator==(const PoolHash& other) const noexcept;
   inline bool operator!=(const PoolHash& other) const noexcept;
@@ -127,8 +127,8 @@ public:
 public:
   Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage = Storage());
 
-  static Pool from_binary(const cs::Bytes& data);
-  static Pool meta_from_binary(const cs::Bytes& data, size_t& cnt);
+  static Pool from_binary(cs::Bytes&& data);
+  static Pool meta_from_binary(cs::Bytes&& data, size_t& cnt);
   static Pool load(const PoolHash& hash, Storage storage = Storage());
 
   static Pool from_byte_stream(const char* data, size_t size);

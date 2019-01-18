@@ -42,11 +42,11 @@ cs::Bytes PoolHash::to_binary() const noexcept {
   return d->value;
 }
 
-PoolHash PoolHash::from_binary(const cs::Bytes& data) {
+PoolHash PoolHash::from_binary(cs::Bytes&& data) {
   const size_t sz = data.size();
   PoolHash res;
   if ((0 == sz) || (::csdb::priv::crypto::hash_size == sz)) {
-    res.d->value = data;
+    res.d->value = std::move(data);
   }
   return res;
 }
@@ -624,23 +624,22 @@ cs::Bytes Pool::to_binary() const noexcept {
   return d->binary_representation_;
 }
 
-uint64_t Pool::get_time() const noexcept
-{
+uint64_t Pool::get_time() const noexcept {
   return atoll(user_field(0).value<std::string>().c_str());
 }
 
-Pool Pool::from_binary(const cs::Bytes& data) {
+Pool Pool::from_binary(cs::Bytes&& data) {
   std::unique_ptr<priv> p { new priv() };
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!p->get(is)) {
     return Pool();
   }
-  p->binary_representation_ = data;
+  p->binary_representation_ = std::move(data);
   p->update_transactions();
   return Pool(p.release());
 }
 
-Pool Pool::meta_from_binary(const cs::Bytes& data, size_t& cnt) {
+Pool Pool::meta_from_binary(cs::Bytes&& data, size_t& cnt) {
   std::unique_ptr<priv> p(new priv());
   ::csdb::priv::ibstream is(data.data(), data.size());
 
@@ -648,7 +647,7 @@ Pool Pool::meta_from_binary(const cs::Bytes& data, size_t& cnt) {
     return Pool();
   }
 
-  p->binary_representation_ = data;
+  p->binary_representation_ = std::move(data);
   return Pool(p.release());
 }
 

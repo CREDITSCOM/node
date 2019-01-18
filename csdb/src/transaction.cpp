@@ -228,7 +228,7 @@ cs::Bytes Transaction::to_binary() {
   return os.buffer();
 }
 
-Transaction Transaction::from_binary(const cs::Bytes data) {
+Transaction Transaction::from_binary(const cs::Bytes& data) {
   Transaction t;
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!t.get(is)) {

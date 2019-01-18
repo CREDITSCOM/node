@@ -195,12 +195,12 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
   Storage::OpenProgress progress{0};
   for (it->seek_to_first(); it->is_valid(); it->next()) {
-    const cs::Bytes v = it->value();
+    cs::Bytes v = it->value();
 
     // Хеш в ключе совпадает с реальным хешем блока?
     PoolHash real_hash = PoolHash::calc_from_data(v);
 
-    Pool p = Pool::from_binary(v);
+    Pool p = Pool::from_binary(std::move(v));
     if (!p.is_valid()) {
       set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key '%s'.", real_hash.to_string().c_str());
       return false;
@@ -477,10 +477,10 @@ Pool Storage::pool_load_internal(const PoolHash &hash, const bool metaOnly, size
 
   if (needParseData) {
     if (metaOnly) {
-      res = Pool::meta_from_binary(data, trxCnt);
+      res = Pool::meta_from_binary(std::move(data), trxCnt);
     }
     else {
-      res = Pool::from_binary(data);
+      res = Pool::from_binary(std::move(data));
     }
   }
 
@@ -556,7 +556,7 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
   }
 
   if (needParseData) {
-    res = Pool::from_binary(data);
+    res = Pool::from_binary(std::move(data));
   }
 
   if (!res.is_valid()) {
@@ -592,7 +592,7 @@ Pool Storage::pool_load_meta(const PoolHash& hash, size_t& cnt) const {
     return Pool{};
   }
 
-  res = Pool::meta_from_binary(data, cnt);
+  res = Pool::meta_from_binary(std::move(data), cnt);
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", funcName(), hash.to_string().c_str());
   }
@@ -628,7 +628,7 @@ Pool Storage::pool_remove_last() {
     return Pool{};
   }
 
-  res = Pool::from_binary(data);
+  res = Pool::from_binary(std::move(data));
   if (!res.is_valid()) {
     d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", funcName(), last_hash().to_string().c_str());
   }

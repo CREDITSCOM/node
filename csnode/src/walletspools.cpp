@@ -225,7 +225,7 @@ void WalletsPools::convert(const csdb::PoolHash& poolHashDb, PoolHash& poolHashC
 
 void WalletsPools::convert(const PoolHash& poolHashCache, csdb::PoolHash& poolHashDb) {
   cs::Bytes hashBytes(poolHashCache.begin(), poolHashCache.end());
-  poolHashDb = csdb::PoolHash::from_binary(hashBytes);
+  poolHashDb = csdb::PoolHash::from_binary(std::move(hashBytes));
 }
 
 }  // namespace cs

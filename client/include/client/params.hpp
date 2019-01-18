@@ -14,7 +14,7 @@
   #define TRANSACTIONS_INDEX
   #define TOKENS_CACHE
 #else
-//  #define SPAMMER
+  #define SPAMMER
 #endif
 
 #ifdef MONITOR_NODE

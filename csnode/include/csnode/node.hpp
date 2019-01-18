@@ -81,7 +81,7 @@ public:
   void sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
-  csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey);
+  csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   void retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
@@ -113,7 +113,8 @@ public:
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, const std::vector<cs::SignaturePair> poolSignatures);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
+                         const cs::PublicKey& sender, std::vector<cs::SignaturePair>&& poolSignatures);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);

@@ -428,7 +428,7 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::Pool& pool) {
   cs::Bytes bytes;
   (*this) >> bytes;
-  pool = csdb::Pool::from_binary(bytes);
+  pool = csdb::Pool::from_binary(std::move(bytes));
   return *this;
 }
 
@@ -507,7 +507,7 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
   cs::Bytes bytes;
   (*this) >> bytes;
-  hash = csdb::PoolHash::from_binary(bytes);
+  hash = csdb::PoolHash::from_binary(std::move(bytes));
   return *this;
 }
 

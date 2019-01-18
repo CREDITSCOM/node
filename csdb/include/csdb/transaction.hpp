@@ -120,7 +120,7 @@ public:
   void set_signature(const cs::Signature& signature);
 
   cs::Bytes to_binary();
-  static Transaction from_binary(const cs::Bytes data);
+  static Transaction from_binary(const cs::Bytes& data);
 
   static Transaction from_byte_stream(const char* data, size_t m_size);
   std::vector<uint8_t> to_byte_stream() const;

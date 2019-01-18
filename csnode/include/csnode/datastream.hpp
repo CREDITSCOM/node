@@ -476,7 +476,7 @@ inline DataStream& operator>>(DataStream& stream, csdb::PoolHash& hash) {
   cs::Bytes bytes;
   stream >> bytes;
 
-  hash = csdb::PoolHash::from_binary(bytes);
+  hash = csdb::PoolHash::from_binary(std::move(bytes));
 
   return stream;
 }
@@ -488,7 +488,7 @@ inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool) {
   cs::Bytes bytes;
   stream >> bytes;
 
-  pool = csdb::Pool::from_binary(bytes);
+  pool = csdb::Pool::from_binary(std::move(bytes));
 
   return stream;
 }
@@ -529,6 +529,15 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
 ///
 inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
   bytesView = stream.bytesView();
+  return stream;
+}
+
+///
+/// Writes signature pair to stream.
+///
+inline DataStream& operator>>(DataStream& stream, cs::SignaturePair& signaturePair) {
+  stream >> signaturePair.sender;
+  stream >> signaturePair.signature;
   return stream;
 }
 
@@ -662,6 +671,15 @@ inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entit
 ///
 inline DataStream& operator<<(DataStream& stream, const cs::BytesView& bytesView) {
   stream.addBytesView(bytesView);
+  return stream;
+}
+
+///
+/// Writes signature pair to stream.
+///
+inline DataStream& operator<<(DataStream& stream, const cs::SignaturePair& signaturePair) {
+  stream << signaturePair.sender;
+  stream << signaturePair.signature;
   return stream;
 }
 }  // namespace cs
