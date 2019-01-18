@@ -438,7 +438,10 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
   send_transaction.set_target(BlockChain::getAddressFromKey(transaction.target));
   send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
   send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
-  send_transaction.set_signature(transaction.signature);
+  // TODO Change Thrift to avoid copy
+  cs::Signature signature;
+  std::copy(transaction.signature.begin(), transaction.signature.end(), signature.begin());
+  send_transaction.set_signature(signature);
   return send_transaction;
 }
 

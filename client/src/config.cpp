@@ -326,8 +326,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
     }
 
     publicKey_ = cscrypto::GetMatchingPublic(privateKey_);
-    pk58 = EncodeBase58(publicKey_.data(),
-                        (publicKey_.data() + PUBLIC_KEY_LENGTH));
+    pk58 = EncodeBase58(publicKey_.data(), publicKey_.data() + publicKey_.size());
   }
   else {
     // No private key detected
@@ -361,8 +360,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
           skBytes.assign(sk.data(), sk.data() + sk.size());
         }
 
-        pk58 = EncodeBase58(publicKey_.data(),
-                            (publicKey_.data() + PUBLIC_KEY_LENGTH));
+        pk58 = EncodeBase58(publicKey_.data(), publicKey_.data() + publicKey_.size());
         std::string sk58 = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
 
         writeFile(pathToPk, pk58);

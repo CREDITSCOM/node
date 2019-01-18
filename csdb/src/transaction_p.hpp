@@ -48,6 +48,7 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   : read_only_(false)
   , amount_(0_c)
   , signature_() {
+    signature_.fill(0);
   }
 
   inline priv(const priv& other)
@@ -65,7 +66,7 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   }
 
   inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-              AmountCommission max_fee, AmountCommission counted_fee, std::string signature)
+              AmountCommission max_fee, AmountCommission counted_fee, cs::Signature signature)
   : read_only_(false)
   , innerID_(innerID)
   , source_(source)
@@ -91,7 +92,7 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   Amount amount_;
   AmountCommission max_fee_;
   AmountCommission counted_fee_;
-  std::string signature_;
+  cs::Signature signature_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
 
   uint64_t time_{};  // optional, not set automatically

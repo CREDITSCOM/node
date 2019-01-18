@@ -79,7 +79,7 @@ public:
   void smartStageEmptyReply(uint8_t requesterNumber);
   void smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+  void sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey);
