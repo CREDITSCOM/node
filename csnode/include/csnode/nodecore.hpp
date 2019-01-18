@@ -58,10 +58,6 @@ using PoolsRequestedSequences = std::vector<cs::Sequence>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
-  PublicKeyLength = PUBLIC_KEY_LENGTH,
-  HashLength = HASH_LENGTH,
-  SignatureLength = SIGNATURE_LENGTH,
-  PrivateKeyLength = PRIVATE_KEY_LENGTH,
   NeighboursRequestDelay = 350
 };
 

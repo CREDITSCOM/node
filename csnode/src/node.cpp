@@ -1905,7 +1905,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 }
 
-void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
+void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csmeta(csdetails) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -2507,7 +2507,7 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
     return;
   }
 
-  cscrypto::Signature signature;
+  cs::Signature signature;
   cscrypto::GenerateSignature(signature, solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
   sendDefault(respondent, MsgTypes::HashReply, roundNumber_, subRound_, signature, hash);
 }
@@ -2524,7 +2524,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
-  cscrypto::Signature signature;
+  cs::Signature signature;
   istream_ >> signature;
 
   csdb::PoolHash hash;

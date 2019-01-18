@@ -88,6 +88,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     ::csdb::internal::shared_data()
   {
     writer_public_key_.fill(0);
+    signature_.fill(0);
   }
 
   priv(PoolHash previous_hash, cs::Sequence sequence, ::csdb::Storage::WeakPtr storage)
@@ -216,7 +217,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     signatures_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       int index;
-      ::std::string sig;
+      cs::Signature sig;
 
       if (!is.get(index)) {
         return false;
@@ -355,10 +356,10 @@ class Pool::priv : public ::csdb::internal::shared_data {
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
-  ::std::string signature_;
+  cs::Signature signature_;
   std::vector<uint8_t> realTrusted_;
   cs::PublicKey writer_public_key_;
-  ::std::vector<std::pair<int, ::std::string>> signatures_;
+  ::std::vector<std::pair<int, cs::Signature>> signatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
@@ -485,7 +486,7 @@ const cs::PublicKey& Pool::writer_public_key() const noexcept {
   return d->writer_public_key_;
 }
 
-std::string Pool::signature() const noexcept {
+const cs::Signature& Pool::signature() const noexcept {
   return d->signature_;
 }
 
@@ -493,7 +494,7 @@ const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
   return d->next_confidants_;
 }
 
-const ::std::vector<std::pair<int, ::std::string>>& Pool::signatures() const noexcept {
+const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noexcept {
   return d->signatures_;
 }
 
@@ -527,7 +528,7 @@ void Pool::set_writer_public_key(const cs::PublicKey& writer_public_key) noexcep
   data->writer_public_key_ = writer_public_key;
 }
 
-void Pool::set_signature(const std::string& signature) noexcept {
+void Pool::set_signature(const cs::Signature& signature) noexcept {
   if (d.constData()->read_only_) {
     return;
   }
@@ -547,7 +548,7 @@ void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept
   data->next_confidants_ = confidants;
 }
 
-void Pool::add_signature(int index, ::std::string& signature) noexcept {
+void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
   if (d.constData()->read_only_) {
     return;
   }
@@ -629,7 +630,7 @@ uint64_t Pool::get_time() const noexcept
 }
 
 Pool Pool::from_binary(const cs::Bytes& data) {
-    std::unique_ptr<priv> p { new priv() };
+  std::unique_ptr<priv> p { new priv() };
   ::csdb::priv::ibstream is(data.data(), data.size());
   if (!p->get(is)) {
     return Pool();
@@ -717,38 +718,26 @@ cs::Bytes Pool::to_byte_stream_for_sig() {
 }
 
 void Pool::sign(const cscrypto::PrivateKey& private_key) {
-  cscrypto::Signature signature;
-  auto pool_bytes = this->to_byte_stream_for_sig();
-  cscrypto::GenerateSignature(signature, private_key, pool_bytes.data(), pool_bytes.size());
-  d->signature_ = std::string(signature.begin(), signature.end());
+  const auto& pool_bytes = this->to_byte_stream_for_sig();
+  cscrypto::GenerateSignature(d->signature_, private_key, pool_bytes.data(), pool_bytes.size());
 }
 
 bool Pool::verify_signature() {
-  if (this->writer_public_key().size() != cscrypto::kPublicKeySize ||
-      d->signature_.size() != cscrypto::kSignatureSize) {
-    return false;
-  }
-
-  const auto& pool_bytes = this->to_byte_stream_for_sig();
-  cscrypto::Signature signature;
-  memcpy(signature.data(), this->signature().data(), cscrypto::kSignatureSize);
-  return cscrypto::VerifySignature(signature.data(), this->writer_public_key().data(),
-    pool_bytes.data(), pool_bytes.size());
+  const auto& pool_bytes = to_byte_stream_for_sig();
+  return cscrypto::VerifySignature(signature().data(), writer_public_key().data(),
+                                   pool_bytes.data(), pool_bytes.size());
 }
 
-bool Pool::verify_signature(const std::string& signature) {
-  if (this->writer_public_key().size() != cscrypto::kPublicKeySize || signature.size() != cscrypto::kSignatureSize) {
-    return false;
-  }
-  const auto& pool_bytes = this->to_byte_stream_for_sig();
-  cscrypto::Signature sig;
-  memcpy(sig.data(), signature.data(), cscrypto::kSignatureSize);
-  if (cscrypto::VerifySignature(sig.data(),
-      this->writer_public_key().data(), pool_bytes.data(), pool_bytes.size())) {
+bool Pool::verify_signature(const cs::Signature& signature) {
+  const auto& pool_bytes = to_byte_stream_for_sig();
+  const bool verify = cscrypto::VerifySignature(signature.data(), writer_public_key().data(),
+                                                pool_bytes.data(), pool_bytes.size());
+
+  if (verify) {
     d->signature_ = signature;
-    return true;
   }
-  return false;
+
+  return verify;
 }
 
 Pool Pool::load(const PoolHash& hash, Storage storage) {
