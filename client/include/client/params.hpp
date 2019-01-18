@@ -2,7 +2,7 @@
 #define PARAMS_HPP
 
 //#define MONITOR_NODE
-#define WEB_WALLET_NODE
+//#define WEB_WALLET_NODE
 #define NODE_API
 #define AJAX_IFACE
 

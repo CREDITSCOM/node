@@ -13,7 +13,7 @@
 
 #include <client/config.hpp>
 
-#define RECREATE_INDEX
+//#define RECREATE_INDEX
 
 // uncomment this to generate new cheat db file (__integr.seq) every time it is absent in BD directory
 //#define RECREATE_CHEAT
