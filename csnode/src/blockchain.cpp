@@ -15,6 +15,9 @@
 
 //#define RECREATE_INDEX
 
+// uncomment this to generate new cheat db file (__integr.seq) every time it is absent in BD directory
+#define RECREATE_CHEAT
+
 using namespace cs;
 
 void generateCheatDbFile(std::string, const BlockHashes&);
@@ -115,6 +118,8 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
     const cs::Sequence last_written_sequence = pool.sequence();
     cs::Sequence current_sequence = 0;
 
+    size_t cnt = 1;
+    std::cout << '\n';
     while (current_sequence <= last_written_sequence) {
       pool = loadBlock(current_sequence);
       if (!updateWalletIds(pool, initer)) {
@@ -131,7 +136,12 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 #ifdef TRANSACTIONS_INDEX
       total_transactions_count_ += pool.transactions().size();
 #endif
+      if(cnt % 1000 == 0) {
+        std::cout << '\r' << cnt;
+      }
+      ++cnt;
     }
+    std::cout << "\rDone, handled " << cnt << " blocks";
 
     res = true;
   }
@@ -226,9 +236,17 @@ void generateCheatDbFile(std::string path, const BlockHashes& bh) {
 }
 
 bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+  std::string origin = path;
   const auto cd = prepareCheatData(path, bh);
 
   std::ifstream f(path);
+#if defined(RECREATE_CHEAT)
+  if(!f) {
+    generateCheatDbFile(origin, bh);
+    cswarning() << "Blockchan: cannot open special mark so it was regenerated";
+    return true;
+  }
+#endif// RECREATE_CHEAT
   std::string rcd;
   f >> rcd;
 

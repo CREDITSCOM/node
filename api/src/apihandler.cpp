@@ -706,16 +706,26 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
   std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
+  size_t cnt = 1;
+  std::cout << "API: updating smart caches once...\n";
   while (curph != pending_smart_transactions->last_pull_hash) {
     new_blocks.push_back(curph);
     size_t res;
     curph = s_blockchain.loadBlockMeta(curph, res).previous_hash();
-    if (curph.is_empty())
+    if(cnt % 1000 == 0) {
+      std::cout << '\r' << cnt;
+    }
+    if(curph.is_empty()) {
+      std::cout << '\r' << cnt << "... Done\n";
       break;
+    }
+    ++cnt;
   }
 
   if (curph.is_empty() && !pending_smart_transactions->last_pull_hash.is_empty()) {
     // Fork detected!
+    cnt = 1;
+    std::cout << "API: fork detected, handling " << new_blocks.size() << " hashes...\n";
     auto luca = pending_smart_transactions->last_pull_hash;
     while (!luca.is_empty()) {
       auto fIt = std::find(new_blocks.begin(), new_blocks.end(), luca);
@@ -723,13 +733,18 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         new_blocks.erase(fIt, new_blocks.end());
         break;
       }
+      std::cout << '\r' << cnt;
       size_t res;
       luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
+      ++cnt;
     }
+    std::cout << "... Done\n";
   }
 
   pending_smart_transactions->last_pull_hash = start;
 
+  cnt = 1;
+  std::cout << "API: extracting smart states from " << new_blocks.size() << " blocks...\n";
   while (!new_blocks.empty()) {
     auto p = s_blockchain.loadBlock(new_blocks.back());
     new_blocks.pop_back();
@@ -739,7 +754,12 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       if (is_smart(tr) || is_smart_state(tr))
         pending_smart_transactions->queue.push(std::move(tr));
     }
+    if(cnt % 1000 == 0) {
+      std::cout << '\r' << cnt;
+    }
+    ++cnt;
   }
+  std::cout << "\rDone, handled " << cnt << " blocks...\n";
   if (!pending_smart_transactions->queue.empty()) {
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
