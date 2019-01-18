@@ -1246,6 +1246,7 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const api::
         api::TokenBalance tb;
         tb.token = fromByteArray(tokenIt->first.public_key());
         tb.code = tokenIt->second.symbol;
+        tb.name = tokenIt->second.name;
 
         auto hi = tokenIt->second.holders.find(addr);
         if (hi != tokenIt->second.holders.end())
@@ -1262,6 +1263,35 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const api::
 
 void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const api::Address& token, int64_t offset, int64_t limit) {
   tokenTransactionsInternal(_return, *this, tm, token, true, false, offset, limit);
+}
+
+void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const api::Address& token, const TransactionId& id) {
+  const csdb::PoolHash      poolhash = csdb::PoolHash::from_binary(toByteArray(id.poolHash));
+  const csdb::TransactionID trxn_id = csdb::TransactionID(poolhash, id.index);
+  const csdb::Transaction   trxn = s_blockchain.loadTransaction(trxn_id);
+  const csdb::Address       addr = BlockChain::getAddressFromKey(token);
+
+  std::string code{};
+  tm.applyToInternal([&addr, &code](const TokensMap& tm, const HoldersMap&) {
+    const auto it = tm.find(addr);
+    if (it != tm.cend())
+      code = it->second.symbol;
+  });
+
+  if (code.empty()) {
+    SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    return;
+  }
+
+  const auto pool = s_blockchain.loadBlock(trxn.id().pool_hash());
+  const auto smart = fetch_smart(trxn);
+  const auto addr_pk = s_blockchain.get_addr_by_type(trxn.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+  const auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
+
+  _return.count = 1;
+
+  addTokenResult(_return, addr, code, pool, trxn, smart, addrPair, s_blockchain);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 #ifdef TRANSACTIONS_INDEX
@@ -1329,7 +1359,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
         const auto smart = fetch_smart(t);
         if (!TokensMaster::isTransfer(smart.method, smart.params)) continue;
         if (--offset >= 0) continue;
-        csdb::Address target_pk = s_blockchain.get_addr_by_type(t.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        csdb::Address target_pk = s_blockchain.get_addr_by_type(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
         auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
         addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
         if (--limit == 0) break;
@@ -1601,7 +1631,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
 }
 
 void
-APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
+APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 #ifdef MONITOR_NODE
   const static uint32_t PER_PAGE = 256;
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1611,15 +1641,17 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   uint32_t limit = PER_PAGE;
   uint32_t total = 0;
 
-  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WriterData& wd) {
+  s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::TrustedData& wd) {
     if (addr.empty()) return true;
     if (offset == 0) {
       if (limit > 0) {
-        api::WriterInfo wi;
+        api::TrustedInfo wi;
+        //const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
         const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 
         wi.timesWriter = wd.times;
+        wi.timesTrusted = wd.times_trusted;
         wi.feeCollected.integral = wd.totalFee.integral();
         wi.feeCollected.fraction = wd.totalFee.fraction();
 
@@ -1639,4 +1671,12 @@ APIHandler::WritersGet(WritersGetResult& _return, int32_t _page) {
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 #endif
 }
+
 ////////new
+
+void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
+  auto pool = s_blockchain.loadBlock(s_blockchain.getLastHash());
+  _return.lastBlock = s_blockchain.loadBlock(s_blockchain.getLastHash()).sequence();
+  _return.currRound = cs::Conveyer::instance().currentRoundNumber();
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}

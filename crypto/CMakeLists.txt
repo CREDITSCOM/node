@@ -27,8 +27,9 @@ if(WIN32)
   set(msbuild_parallel "/m")
   set(msbuild_platform "/p:platform=x64")
   set(proj_to_build "libsodium.sln")
+  set(disable_post_build "/p:PostBuildEventUseInBuild=false")
   
-  execute_process(COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${msbuild_parallel} ${proj_to_build} ${msbuild_property} ${msbuild_platform}
+  execute_process(COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${msbuild_parallel} ${proj_to_build} ${msbuild_property} ${msbuild_platform} ${disable_post_build}
 				  WORKING_DIRECTORY ${libsodium_dir})
 				  
   execute_process(COMMAND git apply ${libsodium_patch} -R
@@ -70,6 +71,11 @@ set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELWITHDEBINFO
              ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
 set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_DEBUG
              ${libsodium_dir}/Build/Debug/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
+
+set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELSPAM
+             ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
+set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELMONITOR
+             ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 
 add_library(${PROJECT_NAME} STATIC

@@ -1005,6 +1005,7 @@ void Node::writeDefaultStream(Args&&... args) {
 
 template<typename... Args>
 bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+  auto lock = transport_->getNeighboursLock();
   Connections connections = transport_->getNeighboursWithoutSS();
 
   if (connections.empty()) {

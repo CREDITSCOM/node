@@ -10,7 +10,6 @@
 #include <client/config.hpp>
 
 #include <csnode/conveyer.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>

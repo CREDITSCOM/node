@@ -19,6 +19,17 @@ class Wallet::priv : public ::csdb::internal::shared_data {
   Address address_;
   std::map<Currency, Amount> amounts_;
 
+  priv clone() const {
+    priv result;
+
+    result.address_ = address_.clone();
+
+    for (auto& am : amounts_)
+      result.amounts_[am.first.clone()] = am.second;
+
+    return result;
+  }
+
   friend class Wallet;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Wallet)

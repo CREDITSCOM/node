@@ -6,6 +6,7 @@ namespace csdb {
 
 class Balance::priv : public ::csdb::internal::shared_data
 {
+  DEFAULT_PRIV_CLONE()
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Balance)
 

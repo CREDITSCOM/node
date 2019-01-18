@@ -502,8 +502,10 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     for (uint8_t i = nSize; i < allNeighboursCount; ++i) {
       ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
       if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-        auto isAlreadyHave =
-            std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == i; });
+        auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) {
+          return el.index() == i;
+        });
+
         if (isAlreadyHave == neighbours_.end()) {
           neighbours_.emplace_back(NeighboursSetElemet(i, neighbour->key, syncData_.blockPoolsCount));
         }

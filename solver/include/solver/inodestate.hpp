@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <lib/system/keys.hpp>  // PublicKey, Hash
 #include "result.hpp"
+
+#include <lib/system/common.hpp>
 
 namespace csdb {
 class Pool;

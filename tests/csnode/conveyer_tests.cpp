@@ -4,6 +4,8 @@
 #include <csnode/conveyer.hpp>
 #include <iostream>
 
+#include <lib/system/hash.hpp>
+
 const cs::RoundNumber kRoundNumber = 12345;
 const cs::PublicKey kPublicKey = {
     0x53, 0x4B, 0xD3, 0xDF, 0x77, 0x29, 0xFD, 0xCF, 0xEA, 0x4A, 0xCD,

@@ -22,8 +22,8 @@
 #include <deque>
 #include <queue>
 
-#include <csnode/threading.hpp>
 #include <client/params.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include "tokens.hpp"
 
@@ -134,6 +134,7 @@ public:
 
   void TokenBalancesGet(api::TokenBalancesResult&, const api::Address&) override;
   void TokenTransfersGet(api::TokenTransfersResult&, const api::Address& token, int64_t offset, int64_t limit) override;
+  void TokenTransferGet(api::TokenTransfersResult& _return, const api::Address& token, const TransactionId& id) override;
   void TokenWalletTransfersGet(api::TokenTransfersResult&, const api::Address& token, const api::Address& address, int64_t offset, int64_t limit) override;
   void TokenTransactionsGet(api::TokenTransactionsResult&, const api::Address&, int64_t offset, int64_t limit) override;
   void TokenInfoGet(api::TokenInfoResult&, const api::Address&) override;
@@ -144,8 +145,10 @@ public:
   void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
 #endif
   void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
-  void WritersGet(api::WritersGetResult& _return, int32_t page) override;
+  void TrustedGet(api::TrustedGetResult& _return, int32_t page) override;
   ////////new
+
+  void SyncStateGet(api::SyncStateResult& _return) override;
 
   BlockChain &get_s_blockchain() const noexcept { return s_blockchain; }
 private:

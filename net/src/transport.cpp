@@ -1,7 +1,6 @@
 /* Send blaming letters to @yrtimd */
 #include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
-#include <lib/system/keys.hpp>
 #include <lib/system/utils.hpp>
 
 #include "network.hpp"
@@ -627,6 +626,18 @@ ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
 ConnectionPtr Transport::getRandomNeighbour() {
   csdebug() << "Transport> Get random neighbour for Sync";
   return nh_.getRandomSyncNeighbour();
+}
+
+std::unique_lock<cs::SpinLock> Transport::getNeighboursLock() const {
+  return nh_.getNeighboursLock();
+}
+
+void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
+  nh_.forEachNeighbour(std::move(func));
+}
+
+void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func) {
+  nh_.forEachNeighbourWithoutSS(std::move(func));
 }
 
 const Connections Transport::getNeighbours() const {

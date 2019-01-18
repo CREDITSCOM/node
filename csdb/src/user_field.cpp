@@ -117,6 +117,8 @@ class UserField::priv : public ::csdb::internal::shared_data {
     }
   }
 
+  DEFAULT_PRIV_CLONE()
+
   UserField::Type type_;
   uint64_t i_value_;
   ::std::string s_value_;

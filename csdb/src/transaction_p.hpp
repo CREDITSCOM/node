@@ -36,6 +36,13 @@ class TransactionID::priv : public ::csdb::internal::shared_data {
     index_ = index;
   }
 
+  priv clone() const {
+    priv result;
+    result.pool_hash_ = pool_hash_.clone();
+    result.index_ = index_;
+    return result;
+  }
+
   PoolHash pool_hash_;
   TransactionID::sequence_t index_ = 0;
   friend class TransactionID;
@@ -81,6 +88,28 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index) {
     id_.d->_update(pool_hash, index);
     read_only_ = true;
+  }
+
+  priv clone() const {
+    priv result;
+    result.read_only_ = read_only_;
+    result.id_ = id_.clone();
+    result.innerID_ = innerID_;
+
+    result.source_ = source_.clone();
+    result.target_ = target_.clone();
+    result.currency_ = currency_.clone();
+    result.amount_ = amount_;
+    result.max_fee_ = max_fee_;
+    result.counted_fee_ = counted_fee_;
+    result.signature_ = signature_;
+
+    for (auto& uf : user_fields_)
+      result.user_fields_[uf.first] = uf.second.clone();
+
+    result.time_ = time_;
+
+    return result;
   }
 
   bool read_only_;
