@@ -134,6 +134,7 @@ public:
 
   void TokenBalancesGet(api::TokenBalancesResult&, const api::Address&) override;
   void TokenTransfersGet(api::TokenTransfersResult&, const api::Address& token, int64_t offset, int64_t limit) override;
+  void TokenTransferGet(api::TokenTransfersResult& _return, const api::Address& token, const TransactionId& id) override;
   void TokenWalletTransfersGet(api::TokenTransfersResult&, const api::Address& token, const api::Address& address, int64_t offset, int64_t limit) override;
   void TokenTransactionsGet(api::TokenTransactionsResult&, const api::Address&, int64_t offset, int64_t limit) override;
   void TokenInfoGet(api::TokenInfoResult&, const api::Address&) override;
