@@ -94,7 +94,7 @@ bool cs::DataStream::isAvailable(std::size_t size) {
 
 char* cs::DataStream::data() const {
   if (!bytes_) {
-    return head_;
+    return data_ + index_;
   }
   else {
     return reinterpret_cast<char*>(bytes_->data());
@@ -103,7 +103,7 @@ char* cs::DataStream::data() const {
 
 std::size_t cs::DataStream::size() const {
   if (!bytes_) {
-    return dataSize_;
+    return dataSize_ - index_;
   }
   else {
     return bytes_->size();

@@ -93,27 +93,50 @@ Role SolverContext::role() const {
   return Role::Normal;
 }
 
-void SolverContext::spawn_next_round() {
+void SolverContext::spawn_next_round(cs::StageThree& st3) {
   std::string tStamp;
   uint8_t writer_idx = InvalidConfidantIndex;
   const auto own_stage3 = stage3((uint8_t) own_conf_number());
-  if(own_stage3 != nullptr) {
-    writer_idx = own_stage3->writer;
+  //if(own_stage3 != nullptr) {
+  //  writer_idx = own_stage3->writer;
+  //  csdebug() << "writer idx = " << (int)writer_idx ;
+  //}
+  //else {
+  //csdebug() << "else" ;
+  //  for(const auto& s3 : stage3_data()) {
+  //    writer_idx = s3.writer;
+  //    if(writer_idx != InvalidConfidantIndex) {
+  //      break;
+  //    }
+  //  }
+  //}
+  //if(writer_idx != InvalidConfidantIndex) {
+  //  csdebug() << "writer_idx != invalid";
+  //  auto ptr = stage1(writer_idx);
+  //  if(ptr != nullptr) {
+  //    csdebug() << "ptr(my stage 1) != nullptr";
+  //    tStamp = ptr->roundTimeStamp;
+  //  }
+  //}
+
+
+  if (st3.sender != InvalidConfidantIndex) {
+    writer_idx = st3.writer;
+    csdebug() << "writer idx = " << (int)writer_idx;
   }
   else {
-    for(const auto& s3 : stage3_data()) {
-      writer_idx = s3.writer;
-      if(writer_idx != InvalidConfidantIndex) {
-        break;
-      }
-    }
+    cserror() << "Writer wans't elected on this node";
+    return;
   }
-  if(writer_idx != InvalidConfidantIndex) {
+  if (writer_idx != InvalidConfidantIndex) {
+    csdebug() << "writer_idx != invalid";
     auto ptr = stage1(writer_idx);
-    if(ptr != nullptr) {
+    if (ptr != nullptr) {
+      csdebug() << "ptr(my stage 1) != nullptr";
       tStamp = ptr->roundTimeStamp;
     }
   }
+
   if(tStamp.empty()) {
     cswarning() << "SolverCore: cannot act as writer because lack writer timestamp";
     return;
@@ -130,7 +153,11 @@ void SolverContext::spawn_next_round() {
     ++i;
   }
   csdebug() << "SolverCore: new hashes count is " << core.hashes_candidates.size();
-  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp));
+  core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp), st3);
+}
+
+void SolverContext::sendRoundTable() {
+  core.sendRoundTable();
 }
 
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {

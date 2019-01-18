@@ -538,8 +538,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
-  case MsgTypes::NewCharacteristic:
-    return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
+  //case MsgTypes::NewCharacteristic:
+  //  return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::FirstStage:
     return node_->getStageOne(data, size, firstPack.getSender());
   case MsgTypes::SecondStage:

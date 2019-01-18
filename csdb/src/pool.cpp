@@ -125,11 +125,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it.second);
     }
 
-    os.put(writer_public_key_);
-    os.put(signature_);
+    os.put(realTrusted_);
+
   }
 
-  void put_for_sig(::csdb::priv::obstream& os) {
+  void put_for_sig(::csdb::priv::obstream& os) const {
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -150,7 +150,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it);
     }
 
-    os.put(writer_public_key_);
+    os.put(realTrusted_);
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
@@ -271,11 +271,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    if (!is.get(writer_public_key_)) {
-      return false;
-    }
-
-    if (!is.get(signature_)) {
+    if (!is.get(realTrusted_)) {
       return false;
     }
 
@@ -361,6 +357,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   cs::Signature signature_;
+  std::vector<uint8_t> realTrusted_;
   cs::PublicKey writer_public_key_;
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
   cs::Bytes binary_representation_;
@@ -702,7 +699,7 @@ bool Pool::save(Storage storage) {
   }
 
   if (d->hash_.is_empty()) {
-    d->hash_ = PoolHash::calc_from_data(d->binary_representation_);
+    d->hash_ = PoolHash::calc_from_data(to_byte_stream_for_sig());
   }
 
   if (s.pool_save(*this)) {

@@ -193,7 +193,7 @@ TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
   auto packet = CreateTestPacket(2);
   conveyer.addTransactionsPacket(packet);
   auto& table{conveyer.transactionsPacketTable()};
-  ASSERT_EQ(table.at(packet.hash()).toBinary(), packet.toBinary());
+  ASSERT_EQ(table.at(packet.hash()).toHashBinary(), packet.toHashBinary());
 }
 
 TEST(Conveyer, CanAddTransactionToLastBlock) {

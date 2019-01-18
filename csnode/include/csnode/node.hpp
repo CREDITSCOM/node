@@ -89,9 +89,9 @@ public:
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
 
-  void sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Signature& poolSignature);
-  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
-
+  void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
+  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3);
+  void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 
   // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -107,12 +107,13 @@ public:
   void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
   // called by solver, review required:
   bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
+  void sendRoundTable();
 
   // transaction's pack syncro
   void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+  void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, const std::vector<cs::SignaturePair> poolSignatures);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -191,14 +192,11 @@ public slots:
 
 private:
   bool init(const Config& config);
-  void sendRoundPackage(const cs::PublicKey& target, const cs::RoundTable& roundTable,
-                        const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic,
-                        const cs::Signature& signature);
-  void sendRoundPackageToAll(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                             const cs::Characteristic& characteristic, const cs::Signature& signature);
+  void sendRoundPackage(const cs::PublicKey& target);
+  void sendRoundPackageToAll();
 
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
-                             const cs::Characteristic& characteristic, const cs::Signature& signature);
+                             const cs::Characteristic& characteristic, cs::StageThree& st3);
 
   bool readRoundData(cs::RoundTable& roundTable);
   void reviewConveyerHashes();
@@ -310,9 +308,14 @@ private:
     uint8_t subRound;
     cs::PoolMetaInfo poolMetaInfo;
     cs::Characteristic characteristic;
-    cs::Signature poolSignature;
-    cs::Notifications notifications;
   };
+  struct SentSignatures {
+    std::vector<cs::SignaturePair> poolSignatures;
+    std::vector<cs::SignaturePair> roundSignatures;
+  };
+
+  cs::Bytes lastRoundTableMessage_;
+  cs::Bytes lastSignaturesMessage_;
 
   std::vector<cs::Bytes> stageOneMessage_;
   std::vector<cs::Bytes> stageTwoMessage_;
@@ -328,7 +331,7 @@ private:
   std::vector<cs::Stage> smartStageTemporary_;
 
   SentRoundData lastSentRoundData_;
-
+  SentSignatures lastSentSignatures_;
   // round stat
   cs::RoundStat stat_;
 };

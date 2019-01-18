@@ -43,7 +43,7 @@ using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 
 // array of notifications
 using Notifications = std::vector<cs::Bytes>;
-
+using Signatures = std::vector<cscrypto::Signature>;
 // round data
 using PublicKeys = std::vector<PublicKey>;
 using PrivateKeys = std::vector<PrivateKey>;
@@ -95,6 +95,7 @@ struct PoolMetaInfo {
   cs::PublicKey writerKey;
   csdb::PoolHash previousHash;
   cs::Sequence sequenceNumber;
+  std::vector<uint8_t> realTrustedMask;
 };
 
 struct HashVector {
@@ -129,10 +130,18 @@ struct ConveyerMeta {
   cs::TransactionsPacket invalidTransactions;
 };
 
+struct SignaturePair {
+  uint8_t sender;
+  cs::Signature signature;
+};
+
 struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
+  std::vector<cs::SignaturePair> signatures;
 };
+
+
 
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;

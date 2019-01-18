@@ -54,6 +54,8 @@ public:
     return req_stop;
   }
 
+  void sendRoundTable();
+
   uint8_t subRound(); 
   // Solver "public" interface,
   // below are the "required" methods to be implemented by Solver-compatibility issue:
@@ -201,7 +203,7 @@ private:
   void handleTransitions(Event evt);
   bool stateCompleted(Result result);
 
-  void spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp);
+  void spawn_next_round(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes, std::string&& currentTimeStamp, cs::StageThree& st3);
 
   void store_received_block(csdb::Pool& p, bool defer_write);
   bool is_block_deferred() const;
