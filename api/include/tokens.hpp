@@ -113,7 +113,7 @@ private:
   struct DeployTask {
     csdb::Address address;
     csdb::Address deployer;
-    std::string byteCode;
+    std::vector<general::ByteCodeObject> byteCodeObjects;
   };
   std::queue<DeployTask> deployQueue_;
 

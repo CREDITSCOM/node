@@ -120,15 +120,21 @@ namespace cs
     static_assert(cscrypto::kHashSize == cscrypto::kPublicKeySize);
 
     std::vector<cscrypto::Byte> strToHash;
-    strToHash.reserve(cscrypto::kPublicKeySize + 6 + data.byteCode.size());
+    std::string byteCode{};
+    if (!data.byteCodeObjects.empty()) {
+      for (auto &curr_byteCode : data.byteCodeObjects) {
+        byteCode += curr_byteCode.byteCode;
+      }
+    }
+    strToHash.reserve(cscrypto::kPublicKeySize + 6 + byteCode.size());
 
     const auto dPk = deployer.public_key();
     const auto idPtr = reinterpret_cast<const cscrypto::Byte*>(&trId);
 
     std::copy(dPk.begin(), dPk.end(), std::back_inserter(strToHash));
     std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
-    std::copy(data.byteCode.begin(),
-      data.byteCode.end(),
+    std::copy(byteCode.begin(),
+      byteCode.end(),
       std::back_inserter(strToHash));
 
     cscrypto::Hash result;
@@ -564,7 +570,7 @@ namespace cs
       // create runnable object
       auto runnable = [=]() mutable {
         executor::ExecuteByteCodeResult resp;
-        get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
+        get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCodeObjects,
                                                  state, contract.method, contract.params, Consensus::T_smart_contract);
 
         std::lock_guard<std::mutex> lock(mtx_emit_transaction);

@@ -115,19 +115,13 @@ public:
   void TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address,
                             const std::vector<int64_t>& v) override;
 
-  void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
-
-  void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) override;
-
-  //void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
-
-  //void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
+  void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject> & byteCodeObjects) override;
 
   ////////new
   void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
   ////////new
   api::SmartContractInvocation getSmartContract(const csdb::Address&, bool&);
-  std::string getSmartByteCode(const csdb::Address&, bool&);
+  std::vector<general::ByteCodeObject> getSmartByteCode(const csdb::Address&, bool&);
   void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
   void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
   ::executor::ContractExecutorConcurrentClient& getExecutor();
@@ -189,7 +183,7 @@ private:
 
 private:
   void state_updater_work_function();
-  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& code,
+  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::vector<general::ByteCodeObject> &code,
                          const std::string& state, const std::string& method,
                          const std::vector<general::Variant>& params); //::general::Variant
 

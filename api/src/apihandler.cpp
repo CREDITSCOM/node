@@ -365,7 +365,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
   if (!tr.is_valid())
     return res;
   const auto sci = deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>());
-  res.smartContractDeploy.byteCode    = sci.smartContractDeploy.byteCode;
+  res.smartContractDeploy.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
   res.smartContractDeploy.sourceCode  = sci.smartContractDeploy.sourceCode;
   res.smartContractDeploy.hashState   = sci.smartContractDeploy.hashState;
   res.deployer  = fromByteArray(s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key());
@@ -386,8 +386,10 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 #ifdef MONITOR_NODE
   s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
-    res.transactionsCount = wd.transNum_;
+    //res.transactionsCount = wd.transNum_;
   });
+  if (tr.user_field(0).is_valid())
+    res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 #endif
 
   auto pool = s_blockchain.loadBlock(tr.id().pool_hash());
@@ -464,8 +466,8 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 }
 
 void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address,
-                                   const std::string& code, const std::string& state, const std::string& method,
-                                   const std::vector<general::Variant>& params) {
+                                      const std::vector<general::ByteCodeObject>& code, const std::string& state, const std::string& method,
+                                      const std::vector<general::Variant>& params) {
   static std::mutex m;
   std::lock_guard<std::mutex> lk(m);
   using transport_type = decltype(executor_transport)::element_type;
@@ -481,33 +483,6 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
   executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
 }
-void APIHandler::MembersSmartContractGet(MembersSmartContractGetResult&, const TransactionId&) {
-  /*const auto poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
-  const auto tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
-  auto transaction = s_blockchain.loadTransaction(tmpTransactionId);
-  const auto smart = fetch_smart_body(transaction);
-  const auto smart_state = transaction.user_field(smart_state_idx).value<std::string>();
-  const auto api_addr = transaction.source().to_api_addr();
-
-  executor::ExecuteByteCodeResult api_resp;
-  // name
-  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getName", std::vector<::general::Variant>());
-  _return.name = api_resp.ret_val.v_string;
-  // decimal
-  api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getDecimal", std::vector<::general::Variant>());
-  _return.decimal = api_resp.ret_val.v_string;
-  // total coins
-  api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "totalSupply", std::vector<::general::Variant>());
-  _return.totalCoins = api_resp.ret_val.v_string;
-  // symbol
-  api_resp.ret_val.v_string.clear();
-  execute_byte_code(api_resp, api_addr, smart.smartContractDeploy.byteCode, smart_state, "getSymbol", std::vector<::general::Variant>());
-  _return.symbol = api_resp.ret_val.v_string;
-  // owner
-  //_return.owner = api_resp.contractVariables["owner"].v_string;*/
-}
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
   auto input_smart      = transaction.smartContract;
@@ -515,15 +490,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   const auto smart_addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   const bool deploy     = is_smart_deploy(input_smart);
 
-  std::string origin_bytecode;
+  std::vector<general::ByteCodeObject> origin_bytecode;
   if (!deploy) {
-    input_smart.smartContractDeploy.byteCode.clear();
+    input_smart.smartContractDeploy.byteCodeObjects.clear();
     input_smart.smartContractDeploy.sourceCode.clear();
 
     decltype(auto) smart_origin = lockedReference(this->smart_origin);
     auto it = smart_origin->find(smart_addr);
     if (it != smart_origin->end())
-      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCode;
+      origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCodeObjects;
     else {
       SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
       return;
@@ -566,7 +541,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     // --
     auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     executor::ExecuteByteCodeResult api_resp;
-    const std::string& bytecode = deploy ? input_smart.smartContractDeploy.byteCode : origin_bytecode;
+    const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
     execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
     if (api_resp.status.code) {
@@ -999,9 +974,9 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) {
+void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
   executor::GetContractMethodsResult executor_ret;
-  executor->getContractMethods(executor_ret, bytecode);
+  executor->getContractMethods(executor_ret, byteCodeObjects);
   _return.code = executor_ret.status.code;
   _return.message = executor_ret.status.message;
   for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
@@ -1146,13 +1121,11 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
   return api::SmartContractInvocation {};
 }
 
-std::string APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+std::vector<general::ByteCodeObject> APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
   auto invocation = getSmartContract(addr, present);
-  if(present) {
-    return invocation.smartContractDeploy.byteCode;
-  }
-
-  return std::string();
+  if (present)
+    return invocation.smartContractDeploy.byteCodeObjects;
+  return std::vector<general::ByteCodeObject>{};
 }
 
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
@@ -1167,7 +1140,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   }
 
   executor::GetContractMethodsResult methodsResult;
-  getExecutor().getContractMethods(methodsResult, result.byteCode);
+  getExecutor().getContractMethods(methodsResult, result.byteCodeObjects);
 
   if (methodsResult.status.code) {
     _return.status.code = methodsResult.status.code;
@@ -1176,7 +1149,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   }
 
   _return.ts = (api::TokenStandart)(uint32_t)TokensMaster::getTokenStandart(methodsResult.methods);
-  _return.byteCode = std::move(result.byteCode);
+  _return.byteCodeObjects = std::move(result.byteCodeObjects);
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -1185,7 +1158,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
 
   bool present = false;
-  std::string byteCode = getSmartByteCode(addr, present);
+  std::vector<general::ByteCodeObject> byteCode = getSmartByteCode(addr, present);
   std::string state;
 
   {

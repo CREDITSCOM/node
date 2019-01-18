@@ -182,7 +182,7 @@ template <> std::string getVariantAs(const general::Variant& var) { return var.v
 template <typename RetType>
 void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const api::Address& addr,
-                    const std::string& byteCode,
+                    const std::vector<general::ByteCodeObject> &byteCodeObjects,
                     const std::string& state,
                     const std::string& method,
                     const std::vector<general::Variant>& params,
@@ -192,7 +192,7 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
 
   executor.executeByteCode(result,
                            addr,
-                           byteCode,
+                           byteCodeObjects,
                            state,
                            method,
                            params,
@@ -204,7 +204,7 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
 void TokensMaster::refreshTokenState(const csdb::Address& token,
                                      const std::string& newState) {
   bool present = false;
-  auto byteCode = api_->getSmartByteCode(token, present);
+  auto byteCodeObjects = api_->getSmartByteCode(token, present);
   if (!present) return;
 
   const auto pk = token.public_key();
@@ -212,13 +212,13 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   std::string name, symbol, totalSupply;
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "getSymbol", std::vector<general::Variant>(), 250,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
@@ -229,7 +229,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                    }
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount(newSupp);
@@ -267,7 +267,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   executor::ExecuteByteCodeMultipleResult result;
   api_->getExecutor().
-    executeByteCodeMultiple(result, dpAddr, byteCode, newState,
+    executeByteCodeMultiple(result, dpAddr, byteCodeObjects, newState,
                             "balanceOf", holderKeysParams, 100);
 
   if (!result.status.code &&
@@ -329,7 +329,7 @@ void TokensMaster::run() {
         try { api_->getExecutor(); }
         catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
 
-        api_->getExecutor().getContractMethods(methodsResult, dt.byteCode);
+        api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
         if (!methodsResult.status.code) {
           auto ts = getTokenStandart(methodsResult.methods);
           if (ts != TokenStandart::NotAToken) {
@@ -392,7 +392,7 @@ void TokensMaster::checkNewDeploy(const csdb::Address& sc,
   DeployTask dt;
   dt.address = sc;
   dt.deployer = deployer;
-  dt.byteCode = sci.smartContractDeploy.byteCode;
+  dt.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
 
   TokenInvocationData tdo;
   tdo.newState = newState;
