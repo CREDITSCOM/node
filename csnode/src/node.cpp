@@ -60,7 +60,7 @@ bool Node::init(const Config& config) {
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
-  cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+  cslog() << "Blockchain is ready, contains " << stat_.totalAcceptedTransactions_ << " transactions";
 
 #ifdef NODE_API
   std::cout << "Init API... ";

@@ -16,7 +16,7 @@
 //#define RECREATE_INDEX
 
 // uncomment this to generate new cheat db file (__integr.seq) every time it is absent in BD directory
-//#define RECREATE_CHEAT
+#define RECREATE_CHEAT
 
 using namespace cs;
 
@@ -72,7 +72,6 @@ bool BlockChain::init(const std::string& path)
   }
   else {
     csdebug() << "Last hash is not empty. Reading wallets";
-    std::cout << "Reading wallets... ";
     {
       std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
       if(!initFromDB(*initer))
@@ -95,7 +94,7 @@ bool BlockChain::init(const std::string& path)
 
 #if defined(TRANSACTIONS_INDEX) && defined(RECREATE_INDEX)
   for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
-    auto pool = loadBlock(seq + 1);
+    auto pool = loadBlock(seq);
     createTransactionsIndex(pool);
   }
 
@@ -119,7 +118,7 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
     cs::Sequence current_sequence = 0;
 
     size_t cnt = 1;
-    std::cout << '\n';
+    std::cout << "Reading wallets...\n";
     while (current_sequence <= last_written_sequence) {
       pool = loadBlock(current_sequence);
       if (!updateWalletIds(pool, initer)) {
@@ -141,7 +140,7 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       }
       ++cnt;
     }
-    std::cout << "\rDone, handled " << cnt << " blocks";
+    std::cout << "\rDone, handled " << cnt - 1 << " blocks\n";
 
     res = true;
   }
@@ -165,13 +164,13 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
   std::set<csdb::Address> indexedAddrs;
 
   auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
-    if (indexedAddrs.insert(addr).second) {
-      auto key = get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY);
+    auto key = get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY);
+    if (indexedAddrs.insert(key).second) {
 #ifdef RECREATE_INDEX
       csdb::PoolHash lapoo = lapoos[key];
       lapoos[key] = pool.hash();
 #else
-      csdb::PoolHash lapoo = getLastTransaction(addr).pool_hash();
+      csdb::PoolHash lapoo = getLastTransaction(key).pool_hash();
 #endif
       storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
     }
@@ -243,7 +242,7 @@ bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
 #if defined(RECREATE_CHEAT)
   if(!f) {
     generateCheatDbFile(origin, bh);
-    cswarning() << "Blockchan: cannot open special mark so it was regenerated";
+    cswarning() << "Blockchain: cannot open special mark so it was regenerated";
     return true;
   }
 #endif// RECREATE_CHEAT

@@ -682,7 +682,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
   size_t cnt = 1;
-  std::cout << "API: updating smart caches once...\n";
+  std::cout << "API: analizing blockchain...\n";
   while (curph != pending_smart_transactions->last_pull_hash) {
     new_blocks.push_back(curph);
     size_t res;
@@ -719,7 +719,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   pending_smart_transactions->last_pull_hash = start;
 
   cnt = 1;
-  std::cout << "API: extracting smart states from " << new_blocks.size() << " blocks...\n";
+  //std::cout << "API: searching for smart states in " << new_blocks.size() << " blocks...\n";
   while (!new_blocks.empty()) {
     auto p = s_blockchain.loadBlock(new_blocks.back());
     new_blocks.pop_back();
@@ -729,12 +729,12 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       if (is_smart(tr) || is_smart_state(tr))
         pending_smart_transactions->queue.push(std::move(tr));
     }
-    if(cnt % 1000 == 0) {
-      std::cout << '\r' << cnt;
-    }
+    //if(cnt % 1000 == 0) {
+    //  std::cout << '\r' << cnt;
+    //}
     ++cnt;
   }
-  std::cout << "\rDone, handled " << cnt << " blocks...\n";
+  //std::cout << "\rDone, handled " << cnt << " blocks...\n";
   if (!pending_smart_transactions->queue.empty()) {
     auto tr = std::move(pending_smart_transactions->queue.front());
     pending_smart_transactions->queue.pop();
