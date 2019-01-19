@@ -708,12 +708,14 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         new_blocks.erase(fIt, new_blocks.end());
         break;
       }
-      //std::cout << '\r' << cnt;
+      //if(cnt % 1000 == 0) {
+      //  std::cout << '\r' << cnt;
+      //}
       size_t res;
       luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
       ++cnt;
     }
-    //std::cout << "... Done\n";
+    //std::cout << '\r' << cnt << "... Done\n";
   }
 
   pending_smart_transactions->last_pull_hash = start;
