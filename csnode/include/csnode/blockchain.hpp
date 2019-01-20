@@ -39,8 +39,8 @@ class TransactionsPacket;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
 
-/** @brief   The write block signal emits when block is flushed to disk */
-using WriteBlockSignal = cs::Signal<void(const cs::Sequence)>;
+/** @brief   The write block or remove block signal emits when block is flushed to disk */
+using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
 class BlockChain {
@@ -292,7 +292,10 @@ public signals:
 
 
   /** @brief The write block event. Raised when the next block is flushed to storage */
-  cs::WriteBlockSignal writeBlockEvent;
+  cs::ChangeBlockSignal writeBlockEvent;
+
+  /** @brief The remove block event. Raised when the next block is flushed to storage */
+  cs::ChangeBlockSignal removeBlockEvent;
 
 private:
 

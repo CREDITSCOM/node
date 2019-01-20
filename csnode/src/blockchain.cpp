@@ -414,6 +414,8 @@ void BlockChain::removeLastBlock() {
 
   removeWalletsInPoolFromCache(pool);
 
+  emit removeBlockEvent(pool.sequence());
+
   csmeta(csdebug) << "done";
 }
 

@@ -60,10 +60,13 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   }
 
   const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
-  const cs::Sequence last = lastWrittenSequence + cachedBlocksSize;
-  const cs::Sequence blocksRemaining = roundNum - last;
+  const cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
+  const cs::Sequence blocksRemaining = roundNum - totalBlocks;
+  csdebug() << "SYNC: Round Num: " << roundNum
+            << ", LastWritten: " << lastWrittenSequence
+            << ", Total blocks: " << totalBlocks
+            << ", Cached blocks size in blockchain: " << cachedBlocksSize;
   cslog() << "SYNC: Blocks remaining: " << blocksRemaining;
-  csdebug() << "SYNC: Cached blocks size in blockchain: " << cachedBlocksSize;
 
   if (blocksRemaining == 0) {
     showSyncronizationProgress(lastWrittenSequence);
@@ -91,6 +94,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   if (!isSyncroStarted_) {
     isSyncroStarted_ = true;
     cs::Connector::connect(&blockChain_->writeBlockEvent, this, &cs::PoolSynchronizer::onWriteBlock);
+    cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 
     refreshNeighbours();
     sendBlockRequest();
@@ -234,6 +238,11 @@ void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
   removeExistingSequence(sequence);
 }
 
+void cs::PoolSynchronizer::onRemoveBlock(const cs::Sequence sequence) {
+  csmeta(csdetails) << sequence;
+  removeExistingSequence(sequence, SequenceRemovalAccuracy::UPPER_BOUND);
+}
+
 //
 // Service
 //
@@ -262,7 +271,7 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
   return remaining == 0;
 }
 
-bool cs::PoolSynchronizer::checkActivity(const CounterType& counterType) {
+bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
   refreshNeighbours();
 
   if (neighbours_.empty()) {
@@ -358,7 +367,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
 
   // remove unnecessary sequnces
-  removeExistingSequence(lastWrittenSequence, true);
+  removeExistingSequence(lastWrittenSequence, SequenceRemovalAccuracy::LOWER_BOUND);
 
   cs::Sequence sequence = lastWrittenSequence;
 
@@ -453,11 +462,11 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   return true;
 }
 
-void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, const bool includingSmaller) {
+void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
   csmeta(csdetails) << sequence;
 
   for (auto& neighbour : neighbours_) {
-    neighbour.removeSequnce(sequence, includingSmaller);
+    neighbour.removeSequnce(sequence, accuracy);
 
     if (neighbour.sequences().empty()) {
       neighbour.resetRoundCounter();
@@ -469,18 +478,27 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, c
   printNeighbours("Check seq:");
 }
 
-void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const bool includingSmaller) {
-  checkNeighbourSequence(sequence, includingSmaller);
+void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+  checkNeighbourSequence(sequence, accuracy);
 
   if (!requestedSequences_.empty()) {
-    if (includingSmaller) {
-      requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(sequence));
-    }
-    else {
-      auto it = requestedSequences_.find(sequence);
-      if (it != requestedSequences_.end()) {
-        requestedSequences_.erase(it);
+    switch (accuracy) {
+      case SequenceRemovalAccuracy::EXACT: {
+        auto it = requestedSequences_.find(sequence);
+        if (it != requestedSequences_.end()) {
+          requestedSequences_.erase(it);
+        }
+        break;
       }
+      case SequenceRemovalAccuracy::LOWER_BOUND:
+        requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(sequence));
+        break;
+      case SequenceRemovalAccuracy::UPPER_BOUND:
+        requestedSequences_.erase(requestedSequences_.lower_bound(sequence), requestedSequences_.end());
+        break;
+      default:
+        csmeta(cserror) << "UNKNOWN PRECISION REMOVABLE TYPE";
+        break;
     }
   }
 }
@@ -551,6 +569,7 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 
 void cs::PoolSynchronizer::synchroFinished() {
   cs::Connector::disconnect(&blockChain_->writeBlockEvent);
+  cs::Connector::disconnect(&blockChain_->removeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();
   }
