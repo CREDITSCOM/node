@@ -2285,7 +2285,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     line1 << '=';
   }
 
-  line1 << " " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_) << " ";
+  line1 << " R-" << roundNumber_ << "." << cs::numeric_cast<int>(subRound_) << " ";
 
   if (NodeLevel::Normal == myLevel_) {
     line1 << "NORMAL";

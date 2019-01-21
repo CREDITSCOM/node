@@ -69,13 +69,16 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
 }
 
 void Fee::SetCountedFee() {
+
+  constexpr double fixed = 0.0001428;
+
   if (current_pool_ != nullptr) {
     std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
     size_t size_of_transaction;
     double counted_fee;
     for (auto& transaction : transactions) {
       size_of_transaction = transaction.to_byte_stream().size();
-      counted_fee = one_byte_cost_ * size_of_transaction;
+      counted_fee = fixed; // one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
         transaction.set_counted_fee(csdb::AmountCommission(kMinFee));
       }
@@ -90,7 +93,7 @@ void Fee::SetCountedFee() {
     double counted_fee;
     for (size_t i = 0; i < transactions.size(); ++i) {
       size_of_transaction = transactions[i].to_byte_stream().size();
-      counted_fee = one_byte_cost_ * size_of_transaction;
+      counted_fee = fixed; // one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
         transactions[i].set_counted_fee(csdb::AmountCommission(kMinFee));
       }
