@@ -2188,16 +2188,14 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     }
   }
   size_t neededConfNumber = rt->confidants.size()/2U +1U;
-  if (signaturesCount == count && signaturesCount >= neededConfNumber) {
+
+  if (signaturesCount >= neededConfNumber) {
     csdebug() << "All signatures in RoundTable are ok!";
   } 
   else {
     csdebug() << "RoundTable is not valid!";
     return;
   }
-
-
-
 
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
