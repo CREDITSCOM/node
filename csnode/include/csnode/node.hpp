@@ -233,7 +233,6 @@ private:
   template <class... Args>
   void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-
   // to neighbours
   template<typename... Args>
   bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
@@ -303,6 +302,7 @@ private:
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
   uint8_t subRound_;
+
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable roundTable;
@@ -310,6 +310,7 @@ private:
     cs::PoolMetaInfo poolMetaInfo;
     cs::Characteristic characteristic;
   };
+
   struct SentSignatures {
     std::vector<cs::SignaturePair> poolSignatures;
     std::vector<cs::SignaturePair> roundSignatures;
@@ -333,6 +334,7 @@ private:
 
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;
+
   // round stat
   cs::RoundStat stat_;
 };

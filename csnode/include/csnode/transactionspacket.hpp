@@ -3,6 +3,7 @@
 
 #include <csdb/transaction.hpp>
 #include <lib/system/common.hpp>
+
 #include <string>
 #include <vector>
 
@@ -91,6 +92,12 @@ public:  // Static interface
   static TransactionsPacket fromByteStream(const char* data, size_t size);
 
 public:  // Interface
+  enum Serialization : cs::Byte {
+    Signatures = 0x01,
+    Transactions = 0x04,
+    All = Serialization::Signatures | Serialization::Transactions
+  };
+
   TransactionsPacket() = default;
 
   TransactionsPacket(const TransactionsPacket& packet) = default;
@@ -102,9 +109,7 @@ public:  // Interface
   /// @brief Coverts transactions packet to binary representation.
   /// @return packet as binary representation
   ///
-  cs::Bytes toBinary() const noexcept;
-
-  cs::Bytes toHashBinary() const noexcept;
+  cs::Bytes toBinary(Serialization options = Serialization::All) const noexcept;
 
   ///
   /// @brief Generates hash
@@ -134,12 +139,12 @@ public:  // Interface
   /// @brief Adds signature to transaction vector
   /// @param signature Signature to add
   ///
-  bool addSignature(const cscrypto::Signature& signature);
+  bool addSignature(const cs::Signature& signature);
 
   ///
-/// @brief Adds transaction to transaction vector
-/// @param transaction Any transaction to add
-///
+  /// @brief Adds transaction to transaction vector
+  /// @param transaction Any transaction to add
+  ///
   bool addTransaction(const csdb::Transaction& transaction);
 
   ///
@@ -149,10 +154,10 @@ public:  // Interface
   const std::vector<csdb::Transaction>& transactions() const noexcept;
 
   ///
-/// @brief Returns transactions
-/// @return Reference to signatures vector
-///
-  const std::vector<cscrypto::Signature>& signatures() const noexcept;
+  /// @brief Returns transactions
+  /// @return Reference to signatures vector
+  ///
+  const std::vector<cs::Signature>& signatures() const noexcept;
 
   ///
   /// @brief Returns trabsactions, non const version
@@ -166,13 +171,12 @@ public:  // Interface
   void clear() noexcept;
 
 private:  // Service
-  void hashPut(::csdb::priv::obstream& os) const;
-  void put(::csdb::priv::obstream& os) const;
+  void put(::csdb::priv::obstream& os, Serialization options) const;
   bool get(::csdb::priv::ibstream& is);
 
 private:  // Members
   TransactionsPacketHash m_hash;
-  std::vector<cscrypto::Signature> m_signatures;
+  std::vector<cs::Signature> m_signatures;
   std::vector<csdb::Transaction> m_transactions;
 };
 }  // namespace cs

@@ -119,15 +119,9 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
 // Interface
 //
 
-cs::Bytes TransactionsPacket::toBinary() const noexcept {
+cs::Bytes TransactionsPacket::toBinary(Serialization options) const noexcept {
   ::csdb::priv::obstream os;
-  put(os);
-  return os.buffer();
-}
-
-cs::Bytes TransactionsPacket::toHashBinary() const noexcept {
-  ::csdb::priv::obstream os;
-  hashPut(os);
+  put(os, options);
   return os.buffer();
 }
 
@@ -135,7 +129,7 @@ bool TransactionsPacket::makeHash() {
   bool isEmpty = isHashEmpty();
 
   if (isEmpty) {
-    m_hash = TransactionsPacketHash::calcFromData(toHashBinary());
+    m_hash = TransactionsPacketHash::calcFromData(toBinary(Serialization::Transactions));
   }
 
   return isEmpty;
@@ -159,19 +153,19 @@ bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
   }
 
   m_transactions.push_back(transaction);
-
   return true;
 }
 
-bool TransactionsPacket::addSignature(const cscrypto::Signature& signature) {
-  if (std::find(m_signatures.cbegin(), m_signatures.cend(), signature) == m_signatures.cend()) {
-    return false;
+bool TransactionsPacket::addSignature(const cs::Signature& signature) {
+  if (std::find(m_signatures.begin(), m_signatures.end(), signature) != m_signatures.cend()) {
+    m_signatures.push_back(signature);
+    return true;
   }
-  m_signatures.push_back(signature);
-  return true;
+
+  return false;
 }
 
-const std::vector<cscrypto::Signature>& TransactionsPacket::signatures() const noexcept {
+const std::vector<cs::Signature>& TransactionsPacket::signatures() const noexcept {
   return m_signatures;
 }
 
@@ -191,67 +185,62 @@ void TransactionsPacket::clear() noexcept {
 // Service
 //
 
-void TransactionsPacket::put(::csdb::priv::obstream& os) const {
-  os.put(m_transactions.size());
+void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) const {
+  if (options & Serialization::Transactions) {
+    os.put(m_transactions.size());
 
-  for (const auto& it : m_transactions) {
-    os.put(it);
+    for (const auto& it : m_transactions) {
+      os.put(it);
+    }
   }
 
-  os.put(m_signatures.size());
-  for (const auto& it : m_signatures) {
-    os.put(it);
-  }
+  if (options & Serialization::Signatures) {
+    os.put(m_signatures.size());
 
-}
-
-void TransactionsPacket::hashPut(::csdb::priv::obstream& os) const {
-  os.put(m_transactions.size());
-
-  for (const auto& it : m_transactions) {
-    os.put(it);
+    for (const auto& it : m_signatures) {
+      os.put(it);
+    }
   }
 }
 
 bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
-  std::size_t count;
+  std::size_t transactionsCount = 0;
 
-  if (!is.get(count)) {
+  if (!is.get(transactionsCount)) {
     return false;
   }
 
   m_transactions.clear();
-  m_transactions.reserve(count);
+  m_transactions.reserve(transactionsCount);
 
-  for (std::size_t i = 0; i < count; ++i) {
-    csdb::Transaction tran;
+  for (std::size_t i = 0; i < transactionsCount; ++i) {
+    csdb::Transaction transaction;
 
-    if (!is.get(tran)) {
+    if (!is.get(transaction)) {
       return false;
     }
 
-    m_transactions.push_back(tran);
+    m_transactions.push_back(transaction);
   }
 
-  std::size_t sigCount = 0;
-  if (!is.get(sigCount)) {
+  std::size_t signaturesCount = 0;
+
+  if (!is.get(signaturesCount)) {
     return false;
   }
 
   m_signatures.clear();
-  if (sigCount > 0) {
-    m_signatures.reserve(sigCount);
-    for (std::size_t i = 0; i < sigCount; ++i) {
-      cscrypto::Signature sig;
+  m_signatures.reserve(signaturesCount);
 
-      if (!is.get(sig)) {
-        return false;
-      }
+  for (std::size_t i = 0; i < signaturesCount; ++i) {
+    cs::Signature signature;
 
-      m_signatures.push_back(sig);
+    if (!is.get(signature)) {
+      return false;
     }
-  }
 
+    m_signatures.push_back(signature);
+  }
 
   return true;
 }
