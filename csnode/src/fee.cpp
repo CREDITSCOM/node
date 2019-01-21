@@ -227,6 +227,9 @@ void Fee::ResetTrustedCache(const BlockChain& blockchain) {
         last_trusted_.insert(confidants[i]);
       }
       --last_sequence;
+      if (last_sequence < 1) {
+        break;
+      }
       pool = blockchain.loadBlock(last_sequence);
     }
   } else {
