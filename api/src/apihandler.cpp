@@ -510,11 +510,35 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     auto scKey = cs::SmartContracts::get_valid_smart_address(deployer,
       send_transaction.innerID(),
       input_smart.smartContractDeploy);
-    if (scKey != addr) {
+    if(scKey != addr) {
       _return.status.code = 127;
       const auto data = scKey.public_key().data();
       std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
       _return.status.message = "Bad smart contract address, expected " + str;
+
+#ifdef WEB_WALLET_NODE
+      auto trId = send_transaction.innerID();
+      std::vector<cscrypto::Byte> strToHash;
+      std::string byteCode {};
+      if(!input_smart.smartContractDeploy.byteCodeObjects.empty()) {
+        for(auto &curr_byteCode : input_smart.smartContractDeploy.byteCodeObjects) {
+          byteCode += curr_byteCode.byteCode;
+        }
+      }
+      strToHash.reserve(cscrypto::kPublicKeySize + 6 + byteCode.size());
+
+      const auto dPk = deployer.public_key();
+      const auto idPtr = reinterpret_cast<const cscrypto::Byte*>(&trId);
+
+      std::copy(dPk.begin(), dPk.end(), std::back_inserter(strToHash));
+      std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
+      std::copy(byteCode.begin(),
+        byteCode.end(),
+        std::back_inserter(strToHash));
+
+      for(auto& c : byteCode)
+        _return.status.message += " " + std::to_string((uint32_t) (int8_t) c);
+#endif
       return;
     }
   }
