@@ -360,6 +360,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   std::vector<uint8_t> realTrusted_;
   cs::PublicKey writer_public_key_;
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
+  ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
@@ -498,6 +499,12 @@ const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noe
   return d->signatures_;
 }
 
+const ::std::vector<csdb::Pool::SmartSignature>& Pool::smartSignatures() const noexcept
+{
+  // TODO: вставьте здесь оператор return
+  return d->smartSignatures_;
+}
+
 void Pool::set_sequence(cs::Sequence seq) noexcept {
   if (d.constData()->read_only_) {
     return;
@@ -549,12 +556,19 @@ void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept
 }
 
 void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
-  if (d.constData()->read_only_) {
-    return;
-  }
+  //if (d.constData()->read_only_) {
+  //  return;
+  //}
   priv* data = d.data();
   data->is_valid_ = true;
   data->signatures_.emplace_back(std::make_pair(index, signature));
+}
+
+void Pool::add_smart_signature(csdb::Pool::SmartSignature smartSignature) noexcept
+{
+  //priv* data = d.data();
+  //data->is_valid_ = true;
+  //data->smartSignatures_.emplace_back(smartSignature);
 }
 
 void Pool::set_storage(const Storage& storage) noexcept {

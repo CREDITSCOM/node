@@ -96,6 +96,7 @@ struct PoolMetaInfo {
   csdb::PoolHash previousHash;
   cs::Sequence sequenceNumber;
   std::vector<uint8_t> realTrustedMask;
+  std::vector <csdb::Pool::SmartSignature> smartSignatures;
 };
 
 struct HashVector {

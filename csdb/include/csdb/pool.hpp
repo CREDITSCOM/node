@@ -122,6 +122,13 @@ public:
     AddressId addressId_;
     WalletId walletId_;
   };
+  
+  struct SmartSignature {
+    cs::PublicKey smartKey;
+    cs::Sequence smartConsensusPool;
+    ::std::vector<std::pair<int, cs::Signature>> signatures_;
+  };
+
   using NewWallets = std::vector<NewWalletInfo>;
 
 public:
@@ -148,6 +155,7 @@ public:
   const cs::Signature& signature() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
   const ::std::vector<std::pair<int, cs::Signature>>& signatures() const noexcept;
+  const ::std::vector<csdb::Pool::SmartSignature>& smartSignatures() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
@@ -156,6 +164,7 @@ public:
   void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void add_signature(int index, const cs::Signature& signature) noexcept;
+  void add_smart_signature(csdb::Pool::SmartSignature smartSignature) noexcept;
 
   Transactions& transactions();
   const Transactions& transactions() const;

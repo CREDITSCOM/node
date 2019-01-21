@@ -353,6 +353,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
+  cs::Signature signature;
+  size_t smartSigCount;
+  csdb::Pool::SmartSignature tmpSmartSignature;
 
   poolStream >> poolMetaInfo.timestamp;
   poolStream >> characteristic.mask;
@@ -360,6 +363,13 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   //istream_ >> signature;
   poolStream >> poolMetaInfo.realTrustedMask;
   poolStream >> poolMetaInfo.previousHash;
+  poolStream >> smartSigCount;
+  //for (int i = 0; i < smartSigCount; ++i) {
+  //  poolStream >> tmpSmartSignature.smartKey;
+  //  poolStream >> tmpSmartSignature.smartConsensusPool;
+  //  poolStream >> tmpSmartSignature.signatures_;
+  //  poolMetaInfo.smartSignatures.push_back(tmpSmartSignature);
+  //}
 
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -389,6 +399,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     }
     else {
       pool.value().set_confidants(ptable->confidants);
+      //for(auto& it : poolMetaInfo.smartSignatures) {
+      //  pool.value().add_smart_signature(it);
+      //}
     }
 
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
@@ -1997,8 +2010,7 @@ void Node::addRoundSignature(const cs::StageThree& st3) {
 
 void Node::sendRoundPackage(const cs::PublicKey& target) {
   csmeta(csdetails) << "Send round table";
-  sendDefault(target, MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_,
-    lastSentSignatures_.poolSignatures, lastSentSignatures_.roundSignatures);
+  sendDefault(target, MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
 
   if (!lastSentRoundData_.characteristic.mask.empty()) {
     csmeta(csdebug) << "Packing " << lastSentRoundData_.characteristic.mask.size() << " bytes of char. mask to send";
@@ -2017,10 +2029,10 @@ void Node::sendRoundPackageToAll() {
   stream << lastSentSignatures_.roundSignatures;
 
   csdebug() << "Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
-  csdebug() << "Send RoundData : " << cs::Utils::byteStreamToHex(lastSignaturesMessage_.data(), lastSignaturesMessage_.size())
-            << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
-
-  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastSignaturesMessage_, lastRoundTableMessage_);
+  csdebug() << "Send RoundData : " << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size())
+  << cs::Utils::byteStreamToHex(lastSignaturesMessage_.data(), lastSignaturesMessage_.size());
+  
+  sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
 
   if (!lastSentRoundData_.characteristic.mask.empty()) {
     csmeta(csdebug) << "Packing " << lastSentRoundData_.characteristic.mask.size() << " bytes of char. mask to send";
@@ -2149,6 +2161,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   subRound_ = subRound;
+  cs::Bytes roundBytes;
+  istream_ >> roundBytes;
   cs::Bytes bytes;
   istream_ >> bytes;
   cs::DataStream stream(bytes.data(), bytes.size());
@@ -2161,8 +2175,30 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   stream >> roundSignatures;
   csdebug() << "RoundSignatures Amount = " << roundSignatures.size();
 
-  cs::Bytes roundBytes;
-  istream_ >> roundBytes;
+  size_t signaturesCount = 0;
+  auto rt = cs::Conveyer::instance().roundTable(rNum - 1);
+  if (rt == nullptr) {
+    return;
+  }
+  for (auto& it : roundSignatures) {
+    cs::Hash tempHash;
+    cscrypto::CalculateHash(tempHash, roundBytes.data(), roundBytes.size());
+    if(cscrypto::VerifySignature(it.signature,rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
+      ++signaturesCount;
+    }
+  }
+  size_t neededConfNumber = rt->confidants.size()/2U +1U;
+  if (signaturesCount == count && signaturesCount >= neededConfNumber) {
+    csdebug() << "All signatures in RoundTable are ok!";
+  } 
+  else {
+    csdebug() << "RoundTable is not valid!";
+    return;
+  }
+
+
+
+
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;

@@ -238,10 +238,10 @@ namespace cs
         break;
       case 1:
         for (auto& st : stageThreeStorage) {
-          csdebug() << "OUR:";
-          printStage3(stage);
-          csdebug() << "GOT:";
-          st.print();
+          //csdebug() << "OUR:";
+          //printStage3(stage);
+          //csdebug() << "GOT:";
+          //st.print();
           //TODO: change the routine of pool signing
           bool blockSignaturesOk = cscrypto::VerifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size());
           if (!blockSignaturesOk) {
@@ -271,10 +271,10 @@ namespace cs
         break;
       case 2:
         const auto st = find_stage3(pnode->getConfidantNumber());
-        csdebug() << "OUR:";
-        st->print();
-        csdebug() << "GOT:";
-        printStage3(stage);
+        //csdebug() << "OUR:";
+        //st->print();
+        //csdebug() << "GOT:";
+        //printStage3(stage);
         bool blockSignaturesOk = cscrypto::VerifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size());
         if(!blockSignaturesOk) {
           csdebug() << "Block Signatures are not ok";

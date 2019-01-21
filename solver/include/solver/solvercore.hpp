@@ -308,7 +308,7 @@ private:
   cs::StageTwoSmarts st2;
   cs::StageThreeSmarts st3;
   std::vector <int> smartUntrusted;
-
+  std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
   // stores candidates for next round
   std::vector<cs::PublicKey> trusted_candidates;
   std::vector <cs::TransactionsPacketHash> hashes_candidates;

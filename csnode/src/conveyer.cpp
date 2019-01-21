@@ -108,6 +108,9 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
       return std::nullopt;
     }
 
+    if (!iterator->second.signatures().empty()) {
+      //TODO: add code here to manage the smartSignatures
+    }
     const auto& transactions = iterator->second.transactions();
 
     for (const auto& transaction : transactions) {
