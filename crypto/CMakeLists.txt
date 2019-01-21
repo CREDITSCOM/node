@@ -15,7 +15,7 @@ if(WIN32)
   else()
     set(libsodium_patch ${libsodium_dir}/../patches/msvs141_retargeting17134.patch)
   endif()
-  execute_process(COMMAND git apply ${libsodium_patch}
+  execute_process(COMMAND git apply --ignore-space-change ${libsodium_patch}
                   WORKING_DIRECTORY ${libsodium_dir})
 				  
   if(CMAKE_BUILD_TYPE MATCHES Debug)
