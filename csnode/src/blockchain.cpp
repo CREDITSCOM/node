@@ -399,7 +399,8 @@ void BlockChain::removeLastBlock() {
     csmeta(cserror) << "Error! Last pool hash mismatch";
     const auto findSequence = blockHashes_->find(poolHash);
     const auto& bh = blockHashes_->getHashes();
-    csmeta(cserror) << "Block hashes size: " << bh.size() << ", Pool sequence: " << pool.sequence()
+    csmeta(cserror) << "Block hashes size: " << bh.size()
+                    << ", Pool sequence: " << pool.sequence()
                     << ", in Block hashes sequence: " << findSequence;
     if (findSequence == 0) {
       for (std::size_t i = 0; i < bh.size(); ++i) {
@@ -413,6 +414,8 @@ void BlockChain::removeLastBlock() {
 #endif
 
   removeWalletsInPoolFromCache(pool);
+
+  cachedBlocks_.erase(cachedBlocks_.lower_bound(pool.sequence()), cachedBlocks_.end());
 
   emit removeBlockEvent(pool.sequence());
 
