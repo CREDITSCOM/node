@@ -32,7 +32,7 @@ if(WIN32)
   execute_process(COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${msbuild_parallel} ${proj_to_build} ${msbuild_property} ${msbuild_platform} ${disable_post_build}
 				  WORKING_DIRECTORY ${libsodium_dir})
 				  
-  execute_process(COMMAND git apply ${libsodium_patch} -R
+  execute_process(COMMAND git apply --ignore-space-change ${libsodium_patch} -R
                   WORKING_DIRECTORY ${libsodium_dir})
 else()
   execute_process(COMMAND bash ./autogen.sh
