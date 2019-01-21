@@ -2196,9 +2196,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     return;
   }
 
-
-
-
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
