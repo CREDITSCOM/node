@@ -371,6 +371,16 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   //  poolMetaInfo.smartSignatures.push_back(tmpSmartSignature);
   //}
 
+  auto& confidants = cs::Conveyer::instance().confidants();
+
+  for (size_t i = 0; i < poolMetaInfo.realTrustedMask.size(); ++i) {
+    if (poolMetaInfo.realTrustedMask.at(i) == 0) {
+      poolMetaInfo.writerKey = confidants.at(i);
+      break;
+    }
+  }
+
+
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
     return;
@@ -2545,8 +2555,13 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
-  if (!cscrypto::VerifySignature(signature, solver_->getPublicKey(), hash.to_binary().data(), hash.size())) {
-    csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
+  if(std::find(confidants.cbegin(),confidants.cend(),sender)!= confidants.cend()) {
+    if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
+      csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
+      return;
+    }
+  }
+  else {
     return;
   }
 

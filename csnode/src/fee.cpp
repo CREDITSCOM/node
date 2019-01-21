@@ -216,6 +216,9 @@ double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChai
 void Fee::ResetTrustedCache(const BlockChain& blockchain) {
   last_trusted_.clear();
   size_t last_sequence = blockchain.getLastSequence();
+  if (last_sequence == 0) {
+    return;
+  }
   csdb::Pool pool = blockchain.loadBlock(last_sequence);
   if (last_sequence <= kBlocksNumForNodesQtyEstimation) {
     while (pool.is_valid()) {
@@ -224,6 +227,9 @@ void Fee::ResetTrustedCache(const BlockChain& blockchain) {
         last_trusted_.insert(confidants[i]);
       }
       --last_sequence;
+      if (last_sequence < 1) {
+        break;
+      }
       pool = blockchain.loadBlock(last_sequence);
     }
   } else {
