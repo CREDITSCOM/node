@@ -1,8 +1,14 @@
 #ifndef PARAMS_HPP
 #define PARAMS_HPP
 
+/**
+*  Please don't commit these three defines
+*  below uncommented.
+*/
 //#define MONITOR_NODE
 //#define WEB_WALLET_NODE
+//#define SPAMMER
+
 #define NODE_API
 #define AJAX_IFACE
 
@@ -13,8 +19,6 @@
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
   #define TRANSACTIONS_INDEX
   #define TOKENS_CACHE
-#else
-  #define SPAMMER
 #endif
 
 #ifdef MONITOR_NODE

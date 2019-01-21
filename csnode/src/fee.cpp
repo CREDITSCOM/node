@@ -42,6 +42,9 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   if (pool->transactions().size() < 1) {
     return;
   }
+  if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
+    ResetTrustedCache(blockchain);
+  }
   Init(blockchain, pool);
   CountOneByteCost(blockchain);
   SetCountedFee();
@@ -208,5 +211,31 @@ double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChai
   }
 
   return time_stamp_to - time_stamp_from;
+}
+
+void Fee::ResetTrustedCache(const BlockChain& blockchain) {
+  last_trusted_.clear();
+  size_t last_sequence = blockchain.getLastSequence();
+  csdb::Pool pool = blockchain.loadBlock(last_sequence);
+  if (last_sequence <= kBlocksNumForNodesQtyEstimation) {
+    while (pool.is_valid()) {
+      const auto& confidants = pool.confidants();
+      for (size_t i = 0; i < confidants.size(); ++i) {
+        last_trusted_.insert(confidants[i]);
+      }
+      --last_sequence;
+      pool = blockchain.loadBlock(last_sequence);
+    }
+  } else {
+    size_t sequence_to_stop = last_sequence - kBlocksNumForNodesQtyEstimation;
+    while (last_sequence > sequence_to_stop && pool.is_valid()) {
+      const auto& confidants = pool.confidants();
+      for (size_t i = 0; i < confidants.size(); ++i) {
+        last_trusted_.insert(confidants[i]);
+      }
+      --last_sequence;
+      pool = blockchain.loadBlock(last_sequence);
+    }
+  }
 }
 }  // namespace cs
