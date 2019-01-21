@@ -74,6 +74,7 @@ private:
   size_t EstimateNumOfNodesInNetwork(const BlockChain& blockchain);
   inline void Init(const BlockChain& blockchain, csdb::Pool* pool);
   inline void Init(const BlockChain&, TransactionsPacket* packet);
+  void ResetTrustedCache(const BlockChain&);
 
   size_t num_of_last_block_;
   size_t total_transactions_length_;
