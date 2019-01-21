@@ -75,6 +75,8 @@ set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELSPAM
              ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
 set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELMONITOR
              ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
+set_property(TARGET libsodium PROPERTY IMPORTED_LOCATION_RELWALLET
+             ${libsodium_dir}/Build/Release/x64/${lb_lib_folder}/libsodium${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 
 add_library(${PROJECT_NAME} STATIC
