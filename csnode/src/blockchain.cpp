@@ -133,7 +133,15 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
       ++current_sequence;
 #ifdef TRANSACTIONS_INDEX
-      total_transactions_count_ += pool.transactions().size();
+      if(pool.transactions().size()) {
+        total_transactions_count_ += pool.transactions().size();
+
+        if(lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
+          previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+
+        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
+      }
 #endif
       if(cnt % 1000 == 0) {
         std::cout << '\r' << cnt;
