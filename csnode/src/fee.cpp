@@ -54,6 +54,9 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
   if (packet->transactionsCount() < 1) {
     return;
   }
+  if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
+    ResetTrustedCache(blockchain);
+  }
   Init(blockchain, packet);
   CountOneByteCost(blockchain);
   SetCountedFee();
