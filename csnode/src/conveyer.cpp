@@ -482,6 +482,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.add_user_field(0, metaPoolInfo.timestamp);
 
   newPool.set_writer_public_key(metaPoolInfo.writerKey);
+  csdebug() << "\twriter keuy is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey.data(), metaPoolInfo.writerKey.size());
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csmeta(csdetails) << "done";
