@@ -1247,7 +1247,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     csmeta(csdebug) << "Stage-1 of T[" << static_cast<int>(stage.sender) << "], sender key ok";
   }
 
-  csdetails() << csname() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
+  csdetails() << csname() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
   solver_->gotStageOne(std::move(stage));
 }
@@ -1696,7 +1696,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender)
                 << ", sender key: " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
                 << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-  csdebug() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
+  csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
   csdebug() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageOne(stage, false);
