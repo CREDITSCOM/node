@@ -259,6 +259,10 @@ public:
     return core.find_stage1(sender);
   }
 
+  const size_t trueStagesThree() const {
+    return (size_t)core.trueStagesThree();
+  }
+
   const cs::StageTwo* stage2(uint8_t sender) const {
     return core.find_stage2(sender);
   }

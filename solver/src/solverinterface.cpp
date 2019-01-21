@@ -310,6 +310,11 @@ namespace cs
     }
   }
 
+  size_t SolverCore::trueStagesThree() {
+    return trueStageThreeStorage.size();
+  }
+  
+
   void SolverCore::send_wallet_transaction(const csdb::Transaction& tr)
   {
     //DEBUG:

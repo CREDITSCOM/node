@@ -110,6 +110,7 @@ public:
   void createFinalTransactionSet();
   bool smartConfidantExist(uint8_t);
   void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
+  size_t trueStagesThree();
 
   void requestSmartStages(int st);
   void requestSmartStagesNeighbors(int st);

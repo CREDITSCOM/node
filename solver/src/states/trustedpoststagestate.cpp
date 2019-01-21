@@ -104,8 +104,7 @@ void TrustedPostStageState::request_stages_neighbors(SolverContext& context) {
 }
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
-  ++cnt_recv_stages;
-  if(cnt_recv_stages >= context.cnt_trusted() / 2U + 1U) {
+  if(context.trueStagesThree() >= context.cnt_trusted() / 2U + 1U) {
     csdebug() << name() << ": enough stage-3 received amount = " << cnt_recv_stages;
     return Result::Finish;
   }
