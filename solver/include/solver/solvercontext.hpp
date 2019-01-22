@@ -235,6 +235,10 @@ public:
 
   std::string sender_description(const cs::PublicKey& sender_id);
 
+  csdb::PoolHash SolverContext::spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
+
+  void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
+
   void add_stage1(cs::StageOne& stage, bool send);
 
   void add_stage2(cs::StageTwo& stage, bool send);

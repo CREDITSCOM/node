@@ -140,7 +140,7 @@ Address Address::from_public_key(const cs::PublicKey& key) {
 
 Address Address::from_public_key(const char *key) {
   Address res;
-  memcpy(res.d->data_.public_key.data(), key, ::csdb::priv::crypto::public_key_size);
+  std::copy(key, key + ::csdb::priv::crypto::public_key_size, res.d->data_.public_key.begin());
   res.d->is_wallet_id_ = false;
   return res;
 }

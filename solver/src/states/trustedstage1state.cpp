@@ -72,22 +72,33 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   return (enough_hashes ? Result::Finish : Result::Ignore);
 }
 
-Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& /*pool_hash*/,
+Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
                                   const cs::PublicKey& sender) {
-  // get node status for useful logging
+  
+  csdb::PoolHash lastHash = context.blockchain().getLastHash();
+  csdb::PoolHash spoiledHash = context.spoileHash(lastHash, sender);
   csdebug() << name() << ": <-- hash from " << context.sender_description(sender);
-  if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
-    csdebug() << name() << ": hash is OK";
-    if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
-      stage.trustedCandidates.push_back(sender);
+  if (spoiledHash == pool_hash) {
+    // get node status for useful logging
+
+    if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
+      csdebug() << name() << ": hash is OK";
+      if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
+        stage.trustedCandidates.push_back(sender);
+      }
+    }
+    if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes)  {
+      // enough hashes
+      // flush deferred block to blockchain if any
+      enough_hashes = true;
+      return (transactions_checked ? Result::Finish : Result::Ignore);
     }
   }
-  if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes)  {
-    // enough hashes
-    // flush deferred block to blockchain if any
-    enough_hashes = true;
-    return (transactions_checked ? Result::Finish : Result::Ignore);
+  else {
+    csdebug() << name() << ": DOES NOT MATCH to my value " << lastHash.to_string();
+    context.sendHashReply(std::move(pool_hash), sender);
   }
+
 
   return Result::Ignore;
 }

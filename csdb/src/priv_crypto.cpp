@@ -14,8 +14,8 @@ cs::Bytes crypto::calc_hash(const cs::Bytes &buffer) noexcept {
   return cs::Bytes(result.begin(), result.end());
 #else
   const size_t result = std::hash<std::string>()(std::string(buffer.begin(), buffer.end()));
-  return internal::byte_array(reinterpret_cast<const uint8_t *>(&result),
-                              reinterpret_cast<const uint8_t *>(&result) + hash_size);
+  return cs::Bytes(reinterpret_cast<const uint8_t *>(&result),
+                   reinterpret_cast<const uint8_t *>(&result) + hash_size);
 #endif
 }
 

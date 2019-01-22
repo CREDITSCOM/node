@@ -1666,7 +1666,6 @@ APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
     if (offset == 0) {
       if (limit > 0) {
         api::TrustedInfo wi;
-        //const ::csdb::internal::byte_array addr_b(addr.begin(), addr.end());
         const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 

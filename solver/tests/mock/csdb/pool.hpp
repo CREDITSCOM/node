@@ -3,14 +3,10 @@
 #include <gmock/gmock.h>
 #include <vector>
 #include <cstdint>
+#include <lib/system/common.hpp>
 
 namespace csdb
 {
-    namespace internal
-    {
-        using byte_array = std::vector<uint8_t>;
-    }
-
     class PoolHash
     {
     public:
@@ -19,7 +15,7 @@ namespace csdb
         PoolHash(const PoolHash&)
         {}
 
-        MOCK_METHOD0(to_binary, internal::byte_array&());
+        MOCK_METHOD0(to_binary, cs::Bytes&());
     };
 
     class Address
@@ -33,7 +29,7 @@ namespace csdb
 
         MOCK_CONST_METHOD0(is_wallet_id, bool());
         MOCK_CONST_METHOD0(wallet_id, WalletId());
-        MOCK_CONST_METHOD0(public_key, const internal::byte_array&());
+        MOCK_CONST_METHOD0(public_key, const cs::Bytes&());
     };
 
     class Amount
@@ -57,7 +53,7 @@ namespace csdb
         MOCK_CONST_METHOD0(source, Address());
         MOCK_CONST_METHOD0(target, Address());
         MOCK_CONST_METHOD0(amount, Amount());
-        MOCK_CONST_METHOD1(verify_signature, bool(internal::byte_array));
+        MOCK_CONST_METHOD1(verify_signature, bool(cs::Bytes));
     };
 
     class Pool
@@ -79,7 +75,7 @@ namespace csdb
         MOCK_CONST_METHOD0(transactions, const std::vector<Transaction>());
         MOCK_METHOD0(verify_signature, bool());
         MOCK_METHOD1(add_transaction, void(const Transaction));
-        MOCK_CONST_METHOD0(writer_public_key, internal::byte_array());
+        MOCK_CONST_METHOD0(writer_public_key, cs::Bytes());
     };
 
 }

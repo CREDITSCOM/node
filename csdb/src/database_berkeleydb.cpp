@@ -178,14 +178,14 @@ bool DatabaseBerkeleyDB::is_open() const {
   return static_cast<bool>(db_blocks_);
 }
 
-bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_array &value) {
+bool DatabaseBerkeleyDB::put(const cs::Bytes& key, uint32_t seq_no, const cs::Bytes& value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
   }
 
   Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
-  Dbt_copy<byte_array> db_value(value);
+  Dbt_copy<cs::Bytes> db_value(value);
 
   int status = db_blocks_->put(nullptr, &db_seq_no, &db_value, 0);
   if (status != 0) {
@@ -193,7 +193,7 @@ bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_
     return false;
   }
 
-  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<cs::Bytes> db_key(key);
   status = db_seq_no_->put(nullptr, &db_key, &db_seq_no, 0);
   if (status != 0) {
     set_last_error_from_berkeleydb(status);
@@ -204,13 +204,13 @@ bool DatabaseBerkeleyDB::put(const byte_array &key, uint32_t seq_no, const byte_
   return true;
 }
 
-bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value) {
+bool DatabaseBerkeleyDB::get(const cs::Bytes& key, cs::Bytes* value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
   }
 
-  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<cs::Bytes> db_key(key);
   if (value == nullptr) {
     return db_seq_no_->exists(nullptr, &db_key, 0) == 0;
   }
@@ -236,7 +236,7 @@ bool DatabaseBerkeleyDB::get(const byte_array &key, byte_array *value) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
+bool DatabaseBerkeleyDB::get(const uint32_t seq_no, cs::Bytes* value) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
@@ -261,13 +261,13 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, byte_array *value) {
   return true;
 }
 
-bool DatabaseBerkeleyDB::remove(const byte_array& key) {
+bool DatabaseBerkeleyDB::remove(const cs::Bytes& key) {
   if (!db_blocks_) {
     set_last_error(NotOpen);
     return false;
   }
 
-  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<cs::Bytes> db_key(key);
   Dbt_copy<uint32_t> db_seq_no;
   int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, 0);
   if (status != 0) {
@@ -404,14 +404,14 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
 }
 
 #ifdef TRANSACTIONS_INDEX
-bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array &value) {
+bool DatabaseBerkeleyDB::putToTransIndex(const cs::Bytes& key, const cs::Bytes& value) {
   if (!db_trans_idx_) {
     set_last_error(NotOpen);
     return false;
   }
 
-  Dbt_copy<byte_array> db_key(key);
-  Dbt_copy<byte_array> db_value(value);
+  Dbt_copy<cs::Bytes> db_key(key);
+  Dbt_copy<cs::Bytes> db_value(value);
 
   int status = db_trans_idx_->put(nullptr, &db_key, &db_value, 0);
   if (status) {
@@ -423,13 +423,13 @@ bool DatabaseBerkeleyDB::putToTransIndex(const byte_array &key, const byte_array
   return true;
 }
 
-bool DatabaseBerkeleyDB::getFromTransIndex(const byte_array &key, byte_array *value) {
+bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) {
   if (!db_trans_idx_) {
     set_last_error(NotOpen);
     return false;
   }
 
-  Dbt_copy<byte_array> db_key(key);
+  Dbt_copy<cs::Bytes> db_key(key);
   Dbt_safe db_value;
 
   int status = db_trans_idx_->get(nullptr, &db_key, &db_value, 0);

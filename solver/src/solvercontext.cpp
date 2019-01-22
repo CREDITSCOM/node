@@ -27,6 +27,18 @@ std::string SolverContext::sender_description(const cs::PublicKey & sender_id)
   return core.pnode->getSenderText(sender_id);
 }
 
+csdb::PoolHash SolverContext::spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey)
+{
+  // either RVO or string's move constructor used:
+  return core.pnode->spoileHash(hashToSpoil, pKey);
+}
+
+void SolverContext::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent)
+{
+  // either RVO or string's move constructor used:
+  return core.pnode->sendHashReply(hash,respondent);
+}
+
 void SolverContext::add_stage1(cs::StageOne& stage, bool send) {
   // core.stageOneStorage.push_back(stage);
   if (send) {
