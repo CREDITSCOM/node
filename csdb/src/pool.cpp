@@ -1,7 +1,6 @@
-#include <utility>
-
 #include "csdb/pool.hpp"
 
+#include <utility>
 #include <algorithm>
 #include <iomanip>
 #include <map>

@@ -20,8 +20,8 @@ void RoundStat::onRoundStart(RoundNumber round) {
   else {
     using namespace std::chrono;
     auto new_duration_ms = duration_cast<milliseconds>(steady_clock::now() - startPointMs_).count();
-    auto last_round_ms = new_duration_ms - totalDurationMs_;
-    totalDurationMs_ = new_duration_ms;
+    auto last_round_ms = cs::numeric_cast<size_t>(new_duration_ms) - totalDurationMs_;
+    totalDurationMs_ = cs::numeric_cast<size_t>(new_duration_ms);
     auto ave_round_ms = totalDurationMs_ / round;
 
     // shortest_rounds.insert(last_round_ms);

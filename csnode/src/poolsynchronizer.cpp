@@ -498,9 +498,6 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
       case SequenceRemovalAccuracy::UPPER_BOUND:
         requestedSequences_.erase(requestedSequences_.lower_bound(sequence), requestedSequences_.end());
         break;
-      default:
-        csmeta(cserror) << "UNKNOWN PRECISION REMOVABLE TYPE";
-        break;
     }
   }
 }

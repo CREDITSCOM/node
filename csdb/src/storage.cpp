@@ -175,10 +175,10 @@ void Storage::priv::set_last_error(Storage::Error error, const char *message, ..
 
   if (error != Storage::Error::NoError) {
     if (!les.last_error_message_.empty()) {
-      cserror() << "Storage> error #" << (int)error << ": " << les.last_error_message_;
+      cserror() << "Storage> error #" << cs::numeric_cast<int>(error)<< ": " << les.last_error_message_;
     }
     else {
-      cserror() << "Storage> error #" << (int)error;
+      cserror() << "Storage> error #" << cs::numeric_cast<int>(error);
     }
   }
 }

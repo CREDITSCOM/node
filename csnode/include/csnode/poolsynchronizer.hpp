@@ -120,9 +120,6 @@ private:  // struct
         case SequenceRemovalAccuracy::UPPER_BOUND:
           sequences_.erase(std::lower_bound(sequences_.begin(), sequences_.end(), sequence), sequences_.end());
           break;
-        default:
-          csmeta(cserror) << "UNKNOWN PRECISION REMOVABLE TYPE";
-          break;
       }
     }
     inline void setSequences(const PoolsRequestedSequences& sequences) {
@@ -229,9 +226,6 @@ inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::Counte
       break;
     case PoolSynchronizer::CounterType::TIMER:
       os << "TIMER";
-      break;
-    default:
-      os << "UNKNOWN COUNTER TYPE";
       break;
   }
 

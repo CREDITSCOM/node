@@ -61,7 +61,6 @@ boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
   }
 
   boost::asio::ip::address address;
-  uint16_t port = 0;
 
   if ((index_ + size) <= dataSize_) {
     if (addressFlag) {
@@ -69,6 +68,7 @@ boost::asio::ip::udp::endpoint cs::DataStream::endpoint() {
                    : boost::asio::ip::address(createAddress<boost::asio::ip::address_v4>());
     }
 
+    uint16_t port = 0;
     if (portFlag) {
       port = *(reinterpret_cast<uint16_t*>(data_ + index_));
       index_ += sizeof(uint16_t);
