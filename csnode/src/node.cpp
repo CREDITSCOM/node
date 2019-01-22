@@ -2581,24 +2581,19 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
   csdb::PoolHash hash;
   istream_ >> hash;
 
-  const auto& confidants = cs::Conveyer::instance().confidants();
-  if (std::find(confidants.cbegin(), confidants.cend(), sender) == confidants.cend()) {
+  if (!cs::Conveyer::instance().isConfidantExists(sender)) {
     csmeta(csdebug) << "The message of WRONG HASH was sent by false confidant!";
     return;
   }
 
-  if (std::find(confidants.cbegin(), confidants.cend(), sender) != confidants.cend()) {
-    if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
-      csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
-      return;
-    }
-  }
-  else {
+  if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
+    csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
     return;
   }
 
   ++badHashReplyCounter;
-  if (badHashReplyCounter > confidants.size() / 2) {
+
+  if (badHashReplyCounter > cs::Conveyer::instance().confidantsCount() / 2) {
     csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
     badHashReplyCounter = 0;
     blockChain_.removeLastBlock();
