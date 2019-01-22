@@ -235,7 +235,9 @@ void generateCheatDbFile(std::string path, const BlockHashes& bh) {
 }
 
 bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+#if defined(RECREATE_CHEAT)
   std::string origin = path;
+#endif// RECREATE_CHEAT
   const auto cd = prepareCheatData(path, bh);
 
   std::ifstream f(path);
@@ -911,7 +913,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     updateWalletIds(pool, *walletsCacheUpdater_);
   }
 
-  constexpr cs::Sequence NoSequence = (cs::Sequence) - 1;
+  constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
   cs::Sequence flushed_block_seq = NoSequence;
 
   {

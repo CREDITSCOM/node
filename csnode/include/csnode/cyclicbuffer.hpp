@@ -1,6 +1,8 @@
 #ifndef CYCLIC_BUFFER_H
 #define CYCLIC_BUFFER_H
 
+#include <cstdint>
+
 template <typename T, uint32_t N>
 class CyclicBuffer {
 public:

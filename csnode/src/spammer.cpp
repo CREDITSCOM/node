@@ -95,7 +95,7 @@ void Spammer::SpamWithTransactions(Node& node) {
           spammer_index = 0;
           ++round_spamming;
         }
-        inner_id_counter = round_spamming * kMaxTransactionsFromOneSource;
+        inner_id_counter = cs::numeric_cast<int64_t>(round_spamming * kMaxTransactionsFromOneSource);
       }
     }
     while (tr_gen_in_round >= kMaxTransactionsInOneRound && round_number == conveyer.currentRoundNumber()) {
@@ -127,7 +127,7 @@ void Spammer::FundMyWallets(Node& node) {
     transaction.set_amount(csdb::Amount(kMaxMoneyForOneSpammer / kMyWalletsNum, 0));
     transaction.set_max_fee(csdb::AmountCommission(0.1));
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
-    srand((unsigned int)time(0));
+    srand(cs::numeric_cast<unsigned int>(time(0)));
     transaction.set_innerID((rand() + 2) & 0x3fffffffffff);
     SignTransaction(transaction, genesis);
     node.getSolver()->send_wallet_transaction(transaction);
