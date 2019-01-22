@@ -2310,17 +2310,17 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     return;
   }
 
-  csdb::PoolHash lastHash = blockChain_.getLastHash();
-  csdb::PoolHash spoiledHash = spoileHash(lastHash, sender);
+  //csdb::PoolHash lastHash = blockChain_.getLastHash();
+  //csdb::PoolHash spoiledHash = spoileHash(lastHash, sender);
 
-  if (spoiledHash == tmp) {
-    solver_->gotHash(std::move(lastHash), sender);
-  } 
-  else {
-    cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-                << " DOES NOT MATCH to my value " << lastHash.to_string();
-    sendHashReply(std::move(tmp), sender);
-  }
+  //if (spoiledHash == tmp) {
+  solver_->gotHash(std::move(tmp), sender);
+  //} 
+  //else {
+  //  cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+  //              << " DOES NOT MATCH to my value " << lastHash.to_string();
+
+  //}
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
