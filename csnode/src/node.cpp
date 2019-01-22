@@ -353,7 +353,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
-  cs::Signature signature;
   size_t smartSigCount;
   csdb::Pool::SmartSignature tmpSmartSignature;
 
@@ -1074,7 +1073,7 @@ RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t
   const int binSize = cs::numeric_cast<int>(bytes.size());
 
   const auto maxSize = LZ4_compressBound(binSize);
-  auto memPtr = allocator_.allocateNext(maxSize);
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(maxSize));
 
   const int compressedSize = LZ4_compress_default(data,
                                                   static_cast<char*>(memPtr.get()),
@@ -1600,7 +1599,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, (cs::RoundNumber)stageOneInfo.sRoundNum, stageOneInfo.signature, message);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, static_cast<cs::RoundNumber>(stageOneInfo.sRoundNum), stageOneInfo.signature, message);
 
   // cache
   smartStageOneMessage_[solver_->ownSmartsConfidantNumber()] = std::move(message);
@@ -1619,15 +1618,16 @@ void Node::smartStagesStorageClear(size_t cSize) {
   for (size_t i = 0; i<smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
     if (it.msgRoundNum == solver_->smartRoundNumber()) {
+      auto str = reinterpret_cast<cs::Byte*>(it.msgData.data());
       switch(it.msgType) {
         case (MsgTypes::FirstSmartStage):
-          getSmartStageOne((uint8_t*)it.msgData.c_str(),it.msgData.size(),it.msgRoundNum, it.msgSender);
+          getSmartStageOne(str, it.msgData.size(),it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::SecondSmartStage):
-          getSmartStageTwo((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageTwo(str, it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::ThirdSmartStage):
-          getSmartStageThree((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageThree(str, it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         default: break;
       }
@@ -1643,14 +1643,16 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     cs::Stage st;
     st.msgType = MsgTypes::FirstSmartStage;
     //std::copy(data, data+size, st.msgData.data());
-    st.msgData = std::string(cs::numeric_cast<const char*>((void*)data), size);
+    st.msgData = std::string(reinterpret_cast<const char*>(data), size);
     //TODO: replace this parcing with the propriate one
     //stageStream >> st.msgData;
     st.msgRoundNum = rNum;
     st.msgSender = sender;
+
     csdebug() << "Get SmartStageOne Message(saving): " << cs::Utils::byteStreamToHex(data,size);
     csdebug() << "Get SmartStageOne Message(saved) : " << cs::Utils::byteStreamToHex(st.msgData.data(), st.msgData.size());
     csdebug() << "Stage stored in smartStageTemporary - won't be used until the correct SmartsRoundNumber comes";
+
     smartStageTemporary_.emplace_back(st);
   }
 
@@ -2500,7 +2502,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
   cs::Hash hash;
-  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cs::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), reinterpret_cast<cs::Byte*>(roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(std::move(bytesHash));
@@ -2555,7 +2557,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
-  if(std::find(confidants.cbegin(),confidants.cend(),sender)!= confidants.cend()) {
+  if (std::find(confidants.cbegin(), confidants.cend(), sender) != confidants.cend()) {
     if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
       csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
       return;
