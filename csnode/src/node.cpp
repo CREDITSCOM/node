@@ -354,7 +354,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
-  cs::Signature signature;
   size_t smartSigCount;
   csdb::Pool::SmartSignature tmpSmartSignature;
 
@@ -1897,13 +1896,13 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
-    csdebug() << "Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    csdebug() << "NODE> Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
   smartStageThreeMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> Stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageThree(stage, false);
 }
 
@@ -2025,9 +2024,6 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   const auto lastHash = blockChain_.getLastHash().to_binary();
   std::copy(lastHash.cbegin(), lastHash.cend(), st3.blockHash.begin());
   cscrypto::GenerateSignature(st3.blockSignature, solver_->getPrivateKey(),st3.blockHash.data(),st3.blockHash.size());
-  //csdebug() << "Hash acquired:"; 
-  //csdebug() << "Last Hash to stage3 = " << cs::Utils::byteStreamToHex(st3.blockHash.data(), st3.blockHash.size());  
-  //csdebug() << "Signature in stage3 = " << cs::Utils::byteStreamToHex(st3.blockSignature.data(), st3.blockSignature.size());
 
   //pool.value().sign(solver_->getPrivateKey());
   //const auto& signature = pool.value().signature();
@@ -2041,7 +2037,7 @@ void Node::addRoundSignature(const cs::StageThree& st3) {
   lastSentSignatures_.poolSignatures.push_back(cs::SignaturePair(st3.sender, st3.blockSignature));
   lastSentSignatures_.roundSignatures.push_back(cs::SignaturePair(st3.sender, st3.roundSignature));
 
-  csdebug() << "Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
+  csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
             << ") = " << lastSentSignatures_.roundSignatures.size();
 }
 
@@ -2065,8 +2061,8 @@ void Node::sendRoundPackageToAll() {
   stream << lastSentSignatures_.poolSignatures;
   stream << lastSentSignatures_.roundSignatures;
 
-  csdebug() << "Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
-  csdebug() << "Send RoundData : " << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size())
+  csdebug() << "NODE> Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
+  csdebug() << "NODE> Send RoundData : " << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size())
   << cs::Utils::byteStreamToHex(lastSignaturesMessage_.data(), lastSignaturesMessage_.size());
   
   sendBroadcast(MsgTypes::RoundTable, roundNumber_, subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
@@ -2150,10 +2146,6 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   //signStream << st3.roundHash;
   cscrypto::GenerateSignature(st3.roundSignature, solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
 
-  //csdebug() << "Round Signature calculated:";
-  //csdebug() << "Last Hash to stage3 = " << cs::Utils::byteStreamToHex(st3.roundHash.data(), st3.roundHash.size());
-  //csdebug() << "Signature in stage3 = " << cs::Utils::byteStreamToHex(st3.roundSignature.data(), st3.roundSignature.size());
-
   //here should be placed parcing of round table
   lastSentSignatures_.poolSignatures.clear();
   lastSentSignatures_.roundSignatures.clear();
@@ -2171,8 +2163,8 @@ void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo&
 
   stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
-  storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3); 
-  csdebug() << "StageThree prepared:";
+  storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3);
+  csdebug() << "NODE> StageThree prepared:";
   st3.print();
 }
 
@@ -2185,7 +2177,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     return;
   }
 
-  csdebug() << "Got RoundData : " << cs::Utils::byteStreamToHex(data,size);
   istream_.init(data, size);
 
   // RoundTable evocation
@@ -2208,12 +2199,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   std::vector<cs::SignaturePair> poolSignatures;
   stream >> poolSignatures;
-  csdebug() << "PoolSignatures Amount = " << poolSignatures.size();
+  csdebug() << "NODE> PoolSignatures Amount = " << poolSignatures.size();
 
   std::vector<cs::SignaturePair> roundSignatures;
   stream >> roundSignatures;
 
-  csdebug() << "RoundSignatures Amount = " << roundSignatures.size();
+  csdebug() << "NODE> RoundSignatures Amount = " << roundSignatures.size();
 
   size_t signaturesCount = 0;
   auto rt = cs::Conveyer::instance().roundTable(rNum - 1);
@@ -2229,10 +2220,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
   size_t neededConfNumber = rt->confidants.size()/2U +1U;
   if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
-    csdebug() << "All signatures in RoundTable are ok!";
+    csdebug() << "NODE> All signatures in RoundTable are ok!";
   } 
   else {
-    csdebug() << "RoundTable is not valid!";
+    csdebug() << "NODE> RoundTable is not valid!";
     return;
   }
 
@@ -2253,7 +2244,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
   roundTable.general = sender;
-  csdebug() << "NODE> confidants: " << roundTable.confidants.size();
+  csdebug() << "NODE> Сonfidants: " << roundTable.confidants.size();
 
   // create pool by previous round, then change conveyer state.
   cs::Conveyer& conveyer = cs::Conveyer::instance();

@@ -62,10 +62,11 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
   const cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
   const cs::Sequence blocksRemaining = roundNum - totalBlocks;
-  csdebug() << "SYNC: Round Num: " << roundNum
-            << ", LastWritten: " << lastWrittenSequence
-            << ", Total blocks: " << totalBlocks
-            << ", Cached blocks size in blockchain: " << cachedBlocksSize;
+  csdebug() << "SYNC:\n Round num: " << roundNum
+            << "\n Conveyer round: " << cs::Conveyer::instance().currentRoundNumber()
+            << "\n Last written seq: " << lastWrittenSequence
+            << "\n Cached blocks: " << cachedBlocksSize
+            << "\n Total blocks: " << totalBlocks;
   cslog() << "SYNC: Blocks remaining: " << blocksRemaining;
 
   if (blocksRemaining == 0) {
@@ -361,6 +362,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
 
   if (requiredBlocks.empty()) {
+    csmeta(csdebug) << "Required blocks is empty !!!";
     return true;
   }
 
