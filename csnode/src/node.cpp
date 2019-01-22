@@ -204,6 +204,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   // "hot" start
+
   handleRoundMismatch(roundTable);
 }
 
@@ -240,6 +241,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
   const auto last_block = blockChain_.getLastSequence();
   if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
     // activate pool synchronizer
+
     poolSynchronizer_->processingSync(globalTable.round);
     // no return, ask for next round info
   }
@@ -2211,27 +2213,24 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   size_t signaturesCount = 0;
   auto rt = cs::Conveyer::instance().roundTable(rNum - 1);
-  if (!rt) {
-    return;
-  }
+  if (rt != nullptr) {
 
-  for (auto& it : roundSignatures) {
-    cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
-    if (cscrypto::VerifySignature(it.signature, rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
-      ++signaturesCount;
+
+    for (auto& it : roundSignatures) {
+      cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
+      if(cscrypto::VerifySignature(it.signature,rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
+        ++signaturesCount;
+      }
+    }
+    size_t neededConfNumber = rt->confidants.size()/2U +1U;
+    if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
+      csdebug() << "NODE> All signatures in RoundTable are ok!";
+    } 
+    else {
+      csdebug() << "NODE> RoundTable is not valid! But we continue ...";
+      //return;
     }
   }
-
-  size_t neededConfNumber = rt->confidants.size()/2U +1U;
-
-  if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
-    csdebug() << "NODE> All signatures in RoundTable are ok!";
-  } 
-  else {
-    csdebug() << "NODE> RoundTable is not valid! But we continue ...";
-    //return;
-  }
-
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
@@ -2258,6 +2257,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   conveyer.setRound(std::move(roundTable));
 
   onRoundStart(conveyer.currentRoundTable());
+
   poolSynchronizer_->processingSync(roundNumber_);
   reviewConveyerHashes();
 
