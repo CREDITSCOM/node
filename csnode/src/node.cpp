@@ -155,8 +155,24 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   }
 
   // this evil code sould be removed after examination
-  while (blockChain_.getLastSequence() >= rNum) {
+  cs::Sequence cnt_removed = 0;
+  cs::Sequence last_seq = blockChain_.getLastSequence();
+  while (last_seq >= rNum) {
+    if(cnt_removed == 0) {
+      // the 1st time
+      csdebug() << "NODE> remove " << last_seq - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << last_seq << ")";
+    }
     blockChain_.removeLastBlock();
+    cs::RoundNumber tmp = blockChain_.getLastSequence();
+    if(last_seq == tmp) {
+      csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
+      break;
+    }
+    ++cnt_removed;
+    last_seq = tmp;
+  }
+  if(cnt_removed > 0) {
+    csdebug() << "NODE> " << cnt_removed << " block(s) was removed";
   }
 
   // resend all this round data available

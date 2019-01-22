@@ -972,6 +972,13 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   }
   if (pool_seq == last_seq + 1) {
     if (pool.previous_hash() != getLastHash()) {
+      csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
+      if(getLastHash().is_empty()) {
+        cswarning() << "BLOCKCHAIN> own last hash is empty";
+      }
+      if(pool.previous_hash().is_empty()) {
+        cswarning() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
+      }
       removeLastBlock();
       return false;
     }
