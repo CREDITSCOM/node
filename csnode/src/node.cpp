@@ -349,7 +349,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   // istream_ >> roundBytes; 
 
   cs::DataStream poolStream(data, size);
-  csdebug() << "NODE> Conveyer sync completed, parsing data size " << size;
+  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size 
+  << ") -> " << cs::Utils::byteStreamToHex(data,size);
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
@@ -369,16 +370,22 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   //  poolStream >> tmpSmartSignature.signatures_;
   //  poolMetaInfo.smartSignatures.push_back(tmpSmartSignature);
   //}
+  csdebug() << "Trying to get confidants from round " << round;
+  const auto ptable = conveyer.roundTable(round);
 
-  auto& confidants = cs::Conveyer::instance().confidants();
-
+  csdebug() << "Real TrustedMask size = " << poolMetaInfo.realTrustedMask.size();
   for (size_t i = 0; i < poolMetaInfo.realTrustedMask.size(); ++i) {
     if (poolMetaInfo.realTrustedMask.at(i) == 0) {
-      poolMetaInfo.writerKey = confidants.at(i);
-      break;
+      std::copy(ptable->confidants.at(i).cbegin(), ptable->confidants.at(i).cend(), poolMetaInfo.writerKey.begin());
+      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
+      //break;
     }
-  }
+    else {
+    csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
+    }
 
+  }
+  csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(),32);
 
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -396,7 +403,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
-
     if (!pool.has_value()) {
       csmeta(cserror) << "Created pool is not valid";
       return;
@@ -419,6 +425,27 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     else {
       stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       blockChain_.testCachedBlocks();
+    }
+
+    size_t truePoolSignatures = 0;
+    csdb::PoolHash tmpHash = blockChain_.getLastHash();
+    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(tmpHash.to_binary().data(), 32);
+    for (auto& it : poolSignatures) {
+      if (cscrypto::VerifySignature(it.signature, ptable->confidants.at(it.sender), tmpHash.to_binary().data(), 32)) {
+        csdebug() << "Signature ["<< (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(),32) << " is valid";
+        ++truePoolSignatures;
+        pool.value().add_signature(it.sender, it.signature);
+      }
+      else {
+        csdebug() << "Signature [" << (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(), 32) << " is NOT valid";
+      }
+    }
+    if (truePoolSignatures == poolSignatures.size()) {
+      cswarning() << "All Pool Signatures Are Ok!";
+    }
+    else {
+      cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+      //TODO: add code of eracing the just written block from blockchain
     }
   }
 
@@ -2094,7 +2121,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   lastSentRoundData_.poolMetaInfo.timestamp = poolMetaInfo.timestamp;
   lastSentRoundData_.poolMetaInfo.writerKey = poolMetaInfo.writerKey;
   lastSentRoundData_.poolMetaInfo.previousHash = poolMetaInfo.previousHash;
-  lastSentRoundData_.poolMetaInfo.realTrustedMask = poolMetaInfo.realTrustedMask;
+  lastSentRoundData_.poolMetaInfo.realTrustedMask = st3.realTrustedMask;
 
   size_t expectedMessageSize = newRoundTable.confidants.size() * sizeof(cscrypto::PublicKey) + sizeof(size_t)
                              + newRoundTable.hashes.size() * sizeof(cscrypto::Hash) + sizeof(size_t)
@@ -2175,8 +2202,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   subRound_ = subRound;
   cs::Bytes roundBytes;
   istream_ >> roundBytes;
+
   cs::Bytes bytes;
   istream_ >> bytes;
+
   cs::DataStream stream(bytes.data(), bytes.size());
 
   std::vector<cs::SignaturePair> poolSignatures;
@@ -2185,6 +2214,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   std::vector<cs::SignaturePair> roundSignatures;
   stream >> roundSignatures;
+
   csdebug() << "RoundSignatures Amount = " << roundSignatures.size();
 
   size_t signaturesCount = 0;
