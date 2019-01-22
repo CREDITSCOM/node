@@ -1035,7 +1035,7 @@ void BlockChain::testCachedBlocks() {
   }
 }
 
-/*csdb::internal::byte_array BlockChain::getKeyFromAddress(csdb::Address& addr) const {
+/*cs::Bytes BlockChain::getKeyFromAddress(csdb::Address& addr) const {
   if (!addr.is_public_key())
     findAddrByWalletId(addr.wallet_id(), addr);
 

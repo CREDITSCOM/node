@@ -96,6 +96,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
   , previous_hash_(std::move(previous_hash))
   , sequence_(sequence)
   , storage_(std::move(storage)) {
+    writer_public_key_.fill(0);
+    signature_.fill(0);
   }
 
   void put(::csdb::priv::obstream& os) const {

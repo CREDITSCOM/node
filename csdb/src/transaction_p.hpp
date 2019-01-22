@@ -53,6 +53,7 @@ class TransactionID::priv : public ::csdb::internal::shared_data {
 class Transaction::priv : public ::csdb::internal::shared_data {
   inline priv()
   : read_only_(false)
+  , innerID_(0)
   , amount_(0_c)
   , signature_() {
     signature_.fill(0);
