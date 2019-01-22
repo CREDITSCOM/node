@@ -2226,8 +2226,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     csdebug() << "NODE> All signatures in RoundTable are ok!";
   } 
   else {
-    csdebug() << "NODE> RoundTable is not valid!";
-    return;
+    csdebug() << "NODE> RoundTable is not valid! But we continue ...";
+    //return;
   }
 
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
