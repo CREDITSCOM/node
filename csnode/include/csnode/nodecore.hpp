@@ -132,7 +132,7 @@ struct ConveyerMeta {
 };
 
 struct SignaturePair {
-  uint8_t sender = 0;
+  uint8_t sender =  cs::ConfidantConsts::InvalidConfidantIndex;
   cs::Signature signature;
 
   SignaturePair() = default;
