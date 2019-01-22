@@ -10,21 +10,21 @@
 #include <csnode/node.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/spammer.hpp>
+#include <csnode/poolsynchronizer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/progressbar.hpp>
+#include <lib/system/signals.hpp>
 
 #include <net/transport.hpp>
 
 #include <base58.h>
 
 #include <boost/optional.hpp>
-#include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-#include <lib/system/signals.hpp>
-#include <poolsynchronizer.hpp>
 
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 100;
@@ -40,9 +40,9 @@ Node::Node(const Config& config)
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_) {
-  std::cout << "Start transport... ";
+  cslog() << "Start transport... ";
   transport_ = new Transport(config, this);
-  std::cout << "Done\n";
+  cslog() << "Done";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   good_ = init(config);
@@ -63,33 +63,33 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
 
 #ifdef NODE_API
-  std::cout << "Init API... ";
+  cslog() << "Init API... ";
   papi_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
     csconnector::Config {
      config.getApiSettings().port,
      config.getApiSettings().ajaxPort,
      config.getApiSettings().executorPort
     });
-  std::cout << "Done\n";
+  cslog() << "Done";
 #endif
 
   if (!transport_->isGood()) {
     return false;
   }
-  std::cout << "Transport is init\n";
+  cslog() << "Transport is init";
 
   if (!solver_) {
     return false;
   }
-  std::cout << "Solver is init\n";
 
-  std::cout << "Everything is init\n";
+  cslog() << "Solver is init";
+  cslog() << "Everything is init";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
-  std::cout << "Spammer is init\n";
+  cslog() << "Spammer is init";
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -100,7 +100,7 @@ bool Node::init(const Config& config) {
 }
 
 void Node::run() {
-  std::cout << "Running transport\n";
+  cslog() << "Running transport";
   transport_->run();
 }
 
@@ -345,12 +345,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  //istream_.init(data, size);
-  // istream_ >> roundBytes; 
-
   cs::DataStream poolStream(data, size);
-  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size 
-  << ") -> " << cs::Utils::byteStreamToHex(data,size);
+  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size  << ") -> " << cs::Utils::byteStreamToHex(data,size);
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
@@ -360,32 +356,36 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.timestamp;
   poolStream >> characteristic.mask;
   poolStream >> poolMetaInfo.sequenceNumber;
-  //istream_ >> signature;
   poolStream >> poolMetaInfo.realTrustedMask;
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
-  //for (int i = 0; i < smartSigCount; ++i) {
-  //  poolStream >> tmpSmartSignature.smartKey;
-  //  poolStream >> tmpSmartSignature.smartConsensusPool;
-  //  poolStream >> tmpSmartSignature.signatures_;
-  //  poolMetaInfo.smartSignatures.push_back(tmpSmartSignature);
-  //}
+
   csdebug() << "Trying to get confidants from round " << round;
-  const auto ptable = conveyer.roundTable(round);
+  const auto table = conveyer.roundTable(round);
+
+  if (table == nullptr) {
+    cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
+    return;
+  }
 
   csdebug() << "Real TrustedMask size = " << poolMetaInfo.realTrustedMask.size();
+
   for (size_t i = 0; i < poolMetaInfo.realTrustedMask.size(); ++i) {
-    if (poolMetaInfo.realTrustedMask.at(i) == 0) {
-      std::copy(ptable->confidants.at(i).cbegin(), ptable->confidants.at(i).cend(), poolMetaInfo.writerKey.begin());
-      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
-      //break;
-    }
-    else {
-    csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
+    if (!conveyer.isConfidantExists(i)) {
+      cserror() << csname() << "Bad index";
+      return;
     }
 
+    const auto& key = conveyer.confidantByIndex(i);
+
+    if (poolMetaInfo.realTrustedMask[i] == 0) {
+      poolMetaInfo.writerKey = key;
+      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
+    }
+    else {
+      csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(key.data(), key.size());
+    }
   }
-  csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(),32);
 
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -397,27 +397,17 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
-
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
+
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
     if (!pool.has_value()) {
       csmeta(cserror) << "Created pool is not valid";
       return;
     }
 
-    const auto ptable = conveyer.roundTable(round);
-    if (ptable == nullptr) {
-      cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
-    }
-    else {
-      pool.value().set_confidants(ptable->confidants);
-      //for(auto& it : poolMetaInfo.smartSignatures) {
-      //  pool.value().add_smart_signature(it);
-      //}
-    }
+    pool.value().set_confidants(table->confidants);
 
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
       cserror() << "NODE> failed to store block in BlockChain";
@@ -429,17 +419,27 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     size_t truePoolSignatures = 0;
     csdb::PoolHash tmpHash = blockChain_.getLastHash();
-    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(tmpHash.to_binary().data(), 32);
+
+    const auto& hashBinary = tmpHash.to_binary();
+    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+
     for (auto& it : poolSignatures) {
-      if (cscrypto::VerifySignature(it.signature, ptable->confidants.at(it.sender), tmpHash.to_binary().data(), 32)) {
-        csdebug() << "Signature ["<< (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(),32) << " is valid";
+      if (!conveyer.isConfidantExists(it.sender)) {
+        return;
+      }
+
+      const auto& confidant = conveyer.confidantByIndex(it.sender);
+
+      if (cscrypto::VerifySignature(it.signature, confidant, hashBinary.data(), hashBinary.size())) {
+        csdebug() << "Signature ["<< static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is valid";
         ++truePoolSignatures;
         pool.value().add_signature(it.sender, it.signature);
       }
       else {
-        csdebug() << "Signature [" << (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(), 32) << " is NOT valid";
+        csdebug() << "Signature [" << static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is NOT valid";
       }
     }
+
     if (truePoolSignatures == poolSignatures.size()) {
       cswarning() << "All Pool Signatures Are Ok!";
     }
@@ -1100,7 +1100,7 @@ RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t
   const int binSize = cs::numeric_cast<int>(bytes.size());
 
   const auto maxSize = LZ4_compressBound(binSize);
-  auto memPtr = allocator_.allocateNext(maxSize);
+  auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(maxSize));
 
   const int compressedSize = LZ4_compress_default(data,
                                                   static_cast<char*>(memPtr.get()),
@@ -1626,7 +1626,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   // signature of round number + calculated hash
   cscrypto::GenerateSignature(stageOneInfo.signature, solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, (cs::RoundNumber)stageOneInfo.sRoundNum, stageOneInfo.signature, message);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, static_cast<cs::RoundNumber>(stageOneInfo.sRoundNum), stageOneInfo.signature, message);
 
   // cache
   smartStageOneMessage_[solver_->ownSmartsConfidantNumber()] = std::move(message);
@@ -1645,15 +1645,16 @@ void Node::smartStagesStorageClear(size_t cSize) {
   for (size_t i = 0; i<smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
     if (it.msgRoundNum == solver_->smartRoundNumber()) {
+      auto str = reinterpret_cast<cs::Byte*>(it.msgData.data());
       switch(it.msgType) {
         case (MsgTypes::FirstSmartStage):
-          getSmartStageOne((uint8_t*)it.msgData.c_str(),it.msgData.size(),it.msgRoundNum, it.msgSender);
+          getSmartStageOne(str, it.msgData.size(),it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::SecondSmartStage):
-          getSmartStageTwo((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageTwo(str, it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         case (MsgTypes::ThirdSmartStage):
-          getSmartStageThree((uint8_t*)it.msgData.c_str(), it.msgData.size(), it.msgRoundNum, it.msgSender);
+          getSmartStageThree(str, it.msgData.size(), it.msgRoundNum, it.msgSender);
           break;
         default: break;
       }
@@ -1669,14 +1670,16 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     cs::Stage st;
     st.msgType = MsgTypes::FirstSmartStage;
     //std::copy(data, data+size, st.msgData.data());
-    st.msgData = std::string(cs::numeric_cast<const char*>((void*)data), size);
+    st.msgData = std::string(reinterpret_cast<const char*>(data), size);
     //TODO: replace this parcing with the propriate one
     //stageStream >> st.msgData;
     st.msgRoundNum = rNum;
     st.msgSender = sender;
+
     csdebug() << "Get SmartStageOne Message(saving): " << cs::Utils::byteStreamToHex(data,size);
     csdebug() << "Get SmartStageOne Message(saved) : " << cs::Utils::byteStreamToHex(st.msgData.data(), st.msgData.size());
     csdebug() << "Stage stored in smartStageTemporary - won't be used until the correct SmartsRoundNumber comes";
+
     smartStageTemporary_.emplace_back(st);
   }
 
@@ -2521,7 +2524,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
   cs::Hash hash;
-  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cs::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), reinterpret_cast<cs::Byte*>(roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(std::move(bytesHash));
@@ -2570,24 +2573,19 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
   csdb::PoolHash hash;
   istream_ >> hash;
 
-  const auto& confidants = cs::Conveyer::instance().confidants();
-  if (std::find(confidants.cbegin(), confidants.cend(), sender) == confidants.cend()) {
+  if (!cs::Conveyer::instance().isConfidantExists(sender)) {
     csmeta(csdebug) << "The message of WRONG HASH was sent by false confidant!";
     return;
   }
 
-  if(std::find(confidants.cbegin(),confidants.cend(),sender)!= confidants.cend()) {
-    if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
-      csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
-      return;
-    }
-  }
-  else {
+  if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
+    csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
     return;
   }
 
   ++badHashReplyCounter;
-  if (badHashReplyCounter > confidants.size() / 2) {
+
+  if (badHashReplyCounter > cs::Conveyer::instance().confidantsCount() / 2) {
     csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
     badHashReplyCounter = 0;
     blockChain_.removeLastBlock();
