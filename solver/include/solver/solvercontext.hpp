@@ -121,15 +121,13 @@ public:
 
   void spawn_next_round(cs::StageThree& st3);
 
-  void spawn_first_round()
-  {
-    //TODO: implement method
+  void spawn_first_round() {
+    // TODO: implement method
   }
 
   void sendRoundTable();
 
-  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes)
-  {
+  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes) {
     std::vector<cs::PublicKey> tmp(nodes);
     std::vector<cs::TransactionsPacketHash> tmpHashes(hashes);
     std::swap(core.trusted_candidates, tmp);
@@ -259,8 +257,8 @@ public:
     return core.find_stage1(sender);
   }
 
-  const size_t trueStagesThree() const {
-    return (size_t)core.trueStagesThree();
+  size_t trueStagesThree() const {
+    return core.trueStagesThree();
   }
 
   const cs::StageTwo* stage2(uint8_t sender) const {
@@ -277,8 +275,7 @@ public:
 
   void request_stage3(uint8_t from, uint8_t required);
 
-  void init_zero(cs::StageOne & stage)
-  {
+  void init_zero(cs::StageOne& stage) {
     stage.sender = cs::InvalidSender;
     stage.hash.fill(0);
     stage.messageHash.fill(0);
@@ -288,8 +285,7 @@ public:
     stage.roundTimeStamp.clear();
   }
 
-  void init_zero(cs::StageTwo & stage)
-  {
+  void init_zero(cs::StageTwo& stage) {
     stage.sender = cs::InvalidSender;
     stage.signature.fill(0);
     size_t cnt = cnt_trusted();
@@ -297,10 +293,9 @@ public:
     stage.signatures.resize(cnt, SolverContext::zeroSignature);
   }
 
-  void fake_stage1(uint8_t from)
-  {
-    if(core.find_stage1(from) == nullptr) {
-      csdebug() << "SolverCore: make stage-1 [" << (int) from << "] as silent";
+  void fake_stage1(uint8_t from) {
+    if (core.find_stage1(from) == nullptr) {
+      csdebug() << "SolverCore: make stage-1 [" << static_cast<int>(from) << "] as silent";
       cs::StageOne fake;
       init_zero(fake);
       fake.sender = from;
@@ -308,10 +303,9 @@ public:
     }
   }
 
-  void fake_stage2(uint8_t from)
-  {
-    if(core.find_stage2(from) == nullptr) {
-      csdebug() << "SolverCore: make stage-2 [" << (int) from << "] as silent";
+  void fake_stage2(uint8_t from) {
+    if (core.find_stage2(from) == nullptr) {
+      csdebug() << "SolverCore: make stage-2 [" << static_cast<int>(from) << "] as silent";
       cs::StageTwo fake;
       init_zero(fake);
       fake.sender = from;

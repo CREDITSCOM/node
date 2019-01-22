@@ -57,7 +57,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
           ++periodStats.smartContractsCount;
         }
 
-        Currency currency = indexedСurrencies_[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -185,7 +185,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
           ++periodStats.smartContractsCount;
         }
 
-        Currency currency = indexedСurrencies_[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -214,7 +214,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
 
-        Currency currency = indexedСurrencies_[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
