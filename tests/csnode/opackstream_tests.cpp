@@ -105,25 +105,24 @@ TEST(OPackStream, getCurrSize) {
 }
 
 template <class T, size_t ArraySize>
-void TestConcreteTypeWriteToOPackStream(
-    const T& value, const unsigned char (&expected_encoded_data)[ArraySize]) {
+void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&expected_encoded_data)[ArraySize]) {
   RegionAllocator allocator(kPageSizeForAllocator, 1);
+
   cs::OPackStream stream(&allocator, kPublicKey);
   stream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
   stream << value;
+
   auto encoded = GetStreamData(stream);
-  // displayStreamData(stream);
+  displayStreamData(stream);
   ASSERT_EQ(1, stream.getPacketsCount());
   ASSERT_EQ(encoded.size(), sizeof expected_encoded_data);
-  ASSERT_TRUE(0 ==
-              memcmp(encoded.data(), expected_encoded_data, encoded.size()));
+  ASSERT_TRUE(0 == memcmp(encoded.data(), expected_encoded_data, encoded.size()));
 }
 
 TEST(OPackStream, IpAddressWrite) {
   const unsigned char expected[] = {0x03, 0x00, 0x00, 0x01, 0x00,
                                     0x7f, 0x00, 0x00, 0x01};
-  TestConcreteTypeWriteToOPackStream(
-      boost::asio::ip::address_v4::from_string("127.0.0.1"), expected);
+  TestConcreteTypeWriteToOPackStream(boost::asio::ip::address_v4::from_string("127.0.0.1"), expected);
 }
 
 TEST(OPackStream, StdStringWrite) {
@@ -138,34 +137,8 @@ TEST(OPackStream, BytesWrite) {
   const unsigned char expected[] = {
       0x03, 0x00, 0x00, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00};
-  TestConcreteTypeWriteToOPackStream(cs::Bytes{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-                                     expected);
+  TestConcreteTypeWriteToOPackStream(cs::Bytes{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}, expected);
 }
-
-/*
-csdb::Transaction CreateFakeTransaction() {
-  const char kPublicKey[csdb::internal::kPublicKeySize] = {0};
-  // const char kPrivateKey[csdb::internal::kPrivateKeySize] = {0};
-  const int64_t id = 0x1234567890abcdef;
-  const csdb::Address source_address =
-      csdb::Address::from_public_key(kPublicKey);
-  const csdb::Address target_address =
-      csdb::Address::from_public_key(kPublicKey);
-  auto currency = csdb::Currency{1};
-  auto amount = csdb::Amount{10, 50};
-  auto max_fee = csdb::AmountCommission{0.01};
-  auto counted_fee = csdb::AmountCommission{0.01};
-  std::string signature("12345678");
-
-  return csdb::Transaction{id,     source_address, target_address, currency,
-                           amount, max_fee,        counted_fee,    signature};
-}
-
-TEST(OPackStream, TransactionWrite) {
-  const auto transaction = CreateFakeTransaction();
-  const unsigned char expected[] = {0x00};
-  TestConcreteTypeWriteToOPackStream(transaction, expected);
-}  //*/
 
 TEST(OPackStream, DISABLED_EmptyPoolWrite) {
   const unsigned char expected[] = {
@@ -188,9 +161,11 @@ TEST(OPackStream, EmptyTransactionsPacketHashWrite) {
 //
 
 TEST(OPackStream, EmptyTransactionsPacketWrite) {
-  const unsigned char expected[] = {0x03, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00,
+  const unsigned char expected[] = {0x03, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00,
                                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                    0x00};
   TestConcreteTypeWriteToOPackStream(cs::TransactionsPacket{}, expected);
 }
 

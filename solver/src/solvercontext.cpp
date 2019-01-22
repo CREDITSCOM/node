@@ -61,7 +61,7 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
 }
 
 size_t SolverContext::own_conf_number() const {
-  return (size_t)core.pnode->getConfidantNumber();
+  return static_cast<size_t>(core.pnode->getConfidantNumber());
 }
 
 size_t SolverContext::cnt_trusted() const {
@@ -96,7 +96,7 @@ Role SolverContext::role() const {
 void SolverContext::spawn_next_round(cs::StageThree& st3) {
   std::string tStamp;
   uint8_t writer_idx = InvalidConfidantIndex;
-  const auto own_stage3 = stage3((uint8_t) own_conf_number());
+
   //if(own_stage3 != nullptr) {
   //  writer_idx = own_stage3->writer;
   //  csdebug() << "writer idx = " << (int)writer_idx ;
@@ -122,7 +122,7 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
 
   if (st3.sender != InvalidConfidantIndex) {
     writer_idx = st3.writer;
-    csdebug() << "writer idx = " << (int)writer_idx;
+    csdebug() << "writer idx = " << static_cast<int>(writer_idx);
   }
   else {
     cserror() << "Writer wans't elected on this node";
@@ -190,7 +190,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-1 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-1 of [" << static_cast<int>(required) << "]";
   core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required);
 }
 
@@ -199,7 +199,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-2 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-2 of [" << static_cast<int>(required) << "]";
   core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required);
 }
 
@@ -208,14 +208,14 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
   if (!conveyer.isConfidantExists(from)) {
     return;
   }
-  csdebug() << "SolverCore: ask [" << (int)from << "] for stage-3 of [" << (int)required << "]";
+  csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-3 of [" << static_cast<int>(required) << "]";
   core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required);
 }
 
 bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
   auto lock = cs::Conveyer::instance().lock();
-
   const auto& block = cs::Conveyer::instance().transactionsBlock();
+
   for (const auto& packet : block) {
     for (const auto& tr : packet.transactions()) {
       if (tr.innerID() == inner_id) {
@@ -223,13 +223,15 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
       }
     }
   }
+
   return false;
 }
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
-  csdebug() << "SolverCore: ask [" << (int)respondent1 << "] for RoundTable";
+  csdebug() << "SolverCore: ask [" << static_cast<int>(respondent1) << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent1);
-  csdebug() << "SolverCore: ask [" << (int)respondent2 << "] for RoundTable";
+
+  csdebug() << "SolverCore: ask [" << static_cast<int>(respondent2) << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent2);
 }
 

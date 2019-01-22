@@ -24,9 +24,9 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
   cstrace() << " Collecting stats: started";
 
-  auto stats = currentStats;
+  auto stats = currentStats_;
   auto startTime = std::chrono::high_resolution_clock::now();
-  auto blockHash = blockchain.getLastHash();
+  auto blockHash = blockchain_.getLastHash();
 
   PeriodStats periodStats;
   periodStats.timeStamp = std::chrono::system_clock::now();
@@ -38,8 +38,8 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       cserror() << "Stats: no bricks in the wall (last hash is empty)";
     }
 
-    while (blockHash != lastHash && !blockHash.is_empty()) {
-      csdb::Pool pool = blockchain.loadBlock(blockHash);
+    while (blockHash != lastHash_ && !blockHash.is_empty()) {
+      csdb::Pool pool = blockchain_.loadBlock(blockHash);
 
       periodStats.poolsCount++;
 
@@ -57,7 +57,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
           ++periodStats.smartContractsCount;
         }
 
-        Currency currency = currencies_indexed[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -68,7 +68,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
       blockHash = pool.previous_hash();
     }
 
-    lastHash = future_last_hash;
+    lastHash_ = future_last_hash;
   }
 
   // total
@@ -89,7 +89,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     std::size_t index = (periods[i] / updateTimeSec) - 1;
 
     try {
-      auto& lastPeriodStats = statsCut.at(index);
+      auto& lastPeriodStats = statsCut_.at(index);
       auto& stat = stats.at(i);
 
       // remove last stats
@@ -120,8 +120,8 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
   }
 
   // update cuts
-  statsCut.push_front(periodStats);
-  statsCut.pop_back();
+  statsCut_.push_front(periodStats);
+  statsCut_.pop_back();
 
   auto finishTime = std::chrono::high_resolution_clock::now();
 
@@ -154,15 +154,15 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   }
 
   auto startTime = std::chrono::system_clock::now();
-  auto blockHash = blockchain.getLastHash();
+  auto blockHash = blockchain_.getLastHash();
   unsigned int currentCutIndex = 0;
   auto startCutTime = stats.first[currentCutIndex].timeStamp;
   auto endCutTime = stats.first[currentCutIndex + 1].timeStamp;
 
-  auto future_lastHash = blockchain.getLastHash();
+  auto future_lastHash = blockchain_.getLastHash();
 
-  while (!blockHash.is_empty() && !quit) {
-    const csdb::Pool pool = blockchain.loadBlock(blockHash);
+  while (!blockHash.is_empty() && !quit_) {
+    const csdb::Pool pool = blockchain_.loadBlock(blockHash);
 
     auto now = std::chrono::system_clock::now();
     auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
@@ -185,7 +185,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
           ++periodStats.smartContractsCount;
         }
 
-        Currency currency = currencies_indexed[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -214,7 +214,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
 
-        Currency currency = currencies_indexed[transaction.currency().to_string()];
+        Currency currency = indexedCurrencies_[transaction.currency().to_string()];
 
         const auto& amount = transaction.amount();
 
@@ -227,7 +227,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
   }
 
   //lastHash = blockchain.getLastHash();
-  lastHash = future_lastHash;
+  lastHash_ = future_lastHash;
 
   auto finishTime = std::chrono::system_clock::now();
   auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime);
@@ -238,31 +238,31 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 }
 
 csstats::csstats(BlockChain& blockchain)
-: blockchain(blockchain) {
+: blockchain_(blockchain) {
   cstrace() << "STATS> csstats start " << "update interval is " << updateTimeSec << " sec";
 #ifndef STATS
   return;
 #endif
 
-  ScopedLock lock(mutex);
+  ScopedLock lock(mutex_);
 
-  thread = std::thread([this]() {
+  thread_ = std::thread([this]() {
     cstrace() << "STATS> csstats thread started";
 
     AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
-    currentStats = std::move(allStats.second);
-    statsCut = std::move(allStats.first);
+    currentStats_ = std::move(allStats.second);
+    statsCut_ = std::move(allStats.first);
 
-    assert(currentStats.size() == collectionPeriods.size());
+    assert(currentStats_.size() == collectionPeriods.size());
 
-    for (auto i = 0ull; i < currentStats.size(); ++i)
-      currentStats[i].periodSec = collectionPeriods[i];
+    for (size_t i = 0; i < currentStats_.size(); ++i)
+      currentStats_[i].periodSec = collectionPeriods[i];
 
-    while (!quit) {
+    while (!quit_) {
       using namespace std::chrono_literals;
 
-      if (!quit) {
+      if (!quit_) {
         auto periods = collectionPeriods;
         periods.pop_back();
 
@@ -281,7 +281,7 @@ csstats::csstats(BlockChain& blockchain)
           ss.str(std::string());
 
           ss << "Blockchain size:";
-          ss << this->blockchain.getSize();
+          ss << this->blockchain_.getSize();
 
           cstrace() << "STATS> " << ss.str();
 #endif
@@ -292,32 +292,32 @@ csstats::csstats(BlockChain& blockchain)
         }
 
         {
-          ScopedLock lock(currentStatsMutex);
-          currentStats = std::move(stats);
+          ScopedLock lock(currentStatsMutex_);
+          currentStats_ = std::move(stats);
         }
       }
 
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-      cstrace()  << "STATS> csstats thread stopped";
+    cstrace() << "STATS> csstats thread stopped";
   });
 }
 
 csstats::~csstats() {
   cstrace() << "STATS> csstats stop";
 
-  ScopedLock lock(mutex);
+  ScopedLock lock(mutex_);
 
-  quit = true;
+  quit_ = true;
 
-  if (thread.joinable()) {
-    thread.join();
+  if (thread_.joinable()) {
+    thread_.join();
   }
 }
 
 StatsPerPeriod csstats::getStats() {
-  ScopedLock lock(currentStatsMutex);
-  return currentStats;
+  ScopedLock lock(currentStatsMutex_);
+  return currentStats_;
 }
 }  // namespace csstats
