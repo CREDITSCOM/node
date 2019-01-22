@@ -443,7 +443,7 @@ void SolverCore::processStages() {
     }
   }
   startTimer(3);
-  cscrypto::GenerateSignature(stage.packageSignature, getPrivateKey(),
+  stage.packageSignature = cscrypto::GenerateSignature(getPrivateKey(),
     smartStageOneStorage_.at(ownSmartsConfNum_).hash.data(),
     smartStageOneStorage_.at(ownSmartsConfNum_).hash.size());
   cslog() << __func__ << "(): done";

@@ -733,7 +733,7 @@ cs::Bytes Pool::to_byte_stream_for_sig() {
 
 void Pool::sign(const cscrypto::PrivateKey& private_key) {
   const auto& pool_bytes = this->to_byte_stream_for_sig();
-  cscrypto::GenerateSignature(d->signature_, private_key, pool_bytes.data(), pool_bytes.size());
+  d->signature_ = cscrypto::GenerateSignature(private_key, pool_bytes.data(), pool_bytes.size());
 }
 
 bool Pool::verify_signature() {

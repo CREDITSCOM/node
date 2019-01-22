@@ -132,8 +132,7 @@ namespace cs
       data.byteCode.end(),
       std::back_inserter(strToHash));
 
-    cscrypto::Hash result;
-    cscrypto::CalculateHash(result, strToHash.data(), strToHash.size());
+    cscrypto::Hash result = cscrypto::CalculateHash(strToHash.data(), strToHash.size());
 
     return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
   }
