@@ -340,7 +340,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
       if (flag == 'g') {
         std::vector<uint8_t> skBytes;
-        cscrypto::GenerateKeyPair(publicKey_, privateKey_);
+        privateKey_ = cscrypto::GenerateKeyPair(publicKey_);
 
         std::cout << "Choose your private key file encryption type (enter number):" << std::endl;
         std::cout << "[1] Encrypt with password (recommended)" << std::endl;

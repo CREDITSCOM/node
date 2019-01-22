@@ -351,10 +351,7 @@ public:
   /// Signs data with security key
   ///
   static cs::Signature sign(const cs::Byte* byte, std::size_t size, const cs::PrivateKey& securityKey) {
-    cs::Signature signature;
-    std::fill(signature.begin(), signature.end(), cs::Byte(0));
-    cscrypto::GenerateSignature(signature, securityKey, byte, size);
-    return signature;
+    return cscrypto::GenerateSignature(securityKey, byte, size);
   }
 
   ///
