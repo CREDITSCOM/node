@@ -27,6 +27,7 @@ constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
 constexpr double kMinFee = 0.0001428;
 constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
+constexpr size_t kDefaultRoundFrequency = 5;
 }  // namespace
 
 Fee::Fee()
@@ -190,6 +191,8 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
   double time_stamp_diff = CountBlockTimeStampDifference(block_number_from, blockchain);
   if(fabs(time_stamp_diff) > std::numeric_limits<double>::epsilon()) {
     rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
+  } else {
+    rounds_frequency_ = kDefaultRoundFrequency;
   }
 }
 
