@@ -96,7 +96,7 @@ private:
   std::chrono::system_clock::time_point lastUpdateTime_ = std::chrono::system_clock::from_time_t(0);
 
   BlockChain& blockchain_;
-  std::map<std::string, Currency> indexedСurrencies_ = {{"CS", 1}};
+  std::map<std::string, Currency> indexedCurrencies_ = {{"CS", 1}};
 
   StatsPerPeriod collectStats(const Periods& periods);
   AllStats collectAllStats(const Periods& periods);
