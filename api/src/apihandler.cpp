@@ -783,9 +783,24 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     pending_smart_transactions->queue.pop();
     auto address = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
 
+    auto source_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+
     if (is_smart_state(tr)) {
       auto smart_state(lockedReference(this->smart_state));
       (*smart_state)[address].update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
+
+      cs::SmartContractRef scr;
+      scr.from_user_field(tr.user_field(1));
+      csdb::TransactionID trId(scr.hash, scr.transaction);
+
+      auto execTrans = s_blockchain.loadTransaction(trId);
+      if (execTrans.is_valid() && is_smart(execTrans)) {
+        const auto smart = fetch_smart(execTrans);
+        auto newState = tr.user_field(smart_state_idx).value<std::string>();
+        if (!newState.empty())
+          tm.checkNewState(target_pk, source_pk, smart, newState);
+      }
     }
     else {
       const auto smart = fetch_smart(tr);
@@ -799,9 +814,6 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         e.new_trxn_cv.notify_all();
       }
 
-      auto source_pk = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-      auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-
       if (is_smart_deploy(smart)) {
         {
           auto smart_origin = lockedReference(this->smart_origin);
@@ -812,10 +824,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
           (*deployed_by_creator)[source_pk].push_back(tr.id());
         }
 
-        tm.checkNewDeploy(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
+        tm.checkNewDeploy(target_pk, source_pk, smart);
       }
-      else
-        tm.checkNewState(target_pk, source_pk, smart, tr.user_field(smart_state_idx).value<std::string>());
 
       return true;
     }

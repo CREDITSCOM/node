@@ -66,8 +66,7 @@ public:
 
   void checkNewDeploy(const csdb::Address& sc,
                       const csdb::Address& deployer,
-                      const api::SmartContractInvocation&,
-                      const std::string& newState);
+                      const api::SmartContractInvocation&);
 
   void checkNewState(const csdb::Address& sc,
                      const csdb::Address& initiator,
@@ -79,16 +78,11 @@ public:
 
   static bool isTransfer(const std::string& method,
                          const std::vector<general::Variant>& params);
-  //static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
-
 
   static std::pair<csdb::Address, csdb::Address>
   getTransferData(const csdb::Address& initiator,
                   const std::string& method,
                   const std::vector<general::Variant>& params);
-  /*static std::pair<csdb::Address, csdb::Address> getTransferData(const csdb::Address& initiator,
-      const std::string& method,
-      const std::vector<general::Variant>& params);*/
 
   static std::string getAmount(const api::SmartContractInvocation&);
 

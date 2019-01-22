@@ -387,15 +387,13 @@ void TokensMaster::run() {
 
 void TokensMaster::checkNewDeploy(const csdb::Address& sc,
                                   const csdb::Address& deployer,
-                                  const api::SmartContractInvocation& sci,
-                                  const std::string& newState) {
+                                  const api::SmartContractInvocation& sci) {
   DeployTask dt;
   dt.address = sc;
   dt.deployer = deployer;
   dt.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
 
   TokenInvocationData tdo;
-  tdo.newState = newState;
 
   TokenInvocationData::Params ps;
   ps.initiator = deployer;
@@ -405,7 +403,6 @@ void TokensMaster::checkNewDeploy(const csdb::Address& sc,
     std::lock_guard<decltype(cvMut_)> l(cvMut_);
     /* It is important to do this under one lock */
     deployQueue_.push(dt);
-    newExecutes_[sc] = tdo;
   }
 
   tokCv_.notify_all();
@@ -474,7 +471,7 @@ std::string TokensMaster::getAmount(const api::SmartContractInvocation& sci) {
 TokensMaster::TokensMaster(api::APIHandler*) { }
 TokensMaster::~TokensMaster() { }
 void TokensMaster::run() { }
-void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
+void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>) { }
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
@@ -482,7 +479,7 @@ std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
 TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>&) { return TokenStandart::NotAToken; }
 
-/*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
+/*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>) { }
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
