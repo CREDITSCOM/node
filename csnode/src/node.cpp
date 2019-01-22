@@ -345,12 +345,8 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  //istream_.init(data, size);
-  // istream_ >> roundBytes; 
-
   cs::DataStream poolStream(data, size);
-  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size 
-  << ") -> " << cs::Utils::byteStreamToHex(data,size);
+  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size  << ") -> " << cs::Utils::byteStreamToHex(data,size);
 
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
@@ -360,32 +356,36 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.timestamp;
   poolStream >> characteristic.mask;
   poolStream >> poolMetaInfo.sequenceNumber;
-  //istream_ >> signature;
   poolStream >> poolMetaInfo.realTrustedMask;
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
-  //for (int i = 0; i < smartSigCount; ++i) {
-  //  poolStream >> tmpSmartSignature.smartKey;
-  //  poolStream >> tmpSmartSignature.smartConsensusPool;
-  //  poolStream >> tmpSmartSignature.signatures_;
-  //  poolMetaInfo.smartSignatures.push_back(tmpSmartSignature);
-  //}
+
   csdebug() << "Trying to get confidants from round " << round;
-  const auto ptable = conveyer.roundTable(round);
+  const auto table = conveyer.roundTable(round);
+
+  if (table == nullptr) {
+    cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
+    return;
+  }
 
   csdebug() << "Real TrustedMask size = " << poolMetaInfo.realTrustedMask.size();
+
   for (size_t i = 0; i < poolMetaInfo.realTrustedMask.size(); ++i) {
-    if (poolMetaInfo.realTrustedMask.at(i) == 0) {
-      std::copy(ptable->confidants.at(i).cbegin(), ptable->confidants.at(i).cend(), poolMetaInfo.writerKey.begin());
-      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
-      //break;
-    }
-    else {
-    csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(ptable->confidants.at(i).data(), 32);
+    if (!conveyer.isConfidantExists(i)) {
+      cserror() << csname() << "Bad index";
+      return;
     }
 
+    const auto& key = conveyer.confidantByIndex(i);
+
+    if (poolMetaInfo.realTrustedMask[i] == 0) {
+      poolMetaInfo.writerKey = key;
+      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
+    }
+    else {
+      csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(key.data(), key.size());
+    }
   }
-  csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(),32);
 
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -397,27 +397,17 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
-
     stat_.totalReceivedTransactions_ += characteristic.mask.size();
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
+
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
     if (!pool.has_value()) {
       csmeta(cserror) << "Created pool is not valid";
       return;
     }
 
-    const auto ptable = conveyer.roundTable(round);
-    if (ptable == nullptr) {
-      cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
-    }
-    else {
-      pool.value().set_confidants(ptable->confidants);
-      //for(auto& it : poolMetaInfo.smartSignatures) {
-      //  pool.value().add_smart_signature(it);
-      //}
-    }
+    pool.value().set_confidants(table->confidants);
 
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
       cserror() << "NODE> failed to store block in BlockChain";
@@ -429,17 +419,27 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     size_t truePoolSignatures = 0;
     csdb::PoolHash tmpHash = blockChain_.getLastHash();
-    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(tmpHash.to_binary().data(), 32);
+
+    const auto& hashBinary = tmpHash.to_binary();
+    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+
     for (auto& it : poolSignatures) {
-      if (cscrypto::VerifySignature(it.signature, ptable->confidants.at(it.sender), tmpHash.to_binary().data(), 32)) {
-        csdebug() << "Signature ["<< (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(),32) << " is valid";
+      if (!conveyer.isConfidantExists(it.sender)) {
+        return;
+      }
+
+      const auto& confidant = conveyer.confidantByIndex(it.sender);
+
+      if (cscrypto::VerifySignature(it.signature, confidant, hashBinary.data(), hashBinary.size())) {
+        csdebug() << "Signature ["<< static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is valid";
         ++truePoolSignatures;
         pool.value().add_signature(it.sender, it.signature);
       }
       else {
-        csdebug() << "Signature [" << (int)it.sender << "] of " << cs::Utils::byteStreamToHex(ptable->confidants.at(it.sender).data(), 32) << " is NOT valid";
+        csdebug() << "Signature [" << static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is NOT valid";
       }
     }
+
     if (truePoolSignatures == poolSignatures.size()) {
       cswarning() << "All Pool Signatures Are Ok!";
     }
