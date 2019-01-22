@@ -10,21 +10,21 @@
 #include <csnode/node.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/spammer.hpp>
+#include <csnode/poolsynchronizer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/progressbar.hpp>
+#include <lib/system/signals.hpp>
 
 #include <net/transport.hpp>
 
 #include <base58.h>
 
 #include <boost/optional.hpp>
-#include <lib/system/progressbar.hpp>
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-#include <lib/system/signals.hpp>
-#include <poolsynchronizer.hpp>
 
 const unsigned MIN_CONFIDANTS = 3;
 const unsigned MAX_CONFIDANTS = 100;
@@ -40,9 +40,9 @@ Node::Node(const Config& config)
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_) {
-  std::cout << "Start transport... ";
+  cslog() << "Start transport... ";
   transport_ = new Transport(config, this);
-  std::cout << "Done\n";
+  cslog() << "Done";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   good_ = init(config);
@@ -63,33 +63,33 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
 
 #ifdef NODE_API
-  std::cout << "Init API... ";
+  cslog() << "Init API... ";
   papi_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
     csconnector::Config {
      config.getApiSettings().port,
      config.getApiSettings().ajaxPort,
      config.getApiSettings().executorPort
     });
-  std::cout << "Done\n";
+  cslog() << "Done";
 #endif
 
   if (!transport_->isGood()) {
     return false;
   }
-  std::cout << "Transport is init\n";
+  cslog() << "Transport is init";
 
   if (!solver_) {
     return false;
   }
-  std::cout << "Solver is init\n";
 
-  std::cout << "Everything is init\n";
+  cslog() << "Solver is init";
+  cslog() << "Everything is init";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
-  std::cout << "Spammer is init\n";
+  cslog() << "Spammer is init";
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -100,7 +100,7 @@ bool Node::init(const Config& config) {
 }
 
 void Node::run() {
-  std::cout << "Running transport\n";
+  cslog() << "Running transport";
   transport_->run();
 }
 
