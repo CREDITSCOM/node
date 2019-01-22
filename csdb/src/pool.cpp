@@ -501,7 +501,7 @@ const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noe
 
 const ::std::vector<csdb::Pool::SmartSignature>& Pool::smartSignatures() const noexcept
 {
-  // TODO: âñòàâüòå çäåñü îïåðàòîð return
+  // TODO: Ð²ÑÑ‚Ð°Ð²ÑŒÑ‚Ðµ Ð·Ð´ÐµÑÑŒ Ð¾Ð¿ÐµÑ€Ð°Ñ‚Ð¾Ñ€ return
   return d->smartSignatures_;
 }
 
