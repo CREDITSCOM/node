@@ -808,6 +808,10 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       auto execTrans = s_blockchain.loadTransaction(trId);
       if (execTrans.is_valid() && is_smart(execTrans)) {
         const auto smart = fetch_smart(execTrans);
+
+        if (is_smart_deploy(smart))
+          tm.checkNewDeploy(target_pk, source_pk, smart);
+
         auto newState = tr.user_field(smart_state_idx).value<std::string>();
         if (!newState.empty())
           tm.checkNewState(target_pk, source_pk, smart, newState);
@@ -834,8 +838,6 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
           auto deployed_by_creator = lockedReference(this->deployed_by_creator);
           (*deployed_by_creator)[source_pk].push_back(tr.id());
         }
-
-        tm.checkNewDeploy(target_pk, source_pk, smart);
       }
 
       return true;
