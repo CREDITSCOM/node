@@ -498,7 +498,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   std::vector<general::ByteCodeObject> origin_bytecode;
   if (!deploy) {
-    input_smart.smartContractDeploy.byteCodeObjects.clear();
+    for (auto &it : input_smart.smartContractDeploy.byteCodeObjects) {
+      it.byteCode.clear();
+    }
+    
     input_smart.smartContractDeploy.sourceCode.clear();
 
     decltype(auto) smart_origin = lockedReference(this->smart_origin);

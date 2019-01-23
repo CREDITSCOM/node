@@ -212,6 +212,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   std::string name, symbol, totalSupply;
 
+  if (byteCodeObjects.empty()) return;
   executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
@@ -329,17 +330,19 @@ void TokensMaster::run() {
         try { api_->getExecutor(); }
         catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
 
-        api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
-        if (!methodsResult.status.code) {
-          auto ts = getTokenStandart(methodsResult.methods);
-          if (ts != TokenStandart::NotAToken) {
-            Token t;
-            t.standart = ts;
-            t.owner = dt.deployer;
+        if (!dt.byteCodeObjects.empty()) {
+          api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
+          if (!methodsResult.status.code) {
+            auto ts = getTokenStandart(methodsResult.methods);
+            if (ts != TokenStandart::NotAToken) {
+              Token t;
+              t.standart = ts;
+              t.owner = dt.deployer;
 
-            {
-              std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
-              tokens_[dt.address] = t;
+              {
+                std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
+                tokens_[dt.address] = t;
+              }
             }
           }
         }
