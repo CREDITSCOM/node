@@ -220,38 +220,39 @@ void SolverCore::sendRoundTable() {
   }
 
   void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
-    if(pack.transactionsCount() == 0) {
-      //TODO: fix failure of smart execution, clear it from exe_queue
+    if (pack.transactionsCount() == 0) {
+      // TODO: fix failure of smart execution, clear it from exe_queue
       cserror() << "SolverCore: empty packet must not finish smart contract execution";
       return;
     }
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
-    for(const auto tr : pack.transactions()) {
-      if(psmarts->is_new_state(tr)) {
+    for (const auto tr : pack.transactions()) {
+      if (psmarts->is_new_state(tr)) {
         cs::SmartContractRef smartRef;
         smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
         smartRoundNumber_ = smartRef.sequence;
       }
     }
-    if(0 == smartRoundNumber_) {
-      //TODO: fix failure of smart execution, clear it from exe_queue
+    if (0 == smartRoundNumber_) {
+      // TODO: fix failure of smart execution, clear it from exe_queue
       cserror() << "SolverCore: smart contract result packet must contain new state transaction";
       return;
     }
-    pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
+    pnode->retriveSmartConfidants(smartRoundNumber_, smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
-    cslog() << "======================  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] =========================";
+    cslog() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << (int)ownSmartsConfNum_
+            << "] =========================";
     csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
       return;
     }
-    //cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+    // cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
     pack.makeHash();
     auto tmp = pack.hash().toBinary();
-    std::copy(tmp.cbegin(),tmp.cend(), st1.hash.begin());
+    std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
     currentSmartTransactionPack_ = pack;
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
@@ -266,20 +267,21 @@ void SolverCore::sendRoundTable() {
       if (e == pnode->getNodeIdKey()) {
         ownSmartConfNumber = i;
       }
-      csdebug() << "[" << (int)i << "] "
+      csdebug() << "[" << static_cast<int>(i) << "] "
         << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber
           ? "me"
           : cs::Utils::byteStreamToHex(e.data(), e.size()));
       ++i;
     }
+
     if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
       csdebug() << "          This NODE is not a confidant one for this smart-contract consensus round";
     }
+
     return ownSmartConfNumber;
   }
 
-  uint8_t SolverCore::ownSmartsConfidantNumber()
-  {
+  uint8_t SolverCore::ownSmartsConfidantNumber() {
     return ownSmartsConfNum_;
   }
 
@@ -287,8 +289,7 @@ void SolverCore::sendRoundTable() {
     return smartRoundNumber_;
   }
 
-  void SolverCore::refreshSmartStagesStorage()
-  {
+  void SolverCore::refreshSmartStagesStorage() {
     csdetails() << "          " << __func__;
     size_t cSize = smartConfidants_.size();
     smartStageOneStorage_.clear();
@@ -297,12 +298,15 @@ void SolverCore::sendRoundTable() {
     smartStageTwoStorage_.resize(cSize);
     smartStageThreeStorage_.clear();
     smartStageThreeStorage_.resize(cSize);
+
     for (size_t i = 0; i < cSize; ++i) {
       smartStageOneStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
       smartStageTwoStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
       smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
     }
-    memset(&st1,0,sizeof(st1));
+
+    memset(&st1, 0, sizeof(st1));
+
     st2.signatures.clear();
     st2.signatures.resize(cSize);
     st2.hashes.clear();
@@ -315,16 +319,20 @@ void SolverCore::sendRoundTable() {
     st3.writer = cs::ConfidantConsts::InvalidConfidantIndex;
     st2.sRoundNum = 0;
     st3.sRoundNum = 0;
-    memset(st3.signature.data(),0,st3.signature.size());
-    memset(st2.signature.data(),0,st3.signature.size());
+
+    memset(st3.signature.data(), 0, st3.signature.size());
+    memset(st2.signature.data(), 0, st3.signature.size());
+
     pnode->smartStagesStorageClear(cSize);
+
     smartUntrusted.clear();
     smartUntrusted.resize(cSize);
-    std::fill(smartUntrusted.begin(),smartUntrusted.end(),0);
+
+    std::fill(smartUntrusted.begin(), smartUntrusted.end(), 0);
     startTimer(1);
   }
 
-  void SolverCore::addSmartStageOne( cs::StageOneSmarts& stage, bool send) {
+  void SolverCore::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     if (send) {
       pnode->sendSmartStageOne(stage);
     }
@@ -332,7 +340,7 @@ void SolverCore::sendRoundTable() {
       return;
     }
     smartStageOneStorage_.at(stage.sender) = stage;
-    for (size_t i=0; i<smartConfidants_.size(); ++i) {
+    for (size_t i = 0; i < smartConfidants_.size(); ++i) {
       csdebug() << "[" << i << "] - " << (int)smartStageOneStorage_.at(i).sender;
     }
     csdebug() << "          <-- SMART-Stage-1 [" << (int)stage.sender << "]";
