@@ -95,6 +95,7 @@ namespace cs
     std::string state;
     SmartContractRef smartContract;
     executor::ExecuteByteCodeResult result;
+    std::string error;
   };
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
