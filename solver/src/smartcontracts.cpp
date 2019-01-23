@@ -588,7 +588,7 @@ namespace cs
           csdebug() << name() << ": smart contract call completed";
         }
         else {
-          cserror() << name() << ": exception while executong byte-code: " << error;
+          cserror() << name() << ": " << error;
         }
         return SmartExecutionData {
           start_tr,
