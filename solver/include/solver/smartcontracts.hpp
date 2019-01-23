@@ -210,7 +210,7 @@ namespace cs
     void onStoreBlock(csdb::Pool block);
 
     // called when next block is read from database
-    void onReadBlock(csdb::Pool block, bool* should_stop);
+    void onReadBlock([[maybe_unused]] csdb::Pool block, [[maybe_unused]] bool* should_stop);
 
   private:
 

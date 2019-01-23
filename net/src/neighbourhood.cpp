@@ -266,7 +266,7 @@ std::unique_lock<cs::SpinLock> Neighbourhood::getNeighboursLock() const {
 
 void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
   cs::SpinGuard lock(nLockFlag_);
-  for (const ConnectionPtr connection : neighbours_) {
+  for (ConnectionPtr connection : neighbours_) {
     if (connection) {
       func(connection);
     }
@@ -275,7 +275,7 @@ void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
 
 void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func) {
   cs::SpinGuard lock(nLockFlag_);
-  for (const ConnectionPtr connection : neighbours_) {
+  for (ConnectionPtr connection : neighbours_) {
     if (connection && !connection->isSignal) {
       func(connection);
     }
@@ -724,7 +724,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const cs::Sequence seq, bool& 
     for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
       if (!candidate->syncSeqs[i]) {
         candidate->syncSeqs[i] = seq;
-        candidate->syncSeqsRetries[i] = rand() % (MaxSyncAttempts / 2);
+        candidate->syncSeqsRetries[i] = static_cast<cs::Sequence>(rand()) % (MaxSyncAttempts / 2);
         break;
       }
     }
@@ -821,7 +821,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     return -1;
   }
 
-  const size_t neighbourCount = static_cast<int>(neighbours_.size() - 1U);
+  const size_t neighbourCount = static_cast<size_t>(neighbours_.size() - 1U);
 
   if (attemptCount > (neighbourCount * 3)) {
     int index = 0;
