@@ -565,11 +565,18 @@ void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
   data->signatures_.emplace_back(std::make_pair(index, signature));
 }
 
-void Pool::add_smart_signature(csdb::Pool::SmartSignature smartSignature) noexcept
+void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept
 {
   //priv* data = d.data();
   //data->is_valid_ = true;
   //data->smartSignatures_.emplace_back(smartSignature);
+}
+
+void Pool::add_real_rusted(const std::vector<uint8_t>& trustedMask) noexcept
+{
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->realTrusted_ = trustedMask;
 }
 
 void Pool::set_storage(const Storage& storage) noexcept {

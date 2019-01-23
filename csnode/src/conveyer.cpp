@@ -111,9 +111,8 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
     }
 
     if (!iterator->second.signatures().empty()) {
-      // TODO: add code here to manage the smartSignatures
+      //TODO: add code here to manage the smartSignatures
     }
-
     const auto& transactions = iterator->second.transactions();
 
     for (const auto& transaction : transactions) {
@@ -496,7 +495,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
-
+  newPool.add_real_rusted(metaPoolInfo.realTrustedMask);
   newPool.set_writer_public_key(metaPoolInfo.writerKey);
   csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey.data(), metaPoolInfo.writerKey.size());
   newPool.set_previous_hash(metaPoolInfo.previousHash);
