@@ -6,11 +6,14 @@
 // 4706 - assignment within conditional expression
 // 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
 //         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
-#pragma warning(disable: 4706 4373)
+#pragma warning(disable: 4706 4373 4244 4244 4267)
 #endif
 
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #include <csnode/blockchain.hpp>
 
@@ -286,9 +289,5 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 #endif  // APIHANDLER_HPP

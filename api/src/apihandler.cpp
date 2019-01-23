@@ -1136,15 +1136,19 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
 api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& addr, bool& present)
 {
   csdb::Address abs_addr = addr;
-  if(addr.is_wallet_id()) {
+  if (addr.is_wallet_id()) {
     abs_addr = s_blockchain.get_addr_by_type(addr, BlockChain::ADDR_TYPE::PUBLIC_KEY);
   }
 
   decltype(auto) smart_origin_ref = lockedReference(this->smart_origin);
 
   auto it = smart_origin_ref->find(abs_addr);
-  if((present = (it != smart_origin_ref->end())))
+  present = (it != smart_origin_ref->end());
+
+  if (present) {
     return fetch_smart(s_blockchain.loadTransaction(it->second));
+  }
+
   return api::SmartContractInvocation {};
 }
 
