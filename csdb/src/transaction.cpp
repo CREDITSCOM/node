@@ -20,7 +20,7 @@ namespace csdb {
 
 SHARED_DATA_CLASS_IMPLEMENTATION(TransactionID)
 
-TransactionID::TransactionID(PoolHash poolHash, sequence_t index)
+TransactionID::TransactionID(PoolHash poolHash, cs::Sequence index)
 : d(new priv(poolHash, index)) {
 }
 
@@ -32,7 +32,7 @@ PoolHash TransactionID::pool_hash() const noexcept {
   return d->pool_hash_;
 }
 
-TransactionID::sequence_t TransactionID::index() const noexcept {
+cs::Sequence TransactionID::index() const noexcept {
   return d->index_;
 }
 
@@ -54,7 +54,7 @@ TransactionID TransactionID::from_string(const ::std::string& str) {
         uintmax_t idx = strtoumax(start, &end, 10);
         if ((end != start) && ('\0' == (*end))) {
           res.d->pool_hash_ = ph;
-          res.d->index_ = static_cast<sequence_t>(idx);
+          res.d->index_ = static_cast<cs::Sequence>(idx);
         }
       }
     }

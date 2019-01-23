@@ -650,7 +650,7 @@ Wallet Storage::wallet(const Address &addr) const {
 
 bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& InnerId /*input*/, Transaction& trx /*output*/) const {
   Pool curPool;
-  TransactionID::sequence_t curIdx = InnerId;
+  cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(InnerId);
   bool is_in_blockchain = false;
 
   auto nextIt = [this, &curPool, &curIdx]() -> bool {
@@ -664,7 +664,7 @@ bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& 
           curPool = pool_load(curPool.previous_hash());
         } while (curPool.is_valid() && !(curPool.transactions_count()));
         if (curPool.is_valid()) {
-          curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+          curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
           return true;
         }
       }
@@ -675,7 +675,7 @@ bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& 
         curPool = pool_load(curPool.previous_hash());
       }
       if (curPool.is_valid()) {
-        curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+        curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
         return true;
       }
     }
@@ -699,7 +699,7 @@ std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit
   res.reserve(limit);
 
   Pool curPool;
-  TransactionID::sequence_t curIdx = 0;
+  cs::Sequence curIdx = 0;
 
   auto seekIt = [this, &curPool, &curIdx](const TransactionID &id) -> bool {
     if (id.is_valid()) {
@@ -723,7 +723,7 @@ std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit
           curPool = pool_load(curPool.previous_hash());
         } while (curPool.is_valid() && !(curPool.transactions_count()));
         if (curPool.is_valid()) {
-          curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+          curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
           return true;
         }
       }
@@ -734,7 +734,7 @@ std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit
         curPool = pool_load(curPool.previous_hash());
       }
       if (curPool.is_valid()) {
-        curIdx = static_cast<TransactionID::sequence_t>(curPool.transactions_count() - 1);
+        curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
         return true;
       }
     }
