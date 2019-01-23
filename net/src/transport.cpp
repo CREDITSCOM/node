@@ -432,11 +432,11 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     return false;
   }
 
-  const auto rLim = std::max(node_->getRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
+  //const auto rLim = std::max(node_->getRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
 
-  if (!pack.isFragmented()) {
-    return pack.getRoundNum() >= rLim;
-  }
+  //if (!pack.isFragmented()) {
+  //  return pack.getRoundNum() >= rLim;
+  //}
 
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
@@ -444,7 +444,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     rn = pack.getRoundNum() + (pack.getType() != MsgTypes::Transactions ? 0 : 5);
   }
 
-  return !rn || rn >= rLim;
+  return true; // !rn || rn >= rLim;
 }
 
 void Transport::processNodeMessage(const Packet& pack) {
