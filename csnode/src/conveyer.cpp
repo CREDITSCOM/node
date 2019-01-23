@@ -1,6 +1,8 @@
 #include "csnode/conveyer.hpp"
 
 #include <csdb/transaction.hpp>
+#include <csnode/datastream.hpp>
+
 
 #include <exception>
 #include <iomanip>
@@ -411,6 +413,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     return std::nullopt;
   }
 
+  ////This code is only for testing  -- should be removed after finding bugs
+  cs::Bytes pKeys;
+  cs::Bytes commisions;
+  cs::DataStream pKeysStream(pKeys);
+  cs::DataStream commisionStream(commisions);
+  ///////
   cs::TransactionsPacketTable hashTable;
   const cs::PacketsHashes& localHashes = meta->roundTable.hashes;
   const cs::Characteristic& characteristic = meta->characteristic;
@@ -443,6 +451,8 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
       if (maskIndex < mask.size()) {
         if (mask[maskIndex] != 0u) {
           newPool.add_transaction(transaction);
+          pKeysStream << transaction.source().public_key();
+          commisionStream << transaction.to_byte_stream();
         }
         else {
           invalidTransactions.addTransaction(transaction);
@@ -451,7 +461,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
       ++maskIndex;
     }
+    Hash pkHash = cscrypto::CalculateHash(pKeys.data(),pKeys.size());
+    Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
 
+    csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+    csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+  
     if (maskIndex > mask.size()) {
       csmeta(cserror) << "hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
       removeHashesFromTable(localHashes);
