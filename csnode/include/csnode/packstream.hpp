@@ -31,7 +31,7 @@ public:
 
   template <typename T>
   const T& peek() const {
-    return *(T*)ptr_;
+    return *(reinterpret_cast<const T*>(ptr_));
   }
 
   template <typename T>
@@ -94,6 +94,7 @@ public:
   IPackStream& operator>>(std::vector<T, A>& vector) {
     std::size_t size;
     (*this) >> size;
+
     if (size == 0) {
       return *this;
     }
@@ -148,7 +149,7 @@ public:
   }
 
   size_t remainsBytes() const {
-    return end_ - ptr_;
+    return static_cast<size_t>(end_ - ptr_);
   }
 
   bool isBytesAvailable(size_t bytes) const {
@@ -213,7 +214,7 @@ public:
     const auto left = static_cast<uint32_t>(end_ - ptr_);
 
     if (left >= sizeof(T)) {
-      *((T*)ptr_) = value;
+      *(reinterpret_cast<T*>(ptr_)) = value;
       ptr_ += sizeof(T);
     }
     else {
@@ -310,7 +311,7 @@ private:
         // insert size_inserted bytes from [1] and shift current content "rightward"
         ++ptr_;
 
-        size_t shiftedSize = end_ - ptr_;
+        size_t shiftedSize = static_cast<size_t>(end_ - ptr_);
         tempBuffer = allocator_->allocateNext(static_cast<uint32_t>(shiftedSize));
         tail = static_cast<cs::Byte*>(tempBuffer.get());
 

@@ -193,7 +193,7 @@ public:
       int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
 
       if ((compressedSize > 0) && (compressedSize < sourceSize)) {
-        return boost::asio::buffer(dest, static_cast<size_t>(compressedSize + headerSize));
+        return boost::asio::buffer(dest, static_cast<size_t>(compressedSize) + headerSize);
       }
       else {
         csdebug() << "Skipping packet compression, rawSize = " << sourceSize << ", compressedSize = " << compressedSize;
@@ -228,7 +228,7 @@ public:
       if ((uncompressedSize > 0) && (uncompressedSize <= destSize)) {
         std::copy(dest, dest + uncompressedSize, source + headerSize);
         *source &= ~BaseFlags::Compressed;
-        packetSize = uncompressedSize + headerSize;
+        packetSize = static_cast<size_t>(uncompressedSize) + headerSize;
       }
       else {
         cserror() << "Decoding malformed packet content";

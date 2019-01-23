@@ -17,8 +17,7 @@ class Node;
 
 namespace cs {
 
-using PoolSynchronizerRequestSignal =
-    cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
+using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
 
 class PoolSynchronizer {
 public:  // Interface
@@ -79,14 +78,12 @@ private:  // Service
   void printNeighbours(const std::string& funcName) const;
 
 private:  // struct
-  enum class CounterType
-  {
+  enum class CounterType {
     ROUND,
     TIMER
   };
 
-  enum class SequenceRemovalAccuracy
-  {
+  enum class SequenceRemovalAccuracy {
     EXACT,
     LOWER_BOUND,
     UPPER_BOUND

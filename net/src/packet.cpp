@@ -39,8 +39,8 @@ bool Packet::isHeaderValid() const {
 
   if (size() <= getHeadersLength()) {
     cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")"
-              << (this->isNetwork() ? ", network" : "") << (this->isFragmented() ? ", fragmeted" : "") << ", type "
-              << getMsgTypesString(this->getType()) << "(" << (int)this->getType() << ")";
+              << (isNetwork() ? ", network" : "") << (isFragmented() ? ", fragmeted" : "") << ", type "
+              << getMsgTypesString(getType()) << "(" << static_cast<int>(getType()) << ")";
     return false;
   }
 
@@ -116,15 +116,16 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     if (msg->packetsTotal_ >= 20) {
       if (msg->packetsLeft_ != 0) {
         // the 1st fragment contains full info:
-        if(pack.getFragmentId() == 0) {
+        if (pack.getFragmentId() == 0) {
           csdetails() << "COLLECT> recv pack " << getMsgTypesString(pack.getType()) << " of " << msg->packetsTotal_
-            << ", round " << pack.getRoundNum();
+                      << ", round " << pack.getRoundNum();
         }
         csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
       }
       else {
-        csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << getMsgTypesString(msg->getFirstPack().getType())
-          << ", round " << msg->getFirstPack().getRoundNum();
+        csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") "
+                    << getMsgTypesString(msg->getFirstPack().getType()) << ", round "
+                    << msg->getFirstPack().getRoundNum();
       }
     }
   }
