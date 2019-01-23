@@ -572,6 +572,13 @@ void Pool::add_smart_signature(csdb::Pool::SmartSignature smartSignature) noexce
   //data->smartSignatures_.emplace_back(smartSignature);
 }
 
+void Pool::add_real_rusted(std::vector<uint8_t> trustedMask) noexcept
+{
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->realTrusted_ = trustedMask;
+}
+
 void Pool::set_storage(const Storage& storage) noexcept {
   // We can set up storage even if Pool is read-only
   priv* data = d.data();

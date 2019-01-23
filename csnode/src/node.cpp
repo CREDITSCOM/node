@@ -382,10 +382,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     if (poolMetaInfo.realTrustedMask[i] == 0) {
       poolMetaInfo.writerKey = key;
-      csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
+      //csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
     }
     else {
-      csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(key.data(), key.size());
+      //csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(key.data(), key.size());
     }
   }
 
@@ -408,6 +408,9 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       csmeta(cserror) << "Created pool is not valid";
       return;
     }
+    //for (auto& it : poolSignatures) {
+    //  pool.value().add_signature(it.sender, it.signature);
+    //}
 
     pool.value().set_confidants(table->confidants);
 
@@ -419,47 +422,47 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       blockChain_.testCachedBlocks();
     }
 
-    size_t truePoolSignatures = 0;
-    csdb::PoolHash tmpHash = blockChain_.getLastHash();
+  //  size_t truePoolSignatures = 0;
+  //  csdb::PoolHash tmpHash = blockChain_.getLastHash();
 
-    const auto& hashBinary = tmpHash.to_binary();
-    csdebug() << "Hash: " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+  //  const auto& hashBinary = tmpHash.to_binary();
+  //  csdebug() << "Hash: " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
 
-    const auto rtPtr = conveyer.roundTable(poolMetaInfo.sequenceNumber);
-    if (rtPtr == nullptr) {
-      csdebug() << "No RoundTable for such round";
-      return;
-    }
-    const auto& confidantsToVerify = rtPtr->confidants;
-    if (poolSignatures.size() != confidantsToVerify.size()) {
-      csdebug() << "The number of confidants in the conveyer of round #" << poolMetaInfo.sequenceNumber << " doesn't correspond to the number of disignatures";
-      //TODO: add code to remove the las written block above
-      return;
-    }
-    for (auto& it : poolSignatures) {
-      if (!conveyer.isConfidantExists(it.sender)) {
-        return;
-      }
+  //  const auto rtPtr = conveyer.roundTable(poolMetaInfo.sequenceNumber);
+  //  if (rtPtr == nullptr) {
+  //    csdebug() << "No RoundTable for such round";
+  //    return;
+  //  }
+  //  const auto& confidantsToVerify = rtPtr->confidants;
+  //  if (poolSignatures.size() != confidantsToVerify.size()) {
+  //    csdebug() << "The number of confidants in the conveyer of round #" << poolMetaInfo.sequenceNumber << " doesn't correspond to the number of disignatures";
+  //    //TODO: add code to remove the las written block above
+  //    return;
+  //  }
+  //  for (auto& it : poolSignatures) {
+  //    //if (!conveyer.isConfidantExists(it.sender)) {
+  //    //  return;
+  //    //}
 
-      const auto& confidant = confidantsToVerify.at(it.sender);
+  //    const auto& confidant = confidantsToVerify.at(it.sender);
 
-      if (cscrypto::VerifySignature(it.signature, confidant, hashBinary.data(), hashBinary.size())) {
-        csdebug() << "Signature ["<< static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is valid";
-        ++truePoolSignatures;
-        pool.value().add_signature(it.sender, it.signature);
-      }
-      else {
-        csdebug() << "Signature [" << static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is NOT valid";
-      }
-    }
+  //    if (cscrypto::VerifySignature(it.signature, confidant, hashBinary.data(), hashBinary.size())) {
+  //      csdebug() << "Signature ["<< static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is valid";
+  //      ++truePoolSignatures;
+  //      pool.value().add_signature(it.sender, it.signature);
+  //    }
+  //    else {
+  //      csdebug() << "Signature [" << static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is NOT valid";
+  //    }
+  //  }
 
-    if (truePoolSignatures == poolSignatures.size()) {
-      cswarning() << "All Pool Signatures Are Ok!";
-    }
-    else {
-      cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
-      //TODO: add code of eracing the just written block from blockchain
-    }
+  //  if (truePoolSignatures == poolSignatures.size()) {
+  //    cswarning() << "All Pool Signatures Are Ok!";
+  //  }
+  //  else {
+  //    cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+  //    //TODO: add code of eracing the just written block from blockchain
+  //  }
   }
 
   csmeta(csdetails) << "done";
@@ -2015,7 +2018,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   if (st3.sender!=cs::ConfidantConsts::InvalidConfidantIndex) {
     poolMetaInfo.writerKey = conveyer.confidants().at(st3.writer);
   }
-
+  poolMetaInfo.realTrustedMask = st3.realTrustedMask;
   poolMetaInfo.previousHash = blockChain_.getLastHash();
 
   /////////////////////////////////////////////////////////////////////////// preparing block meta info
