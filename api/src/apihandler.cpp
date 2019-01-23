@@ -501,7 +501,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     for (auto &it : input_smart.smartContractDeploy.byteCodeObjects) {
       it.byteCode.clear();
     }
-    
+
     input_smart.smartContractDeploy.sourceCode.clear();
 
     decltype(auto) smart_origin = lockedReference(this->smart_origin);
@@ -524,30 +524,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       const auto data = scKey.public_key().data();
       std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
       _return.status.message = "Bad smart contract address, expected " + str;
-
-#ifdef WEB_WALLET_NODE
-      auto trId = send_transaction.innerID();
-      std::vector<cscrypto::Byte> strToHash;
-      std::string byteCode {};
-      if(!input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-        for(auto &curr_byteCode : input_smart.smartContractDeploy.byteCodeObjects) {
-          byteCode += curr_byteCode.byteCode;
-        }
-      }
-      strToHash.reserve(cscrypto::kPublicKeySize + 6 + byteCode.size());
-
-      const auto dPk = deployer.public_key();
-      const auto idPtr = reinterpret_cast<const cscrypto::Byte*>(&trId);
-
-      std::copy(dPk.begin(), dPk.end(), std::back_inserter(strToHash));
-      std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
-      std::copy(byteCode.begin(),
-        byteCode.end(),
-        std::back_inserter(strToHash));
-
-      for(auto& c : byteCode)
-        _return.status.message += " " + std::to_string((uint32_t) (int8_t) c);
-#endif
       return;
     }
   }
@@ -719,7 +695,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
   static bool log_to_console = true;
   size_t cnt = 0;
-  
+
   if(log_to_console) {
     std::cout << "API: analizing blockchain...\n";
   }
@@ -809,12 +785,14 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       if (execTrans.is_valid() && is_smart(execTrans)) {
         const auto smart = fetch_smart(execTrans);
 
+        auto caller_pk = s_blockchain.get_addr_by_type(execTrans.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+
         if (is_smart_deploy(smart))
-          tm.checkNewDeploy(target_pk, source_pk, smart);
+          tm.checkNewDeploy(target_pk, caller_pk, smart);
 
         auto newState = tr.user_field(smart_state_idx).value<std::string>();
         if (!newState.empty())
-          tm.checkNewState(target_pk, source_pk, smart, newState);
+          tm.checkNewState(target_pk, caller_pk, smart, newState);
       }
     }
     else {
