@@ -17,6 +17,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   refreshNeighbours();
 
   cs::Connector::connect(&timer_.timeOut, this, &cs::PoolSynchronizer::onTimeOut);
+  cs::Connector::connect(&roundSimulation_.timeOut, this, &cs::PoolSynchronizer::onRoundSimulation);
 
   // Print Pool Sync Data Info
   const uint8_t hl = 25;
@@ -76,8 +77,9 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   }
 
   const bool useTimer = syncData_.sequencesVerificationFrequency > 1;
-  const uint32_t delay =
-      useTimer ? cs::numeric_cast<uint32_t>(syncData_.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
+  const int delay = useTimer ?
+                    cs::numeric_cast<int>(syncData_.sequencesVerificationFrequency) :
+                    cs::numeric_cast<int>(cs::NeighboursRequestDelay);
 
   // already synchro start
   if (isSyncroStarted_ && !useTimer) {
@@ -88,7 +90,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
     // BigBang received
     if (isBigBand && !timer_.isRunning()) {
-      timer_.start(cs::numeric_cast<int>(delay));
+      timer_.start(delay);
     }
   }
 
@@ -101,10 +103,13 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     sendBlockRequest();
 
     if (isBigBand || useTimer) {
-      timer_.start(cs::numeric_cast<int>(delay));
+      timer_.start(delay);
     }
+
+    roundSimulation_.start(60000, cs::Timer::Type::HighPrecise); // 1 Min
   }
   else if (syncData_.requestRepeatRoundCount > 0) {
+    roundSimulation_.reset();
     const bool isNeedRequest = checkActivity(CounterType::ROUND);
     bool isAvailable = false;
 
@@ -233,6 +238,15 @@ void cs::PoolSynchronizer::onTimeOut() {
       sendBlockRequest();
     }
   });
+}
+
+void cs::PoolSynchronizer::onRoundSimulation() {
+  csmeta(csdetails) << "on round simulation";
+  bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
+
+  if (isAvailable) {
+    sendBlockRequest();
+  }
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
@@ -571,6 +585,9 @@ void cs::PoolSynchronizer::synchroFinished() {
   cs::Connector::disconnect(&blockChain_->removeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();
+  }
+  if (roundSimulation_.isRunning()) {
+    roundSimulation_.stop();
   }
   isSyncroStarted_ = false;
   requestedSequences_.clear();
