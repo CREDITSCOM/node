@@ -164,8 +164,8 @@ public:
   void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void add_signature(int index, const cs::Signature& signature) noexcept;
-  void add_smart_signature(csdb::Pool::SmartSignature smartSignature) noexcept;
-  void add_real_rusted(std::vector<uint8_t> trustedMask) noexcept;
+  void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
+  void add_real_rusted(const std::vector<uint8_t>& trustedMask) noexcept;
 
   Transactions& transactions();
   const Transactions& transactions() const;
