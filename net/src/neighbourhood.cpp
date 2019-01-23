@@ -836,7 +836,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     return -1;
   }
 
-  const int randomNumber = cs::Utils::generateRandomValue<int>(0, neighbourCount);
+  const int randomNumber = cs::Utils::generateRandomValue<int>(0, static_cast<int>(neighbourCount));
   const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
 
   if (!nb) {

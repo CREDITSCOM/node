@@ -456,7 +456,7 @@ namespace cs
     }
   }
 
-  void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
+  void SmartContracts::onReadBlock([[maybe_unused]] csdb::Pool block, [[maybe_unused]] bool* should_stop)
   {}
 
   void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
