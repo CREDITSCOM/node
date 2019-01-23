@@ -1014,6 +1014,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
           }
         }
       }
+      lock.unlock();
       if (!finish_for_idx) {                              // if hash table doesn't contain trx return true if in last 5 rounds
         if (conveyer.isMetaTransactionInvalid(inner_id))  // trx is invalid (time between del from hash table and add to blockchain)
           _return.states[inner_id] = INVALID;
