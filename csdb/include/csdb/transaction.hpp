@@ -49,17 +49,14 @@ class Pool;
 class TransactionID {
   SHARED_DATA_CLASS_DECLARE(TransactionID)
 public:
-  /// \deprecated Тип будет удалён в следующих версиях.
-  using sequence_t = cs::Sequence;
-
   /// \deprecated Конструктор будет удалён в следующих версиях.
-  TransactionID(PoolHash poolHash, sequence_t index);
+  TransactionID(PoolHash poolHash, cs::Sequence index);
 
   bool is_valid() const noexcept;
   PoolHash pool_hash() const noexcept;
 
   /// \deprecated Метод будет удалён в следующих версиях.
-  sequence_t index() const noexcept;
+  cs::Sequence index() const noexcept;
 
   std::string to_string() const noexcept;
   cs::Bytes to_byte_stream() const noexcept;

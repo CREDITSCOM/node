@@ -425,12 +425,23 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     const auto& hashBinary = tmpHash.to_binary();
     csdebug() << "Hash: " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
 
+    const auto rtPtr = conveyer.roundTable(poolMetaInfo.sequenceNumber);
+    if (rtPtr == nullptr) {
+      csdebug() << "No RoundTable for such round";
+      return;
+    }
+    const auto& confidantsToVerify = rtPtr->confidants;
+    if (poolSignatures.size() != confidantsToVerify.size()) {
+      csdebug() << "The number of confidants in the conveyer of round #" << poolMetaInfo.sequenceNumber << " doesn't correspond to the number of disignatures";
+      //TODO: add code to remove the las written block above
+      return;
+    }
     for (auto& it : poolSignatures) {
       if (!conveyer.isConfidantExists(it.sender)) {
         return;
       }
 
-      const auto& confidant = conveyer.confidantByIndex(it.sender);
+      const auto& confidant = confidantsToVerify.at(it.sender);
 
       if (cscrypto::VerifySignature(it.signature, confidant, hashBinary.data(), hashBinary.size())) {
         csdebug() << "Signature ["<< static_cast<int>(it.sender) << "] of " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size()) << " is valid";

@@ -7,11 +7,11 @@
 #ifndef _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
 #define _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
 
+#include "csdb/transaction.hpp"
+
 #include <map>
 
 #include "csdb/internal/shared_data_ptr_implementation.hpp"
-
-#include "csdb/transaction.hpp"
 
 #include "csdb/address.hpp"
 #include "csdb/amount.hpp"
@@ -26,12 +26,12 @@ class TransactionID::priv : public ::csdb::internal::shared_data {
   : index_(0) {
   }
 
-  inline priv(PoolHash pool_hash, TransactionID::sequence_t index)
+  inline priv(PoolHash pool_hash, cs::Sequence index)
   : pool_hash_(pool_hash)
   , index_(index) {
   }
 
-  inline void _update(PoolHash pool_hash, TransactionID::sequence_t index) {
+  inline void _update(PoolHash pool_hash, cs::Sequence index) {
     pool_hash_ = pool_hash;
     index_ = index;
   }
@@ -44,7 +44,7 @@ class TransactionID::priv : public ::csdb::internal::shared_data {
   }
 
   PoolHash pool_hash_;
-  TransactionID::sequence_t index_ = 0;
+  cs::Sequence index_ = 0;
   friend class TransactionID;
   friend class Transaction;
   friend class Pool;
@@ -86,7 +86,7 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   , signature_(signature) {
   }
 
-  inline void _update_id(PoolHash pool_hash, TransactionID::sequence_t index) {
+  inline void _update_id(PoolHash pool_hash, cs::Sequence index) {
     id_.d->_update(pool_hash, index);
     read_only_ = true;
   }
