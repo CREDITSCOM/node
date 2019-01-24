@@ -49,7 +49,7 @@ public:
   void stop();
 
   ///
-  /// @brief Restarss timer.
+  /// @brief Restars timer.
   ///
   void restart();
 

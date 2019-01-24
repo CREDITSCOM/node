@@ -280,8 +280,7 @@ public:
   void addString(const std::string& string);
 
   ///
-  /// Returns std::string from stream.
-  ///        /// @return Returns std::string by arguments size.
+  /// @return Returns std::string by arguments size.
   /// If stream can not return size of bytes it returns empty std::string.
   ///
   std::string string();
