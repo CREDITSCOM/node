@@ -160,6 +160,7 @@ private:
 
   struct SmartState {
     std::string state;
+    csdb::TransactionID transaction;
     csdb::TransactionID initer;
   };
 

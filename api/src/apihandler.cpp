@@ -583,10 +583,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   else {
 #ifndef TETRIS_NODE
     std::string new_state;
+    csdb::TransactionID trId;
+
     contract_state_entry.wait_till_front([&](SmartState& ss) {
       auto execTrans = s_blockchain.loadTransaction(ss.initer);
       if(execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
         new_state = ss.state;
+        trId = ss.transaction.clone();
         return true;
       }
       return false;
@@ -597,13 +600,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       return;
     }
     else {
-      csdb::Address addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-
-      for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
-        if (is_smart_state(*trIt) && trIt->user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
-          _return.smart_contract_result = deserialize<::general::Variant>(trIt->user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
-          break;
-        }
+      auto stateTrans = s_blockchain.loadTransaction(trId);
+      if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
+        _return.smart_contract_result = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
       }
     }
 #else
@@ -805,7 +804,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
       auto smart_state(lockedReference(this->smart_state));
       (*smart_state)[address].update_state([&]() { 
-        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), trId };
+        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id(), trId };
       });
 
       auto execTrans = s_blockchain.loadTransaction(trId);
