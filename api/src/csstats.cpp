@@ -49,7 +49,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
-#ifdef TRANSACTIONS_INDEX
+#ifdef MONITOR_NODE
         if (transaction.user_field(0).is_valid())
           periodStats.transactionsSmartCount += blockchain.getTransactionsCount(transaction.target());
 #endif
