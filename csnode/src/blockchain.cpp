@@ -96,7 +96,7 @@ bool BlockChain::init(const std::string& path)
 
 #if defined(TRANSACTIONS_INDEX) && defined(RECREATE_INDEX)
   for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
-    auto pool = loadBlock(seq + 1);
+    auto pool = loadBlock(seq);
     createTransactionsIndex(pool);
   }
 
@@ -135,14 +135,22 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
 
       ++current_sequence;
 #ifdef TRANSACTIONS_INDEX
-      total_transactions_count_ += pool.transactions().size();
+      if(pool.transactions().size()) {
+        total_transactions_count_ += pool.transactions().size();
+
+        if(lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
+          previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+
+        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
+      }
 #endif
       if(cnt % 1000 == 0) {
         std::cout << '\r' << cnt;
       }
       ++cnt;
     }
-    std::cout << "\rDone, handled " << cnt << " blocks";
+    std::cout << "\rDone, handled " << cnt - 1 << " blocks\n";
 
     res = true;
   }
@@ -244,7 +252,7 @@ bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
 #if defined(RECREATE_CHEAT)
   if(!f) {
     generateCheatDbFile(origin, bh);
-    cswarning() << "Blockchan: cannot open special mark so it was regenerated";
+    cswarning() << "Blockchain: cannot open special mark so it was regenerated";
     return true;
   }
 #endif// RECREATE_CHEAT
@@ -971,6 +979,13 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   }
   if (pool_seq == last_seq + 1) {
     if (pool.previous_hash() != getLastHash()) {
+      csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
+      if(getLastHash().is_empty()) {
+        cswarning() << "BLOCKCHAIN> own last hash is empty";
+      }
+      if(pool.previous_hash().is_empty()) {
+        cswarning() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
+      }
       removeLastBlock();
       return false;
     }

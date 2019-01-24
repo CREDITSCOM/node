@@ -41,6 +41,7 @@ Fee::Fee()
 
 void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   if (pool->transactions().size() < 1) {
+    EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
   if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
@@ -53,6 +54,7 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
 
 void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
   if (packet->transactionsCount() < 1) {
+    EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
   if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
@@ -112,6 +114,7 @@ void Fee::CountOneByteCost(const BlockChain& blockchain) {
 
   if (num_of_last_block_ <= kMaxRoundNumWithFixedFee) {
     one_byte_cost_ = kFixedOneByteFee;
+    EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
 
@@ -145,8 +148,7 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   size_t last_sequence = blockchain.getLastSequence();
-  size_t sequence_gap = 5; // case of removing last block
-  csdb::Pool pool = blockchain.loadBlock(last_sequence - sequence_gap);
+  csdb::Pool pool = blockchain.loadBlock(last_sequence);
   const auto& confidants = pool.confidants();
   
   for (size_t i = 0; i < confidants.size(); ++i) {
