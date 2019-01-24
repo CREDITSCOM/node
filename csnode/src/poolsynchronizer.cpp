@@ -109,7 +109,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     roundSimulation_.start(60000, cs::Timer::Type::HighPrecise); // 1 Min
   }
   else if (syncData_.requestRepeatRoundCount > 0) {
-    roundSimulation_.reset();
+    roundSimulation_.restart();
     const bool isNeedRequest = checkActivity(CounterType::ROUND);
     bool isAvailable = false;
 
@@ -620,7 +620,7 @@ void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
                       << " Neighbour index: " << neighbour.index()
                       << ", does not contained in transport. Neighbours сount: " << transport_->getNeighboursCount()
                       << ", neighbour key: "
-                      << cs::Utils::byteStreamToHex(neighbour.publicKey().data(), neighbour.publicKey().size());;
+                      << cs::Utils::byteStreamToHex(neighbour.publicKey().data(), neighbour.publicKey().size());
     }
   }
 }

@@ -37,7 +37,7 @@ void cs::Timer::stop() {
   }
 }
 
-void cs::Timer::reset() {
+void cs::Timer::restart() {
   if (isRunning_) {
     if (type_ == Type::Standard) {
       stop();

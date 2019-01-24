@@ -43,14 +43,15 @@ public:
 
   ///
   /// @brief Stops timer.
-  /// @brief Timer would not stop immediatly, only after thread joining.
+  /// @brief Timer would not stop immediatly if it's type is Standard, only after thread joined.
+  /// @brief If timer type is HigPrecise it stops immediatly.
   ///
   void stop();
 
   ///
-  /// @brief Resets timer.
+  /// @brief Restarss timer.
   ///
-  void reset();
+  void restart();
 
   ///
   /// @brief Returns timer status.
