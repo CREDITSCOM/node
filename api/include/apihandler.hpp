@@ -158,7 +158,12 @@ private:
     csdb::PoolHash last_pull_hash{};
   };
 
-  using smart_state_entry = cs::WorkerQueue<std::string>;
+  struct SmartState {
+    std::string state;
+    csdb::TransactionID initer;
+  };
+
+  using smart_state_entry = cs::WorkerQueue<SmartState>;
   using client_type = executor::ContractExecutorConcurrentClient;
 
   BlockChain& s_blockchain;

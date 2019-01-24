@@ -540,10 +540,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     // -- prevent start transaction from flow to solver, so move it here:
     std::string contract_state;
     if(!deploy) {
-      contract_state_entry.wait_till_front([&](std::string& state) {
-        if(state.empty())
+      contract_state_entry.wait_till_front([&](SmartState& ss) {
+        if(ss.state.empty())
           return false;
-        contract_state = state;
+        contract_state = ss.state;
         return true;
       });
     }
@@ -576,11 +576,34 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy) {
-    contract_state_entry.wait_till_front([&](std::string& state) { return !state.empty(); });
+    contract_state_entry.wait_till_front([&](SmartState& ss) { return !ss.state.empty(); });
   }
   else {
 #ifndef TETRIS_NODE
-    contract_state_entry.yield();
+    std::string new_state;
+    contract_state_entry.wait_till_front([&](SmartState& ss) {
+      auto execTrans = s_blockchain.loadTransaction(ss.initer);
+      if(execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
+        new_state = ss.state;
+        return true;
+      }
+      return false;
+    });
+
+    if(new_state.empty()) {
+      SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+      return;
+    }
+    else {
+      csdb::Address addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+
+      for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
+        if (is_smart_state(*trIt) && trIt->user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
+          _return.smart_contract_result = deserialize<::general::Variant>(trIt->user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
+          break;
+        }
+      }
+    }
 #else
     contract_state_entry.update_state([=](const std::string&) { return execResp.contractState; });
 #endif
@@ -682,7 +705,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ap
   _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
   const csdb::Address adrs = BlockChain::getAddressFromKey(address);
   auto smart_state(lockedReference(this->smart_state));
-  _return.smartContract.objectState = (*smart_state)[adrs].get_state();
+  _return.smartContract.objectState = (*smart_state)[adrs].get_state().state;
 
   SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
   return;
@@ -774,12 +797,14 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     auto target_pk = s_blockchain.get_addr_by_type(tr.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
 
     if (is_smart_state(tr)) {
-      auto smart_state(lockedReference(this->smart_state));
-      (*smart_state)[address].update_state([&]() { return tr.user_field(smart_state_idx).value<std::string>(); });
-
       cs::SmartContractRef scr;
       scr.from_user_field(tr.user_field(cs::trx_uf::new_state::RefStart));
       csdb::TransactionID trId(scr.hash, scr.transaction);
+
+      auto smart_state(lockedReference(this->smart_state));
+      (*smart_state)[address].update_state([&]() { 
+        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), trId };
+      });
 
       auto execTrans = s_blockchain.loadTransaction(trId);
       if (execTrans.is_valid() && is_smart(execTrans)) {
@@ -1213,7 +1238,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
     //if (it != smartStateRef->end()) state = it->second.get_current_state().state;
     //else present = false;
 
-    if (it != smartStateRef->end()) state = (*smartStateRef)[addr].get_state();
+    if (it != smartStateRef->end()) state = (*smartStateRef)[addr].get_state().state;
     else present = false;
   }
 
