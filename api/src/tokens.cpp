@@ -190,6 +190,8 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const std::function<void(const RetType&)> handler) {
   executor::ExecuteByteCodeResult result;
 
+  if (byteCodeObjects.empty())
+    return;
   executor.executeByteCode(result,
                            addr,
                            byteCodeObjects,
@@ -267,6 +269,8 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   }
 
   executor::ExecuteByteCodeMultipleResult result;
+  if (byteCodeObjects.empty())
+    return;
   api_->getExecutor().
     executeByteCodeMultiple(result, dpAddr, byteCodeObjects, newState,
                             "balanceOf", holderKeysParams, 100);

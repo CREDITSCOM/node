@@ -49,23 +49,15 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
-
-#ifdef TRANSACTIONS_INDEX
-        if (transaction.user_field(0).is_valid()) {
-          periodStats.transactionsSmartCount += blockchain.getTransactionsCount();// blockchain.get_trxns_count(transaction.source()).total_trxns_count;
-          //++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
-        }                                        // smart contracts
+#ifdef MONITOR_NODE
+        if (transaction.user_field(0).is_valid())
+          periodStats.transactionsSmartCount += blockchain.getTransactionsCount(transaction.target());
 #endif
-
-
-        if (is_deploy_transaction(transaction)) {
+        if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
-        }
 
         Currency currency = currencies_indexed[transaction.currency().to_string()];
-
         const auto& amount = transaction.amount();
-
         periodStats.balancePerCurrency[currency].integral += amount.integral();
         periodStats.balancePerCurrency[currency].fraction += amount.fraction();
       }

@@ -386,7 +386,6 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 #ifdef MONITOR_NODE
   s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
-    //res.transactionsCount = wd.transNum_;
   });
   if (tr.user_field(0).is_valid())
     res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
@@ -487,7 +486,8 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
   }
 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
-  executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
+  if(!code.empty())
+    executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -551,18 +551,20 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     executor::ExecuteByteCodeResult api_resp;
     const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
-    execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
+    if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
+      execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
-    if (api_resp.status.code) {
-      _return.status.code = api_resp.status.code;
-      _return.status.message = api_resp.status.message;
-      contract_state_entry.yield();
-      return;
+      if (api_resp.status.code) {
+        _return.status.code = api_resp.status.code;
+        _return.status.message = api_resp.status.message;
+        contract_state_entry.yield();
+        return;
+      }
+
+      _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
+      if (_return.__isset.smart_contract_result)
+        _return.smart_contract_result = api_resp.ret_val;
     }
-
-    _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
-    if (_return.__isset.smart_contract_result)
-      _return.smart_contract_result = api_resp.ret_val;
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     contract_state_entry.yield();
@@ -1046,6 +1048,8 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
   executor::GetContractMethodsResult executor_ret;
+  if (byteCodeObjects.empty())
+    return;
   executor->getContractMethods(executor_ret, byteCodeObjects);
   _return.code = executor_ret.status.code;
   _return.message = executor_ret.status.message;
@@ -1210,6 +1214,8 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return,
   }
 
   executor::GetContractMethodsResult methodsResult;
+  if (result.byteCodeObjects.empty())
+    return;
   getExecutor().getContractMethods(methodsResult, result.byteCodeObjects);
 
   if (methodsResult.status.code) {
@@ -1248,6 +1254,8 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
   }
 
   executor::GetContractMethodsResult methodsResult;
+  if (byteCode.empty())
+    return;
   getExecutor().getContractMethods(methodsResult, byteCode);
 
   if (methodsResult.status.code) {
@@ -1257,6 +1265,8 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
   }
 
   executor::GetContractVariablesResult variablesResult;
+  if (byteCode.empty())
+    return;
   getExecutor().getContractVariables(variablesResult, byteCode, state);
 
   if (variablesResult.status.code) {

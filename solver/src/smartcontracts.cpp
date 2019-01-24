@@ -544,8 +544,10 @@ namespace cs
 
         std::string error;
         try {
+          if (contract.smartContractDeploy.byteCodeObjects.empty())
+            return SmartExecutionData{};
           get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCodeObjects,
-            state, contract.method, contract.params, /*Consensus::T_smart_contract*/120000);
+              state, contract.method, contract.params, Consensus::T_smart_contract);
         }
         catch(std::exception& x) {
           error = x.what();
