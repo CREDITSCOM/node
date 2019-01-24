@@ -346,6 +346,20 @@ public:
     return *(reinterpret_cast<T*>(data_ + index_));
   }
 
+  ///
+  /// @brief Converts to template entity if compile.
+  /// @brief For parsing converts last not readed part.
+  ///
+  template <typename T>
+  T convert() const {
+    if (bytes_) {
+      return T(bytes_->begin(), bytes_->end());
+    }
+    else {
+      return T(data_, data_ + (dataSize_ - index_));
+    }
+  }
+
 private:
   // attributes
   char* data_ = nullptr;
