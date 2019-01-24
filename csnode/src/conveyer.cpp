@@ -464,7 +464,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
 
     csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
-    csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+    csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(comHash.data(), comHash.size());
   
     if (maskIndex > mask.size()) {
       csmeta(cserror) << "hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
