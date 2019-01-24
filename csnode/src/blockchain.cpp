@@ -1131,7 +1131,7 @@ bool BlockChain::is_equal(const csdb::Address &laddr, const csdb::Address &raddr
   return false;
 }
 
-#ifdef MONITOR_NODE
+#ifdef TRANSACTIONS_INDEX
 uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
   WalletId id;
