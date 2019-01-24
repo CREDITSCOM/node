@@ -1129,7 +1129,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
   const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
   if (!wallDataPtr)
     return 0;
-  return wallDataPtr->transNum_;
+  return static_cast<uint32_t>(wallDataPtr->transNum_);
 }
 #endif
 

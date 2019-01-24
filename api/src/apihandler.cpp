@@ -385,7 +385,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 #ifdef MONITOR_NODE
   s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) {
     res.createTime = wd.createTime_;
-    res.transactionsCount = wd.transNum_;
+    res.transactionsCount = static_cast<int32_t>(wd.transNum_);
   });
 #endif
 
@@ -662,9 +662,7 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
 #ifdef MONITOR_NODE
-  csstats::StatsPerPeriod stats = this->stats.getStats();
-
-  for (auto& s : stats) {
+  for (auto& s : this->stats.getStats()) {
     api::PeriodStats ps = {};
     ps.periodDuration = s.periodSec;
     ps.poolsCount = s.poolsCount;
@@ -1326,7 +1324,7 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return,
   _return.result = false;
   _return.trxns_count.sendCount = 0;
   _return.trxns_count.recvCount = 0;
-  _return.total_trxns_count = s_blockchain.getTransactionsCount();
+  _return.total_trxns_count = static_cast<int32_t>(s_blockchain.getTransactionsCount());
 
   auto tPair = s_blockchain.getLastNonEmptyBlock();
   while (limit > 0 && tPair.second) {
@@ -1367,7 +1365,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
     }
   });
 
-  _return.count = totalTransfers;
+  _return.count = static_cast<int32_t>(totalTransfers);
 
   csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
   while (limit && !pooh.is_empty() && tokenTransPools.size()) {
@@ -1672,8 +1670,8 @@ APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
         const cs::Bytes addr_b(addr.begin(), addr.end());
         wi.address = fromByteArray(addr_b);
 
-        wi.timesWriter = wd.times;
-        wi.timesTrusted = wd.times_trusted;
+        wi.timesWriter = static_cast<int32_t>(wd.times);
+        wi.timesTrusted = static_cast<int32_t>(wd.times_trusted);
         wi.feeCollected.integral = wd.totalFee.integral();
         wi.feeCollected.fraction = wd.totalFee.fraction();
 
