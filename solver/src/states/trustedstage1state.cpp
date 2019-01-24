@@ -146,7 +146,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
       cs::Byte byte = static_cast<cs::Byte>(true);
-      if(!smarts.is_new_state( transaction)) {
+      if(!smarts.is_new_state(transaction)) {
         byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
       }
       else {
@@ -248,7 +248,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     cscrypto::CalculateHash(hash, characteristic.mask.data(), characteristic.mask.size());
   }
 
-  csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+  csdebug() << name() << ": generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
   return hash;
 }
 
@@ -257,7 +257,7 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
   csdb::Address src = transaction.source();
   //TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
   // currently will be rejected
-  if(!context.smart_contracts().is_known_smart_contract(src)&& transaction.user_field_ids().size() != 3) {
+  if(!context.smart_contracts().is_smart_contract(transaction)) {
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
       return transaction.verify_signature(data_to_fetch_pulic_key.address_);
@@ -266,7 +266,15 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
     return transaction.verify_signature(src.public_key());
   }
   else {
-    //TODO: add here code for validating the smart contract transaction 
+    if(context.smart_contracts().is_new_state(transaction)) {
+      // special rule for new_state transactions
+      if(src != transaction.target()) {
+        csdebug() << name() << ": smart state trx has different source and target";
+        return false;
+      }
+      return true;
+    }
+    //TODO: add here code for validating signatures in the smart contract transaction
     return true;
   }
 }
