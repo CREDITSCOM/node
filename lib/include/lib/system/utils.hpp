@@ -17,15 +17,6 @@
 #include <string>
 #include <thread>
 
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4324)  // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
-#endif
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-
 #include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -164,14 +155,6 @@ public:
     ss << std::put_time(&result, "%H:%M:%S");
 #endif
     return ss.str();
-  }
-
-  ///
-  /// Returns C-style array size
-  ///
-  template <class T, size_t size>
-  static inline constexpr size_t arraySize(const T (&)[size]) noexcept {
-    return size;
   }
 
   ///
