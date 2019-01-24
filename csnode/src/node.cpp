@@ -408,9 +408,18 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       csmeta(cserror) << "Created pool is not valid";
       return;
     }
-    //for (auto& it : poolSignatures) {
-    //  pool.value().add_signature(it.sender, it.signature);
-    //}
+
+    //std::string str_addr = "HJAKzxeiXsusfro1S55NvTpdmHCdVtNtFjWXPWzYaykj";
+    //std::vector<uint8_t> pub_key;
+    //DecodeBase58(str_addr, pub_key);
+    //cs::PublicKey pKey;
+
+    //std::copy(pub_key.cbegin(), pub_key.cend(), pKey.begin());
+    //if(myConfidantIndex_== 0){
+      //for (auto& it : poolSignatures) {
+      //  pool.value().add_signature(it.sender, it.signature);
+      //}
+   /*  }*/
 
     pool.value().set_confidants(table->confidants);
 
