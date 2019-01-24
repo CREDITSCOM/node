@@ -568,13 +568,32 @@ namespace cs
                                                  contract.smartContractDeploy.byteCode, state, contract.method,
                                                  contract.params, Consensus::T_smart_contract);
 
+        std::string error;
+        try {
+          get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCode,
+            state, contract.method, contract.params, Consensus::T_smart_contract);
+        }
+        catch(std::exception& x) {
+          error = x.what();
+        }
+        catch(...) {
+          error = " exception while executing byte code";
+        }
+
         std::lock_guard<std::mutex> lock(mtx_emit_transaction);
-
-        csdebug() << name() << ": smart contract call completed";
-
-        SmartExecutionData data = {start_tr, state, item, resp};
-
-        return data;
+        if(error.empty()) {
+          csdebug() << name() << ": smart contract call completed";
+        }
+        else {
+          cserror() << name() << ": " << error;
+        }
+        return SmartExecutionData {
+          start_tr,
+          state,
+          item,
+          resp,
+          error
+        };
       };
 
       // run async and watch result

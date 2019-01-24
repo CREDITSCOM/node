@@ -95,6 +95,7 @@ namespace cs
     std::string state;
     SmartContractRef smartContract;
     executor::ExecuteByteCodeResult result;
+    std::string error;
   };
 
   inline bool operator==(const SmartContractRef& l, const SmartContractRef& r)
@@ -210,7 +211,7 @@ namespace cs
     void onStoreBlock(csdb::Pool block);
 
     // called when next block is read from database
-    void onReadBlock([[maybe_unused]] csdb::Pool block, [[maybe_unused]] bool* should_stop);
+    void onReadBlock(csdb::Pool block, bool* should_stop);
 
   private:
 

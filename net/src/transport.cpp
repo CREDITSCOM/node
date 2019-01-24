@@ -441,7 +441,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0) {
-    rn = pack.getRoundNum() + (pack.getType() != MsgTypes::Transactions ? 0 : 5);
+    rn = pack.getRoundNum();
   }
 
   return !rn || rn >= rLim;
