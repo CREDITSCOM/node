@@ -44,4 +44,7 @@ public:
 
   /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
   constexpr static size_t maxStageOneHashes = 250;
+
+  /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
+  constexpr static unsigned int MaxRoundsExecuteSmart = 100;
 };

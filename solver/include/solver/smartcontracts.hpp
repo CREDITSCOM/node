@@ -58,8 +58,10 @@ namespace cs
       constexpr csdb::user_field_id_t RefStart = 1;
       // fee value
       constexpr csdb::user_field_id_t Fee = 2;
+      // return value
+      constexpr csdb::user_field_id_t RetVal = 3;
       // count of user fields
-      constexpr size_t Count = 3;
+      constexpr size_t Count = 4;
     }
     // smart-gen transaction field
     namespace smart_gen
@@ -165,7 +167,7 @@ namespace cs
     }
 
     void enqueue(csdb::Pool block, size_t trx_idx);
-    void on_completed(csdb::Pool block, size_t trx_idx);
+    void on_new_state(csdb::Pool block, size_t trx_idx);
 
     void set_execution_result(cs::TransactionsPacket& pack) const;
 
@@ -223,7 +225,6 @@ namespace cs
     // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
     csconnector::connector::ApiHandlerPtr papi;
 
-    CallsQueueScheduler::CallTag tag_remove_finished_contract;
     CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
     // last contract's state storage
@@ -271,8 +272,6 @@ namespace cs
     }
 
     void checkAllExecutions();
-
-    void cancel_running_smart_contract();
 
     void test_exe_queue();
 
