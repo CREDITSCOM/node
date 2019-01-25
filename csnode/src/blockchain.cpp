@@ -243,7 +243,9 @@ void generateCheatDbFile(std::string path, const BlockHashes& bh) {
 }
 
 bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+#if defined(RECREATE_CHEAT)
   std::string origin = path;
+#endif// RECREATE_CHEAT
   const auto cd = prepareCheatData(path, bh);
 
   std::ifstream f(path);
