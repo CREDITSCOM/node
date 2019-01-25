@@ -410,7 +410,7 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   for (auto& item : exe_queue) {
     if (item.status == SmartContractStatus::Running) {
       const auto seq = block.sequence();
-      if (seq > item.round && seq - item.round > Consensus::MaxRoundsExecuteSmart) {
+      if (seq > item.round && seq - item.round >= Consensus::MaxRoundsExecuteSmart) {
         cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
                     << " blocks, cancel it without transaction";
         item.status = SmartContractStatus::Finished;
