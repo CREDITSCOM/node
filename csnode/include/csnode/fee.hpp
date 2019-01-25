@@ -36,8 +36,8 @@ public:
   *  @param pool/packet - counted fee will be set for each transaction
   *                       in this pool/packet.
   */
-  void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool, bool from_consensus = false);
-  void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet, bool from_consensys = false);
+  void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
+  void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
 
   Fee();
   Fee(const Fee&) = delete;
@@ -82,7 +82,7 @@ private:
   double one_byte_cost_;
   double one_round_cost_;
   double rounds_frequency_;
-  bool called_from_consensys_;
+  bool update_trusted_cache_;
   csdb::Pool* current_pool_;
   TransactionsPacket* transactions_packet_;
   std::map<cs::PublicKey, uint64_t> last_trusted_;
