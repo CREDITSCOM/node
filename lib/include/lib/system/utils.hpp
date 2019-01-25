@@ -331,39 +331,11 @@ public:
 public:
 
   ///
-  /// Signs data with security key
-  ///
-  static cs::Signature sign(const cs::Byte* byte, std::size_t size, const cs::PrivateKey& securityKey) {
-    return cscrypto::GenerateSignature(securityKey, byte, size);
-  }
-
-  ///
-  /// Signs data with security key
-  ///
-  static cs::Signature sign(const cs::Bytes& data, const cs::PrivateKey& securityKey) {
-    return cs::Utils::sign(data.data(), data.size(), securityKey);
-  }
-
-  ///
   /// Returns current time point as string representation
   ///
   static std::string currentTimestamp() {
     auto now = std::chrono::system_clock::now();
     return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
-  }
-
-  ///
-  /// Verifies data signature with public key
-  ///
-  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Byte* message, std::size_t messageSize) {
-    return cscrypto::VerifySignature(signature, publicKey, message, messageSize);
-  }
-
-  ///
-  /// Verifies data signature with public key
-  ///
-  static bool verifySignature(const cs::Signature& signature, const cs::PublicKey& publicKey, const cs::Bytes& bytes) {
-    return cs::Utils::verifySignature(signature, publicKey, bytes.data(), bytes.size());
   }
 
   ///
