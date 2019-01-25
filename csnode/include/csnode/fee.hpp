@@ -7,7 +7,7 @@
 #define SOLVER_FEE_HPP
 
 #include <cstddef>
-#include <set>
+#include <map>
 
 #include <lib/system/common.hpp>
 
@@ -75,6 +75,7 @@ private:
   inline void Init(const BlockChain& blockchain, csdb::Pool* pool);
   inline void Init(const BlockChain&, TransactionsPacket* packet);
   void ResetTrustedCache(const BlockChain&);
+  void AddConfidants(const std::vector<cs::PublicKey>& pool);
 
   size_t num_of_last_block_;
   size_t total_transactions_length_;
@@ -83,7 +84,7 @@ private:
   double rounds_frequency_;
   csdb::Pool* current_pool_;
   TransactionsPacket* transactions_packet_;
-  std::multiset<cs::PublicKey> last_trusted_;
+  std::map<cs::PublicKey, uint64_t> last_trusted_;
 };
 }  // namespace cs
 
