@@ -36,32 +36,42 @@ Fee::Fee()
     one_byte_cost_(0),
     one_round_cost_(0),
     rounds_frequency_(0),
-    called_from_consensys_(false),
+    update_trusted_cache_(true),
     current_pool_(nullptr),
     transactions_packet_(nullptr) {}
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool, bool from_consensys) {
-  called_from_consensys_ = from_consensys;
+void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
+  if (num_of_last_block_ > blockchain.getLastSequence()) {
+    ResetTrustedCache(blockchain);
+    update_trusted_cache_ = false;
+  } else if (num_of_last_block_ == blockchain.getLastSequence()) {
+    update_trusted_cache_ = false;
+  } else {
+    update_trusted_cache_ = true;
+  }
+
   if (pool->transactions().size() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
-  }
-  if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
-    ResetTrustedCache(blockchain);
   }
   Init(blockchain, pool);
   CountOneByteCost(blockchain);
   SetCountedFee();
 }
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet, bool from_consensys) {
-  called_from_consensys_ = from_consensys;
+void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
+  if (num_of_last_block_ > blockchain.getLastSequence()) {
+    ResetTrustedCache(blockchain);
+    update_trusted_cache_ = false;
+  } else if (num_of_last_block_ == blockchain.getLastSequence()) {
+    update_trusted_cache_ = false;
+  } else {
+    update_trusted_cache_ = true;
+  }
+
   if (packet->transactionsCount() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
-  }
-  if (num_of_last_block_ > blockchain.getLastSequence() + 1) {
-    ResetTrustedCache(blockchain);
   }
   Init(blockchain, packet);
   CountOneByteCost(blockchain);
@@ -71,13 +81,13 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
 inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
   current_pool_ = pool;
   transactions_packet_ = nullptr;
-  num_of_last_block_ = blockchain.getLastSequence() + 1;
+  num_of_last_block_ = blockchain.getLastSequence();
 }
 
 inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) {
   transactions_packet_ = packet;
   current_pool_ = nullptr;
-  num_of_last_block_ = blockchain.getLastSequence() + 1;
+  num_of_last_block_ = blockchain.getLastSequence();
 }
 
 void Fee::SetCountedFee() {
@@ -140,25 +150,24 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 }
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
-  if (called_from_consensys_) {
+  if (!update_trusted_cache_) {
     return last_trusted_.size();
   }
   csmeta(csdebug) << "begin";
-  const size_t last_sequence = blockchain.getLastSequence();
-  csdb::Pool pool = blockchain.loadBlock(last_sequence);
+  csdb::Pool pool = blockchain.loadBlock(num_of_last_block_);
 
   if (!pool.is_valid()) {
-    cserror() << "Fee> Pool is not valid. Error load block: " << last_sequence;
+    cserror() << "Fee> Pool is not valid. Error load block: " << num_of_last_block_;
     return last_trusted_.size();
   }
 
   AddConfidants(pool.confidants());
 
-  if (last_sequence <= kBlocksNumForNodesQtyEstimation) {
+  if (num_of_last_block_ <= kBlocksNumForNodesQtyEstimation) {
     return last_trusted_.size();
   }
 
-  const auto sequence_to_remove = last_sequence - kBlocksNumForNodesQtyEstimation;
+  const auto sequence_to_remove = num_of_last_block_ - kBlocksNumForNodesQtyEstimation;
   csdb::Pool pool_to_remove_conf = blockchain.loadBlock(sequence_to_remove);
   if (!pool_to_remove_conf.is_valid()) {
     cserror() << "Fee> Pool is not valid. Error load block for remove confidants: " << sequence_to_remove;
