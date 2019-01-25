@@ -78,31 +78,19 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
 }
 
 void Fee::SetCountedFee() {
+  std::vector<csdb::Transaction>* transactions = nullptr;
+
   if (current_pool_ != nullptr) {
-    std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
-    for (auto& transaction : transactions) {
-      const size_t size_of_transaction = transaction.to_byte_stream().size();
-      const double counted_fee = one_byte_cost_ * size_of_transaction;
-      if (counted_fee < kMinFee) {
-        transaction.set_counted_fee(csdb::AmountCommission(kMinFee));
-      }
-      else {
-        transaction.set_counted_fee(csdb::AmountCommission(counted_fee));
-      }
-    }
+    transactions = &(current_pool_->transactions());
   }
   else {
-    std::vector<csdb::Transaction>& transactions = transactions_packet_->transactions();
-    for (size_t i = 0; i < transactions.size(); ++i) {
-      const size_t size_of_transaction = transactions[i].to_byte_stream().size();
-      const double counted_fee = one_byte_cost_ * size_of_transaction;
-      if (counted_fee < kMinFee) {
-        transactions[i].set_counted_fee(csdb::AmountCommission(kMinFee));
-      }
-      else {
-        transactions[i].set_counted_fee(csdb::AmountCommission(counted_fee));
-      }
-    }
+    transactions = &(transactions_packet_->transactions());
+  }
+
+  for (auto& transaction : (*transactions)) {
+    const size_t size_of_transaction = transaction.to_byte_stream().size();
+    const double counted_fee = one_byte_cost_ * size_of_transaction;
+    transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
   }
 }
 
@@ -125,14 +113,16 @@ void Fee::CountOneByteCost(const BlockChain& blockchain) {
 
 void Fee::CountTotalTransactionsLength() {
   total_transactions_length_ = 0;
-  std::vector<csdb::Transaction> transactions;
+  std::vector<csdb::Transaction>* transactions = nullptr;
+
   if (current_pool_ != nullptr) {
-    transactions = current_pool_->transactions();
+    transactions = &(current_pool_->transactions());
   }
   else {
-    transactions = transactions_packet_->transactions();
+    transactions = &(transactions_packet_->transactions());
   }
-  for (auto & transaction : transactions) {
+
+  for (const auto& transaction : (*transactions)) {
     total_transactions_length_ += transaction.to_byte_stream().size();
   }
 }
@@ -147,30 +137,44 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 }
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
-  size_t last_sequence = blockchain.getLastSequence();
+  const size_t last_sequence = blockchain.getLastSequence();
   csdb::Pool pool = blockchain.loadBlock(last_sequence);
-  const auto& confidants = pool.confidants();
-  
-  for (size_t i = 0; i < confidants.size(); ++i) {
-    last_trusted_.insert(confidants[i]);
+
+  if (!pool.is_valid()) {
+    cserror() << "Fee> Pool is not valid. Error load block: " << last_sequence;
+    return last_trusted_.size();
   }
 
-  if (last_sequence > kBlocksNumForNodesQtyEstimation) {
-    csdb::Pool pool_to_remove_conf = blockchain.loadBlock(last_sequence - kBlocksNumForNodesQtyEstimation);
-    const auto& confidants_to_remove = pool_to_remove_conf.confidants();
-    for (size_t i = 0; i < confidants_to_remove.size(); ++i) {
-      auto it = last_trusted_.find(confidants_to_remove[i]);
-      if (it != last_trusted_.end()) {
+  AddConfidants(pool.confidants());
+
+  if (last_sequence <= kBlocksNumForNodesQtyEstimation) {
+    return last_trusted_.size();
+  }
+
+  const auto sequence_to_remove = last_sequence - kBlocksNumForNodesQtyEstimation;
+  csdb::Pool pool_to_remove_conf = blockchain.loadBlock(sequence_to_remove);
+  if (!pool_to_remove_conf.is_valid()) {
+    cserror() << "Fee> Pool is not valid. Error load block for remove confidants: " << sequence_to_remove;
+    return last_trusted_.size();
+  }
+
+  const auto& confidants_to_remove = pool_to_remove_conf.confidants();
+  for (const auto& conf : confidants_to_remove) {
+    auto it = last_trusted_.find(conf);
+    if (it != last_trusted_.end()) {
+      --(it->second);
+      if (it->second == 0){
         last_trusted_.erase(it);
       }
     }
+    else {
+      cserror() << "Fee> Confidants to remove is not contained to last trusted confidants.";
+      cserror() << "Fee> Confidant: " << cs::Utils::byteStreamToHex(conf.data(), conf.size())
+                  << ", Round: " << sequence_to_remove;
+    }
   }
 
-  std::set<cs::PublicKey> unique_trusted;
-  for (const auto& it : last_trusted_) {
-    unique_trusted.insert(it);
-  }
-  return unique_trusted.size();
+  return last_trusted_.size();
 }
 
 void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
@@ -223,29 +227,32 @@ void Fee::ResetTrustedCache(const BlockChain& blockchain) {
   if (last_sequence == 0) {
     return;
   }
-  csdb::Pool pool = blockchain.loadBlock(last_sequence);
-  if (last_sequence <= kBlocksNumForNodesQtyEstimation) {
-    while (pool.is_valid()) {
-      const auto& confidants = pool.confidants();
-      for (size_t i = 0; i < confidants.size(); ++i) {
-        last_trusted_.insert(confidants[i]);
-      }
-      --last_sequence;
-      if (last_sequence < 1) {
-        break;
-      }
-      pool = blockchain.loadBlock(last_sequence);
+
+  const size_t sequence_to_stop = (last_sequence > kBlocksNumForNodesQtyEstimation ?
+                                   last_sequence - kBlocksNumForNodesQtyEstimation :
+                                   0);
+
+  while (last_sequence > sequence_to_stop) {
+    csdb::Pool pool = blockchain.loadBlock(last_sequence);
+    if (!pool.is_valid()) {
+      break;
     }
-  } else {
-    size_t sequence_to_stop = last_sequence - kBlocksNumForNodesQtyEstimation;
-    while (last_sequence > sequence_to_stop && pool.is_valid()) {
-      const auto& confidants = pool.confidants();
-      for (size_t i = 0; i < confidants.size(); ++i) {
-        last_trusted_.insert(confidants[i]);
-      }
-      --last_sequence;
-      pool = blockchain.loadBlock(last_sequence);
-    }
+
+    AddConfidants(pool.confidants());
+
+    --last_sequence;
   }
+}
+
+void Fee::AddConfidants(const std::vector<cs::PublicKey>& confidants) {
+  for (const auto& conf : confidants) {
+    auto it = last_trusted_.find(conf);
+    if (it != last_trusted_.end()) {
+      ++(it->second);
+    }
+    else {
+      last_trusted_.emplace(std::make_pair(conf, 1));
+    }
+  };
 }
 }  // namespace cs
