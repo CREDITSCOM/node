@@ -950,7 +950,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
     finalizeBlock(deferredBlock_);
-    pool = deferredBlock_;
+    pool = deferredBlock_.clone();
   }
 
   emit storeBlockEvent_(pool);
