@@ -10,7 +10,7 @@ using ThreadId = std::thread::id;
 template<typename T>
 using Ref = std::reference_wrapper<T>;
 
-static const uint64_t sleepTimeMs = 1500;
+static const uint64_t sleepTimeMs = 2500;
 
 template<typename... Types>
 void print(Types&& ...args) {
@@ -118,11 +118,17 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
 
   while(!isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+
+  if (!called) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+  }
 
   if (!called && isRunningFinished) {
     print("Method executed, but does not generate finished signal");
   }
+
+  print("Called value is ", called);
+  print("isRunnings value is ", isRunningFinished);
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);
@@ -162,8 +168,14 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
   cs::Connector::connect(&watcher->failed, &demo, &Demo::onFailed);
 
-  while(!called && !isRunningFinished);
-  std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+  while(!isRunningFinished);
+
+  if (!called) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+  }
+
+  print("Called value is ", called);
+  print("isRunnings value is ", isRunningFinished);
 
   if (!called && isRunningFinished) {
     print("Method executed, but does not generate finished signal");
