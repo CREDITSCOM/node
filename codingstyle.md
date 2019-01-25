@@ -66,7 +66,7 @@ Glance coding style guide description.
 
 - namespace name starts with lower case
 
->```
+>```cpp
 >namespace cs {
 >class A {
 >};
