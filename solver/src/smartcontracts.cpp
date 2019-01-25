@@ -87,12 +87,15 @@ namespace cs
       return false;
     }
 
-    const auto invoke = get_smart_contract(tr);
-    if(!invoke.has_value()) {
+    using namespace cs::trx_uf;
+    csdb::UserField uf = tr.user_field(deploy::Code);
+    if(!uf.is_valid()) {
       return false;
     }
+
+    const auto invoke = deserialize<api::SmartContractInvocation>(uf.value<std::string>()); //get_smart_contract(tr);
     // deploy ~ start but method in invoke info is empty
-    return invoke.value().method.empty();
+    return invoke.method.empty();
   }
 
   bool SmartContracts::is_start(const csdb::Transaction tr) const
@@ -469,7 +472,21 @@ namespace cs
   }
 
   void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
-  {}
+  {
+    //auto seq = block.sequence();
+    //if(seq == 1925595 || seq == 1925395) {
+    //  std::string state;
+    //  ::general::Variant ret_val;
+    //  if(block.transactions_count() > 0) {
+    //    for(auto& tr : block.transactions()) {
+    //      state = tr.user_field(-2).value<std::string>();
+    //      ret_val = deserialize<::general::Variant>(tr.user_field(3).value<std::string>());
+    //    }
+    //  }
+    //}
+
+
+  }
 
   void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
   {
@@ -544,9 +561,10 @@ namespace cs
 
         std::string error;
         try {
-          if (contract.smartContractDeploy.byteCodeObjects.empty())
-            return SmartExecutionData{};
-          get_api()->getExecutor().executeByteCode(resp, start_tr.source().to_api_addr(), contract.smartContractDeploy.byteCodeObjects,
+          if(contract.smartContractDeploy.byteCodeObjects.empty()) {
+            return SmartExecutionData {};
+          }
+          get_api()->getExecutor().executeByteCode(resp, absolute_address(start_tr.source()).to_api_addr(), contract.smartContractDeploy.byteCodeObjects,
               state, contract.method, contract.params, Consensus::T_smart_contract);
         }
         catch(std::exception& x) {

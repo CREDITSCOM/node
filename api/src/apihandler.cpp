@@ -804,7 +804,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
       auto smart_state(lockedReference(this->smart_state));
       (*smart_state)[address].update_state([&]() { 
-        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id(), trId };
+        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id().clone(), trId.clone() };
       });
 
       auto execTrans = s_blockchain.loadTransaction(trId);
@@ -829,18 +829,18 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
           return (*smart_last_trxn)[address];
         }();
         std::unique_lock<decltype(e.lock)> l(e.lock);
-        e.trid_queue.push_back(tr.id());
+        e.trid_queue.push_back(tr.id().clone());
         e.new_trxn_cv.notify_all();
       }
 
       if (is_smart_deploy(smart)) {
         {
           auto smart_origin = lockedReference(this->smart_origin);
-          (*smart_origin)[address] = tr.id();
+          (*smart_origin)[address] = tr.id().clone();
         }
         {
           auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-          (*deployed_by_creator)[source_pk].push_back(tr.id());
+          (*deployed_by_creator)[source_pk].push_back(tr.id().clone());
         }
       }
 
