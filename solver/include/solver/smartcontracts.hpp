@@ -2,19 +2,19 @@
 
 #include <apihandler.hpp>
 #include <csdb/address.hpp>
-#include <csdb/user_field.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
-#include <lib/system/signals.hpp>
+#include <csdb/user_field.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/concurrent.hpp>
+#include <lib/system/signals.hpp>
 
-#include <csnode/node.hpp> // introduce Node::api_handler_ptr_t
+#include <csnode/node.hpp>  // introduce Node::api_handler_ptr_t
 
-#include <optional>
-#include <vector>
 #include <list>
 #include <mutex>
+#include <optional>
+#include <vector>
 
 //#define DEBUG_SMARTS
 
@@ -35,7 +35,6 @@ constexpr csdb::user_field_id_t Code = 0;
 // count of user fields
 constexpr size_t Count = 1;
 }  // namespace deploy
-
 // start transaction fields
 namespace start {
 // methods with args (string)
@@ -45,7 +44,6 @@ constexpr csdb::user_field_id_t RefState = 1;
 // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
 // constexpr size_t Count = {1,2};
 }  // namespace start
-
 // new state transaction fields
 namespace new_state {
 // new state value, new byte-code (string)
@@ -54,8 +52,10 @@ constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for curren
 constexpr csdb::user_field_id_t RefStart = 1;
 // fee value
 constexpr csdb::user_field_id_t Fee = 2;
+// return value
+constexpr csdb::user_field_id_t RetVal = 3;
 // count of user fields
-constexpr size_t Count = 3;
+constexpr size_t Count = 4;
 }  // namespace new_state
 // smart-gen transaction field
 namespace smart_gen {
@@ -79,6 +79,7 @@ struct SmartContractRef {
   // "serialization" methods
 
   csdb::UserField to_user_field() const;
+
   void from_user_field(const csdb::UserField fld);
 };
 
@@ -150,7 +151,7 @@ public:
   }
 
   void enqueue(csdb::Pool block, size_t trx_idx);
-  void on_completed(csdb::Pool block, size_t trx_idx);
+  void on_new_state(csdb::Pool block, size_t trx_idx);
 
   void set_execution_result(cs::TransactionsPacket& pack) const;
 
@@ -203,7 +204,6 @@ private:
   // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
   csconnector::connector::ApiHandlerPtr papi;
 
-  CallsQueueScheduler::CallTag tag_remove_finished_contract;
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
   // last contract's state storage
@@ -248,8 +248,6 @@ private:
   }
 
   void checkAllExecutions();
-
-  void cancel_running_smart_contract();
 
   void test_exe_queue();
 
