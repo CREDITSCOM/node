@@ -364,8 +364,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
 
   cs::DataStream poolStream(data, size);
-  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size  << ") -> " << cs::Utils::byteStreamToHex(data,size);
-
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
   size_t smartSigCount;
@@ -2311,7 +2309,7 @@ void Node::sendHash(cs::RoundNumber round) {
 
   const auto& hash = blockChain_.getLastHash();
   csdb::PoolHash spoiledHash;
-  csdebug() << "NODE> Sending hash " << hash.to_string() << " to ALL";
+  csdebug() << "NODE> Sending hash " /*<< hash.to_string()*/ << " to ALL";
   spoiledHash = spoileHash(hash, solver_->getPublicKey());
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
   csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);

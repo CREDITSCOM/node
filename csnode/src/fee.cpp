@@ -143,6 +143,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   if (called_from_consensys_) {
     return last_trusted_.size();
   }
+  csmeta(csdebug) << "begin";
   const size_t last_sequence = blockchain.getLastSequence();
   csdb::Pool pool = blockchain.loadBlock(last_sequence);
 
@@ -176,7 +177,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
     else {
       cserror() << "Fee> Confidants to remove is not contained to last trusted confidants.";
       cserror() << "Fee> Confidant: " << cs::Utils::byteStreamToHex(conf.data(), conf.size())
-                  << ", Round: " << sequence_to_remove;
+                << ", Round: " << sequence_to_remove;
     }
   }
 
