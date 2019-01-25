@@ -1189,7 +1189,7 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
     else if (is_smart(*trIt) && trx_id == trIt->id()) {
       if (!func(trIt.getPool(), *trIt))
         break;
-      memset(&trx_id, 0, sizeof(csdb::TransactionID));
+      trx_id = csdb::TransactionID{};
     }   
   }
 }
