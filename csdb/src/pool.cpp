@@ -99,7 +99,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     //signature_.fill(0);
   }
 
-  void put(::csdb::priv::obstream& os) const {
+  void put(::csdb::priv::obstream& os, bool doHash) const {
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -122,14 +122,33 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     os.put(realTrusted_);
 
+    if (doHash) {
+      return;
+    }
+    size_t hashingLength = os.buffer().size();
+
     os.put(signatures_.size());
     for (const auto& it : signatures_) {
       os.put(it.first);
       os.put(it.second);
     }
+
+    os.put(smartSignatures_.size());
+    for (const auto& it : smartSignatures_) {
+      os.put(it.smartKey);
+      os.put(it.smartConsensusPool);
+      os.put(it.signatures_.size());
+      for (const auto& itt : it.signatures_) {
+        os.put(itt.first);
+        os.put(itt.second);
+      }
+    }
+    os.put(hashingLength);
+
   }
 
   void put_for_sig(::csdb::priv::obstream& os) const {
+  //not used now
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -231,6 +250,40 @@ class Pool::priv : public ::csdb::internal::shared_data {
     return true;
   }
 
+  bool getSmartSignatures(::csdb::priv::ibstream& is) {
+    size_t cnt = 0;
+    size_t confCount = 0;
+    if (!is.get(cnt)) {
+      return false;
+    }
+
+    smartSignatures_.clear();
+    smartSignatures_.reserve(cnt);
+
+    for (size_t smarts = 0; smarts < cnt; ++smarts) {
+      SmartSignature sSig;
+      sSig.smartConsensusPool = 0;
+      sSig.smartKey.fill(0);
+      sSig.signatures_.clear();
+      
+      int index;
+      if (!is.get(sSig.smartKey)) {
+        return false;
+      }
+
+      if (!is.get(sSig.smartConsensusPool)) {
+        return false;
+      }
+
+      if (!is.get(confCount)) {
+        return false;
+      }
+
+      smartSignatures_.emplace_back(sSig);
+    }
+    return true;
+  }
+
   bool getNewWallets(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
     if (!is.get(cnt)) {
@@ -275,6 +328,15 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
+    if (!getSmartSignatures(is)) {
+      return false;
+    }
+
+    size_t hashingLength;
+    if(!is.get(hashingLength)) {
+      return false;
+    }
+
     is_valid_ = true;
     return true;
   }
@@ -292,13 +354,22 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   void update_binary_representation() {
     ::csdb::priv::obstream os;
-    put(os);
+    put(os, false);
     binary_representation_ = std::move(const_cast<cs::Bytes&>(os.buffer()));
   }
 
   void update_transactions() {
     read_only_ = true;
-    hash_ = PoolHash::calc_from_data(binary_representation_);
+    size_t hashingLength = 0;
+    ::csdb::priv::ibstream is(binary_representation_.data() + binary_representation_.size() - sizeof(size_t), sizeof(size_t));
+    if (!is.get(hashingLength)) {
+      return;
+    }
+
+
+    const auto pointer = binary_representation_.data();;
+    cs::Bytes binRep(pointer, pointer + hashingLength);
+    hash_ = PoolHash::calc_from_data(binRep);
     for (size_t idx = 0; idx < transactions_.size(); ++idx) {
       transactions_[idx].d->_update_id(hash_, idx);
     }
@@ -339,6 +410,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
     //result.signature_ = signature_;
     //result.writer_public_key_ = writer_public_key_;
     result.signatures_ = signatures_;
+    result.smartSignatures_ = smartSignatures_;
+    result.realTrusted_ = realTrusted_;
     result.binary_representation_ = binary_representation_;
 
     result.storage_ = storage_;
@@ -362,6 +435,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
+  size_t hashingLength_ = 0;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
 };
@@ -585,6 +659,7 @@ void Pool::add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept
   data->realTrusted_ = trustedMask;
 }
 
+
 void Pool::set_storage(const Storage& storage) noexcept {
   // We can set up storage even if Pool is read-only
   priv* data = d.data();
@@ -739,7 +814,7 @@ bool Pool::save(Storage storage) {
 
 cs::Bytes Pool::to_byte_stream_for_sig() {
   ::csdb::priv::obstream os;
-  d->put_for_sig(os);
+  d->put(os, true);
   cs::Bytes result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
   return result;
 }

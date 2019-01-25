@@ -182,7 +182,7 @@ private:
   void logBlockInfo(csdb::Pool& pool);
 
   // Thread unsafe
-  void finalizeBlock(csdb::Pool& pool);
+  bool finalizeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
 

@@ -474,10 +474,47 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   csdebug() << " last storage size: " << getSize();
 }
 
-void BlockChain::finalizeBlock(csdb::Pool& pool) {
+bool BlockChain::finalizeBlock(csdb::Pool& pool) {
   if(!pool.compose()) {
     csmeta(cserror) << "Couldn't compose block: " << pool.sequence();
-    return;
+    return false;
+  }
+
+  const auto& confidants = pool.confidants();
+  const auto& signatures = pool.signatures();
+  if (signatures.empty() && pool.sequence() != 0) {
+    csdebug() << "The  pool doesn't contain signatures";
+    return false;
+  }
+
+  if (signatures.size() < confidants.size() / 2U + 1U && pool.sequence() != 0) {
+    csdebug() << "The number of signatures is insufficient";
+    return false;
+  }
+
+  size_t truePoolSignatures = 0;
+
+  for (auto& it : signatures) {
+    if (it.first < confidants.size()) {
+      if (cscrypto::VerifySignature(it.second, confidants.at(it.first), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
+        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(it.first).data(), confidants.at(it.first).size()) << " is valid";
+        ++truePoolSignatures;
+      }
+      else {
+        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(it.first).data(), confidants.at(it.first).size()) << " is NOT VALID";
+      }
+    }
+    else {
+      cswarning() << "The number of confidants in pool doesn't correspond the indexes of the signatures";
+      return false;
+    }
+  }
+  if (truePoolSignatures == signatures.size()) {
+    cslog() << "The number of signatures is sufficient ant all of them are OK!";
+  }
+  else {
+    cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+    return false;
   }
 
 #ifdef TRANSACTIONS_INDEX
@@ -486,10 +523,12 @@ void BlockChain::finalizeBlock(csdb::Pool& pool) {
 
   if(!updateFromNextBlock(pool)) {
     csmeta(cserror) << "Error in updateFromNextBlock()";
+    return false;
   }
 
   csmeta(csdetails) << "last hash: " << pool.hash().to_string();
   recount_trxns(pool);
+  return true;
 }
 
 const csdb::Storage& BlockChain::getStorage() const {
@@ -946,7 +985,12 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
-    finalizeBlock(deferredBlock_);
+    if(finalizeBlock(deferredBlock_)) {
+      csdebug() << "The block is correct";
+    } 
+    else {
+      csdebug() << "the signatures of the block sre incorrect";
+    }
     pool = deferredBlock_;
   }
 
