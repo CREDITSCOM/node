@@ -234,7 +234,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
         bool present;
         const auto tmp = papi->getSmartContract(tr.source(), present);  // tr.target() is also allowed
         if (present) {
-          return tmp;
+          return std::make_optional(tmp);
         }
       }
     }
@@ -243,28 +243,31 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
   else {
     const auto& smart_fld = tr.user_field(trx_uf::deploy::Code);  // trx_uf::start::Methods == trx_uf::deploy::Code
     if (smart_fld.is_valid()) {
-      const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
-      if (invoke_info.method.empty()) {
-        // is deploy
-        return invoke_info;
-      }
-      else {
-        // is start
-        // currently invoke_info contains all info required to execute contract, so
-        // we need not acquire origin
-        constexpr bool api_pass_code_and_methods = false;
-        if constexpr (api_pass_code_and_methods) {
-          return invoke_info;
+      std::string data = smart_fld.value<std::string>();
+      if(!data.empty()) {
+        const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
+        if(invoke_info.method.empty()) {
+          // is deploy
+          return std::make_optional(invoke_info);
         }
-        // if api is refactored, we may need to acquire contract origin separately:
-        if constexpr (!api_pass_code_and_methods) {
-          bool present;
-          if (papi != nullptr) {
-            auto tmp = papi->getSmartContract(tr.target(), present);
-            if (present) {
-              tmp.method = invoke_info.method;
-              tmp.params = invoke_info.params;
-              return tmp;
+        else {
+          // is start
+          // currently invoke_info contains all info required to execute contract, so
+          // we need not acquire origin
+          constexpr bool api_pass_code_and_methods = false;
+          if constexpr (api_pass_code_and_methods) {
+            return std::make_optional(invoke_info);
+          }
+          // if api is refactored, we may need to acquire contract origin separately:
+          if constexpr (!api_pass_code_and_methods) {
+            bool present;
+            if (papi != nullptr) {
+              auto tmp = papi->getSmartContract(tr.target(), present);
+              if (present) {
+                tmp.method = invoke_info.method;
+                tmp.params = invoke_info.params;
+                return std::make_optional(tmp);
+              }
             }
           }
         }
@@ -585,7 +588,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   if (!bc.findWalletData(SmartContracts::absolute_address(src.target()), wallData, wallId)) {
     return csdb::Transaction{};
   }
-
+  
   csdb::Transaction result(
       wallData.trxTail_.getLastTransactionId() + 1,  // TODO: possible conflict with other innerIDs!
       src.target(),                                  // contracts' key - source

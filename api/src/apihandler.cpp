@@ -572,7 +572,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
       _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
       if (_return.__isset.smart_contract_result)
-        _return.smart_contract_result = api_resp.ret_val;
+        _return.__set_smart_contract_result(api_resp.ret_val);
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -611,7 +611,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     else {
       auto stateTrans = s_blockchain.loadTransaction(trId);
       if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
-        _return.smart_contract_result = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
+        _return.__set_smart_contract_result(deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>()));
       }
     }
 #else
@@ -1179,11 +1179,18 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
 }
 
 void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)> func) {
+  csdb::TransactionID trx_id{};
   for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
-    if (is_smart(*trIt)) {
+    if (is_smart_state(*trIt)) {
+      cs::SmartContractRef smart_ref;
+      smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
+      trx_id = csdb::TransactionID(smart_ref.hash, smart_ref.transaction);
+    }
+    else if (is_smart(*trIt) && trx_id == trIt->id()) {
       if (!func(trIt.getPool(), *trIt))
         break;
-    }
+      memset(&trx_id, 0, sizeof(csdb::TransactionID));
+    }   
   }
 }
 

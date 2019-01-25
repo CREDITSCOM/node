@@ -238,7 +238,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
     pnode->retriveSmartConfidants(smartRoundNumber_ , smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
-    cslog() << "======================  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] =========================";
+    csdebug() << "======================  SMART-ROUND: "<< smartRoundNumber_  << " [" << (int)ownSmartsConfNum_ << "] =========================";
     csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
@@ -406,7 +406,7 @@ void SolverCore::processStages() {
   int lowerTrustedLimit = (int)(smartConfidants_.size() /2. + 1.);
   if (cnt_active < lowerTrustedLimit) {
     cslog() << "Smart's consensus NOT achieved, the state transaction won't send to the conveyer";
-    return;    
+    return;
   }
   csdebug() << "Smart's consensus achieved";
 
@@ -623,7 +623,7 @@ void SolverCore::processStages() {
                 pnode->smartStageRequest(MsgTypes::SmartFirstStageRequest, i , required);
                 ++cnt_requested;
             }
-          } 
+          }
         }
         break;
       case 2:
