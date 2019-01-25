@@ -357,7 +357,16 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& 
 }
 
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
-  return tr.is_valid() ? deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>()) : api::SmartContractInvocation();
+  if(tr.is_valid()) {
+    const auto uf = tr.user_field(cs::trx_uf::deploy::Code);
+    if(uf.is_valid()) {
+      std::string data = uf.value<std::string>();
+      if(!data.empty()) {
+        return deserialize<api::SmartContractInvocation>(std::move(data));
+      }
+    }
+  }
+  return api::SmartContractInvocation();
 }
 
 api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
@@ -563,7 +572,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
       _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
       if (_return.__isset.smart_contract_result)
-        _return.smart_contract_result = api_resp.ret_val;
+        _return.__set_smart_contract_result(api_resp.ret_val);
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -602,7 +611,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     else {
       auto stateTrans = s_blockchain.loadTransaction(trId);
       if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
-        _return.smart_contract_result = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
+        _return.__set_smart_contract_result(deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>()));
       }
     }
 #else
@@ -804,7 +813,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
       auto smart_state(lockedReference(this->smart_state));
       (*smart_state)[address].update_state([&]() { 
-        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id(), trId };
+        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id().clone(), trId.clone() };
       });
 
       auto execTrans = s_blockchain.loadTransaction(trId);
@@ -829,18 +838,18 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
           return (*smart_last_trxn)[address];
         }();
         std::unique_lock<decltype(e.lock)> l(e.lock);
-        e.trid_queue.push_back(tr.id());
+        e.trid_queue.push_back(tr.id().clone());
         e.new_trxn_cv.notify_all();
       }
 
       if (is_smart_deploy(smart)) {
         {
           auto smart_origin = lockedReference(this->smart_origin);
-          (*smart_origin)[address] = tr.id();
+          (*smart_origin)[address] = tr.id().clone();
         }
         {
           auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-          (*deployed_by_creator)[source_pk].push_back(tr.id());
+          (*deployed_by_creator)[source_pk].push_back(tr.id().clone());
         }
       }
 
