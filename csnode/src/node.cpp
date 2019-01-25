@@ -2290,10 +2290,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   // create pool by previous round, then change conveyer state.
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  if (myLevel_ != NodeLevel::Confidant) {
-    csdebug() << "Confidants don't need to build block once again";
-    getCharacteristic(reinterpret_cast<cs::Byte*>(roundStream.data()), roundStream.size(), conveyer.currentRoundNumber(), sender, std::move(poolSignatures));
-  }
+  getCharacteristic(reinterpret_cast<cs::Byte*>(roundStream.data()), roundStream.size(), conveyer.currentRoundNumber(), sender, std::move(poolSignatures));
 
   conveyer.setRound(std::move(roundTable));
 

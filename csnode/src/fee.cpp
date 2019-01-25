@@ -36,10 +36,12 @@ Fee::Fee()
     one_byte_cost_(0),
     one_round_cost_(0),
     rounds_frequency_(0),
+    called_from_consensys_(false),
     current_pool_(nullptr),
     transactions_packet_(nullptr) {}
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
+void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool, bool from_consensys) {
+  called_from_consensys_ = from_consensys;
   if (pool->transactions().size() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
@@ -52,7 +54,8 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   SetCountedFee();
 }
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
+void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet, bool from_consensys) {
+  called_from_consensys_ = from_consensys;
   if (packet->transactionsCount() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
@@ -137,6 +140,9 @@ void Fee::CountOneRoundCost(const BlockChain& blockchain) {
 }
 
 size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
+  if (called_from_consensys_) {
+    return last_trusted_.size();
+  }
   const size_t last_sequence = blockchain.getLastSequence();
   csdb::Pool pool = blockchain.loadBlock(last_sequence);
 
