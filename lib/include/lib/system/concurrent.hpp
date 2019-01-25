@@ -335,7 +335,7 @@ public:
   void wait_till_front(const J& j) {
     std::unique_lock<decltype(lock_)> l(lock_);
 
-    conditionalVariable_.wait(l, [&]() { return j(state); });
+    conditionalVariable_.wait(l, [&]() { return j(state_); });
 
     tidMap_.erase(std::this_thread::get_id());
     conditionalVariable_.notify_all();
