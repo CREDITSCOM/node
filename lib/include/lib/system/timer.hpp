@@ -43,9 +43,15 @@ public:
 
   ///
   /// @brief Stops timer.
-  /// @brief Timer would not stop immediatly, only after thread joining.
+  /// @brief Timer would not stop immediatly if it's type is Standard, only after thread joined.
+  /// @brief If timer type is HigPrecise it stops immediatly.
   ///
   void stop();
+
+  ///
+  /// @brief Restars timer.
+  ///
+  void restart();
 
   ///
   /// @brief Returns timer status.
@@ -87,7 +93,7 @@ private:
 
   unsigned int allowDifference_;
   std::chrono::milliseconds ms_;
-  std::chrono::nanoseconds ns_;
+  std::atomic<int64_t> ns_;
 
   std::chrono::milliseconds realMs_;
   std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;

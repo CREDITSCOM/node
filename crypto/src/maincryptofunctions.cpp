@@ -2,7 +2,15 @@
 
 #include <cassert>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4324 4244 4267 4804) // 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier,
+                                              // convertion from uin64_t to uin32_t, convertion from size_t to uint8_t
+#endif
 #include <blake2.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 namespace cscrypto {
 

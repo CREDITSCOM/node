@@ -6,11 +6,14 @@
 // 4706 - assignment within conditional expression
 // 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
 //         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
-#pragma warning(disable: 4706 4373)
+#pragma warning(disable: 4706 4373 4244 4244 4267)
 #endif
 
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #include <csnode/blockchain.hpp>
 
@@ -115,19 +118,13 @@ public:
   void TransactionsStateGet(TransactionsStateGetResult& _return, const api::Address& address,
                             const std::vector<int64_t>& v) override;
 
-  void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::string& bytecode) override;
-
-  void MembersSmartContractGet(MembersSmartContractGetResult& _return, const TransactionId& transactionId) override;
-
-  //void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
-
-  //void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
+  void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject> & byteCodeObjects) override;
 
   ////////new
   void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
   ////////new
   api::SmartContractInvocation getSmartContract(const csdb::Address&, bool&);
-  std::string getSmartByteCode(const csdb::Address&, bool&);
+  std::vector<general::ByteCodeObject> getSmartByteCode(const csdb::Address&, bool&);
   void SmartContractDataGet(api::SmartContractDataResult&, const api::Address&) override;
   void SmartContractCompile(api::SmartContractCompileResult&, const std::string&) override;
   ::executor::ContractExecutorConcurrentClient& getExecutor();
@@ -164,7 +161,13 @@ private:
     csdb::PoolHash last_pull_hash{};
   };
 
-  using smart_state_entry = cs::WorkerQueue<std::string>;
+  struct SmartState {
+    std::string state;
+    csdb::TransactionID transaction;
+    csdb::TransactionID initer;
+  };
+
+  using smart_state_entry = cs::WorkerQueue<SmartState>;
   using client_type = executor::ContractExecutorConcurrentClient;
 
   BlockChain& s_blockchain;
@@ -189,7 +192,7 @@ private:
 
 private:
   void state_updater_work_function();
-  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& code,
+  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::vector<general::ByteCodeObject> &code,
                          const std::string& state, const std::string& method,
                          const std::vector<general::Variant>& params); //::general::Variant
 
@@ -286,9 +289,5 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 #endif  // APIHANDLER_HPP

@@ -15,6 +15,19 @@
 
 #include "config.hpp"
 
+// diagnostic output
+#if defined(_MSC_VER)
+ #if defined(MONITOR_NODE)
+  #pragma message ( "\n*** Monitor node has been built ***\n" ) 
+ #elif defined(WEB_WALLET_NODE)
+  #pragma message ( "\n*** Web wallet node has been built ***\n" ) 
+ #elif defined(SPAMMER)
+  #pragma message ( "\n*** Spammer node has been built ***\n" )
+ #else
+  #pragma message ( "\n*** Basic node has been built ***\n" )
+ #endif
+#endif // _MSC_VER
+
 #ifdef BUILD_WITH_GPROF
 void sigUsr1Handler(int sig) {
   std::cerr << "Exiting on SIGUSR1\n";

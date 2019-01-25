@@ -460,6 +460,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
       ++maskIndex;
     }
+    Hash pkHash = cscrypto::CalculateHash(pKeys.data(),pKeys.size());
+    Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
+
+    csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+    csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
   
     if (maskIndex > mask.size()) {
       csmeta(cserror) << "hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
@@ -571,11 +576,11 @@ void cs::ConveyerBase::flushTransactions() {
       }
 
       // try to send save in node
-      pimpl_->flushPacket(packet);
+      emit pimpl_->flushPacket(packet);
 
       auto hash = packet.hash();
 
-      if (pimpl_->packetsTable.count(hash) == 0u) {
+      if (auto iter = pimpl_->packetsTable.find(hash); iter == pimpl_->packetsTable.end()) {
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
       }
       else {

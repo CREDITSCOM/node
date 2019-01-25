@@ -15,7 +15,7 @@ IPacMan::Task& IPacMan::allocNext() {
 }
 
 void IPacMan::enQueueLast() {
-  allocator_.shrinkLast(lastElt_->element.size);
+  allocator_.shrinkLast(static_cast<uint32_t>(lastElt_->element.size));
   queue_.unlockWrite(lastElt_);
   lockedLast_ = false;
 }

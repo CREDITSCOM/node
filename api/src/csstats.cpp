@@ -39,6 +39,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     }
 
     while (blockHash != lastHash_ && !blockHash.is_empty()) {
+      std::this_thread::sleep_for(std::chrono::seconds(2)); //fix me (solution for synchronization with transactionsSmartCount)
       csdb::Pool pool = blockchain_.loadBlock(blockHash);
 
       periodStats.poolsCount++;
@@ -48,19 +49,15 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
-
-        if (transaction.user_field(0).is_valid()) {
-          ++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
-        }                                        // smart contracts
-
-        if (is_deploy_transaction(transaction)) {
+#ifdef MONITOR_NODE
+        if (transaction.user_field(0).is_valid())
+          periodStats.transactionsSmartCount += blockchain.getTransactionsCount(transaction.target());
+#endif
+        if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
-        }
 
         Currency currency = indexedCurrencies_[transaction.currency().to_string()];
-
         const auto& amount = transaction.amount();
-
         periodStats.balancePerCurrency[currency].integral += amount.integral();
         periodStats.balancePerCurrency[currency].fraction += amount.fraction();
       }

@@ -43,6 +43,7 @@ public signals:  // Signals
 
 private slots:
   void onTimeOut();
+  void onRoundSimulation();
 
   void onWriteBlock(const cs::Sequence sequence);
   void onRemoveBlock(const cs::Sequence sequence);
@@ -212,6 +213,7 @@ private:  // Members
   std::vector<NeighboursSetElemet> neighbours_;
 
   cs::Timer timer_;
+  cs::Timer roundSimulation_;
 
   friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
 };

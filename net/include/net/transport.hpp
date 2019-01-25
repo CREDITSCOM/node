@@ -157,7 +157,7 @@ public:
   void resetNeighbours();
 
 private:
-	void registerTask(Packet* pack, const uint32_t packNum, const bool);
+  void registerTask(Packet* pack, const uint32_t packNum, const bool);
   void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
   // Dealing with network connections

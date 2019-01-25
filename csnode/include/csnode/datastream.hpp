@@ -280,8 +280,7 @@ public:
   void addString(const std::string& string);
 
   ///
-  /// Returns std::string from stream.
-  ///        /// @return Returns std::string by arguments size.
+  /// @return Returns std::string by arguments size.
   /// If stream can not return size of bytes it returns empty std::string.
   ///
   std::string string();
@@ -344,6 +343,20 @@ public:
   template <typename T>
   inline const T& peek() const {
     return *(reinterpret_cast<T*>(data_ + index_));
+  }
+
+  ///
+  /// @brief Converts to template entity if compile.
+  /// @brief For parsing converts last not readed part.
+  ///
+  template <typename T>
+  T convert() const {
+    if (bytes_) {
+      return T(bytes_->begin(), bytes_->end());
+    }
+    else {
+      return T(data_, data_ + (dataSize_ - index_));
+    }
   }
 
 private:

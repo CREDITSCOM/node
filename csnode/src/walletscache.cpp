@@ -98,7 +98,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
     fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
   }
 
-  auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
+  [[maybe_unused]] auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
 #ifdef MONITOR_NODE
   setWalletTime(wrWall, timeStamp);
 #endif
@@ -184,7 +184,9 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
   setModified(id);
 
 #ifdef MONITOR_NODE
-  ++wallData.transNum_;
+  if (tr.source() != tr.target())  // Already counted in loadTrxForSource
+    ++wallData.transNum_;
+
   setWalletTime(wallData.address_, tr.get_time());
 #endif
 

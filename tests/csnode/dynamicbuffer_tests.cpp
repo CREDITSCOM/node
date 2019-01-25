@@ -20,7 +20,7 @@ TEST(DynamicBuffer, get_element_by_index)
   size_t size = strlen(str) + 1;
   DynamicBuffer a(size);
   auto buffer = a.get();
-  strcpy(buffer, str);
+  std::copy(std::begin(str), std::end(str), buffer);
 
   ASSERT_TRUE(a[3] == str[3]);
 }
@@ -31,8 +31,7 @@ TEST(DynamicBuffer, stl_interface)
   size_t size = strlen(str) + 1;
   DynamicBuffer a(size);
   auto buffer = a.get();
-  strcpy(buffer, str);
-
+  std::copy(std::begin(str), std::end(str), buffer);
   std::sort(a.begin(), a.end() - 1);
 
   ASSERT_STREQ("abc", *a);

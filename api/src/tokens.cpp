@@ -182,7 +182,7 @@ template <> std::string getVariantAs(const general::Variant& var) { return var.v
 template <typename RetType>
 void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const api::Address& addr,
-                    const std::string& byteCode,
+                    const std::vector<general::ByteCodeObject> &byteCodeObjects,
                     const std::string& state,
                     const std::string& method,
                     const std::vector<general::Variant>& params,
@@ -190,9 +190,11 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const std::function<void(const RetType&)> handler) {
   executor::ExecuteByteCodeResult result;
 
+  if (byteCodeObjects.empty())
+    return;
   executor.executeByteCode(result,
                            addr,
-                           byteCode,
+                           byteCodeObjects,
                            state,
                            method,
                            params,
@@ -204,7 +206,7 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
 void TokensMaster::refreshTokenState(const csdb::Address& token,
                                      const std::string& newState) {
   bool present = false;
-  auto byteCode = api_->getSmartByteCode(token, present);
+  auto byteCodeObjects = api_->getSmartByteCode(token, present);
   if (!present) return;
 
   const auto pk = token.public_key();
@@ -212,13 +214,14 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   std::string name, symbol, totalSupply;
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  if (byteCodeObjects.empty()) return;
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "getSymbol", std::vector<general::Variant>(), 250,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
@@ -229,7 +232,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                    }
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCode, newState,
+  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount(newSupp);
@@ -260,14 +263,15 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
     general::Variant var;
     //var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
     auto key = h.public_key();
-    cs::Bytes pk(key.begin(), key.end());
-    var.__set_v_string(EncodeBase58(pk));
+    var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
     holderKeysParams.push_back(std::vector<general::Variant>(1, var));
   }
 
   executor::ExecuteByteCodeMultipleResult result;
+  if (byteCodeObjects.empty())
+    return;
   api_->getExecutor().
-    executeByteCodeMultiple(result, dpAddr, byteCode, newState,
+    executeByteCodeMultiple(result, dpAddr, byteCodeObjects, newState,
                             "balanceOf", holderKeysParams, 100);
 
   if (!result.status.code &&
@@ -329,17 +333,19 @@ void TokensMaster::run() {
         try { api_->getExecutor(); }
         catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
 
-        api_->getExecutor().getContractMethods(methodsResult, dt.byteCode);
-        if (!methodsResult.status.code) {
-          auto ts = getTokenStandart(methodsResult.methods);
-          if (ts != TokenStandart::NotAToken) {
-            Token t;
-            t.standart = ts;
-            t.owner = dt.deployer;
+        if (!dt.byteCodeObjects.empty()) {
+          api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
+          if (!methodsResult.status.code) {
+            auto ts = getTokenStandart(methodsResult.methods);
+            if (ts != TokenStandart::NotAToken) {
+              Token t;
+              t.standart = ts;
+              t.owner = dt.deployer;
 
-            {
-              std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
-              tokens_[dt.address] = t;
+              {
+                std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
+                tokens_[dt.address] = t;
+              }
             }
           }
         }
@@ -387,15 +393,13 @@ void TokensMaster::run() {
 
 void TokensMaster::checkNewDeploy(const csdb::Address& sc,
                                   const csdb::Address& deployer,
-                                  const api::SmartContractInvocation& sci,
-                                  const std::string& newState) {
+                                  const api::SmartContractInvocation& sci) {
   DeployTask dt;
   dt.address = sc;
   dt.deployer = deployer;
-  dt.byteCode = sci.smartContractDeploy.byteCode;
+  dt.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
 
   TokenInvocationData tdo;
-  tdo.newState = newState;
 
   TokenInvocationData::Params ps;
   ps.initiator = deployer;
@@ -405,7 +409,6 @@ void TokensMaster::checkNewDeploy(const csdb::Address& sc,
     std::lock_guard<decltype(cvMut_)> l(cvMut_);
     /* It is important to do this under one lock */
     deployQueue_.push(dt);
-    newExecutes_[sc] = tdo;
   }
 
   tokCv_.notify_all();
@@ -474,7 +477,7 @@ std::string TokensMaster::getAmount(const api::SmartContractInvocation& sci) {
 TokensMaster::TokensMaster(api::APIHandler*) { }
 TokensMaster::~TokensMaster() { }
 void TokensMaster::run() { }
-void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
+void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>) { }
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
@@ -482,7 +485,7 @@ std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) { return ""; }
 TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>&) { return TokenStandart::NotAToken; }
 
-/*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
+/*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) { }
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>) { }
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) { return false; }
