@@ -44,7 +44,7 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   if (num_of_last_block_ > blockchain.getLastSequence()) {
     ResetTrustedCache(blockchain);
     update_trusted_cache_ = false;
-  } else if (num_of_last_block_ == blockchain.getLastSequence()) {
+  } else if (num_of_last_block_ == blockchain.getLastSequence() && last_trusted_.size() != 0) {
     update_trusted_cache_ = false;
   } else {
     update_trusted_cache_ = true;
@@ -63,7 +63,7 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
   if (num_of_last_block_ > blockchain.getLastSequence()) {
     ResetTrustedCache(blockchain);
     update_trusted_cache_ = false;
-  } else if (num_of_last_block_ == blockchain.getLastSequence()) {
+  } else if (num_of_last_block_ == blockchain.getLastSequence() && last_trusted_.size() != 0) {
     update_trusted_cache_ = false;
   } else {
     update_trusted_cache_ = true;
