@@ -435,7 +435,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
-  size_t hashingLength_ = 0;
   ::csdb::Storage::WeakPtr storage_;
   friend class Pool;
 };

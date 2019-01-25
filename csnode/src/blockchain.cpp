@@ -280,7 +280,7 @@ void BlockChain::writeGenesisBlock() {
 
   csdebug() << "Genesis block completed ... trying to save";
 
-  finalizeBlock(genesis);
+  finalizeBlock(genesis, true);
   deferredBlock_ = genesis;
 
   csdebug() << genesis.hash().to_string();
@@ -474,7 +474,7 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   csdebug() << " last storage size: " << getSize();
 }
 
-bool BlockChain::finalizeBlock(csdb::Pool& pool) {
+bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   if(!pool.compose()) {
     csmeta(cserror) << "Couldn't compose block: " << pool.sequence();
     return false;
@@ -482,7 +482,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool) {
 
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
-  if (signatures.empty() && pool.sequence() != 0) {
+  if (signatures.empty() && (pool.sequence() != 0 || !isTrusted)) {
     csdebug() << "The  pool doesn't contain signatures";
     return false;
   }
@@ -928,7 +928,7 @@ const BlockChain::AddrTrnxCount& BlockChain::get_trxns_count(const csdb::Address
   return transactionsCount_[addr];
 }
 
-std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets)
+std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets, bool isTrusted)
 {
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
@@ -985,11 +985,12 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
-    if(finalizeBlock(deferredBlock_)) {
+    if(finalizeBlock(deferredBlock_, isTrusted)) {
       csdebug() << "The block is correct";
     } 
     else {
       csdebug() << "the signatures of the block sre incorrect";
+      return std::make_pair(false, csdb::Pool{});
     }
     pool = deferredBlock_;
   }
@@ -1019,7 +1020,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
       return false;
     }
     // write immediately
-    if (recordBlock(pool, !by_sync).first) {
+    if (recordBlock(pool, !by_sync, false).first) {
       csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
       // unable to call because stack overflow in case of huge written blocks amount possible:
       //testCachedBlocks();
@@ -1047,7 +1048,7 @@ std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool) {
   if (pool_seq != last_seq + 1) {
     return std::nullopt;
   }
-  return recordBlock(pool, true).second;
+  return recordBlock(pool, true, true).second;
 }
 
 void BlockChain::testCachedBlocks() {

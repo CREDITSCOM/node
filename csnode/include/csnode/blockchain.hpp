@@ -182,7 +182,7 @@ private:
   void logBlockInfo(csdb::Pool& pool);
 
   // Thread unsafe
-  bool finalizeBlock(csdb::Pool& pool);
+  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
 
@@ -314,7 +314,7 @@ private:
    *            pool)
    */
 
-  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool, bool requireAddWallets);
+  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool, bool requireAddWallets, bool isTrusted);
 
   // to store outrunning blocks until the time to insert them comes
   // stores pairs of <block, sender> sorted by sequence number
