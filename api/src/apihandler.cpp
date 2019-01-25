@@ -357,7 +357,16 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& 
 }
 
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
-  return tr.is_valid() ? deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>()) : api::SmartContractInvocation();
+  if(tr.is_valid()) {
+    const auto uf = tr.user_field(cs::trx_uf::deploy::Code);
+    if(uf.is_valid()) {
+      std::string data = uf.value<std::string>();
+      if(!data.empty()) {
+        return deserialize<api::SmartContractInvocation>(std::move(data));
+      }
+    }
+  }
+  return api::SmartContractInvocation();
 }
 
 api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
