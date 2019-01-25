@@ -40,9 +40,9 @@ Node::Node(const Config& config)
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_) {
-  cslog() << "Start transport... ";
+  std::cout << "Start transport... ";
   transport_ = new Transport(config, this);
-  cslog() << "Done";
+  std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   good_ = init(config);
@@ -60,36 +60,36 @@ bool Node::init(const Config& config) {
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
-  cslog() << "Blockchain is init, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+  cslog() << "Blockchain is ready, contains " << stat_.totalAcceptedTransactions_ << " transactions";
 
 #ifdef NODE_API
-  cslog() << "Init API... ";
+  std::cout << "Init API... ";
   papi_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
     csconnector::Config {
      config.getApiSettings().port,
      config.getApiSettings().ajaxPort,
      config.getApiSettings().executorPort
     });
-  cslog() << "Done";
+  std::cout << "Done\n";
 #endif
 
   if (!transport_->isGood()) {
     return false;
   }
-  cslog() << "Transport is init";
+  std::cout << "Transport is init\n";
 
   if (!solver_) {
     return false;
   }
+  std::cout << "Solver is init\n";
 
-  cslog() << "Solver is init";
-  cslog() << "Everything is init";
+  std::cout << "Everything is init\n";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
 
 #ifdef SPAMMER
   runSpammer();
-  cslog() << "Spammer is init";
+  std::cout << "Spammer is init\n";
 #endif
 
   cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
@@ -100,7 +100,7 @@ bool Node::init(const Config& config) {
 }
 
 void Node::run() {
-  cslog() << "Running transport";
+  std::cout << "Running transport\n";
   transport_->run();
 }
 
@@ -155,8 +155,24 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   }
 
   // this evil code sould be removed after examination
-  while (blockChain_.getLastSequence() >= rNum) {
+  cs::Sequence cnt_removed = 0;
+  cs::Sequence last_seq = blockChain_.getLastSequence();
+  while (last_seq >= rNum) {
+    if(cnt_removed == 0) {
+      // the 1st time
+      csdebug() << "NODE> remove " << last_seq - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << last_seq << ")";
+    }
     blockChain_.removeLastBlock();
+    cs::RoundNumber tmp = blockChain_.getLastSequence();
+    if(last_seq == tmp) {
+      csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
+      break;
+    }
+    ++cnt_removed;
+    last_seq = tmp;
+  }
+  if(cnt_removed > 0) {
+    csdebug() << "NODE> " << cnt_removed << " block(s) was removed";
   }
 
   // resend all this round data available
@@ -1641,7 +1657,9 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   // signature of round number + calculated hash
   stageOneInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, static_cast<cs::RoundNumber>(stageOneInfo.sRoundNum), stageOneInfo.signature, message);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, roundNumber_,
+    // payload
+    stageOneInfo.sRoundNum, stageOneInfo.signature, message);
 
   // cache
   smartStageOneMessage_[solver_->ownSmartsConfidantNumber()] = std::move(message);
@@ -1656,8 +1674,8 @@ void Node::smartStagesStorageClear(size_t cSize) {
   smartStageThreeMessage_.clear();
   smartStageThreeMessage_.resize(cSize);
 
-  csmeta(csdetails) << " SmartStagesStorage prepared, martStageTemporary_.size() = " << smartStageTemporary_.size();
-  for (size_t i = 0; i<smartStageTemporary_.size(); i++) {
+  csmeta(csdetails) << " SmartStagesStorage prepared, smartStageTemporary_.size() = " << smartStageTemporary_.size();
+  for(size_t i = 0; i < smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
     if (it.msgRoundNum == solver_->smartRoundNumber()) {
       auto str = reinterpret_cast<cs::Byte*>(it.msgData.data());
@@ -1681,14 +1699,22 @@ void Node::smartStagesStorageClear(size_t cSize) {
 
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csmeta(csdetails) << "started";
-  if (rNum != solver_->smartRoundNumber()) {
+
+  csdetails() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
+
+  istream_.init(data, size);
+
+  cs::StageOneSmarts stage;
+  istream_ >> stage.sRoundNum >> stage.signature;
+
+  if(stage.sRoundNum != solver_->smartRoundNumber()) {
     cs::Stage st;
     st.msgType = MsgTypes::FirstSmartStage;
     //std::copy(data, data+size, st.msgData.data());
     st.msgData = std::string(reinterpret_cast<const char*>(data), size);
     //TODO: replace this parcing with the propriate one
     //stageStream >> st.msgData;
-    st.msgRoundNum = rNum;
+    st.msgRoundNum = stage.sRoundNum;
     st.msgSender = sender;
 
     csdebug() << "Get SmartStageOne Message(saving): " << cs::Utils::byteStreamToHex(data,size);
@@ -1703,12 +1729,6 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     return;
   }
   csdebug() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
-
-  istream_.init(data, size);
-
-  cs::StageOneSmarts stage;
-  stage.sRoundNum = rNum;
-  istream_ >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
@@ -1780,14 +1800,16 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
 
   // create signature
   stageTwoInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::SecondSmartStage, stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::SecondSmartStage, roundNumber_,
+    // payload:
+    stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
 
   // cash our stage two
   smartStageTwoMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdebug) << "done";
 }
 
-void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
   csmeta(csdebug);
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -1795,19 +1817,18 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
     return;
   }
 
-  csdebug() << "NODE> Getting Stage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Getting SmartStage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
   istream_.init(data, size);
 
   cs::StageTwoSmarts stage;
-  stage.sRoundNum = rNum;
-  istream_ >> stage.signature;
+  istream_ >> stage.sRoundNum >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "NODE> Bad StageTwo packet format";
+    cserror() << "NODE> Bad SmartStageTwo packet format";
     return;
   }
 
@@ -1826,21 +1847,21 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
 
   if (stage.sender >= smartConfidants.size()) {
-    cswarning() << "NODE> WRONG sender number";
+    cswarning() << "NODE> WRONG SmartStage-2 sender number";
     return;
   }
 
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
-    csdebug() << "NODE> Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    csdebug() << "NODE> Smart Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
   csmeta(csdetails) << "Signature is OK";
   smartStageTwoMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> Stage Two from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> Smart Stage Two from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageTwo(stage, false);
 }
 
@@ -1866,14 +1887,16 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   stream << stageThreeInfo.packageSignature;
 
   stageThreeInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
+  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, roundNumber_,
+    // payload:
+    stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
   
   // cach stage three
   smartStageThreeMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdebug) << "done";
 }
 
-void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
   csmeta(csdetails) << "started";
   csunused(sender);
 
@@ -1885,14 +1908,13 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   istream_.init(data, size);
 
   cs::StageThreeSmarts stage;
-  stage.sRoundNum = rNum;
-  istream_ >> stage.signature;
+  istream_ >> stage.sRoundNum >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "NODE> Bad Smart Stage Three packet format";
+    cserror() << "NODE> Bad SmartStage Three packet format";
     return;
   }
 
@@ -1915,13 +1937,13 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
-    csdebug() << "NODE> Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    csdebug() << "SmartStage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
   smartStageThreeMessage_[stage.sender] = std::move(bytes);
 
-  csdebug() << "NODE> Stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> SmartStage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageThree(stage, false);
 }
 
@@ -1966,7 +1988,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   }
 
   if (!istream_.good() || !istream_.end()) {
-    cserror() << "Bad StageThree packet format";
+    cserror() << "Bad SmartStage request packet format";
     return;
   }
 
@@ -2001,7 +2023,9 @@ void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signat
     break;
   }
 
-  sendDefault(solver_->smartConfidants().at(requester), msgType, solver_->smartRoundNumber(), signature, message);
+  sendDefault(solver_->smartConfidants().at(requester), msgType, roundNumber_,
+    // payload:
+    solver_->smartRoundNumber(), signature, message);
   csmeta(csdetails) << "done";
 }
 
@@ -2452,7 +2476,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     line1 << '=';
   }
 
-  line1 << " " << roundNumber_ << "." << cs::numeric_cast<int>(subRound_) << " ";
+  line1 << " R-" << roundNumber_ << "." << cs::numeric_cast<int>(subRound_) << " ";
 
   if (NodeLevel::Normal == myLevel_) {
     line1 << "NORMAL";

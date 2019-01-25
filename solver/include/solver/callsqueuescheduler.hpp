@@ -12,8 +12,7 @@
 // template<typename TResol = std::chrono::milliseconds>
 class CallsQueueScheduler {
 public:
-  enum class Launch
-  {
+  enum class Launch {
 
     ///< An enum constant representing the once option: launch once, cancel if previous schedule call still is not done
     once,

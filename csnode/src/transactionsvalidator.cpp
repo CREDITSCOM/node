@@ -24,6 +24,9 @@ void TransactionsValidator::reset(size_t transactionsNum) {
 }
 
 bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1) {
+  if(trx.source() == trx.target()) {
+    return false;
+  }
   if (!validateTransactionAsSource(trx, trxInd, del1)) {
     return false;
   }
@@ -75,6 +78,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 }
 
 bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
+  //TODO: test WalletId exists
   WalletsState::WalletId walletId{};
   WalletsState::WalletData& wallState = walletsState_.getData(trx.target(), walletId);
 

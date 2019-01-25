@@ -396,11 +396,16 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
 }
 
 bool is_smart(const csdb::Transaction& tr) {
-  return tr.user_field(0).type() == csdb::UserField::Type::String;
+  using namespace cs::trx_uf;
+  // deploy::Code == start::Methods == 0
+  return tr.user_field(deploy::Code).type() == csdb::UserField::Type::String;
 }
 
 bool is_smart_state(const csdb::Transaction& tr) {
-  return tr.user_field(-2).type() == csdb::UserField::Type::String;
+  using namespace cs::trx_uf;
+  // test user_field[RefStart] helps filter out ancient smart contracts:
+  return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String &&
+    tr.user_field(new_state::RefStart).type() == csdb::UserField::Type::String);
 }
 
 bool is_smart_deploy(const api::SmartContractInvocation& smart) {
@@ -408,7 +413,8 @@ bool is_smart_deploy(const api::SmartContractInvocation& smart) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr) {
-  auto uf = tr.user_field(0);
+  using namespace cs::trx_uf;
+  auto uf = tr.user_field(deploy::Code);
   return uf.type() == csdb::UserField::Type::String && is_smart_deploy(deserialize<api::SmartContractInvocation>(uf.value<std::string>()));
 }
 
@@ -587,7 +593,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return;
   }
 
-  send_transaction.add_user_field(0, serialize(transaction.smartContract));
+  using namespace cs::trx_uf;
+  // cs::trx_uf::deploy::Code == cs::trx_uf::start::Methods == 0
+  send_transaction.add_user_field(deploy::Code, serialize(transaction.smartContract));
 
   solver.send_wallet_transaction(send_transaction);
 
@@ -706,46 +714,62 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
   auto pending_smart_transactions_ref = lockedReference(this->pending_smart_transactions);
   std::vector<csdb::PoolHash> new_blocks;
   auto curph = start;
-  size_t cnt = 1;
-  std::cout << "API: updating smart caches once...\n";
+
+  static bool log_to_console = true;
+  size_t cnt = 0;
+  
+  if(log_to_console) {
+    std::cout << "API: analizing blockchain...\n";
+  }
   while (curph != pending_smart_transactions_ref->last_pull_hash) {
+    ++cnt;
     new_blocks.push_back(curph);
     size_t res;
     curph = s_blockchain.loadBlockMeta(curph, res).previous_hash();
-    if(cnt % 1000 == 0) {
+    if(log_to_console && (cnt % 1000) == 0) {
       std::cout << '\r' << cnt;
     }
     if(curph.is_empty()) {
-      std::cout << '\r' << cnt << "... Done\n";
+      if(log_to_console) {
+        std::cout << '\r' << cnt << "... Done\n";
+      }
       break;
     }
-    ++cnt;
   }
 
   if (curph.is_empty() && !pending_smart_transactions_ref->last_pull_hash.is_empty()) {
     // Fork detected!
-    cnt = 1;
-    std::cout << "API: fork detected, handling " << new_blocks.size() << " hashes...\n";
+    cnt = 0;
+    if(log_to_console) {
+      std::cout << "API: fork detected, handling " << new_blocks.size() << " hashes...\n";
+    }
     auto luca = pending_smart_transactions_ref->last_pull_hash;
     while (!luca.is_empty()) {
+      ++cnt;
       auto fIt = std::find(new_blocks.begin(), new_blocks.end(), luca);
       if (fIt != new_blocks.end()) {
         new_blocks.erase(fIt, new_blocks.end());
         break;
       }
-      std::cout << '\r' << cnt;
+      if(log_to_console && (cnt % 100) == 0) {
+        std::cout << '\r' << cnt;
+      }
       size_t res;
       luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
-      ++cnt;
     }
-    std::cout << "... Done\n";
+    if(log_to_console) {
+      std::cout << '\r' << cnt << "... Done\n";
+    }
   }
 
   pending_smart_transactions_ref->last_pull_hash = start;
 
-  cnt = 1;
-  std::cout << "API: extracting smart states from " << new_blocks.size() << " blocks...\n";
+  cnt = 0;
+  if(log_to_console) {
+    std::cout << "API: searching for smart states in " << new_blocks.size() << " blocks...\n";
+  }
   while (!new_blocks.empty()) {
+    ++cnt;
     auto p = s_blockchain.loadBlock(new_blocks.back());
     new_blocks.pop_back();
     auto& trs = p.transactions();
@@ -754,12 +778,15 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       if (is_smart(tr) || is_smart_state(tr))
         pending_smart_transactions_ref->queue.push(std::move(tr));
     }
-    if(cnt % 1000 == 0) {
+    if(log_to_console && (cnt % 1000) == 0) {
       std::cout << '\r' << cnt;
     }
-    ++cnt;
   }
-  std::cout << "\rDone, handled " << cnt << " blocks...\n";
+  if(log_to_console) {
+    std::cout << "\rDone, handled " << cnt << " blocks...\n";
+  }
+  log_to_console = false;
+
   if (!pending_smart_transactions_ref->queue.empty()) {
     auto tr = std::move(pending_smart_transactions_ref->queue.front());
     pending_smart_transactions_ref->queue.pop();
