@@ -184,7 +184,9 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
   setModified(id);
 
 #ifdef MONITOR_NODE
-  ++wallData.transNum_;
+  if (tr.source() != tr.target())  // Already counted in loadTrxForSource
+    ++wallData.transNum_;
+
   setWalletTime(wallData.address_, tr.get_time());
 #endif
 

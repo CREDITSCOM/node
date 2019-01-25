@@ -1677,7 +1677,7 @@ void Node::smartStagesStorageClear(size_t cSize) {
   csmeta(csdetails) << " SmartStagesStorage prepared, smartStageTemporary_.size() = " << smartStageTemporary_.size();
   for(size_t i = 0; i < smartStageTemporary_.size(); i++) {
     auto& it = smartStageTemporary_.at(i);
-    if (it.msgRoundNum == solver_->smartRoundNumber()) {
+    if(it.msgRoundNum == solver_->smartRoundNumber()) {
       auto str = reinterpret_cast<cs::Byte*>(it.msgData.data());
       switch(it.msgType) {
         case (MsgTypes::FirstSmartStage):
@@ -1697,7 +1697,7 @@ void Node::smartStagesStorageClear(size_t cSize) {
   smartStageTemporary_.clear();
 }
 
-void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
   csmeta(csdetails) << "started";
 
   csdetails() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
@@ -1724,11 +1724,10 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     smartStageTemporary_.emplace_back(st);
   }
 
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
+  if(solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     csdebug() << "NODE> ignore smartStage-1 as no confidant";
     return;
   }
-  csdebug() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
 
   cs::Bytes bytes;
   istream_ >> bytes;
