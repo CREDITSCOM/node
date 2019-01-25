@@ -572,7 +572,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
       _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
       if (_return.__isset.smart_contract_result)
-        _return.smart_contract_result = api_resp.ret_val;
+        _return.__set_smart_contract_result(api_resp.ret_val);
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -611,7 +611,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     else {
       auto stateTrans = s_blockchain.loadTransaction(trId);
       if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
-        _return.smart_contract_result = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
+        _return.__set_smart_contract_result(deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>()));
       }
     }
 #else
