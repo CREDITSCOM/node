@@ -1107,7 +1107,7 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet)
 {
   if(!fee_ || packet.transactionsCount() == 0)
     return;
-  fee_->CountFeesInPool(*this, &packet);
+  fee_->CountFeesInPool(*this, &packet, true);
 }
 
 csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const {
