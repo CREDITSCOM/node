@@ -590,14 +590,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     contract_state_entry.wait_till_front([&](SmartState& ss) { return !ss.state.empty(); });
   }
   else {
-#ifndef TETRIS_NODE
     std::string new_state;
     csdb::TransactionID trId;
 
     contract_state_entry.wait_till_front([&](SmartState& ss) {
       auto execTrans = s_blockchain.loadTransaction(ss.initer);
       if(execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
-        new_state = ss.state;
+        new_state = ss.lastEmpty ? std::string() : ss.state;
         trId = ss.transaction.clone();
         return true;
       }
@@ -614,9 +613,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         _return.__set_smart_contract_result(deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>()));
       }
     }
-#else
-    contract_state_entry.update_state([=](const std::string&) { return execResp.contractState; });
-#endif
   }
 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
@@ -812,8 +808,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
       csdb::TransactionID trId(scr.hash, scr.transaction);
 
       auto smart_state(lockedReference(this->smart_state));
-      (*smart_state)[address].update_state([&]() { 
-        return SmartState { tr.user_field(smart_state_idx).value<std::string>(), tr.id().clone(), trId.clone() };
+      (*smart_state)[address].update_state([&](const SmartState& oldState) {
+                                             auto newState = tr.user_field(smart_state_idx).value<std::string>();
+                                             return SmartState { newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone() };
       });
 
       auto execTrans = s_blockchain.loadTransaction(trId);
@@ -1190,7 +1187,7 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
       if (!func(trIt.getPool(), *trIt))
         break;
       trx_id = csdb::TransactionID{};
-    }   
+    }
   }
 }
 
