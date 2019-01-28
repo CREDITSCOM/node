@@ -146,20 +146,23 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
       bool byte = true;
-
-      if(!smarts.is_new_state(transaction)) {
+      bool is_smart_new_state = smarts.is_new_state(transaction);
+      if(!is_smart_new_state) {
         byte = !(transaction.source() == transaction.target());
+        byte = byte && ptransval->validateTransaction(transaction, i, del1);
       }
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
         if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
           byte = false;
-          cswarning() << name() << ": reject new_state trx because related contract is closed";
+          cslog() << name() << ": reject smart new_state trx because related contract is closed";
         }
       }
 
-      byte = byte && ptransval->validateTransaction(transaction, i, del1);
+      if(!byte) {
+        cslog() << name() << ": trx[" << i << "] rejected in validateTransaction()";
+      }
 
       if (byte) {
         // yrtimd: test with get_valid_smart_address() only for deploy transactions:
@@ -170,7 +173,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
             byte = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
 
             if (!byte) {
-              csdebug() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
+              cslog() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
             }
           }
         }
@@ -178,12 +181,12 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         if (byte) {
           byte = check_transaction_signature(context, transaction);
           if(!byte) {
-            csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+            cslog() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
           }
         }
       }
       else {
-        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
+        cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
       characteristicMask.push_back(byte ? (cs::Byte)1 : (cs::Byte)0);
@@ -192,7 +195,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      csdebug() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
+      cslog() << name() << ": " << excluded.transactions_count() << " transactions are rejected in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart
@@ -210,7 +213,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       ++i;
     }
     if(!smart_rejected.empty()) {
-      cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
+      cslog() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
       cs::TransactionsPacket rejected;
 
       // 2. reject all trxs from those smarts & collect all rejected trxs
@@ -226,7 +229,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
       }
       if(cnt_add_rejected > 0) {
-        cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+        cslog() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
       }
 
       // 3. signal SmartContracts service some trxs are rejected

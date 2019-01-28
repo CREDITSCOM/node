@@ -350,14 +350,14 @@ void SmartContracts::test_exe_queue() {
   // select next queue item
   while (!exe_queue.empty()) {
     auto next = exe_queue.begin();
-    if (next->status == SmartContractStatus::Finished || next->status == SmartContractStatus::Closed) {
+    if (next->status == SmartContractStatus::Closed) {
       csdebug() << name() << ": finished contract still in queue, remove it";
       remove_from_queue(exe_queue.cbegin());
       continue;
     }
-    if (next->status == SmartContractStatus::Running) {
+    if (next->status == SmartContractStatus::Running || next->status == SmartContractStatus::Finished ) {
       // some contract is already running
-      csdebug() << name() << ": there is running contract in queue";
+      csdebug() << name() << ": some contract blocks queue";
       break;
     }
     csdebug() << name() << ": set running status to next contract in queue";
@@ -387,7 +387,7 @@ bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const
   if(!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));
     if(it != exe_queue.cend()) {
-      return it->status != SmartContractStatus::Closed;
+      return it->status == SmartContractStatus::Closed;
     }
   }
   return true;
