@@ -841,8 +841,10 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
       if (is_smart_deploy(smart)) {
         {
-          auto smart_origin = lockedReference(this->smart_origin);
-          (*smart_origin)[address] = tr.id().clone();
+          if (!smart.smartContractDeploy.byteCodeObjects.empty()) {
+            auto smart_origin = lockedReference(this->smart_origin);
+            (*smart_origin)[address] = tr.id().clone();
+          }
         }
         {
           auto deployed_by_creator = lockedReference(this->deployed_by_creator);
@@ -1184,9 +1186,9 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
       trx_id = csdb::TransactionID(smart_ref.hash, smart_ref.transaction);
     }
     else if (is_smart(*trIt) && trx_id == trIt->id()) {
+      trx_id = csdb::TransactionID{};
       if (!func(trIt.getPool(), *trIt))
         break;
-      trx_id = csdb::TransactionID{};
     }
   }
 }
