@@ -387,10 +387,10 @@ bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const
   if(!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));
     if(it != exe_queue.cend()) {
-      return it->status == SmartContractStatus::Closed;
+      return it->status != SmartContractStatus::Closed;
     }
   }
-  return false;
+  return true;
 }
 
 bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
@@ -464,7 +464,7 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
 }
 
 void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop) {
-  should_stop = false;
+  *should_stop = false;
 }
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it) {

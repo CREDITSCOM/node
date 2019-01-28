@@ -146,9 +146,9 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
       cs::Byte byte = static_cast<cs::Byte>(true);
-      if(!smarts.is_new_state(transaction)) {
-        byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
-      }
+
+      if(!smarts.is_new_state(transaction))
+        byte = !(transaction.source() == transaction.target());
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
@@ -157,6 +157,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
           cswarning() << name() << ": reject new_state trx because related contract is closed";
         }
       }
+
+      byte = byte && static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
 
       if (byte) {
         // yrtimd: test with get_valid_smart_address() only for deploy transactions:
