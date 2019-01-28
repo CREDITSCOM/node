@@ -88,3 +88,20 @@ Glance coding style guide description.
 
 >```cpp
 >static int gPlatformStatus = 0;
+
+### Clang format settings
+
+>```
+>BasedOnStyle: Google
+>ColumnLimit: 180
+>AllowShortFunctionsOnASingleLine: 'false'
+>AllowShortIfStatementsOnASingleLine: 'false'
+>AllowShortLoopsOnASingleLine: 'false'
+>AlignTrailingComments: 'true'
+>ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
+>ConstructorInitializerIndentWidth: 0
+>BreakConstructorInitializersBeforeComma: 'true'
+>BreakBeforeBraces: 'Custom'
+>BraceWrapping: { AfterEnum: true, BeforeElse: true, BeforeCatch: true }
+>MaxEmptyLinesToKeep: 1
+>AccessModifierOffset: -2
