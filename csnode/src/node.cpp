@@ -1339,7 +1339,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   if (!conveyer.isConfidantExists(stage.sender)) {
     return;
   }
-  
+
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
@@ -1439,7 +1439,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
- 
+
   stageThreeMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
@@ -1819,7 +1819,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, roundNumber_,
     // payload:
     stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
-  
+
   // cach stage three
   smartStageThreeMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdebug) << "done";
@@ -2135,7 +2135,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
 void Node::sendHash(cs::RoundNumber round) {
 #if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
-  if (blockChain_.getLastSequence() != round - 1) {
+  if (solver_->smartRoundNumber() || blockChain_.getLastSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
   }
@@ -2179,7 +2179,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
   if (spoiledHash == tmp) {
     solver_->gotHash(std::move(lastHash), sender);
-  } 
+  }
   else {
     cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                 << " DOES NOT MATCH to my value " << lastHash.to_string();
