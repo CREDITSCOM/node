@@ -145,20 +145,21 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte = static_cast<cs::Byte>(true);
+      bool byte = true;
 
-      if(!smarts.is_new_state(transaction))
+      if(!smarts.is_new_state(transaction)) {
         byte = !(transaction.source() == transaction.target());
+      }
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
         if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
-          byte = 0;
+          byte = false;
           cswarning() << name() << ": reject new_state trx because related contract is closed";
         }
       }
 
-      byte = byte && static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+      byte = byte && ptransval->validateTransaction(transaction, i, del1);
 
       if (byte) {
         // yrtimd: test with get_valid_smart_address() only for deploy transactions:
@@ -166,7 +167,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
           auto sci = context.smart_contracts().get_smart_contract(transaction);
           if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
             csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY); 
-            byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
+            byte = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
 
             if (!byte) {
               csdebug() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
@@ -175,7 +176,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
 
         if (byte) {
-          byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+          byte = check_transaction_signature(context, transaction);
           if(!byte) {
             csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
           }
@@ -185,7 +186,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
-      characteristicMask.push_back(byte);
+      characteristicMask.push_back(byte ? (cs::Byte)1 : (cs::Byte)0);
     }
 
     csdb::Pool excluded;
