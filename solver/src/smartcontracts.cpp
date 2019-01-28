@@ -10,6 +10,7 @@
 #include <optional>
 
 namespace cs {
+
 csdb::UserField SmartContractRef::to_user_field() const {
   cs::Bytes data;
   cs::DataStream stream(data);
@@ -155,11 +156,11 @@ csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const Sma
 void SmartContracts::onExecutionFinished(const SmartExecutionData& data) {
   auto it = find_in_queue(data.smartContract);
   if (it != exe_queue.end()) {
-    if (it->status == SmartContractStatus::Finished) {
+    if (it->status == SmartContractStatus::Finished || it->status == SmartContractStatus::Closed) {
       // already finished (by "timeout"), no transaction required
       return;
     }
-    it->status = SmartContractStatus::Finished;
+    it->finish( bc.getLastSequence() );
   }
   else {
     cserror() << name() << ": cannot find in queue just completed contract";
@@ -283,13 +284,13 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     cserror() << name() << ": incorrect trx index in block to enqueue smart contract";
     return;
   }
-  SmartContractRef new_item{block.hash(), block.sequence(), trx_idx};
+  SmartContractRef new_item { block.hash(), block.sequence(), trx_idx };
   if (!exe_queue.empty()) {
     auto it = find_in_queue(new_item);
     // test duplicated contract call
     if (it != exe_queue.cend()) {
       cserror() << name() << ": attempt to queue duplicated contract transaction, already queued on round #"
-                << it->round;
+                << it->round_enqueue;
       return;
     }
   }
@@ -300,8 +301,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
   cslog() << "\\       /";
   cslog() << " \\_____/";
   csdb::Address addr = absolute_address(block.transaction(trx_idx).target());
-  exe_queue.emplace_back(
-      QueueItem{new_item, SmartContractStatus::Waiting, block.sequence(), addr, std::vector<csdb::Transaction>()});
+  exe_queue.emplace_back( QueueItem(new_item, addr)).wait(block.sequence());
   test_exe_queue();
 }
 
@@ -350,7 +350,7 @@ void SmartContracts::test_exe_queue() {
   // select next queue item
   while (!exe_queue.empty()) {
     auto next = exe_queue.begin();
-    if (next->status == SmartContractStatus::Finished) {
+    if (next->status == SmartContractStatus::Finished || next->status == SmartContractStatus::Closed) {
       csdebug() << name() << ": finished contract still in queue, remove it";
       remove_from_queue(exe_queue.cbegin());
       continue;
@@ -361,7 +361,7 @@ void SmartContracts::test_exe_queue() {
       break;
     }
     csdebug() << name() << ": set running status to next contract in queue";
-    next->status = SmartContractStatus::Running;
+    next->start( bc.getLastSequence() ); // use blockchain based round counting
     if (!invoke_execution(next->contract)) {
       remove_from_queue(next);
     }
@@ -374,31 +374,41 @@ void SmartContracts::test_exe_queue() {
 
 bool SmartContracts::is_running_smart_contract(csdb::Address addr) const {
   if (!exe_queue.empty()) {
-    const auto& current = exe_queue.front();
-    if (current.status == SmartContractStatus::Running) {
-      const csdb::Address tmp = absolute_address(addr);
-      return (current.abs_addr == tmp);
+    const auto it = find_in_queue(absolute_address(addr));
+    if(it != exe_queue.cend()) {
+      return it->status == SmartContractStatus::Running;
     }
   }
   return false;
 }
 
-bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr) {
+bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const
+{
+  if(!exe_queue.empty()) {
+    const auto it = find_in_queue(absolute_address(addr));
+    if(it != exe_queue.cend()) {
+      return it->status == SmartContractStatus::Closed;
+    }
+  }
+  return false;
+}
+
+bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
+{
   csdb::Address abs_addr = absolute_address(tr.source());
 
-  if (is_running_smart_contract(abs_addr)) {
+  if(is_running_smart_contract(abs_addr)) {
     // expect calls from api when trxs received
     std::lock_guard<std::mutex> lock(mtx_emit_transaction);
 
-    auto& v = exe_queue.front().created_transactions;
-    v.push_back(tr);
-    csdebug() << name() << ": smart contract emits transaction, add, total " << v.size();
+    auto it = find_in_queue(abs_addr);
+    it->created_transactions.push_back(tr);
+    csdebug() << name() << ": smart contract emits transaction, add, total " << it->created_transactions.size();
     return true;
   }
-  else {
-    if (contract_state.count(abs_addr)) {
-      csdebug() << name() << ": inactive smart contract emits transaction, ignore";
-    }
+  else if(contract_state.count(abs_addr) > 0) {
+    csdebug() << name() << ": smart contract is not allowed to emit transaction, ignore";
+    return true; // block from conveyer sync
   }
 
   return false;
@@ -408,17 +418,17 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   // control round-based timeout
   bool retest_required = false;
   for (auto& item : exe_queue) {
-    if (item.status == SmartContractStatus::Running) {
-      const auto seq = block.sequence();
-      if (seq > item.round && seq - item.round >= Consensus::MaxRoundsExecuteSmart) {
+    const auto seq = block.sequence();
+    if(seq > item.round_start && seq - item.round_start >= Consensus::MaxRoundsExecuteSmart) {
+      if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
         cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
-                    << " blocks, cancel it without transaction";
-        item.status = SmartContractStatus::Finished;
+          << " blocks (from #," << item.round_start << "), cancel it without transaction";
+        item.close();
         retest_required = true;
       }
-    }
-    else if (item.status == SmartContractStatus::Finished) {
-      retest_required;
+      else if(item.status == SmartContractStatus::Closed) {
+        retest_required = true;
+      }
     }
   }
   if (retest_required) {
@@ -454,17 +464,7 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
 }
 
 void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop) {
-  // auto seq = block.sequence();
-  // if(seq == 1925595 || seq == 1925395) {
-  //  std::string state;
-  //  ::general::Variant ret_val;
-  //  if(block.transactions_count() > 0) {
-  //    for(auto& tr : block.transactions()) {
-  //      state = tr.user_field(-2).value<std::string>();
-  //      ret_val = deserialize<::general::Variant>(tr.user_field(3).value<std::string>());
-  //    }
-  //  }
-  //}
+  should_stop = false;
 }
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it) {
