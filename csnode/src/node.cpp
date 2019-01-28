@@ -363,8 +363,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
 
   cs::DataStream poolStream(data, size);
-  csdebug() << "NODE> Conveyer sync completed, parsing data size (" << size  << ") -> " << cs::Utils::byteStreamToHex(data,size);
-
   cs::Characteristic characteristic;
   cs::PoolMetaInfo poolMetaInfo;
   size_t smartSigCount;
@@ -483,21 +481,18 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csmeta(csdetails) << "done";
 }
 
-void Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const {
+cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
   csmeta(csdebug);
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале
   const cs::RoundTable* table = cs::Conveyer::instance().roundTable(startSmartRoundNumber);
-  if (table == nullptr) {
-    csdb::Pool tmpPool = blockChain_.loadBlock(startSmartRoundNumber);
-    const auto& confidants = tmpPool.confidants();
-    csdebug() << "___[" << startSmartRoundNumber << "] = [" << tmpPool.sequence() << "]: " << confidants.size();
-    for (auto& key : confidants) {
-      confs.emplace_back(key);
-    }
-    return;
+  if (table != nullptr) {
+    return table->confidants;
   }
 
-  confs = table->confidants;
+  csdb::Pool tmpPool = blockChain_.loadBlock(startSmartRoundNumber);
+  const cs::ConfidantsKeys& confs = tmpPool.confidants();
+  csdebug() << "___[" << startSmartRoundNumber << "] = [" << tmpPool.sequence() << "]: " << confs.size();
+  return confs;
 }
 
 void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
@@ -1935,6 +1930,11 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   }
 
   const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+  if (stage.sender >= smartConfidants.size()) {
+    cswarning() << "NODE> WRONG SmartStage-3 sender number: " << stage.sender << ", smartConf size: " << smartConfidants.size();
+    return;
+  }
+
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
@@ -2041,7 +2041,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   const cs::ConfidantsKeys& confidants = conveyer.confidants();
   if (st3.sender!=cs::ConfidantConsts::InvalidConfidantIndex) {
-    poolMetaInfo.writerKey = conveyer.confidants().at(st3.writer);
+    poolMetaInfo.writerKey = confidants.at(st3.writer);
   }
   poolMetaInfo.realTrustedMask = st3.realTrustedMask;
   poolMetaInfo.previousHash = blockChain_.getLastHash();
@@ -2255,11 +2255,15 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   stream >> roundSignatures;
 
   csdebug() << "NODE> RoundSignatures Amount = " << roundSignatures.size();
-
-  size_t signaturesCount = 0;
   auto rt = conveyer.roundTable(rNum - 1);
+
   if (rt != nullptr) {
+    size_t signaturesCount = 0;
     for (auto& it : roundSignatures) {
+      if (it.sender >= rt->confidants.size()) {
+        cserror() << "NODE> Getting round table is contained of more confidants";
+        return;
+      }
       cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
       if (cscrypto::VerifySignature(it.signature, rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
         ++signaturesCount;
@@ -2315,10 +2319,8 @@ void Node::sendHash(cs::RoundNumber round) {
     return;
   }
 
-  const auto& hash = blockChain_.getLastHash();
-  csdb::PoolHash spoiledHash;
-  csdebug() << "NODE> Sending hash " << hash.to_string() << " to ALL";
-  spoiledHash = spoileHash(hash, solver_->getPublicKey());
+  csdebug() << "NODE> Sending hash to ALL";
+  csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
   csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
 #endif
