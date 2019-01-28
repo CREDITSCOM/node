@@ -420,10 +420,15 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   for (auto& item : exe_queue) {
     const auto seq = block.sequence();
     if(seq > item.round_start && seq - item.round_start >= Consensus::MaxRoundsExecuteSmart) {
-      cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
-        << " blocks, cancel it without transaction";
-      item.close();
-      retest_required = true;
+      if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
+        cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
+          << " blocks (from #," << item.round_start << "), cancel it without transaction";
+        item.close();
+        retest_required = true;
+      }
+      else if(item.status == SmartContractStatus::Closed) {
+        retest_required = true;
+      }
     }
   }
   if (retest_required) {
