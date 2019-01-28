@@ -364,7 +364,7 @@ public:
   template <typename State>
   void update_state(const State& state) {
     std::lock_guard<decltype(lock_)> lock(lock_);
-    state_ = state();
+    state_ = state(state_);
     conditionalVariable_.notify_all();
   }
 };

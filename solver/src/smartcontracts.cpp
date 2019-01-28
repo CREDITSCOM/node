@@ -464,7 +464,7 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
 }
 
 void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop) {
-  should_stop = false;
+  *should_stop = false;
 }
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it) {
@@ -588,7 +588,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   if (!bc.findWalletData(SmartContracts::absolute_address(src.target()), wallData, wallId)) {
     return csdb::Transaction{};
   }
-  
+
   csdb::Transaction result(
       wallData.trxTail_.getLastTransactionId() + 1,  // TODO: possible conflict with other innerIDs!
       src.target(),                                  // contracts' key - source
