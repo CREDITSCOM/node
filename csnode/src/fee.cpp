@@ -50,11 +50,12 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
     update_trusted_cache_ = true;
   }
 
+  Init(blockchain, pool);
+
   if (pool->transactions().size() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
-  Init(blockchain, pool);
   CountOneByteCost(blockchain);
   SetCountedFee();
 }
@@ -69,11 +70,12 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
     update_trusted_cache_ = true;
   }
 
+  Init(blockchain, packet);
+
   if (packet->transactionsCount() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
-  Init(blockchain, packet);
   CountOneByteCost(blockchain);
   SetCountedFee();
 }
