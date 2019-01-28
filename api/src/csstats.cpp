@@ -39,7 +39,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     }
 
     while (blockHash != lastHash && !blockHash.is_empty()) {
-      std::this_thread::sleep_for(std::chrono::seconds(2)); //fix me (solution for synchronization with transactionsSmartCount)
+      //std::this_thread::sleep_for(std::chrono::seconds(2)); //fix me (solution for synchronization with transactionsSmartCount)
       csdb::Pool pool = blockchain.loadBlock(blockHash);
 
       periodStats.poolsCount++;
