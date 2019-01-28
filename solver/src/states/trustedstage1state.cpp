@@ -152,9 +152,9 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
-        if(!context.smart_contracts().is_running_smart_contract(transaction.target())) {
+        if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
           byte = 0;
-          cswarning() << name() << ": reject new_state trx because related contract is not running";
+          cswarning() << name() << ": reject new_state trx because related contract is closed";
         }
       }
 
