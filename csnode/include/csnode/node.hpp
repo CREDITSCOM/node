@@ -138,6 +138,13 @@ public:
 
   void smartStagesStorageClear(size_t cSize);
 
+  enum Level {
+    Normal,
+    Confidant,
+    Main,
+    Writer
+  };
+
   enum MessageActions {
     Process,
     Postpone,
@@ -150,11 +157,9 @@ public:
     return nodeIdKey_;
   }
 
-  NodeLevel getNodeLevel() const {
+  Level getNodeLevel() const {
     return myLevel_;
   }
-
-  cs::RoundNumber getRoundNumber() const;
 
   uint8_t getConfidantNumber() const{
     return myConfidantIndex_;
@@ -266,10 +271,7 @@ private:
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
-  // current round state
-  cs::RoundNumber roundNumber_ = 0;
-  NodeLevel myLevel_;
-
+  Level myLevel_;
   cs::Byte myConfidantIndex_;
 
   // main cs storage
@@ -339,6 +341,6 @@ private:
   cs::RoundStat stat_;
 };
 
-std::ostream& operator<<(std::ostream& os, NodeLevel nodeLevel);
+std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
 
 #endif  // NODE_HPP

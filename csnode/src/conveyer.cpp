@@ -37,6 +37,18 @@ cs::ConveyerBase::ConveyerBase() {
   pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 }
 
+void cs::ConveyerBase::setRound(cs::RoundNumber round) {
+  csmeta(csdebug) << "trying to change round to " << round;
+
+  if (currentRoundNumber() < round) {
+    pimpl_->currentRound = round;
+    csdebug() << csname() << "cached round updated";
+  }
+  else {
+    cswarning() << csname() << "current round " << currentRoundNumber();
+  }
+}
+
 cs::ConveyerBase::~ConveyerBase() = default;
 
 cs::PacketFlushSignal& cs::ConveyerBase::flushSignal() {
@@ -136,14 +148,14 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
     }
   }
 
-  setRound(std::move(table));
+  setTable(std::move(table));
 }
 
-void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
+void cs::ConveyerBase::setTable(const RoundTable& table) {
   csmeta(csdebug) << "started";
 
-  if (table.round <= currentRoundNumber()) {
-    cserror() << csname() << "Setting round in conveyer failed";
+  if (table.round != currentRoundNumber()) {
+    cserror() << csname() << "Setting table in conveyer failed, current round " << currentRoundNumber() << ", table round " << table.round;
     return;
   }
 
@@ -171,7 +183,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
   cs::ConveyerMetaStorage::Element element;
   element.round = table.round;
   element.meta.neededHashes = std::move(neededHashes);
-  element.meta.roundTable = std::move(table);
+  element.meta.roundTable = table;
 
   {
     cs::Lock lock(sharedMutex_);
@@ -242,6 +254,10 @@ const cs::RoundTable* cs::ConveyerBase::roundTable(cs::RoundNumber round) const 
 
 cs::RoundNumber cs::ConveyerBase::currentRoundNumber() const {
   return pimpl_->currentRound;
+}
+
+cs::RoundNumber cs::ConveyerBase::previousRoundNumber() const {
+  return pimpl_->currentRound - 1;
 }
 
 const cs::PacketsHashes& cs::ConveyerBase::currentNeededHashes() const {

@@ -24,8 +24,7 @@ using KeyType = cs::Bytes;
  * @brief   Values that represent roles, repeats analog defined in node.hpp
  */
 
-enum class Role
-{
+enum class Role {
   Normal,
   Trusted,
   Writer
@@ -404,23 +403,6 @@ public:
    */
 
   size_t cnt_trusted() const;
-
-  /**
-   * @fn  size_t SolverContext::cnt_trusted_desired() const;
-   *
-   * @brief   Gets preferred count of trusted nodes for any round.
-   *
-   * @author  aae
-   * @date    03.10.2018
-   *
-   * @return  The desired number of trusted nodes for any round.
-   *
-   * ### remarks  Aae, 30.09.2018.
-   */
-
-  size_t cnt_trusted_desired() const {
-    return core.cnt_trusted_desired;
-  }
 
   /**
    * @fn  const std::vector<PublicKey>& SolverContext::trusted() const;

@@ -146,7 +146,7 @@ TEST(Conveyer, RoundTableReturnsSameAsThatWasSetWithSetRound) {
   ConveyerTest conveyer{};
   auto round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& round_table_copy{cs::RoundTable{round_table}};
-  conveyer.setRound(std::move(round_table_copy));
+  conveyer.setTable(std::move(round_table_copy));
   ASSERT_EQ(round_table, conveyer.currentRoundTable());
 }
 
@@ -154,20 +154,20 @@ TEST(Conveyer, SetRoundDoesNotSetInvalidRoundNumber) {
   ConveyerTest conveyer{};
   auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& incorrect_round_table{cs::RoundTable{round_table}};
-  conveyer.setRound(std::move(round_table));
+  conveyer.setTable(std::move(round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
   incorrect_round_table.round = round_table.round - 1;
-  conveyer.setRound(std::move(incorrect_round_table));
+  conveyer.setTable(std::move(incorrect_round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
   incorrect_round_table.round = 0;
-  conveyer.setRound(std::move(incorrect_round_table));
+  conveyer.setTable(std::move(incorrect_round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
 }
 
 TEST(Conveyer, RoundTableReturnsNullIfRoundWasNotAdded) {
   ConveyerTest conveyer{};
   auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
-  conveyer.setRound(std::move(round_table));
+  conveyer.setTable(std::move(round_table));
   ASSERT_EQ(conveyer.roundTable(1), nullptr);
 }
 
@@ -215,7 +215,7 @@ TEST(Conveyer, MainLogic) {
   auto&& packet_copy{cs::TransactionsPacket{packet}};
   ConveyerTest conveyer{};
   auto hash = packet_copy.hash();
-  conveyer.setRound(CreateTestRoundTable({packet_copy.hash()}));
+  conveyer.setTable(CreateTestRoundTable({packet_copy.hash()}));
   ASSERT_EQ(1, conveyer.currentNeededHashes().size());
 
   conveyer.addFoundPacket(kRoundNumber, std::move(packet_copy));

@@ -17,7 +17,7 @@
 // time in ms only
 const std::size_t TIME_TO_AWAIT_ACTIVITY = 50;
 const std::size_t ROUND_DELAY = 1000;
-const std::size_t TIME_TO_AWAIT_SS_ROUND = 7000;
+const std::size_t TIME_TO_AWAIT_SS_ROUND = 10000;
 
 namespace std {
 // transactions packet hash specialization
@@ -26,13 +26,6 @@ struct hash<cs::TransactionsPacketHash> {
   std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
 };
 }  // namespace std
-
-enum NodeLevel {
-  Normal,
-  Confidant,
-  Main,
-  Writer
-};
 
 namespace cs {
 // table for fast transactions storage
@@ -148,8 +141,6 @@ struct CharacteristicMeta {
   cs::PublicKey sender;
   std::vector<cs::SignaturePair> signatures;
 };
-
-
 
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;

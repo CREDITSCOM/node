@@ -3,10 +3,9 @@
 #include <solvercontext.hpp>
 #include <smartcontracts.hpp>
 
-#pragma warning(push)
-#pragma warning(disable : 4267 4244 4100 4245)
+
 #include <csnode/node.hpp>
-#pragma warning(pop)
+#include <csnode/conveyer.hpp>
 
 #include <csdb/currency.hpp>
 #include <lib/system/logger.hpp>
@@ -96,9 +95,9 @@ namespace cs
 
   void SolverCore::nextRound()
   {
-    if(pnode != nullptr) {
-      auto tmp = pnode->getRoundNumber();
-      if(cur_round == tmp) {
+    if (pnode != nullptr) {
+      auto tmp = cs::Conveyer::instance().currentRoundNumber();
+      if (cur_round == tmp) {
         cswarning() << "SolverCore: current round #" << tmp << " restarted (BigBang?)";
       }
       cur_round = tmp;
@@ -108,7 +107,7 @@ namespace cs
     }
 
     // as store result of current round:
-    if(Consensus::Log) {
+    if (Consensus::Log) {
       csdebug() << "SolverCore: clear all stored round data (block hashes, stages-1..3)";
     }
 
@@ -119,14 +118,8 @@ namespace cs
     trueStageThreeStorage.clear();
     trusted_candidates.clear();
 
-    if(!pstate) {
+    if (!pstate) {
       return;
-    }
-
-    // update desired count of trusted nodes
-    size_t cnt_trusted = cs::Conveyer::instance().confidantsCount();
-    if(cnt_trusted > cnt_trusted_desired) {
-      cnt_trusted_desired = cnt_trusted;
     }
 
     // start timeout tracking
@@ -143,7 +136,7 @@ namespace cs
     //  },
     //  true /*replace exisiting*/);
 
-    if(stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
+    if (stateCompleted(pstate->onRoundTable(*pcontext, cur_round))) {
       handleTransitions(Event::RoundTable);
     }
   }
@@ -372,7 +365,7 @@ namespace cs
 
   void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey& /*respondent*/)
   {
-    if(next_round_started) {
+    if (next_round_started) {
       csdebug() << "SolverCore: round info reply means next round started, and I am not trusted node. Waiting next round";
       return;
     }

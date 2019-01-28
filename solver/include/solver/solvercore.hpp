@@ -176,7 +176,6 @@ private:
   bool req_stop;
   std::map<StatePtr, Transitions> transitions;
   StatePtr pstate;
-  size_t cnt_trusted_desired;
 
   // consensus data
 
