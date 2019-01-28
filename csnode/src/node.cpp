@@ -2246,26 +2246,31 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   csdebug() << "NODE> RoundSignatures Amount = " << roundSignatures.size();
 
-  size_t signaturesCount = 0;
   auto rt = cs::Conveyer::instance().roundTable(rNum - 1);
+
   if (rt != nullptr) {
-
-
+    size_t signaturesCount = 0;
     for (auto& it : roundSignatures) {
+      if (it.sender > rt->confidants.size()) {
+        cserror() << "NODE> Getting round table is contained of more confidants";
+        return;
+      }
       cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
-      if(cscrypto::VerifySignature(it.signature,rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
+      if (cscrypto::VerifySignature(it.signature, rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
         ++signaturesCount;
       }
     }
-    size_t neededConfNumber = rt->confidants.size()/2U +1U;
+
+    size_t neededConfNumber = rt->confidants.size() / 2U + 1U;
     if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
       csdebug() << "NODE> All signatures in RoundTable are ok!";
-    } 
+    }
     else {
       csdebug() << "NODE> RoundTable is not valid! But we continue ...";
       //return;
     }
   }
+
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
