@@ -84,7 +84,7 @@ Glance coding style guide description.
 >   };
 >};
 
-- global/static (not local static) variable starts with 'g' symbol
+- global variable starts with 'g' symbol
 
 >```cpp
 >static int gPlatformStatus = 0;
