@@ -10,7 +10,7 @@ PrivateKey::PrivateKey(): mem_(nullptr), ctr_(new uint32_t(1)) {}
 void PrivateKey::clear() {
   if (!(--(*ctr_))) {
     sodium_free(mem_);
-    free(ctr_);
+    delete ctr_;
   }
 }
 

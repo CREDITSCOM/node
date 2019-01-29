@@ -337,6 +337,8 @@ private:
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;
 
+  std::vector<bool> badHashReplyCounter_;
+
   // round stat
   cs::RoundStat stat_;
 };

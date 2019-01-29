@@ -2484,6 +2484,11 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   stageThreeMessage_.resize(roundTable.confidants.size());
   stageThreeSent = false;
   constexpr int padWidth = 30;
+  badHashReplyCounter_.clear();
+  badHashReplyCounter_.resize(roundTable.confidants.size());
+  for(auto& badHash : badHashReplyCounter_) {
+    badHash = false;
+  }
 
   std::ostringstream line1;
   for (int i = 0; i < padWidth; i++) {
@@ -2604,11 +2609,16 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
   }
 
   cs::Signature signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
-  sendDefault(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, hash);
+  sendDefault(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);
 }
 
 void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
-  static size_t badHashReplyCounter = 0;
+  if (myLevel_ == Level::Confidant) {
+    csmeta(csdebug) << "I'm confidant. Exit from getHashReply";
+    return;
+  }
+
+  csmeta(csdebug);
 
   istream_.init(data, size);
   uint8_t subRound = 0;
@@ -2624,6 +2634,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
   cs::Signature signature;
   istream_ >> signature;
 
+  uint8_t senderNumber;
+  istream_ >> senderNumber;
+
   csdb::PoolHash hash;
   istream_ >> hash;
 
@@ -2632,16 +2645,35 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
+  if (senderNumber >= conveyer.confidantsCount()) {
+    csmeta(csdetails) << "Sender num: " << senderNumber
+                      << " >=  confidants count conveyer: " << conveyer.confidantsCount();
+    return;
+  }
+
+  if (conveyer.confidantByIndex(senderNumber) != sender) {
+    csmeta(csdetails) << "Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                      << " is not correspond by index at conveyer: " << senderNumber;
+    return;
+  }
+
+  if (badHashReplyCounter_[senderNumber]) {
+    csmeta(csdetails) << "Sender num: " << senderNumber << " already send hash reply";
+    return;
+  }
+
+  badHashReplyCounter_[senderNumber] = true;
+
   if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
     csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
     return;
   }
 
-  ++badHashReplyCounter;
+  const auto badHashReplySummary = std::count_if(badHashReplyCounter_.begin(), badHashReplyCounter_.end(),
+                                                 [](bool badHash) { return badHash; });
 
-  if (badHashReplyCounter > conveyer.confidantsCount() / 2) {
+  if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) {
     csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
-    badHashReplyCounter = 0;
     blockChain_.removeLastBlock();
   }
 }
