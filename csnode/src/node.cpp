@@ -155,24 +155,29 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   }
 
   // this evil code sould be removed after examination
-  cs::Sequence cnt_removed = 0;
-  cs::Sequence last_seq = blockChain_.getLastSequence();
-  while (last_seq >= rNum) {
-    if(cnt_removed == 0) {
+  cs::Sequence countRemoved = 0;
+  cs::Sequence lastSequence = blockChain_.getLastSequence();
+
+  while (lastSequence >= rNum) {
+    if (countRemoved == 0) {
       // the 1st time
-      csdebug() << "NODE> remove " << last_seq - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << last_seq << ")";
+      csdebug() << "NODE> remove " << lastSequence - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
     }
+
     blockChain_.removeLastBlock();
     cs::RoundNumber tmp = blockChain_.getLastSequence();
-    if(last_seq == tmp) {
+
+    if (lastSequence == tmp) {
       csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
       break;
     }
-    ++cnt_removed;
-    last_seq = tmp;
+
+    ++countRemoved;
+    lastSequence = tmp;
   }
-  if(cnt_removed > 0) {
-    csdebug() << "NODE> " << cnt_removed << " block(s) was removed";
+
+  if (countRemoved > 0) {
+    csdebug() << "NODE> " << countRemoved << " block(s) was removed";
   }
 
   // resend all this round data available
@@ -337,7 +342,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
     return;
   }
 
-  csdebug() << "NODE> Get packet hashes reply: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+  csdebug() << "NODE> Get packet hashes reply: sender " << cs::Utils::byteStreamToHex(sender);
   csdebug() << "NODE> Hashes reply got packets count: " << packets.size();
 
   processPacketsReply(std::move(packets), round);
@@ -2469,6 +2474,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   if (!found) {
     myLevel_ = Level::Normal;
   }
+
   // TODO: think how to improve this code.
   stageOneMessage_.clear();
   stageOneMessage_.resize(roundTable.confidants.size());
@@ -2513,7 +2519,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   csdebug() << line2.str();
-
   csdebug() << " Confidants:";
 
   for (size_t i = 0; i < roundTable.confidants.size(); ++i) {

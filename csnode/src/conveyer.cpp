@@ -30,7 +30,20 @@ struct cs::ConveyerBase::Impl {
 
 public signals:
   cs::PacketFlushSignal flushPacket;
+
+  // helpers
+  const cs::ConveyerMeta* validMeta() &;
 };
+
+inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
+  cs::ConveyerMeta* meta = metaStorage.get(currentRound);
+
+  if (meta != nullptr) {
+    return meta;
+  }
+
+  return &(metaStorage.max());
+}
 
 cs::ConveyerBase::ConveyerBase() {
   pimpl_ = std::make_unique<cs::ConveyerBase::Impl>();
@@ -106,7 +119,7 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (!meta) {
-    cserror() << csname() << "Can not create transactions packet";
+    cserror() << csname() << "Can not create transactions packet at round " << currentRoundNumber();
     return std::nullopt;
   }
 
@@ -200,8 +213,7 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
-  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(pimpl_->currentRound);
-  return meta->roundTable;
+  return pimpl_->validMeta()->roundTable;
 }
 
 const cs::ConfidantsKeys& cs::ConveyerBase::confidants() const {
@@ -261,7 +273,7 @@ cs::RoundNumber cs::ConveyerBase::previousRoundNumber() const {
 }
 
 const cs::PacketsHashes& cs::ConveyerBase::currentNeededHashes() const {
-  return *(neededHashes(currentRoundNumber()));
+  return pimpl_->validMeta()->neededHashes;
 }
 
 const cs::PacketsHashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
@@ -321,14 +333,13 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
 }
 
 const cs::Notifications& cs::ConveyerBase::notifications() const {
-  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
-  return meta->notifications;
+  return pimpl_->validMeta()->notifications;
 }
 
 void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
-  if (meta) {
+  if (meta != nullptr) {
     csdebug() << csname() << "Writer notification added";
     meta->notifications.push_back(bytes);
   }
@@ -388,7 +399,7 @@ std::optional<cs::CharacteristicMeta> cs::ConveyerBase::characteristicMeta(const
 void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round) {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
-  if (meta) {
+  if (meta != nullptr) {
     csdebug() << csname() << "Characteristic set to conveyer, #" << round;
     meta->characteristic = characteristic;
   }
@@ -508,10 +519,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.add_user_field(0, metaPoolInfo.timestamp);
   newPool.add_real_rusted(metaPoolInfo.realTrustedMask);
   newPool.set_writer_public_key(metaPoolInfo.writerKey);
-  csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey.data(), metaPoolInfo.writerKey.size());
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
+  csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
   csmeta(csdetails) << "done";
+
   return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 

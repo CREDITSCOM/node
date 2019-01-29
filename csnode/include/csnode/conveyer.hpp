@@ -160,7 +160,7 @@ public:
   cs::RoundNumber currentRoundNumber() const;
 
   ///
-  /// @brief Returns previous round number (special for characteristic and pool creation)
+  /// @brief Returns previous round number (special for characteristic and pool creation).
   ///
   cs::RoundNumber previousRoundNumber() const;
 
