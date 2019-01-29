@@ -198,7 +198,7 @@ protected:
           emit finished(result);
         };
 
-        Super::callSignal(signal);
+        Super::callSignal(std::bind(lambda, std::move(result)));
       }
       catch (std::exception& e) {
         Super::await(failed);
