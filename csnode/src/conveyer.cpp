@@ -167,7 +167,7 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
 void cs::ConveyerBase::setTable(const RoundTable& table) {
   csmeta(csdebug) << "started";
 
-  if (table.round != currentRoundNumber()) {
+  if (table.round < currentRoundNumber()) {
     cserror() << csname() << "Setting table in conveyer failed, current round " << currentRoundNumber() << ", table round " << table.round;
     return;
   }
@@ -188,10 +188,8 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
     csdetails() << csname() <<  "Need hash " << hash.toString();
   }
 
-  {
-    cs::Lock lock(sharedMutex_);
-    pimpl_->currentRound = table.round;
-  }
+  // atomic
+  pimpl_->currentRound = table.round;
 
   cs::ConveyerMetaStorage::Element element;
   element.round = table.round;
