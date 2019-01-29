@@ -88,7 +88,7 @@ struct PoolMetaInfo {
   cs::PublicKey writerKey;
   csdb::PoolHash previousHash;
   cs::Sequence sequenceNumber;
-  std::vector<uint8_t> realTrustedMask;
+  cs::Bytes realTrustedMask;
   std::vector <csdb::Pool::SmartSignature> smartSignatures;
 };
 

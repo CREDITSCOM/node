@@ -145,7 +145,8 @@ TEST(Conveyer, RoundTableReturnsSameAsThatWasSetWithSetRound) {
   ConveyerTest conveyer{};
   auto round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& round_table_copy{cs::RoundTable{round_table}};
-  conveyer.setTable(std::move(round_table_copy));
+  conveyer.setRound(round_table.round);
+  conveyer.setTable(round_table_copy);
   ASSERT_EQ(round_table, conveyer.currentRoundTable());
 }
 
@@ -248,7 +249,7 @@ TEST(Conveyer, MainLogic) {
   std::fill(pk.begin(), pk.end(), 0);
 
   csdb::PoolHash ph;
-  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber};
+  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
   auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 

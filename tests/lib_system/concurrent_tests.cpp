@@ -108,6 +108,10 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
       print("Watcher finished slot activated");
       called = true;
     }
+
+    void onFailed() {
+      print("Execution failed");
+    }
   };
 
   Demo demo;
@@ -115,7 +119,10 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   auto binder = std::bind(&Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
+  print("Not connected yet");
+
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
+  cs::Connector::connect(&watcher->failed, &demo, &Demo::onFailed);
 
   while(!isRunningFinished);
 
@@ -163,6 +170,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   std::string message = "Finished";
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
+  print("Not connected yet");
 
   // look at watcher
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
@@ -171,6 +179,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   while(!isRunningFinished);
 
   if (!called) {
+    print("Not called, sleeping...");
     std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
   }
 
