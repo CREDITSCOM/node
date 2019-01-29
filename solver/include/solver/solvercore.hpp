@@ -31,6 +31,8 @@ class SmartContracts;
 
 namespace cs {
 
+  constexpr cs::Byte InvalidConfidant = 255;
+
 class SolverCore {
 public:
   using Counter = size_t;
@@ -297,9 +299,9 @@ private:
   std::vector<cs::StageOneSmarts> smartStageOneStorage_;
   std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
   std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-  bool smartStagesStorageRefreshed_ = false;
+  bool smartStagesStorageRefreshed_;
   std::vector<cs::PublicKey> smartConfidants_;
-  uint8_t ownSmartsConfNum_ = 255;
+  uint8_t ownSmartsConfNum_;
   cs::Sequence smartRoundNumber_;
   cs::TransactionsPacket currentSmartTransactionPack_;
   cs::StageOneSmarts st1;
