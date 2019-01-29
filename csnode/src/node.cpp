@@ -2473,7 +2473,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   constexpr int padWidth = 30;
   badHashReplyCounter_.clear();
   badHashReplyCounter_.resize(roundTable.confidants.size());
-  for(auto& badHash : badHashReplyCounter_) {
+  for(auto badHash : badHashReplyCounter_) {
     badHash = false;
   }
 
