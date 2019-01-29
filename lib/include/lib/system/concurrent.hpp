@@ -182,11 +182,11 @@ protected:
       try {
         Result result = Super::future_.get();
 
-        auto signal = [=] {
+        auto lambda = [this](const Result& result) {
           emit finished(result);
         };
 
-        Super::callSignal(signal);
+        Super::callSignal(std::bind(lambda, std::move(result)));
       }
       catch (std::exception& e) {
         cserror() << "Concurrent execution with " << typeid(Result).name() << " failed, " << e.what();
