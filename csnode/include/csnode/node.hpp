@@ -84,7 +84,7 @@ public:
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
-  void retriveSmartConfidants(const cs::Sequence startSmartRoundNumber, cs::ConfidantsKeys& confs) const;
+  cs::ConfidantsKeys retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const;
 
   void onRoundStart(const cs::RoundTable& roundTable);
   void startConsensus();
@@ -334,6 +334,8 @@ private:
 
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;
+
+  std::vector<bool> badHashReplyCounter_;
 
   // round stat
   cs::RoundStat stat_;

@@ -10,7 +10,7 @@
 
 #include "priv_crypto.hpp"
 
-#include <lib/system/scope_guard.h>
+#include <lib/system/scopeguard.hpp>
 
 namespace csdb {
 
@@ -125,7 +125,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   status = status ? status : env_.txn_begin(nullptr, &txn, DB_READ_UNCOMMITTED);
   auto txn_create_status = status;
 
-  auto g = scopeGuard([&]() {
+  auto g = cs::scopeGuard([&]() {
     if (txn_create_status) {
       return;
     }
@@ -184,7 +184,7 @@ bool DatabaseBerkeleyDB::put(const cs::Bytes& key, uint32_t seq_no, const cs::By
   DbTxn *tid;
   int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
   int txn_create_status = status;
-  auto g = scopeGuard([&]() {
+  auto g = cs::scopeGuard([&]() {
     if (txn_create_status) {
       return;
     }

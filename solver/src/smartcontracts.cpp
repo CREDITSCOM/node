@@ -233,7 +233,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
         bool present;
         const auto tmp = papi->getSmartContract(tr.source(), present);  // tr.target() is also allowed
         if (present) {
-          return std::make_optional(tmp);
+          return std::make_optional(std::move(tmp));
         }
       }
     }
@@ -247,7 +247,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
       const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
       if (invoke_info.method.empty()) {
         // is deploy
-          return std::make_optional(invoke_info);
+        return std::make_optional(std::move(invoke_info));
       }
       else {
         // is start
@@ -255,7 +255,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
         // we need not acquire origin
         constexpr bool api_pass_code_and_methods = false;
         if constexpr (api_pass_code_and_methods) {
-            return std::make_optional(invoke_info);
+          return std::make_optional(std::move(invoke_info));
         }
         // if api is refactored, we may need to acquire contract origin separately:
         if constexpr (!api_pass_code_and_methods) {
@@ -265,7 +265,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
             if (present) {
               tmp.method = invoke_info.method;
               tmp.params = invoke_info.params;
-                return std::make_optional(tmp);
+                return std::make_optional(std::move(tmp));
               }
             }
           }

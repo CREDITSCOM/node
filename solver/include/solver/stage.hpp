@@ -40,9 +40,9 @@ struct StageThree {
   void print() {
     std::string realTrustedString;
     for (auto& i : realTrustedMask) {
-      realTrustedString = realTrustedString + "[" + std::to_string((int)i) + "] ";
+      realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
     }
-    csdebug() << "     SENDER = " << (int)sender << ", WRITER = " << (int)writer << ", RealTrusted = " << realTrustedString;
+    csdebug() << "     SENDER = " << static_cast<int>(sender) << ", WRITER = " << static_cast<int>(writer) << ", RealTrusted = " << realTrustedString;
     csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(blockHash.data(), blockHash.size());
     csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(blockSignature.data(), blockSignature.size());
     csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(roundHash.data(), roundHash.size());
