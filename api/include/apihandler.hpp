@@ -287,6 +287,9 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
+bool is_smart(const csdb::Transaction& tr);
+bool is_smart_state(const csdb::Transaction& tr);
+bool is_smart_deploy(const api::SmartContractInvocation& smart);
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
