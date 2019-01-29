@@ -49,8 +49,7 @@ bool operator==(const cs::RoundTable& left, const cs::RoundTable& right) {
          hashes_is_equal && charBytes_is_equal;
 }
 
-bool operator==(const cs::Characteristic& left,
-                const cs::Characteristic& right) {
+bool operator==(const cs::Characteristic& left, const cs::Characteristic& right) {
   return left.mask == right.mask;
 }
 }  // namespace cs
@@ -71,10 +70,10 @@ bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
 }
 }  // namespace csdb
 
-csdb::Transaction CreateTestTransaction(const int64_t id,
-                                        const uint8_t amount) {
+csdb::Transaction CreateTestTransaction(const int64_t id, const uint8_t amount) {
   cs::Signature sign;
   sign.fill(0);
+
   csdb::Transaction transaction{
       id,
       csdb::Address::from_public_key(
@@ -90,39 +89,39 @@ csdb::Transaction CreateTestTransaction(const int64_t id,
       csdb::AmountCommission{0.},
       csdb::AmountCommission{0.},
       sign};
+
   return transaction;
 }
 
 auto CreateTestPacket(const size_t number_of_transactions) {
-  cs::TransactionsPacket packet{};
+  cs::TransactionsPacket packet;
+
   for (size_t i = 0; i < number_of_transactions; ++i) {
-    packet.addTransaction(CreateTestTransaction(0x1234567800000001 + i, 1));
+    size_t value = 0x1234567800000001;
+    packet.addTransaction(CreateTestTransaction(static_cast<int64_t>(value + i), static_cast<uint8_t>(1)));
   }
+
   packet.makeHash();
   cslog() << "hash = " << packet.hash().toString();
   return packet;
 }
 
 auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
-  return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes,
-                        kCharacteristic};
+  return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes, kCharacteristic};
 }
 
 TEST(TransactionsEqualityOperator, SameAreEqual) {
-  auto transaction1 = CreateTestTransaction(123, uint8_t{45}),
-       transaction2 = transaction1;
+  auto transaction1 = CreateTestTransaction(123, uint8_t{45}), transaction2 = transaction1;
   ASSERT_EQ(transaction1, transaction2);
   ASSERT_TRUE(transaction1 == transaction2);
 }
 
 TEST(TransactionsEqualityOperator, DifferentId) {
-  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
-               CreateTestTransaction(321, uint8_t{45}));
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) == CreateTestTransaction(321, uint8_t{45}));
 }
 
 TEST(TransactionsEqualityOperator, DifferentAmount) {
-  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
-               CreateTestTransaction(123, uint8_t{00}));
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) == CreateTestTransaction(123, uint8_t{00}));
 }
 
 class ConveyerTest : public cs::ConveyerBase {
@@ -183,9 +182,10 @@ TEST(Conveyer, AddTransaction) {
 }
 
 TEST(Conveyer, TransactionPacketTableIsEmptyAtCreation) {
+  constexpr auto size = 0;
   ConveyerTest conveyer{};
   auto& table = conveyer.transactionsPacketTable();
-  ASSERT_EQ(0, table.size());
+  ASSERT_EQ(table.size(), size);
 }
 
 TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
@@ -214,8 +214,11 @@ TEST(Conveyer, MainLogic) {
   auto packet = CreateTestPacket(20);
   auto&& packet_copy{cs::TransactionsPacket{packet}};
   ConveyerTest conveyer{};
+
   auto hash = packet_copy.hash();
-  conveyer.setTable(CreateTestRoundTable({packet_copy.hash()}));
+  auto table = CreateTestRoundTable({packet_copy.hash()});
+
+  conveyer.setTable(table);
   ASSERT_EQ(1, conveyer.currentNeededHashes().size());
 
   conveyer.addFoundPacket(kRoundNumber, std::move(packet_copy));
