@@ -180,6 +180,35 @@ public:
   }
 
   ///
+  /// @brief Returns reference to last round meta storage.
+  /// @warning Use only if elements exists.
+  ///
+  const T& last() const {
+    auto iterator = end();
+    --iterator;
+
+    return iterator->meta;
+  }
+
+  ///
+  /// @brief Returns max round meta element.
+  /// @warning Use only if elements exists.
+  ///
+  const T& max() const {
+    const MetaElement* element = nullptr;
+    cs::RoundNumber maxRound = 0;
+
+    std::for_each(buffer_.begin(), buffer_.end(), [&](const MetaElement& value) {
+      if (maxRound <= value.round) {
+        maxRound = value.round;
+        element = &value;
+      }
+    });
+
+    return element->meta;
+  }
+
+  ///
   /// @brief Returns const begin interator of circular buffer.
   ///
   auto begin() const {
