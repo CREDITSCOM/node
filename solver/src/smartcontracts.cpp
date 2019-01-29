@@ -47,9 +47,28 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 
 SmartContracts::~SmartContracts() = default;
 
-void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api) {
+void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
+{
   papi = api;
   node_id = id;
+  // validate contract states
+  auto pred = [](const auto& item) { return item.first.is_wallet_id(); };
+  auto it = std::find_if(contract_state.cbegin(), contract_state.cend(), pred);
+  size_t cnt = contract_state.size();
+  while(it != contract_state.cend()) {
+    // non-absolute address item is always newer then absolute one:
+    csdb::Address abs_addr = absolute_address(it->first);
+    if(abs_addr.is_valid()) {
+      contract_state[abs_addr] = it->second;
+    }
+    contract_state.erase(it);
+    it = std::find_if(contract_state.begin(), contract_state.end(), pred);
+  }
+  size_t new_cnt = contract_state.size();
+  cslog() << name() << ": " << new_cnt << " smart contract states loaded";
+  if(cnt > new_cnt) {
+    cslog() << name() << ": " << cnt - new_cnt << " smart contract states is optimizied";
+  }
 }
 
 /*static*/
@@ -137,8 +156,11 @@ bool SmartContracts::is_new_state(const csdb::Transaction tr) const {
   if (!is_smart_contract(tr)) {
     return false;
   }
-  // must contain user field trx_uf::new_state::Value
-  return tr.user_field_ids().count(trx_uf::new_state::Value) > 0;
+  // must contain user field new_state::Value and new_state::RefStart
+  using namespace cs::trx_uf;
+  // test user_field[RefStart] helps filter out ancient smart contracts:
+  return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String &&
+    tr.user_field(new_state::RefStart).type() == csdb::UserField::Type::String);
 }
 
 /*static*/
@@ -323,21 +345,7 @@ void SmartContracts::on_new_state(csdb::Pool block, size_t trx_idx) {
         SmartContractRef contract_ref;
         contract_ref.from_user_field(fld_contract_ref);
         // update state
-        csdb::UserField fld_state_value = new_state.user_field(trx_uf::new_state::Value);
-        if (!fld_state_value.is_valid()) {
-          cserror() << name() << ": contract new state does not contain state value";
-        }
-        else {
-          std::string state_value = fld_state_value.value<std::string>();
-          if (!state_value.empty()) {
-            contract_state[absolute_address(new_state.target())] = state_value;
-            csdebug() << name() << ": contract state updated, there are " << contract_state.size()
-                      << " items in states cache";
-          }
-          else {
-            cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
-          }
-        }
+        update_contract_state(new_state);
         remove_from_queue(contract_ref);
       }
     }
@@ -463,7 +471,15 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   }
 }
 
-void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop) {
+void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
+{
+  if(block.transactions_count() > 0) {
+    for(const auto& tr : block.transactions()) {
+      if(is_new_state(tr)) {
+        update_contract_state(tr, false /*force_absolute_address*/);
+      }
+    }
+  }
   *should_stop = false;
 }
 
@@ -683,6 +699,28 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
   else {
     cserror() << name() << ": trxs are rejected but list is empty";
   }
+}
+
+bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absolute_address /*= true*/)
+{
+  csdb::UserField fld_state_value = t.user_field(trx_uf::new_state::Value);
+  if(!fld_state_value.is_valid()) {
+    cserror() << name() << ": contract state is not updated, transaction does not contain it";
+    return false;
+  }
+  std::string state_value = fld_state_value.value<std::string>();
+  if(!state_value.empty()) {
+    csdb::Address addr = t.target();
+    if(force_absolute_address) {
+      addr = absolute_address(addr);
+    }
+    contract_state[addr] = state_value;
+  }
+  else {
+    cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
+    return false;
+  }
+  return true;
 }
 
 }  // namespace cs

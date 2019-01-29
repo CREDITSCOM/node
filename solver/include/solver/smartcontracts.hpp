@@ -343,6 +343,8 @@ private:
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
   csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
+
+  bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 };
 
 }  // namespace cs
