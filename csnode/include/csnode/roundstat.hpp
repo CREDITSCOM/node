@@ -15,8 +15,18 @@ public:
 
   void onRoundStart(cs::RoundNumber round);
 
+  // called when next block is read from database
   void onReadBlock(csdb::Pool block, bool* should_stop);
 
+  // called when next block is stored
+  void onStoreBlock(csdb::Pool block);
+
+  size_t total_transactions() const
+  {
+    return totalAcceptedTransactions_;
+  }
+
+private:
   // amount of transactions received (to verify or not or to ignore)
   size_t totalReceivedTransactions_;
 

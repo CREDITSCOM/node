@@ -45,6 +45,7 @@ Node::Node(const Config& config)
   std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
+  cs::Connector::connect(&blockChain_.storeBlockEvent_, &stat_, &cs::RoundStat::onStoreBlock);
   good_ = init(config);
 }
 
@@ -60,7 +61,7 @@ bool Node::init(const Config& config) {
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
-  cslog() << "Blockchain is ready, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+  cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
   std::cout << "Init API... ";
@@ -386,8 +387,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
 
-    stat_.totalReceivedTransactions_ += characteristic.mask.size();
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
@@ -409,7 +408,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       cserror() << "NODE> failed to store block in BlockChain";
     }
     else {
-      stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       blockChain_.testCachedBlocks();
     }
   }
@@ -1989,8 +1987,6 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     return;
   }
 
-  stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
-
   // array
   cs::Signature poolSignature;
   const auto& signature = pool.value().signature();
@@ -2059,8 +2055,6 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& po
     csmeta(cserror) << "Send round info characteristic not found, logic error";
     return;
   }
-
-  stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block

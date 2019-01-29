@@ -290,6 +290,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis);
   deferredBlock_ = genesis;
+  emit storeBlockEvent_(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
