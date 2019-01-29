@@ -163,17 +163,7 @@ public:
 
   const csdb::Storage& getStorage() const;
 
-  struct AddrTrnxCount {
-    uint64_t sendCount;
-    uint64_t recvCount;
-    uint64_t total_trxns_count;
-  };
-
-  void recount_trxns(const std::optional<csdb::Pool>& new_pool);
-  const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-  //std::vector<csdb::Transaction> genesisTrxns_;
 private:
-
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
@@ -226,7 +216,6 @@ private:
 
   std::condition_variable_any newBlockCv_;
   cs::SpinLock waitersLocker_;
-  std::map<csdb::Address, AddrTrnxCount> transactionsCount_;
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;

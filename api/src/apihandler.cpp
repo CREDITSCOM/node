@@ -345,9 +345,6 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const Address& 
     s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
   }
   _return.transactions = convertTransactions(transactions);
-  decltype(auto) trxns_count_res = s_blockchain.get_trxns_count(addr);
-  _return.trxns_count.sendCount = trxns_count_res.sendCount;
-  _return.trxns_count.recvCount = trxns_count_res.recvCount;
 
 #ifdef MONITOR_NODE
   _return.total_trxns_count = s_blockchain.getTransactionsCount(addr);
@@ -1388,8 +1385,6 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return,
   if (!validatePagination(_return, *this, offset, limit)) return;
 
   _return.result = false;
-  _return.trxns_count.sendCount = 0;
-  _return.trxns_count.recvCount = 0;
   _return.total_trxns_count = s_blockchain.getTransactionsCount();
 
   auto tPair = s_blockchain.getLastNonEmptyBlock();
