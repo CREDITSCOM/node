@@ -78,10 +78,10 @@ public:
   const cs::TransactionsBlock& transactionsBlock() const;
 
   ///
-  /// @brief Returns transactions packet created in current round.
-  /// @warning Slow-performance method. No thread safe.
+  /// @brief Returns pair of transactions packet created in current round and smart contract packets.
+  /// @warning Slow-performance method. Thread safe.
   ///
-  std::optional<cs::TransactionsPacket> createPacket() const;
+  std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket() const;
 
   // round info
 

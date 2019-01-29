@@ -115,7 +115,10 @@ const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const {
   return pimpl_->transactionsBlock;
 }
 
-std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
+std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket() const {
+  cs::Lock lock(sharedMutex_);
+
+  static constexpr size_t smartContractDetector = 1;
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (!meta) {
@@ -124,6 +127,8 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
   }
 
   cs::TransactionsPacket packet;
+  cs::Packets smartContractPackets;
+
   cs::PacketsHashes& hashes = meta->roundTable.hashes;
   cs::TransactionsPacketTable& table = pimpl_->packetsTable;
 
@@ -135,9 +140,11 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
       return std::nullopt;
     }
 
-    if (!iterator->second.signatures().empty()) {
-      //TODO: add code here to manage the smartSignatures
+    // to smarts
+    if (iterator->second.signatures().size() > smartContractDetector) {
+      smartContractPackets.push_back(iterator->second);
     }
+
     const auto& transactions = iterator->second.transactions();
 
     for (const auto& transaction : transactions) {
@@ -147,7 +154,8 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
     }
   }
 
-  return std::make_optional<cs::TransactionsPacket>(std::move(packet));
+  auto data = std::make_pair<cs::TransactionsPacket, cs::Packets>(std::move(packet), std::move(smartContractPackets));
+  return std::make_optional<decltype(data)>(std::move(data));
 }
 
 void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
