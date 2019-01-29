@@ -1,20 +1,40 @@
 # Credits C++ coding style guide
 
-Coding style guide description.
+Glance coding style guide description.
 
 ### Base concept
 
 - C++17 standard
 - 2 spaces
-- camel case naming style
+- camelCase naming style
 
 ---
+
+### Brackets
+
+>```cpp
+>
+>void bracketsExample() {
+>}
+>
+>if (transactions.empty()) {
+>}
+>else {
+>}
+
+### Types
+
+- reference and pointer symbols add to right part of type
+>```cpp
+>int& ref = i;
+>int* pointer = &ref;
 
 ### Naming convention
 
 - local variables starts with lower case
 
->```auto exampleValue = 100;```
+>```cpp
+>auto exampleValue = 100;
 
 - class/struct names starts with upper case
 
@@ -32,21 +52,21 @@ Coding style guide description.
 
 - struct fields starts with lowe case
 
->```
+>```cpp
 >struct A {
->   int goodField;
+>   int demoField;
 >};
 
 - method/function starts with lower case
 
->```
+>```cpp
 >void runTransport() {
 >   object->call();
 >}
 
 - namespace name starts with lower case
 
->```
+>```cpp
 >namespace cs {
 >class A {
 >};
@@ -54,7 +74,7 @@ Coding style guide description.
 
 - constant starts with 'k' symbol, or goes to enum
 
->```
+>```cpp
 >constexpr double kTransactionFee = 0.001;
 >
 >class Transport {
@@ -64,8 +84,24 @@ Coding style guide description.
 >   };
 >};
 
-
 - global/static (not local static) variable starts with 'g' symbol
 
->```static int gPlatformStatus = 0;```
+>```cpp
+>static int gPlatformStatus = 0;
 
+### Clang format settings
+
+>```
+>BasedOnStyle: Google
+>ColumnLimit: 180
+>AllowShortFunctionsOnASingleLine: 'false'
+>AllowShortIfStatementsOnASingleLine: 'false'
+>AllowShortLoopsOnASingleLine: 'false'
+>AlignTrailingComments: 'true'
+>ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
+>ConstructorInitializerIndentWidth: 0
+>BreakConstructorInitializersBeforeComma: 'true'
+>BreakBeforeBraces: 'Custom'
+>BraceWrapping: { AfterEnum: true, BeforeElse: true, BeforeCatch: true }
+>MaxEmptyLinesToKeep: 1
+>AccessModifierOffset: -2

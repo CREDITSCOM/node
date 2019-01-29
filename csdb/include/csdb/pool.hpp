@@ -173,6 +173,7 @@ public:
   NewWallets* newWallets() noexcept;
   const NewWallets& newWallets() const noexcept;
   bool getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const;
+  const std::vector<uint8_t>& realTrusted() const noexcept;
 
   /**
    * @brief Добавляет транзакцию в пул.

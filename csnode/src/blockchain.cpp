@@ -90,6 +90,7 @@ bool BlockChain::init(const std::string& path)
       cserror() << "Bad database version";
       return false;
     }
+    fee_->ResetTrustedCache(*this);
     std::cout << "Done\n";
   }
 
@@ -468,7 +469,12 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
 void BlockChain::logBlockInfo(csdb::Pool& pool)
 {
   const auto& trusted = pool.confidants();
-  csdebug() << " trusted count " << trusted.size();
+  std::string  realTrustedString;
+  for (auto& i : pool.realTrusted()) {
+    realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
+  }
+
+  csdebug() << " trusted count " << trusted.size() << ", RealTrusted = " << realTrustedString;
   for(const auto& t : trusted) {
     csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
   }
@@ -489,12 +495,12 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
 
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
-  if (signatures.empty() && (pool.sequence() != 0 || !isTrusted)) {
+  if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
     csdebug() << "The  pool doesn't contain signatures";
     return false;
   }
 
-  if (signatures.size() < confidants.size() / 2U + 1U && pool.sequence() != 0) {
+  if (signatures.size() < confidants.size() / 2U + 1U && !isTrusted && pool.sequence() != 0) {
     csdebug() << "The number of signatures is insufficient";
     return false;
   }
@@ -996,7 +1002,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
       csdebug() << "The block is correct";
     } 
     else {
-      csdebug() << "the signatures of the block sre incorrect";
+      csdebug() << "the signatures of the block are incorrect";
       return std::make_pair(false, csdb::Pool{});
     }
     pool = deferredBlock_;
@@ -1009,10 +1015,21 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   logBlockInfo(pool);
   csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
+  if(pool.sequence() > 1) {
+    csdb::Pool pPool = loadBlock(pool.sequence() - 1);
+    csdebug() << "----------------------- Just history: #" << pPool.sequence() << " until next round ----------------------";
+    logBlockInfo(pPool);
+  }
+
   return std::make_pair(true, pool);
 }
 
+bool BlockChain::addSignaturesToDeferredBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) {
+  return true;
+}
+
 bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
+  csdebug() << __func__ << ":";
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq <= last_seq) {
@@ -1021,6 +1038,19 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     // it is not error, so caller code nothing to do with it
     return true;
   }
+ 
+  if (pool_seq == last_seq) {
+    if (!deferredBlock_.signatures().empty()) {
+      // ignore
+      csdebug() << "BLOCKCHAIN> ignore oudated block #" << pool_seq << ", last written #" << last_seq;
+      // it is not error, so caller code nothing to do with it
+      return true;
+    }
+    else {
+      removeLastBlock();
+    }
+  }
+
   if (pool_seq == last_seq + 1) {
     if (pool.previous_hash() != getLastHash()) {
       csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";

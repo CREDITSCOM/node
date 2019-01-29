@@ -88,6 +88,10 @@ void SolverContext::request_round_table() const {
   //        core.pnode->sendRoundTableRequest(core.cur_round);
 }
 
+bool SolverContext::addSignaturesToLastBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) const {
+  return core.pnode->getBlockChain().addSignaturesToDeferredBlock(blockSignatures);
+}
+
 Role SolverContext::role() const {
   auto v = core.pnode->getNodeLevel();
   switch (v) {

@@ -48,10 +48,12 @@ bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
     isDbInited_ = true;
   }
   else if (seq <= db_.last_) {
+    csdebug() << __func__ <<"seq <= db_.last_" ;
     return false;
   }
 
   if (seq != hashes_.size()) {
+    csdebug() << __func__ << "seq != hashes_.size()";
     return false;  // see BlockChain::putBlock
   }
 

@@ -119,6 +119,9 @@ public:
    * @param   nodes   The nodes.
    */
 
+
+  bool addSignaturesToLastBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) const;
+
   void spawn_next_round(cs::StageThree& st3);
 
   void spawn_first_round() {

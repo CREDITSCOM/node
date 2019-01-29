@@ -470,6 +470,11 @@ Storage Pool::storage() const noexcept {
 Transaction Pool::transaction(size_t index) const {
   return (d->transactions_.size() > index) ? d->transactions_[index] : Transaction{};
 }
+const std::vector<uint8_t>& Pool::realTrusted() const noexcept
+{
+  // TODO: вставьте здесь оператор return
+  return d->realTrusted_;
+}
 
 Transaction Pool::transaction(TransactionID id) const {
   if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_hash() != d->hash_) ||

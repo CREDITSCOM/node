@@ -12,6 +12,14 @@ void WaitingState::on(SolverContext &context) {
   if (writingQueueNumber_ == InvalidConfidantIndex) {
     return;
   }
+  std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures;
+  for (auto& it : context.stage3_data()) {
+    blockSignatures.emplace_back(it.sender,it.blockSignature);
+  }
+
+  if (context.addSignaturesToLastBlock(blockSignatures)) {
+    csdebug() << "Signatures added to new block successfully";
+  }
   std::ostringstream os;
   os << prefix_ << "-" << (size_t)writingQueueNumber_;
   myName_ = os.str();

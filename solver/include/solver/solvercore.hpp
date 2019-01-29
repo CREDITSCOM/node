@@ -215,6 +215,9 @@ private:
   void killTimer(int st);
   void fakeStage(uint8_t confIndex);
 
+  template<class T>
+  bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
+
   // timeout tracking
 
   TimeoutTracking timeout_request_stage;

@@ -50,11 +50,12 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
     update_trusted_cache_ = true;
   }
 
+  Init(blockchain, pool);
+
   if (pool->transactions().size() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
-  Init(blockchain, pool);
   CountOneByteCost(blockchain);
   SetCountedFee();
 }
@@ -69,11 +70,12 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
     update_trusted_cache_ = true;
   }
 
+  Init(blockchain, packet);
+
   if (packet->transactionsCount() < 1) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
-  Init(blockchain, packet);
   CountOneByteCost(blockchain);
   SetCountedFee();
 }
@@ -153,6 +155,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
   if (!update_trusted_cache_) {
     return last_trusted_.size();
   }
+  csmeta(csdebug) << "begin";
   csdb::Pool pool = blockchain.loadBlock(num_of_last_block_);
 
   if (!pool.is_valid()) {
@@ -185,7 +188,7 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
     else {
       cserror() << "Fee> Confidants to remove is not contained to last trusted confidants.";
       cserror() << "Fee> Confidant: " << cs::Utils::byteStreamToHex(conf.data(), conf.size())
-                  << ", Round: " << sequence_to_remove;
+                << ", Round: " << sequence_to_remove;
     }
   }
 
