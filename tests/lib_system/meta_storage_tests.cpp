@@ -63,12 +63,18 @@ TEST(MetaStorage, AppendAndExtract) {
 
   std::cout << "Try to add next element" << std::endl;
 
-  ASSERT_EQ(storage.append(defaultRoundNumber, std::move(value)), true);
+  TestIntMetaSatorage::MetaElement element = {
+    defaultRoundNumber,
+    value
+  };
 
+  ASSERT_EQ(storage.append(element), true);
   printStorageSize(storage);
 
   ASSERT_EQ(storage.size(), 1);
-  ASSERT_EQ(storage.append(defaultRoundNumber + 1, std::move(value)), true);
+
+  element.round = defaultRoundNumber + 1;
+  ASSERT_EQ(storage.append(element), true);
 
   printStorageSize(storage);
   ASSERT_EQ(storage.size(), 2);
@@ -107,4 +113,43 @@ TEST(MetaStorage, BeginEnd) {
     ASSERT_EQ(element.meta, std::string());
     ASSERT_EQ(element.round, cs::RoundNumber());
   }
+}
+
+TEST(MetaStorage, MaxAndLast) {
+  cs::RoundNumber defaultRound = 1;
+  const std::string defaultString = "qwerty";
+  std::string value = defaultString;
+  const std::string expectedString = "111";
+
+  TestStringMetaStorage storage;
+  printStorageSize(storage);
+
+  // 1
+  storage.append(defaultRound, std::move(value));
+  value = defaultString;
+
+  // 2
+  storage.append(++defaultRound, std::move(value));
+  value = defaultString;
+
+  // 3
+  storage.append(++defaultRound, std::move(value));
+  value = expectedString;
+  defaultRound += 7;
+
+  // 10
+  storage.append(defaultRound, std::move(value));
+  printStorageSize(storage);
+
+  ASSERT_EQ(storage.size(), 4);
+
+  printValue("max() string ", storage.max());
+  printValue("Expected string ", expectedString);
+
+  ASSERT_EQ(storage.max(), expectedString);
+
+  printValue("last() value ", storage.last());
+  printValue("Expected last value ", expectedString);
+
+  ASSERT_EQ(storage.last(), expectedString);
 }

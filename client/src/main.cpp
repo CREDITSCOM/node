@@ -45,8 +45,7 @@ void sigUsr1Handler(int sig) {
 const uint32_t CLOSE_TIMEOUT_SECONDS = 10;
 
 void panic() {
-  cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS
-            << " seconds...";
+  cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS << " seconds...";
   std::this_thread::sleep_for(std::chrono::seconds(CLOSE_TIMEOUT_SECONDS));
   exit(1);
 }
@@ -56,7 +55,7 @@ inline void mouseSelectionDisable() {
   DWORD prevMode = 0;
   HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
   GetConsoleMode(hConsole, &prevMode);
-  SetConsoleMode(hConsole, prevMode & (~ENABLE_QUICK_EDIT_MODE));
+  SetConsoleMode(hConsole, prevMode & static_cast<unsigned long>(~ENABLE_QUICK_EDIT_MODE));
 #endif
 }
 
@@ -75,7 +74,7 @@ extern "C" void sigHandler(int sig) {
       cswarning() << "Signal SIGHUP received, exiting";
       break;
     default:
-      cswarning() << "Uncknown signal received!!!";
+      cswarning() << "Unknown signal received!!!";
       break;
   }
 }

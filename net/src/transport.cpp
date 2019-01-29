@@ -1,5 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #include <csnode/packstream.hpp>
+#include <csnode/conveyer.hpp>
+
 #include <lib/system/allocators.hpp>
 #include <lib/system/utils.hpp>
 
@@ -18,7 +20,7 @@ static void stopNode() noexcept(false) {
 }
 
 // Called periodically to poll the signal flag.
-void poll_signal_flag() {
+void pollSignalFlag() {
   if (gSignalStatus == 1) {
     gSignalStatus = 0;
     try {
@@ -32,7 +34,7 @@ void poll_signal_flag() {
 }
 
 // Extern function dfined in main.cpp to poll and handle signal status.
-extern void poll_signal_flag();
+extern void pollSignalFlag();
 
 enum RegFlags : uint8_t {
   UsingIPv6 = 1,
@@ -175,7 +177,7 @@ void Transport::run() {
       nh_.refreshLimits();
     }
 
-    poll_signal_flag();
+    pollSignalFlag();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 
@@ -432,7 +434,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     return false;
   }
 
-  const auto rLim = std::max(node_->getRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
+  const auto rLim = std::max(cs::Conveyer::instance().currentRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
 
   if (!pack.isFragmented()) {
     return pack.getRoundNum() >= rLim;
@@ -483,12 +485,18 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
   postponed_[1] = *postponed_;
   postponed_[0] = &ppBuf;
 
-  csdebug() << "TRANSPORT> POSTPHONED finish";
+  csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
 }
 
 void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack, const uint8_t* data, size_t size) {
   if (size == 0) {
     cserror() << "Bad packet size, why is it zero?";
+    return;
+  }
+
+  // cut my packs
+  if (firstPack.getSender() == node_->getNodeIdKey()) {
+    csdebug() << "TRANSPORT> Ignore myself packs";
     return;
   }
 
@@ -506,28 +514,26 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
       return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
     case MsgTypes::NodeStopRequest:
       return node_->getNodeStopRequest(data, size);
+    case MsgTypes::RoundTable:
+      return node_->getRoundTable(data, size, rNum, firstPack.getSender());
+    case MsgTypes::RoundTableSS:
+      return node_->getRoundTableSS(data, size, rNum);
     default:
       break;
   }
 
   // cut slow packs
-  if ((rNum + roundDifferent) < node_->getRoundNumber()) {
+  if ((rNum + roundDifferent) < cs::Conveyer::instance().currentRoundNumber()) {
     csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << getMsgTypesString(type) << ", fragments " << firstPack.getFragmentsNum();
     return;
   }
 
-  // cut my packs
-  if (firstPack.getSender() == node_->getNodeIdKey()) {
-    csdebug() << "TRANSPORT> Ignore myself packs";
-    return;
-  }
-  if(type == MsgTypes::ThirdSmartStage) {
+  if (type == MsgTypes::ThirdSmartStage) {
     cslog() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
   }
+
   // packets which transport may cut
   switch (type) {
-  case MsgTypes::RoundTableSS:
-    return node_->getRoundTableSS(data, size, rNum);
   case MsgTypes::BlockHash:
     return node_->getHash(data, size, rNum, firstPack.getSender());
   case MsgTypes::HashReply:
@@ -538,8 +544,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
   case MsgTypes::TransactionsPacketReply:
     return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
-  //case MsgTypes::NewCharacteristic:
-  //  return node_->getCharacteristic(data, size, rNum, firstPack.getSender());
   case MsgTypes::FirstStage:
     return node_->getStageOne(data, size, firstPack.getSender());
   case MsgTypes::SecondStage:
@@ -564,8 +568,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::SmartThirdStageRequest:
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
-  case MsgTypes::RoundTable:
-    return node_->getRoundTable(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:
     return node_->getRoundTableReply(data, size, firstPack.getSender());
   default:

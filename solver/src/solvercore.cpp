@@ -53,7 +53,6 @@ SolverCore::SolverCore()
 , pcontext(std::make_unique<SolverContext>(*this))
 , tag_state_expired(CallsQueueScheduler::no_tag)
 , req_stop(true)
-, cnt_trusted_desired(Consensus::MinTrustedNodes)
 // consensus data
 , cur_round(0)
 // previous solver version instance

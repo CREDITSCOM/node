@@ -49,8 +49,7 @@ bool operator==(const cs::RoundTable& left, const cs::RoundTable& right) {
          hashes_is_equal && charBytes_is_equal;
 }
 
-bool operator==(const cs::Characteristic& left,
-                const cs::Characteristic& right) {
+bool operator==(const cs::Characteristic& left, const cs::Characteristic& right) {
   return left.mask == right.mask;
 }
 }  // namespace cs
@@ -71,10 +70,10 @@ bool operator==(const csdb::Transaction& left, const csdb::Transaction& right) {
 }
 }  // namespace csdb
 
-csdb::Transaction CreateTestTransaction(const int64_t id,
-                                        const uint8_t amount) {
+csdb::Transaction CreateTestTransaction(const int64_t id, const uint8_t amount) {
   cs::Signature sign;
   sign.fill(0);
+
   csdb::Transaction transaction{
       id,
       csdb::Address::from_public_key(
@@ -90,39 +89,39 @@ csdb::Transaction CreateTestTransaction(const int64_t id,
       csdb::AmountCommission{0.},
       csdb::AmountCommission{0.},
       sign};
+
   return transaction;
 }
 
 auto CreateTestPacket(const size_t number_of_transactions) {
-  cs::TransactionsPacket packet{};
+  cs::TransactionsPacket packet;
+
   for (size_t i = 0; i < number_of_transactions; ++i) {
-    packet.addTransaction(CreateTestTransaction(0x1234567800000001 + i, 1));
+    size_t value = 0x1234567800000001;
+    packet.addTransaction(CreateTestTransaction(static_cast<int64_t>(value + i), static_cast<uint8_t>(1)));
   }
+
   packet.makeHash();
   cslog() << "hash = " << packet.hash().toString();
   return packet;
 }
 
 auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
-  return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes,
-                        kCharacteristic};
+  return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes, kCharacteristic};
 }
 
 TEST(TransactionsEqualityOperator, SameAreEqual) {
-  auto transaction1 = CreateTestTransaction(123, uint8_t{45}),
-       transaction2 = transaction1;
+  auto transaction1 = CreateTestTransaction(123, uint8_t{45}), transaction2 = transaction1;
   ASSERT_EQ(transaction1, transaction2);
   ASSERT_TRUE(transaction1 == transaction2);
 }
 
 TEST(TransactionsEqualityOperator, DifferentId) {
-  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
-               CreateTestTransaction(321, uint8_t{45}));
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) == CreateTestTransaction(321, uint8_t{45}));
 }
 
 TEST(TransactionsEqualityOperator, DifferentAmount) {
-  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) ==
-               CreateTestTransaction(123, uint8_t{00}));
+  ASSERT_FALSE(CreateTestTransaction(123, uint8_t{45}) == CreateTestTransaction(123, uint8_t{00}));
 }
 
 class ConveyerTest : public cs::ConveyerBase {
@@ -146,7 +145,8 @@ TEST(Conveyer, RoundTableReturnsSameAsThatWasSetWithSetRound) {
   ConveyerTest conveyer{};
   auto round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& round_table_copy{cs::RoundTable{round_table}};
-  conveyer.setRound(std::move(round_table_copy));
+  conveyer.setRound(round_table.round);
+  conveyer.setTable(round_table_copy);
   ASSERT_EQ(round_table, conveyer.currentRoundTable());
 }
 
@@ -154,20 +154,20 @@ TEST(Conveyer, SetRoundDoesNotSetInvalidRoundNumber) {
   ConveyerTest conveyer{};
   auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
   auto&& incorrect_round_table{cs::RoundTable{round_table}};
-  conveyer.setRound(std::move(round_table));
+  conveyer.setTable(std::move(round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
   incorrect_round_table.round = round_table.round - 1;
-  conveyer.setRound(std::move(incorrect_round_table));
+  conveyer.setTable(std::move(incorrect_round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
   incorrect_round_table.round = 0;
-  conveyer.setRound(std::move(incorrect_round_table));
+  conveyer.setTable(std::move(incorrect_round_table));
   ASSERT_EQ(round_table.round, conveyer.currentRoundNumber());
 }
 
 TEST(Conveyer, RoundTableReturnsNullIfRoundWasNotAdded) {
   ConveyerTest conveyer{};
   auto&& round_table{CreateTestRoundTable({CreateTestPacket(2).hash()})};
-  conveyer.setRound(std::move(round_table));
+  conveyer.setTable(std::move(round_table));
   ASSERT_EQ(conveyer.roundTable(1), nullptr);
 }
 
@@ -183,9 +183,10 @@ TEST(Conveyer, AddTransaction) {
 }
 
 TEST(Conveyer, TransactionPacketTableIsEmptyAtCreation) {
+  constexpr auto size = 0;
   ConveyerTest conveyer{};
   auto& table = conveyer.transactionsPacketTable();
-  ASSERT_EQ(0, table.size());
+  ASSERT_EQ(table.size(), size);
 }
 
 TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
@@ -214,8 +215,11 @@ TEST(Conveyer, MainLogic) {
   auto packet = CreateTestPacket(20);
   auto&& packet_copy{cs::TransactionsPacket{packet}};
   ConveyerTest conveyer{};
+
   auto hash = packet_copy.hash();
-  conveyer.setRound(CreateTestRoundTable({packet_copy.hash()}));
+  auto table = CreateTestRoundTable({packet_copy.hash()});
+
+  conveyer.setTable(table);
   ASSERT_EQ(1, conveyer.currentNeededHashes().size());
 
   conveyer.addFoundPacket(kRoundNumber, std::move(packet_copy));
@@ -225,10 +229,10 @@ TEST(Conveyer, MainLogic) {
   auto created_packet{conveyer.createPacket()};
   ASSERT_TRUE(created_packet.has_value());
   ASSERT_EQ(packet.transactionsCount(),
-            created_packet.value().transactionsCount());
+            created_packet.value().first.transactionsCount());
 
-  created_packet.value().makeHash();
-  ASSERT_EQ(packet.hash(), created_packet.value().hash());
+  created_packet.value().first.makeHash();
+  ASSERT_EQ(packet.hash(), created_packet.value().first.hash());
 
   const auto characteristic{cs::Characteristic{{0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
   conveyer.setCharacteristic(characteristic, kRoundNumber);
@@ -245,7 +249,7 @@ TEST(Conveyer, MainLogic) {
   std::fill(pk.begin(), pk.end(), 0);
 
   csdb::PoolHash ph;
-  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber};
+  cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
   auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 
