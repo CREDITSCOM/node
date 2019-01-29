@@ -2216,6 +2216,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     for (auto& it : roundSignatures) {
       cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
+      if (it.sender > rt->confidants.size()) {
+        return;
+      }
       if(cscrypto::VerifySignature(it.signature,rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
         ++signaturesCount;
       }
@@ -2434,6 +2437,11 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   stageThreeMessage_.resize(roundTable.confidants.size());
   stageThreeSent = false;
   constexpr int padWidth = 30;
+  badHashReplyCounter_.clear();
+  badHashReplyCounter_.resize(roundTable.confidants.size());
+  for (auto& it : badHashReplyCounter_) {
+    it = 0U;
+  }
 
   std::ostringstream line1;
   for (int i = 0; i < padWidth; i++) {
@@ -2554,11 +2562,11 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
   }
 
   cs::Signature signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
-  sendDefault(respondent, MsgTypes::HashReply, roundNumber_, subRound_, signature, hash);
+  sendDefault(respondent, MsgTypes::HashReply, roundNumber_, subRound_, signature, getConfidantNumber(), hash);
 }
 
 void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
-  static size_t badHashReplyCounter = 0;
+  csdebug() << __func__;
 
   istream_.init(data, size);
   uint8_t subRound = 0;
@@ -2569,6 +2577,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
+  uint8_t senderNumber;
   cs::Signature signature;
   istream_ >> signature;
 
@@ -2580,16 +2589,34 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
+  if (senderNumber >= cs::Conveyer::instance().currentRoundTable().confidants.size()) {
+    return;
+  }
+
+  if (cs::Conveyer::instance().currentRoundTable().confidants.at(senderNumber) != sender) {
+    return;
+  }
+
+  if (badHashReplyCounter_.at(senderNumber) == 0) {
+    badHashReplyCounter_.at(senderNumber) = 1;
+  }
+
+  if (badHashReplyCounter_.at(senderNumber) == 1) {
+    return;
+  }
+
+  uint8_t badHashReplySummary = 0;
+  for (auto& it : badHashReplyCounter_) {
+    badHashReplySummary += it;
+  }
+
   if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
     csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
     return;
   }
 
-  ++badHashReplyCounter;
-
-  if (badHashReplyCounter > cs::Conveyer::instance().confidantsCount() / 2) {
+  if (badHashReplySummary > cs::Conveyer::instance().confidantsCount() / 2) {
     csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
-    badHashReplyCounter = 0;
     blockChain_.removeLastBlock();
   }
 }
