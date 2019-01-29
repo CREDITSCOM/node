@@ -1178,17 +1178,20 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
 }
 
 void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)> func) {
-  csdb::TransactionID trx_id{};
+  std::list<csdb::TransactionID> l_id;
   for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
     if (is_smart_state(*trIt)) {
       cs::SmartContractRef smart_ref;
       smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
-      trx_id = csdb::TransactionID(smart_ref.hash, smart_ref.transaction);
+      l_id.emplace_back(csdb::TransactionID(smart_ref.hash, smart_ref.transaction));
     }
-    else if (is_smart(*trIt) && trx_id == trIt->id()) {
-      trx_id = csdb::TransactionID{};
-      if (!func(trIt.getPool(), *trIt))
-        break;
+    else if (is_smart(*trIt)) {
+      auto it = std::find(l_id.begin(), l_id.end(), trIt->id());
+      if (it != l_id.end()) {
+        l_id.erase(it);
+        if (!func(trIt.getPool(), *trIt))
+          break;
+      }
     }
   }
 }
