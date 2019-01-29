@@ -229,10 +229,10 @@ TEST(Conveyer, MainLogic) {
   auto created_packet{conveyer.createPacket()};
   ASSERT_TRUE(created_packet.has_value());
   ASSERT_EQ(packet.transactionsCount(),
-            created_packet.value().transactionsCount());
+            created_packet.value().first.transactionsCount());
 
-  created_packet.value().makeHash();
-  ASSERT_EQ(packet.hash(), created_packet.value().hash());
+  created_packet.value().first.makeHash();
+  ASSERT_EQ(packet.hash(), created_packet.value().first.hash());
 
   const auto characteristic{cs::Characteristic{{0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
   conveyer.setCharacteristic(characteristic, kRoundNumber);
