@@ -39,6 +39,8 @@ public:
   void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
   void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
 
+  void ResetTrustedCache(const BlockChain&);
+
   Fee();
   Fee(const Fee&) = delete;
   const Fee& operator=(const Fee&) = delete;
@@ -74,7 +76,6 @@ private:
   size_t EstimateNumOfNodesInNetwork(const BlockChain& blockchain);
   inline void Init(const BlockChain& blockchain, csdb::Pool* pool);
   inline void Init(const BlockChain&, TransactionsPacket* packet);
-  void ResetTrustedCache(const BlockChain&);
   void AddConfidants(const std::vector<cs::PublicKey>& pool);
 
   size_t num_of_last_block_;
