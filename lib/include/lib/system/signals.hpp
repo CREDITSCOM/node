@@ -330,6 +330,7 @@ public:
   ///
   template <template <typename> typename Signal, typename T>
   static void connect(const Signal<T>* signal, typename Signal<T>::Argument slot) {
+    cs::Lock lock(mutex_);
     const_cast<Signal<T>*>(signal)->add(slot);
   }
 
@@ -344,6 +345,8 @@ public:
     using ObjectPointer = void*;
     constexpr int size = Args::GetArguments<Slot>();
     auto obj = reinterpret_cast<ObjectPointer>(const_cast<Object&>(slotObj));
+
+    cs::Lock lock(mutex_);
     const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
   }
 
@@ -385,6 +388,7 @@ public:
     constexpr int size = Args::GetArguments<Slot>();
     std::function<T> binder = Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot));
 
+    cs::Lock lock(mutex_);
     auto& content = const_cast<Signal<T>*>(signal)->content();
     auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
       auto& [object, function] = pair;
@@ -413,6 +417,7 @@ public:
   ///
   template <template <typename> typename Signal, typename T>
   static bool disconnect(const Signal<T>* signal, typename Signal<T>::Argument slot) {
+    cs::Lock lock(mutex_);
     auto& content = const_cast<Signal<T>*>(signal)->content();
     auto iterator = std::find_if(content.begin(), content.end(), [&](const auto& pair) {
       auto& [object, function] = pair;
@@ -438,8 +443,10 @@ public:
   ///
   template <template <typename> typename Signal, typename T>
   static bool disconnect(const Signal<T>* signal) {
+    cs::Lock lock(mutex_);
     auto signalPtr = const_cast<Signal<T>*>(signal);
     *(signalPtr) = nullptr;
+
     return signalPtr->content().empty();
   }
 
@@ -449,8 +456,12 @@ public:
   ///
   template <template <typename> typename Signal, typename T>
   static std::size_t callbacks(const Signal<T>* signal) {
+    cs::SharedLock lock(mutex_);
     return signal->size();
   }
+
+private:
+  inline static cs::SharedMutex mutex_;
 };
 }  // namespace cs
 
