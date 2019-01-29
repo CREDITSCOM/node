@@ -56,7 +56,9 @@ SolverCore::SolverCore()
 , cnt_trusted_desired(Consensus::MinTrustedNodes)
 // consensus data
 , cur_round(0)
-// previous solver version instance
+, smartStagesStorageRefreshed_(false)
+, ownSmartsConfNum_(cs::InvalidConfidant)
+, smartRoundNumber_(0)
 , pnode(nullptr)
 , pws(nullptr)
 , psmarts(nullptr) {
@@ -360,7 +362,7 @@ void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes, const
 void SolverCore::processStages() {
   csdetails() << __func__ << "(): start";
   int cnt = (int)smartConfidants_.size();
-  //perform the evaluation og stages 1 & 2 to find out who is traitor 
+  //perform the evaluation og stages 1 & 2 to find out who is traitor
   int hashFrequency = 1;
   for (auto& st : smartStageOneStorage_) {
     if (st.sender == ownSmartsConfNum_) {
@@ -459,24 +461,25 @@ void SolverCore::processStages() {
     csdetails() << __func__ << "(): <starting> ownSmartConfNum = " << (int)ownSmartsConfNum_ << ", writer = " << (int)(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     //if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
       auto& conv = cs::Conveyer::instance();
-      
+
       //for(const auto& tr : currentSmartTransactionPack_.transactions()) {
       //  conv.addTransaction(tr);
       //}
       // alternative is correct but does not work - currentSmartTransactionPack_'s hash must be empty:
       conv.addSeparatePacket(currentSmartTransactionPack_);
-      
+
       // TODO: найти транзакцию с new_state просмотром пакета
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       csdetails() << "Transaction user fields = " << fieldsNumber;
       csdebug() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
+      smartRoundNumber_ = 0;
       return;
     //}
     //csdebug() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
   void SolverCore::gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber) {
-    
+
     switch (msgType) {
       case MsgTypes::SmartFirstStageRequest:
         if (smartStageOneStorage_.at(requiredNumber).sender == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -496,7 +499,7 @@ void SolverCore::processStages() {
         }
         pnode->sendSmartStageReply(requiredNumber, smartStageThreeStorage_.at(requiredNumber).signature, MsgTypes::ThirdSmartStage, requesterNumber);
         break;
-      
+
     }
   }
 
@@ -648,7 +651,7 @@ void SolverCore::processStages() {
           }
         }
         break;
-        
+
     }
     if (0 == cnt_requested) {
       csdebug() << __func__ << ": no node to request";
