@@ -266,7 +266,7 @@ std::unique_lock<cs::SpinLock> Neighbourhood::getNeighboursLock() const {
 
 void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
   cs::SpinGuard lock(nLockFlag_);
-  for (ConnectionPtr connection : neighbours_) {
+  for (const ConnectionPtr connection : neighbours_) {
     if (connection) {
       func(connection);
     }
@@ -275,7 +275,7 @@ void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
 
 void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func) {
   cs::SpinGuard lock(nLockFlag_);
-  for (ConnectionPtr connection : neighbours_) {
+  for (const ConnectionPtr connection : neighbours_) {
     if (connection && !connection->isSignal) {
       func(connection);
     }

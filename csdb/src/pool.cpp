@@ -322,6 +322,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     priv result;
 
     result.is_valid_ = is_valid_;
+    result.read_only_ = read_only_;
     result.hash_ = hash_.clone();
     result.previous_hash_ = previous_hash_.clone();
     result.sequence_ = sequence_;

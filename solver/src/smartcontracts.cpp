@@ -233,7 +233,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
         bool present;
         const auto tmp = papi->getSmartContract(tr.source(), present);  // tr.target() is also allowed
         if (present) {
-          return tmp;
+          return std::make_optional(tmp);
         }
       }
     }
@@ -242,10 +242,12 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
   else {
     const auto& smart_fld = tr.user_field(trx_uf::deploy::Code);  // trx_uf::start::Methods == trx_uf::deploy::Code
     if (smart_fld.is_valid()) {
+      std::string data = smart_fld.value<std::string>();
+      if(!data.empty()) {
       const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
       if (invoke_info.method.empty()) {
         // is deploy
-        return invoke_info;
+          return std::make_optional(invoke_info);
       }
       else {
         // is start
@@ -253,7 +255,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
         // we need not acquire origin
         constexpr bool api_pass_code_and_methods = false;
         if constexpr (api_pass_code_and_methods) {
-          return invoke_info;
+            return std::make_optional(invoke_info);
         }
         // if api is refactored, we may need to acquire contract origin separately:
         if constexpr (!api_pass_code_and_methods) {
@@ -263,7 +265,8 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
             if (present) {
               tmp.method = invoke_info.method;
               tmp.params = invoke_info.params;
-              return tmp;
+                return std::make_optional(tmp);
+              }
             }
           }
         }
@@ -450,17 +453,6 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
 }
 
 void SmartContracts::onReadBlock([[maybe_unused]] csdb::Pool block, [[maybe_unused]] bool* should_stop) {
-  // auto seq = block.sequence();
-  // if(seq == 1925595 || seq == 1925395) {
-  //  std::string state;
-  //  ::general::Variant ret_val;
-  //  if(block.transactions_count() > 0) {
-  //    for(auto& tr : block.transactions()) {
-  //      state = tr.user_field(-2).value<std::string>();
-  //      ret_val = deserialize<::general::Variant>(tr.user_field(3).value<std::string>());
-  //    }
-  //  }
-  //}
 }
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it) {
@@ -584,7 +576,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   if (!bc.findWalletData(SmartContracts::absolute_address(src.target()), wallData, wallId)) {
     return csdb::Transaction{};
   }
-
+  
   csdb::Transaction result(
       wallData.trxTail_.getLastTransactionId() + 1,  // TODO: possible conflict with other innerIDs!
       src.target(),                                  // contracts' key - source
@@ -593,7 +585,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
       0,                  // amount*/
       src.max_fee(),      // TODO:: how to calculate max fee?
       src.counted_fee(),  // TODO:: how to calculate fee?
-      cs::Signature{}       // empty signature
+      cs::SolverContext::zeroSignature       // empty signature
   );
   // USRFLD1 - ref to start trx
   result.add_user_field(trx_uf::new_state::RefStart, contract.to_user_field());

@@ -432,16 +432,13 @@ void BlockChain::removeLastBlock() {
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
-  csunused(obsolete_block);
-  std::unique_lock<decltype(dbLock_)> l(dbLock_);
   csdb::PoolHash res;
 
-  newBlockCv_.wait(l);
-  /*newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
-    res = storage_.last_hash();
-    //return obsolete_block != res;
-    return obsolete_block == res;
-  });*/
+  std::unique_lock<decltype(waitersLocker_)> l(waitersLocker_);
+  newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
+    res = getLastHash();
+    return obsolete_block != res;
+  });
 
   return res;
 }
@@ -954,7 +951,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
     finalizeBlock(deferredBlock_);
-    pool = deferredBlock_;
+    pool = deferredBlock_.clone();
   }
 
   emit storeBlockEvent_(pool);

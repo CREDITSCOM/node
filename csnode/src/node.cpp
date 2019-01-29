@@ -2113,7 +2113,7 @@ void Node::sendRoundPackageToAll() {
     csmeta(csdebug) << "Packing " << lastSentRoundData_.characteristic.mask.size() << " bytes of char. mask to send";
   }
   /////////////////////////////////////////////////////////////////////////// screen output
-  cslog() << "------------------------------------------  SendRoundTable  ---------------------------------------";
+  csdebug() << "------------------------------------------  SendRoundTable  ---------------------------------------";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   auto table = conveyer.roundTable(roundNumber_);
   cslog() << "Round " << roundNumber_ << ", Confidants count " << table->confidants.size();

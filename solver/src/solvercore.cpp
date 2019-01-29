@@ -242,7 +242,7 @@ void SolverCore::sendRoundTable() {
     pnode->retriveSmartConfidants(smartRoundNumber_, smartConfidants_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
 
-    cslog() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << (int)ownSmartsConfNum_
+    csdebug() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << (int)ownSmartsConfNum_
             << "] =========================";
     csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
@@ -507,7 +507,7 @@ void SolverCore::processStages() {
       cslog() << "Adding separate package with " << currentSmartTransactionPack_.signatures().size() << " signatures";
       conv.addSeparatePacket(currentSmartTransactionPack_);
 
-      // TODO: ����� ���������� � new_state ���������� ������
+      // TODO: lookup new_state through the whole packet
       size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
       csdetails() << "Transaction user fields = " << fieldsNumber;
       csdebug() << __func__ << "(): ==============================================> TRANSACTION SENT TO CONVEYER";
