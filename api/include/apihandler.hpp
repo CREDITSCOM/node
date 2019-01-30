@@ -158,7 +158,14 @@ private:
     csdb::PoolHash last_pull_hash{};
   };
 
-  using smart_state_entry = cs::WorkerQueue<std::string>;
+  struct SmartState {
+    std::string state;
+    bool lastEmpty;
+    csdb::TransactionID transaction;
+    csdb::TransactionID initer;
+  };
+
+  using smart_state_entry = cs::WorkerQueue<SmartState>;
   using client_type = executor::ContractExecutorConcurrentClient;
 
   BlockChain& s_blockchain;
@@ -280,6 +287,9 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
+bool is_smart(const csdb::Transaction& tr);
+bool is_smart_state(const csdb::Transaction& tr);
+bool is_smart_deploy(const api::SmartContractInvocation& smart);
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

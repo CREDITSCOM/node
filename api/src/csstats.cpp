@@ -6,6 +6,7 @@
 #include <cassert>
 #include <client/params.hpp>
 #include <csstats.hpp>
+#include <apihandler.hpp>
 
 namespace csstats {
 
@@ -33,46 +34,31 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
   {
     auto future_last_hash = blockHash;
-
-    if (blockHash.is_empty()) {
+    if (blockHash.is_empty())
       cserror() << "Stats: no bricks in the wall (last hash is empty)";
-    }
 
     while (blockHash != lastHash && !blockHash.is_empty()) {
-      std::this_thread::sleep_for(std::chrono::seconds(2)); //fix me (solution for synchronization with transactionsSmartCount)
       csdb::Pool pool = blockchain.loadBlock(blockHash);
-
       periodStats.poolsCount++;
-
       std::size_t transactionsCount = pool.transactions_count();
       periodStats.transactionsCount += static_cast<uint32_t>(transactionsCount);
 
       for (std::size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
-
-#ifdef TRANSACTIONS_INDEX
-        if (transaction.user_field(0).is_valid()) {
-          periodStats.transactionsSmartCount += blockchain.getTransactionsCount();// blockchain.get_trxns_count(transaction.source()).total_trxns_count;
-          //++periodStats.transactionsSmartCount;  // transactionsSmartCount - amount of transactions associated with
-        }                                        // smart contracts
+#ifdef MONITOR_NODE
+        if(is_smart(transaction) || is_smart_state(transaction))
+          ++periodStats.transactionsSmartCount;
 #endif
-
-
-        if (is_deploy_transaction(transaction)) {
+        if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
-        }
 
         Currency currency = currencies_indexed[transaction.currency().to_string()];
-
         const auto& amount = transaction.amount();
-
         periodStats.balancePerCurrency[currency].integral += amount.integral();
         periodStats.balancePerCurrency[currency].fraction += amount.fraction();
       }
-
       blockHash = pool.previous_hash();
     }
-
     lastHash = future_last_hash;
   }
 
@@ -186,9 +172,13 @@ AllStats csstats::collectAllStats(const Periods& periods) {
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-        if (is_deploy_transaction(transaction)) {
+#ifdef MONITOR_NODE
+        if (is_smart(transaction) || is_smart_state(transaction))
+          ++periodStats.transactionsSmartCount;
+#endif
+
+        if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
-        }
 
         Currency currency = currencies_indexed[transaction.currency().to_string()];
 
@@ -215,6 +205,11 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+#ifdef MONITOR_NODE
+        if (is_smart(transaction) || is_smart_state(transaction))
+          ++periodStats.transactionsSmartCount;
+#endif
 
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;

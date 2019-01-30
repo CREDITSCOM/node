@@ -45,6 +45,7 @@ Node::Node(const Config& config)
   std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
+  cs::Connector::connect(&blockChain_.storeBlockEvent_, &stat_, &cs::RoundStat::onStoreBlock);
   good_ = init(config);
 }
 
@@ -60,7 +61,7 @@ bool Node::init(const Config& config) {
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
-  cslog() << "Blockchain is ready, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+  cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
   std::cout << "Init API... ";
@@ -386,8 +387,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
 
-    stat_.totalReceivedTransactions_ += characteristic.mask.size();
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
@@ -409,7 +408,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       cserror() << "NODE> failed to store block in BlockChain";
     }
     else {
-      stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       blockChain_.testCachedBlocks();
     }
   }
@@ -1339,7 +1337,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
   if (!conveyer.isConfidantExists(stage.sender)) {
     return;
   }
-  
+
   if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
@@ -1439,7 +1437,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
- 
+
   stageThreeMessage_[stage.sender] = std::move(bytes);
 
   csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
@@ -1819,7 +1817,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, roundNumber_,
     // payload:
     stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
-  
+
   // cach stage three
   smartStageThreeMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
   csmeta(csdebug) << "done";
@@ -1989,8 +1987,6 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     return;
   }
 
-  stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
-
   // array
   const cs::Signature& poolSignature = pool.value().signature();
 
@@ -2057,8 +2053,6 @@ void Node::sendRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& po
     csmeta(cserror) << "Send round info characteristic not found, logic error";
     return;
   }
-
-  stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
 
   conveyer.setRound(std::move(roundTable));
   /////////////////////////////////////////////////////////////////////////// sending round info and block
@@ -2133,7 +2127,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
 void Node::sendHash(cs::RoundNumber round) {
 #if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
-  if (blockChain_.getLastSequence() != round - 1) {
+  if (solver_->smartRoundNumber() || blockChain_.getLastSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
   }
@@ -2177,7 +2171,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
   if (spoiledHash == tmp) {
     solver_->gotHash(std::move(lastHash), sender);
-  } 
+  }
   else {
     cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                 << " DOES NOT MATCH to my value " << lastHash.to_string();

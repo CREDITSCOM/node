@@ -60,7 +60,8 @@ class Transaction::priv : public ::csdb::internal::shared_data {
 
   inline priv(const priv& other)
   : ::csdb::internal::shared_data()
-  , read_only_(false)
+  , read_only_(other.read_only_)
+  , id_(other.id_)
   , innerID_(other.innerID_)
   , source_(other.source_)
   , target_(other.target_)
@@ -69,7 +70,8 @@ class Transaction::priv : public ::csdb::internal::shared_data {
   , max_fee_(other.max_fee_)
   , counted_fee_(other.counted_fee_)
   , signature_(other.signature_)
-  , user_fields_(other.user_fields_) {
+  , user_fields_(other.user_fields_)
+  , time_(other.time_) {
   }
 
   inline priv(int64_t innerID, Address source, Address target, Currency currency, Amount amount,

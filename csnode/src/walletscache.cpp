@@ -151,7 +151,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
   }
   WalletData& wallData = getWalletData(id, tr.source());
   wallData.balance_ -= tr.amount();
+
+  if (tr.source() != tr.target())
   wallData.balance_ -= tr.counted_fee().to_double();
+
   wallData.trxTail_.push(tr.innerID());
   setModified(id);
 
@@ -184,7 +187,9 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
   setModified(id);
 
 #ifdef MONITOR_NODE
+  if (tr.source() != tr.target())  // Already counted in loadTrxForSource
   ++wallData.transNum_;
+
   setWalletTime(wallData.address_, tr.get_time());
 #endif
 

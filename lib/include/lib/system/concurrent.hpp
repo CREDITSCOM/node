@@ -335,21 +335,10 @@ public:
   void wait_till_front(const J& j) {
     std::unique_lock<decltype(lock_)> l(lock_);
 
-    auto tid = std::this_thread::get_id();
-    auto tit = tidMap_.find(tid);
-    assert(tit != tidMap_.end());
+    conditionalVariable_.wait(l, [&]() { return j(state_); });
 
-    conditionalVariable_.wait(l, [&]() {
-      if (tit->second == tids_.begin() && j(state_)) {
-        tids_.pop_front();
-        tidMap_.erase(tit);
+    tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
-
-        return true;
-      }
-
-      return false;
-    });
   }
 
   void yield() {
@@ -375,7 +364,7 @@ public:
   template <typename State>
   void update_state(const State& state) {
     std::lock_guard<decltype(lock_)> lock(lock_);
-    state_ = state();
+    state_ = state(state_);
     conditionalVariable_.notify_all();
   }
 };

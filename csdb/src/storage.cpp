@@ -252,7 +252,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
   std::stringstream ss;
   ss << "More than one chains or orphan chains. List follows:" << std::endl;
   for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
-    ss << "  " << ith->first.to_string() << " (lenght = " << ith->second.len_ << "): ";
+    ss << "  " << ith->first.to_string() << " (length = " << ith->second.len_ << "): ";
     if (ith->second.next_.is_empty()) {
       ss << "Normal";
     }
@@ -274,7 +274,9 @@ void Storage::priv::write_routine() {
     while (!write_queue.empty()) {
       Pool &pool = write_queue.front();
       if (!pool.is_read_only()) {
-        pool.compose();
+        if(!pool.compose()) {
+          set_last_error(Storage::DataIntegrityError, "Pool passed to storage is not composed and failed to compose now");
+        }
       }
       const PoolHash hash = pool.hash();
 

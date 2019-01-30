@@ -25,7 +25,7 @@ constexpr double kMarketRateCS = 0.18;
 constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
-constexpr double kMinFee = 0.0001428;
+constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
 constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
 }  // namespace
 
@@ -70,7 +70,7 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
 
 void Fee::SetCountedFee() {
 
-  constexpr double fixed = 0.0001428;
+  constexpr double fixed = kMinFee;
 
   if (current_pool_ != nullptr) {
     std::vector<csdb::Transaction>& transactions = current_pool_->transactions();

@@ -145,13 +145,23 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte = static_cast<cs::Byte>(true);
-      if(!smarts.is_new_state( transaction)) {
-        byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+      bool byte = true;
+      bool is_smart_new_state = smarts.is_new_state(transaction);
+      if(!is_smart_new_state) {
+        byte = !(transaction.source() == transaction.target());
+        byte = byte && ptransval->validateTransaction(transaction, i, del1);
       }
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
+        if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
+          byte = false;
+          cslog() << name() << ": reject smart new_state trx because related contract is closed";
+        }
+      }
+
+      if(!byte) {
+        cslog() << name() << ": trx[" << i << "] rejected in validateTransaction()";
       }
 
       if (byte) {
@@ -160,32 +170,32 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
           auto sci = context.smart_contracts().get_smart_contract(transaction);
           if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
             csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY); 
-            byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
+            byte = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
 
             if (!byte) {
-              csdebug() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
+              cslog() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
             }
           }
         }
 
         if (byte) {
-          byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
+          byte = check_transaction_signature(context, transaction);
           if(!byte) {
-            csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+            cslog() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
           }
         }
       }
       else {
-        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
+        cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
-      characteristicMask.push_back(byte);
+      characteristicMask.push_back(byte ? (cs::Byte)1 : (cs::Byte)0);
     }
 
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      csdebug() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
+      cslog() << name() << ": " << excluded.transactions_count() << " transactions are rejected in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart
@@ -203,7 +213,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       ++i;
     }
     if(!smart_rejected.empty()) {
-      cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
+      cslog() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
       cs::TransactionsPacket rejected;
 
       // 2. reject all trxs from those smarts & collect all rejected trxs
@@ -219,7 +229,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
       }
       if(cnt_add_rejected > 0) {
-        cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+        cslog() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
       }
 
       // 3. signal SmartContracts service some trxs are rejected
@@ -248,7 +258,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     cscrypto::CalculateHash(hash, characteristic.mask.data(), characteristic.mask.size());
   }
 
-  csdebug() << "Trusted-1: Generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
+  csdebug() << name() << ": generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
   return hash;
 }
 
@@ -257,7 +267,7 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
   csdb::Address src = transaction.source();
   //TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
   // currently will be rejected
-  if(!context.smart_contracts().is_known_smart_contract(src)&& transaction.user_field_ids().size() != 3) {
+  if(!context.smart_contracts().is_smart_contract(transaction)) {
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
       return transaction.verify_signature(data_to_fetch_pulic_key.address_);
@@ -266,7 +276,15 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
     return transaction.verify_signature(src.public_key());
   }
   else {
-    //TODO: add here code for validating the smart contract transaction 
+    if(context.smart_contracts().is_new_state(transaction)) {
+      // special rule for new_state transactions
+      if(src != transaction.target()) {
+        csdebug() << name() << ": smart state trx has different source and target";
+        return false;
+      }
+      return true;
+    }
+    //TODO: add here code for validating signatures in the smart contract transaction
     return true;
   }
 }

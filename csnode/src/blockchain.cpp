@@ -242,7 +242,9 @@ void generateCheatDbFile(std::string path, const BlockHashes& bh) {
 }
 
 bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
+#if defined(RECREATE_CHEAT)
   std::string origin = path;
+#endif// RECREATE_CHEAT
   const auto cd = prepareCheatData(path, bh);
 
   std::ifstream f(path);
@@ -287,6 +289,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis);
   deferredBlock_ = genesis;
+  emit storeBlockEvent_(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
@@ -440,7 +443,6 @@ csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) 
     //return obsolete_block != res;
     return obsolete_block == res;
   });*/
-
   return res;
 }
 
@@ -494,7 +496,6 @@ void BlockChain::finalizeBlock(csdb::Pool& pool) {
   }
 
   csmeta(csdetails) << "last hash: " << pool.hash().to_string();
-  recount_trxns(pool);
 }
 
 const csdb::Storage& BlockChain::getStorage() const {
@@ -875,25 +876,6 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
   return true;
 }
 
-void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
-  if (new_pool.value().transactions_count()) {
-    csdb::Address addr_send, addr_recv;
-    for (const auto& trx : new_pool.value().transactions()) {
-      addr_send = get_addr_by_type(trx.source(), ADDR_TYPE::PUBLIC_KEY);
-      addr_recv = get_addr_by_type(trx.target(), ADDR_TYPE::PUBLIC_KEY);
-      transactionsCount_[addr_send].sendCount++;
-      transactionsCount_[addr_recv].recvCount++;
-    }
-//#ifdef TRANSACTIONS_INDEX
-    //total_transactions_count_+= new_pool.value().transactions().size();
-//#endif
-  }
-}
-
-const BlockChain::AddrTrnxCount& BlockChain::get_trxns_count(const csdb::Address& addr) {
-  return transactionsCount_[addr];
-}
-
 std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets)
 {
   const auto last_seq = getLastSequence();
@@ -952,7 +934,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
     finalizeBlock(deferredBlock_);
-    pool = deferredBlock_;
+    pool = deferredBlock_.clone();
   }
 
   emit storeBlockEvent_(pool);
