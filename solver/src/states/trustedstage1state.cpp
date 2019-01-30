@@ -26,7 +26,7 @@ void TrustedStage1State::on(SolverContext& context) {
 }
 
 void TrustedStage1State::off(SolverContext& context) {
-  csdebug() << name() << ": --> stage-1 [" << (int)stage.sender << "]";
+  csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
   context.add_stage1(stage, true);
 }
 
@@ -35,20 +35,28 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     cserror() << name() << ": cannot handle previous round transactions";
     return Result::Ignore;
   }
+
   csdebug() << name() << ": -------> STARTING CONSENSUS #" << context.round() << " <------- ";
+
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  auto maybe_pack = conveyer.createPacket();
-  if (!maybe_pack.has_value()) {
-    cserror() << name()
-      << ": error while prepare consensus to build vector, maybe method called before sync completed?";
+  auto data = conveyer.createPacket();
+
+  if (!data.has_value()) {
+    cserror() << name() << ": error while prepare consensus to build vector, maybe method called before sync completed?";
     return Result::Ignore;
   }
-  cs::TransactionsPacket pack = std::move(maybe_pack.value());
-  csdebug() << name() << ": packet of " << pack.transactionsCount() << " transactions in conveyer";
+
+  // bindings
+  auto&& [packet, smartContractPackets] = std::move(data).value();
+
+  csdebug() << name() << ": packet of " << packet.transactionsCount() << " transactions in" << typeid(conveyer).name();
+  csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
+
+  // TODO: do something with smartContractPackets
 
   // review & validate transactions
-  context.blockchain().setTransactionsFees(pack);
-  stage.hash = build_vector(context, pack);
+  context.blockchain().setTransactionsFees(packet);
+  stage.hash = build_vector(context, packet);
 
   {
     std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
@@ -263,10 +271,10 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
   if (characteristic.mask.empty()) {
     auto round = conveyer.currentRoundNumber();
-    hash = cscrypto::CalculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
+    hash = cscrypto::calculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
   }
   else {
-    hash = cscrypto::CalculateHash(characteristic.mask.data(), characteristic.mask.size());
+    hash = cscrypto::calculateHash(characteristic.mask.data(), characteristic.mask.size());
   }
 
   csdebug() << name() << ": generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());

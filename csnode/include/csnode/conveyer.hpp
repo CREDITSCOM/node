@@ -37,6 +37,12 @@ public:
   };
 
   ///
+  /// @brief Sets cached conveyer round number for utility.
+  /// @warning Call this method before setTable method.
+  ///
+  void setRound(cs::RoundNumber round);
+
+  ///
   /// @brief Returns transactions packet flush signal.
   /// Generates when transactions packet should be sent to network.
   ///
@@ -72,30 +78,31 @@ public:
   const cs::TransactionsBlock& transactionsBlock() const;
 
   ///
-  /// @brief Returns transactions packet created in current round.
-  /// @warning Slow-performance method. No thread safe.
+  /// @brief Returns pair of transactions packet created in current round and smart contract packets.
+  /// @warning Slow-performance method. Thread safe.
   ///
-  std::optional<cs::TransactionsPacket> createPacket() const;
+  std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket() const;
 
   // round info
 
   ///
-  /// @brief Starts round of conveyer, checks all transactions packet hashes
+  /// @brief Starts round of conveyer, checks all transactions packet hashes.
   /// at round table.
   /// @param table Current blockchain round table.
+  /// @warning Call this method after setRound.
   ///
-  void setRound(cs::RoundTable&& table);
+  void setTable(const cs::RoundTable& table);
 
-  /**
-   * @fn    void ConveyerBase::updateRoundTable(cs::RoundTable&& table);
-   *
-   * @brief Updates the round table described by table
-   *
-   * @author    Alexander Avramenko
-   * @date  29.11.2018
-   *
-   * @param [in,out]    table   The new round table contains trusted nodes and round number.
-   */
+  ///
+  /// @fn void ConveyerBase::updateRoundTable(cs::RoundTable&& table).
+  ///
+  /// @brief Updates the round table described by table.
+  ///
+  /// @author Alexander Avramenko.
+  /// @date  29.11.2018.
+  ///
+  /// @param [in,out]    table   The new round table contains trusted nodes and round number.
+  ///
   void updateRoundTable(cs::RoundTable&& table);
 
   ///
@@ -151,6 +158,11 @@ public:
   /// Returns copy of atomic round number.
   ///
   cs::RoundNumber currentRoundNumber() const;
+
+  ///
+  /// @brief Returns previous round number (special for characteristic and pool creation).
+  ///
+  cs::RoundNumber previousRoundNumber() const;
 
   ///
   /// @brief Returns current round needed hashes.

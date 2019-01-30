@@ -166,7 +166,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
             stream << context.round() << context.subRound(); // Attention!!! the uint32_t type
             stream << it.hashes[j];
 
-            if (cscrypto::VerifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
+            if (cscrypto::verifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
               cslog() << name() << ": [" << (int)j << "] marked as untrusted (sent bad hash-signature pair of [" << (int)it.sender << "])";
               context.mark_untrusted((uint8_t)j);
             }

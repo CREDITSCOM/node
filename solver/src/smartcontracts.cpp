@@ -145,7 +145,7 @@ csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deplo
   std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
   std::copy(byteCode.begin(), byteCode.end(), std::back_inserter(strToHash));
 
-  cscrypto::Hash result = cscrypto::CalculateHash(strToHash.data(), strToHash.size());
+  cscrypto::Hash result = cscrypto::calculateHash(strToHash.data(), strToHash.size());
 
   return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
 }

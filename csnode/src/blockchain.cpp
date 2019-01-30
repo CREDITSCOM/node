@@ -90,6 +90,7 @@ bool BlockChain::init(const std::string& path)
       cserror() << "Bad database version";
       return false;
     }
+    fee_->ResetTrustedCache(*this);
     std::cout << "Done\n";
   }
 

@@ -169,6 +169,8 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     csmeta(csdetails) << "Requested sequence: " << el.first << "(" << el.second << ")";
   }
 
+  bool success = false;
+
   for (auto& neighbour : neighbours_) {
     if (!getNeededSequences(neighbour)) {
       csmeta(csdetails) << "Neighbor: " << cs::numeric_cast<int>(neighbour.index()) << " is busy";
@@ -180,10 +182,13 @@ void cs::PoolSynchronizer::sendBlockRequest() {
       break;
     }
 
+    success = true;
     sendBlock(neighbour);
   }
 
-  printNeighbours("Info:");
+  if (success) {
+    printNeighbours("Info:");
+  }
 }
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
@@ -210,7 +215,6 @@ bool cs::PoolSynchronizer::isFastMode() const {
 
 void cs::PoolSynchronizer::onTimeOut() {
   CallsQueue::instance().insert([this] {
-    static uint8_t fastCounter = 0;
     if (!isSyncroStarted_) {
       return;
     }
@@ -218,15 +222,13 @@ void cs::PoolSynchronizer::onTimeOut() {
     bool isAvailable = false;
 
     if (isFastMode()) {
+      static uint8_t fastCounter = 0;
       ++fastCounter;
       if (fastCounter > 20) {
         fastCounter = 0;
         csmeta(csdetails) << "OnTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
         isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
       }
-    }
-    else {
-      fastCounter = 0;
     }
 
     if (!isAvailable) {
@@ -309,10 +311,10 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
       break;
     case CounterType::TIMER:
       for (auto& neighbour : neighbours_) {
+        isNeedRequest = neighbour.sequences().empty();
         if (isNeedRequest) {
           break;
         }
-        isNeedRequest = neighbour.sequences().empty();
       }
       break;
   }
@@ -479,19 +481,27 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 }
 
 void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+  if (neighbours_.empty() || neighbours_.front().sequences().empty()) {
+    return;
+  }
+
   csmeta(csdetails) << sequence;
 
+  bool success = false;
+
   for (auto& neighbour : neighbours_) {
-    neighbour.removeSequnce(sequence, accuracy);
+    success |= neighbour.removeSequnce(sequence, accuracy);
 
     if (neighbour.sequences().empty()) {
       neighbour.resetRoundCounter();
     }
   }
 
-  std::sort(neighbours_.begin(), neighbours_.end());
+  if (success) {
+    std::sort(neighbours_.begin(), neighbours_.end());
 
-  printNeighbours("Check seq:");
+    printNeighbours("Check seq:");
+  }
 }
 
 void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {

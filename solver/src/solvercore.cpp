@@ -53,7 +53,6 @@ SolverCore::SolverCore()
 , pcontext(std::make_unique<SolverContext>(*this))
 , tag_state_expired(CallsQueueScheduler::no_tag)
 , req_stop(true)
-, cnt_trusted_desired(Consensus::MinTrustedNodes)
 // consensus data
 , cur_round(0)
 , smartStagesStorageRefreshed_(false)
@@ -400,7 +399,7 @@ void SolverCore::processStages() {
     }
     for (size_t i = 0; i < cnt; ++i) {
       if (st.signatures[i] != myStage2.signatures[i]) {
-        if (cscrypto::VerifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
+        if (cscrypto::verifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
           ++(smartUntrusted.at(i));
           cslog() << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
         }
@@ -453,7 +452,7 @@ void SolverCore::processStages() {
     }
   }
   startTimer(3);
-  stage.packageSignature = cscrypto::GenerateSignature(getPrivateKey(), hash_t.data(), hash_t.size());
+  stage.packageSignature = cscrypto::generateSignature(getPrivateKey(), hash_t.data(), hash_t.size());
   csmeta(cslog) << "done";
   addSmartStageThree(stage, true);
 }
@@ -471,7 +470,7 @@ void SolverCore::processStages() {
     }
     if (stage.sender != ownSmartsConfNum_) {
       const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
-      if (!cscrypto::VerifySignature(stage.packageSignature, smartConfidants().at(stage.sender), hash.data(), hash.size())) {
+      if (!cscrypto::verifySignature(stage.packageSignature, smartConfidants().at(stage.sender), hash.data(), hash.size())) {
         cslog() << "____ The signature is not valid";
         return; //returns this function of the signature of smart confidant is not corresponding to its the previously sent hash
       }
