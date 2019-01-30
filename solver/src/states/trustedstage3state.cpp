@@ -3,6 +3,8 @@
 
 #include <csnode/datastream.hpp>
 #include <csnode/blockchain.hpp>
+#include <csnode/conveyer.hpp>
+
 #include <lib/system/utils.hpp>
 
 #include <cmath>
@@ -15,7 +17,7 @@ void TrustedStage3State::on(SolverContext& context) {
   cnt_recv_stages = 0;
   stage.realTrustedMask.clear();
   stage.realTrustedMask.resize(context.cnt_trusted());
-  stage.sender = (uint8_t)context.own_conf_number();
+  stage.sender = static_cast<uint8_t>(context.own_conf_number());
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
     cswarning() << name() << ": stage one result not found";
@@ -25,12 +27,13 @@ void TrustedStage3State::on(SolverContext& context) {
     csdebug() << name() << ": handle early received stages-2";
     bool finish = false;
     for (const auto& st : context.stage2_data()) {
-      csdebug() << name() << ": stage-2[" << (int) st.sender << "]";
+      csdebug() << name() << ": stage-2[" << static_cast<int>(st.sender) << "]";
       if (Result::Finish == onStage2(context, st)) {
         finish = true;
       }
     }
-    if(finish) {
+
+    if (finish) {
       context.complete_stage3();
       return;
     }
@@ -58,7 +61,7 @@ void TrustedStage3State::on(SolverContext& context) {
             [pctx, this]() {
               csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
-              cs::RoundNumber rnum = pctx->round();
+              cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
               // timeout #3 handler
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
@@ -80,22 +83,24 @@ void TrustedStage3State::off(SolverContext& /*context*/) {
   if (timeout_request_neighbors.cancel()) {
     csdebug() << name() << ": cancel track timeout to request neighbors about stages-2";
   }
-  if(timeout_force_transition.cancel()) {
+  if (timeout_force_transition.cancel()) {
     csdebug() << name() << ": cancel track timeout to force transition to next state";
   }
 }
 
 // requests stages from corresponded nodes
 void TrustedStage3State::request_stages(SolverContext& context) {
-  uint8_t cnt = (uint8_t)context.cnt_trusted();
+  auto cnt = static_cast<uint8_t>(context.cnt_trusted());
   int cnt_requested = 0;
+
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage2(i) == nullptr) {
       context.request_stage2(i, i);
       ++cnt_requested;
     }
   }
-  if(0 == cnt_requested) {
+
+  if (cnt_requested == 0) {
     csdebug() << name() << ": no node to request";
   }
 }
@@ -103,7 +108,7 @@ void TrustedStage3State::request_stages(SolverContext& context) {
 // requests stages from any available neighbor nodes
 void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
   const auto& stage2_data = context.stage2_data();
-  uint8_t cnt = (uint8_t)context.cnt_trusted();
+  auto cnt = static_cast<uint8_t>(context.cnt_trusted());
   int cnt_requested = 0;
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage2(i) == nullptr) {
@@ -115,23 +120,23 @@ void TrustedStage3State::request_stages_neighbors(SolverContext& context) {
       }
     }
   }
-  if(0 == cnt_requested) {
+
+  if (cnt_requested == 0) {
     csdebug() << name() << ": no node to request";
   }
 }
 
 // forces transition to next stage
-void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNumber round)
-{
+void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNumber round) {
   csdebug() << name() << ": mark outbound nodes in round #" << round;
-  uint8_t cnt = (uint8_t) context.cnt_trusted();
-  for(uint8_t i = 0; i < cnt; ++i) {
-    if(context.stage2(i) == nullptr) {
+  auto cnt = static_cast<uint8_t>(context.cnt_trusted());
+  for (uint8_t i = 0; i < cnt; ++i) {
+    if (context.stage2(i) == nullptr) {
       // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
       csdebug() << name() << ": making fake stage-2 in round " << round;
       context.fake_stage2(i);
       // this procedute can cause the round change
-      if (round != context.round()) { 
+      if (round != cs::Conveyer::instance().currentRoundNumber()) {
         return;
       }
     }
@@ -139,39 +144,40 @@ void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNu
 }
 
 Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&) {
-  const auto ptr = context.stage2((uint8_t)context.own_conf_number());
+  const auto ptr = context.stage2(static_cast<uint8_t>(context.own_conf_number()));
   ++cnt_recv_stages;
   if (ptr != nullptr && cnt_recv_stages == context.cnt_trusted()) {
     csdebug() << name() << ": enough stage-2 received";
     const size_t cnt = context.cnt_trusted();
     for (auto& it : context.stage2_data()) {
       if ( it.sender != context.own_conf_number()) {
-        csdebug() << "Comparing with T(" << (int)it.sender << "):";
+        csdebug() << "Comparing with T(" << static_cast<int>(it.sender) << "):";
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
-          csdetails() << "Signature of T(" << j << ") in my storage is: " << cs::Utils::byteStreamToHex(ptr->signatures[j].data(), ptr->signatures[j].size());
+          csdetails() << "Signature of T(" << j << ") in my storage is: " << cs::Utils::byteStreamToHex(ptr->signatures[j]);
           if (ptr->signatures[j] != it.signatures[j]) {
-            csdebug() << "Signature of T(" << j << ") sent by T(" << (int)it.sender << "):" << cs::Utils::byteStreamToHex(it.signatures[j].data(), it.signatures[j].size())
+            csdebug() << "Signature of T(" << j << ") sent by T(" << static_cast<int>(it.sender) << "):" << cs::Utils::byteStreamToHex(it.signatures[j])
                     << " from stage-2 is not equal to mine";
 
-            if(it.hashes[j] == SolverContext::zeroHash) {
-              csdebug() << name() << ": [" << (int) it.sender << "] marked as untrusted (silent)";
+            if (it.hashes[j] == SolverContext::zeroHash) {
+              csdebug() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (silent)";
               context.mark_untrusted(it.sender);
               continue;
             }
+
             cs::Bytes toVerify;
             size_t messageSize = sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash);
             toVerify.reserve(messageSize);
             cs::DataStream stream(toVerify);
-            stream << context.round() << context.subRound(); // Attention!!! the uint32_t type
+            stream << cs::Conveyer::instance().currentRoundNumber() << context.subRound(); // Attention!!! the uint32_t type
             stream << it.hashes[j];
 
             if (cscrypto::verifySignature(it.signatures[j], context.trusted().at(it.sender), toVerify.data(), messageSize)) {
-              cslog() << name() << ": [" << (int)j << "] marked as untrusted (sent bad hash-signature pair of [" << (int)it.sender << "])";
-              context.mark_untrusted((uint8_t)j);
+              cslog() << name() << ": [" << static_cast<int>(j) << "] marked as untrusted (sent bad hash-signature pair of [" << static_cast<int>(it.sender) << "])";
+              context.mark_untrusted(static_cast<uint8_t>(j));
             }
             else {
-              cslog() << name() << ": [" << (int)it.sender << "] marked as untrusted (bad signature)";
+              cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (bad signature)";
               context.mark_untrusted(it.sender);
             }
 
@@ -181,27 +187,27 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         bool toBreak = false;
         size_t tCandSize = 0;
         const auto ptrStage1 = context.stage1(it.sender);
-        if(ptrStage1 != nullptr){
-          tCandSize =  ptrStage1->trustedCandidates.size();
+        if (ptrStage1 != nullptr) {
+          tCandSize = ptrStage1->trustedCandidates.size();
         }
 
-        if(tCandSize > 0) {
-          for(size_t outer = 0; outer < tCandSize - 1; outer++) {
-            for(size_t inner = outer + 1; inner < tCandSize; inner++) {
-              if(ptrStage1->trustedCandidates.at(outer) == ptrStage1->trustedCandidates.at(inner)) {
-                cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (duplicated candidates)";
+        if (tCandSize > 0) {
+          for (size_t outer = 0; outer < tCandSize - 1; outer++) {
+            for (size_t inner = outer + 1; inner < tCandSize; inner++) {
+              if (ptrStage1->trustedCandidates.at(outer) == ptrStage1->trustedCandidates.at(inner)) {
+                cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (duplicated candidates)";
                 context.mark_untrusted(it.sender);
                 toBreak = true;
                 break;
               }
             }
-            if(toBreak) {
+            if (toBreak) {
               break;
             }
           }
         }
         else {
-          cslog() << name() << ": [" << (int) it.sender << "] marked as untrusted (no candidates)";
+          cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (no candidates)";
           context.mark_untrusted(it.sender);
         }
       }
@@ -211,8 +217,8 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
     csdebug() << "============================ CONSENSUS SUMMARY =================================";
     if (pool_solution_analysis(context)) {
-      if(take_urgent_decision(context)) { //to be redesigned
-        csdebug() << "\t==> [" << (int)stage.writer << "]";
+      if (take_urgent_decision(context)) {  // to be redesigned
+        csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
       }
       else {
         cslog() << "\tconsensus failed waiting for BigBang";
@@ -229,11 +235,12 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     // all trusted nodes must send stage3 data
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
     context.spawn_next_round(stage);
-    csdebug() << name() << ": --> stage-3 [" << (int)stage.sender << "]";
+    csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
     context.add_stage3(stage);  //, stage.writer != stage.sender);
 
     return Result::Finish;
   }
+
   csdebug() << name() << ": continue to receive stages-2";
   return Result::Ignore;
 }
@@ -288,7 +295,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
       return false;
     }
     if (std::equal(it.hash.cbegin(), it.hash.cend(), mostFrequentHash.cbegin()) && stage.realTrustedMask.at(it.sender)!= cs::ConfidantConsts::InvalidConfidantIndex) {
-      csdebug() << "[" << (int)it.sender << "] is not liar";
+      csdebug() << "[" << static_cast<int>(it.sender) << "] is not liar";
     }
     else {
       ++liarNumber;
@@ -296,13 +303,14 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
       stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
 
       bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
-      csdebug() << "[" << (int)it.sender << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "
-              << cs::Utils::byteStreamToHex(it.hash.data(), it.hash.size());
+      csdebug() << "[" << static_cast<int>(it.sender) << "] IS " << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") <<" with hash "
+              << cs::Utils::byteStreamToHex(it.hash);
     }
   }
+
   // TODO: modify to select right confidants to trusted_mask 
   if (liarNumber > 0) {
-    cswarning() << "\tLiars detected: " << (int)liarNumber;
+    cswarning() << "\tLiars detected: " << static_cast<int>(liarNumber);
   }
   else {
     csdebug() << "\tNo liars detected";
@@ -329,23 +337,23 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   std::vector < cs::TransactionsPacketHash> myHashes;
   std::map <cs::TransactionsPacketHash, uint8_t> hashesElection;
   std::vector < cs::TransactionsPacketHash> myRejectedHashes;
-  const uint8_t cnt_trusted = std::min((uint8_t)context.cnt_trusted(), (uint8_t)Consensus::MaxTrustedNodes);
+  const uint8_t cnt_trusted = std::min(static_cast<uint8_t>(context.cnt_trusted()), static_cast<uint8_t>(Consensus::MaxTrustedNodes));
   uint8_t cr = cnt_trusted / 2;
   std::vector<cs::PublicKey> aboveThreshold;
   std::vector<cs::PublicKey> belowThreshold;
-  csdebug() << name() << ": number of generals / 2 = " << (int)cr;
+  csdebug() << name() << ": number of generals / 2 = " << static_cast<int>(cr);
 
   for (uint8_t i = 0; i < cnt_trusted; i++) {
     trustedMask[i] = (context.untrusted_value(i) == 0);
     if (trustedMask[i]) {
       stage.realTrustedMask.at(i) = cs::ConfidantConsts::FirstWriterIndex;
       auto ptr = context.stage1(i);
-      if(ptr == nullptr) {
+      if (ptr == nullptr) {
         continue;
       }
       const auto& stage_i = *ptr;
-      uint8_t candidates_amount = (uint8_t) stage_i.trustedCandidates.size();
-      csdebug() << "Candidates amount of [" << (int)i << "] : " << (int)candidates_amount;
+      uint8_t candidates_amount = static_cast<uint8_t>(stage_i.trustedCandidates.size());
+      csdebug() << "Candidates amount of [" << static_cast<int>(i) << "] : " << static_cast<int>(candidates_amount);
 
 
       for (uint8_t j = 0; j < candidates_amount; j++) {
@@ -354,25 +362,25 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
           candidatesElection.at(stage_i.trustedCandidates.at(j)) += 1;
         }
         else {
-          candidatesElection.emplace(stage_i.trustedCandidates.at(j), (uint8_t)1);
+          candidatesElection.emplace(stage_i.trustedCandidates.at(j), uint8_t(1));
         }
       }
+
       size_t hashes_amount = stage_i.hashesCandidates.size();
       //csdebug() << "My conf number = " << context.own_conf_number();
-      if (stage_i.sender == (uint8_t)context.own_conf_number()) {
+      if (stage_i.sender == static_cast<uint8_t>(context.own_conf_number())) {
         myHashes = stage_i.hashesCandidates;
         myPacks = stage_i.hashesCandidates.size();
       }
 
-
-      csdebug() << "Hashes amount of [" << (int)i << "]: " << (int)hashes_amount;
+      csdebug() << "Hashes amount of [" << static_cast<int>(i) << "]: " << static_cast<int>(hashes_amount);
       for (uint32_t j = 0; j < hashes_amount; j++) {
          // csdebug() << (int)i << "." << j << " " << cs::Utils::byteStreamToHex(stage_i.hashesCandidates.at(j).toBinary().data(), cscrypto::kHashSize);
         if (hashesElection.count(stage_i.hashesCandidates.at(j)) > 0) {
           hashesElection.at(stage_i.hashesCandidates.at(j)) += 1;
         }
         else {
-          hashesElection.emplace(stage_i.hashesCandidates.at(j), (uint8_t)1u);
+          hashesElection.emplace(stage_i.hashesCandidates.at(j), uint8_t(1));
         }
       }
     }
@@ -384,7 +392,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   csdebug() << name() << ": election table ready";
   unsigned int max_conf = int(4. + 1.85 * log(candidatesElection.size() / 4.));
   if (candidatesElection.size() < 4) {
-    max_conf = (unsigned int)candidatesElection.size();
+    max_conf = static_cast<unsigned int>(candidatesElection.size());
     csdebug() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
   }
 
@@ -427,15 +435,18 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   csdebug() << name() << ": initial amount: " << myPacks << ", next round hashes: " << next_round_hashes.size() << ", accepted: " << acceptedPacks;
   csdebug() << name() << ": candidates divided: above = " << aboveThreshold.size() << ", below = " << belowThreshold.size();
   csdebug() << "======================================================";
+
   for (size_t i = 0; i < aboveThreshold.size(); i++) {
-    const auto& tmp = aboveThreshold.at(i);
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << (int)candidatesElection.at(tmp);
+    const auto& tmp = aboveThreshold[i];
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
   }
+
   csdebug() << "------------------------------------------------------";
   for (size_t i = 0; i < belowThreshold.size(); i++) {
-    const auto& tmp = belowThreshold.at(i);
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << (int)candidatesElection.at(tmp);
+    const auto& tmp = belowThreshold[i];
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
   }
+
   csdebug() << name() << ": final list of next round trusted:";
 
   if (aboveThreshold.size() >= max_conf) {  // Consensus::MinTrustedNodes) {
@@ -467,23 +478,23 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 }
 
 bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
-  auto hash_t = context.blockchain().getHashBySequence(context.round() - 1).to_binary();
+  auto hash_t = context.blockchain().getHashBySequence(cs::Conveyer::instance().currentRoundNumber() - 1).to_binary();
   if (hash_t.empty()) {
     return false;  // TODO: decide what to return
   }
-  int k = *(unsigned int *)hash_t.data();
-  if(k < 0) {
+  int k = *(unsigned int*)hash_t.data();
+  if (k < 0) {
     k = -k;
   }
   // stage.realTrustedMask contains !0 on good nodes:
-  int cnt = (int) context.cnt_trusted();
-  int cnt_active = cnt - (int) std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex);
+  int cnt = static_cast<int>(context.cnt_trusted());
+  int cnt_active = cnt - static_cast<int>(std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex));
   if (cnt_active * 2 < cnt + 1) {
     cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
     return false;
   }
   int idx_writer = k % cnt_active;
-  if(cnt != cnt_active) {
+  if (cnt != cnt_active) {
     csdebug() << "\tselect #" << idx_writer << " from " << cnt_active << " good nodes in " << cnt << " total";
   }
   else {
@@ -491,7 +502,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
   }
   // count idx_writer through good nodes (optional):
   int idx = 0;
-  for (int i = 0; i < cnt; ++i) {
+  for (size_t i = 0; i < size_t(cnt); ++i) {
     if (stage.realTrustedMask.at(i) != InvalidConfidantIndex) {
       if (idx == idx_writer) {
         stage.writer = static_cast<uint8_t>(i);
@@ -499,10 +510,10 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
       ++idx;
     }
   }
-  int c = 0;
+  size_t c = 0;
   idx = 0;
-  for (int i = stage.writer; i < cnt + stage.writer; ++i) {
-    c = i % cnt;
+  for (size_t i = stage.writer; i < size_t(cnt + stage.writer); ++i) {
+    c = i % size_t(cnt);
     if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
       stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
       ++idx;

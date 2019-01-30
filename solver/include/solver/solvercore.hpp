@@ -183,7 +183,6 @@ private:
 
   csdb::Address addr_genesis;
   csdb::Address addr_start;
-  cs::RoundNumber cur_round;
   cs::PublicKey public_key;
   cs::PrivateKey private_key;
   // senders of hashes received this round

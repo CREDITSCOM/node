@@ -54,7 +54,6 @@ SolverCore::SolverCore()
 , tag_state_expired(CallsQueueScheduler::no_tag)
 , req_stop(true)
 // consensus data
-, cur_round(0)
 , smartStagesStorageRefreshed_(false)
 , ownSmartsConfNum_(cs::InvalidConfidant)
 , smartRoundNumber_(0)

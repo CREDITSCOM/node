@@ -341,23 +341,6 @@ public:
   }
 
   /**
-   * @fn  uint32_t SolverContext::round() const;
-   *
-   * @brief   Gets the current round number.
-   *
-   * @author  aae
-   * @date    03.10.2018
-   *
-   * @return  An int32_t.
-   *
-   * ### remarks  Aae, 30.09.2018.
-   */
-
-  cs::RoundNumber round() const {
-    return core.cur_round;
-  }
-
-  /**
  * @fn  uint32_t SolverContext::subRound() const;
  *
  * @brief   Gets the current subround.
