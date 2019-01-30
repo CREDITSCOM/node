@@ -70,7 +70,7 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
 
 void Fee::SetCountedFee() {
 
-  constexpr double fixed = 0.0001428;
+  constexpr double fixed = kMinFee;
 
   if (current_pool_ != nullptr) {
     std::vector<csdb::Transaction>& transactions = current_pool_->transactions();

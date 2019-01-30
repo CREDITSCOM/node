@@ -164,6 +164,7 @@ public:
   const csdb::Storage& getStorage() const;
 
 private:
+
   void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
   void createTransactionsIndex(csdb::Pool&);
