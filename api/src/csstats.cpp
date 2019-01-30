@@ -172,9 +172,13 @@ AllStats csstats::collectAllStats(const Periods& periods) {
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-        if (is_deploy_transaction(transaction)) {
+#ifdef MONITOR_NODE
+        if (is_smart(transaction) || is_smart_state(transaction))
+          ++periodStats.transactionsSmartCount;
+#endif
+
+        if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
-        }
 
         Currency currency = currencies_indexed[transaction.currency().to_string()];
 
@@ -201,6 +205,11 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+#ifdef MONITOR_NODE
+        if (is_smart(transaction) || is_smart_state(transaction))
+          ++periodStats.transactionsSmartCount;
+#endif
 
         if (is_deploy_transaction(transaction))
           ++periodStats.smartContractsCount;
