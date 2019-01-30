@@ -2111,9 +2111,7 @@ void Node::sendRoundPackageToAll() {
   stream << lastSentSignatures_.roundSignatures;
 
   csdebug() << "NODE> Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
-  csdebug() << "NODE> Send RoundData : " << cs::Utils::byteStreamToHex(lastRoundTableMessage_.data(), lastRoundTableMessage_.size())
-  << cs::Utils::byteStreamToHex(lastSignaturesMessage_.data(), lastSignaturesMessage_.size());
-  
+
   sendBroadcast(MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
 
   if (!lastSentRoundData_.characteristic.mask.empty()) {
@@ -2486,7 +2484,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   constexpr int padWidth = 30;
   badHashReplyCounter_.clear();
   badHashReplyCounter_.resize(roundTable.confidants.size());
-  for(auto& badHash : badHashReplyCounter_) {
+  for(auto badHash : badHashReplyCounter_) {
     badHash = false;
   }
 

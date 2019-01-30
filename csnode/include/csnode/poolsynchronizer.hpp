@@ -99,16 +99,21 @@ private:  // struct
       sequences_.reserve(blockPoolsCount);
     }
 
-    inline void removeSequnce(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+    inline bool removeSequnce(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
       if (sequences_.empty()) {
-        return;
+        return false;
       }
+
+      bool success = true;
 
       switch (accuracy) {
         case SequenceRemovalAccuracy::EXACT: {
           auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
           if (it != sequences_.end()) {
             sequences_.erase(it);
+          }
+          else {
+            success = false;
           }
           break;
         }
@@ -119,6 +124,7 @@ private:  // struct
           sequences_.erase(std::lower_bound(sequences_.begin(), sequences_.end(), sequence), sequences_.end());
           break;
       }
+      return success;
     }
     inline void setSequences(const PoolsRequestedSequences& sequences) {
       resetSequences();
