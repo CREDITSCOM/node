@@ -14,7 +14,7 @@ Neighbourhood::Neighbourhood(Transport* net)
 template <typename T>
 T getSecureRandom() {
   T result;
-  cscrypto::FillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
+  cscrypto::fillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
   return result;
 }
 

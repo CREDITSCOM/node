@@ -6,7 +6,7 @@
 #include "utils.hpp"
 
 inline cs::Hash generateHash(const void* data, size_t length) {
-  return cscrypto::CalculateHash(reinterpret_cast<const uint8_t*>(data), length);
+  return cscrypto::calculateHash(reinterpret_cast<const uint8_t*>(data), length);
 }
 
 template <>

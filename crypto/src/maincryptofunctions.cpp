@@ -14,33 +14,33 @@
 
 namespace cscrypto {
 
-bool CryptoInit() {
+bool cryptoInit() {
   return sodium_init() >= 0;
 }
 
-Hash CalculateHash(const Byte* data, size_t dataSize, const Byte* key, size_t keySize) {
+Hash calculateHash(const Byte* data, size_t dataSize, const Byte* key, size_t keySize) {
   Hash hash;
   blake2s(hash.data(), BLAKE2S_OUTBYTES, data, dataSize, key, keySize);
   return hash;
 }
 
-PrivateKey GenerateKeyPair(PublicKey& publicKey) {
+PrivateKey generateKeyPair(PublicKey& publicKey) {
   PrivateKey privateKey = PrivateKey::generateWithPair(publicKey);
   return  privateKey;
 }
 
-bool ValidateKeyPair(const PublicKey& publicKey, const PrivateKey& privateKey) {
-  return publicKey == GetMatchingPublic(privateKey);
+bool validateKeyPair(const PublicKey& publicKey, const PrivateKey& privateKey) {
+  return publicKey == getMatchingPublic(privateKey);
 }
 
-PublicKey GetMatchingPublic(const PrivateKey& privateKey) {
+PublicKey getMatchingPublic(const PrivateKey& privateKey) {
   PublicKey result;
   auto pkg = privateKey.access();
   crypto_sign_ed25519_sk_to_pk(result.data(), pkg.data());
   return result;
 }
 
-Signature GenerateSignature(const PrivateKey& privateKey, const Byte* data, size_t dataSize) {
+Signature generateSignature(const PrivateKey& privateKey, const Byte* data, size_t dataSize) {
   assert(data != nullptr);
   unsigned long long signatureLen;
   auto pkg = privateKey.access();
@@ -50,22 +50,22 @@ Signature GenerateSignature(const PrivateKey& privateKey, const Byte* data, size
   return signature;
 }
 
-bool VerifySignature(const Signature& signature, const PublicKey& publicKey, const Byte* data, size_t dataSize) {
+bool verifySignature(const Signature& signature, const PublicKey& publicKey, const Byte* data, size_t dataSize) {
   assert(data != nullptr);
   return !crypto_sign_ed25519_verify_detached(signature.data(), data, dataSize, publicKey.data());
 }
 
-bool VerifySignature(const Byte* signature, const Byte* publicKey, const Byte* data, size_t dataSize) {
+bool verifySignature(const Byte* signature, const Byte* publicKey, const Byte* data, size_t dataSize) {
   assert(signature != nullptr && publicKey != nullptr && data != nullptr);
   return !crypto_sign_ed25519_verify_detached(signature, data, dataSize, publicKey);
 }
 
-void FillBufWithRandomBytes(void* buffer, size_t size) {
+void fillBufWithRandomBytes(void* buffer, size_t size) {
   assert(buffer != nullptr);
   randombytes_buf(buffer, size);
 }
 
-void FillWithZeros(void* buffer, size_t size) {
+void fillWithZeros(void* buffer, size_t size) {
   assert(buffer != nullptr);
   sodium_memzero(buffer, size);
 }

@@ -141,8 +141,8 @@ void Config::dumpJSONKeys(const std::string& fName) const {
   std::ofstream f(fName);
   f << "{\"key\":{\"public\":\"" << pk58 << "\",\"private\":\"" << sk58 << "\"}}";
 
-  cscrypto::FillWithZeros(const_cast<char*>(pk58.data()), pk58.size());
-  cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
+  cscrypto::fillWithZeros(const_cast<char*>(pk58.data()), pk58.size());
+  cscrypto::fillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
 }
 
 
@@ -308,8 +308,8 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         return false;
       }
 
-      cscrypto::FillWithZeros(sk.data(), sk.size());
-      cscrypto::FillWithZeros(sk58.data(), sk58.size());
+      cscrypto::fillWithZeros(sk.data(), sk.size());
+      cscrypto::fillWithZeros(sk58.data(), sk58.size());
 
       if (encrypt) {
         std::cout << "Encrypting the private key file..." << std::endl;
@@ -319,7 +319,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
           std::string sk58tmp =
             EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
           writeFile(pathToSk, sk58tmp);
-          cscrypto::FillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
+          cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
           cslog() << "Key in " << pathToSk << " has been encrypted successfully";
         }
         else {
@@ -328,7 +328,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
       }
     }
 
-    publicKey_ = cscrypto::GetMatchingPublic(privateKey_);
+    publicKey_ = cscrypto::getMatchingPublic(privateKey_);
     pk58 = EncodeBase58(publicKey_.data(), publicKey_.data() + publicKey_.size());
   }
   else {
@@ -340,7 +340,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
       if (flag == 'g') {
         std::vector<uint8_t> skBytes;
-        privateKey_ = cscrypto::GenerateKeyPair(publicKey_);
+        privateKey_ = cscrypto::generateKeyPair(publicKey_);
 
         std::cout << "Choose your private key file encryption type (enter number):" << std::endl;
         std::cout << "[1] Encrypt with password (recommended)" << std::endl;
@@ -370,8 +370,8 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         writeFile(pathToSk, sk58);
 
         // Just in case...
-        cscrypto::FillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
-        cscrypto::FillWithZeros(const_cast<uint8_t*>(skBytes.data()), skBytes.size());
+        cscrypto::fillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
+        cscrypto::fillWithZeros(const_cast<uint8_t*>(skBytes.data()), skBytes.size());
 
         cslog() << "Keys generated";
         break;

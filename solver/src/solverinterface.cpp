@@ -236,11 +236,11 @@ namespace cs
 //          csdebug() << "GOT:";
 //          st.print();
           //TODO: change the routine of pool signing
-          bool blockSignaturesOk = cscrypto::VerifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size());
+          bool blockSignaturesOk = cscrypto::verifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender), stage.blockHash.data(), stage.blockHash.size());
           if (!blockSignaturesOk) {
             csdebug() << "Block Signatures are not ok";
           }
-          bool roundSignaturesOk = cscrypto::VerifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender), stage.roundHash.data(), stage.roundHash.size());
+          bool roundSignaturesOk = cscrypto::verifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender), stage.roundHash.data(), stage.roundHash.size());
           if (!roundSignaturesOk) {
             csdebug() << "Round Signatures are not ok";
           }
@@ -268,11 +268,11 @@ namespace cs
 //        st->print();
 //        csdebug() << "GOT:";
 //        printStage3(stage);
-        bool blockSignaturesOk = cscrypto::VerifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size());
+        bool blockSignaturesOk = cscrypto::verifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender), st->blockHash.data(), st->blockHash.size());
         if(!blockSignaturesOk) {
           csdebug() << "Block Signatures are not ok";
         }
-        bool roundSignaturesOk = cscrypto::VerifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender), st->roundHash.data(), st->roundHash.size());
+        bool roundSignaturesOk = cscrypto::verifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender), st->roundHash.data(), st->roundHash.size());
         if (!roundSignaturesOk) {
           csdebug() << "Round Signatures are not ok";
         }

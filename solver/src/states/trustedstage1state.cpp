@@ -261,10 +261,10 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
   if (characteristic.mask.empty()) {
     auto round = conveyer.currentRoundNumber();
-    hash = cscrypto::CalculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
+    hash = cscrypto::calculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
   }
   else {
-    hash = cscrypto::CalculateHash(characteristic.mask.data(), characteristic.mask.size());
+    hash = cscrypto::calculateHash(characteristic.mask.data(), characteristic.mask.size());
   }
 
   csdebug() << name() << ": generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());

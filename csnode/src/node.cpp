@@ -1222,7 +1222,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   stream << stageOneInfo.roundTimeStamp;
 
   // hash of message
-  stageOneInfo.messageHash = cscrypto::CalculateHash(message.data(), message.size());
+  stageOneInfo.messageHash = cscrypto::calculateHash(message.data(), message.size());
 
   cs::DataStream signStream(messageToSign);
   signStream << cs::Conveyer::instance().currentRoundNumber();
@@ -1230,7 +1230,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
   signStream << stageOneInfo.messageHash;
 
   // signature of round number + calculated hash
-  stageOneInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
+  stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
   const int k1 = (corruptionLevel / 1) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel / 16);
@@ -1278,7 +1278,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   }
 
   // hash of part received message
-  stage.messageHash = cscrypto::CalculateHash(bytes.data(), bytes.size());
+  stage.messageHash = cscrypto::calculateHash(bytes.data(), bytes.size());
 
   cs::Bytes signedMessage;
   cs::DataStream signedStream(signedMessage);
@@ -1302,7 +1302,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
   const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
 
-  if (!cscrypto::VerifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
+  if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Stage-1 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1345,7 +1345,7 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
   stream << stageTwoInfo.hashes;
 
   // create signature
-  stageTwoInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
+  stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
 
   const int k1 = (corruptionLevel / 2) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel / 16);
@@ -1407,7 +1407,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
   
-  if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
+  if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1442,7 +1442,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
   //cscrypto::GenerateSignature(stageThreeInfo.blockSignature, solver_->getPrivateKey(), stageThreeInfo.blockHash.data(), stageThreeInfo.blockHash.size());
   //cscrypto::GenerateSignature(stageThreeInfo.roundSignature, solver_->getPrivateKey(), stageThreeInfo.roundHash.data(), stageThreeInfo.roundHash.size());
-  stageThreeInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
+  stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
 
   const int k1 = (corruptionLevel / 4) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel / 16);
@@ -1502,7 +1502,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     return;
   }
 
-  if (!cscrypto::VerifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
+  if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1648,7 +1648,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   stream << stageOneInfo.hash;
 
   // hash of message
-  stageOneInfo.messageHash = cscrypto::CalculateHash(message.data(), message.size());
+  stageOneInfo.messageHash = cscrypto::calculateHash(message.data(), message.size());
 
   cs::DataStream signStream(messageToSign);
   signStream << solver_->smartRoundNumber();
@@ -1657,7 +1657,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
 
   // signature of round number + calculated hash
-  stageOneInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
+  stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload
@@ -1740,7 +1740,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   }
 
   // hash of part received message
-  stage.messageHash = cscrypto::CalculateHash(bytes.data(), bytes.size());
+  stage.messageHash = cscrypto::calculateHash(bytes.data(), bytes.size());
   csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
   cs::Bytes signedMessage;
@@ -1762,7 +1762,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
-  if (!cscrypto::VerifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
+  if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1800,7 +1800,7 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
   stream << stageTwoInfo.hashes;
 
   // create signature
-  stageTwoInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
+  stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(),
              MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(),
              stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
@@ -1854,7 +1854,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
-  if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
+  if (!cscrypto::verifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "NODE> Smart Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -1887,7 +1887,7 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   stream << stageThreeInfo.realTrustedMask;
   stream << stageThreeInfo.packageSignature;
 
-  stageThreeInfo.signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
+  stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload:
              stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
@@ -1942,7 +1942,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
-  if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
+  if (!cscrypto::verifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "SmartStage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
@@ -2072,7 +2072,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   // array
   const auto lastHash = blockChain_.getLastHash().to_binary();
   std::copy(lastHash.cbegin(), lastHash.cend(), st3.blockHash.begin());
-  st3.blockSignature = cscrypto::GenerateSignature(solver_->getPrivateKey(),st3.blockHash.data(),st3.blockHash.size());
+  st3.blockSignature = cscrypto::generateSignature(solver_->getPrivateKey(),st3.blockHash.data(),st3.blockHash.size());
 
   //pool.value().sign(solver_->getPrivateKey());
   //const auto& signature = pool.value().signature();
@@ -2188,12 +2188,12 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   stream << lastSentRoundData_.poolMetaInfo.previousHash;
   //stream << lastSentRoundData_.poolMetaInfo.writerKey; -- we don't need to send this
 
-  st3.roundHash = cscrypto::CalculateHash(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
+  st3.roundHash = cscrypto::calculateHash(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
   //cs::DataStream signStream(messageToSign);
   //signStream << roundNumber_;
   //signStream << subRound_;
   //signStream << st3.roundHash;
-  st3.roundSignature = cscrypto::GenerateSignature(solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
+  st3.roundSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
 
   //here should be placed parcing of round table
   lastSentSignatures_.poolSignatures.clear();
@@ -2267,8 +2267,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         cserror() << "NODE> Getting round table is contained of more confidants";
         return;
       }
-      cs::Hash tempHash = cscrypto::CalculateHash(roundBytes.data(), roundBytes.size());
-      if (cscrypto::VerifySignature(it.signature, rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
+      cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
+      if (cscrypto::verifySignature(it.signature, rt->confidants.at(it.sender), tempHash.data(), tempHash.size())) {
         ++signaturesCount;
       }
     }
@@ -2580,7 +2580,7 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
   const auto& binary = hashToSpoil.to_binary();
   const auto round = cs::Conveyer::instance().currentRoundNumber();
-  cs::Hash hash = cscrypto::CalculateHash(binary.data(), binary.size(), reinterpret_cast<cs::Byte*>(round), sizeof(round));
+  cs::Hash hash = cscrypto::calculateHash(binary.data(), binary.size(), reinterpret_cast<cs::Byte*>(round), sizeof(round));
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(std::move(bytesHash));
@@ -2588,7 +2588,7 @@ csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey) {
   const auto& binary = hashToSpoil.to_binary();
-  cs::Hash hash = cscrypto::CalculateHash(binary.data(), binary.size(), pKey.data(), pKey.size());
+  cs::Hash hash = cscrypto::calculateHash(binary.data(), binary.size(), pKey.data(), pKey.size());
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(std::move(bytesHash));
@@ -2606,7 +2606,7 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
     return;
   }
 
-  cs::Signature signature = cscrypto::GenerateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
+  cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
   sendDefault(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);
 }
 
@@ -2662,7 +2662,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
   badHashReplyCounter_[senderNumber] = true;
 
-  if (!cscrypto::VerifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
+  if (!cscrypto::verifySignature(signature, sender, hash.to_binary().data(), hash.size())) {
     csmeta(csdebug) << "The message of WRONG HASH has WRONG SIGNATURE!";
     return;
   }
