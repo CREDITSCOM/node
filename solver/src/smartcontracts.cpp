@@ -85,18 +85,14 @@ bool SmartContracts::is_smart_contract(const csdb::Transaction tr) {
   return f.is_valid() && f.type() == csdb::UserField::Type::String;
 }
 
-bool SmartContracts::is_executable(const csdb::Transaction tr) const {
-  if (!is_smart_contract(tr)) {
-    return false;
-  }
-  if (is_new_state(tr)) {
-    return false;
-  }
-  return true;
+/*static*/
+bool SmartContracts::is_executable(const csdb::Transaction tr) {
+  return SmartContracts::is_smart_contract(tr) && !SmartContracts::is_new_state(tr);
 }
 
-bool SmartContracts::is_deploy(const csdb::Transaction tr) const {
-  if (!is_executable(tr)) {
+/*static*/
+bool SmartContracts::is_deploy(const csdb::Transaction tr) {
+  if (!SmartContracts::is_executable(tr)) {
     return false;
   }
 
@@ -111,17 +107,19 @@ bool SmartContracts::is_deploy(const csdb::Transaction tr) const {
   return invoke.method.empty();
 }
 
-bool SmartContracts::is_start(const csdb::Transaction tr) const {
-  if (!is_executable(tr)) {
-    return false;
-  }
+/*static*/
+bool SmartContracts::is_start(const csdb::Transaction tr) {
+  return SmartContracts::is_executable(tr) && !SmartContracts::is_deploy(tr);
+}
 
-  const auto invoke = get_smart_contract(tr);
-  if (!invoke.has_value()) {
-    return false;
-  }
-  // deploy ~ start but method in invoke info is empty
-  return !invoke.value().method.empty();
+/*static*/
+bool SmartContracts::is_new_state(const csdb::Transaction tr)
+{
+  // must contain user field new_state::Value and new_state::RefStart
+  using namespace cs::trx_uf;
+  // test user_field[RefStart] helps filter out ancient smart contracts:
+  return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String &&
+    tr.user_field(new_state::RefStart).type() == csdb::UserField::Type::String);
 }
 
 /* static */
@@ -150,17 +148,6 @@ csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deplo
   cscrypto::CalculateHash(result, strToHash.data(), strToHash.size());
 
   return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
-}
-
-bool SmartContracts::is_new_state(const csdb::Transaction tr) const {
-  if (!is_smart_contract(tr)) {
-    return false;
-  }
-  // must contain user field new_state::Value and new_state::RefStart
-  using namespace cs::trx_uf;
-  // test user_field[RefStart] helps filter out ancient smart contracts:
-  return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String &&
-    tr.user_field(new_state::RefStart).type() == csdb::UserField::Type::String);
 }
 
 /*static*/

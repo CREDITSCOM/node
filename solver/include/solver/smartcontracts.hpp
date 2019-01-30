@@ -141,13 +141,13 @@ public:
   // smart contract related transaction of any type
   static bool is_smart_contract(const csdb::Transaction);
   // deploy or start contract
-  bool is_executable(const csdb::Transaction tr) const;
+  static bool is_executable(const csdb::Transaction tr);
   // deploy contract
-  bool is_deploy(const csdb::Transaction) const;
+  static bool is_deploy(const csdb::Transaction);
   // start contract
-  bool is_start(const csdb::Transaction) const;
+  static bool is_start(const csdb::Transaction);
   // new state of contract, result of invocation of executable transaction
-  bool is_new_state(const csdb::Transaction) const;
+  static bool is_new_state(const csdb::Transaction);
 
   /* Assuming deployer.is_public_key() */
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
