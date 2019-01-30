@@ -56,7 +56,9 @@ SolverCore::SolverCore()
 , cnt_trusted_desired(Consensus::MinTrustedNodes)
 // consensus data
 , cur_round(0)
-// previous solver version instance
+, smartStagesStorageRefreshed_(false)
+, ownSmartsConfNum_(cs::InvalidConfidant)
+, smartRoundNumber_(0)
 , pnode(nullptr)
 , pws(nullptr)
 , psmarts(nullptr) {

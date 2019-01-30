@@ -229,7 +229,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     // all trusted nodes must send stage3 data
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
     context.spawn_next_round(stage);
-    csinfo() << name() << ": --> stage-3 [" << (int)stage.sender << "]";
+    csdebug() << name() << ": --> stage-3 [" << (int)stage.sender << "]";
     context.add_stage3(stage);  //, stage.writer != stage.sender);
 
     return Result::Finish;

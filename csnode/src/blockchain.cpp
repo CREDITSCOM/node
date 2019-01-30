@@ -289,6 +289,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis);
   deferredBlock_ = genesis;
+  emit storeBlockEvent_(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
@@ -432,14 +433,16 @@ void BlockChain::removeLastBlock() {
 }
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
+  csunused(obsolete_block);
+  std::unique_lock<decltype(dbLock_)> l(dbLock_);
   csdb::PoolHash res;
 
-  std::unique_lock<decltype(waitersLocker_)> l(waitersLocker_);
-  newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
-    res = getLastHash();
-    return obsolete_block != res;
-  });
-
+  newBlockCv_.wait(l);
+  /*newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
+    res = storage_.last_hash();
+    //return obsolete_block != res;
+    return obsolete_block == res;
+  });*/
   return res;
 }
 
@@ -883,9 +886,9 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
     }
-//#ifdef TRANSACTIONS_INDEX
-    //total_transactions_count_+= new_pool.value().transactions().size();
-//#endif
+    //#ifdef TRANSACTIONS_INDEX
+        //total_transactions_count_+= new_pool.value().transactions().size();
+    //#endif
   }
 }
 

@@ -24,9 +24,6 @@ void TransactionsValidator::reset(size_t transactionsNum) {
 }
 
 bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1) {
-  if(trx.source() == trx.target()) {
-    return false;
-  }
   if (!validateTransactionAsSource(trx, trxInd, del1)) {
     return false;
   }

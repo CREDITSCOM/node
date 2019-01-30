@@ -45,6 +45,7 @@ Node::Node(const Config& config)
   std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
+  cs::Connector::connect(&blockChain_.storeBlockEvent_, &stat_, &cs::RoundStat::onStoreBlock);
   good_ = init(config);
 }
 
@@ -60,7 +61,7 @@ bool Node::init(const Config& config) {
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
-  cslog() << "Blockchain is ready, contains " << stat_.totalAcceptedTransactions_ << " transactions";
+  cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
   std::cout << "Init API... ";
@@ -269,6 +270,7 @@ cs::RoundNumber Node::getRoundNumber() const {
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   istream_.init(data, size);
+
   cs::TransactionsPacket packet;
   istream_ >> packet;
 
@@ -413,7 +415,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
     // otherwise senseless, this block is already in chain
-    stat_.totalReceivedTransactions_ += characteristic.mask.size();
     conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
 
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
@@ -432,7 +433,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       cserror() << "NODE> failed to store block in BlockChain";
     }
     else {
-      stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
       blockChain_.testCachedBlocks();
     }
 
@@ -501,6 +501,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     cswarning() << "Send transaction packet with empty hash failed";
     return;
   }
+
   sendBroadcast(MsgTypes::TransactionPacket, roundNumber_, packet);
 }
 
@@ -709,6 +710,7 @@ void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumb
 
 void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round) {
   csdebug() << "NODE> Processing packets reply";
+
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
   for (auto&& packet : packets) {
@@ -2061,7 +2063,6 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
     return;
   }
 
-  stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
   // array
   const auto lastHash = blockChain_.getLastHash().to_binary();
   std::copy(lastHash.cbegin(), lastHash.cend(), st3.blockHash.begin());
@@ -2203,8 +2204,6 @@ void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo&
     return;
   }
 
-  stat_.totalReceivedTransactions_ += block_characteristic->mask.size();
-
   storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3);
   csdebug() << "NODE> StageThree prepared:";
   st3.print();
@@ -2291,7 +2290,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   roundTable.confidants = std::move(confidants);
   roundTable.hashes = std::move(hashes);
   roundTable.general = sender;
-  csdebug() << "NODE> Сonfidants: " << roundTable.confidants.size();
+  csdebug() << "NODE> confidants: " << roundTable.confidants.size();
 
   // create pool by previous round, then change conveyer state.
 
@@ -2304,12 +2303,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   poolSynchronizer_->processingSync(roundNumber_);
   reviewConveyerHashes();
 
-  csmeta(csdetails) << "done";
+  csmeta(csdetails) << "done\n";
 }
 
 void Node::sendHash(cs::RoundNumber round) {
 #if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
-  if (blockChain_.getLastSequence() != round - 1) {
+  if (solver_->smartRoundNumber() || blockChain_.getLastSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
   }

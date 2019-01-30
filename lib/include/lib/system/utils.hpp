@@ -17,6 +17,15 @@
 #include <string>
 #include <thread>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)  // warning: 'crypto_generichash_blake2b_state': structure was padded due to alignment specifier
+#endif
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
 #include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
