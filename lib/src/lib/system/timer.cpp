@@ -20,7 +20,7 @@ void cs::Timer::start(int msec, Type type) {
   type_ = type;
 
   ms_ = std::chrono::milliseconds(msec);
-  ns_ = std::chrono::nanoseconds(0);
+  ns_ = 0;
 
   timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
 
@@ -34,6 +34,18 @@ void cs::Timer::stop() {
   if (timerThread_.joinable()) {
     timerThread_.join();
     isRunning_ = false;
+  }
+}
+
+void cs::Timer::restart() {
+  if (isRunning_) {
+    if (type_ == Type::Standard) {
+      stop();
+      start(static_cast<int>(ms_.count()));
+    }
+    else {
+      ns_ = 0;
+    }
   }
 }
 
@@ -70,12 +82,12 @@ void cs::Timer::preciseLoop() {
   while (!interruption_) {
     auto now = std::chrono::high_resolution_clock::now();
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - previousTimePoint);
-    ns_ += ns;
+    ns_ += ns.count();
 
     auto needMsInNs = std::chrono::duration_cast<std::chrono::nanoseconds>(ms_);
 
-    if (needMsInNs <= ns_) {
-      ns_ = std::chrono::nanoseconds(0);
+    if (needMsInNs.count() <= ns_) {
+      ns_ = 0;
 
       emit timeOut();
     }
