@@ -15,7 +15,7 @@ csdb::UserField SmartContractRef::to_user_field() const {
   cs::Bytes data;
   cs::DataStream stream(data);
   stream << hash << sequence << transaction;
-  return csdb::UserField(std::string(data.cbegin(), data.cend()));
+  return csdb::UserField(stream.convert<std::string>());
 }
 
 void SmartContractRef::from_user_field(csdb::UserField fld) {
@@ -265,28 +265,28 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
     const auto& smart_fld = tr.user_field(trx_uf::deploy::Code);  // trx_uf::start::Methods == trx_uf::deploy::Code
     if (smart_fld.is_valid()) {
       std::string data = smart_fld.value<std::string>();
-      if(!data.empty()) {
-      const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
-      if (invoke_info.method.empty()) {
-        // is deploy
-        return std::make_optional(std::move(invoke_info));
-      }
-      else {
-        // is start
-        // currently invoke_info contains all info required to execute contract, so
-        // we need not acquire origin
-        constexpr bool api_pass_code_and_methods = false;
-        if constexpr (api_pass_code_and_methods) {
+      if (!data.empty()) {
+        const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
+        if (invoke_info.method.empty()) {
+          // is deploy
           return std::make_optional(std::move(invoke_info));
         }
-        // if api is refactored, we may need to acquire contract origin separately:
-        if constexpr (!api_pass_code_and_methods) {
-          bool present;
-          if (papi != nullptr) {
-            auto tmp = papi->getSmartContract(tr.target(), present);
-            if (present) {
-              tmp.method = invoke_info.method;
-              tmp.params = invoke_info.params;
+        else {
+          // is start
+          // currently invoke_info contains all info required to execute contract, so
+          // we need not acquire origin
+          constexpr bool api_pass_code_and_methods = false;
+          if constexpr (api_pass_code_and_methods) {
+            return std::make_optional(std::move(invoke_info));
+          }
+          // if api is refactored, we may need to acquire contract origin separately:
+          if constexpr (!api_pass_code_and_methods) {
+            bool present;
+            if (papi != nullptr) {
+              auto tmp = papi->getSmartContract(tr.target(), present);
+              if (present) {
+                tmp.method = invoke_info.method;
+                tmp.params = invoke_info.params;
                 return std::make_optional(std::move(tmp));
               }
             }
@@ -388,19 +388,17 @@ bool SmartContracts::is_running_smart_contract(csdb::Address addr) const {
   return false;
 }
 
-bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const
-{
-  if(!exe_queue.empty()) {
+bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const {
+  if (!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));
-    if(it != exe_queue.cend()) {
+    if (it != exe_queue.cend()) {
       return it->status == SmartContractStatus::Closed;
     }
   }
   return true;
 }
 
-bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
-{
+bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr) {
   csdb::Address abs_addr = absolute_address(tr.source());
 
   if (is_running_smart_contract(abs_addr)) {
@@ -412,9 +410,9 @@ bool SmartContracts::test_smart_contract_emits(csdb::Transaction tr)
     csdebug() << name() << ": smart contract emits transaction, add, total " << it->created_transactions.size();
     return true;
   }
-  else if(contract_state.count(abs_addr) > 0) {
+  else if (contract_state.count(abs_addr) > 0) {
     csdebug() << name() << ": smart contract is not allowed to emit transaction, ignore";
-    return true; // block from conveyer sync
+    return true;  // block from conveyer sync
   }
 
   return false;
@@ -424,15 +422,15 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   // control round-based timeout
   bool retest_required = false;
   for (auto& item : exe_queue) {
-      const auto seq = block.sequence();
-    if(seq > item.round_start && seq - item.round_start >= Consensus::MaxRoundsExecuteSmart) {
-      if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
+    const auto seq = block.sequence();
+    if (seq > item.round_start && seq - item.round_start >= Consensus::MaxRoundsExecuteSmart) {
+      if (item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
         cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
           << " blocks (from #," << item.round_start << "), cancel it without transaction";
         item.close();
         retest_required = true;
       }
-      else if(item.status == SmartContractStatus::Closed) {
+      else if (item.status == SmartContractStatus::Closed) {
         retest_required = true;
       }
     }
@@ -469,11 +467,10 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
   }
 }
 
-void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
-{
-  if(block.transactions_count() > 0) {
-    for(const auto& tr : block.transactions()) {
-      if(is_new_state(tr)) {
+void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop) {
+  if (block.transactions_count() > 0) {
+    for (const auto& tr : block.transactions()) {
+      if (is_new_state(tr)) {
         update_contract_state(tr, false /*force_absolute_address*/);
       }
     }
@@ -699,17 +696,16 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
   }
 }
 
-bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absolute_address /*= true*/)
-{
+bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absolute_address /*= true*/) {
   csdb::UserField fld_state_value = t.user_field(trx_uf::new_state::Value);
-  if(!fld_state_value.is_valid()) {
+  if (!fld_state_value.is_valid()) {
     cserror() << name() << ": contract state is not updated, transaction does not contain it";
     return false;
   }
   std::string state_value = fld_state_value.value<std::string>();
-  if(!state_value.empty()) {
+  if (!state_value.empty()) {
     csdb::Address addr = t.target();
-    if(force_absolute_address) {
+    if (force_absolute_address) {
       addr = absolute_address(addr);
     }
     contract_state[addr] = state_value;
