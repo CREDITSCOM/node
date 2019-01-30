@@ -89,7 +89,7 @@ bool TransactionID::get(::csdb::priv::ibstream& is) {
 SHARED_DATA_CLASS_IMPLEMENTATION(Transaction)
 
 Transaction::Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-                         AmountCommission max_fee, AmountCommission counted_fee, std::string signature)
+                         AmountCommission max_fee, AmountCommission counted_fee, const cs::Signature& signature)
 : d(new priv(innerID, source, target, currency, amount, max_fee, counted_fee, signature)) {
 }
 
@@ -136,7 +136,7 @@ AmountCommission Transaction::counted_fee() const noexcept {
   return d->counted_fee_;
 }
 
-std::string Transaction::signature() const noexcept {
+const cs::Signature& Transaction::signature() const noexcept {
   return d->signature_;
 }
 
@@ -191,7 +191,7 @@ void Transaction::set_counted_fee_unsafe(AmountCommission counted_fee) {
   }
 }
 
-void Transaction::set_signature(std::string signature) {
+void Transaction::set_signature(const cs::Signature& signature) {
   if (!d.constData()->read_only_) {
     d->signature_ = signature;
   }
@@ -258,9 +258,8 @@ std::vector<uint8_t> Transaction::to_byte_stream() const {
 }
 
 bool Transaction::verify_signature(const cs::PublicKey& public_key) const {
-  return cscrypto::VerifySignature(reinterpret_cast<const uint8_t*>(this->signature().data()),
-    public_key.data(), this->to_byte_stream_for_sig().data(),
-    this->to_byte_stream_for_sig().size());
+  const auto byteStream = to_byte_stream_for_sig();
+  return cscrypto::VerifySignature(signature().data(), public_key.data(), byteStream.data(), byteStream.size());
 }
 
 std::vector<uint8_t> Transaction::to_byte_stream_for_sig() const {

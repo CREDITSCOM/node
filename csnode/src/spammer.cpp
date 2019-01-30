@@ -144,18 +144,20 @@ csdb::Address Spammer::OptimizeAddress(const csdb::Address& address, Node& node)
 }
 
 void Spammer::SignTransaction(csdb::Transaction& transaction, const std::vector<cscrypto::Byte>& private_key) {
-  auto transaction_bytes = transaction.to_byte_stream_for_sig();
-  cscrypto::Signature signature;
-  auto priv = cscrypto::PrivateKey::readFromBytes(private_key);
-  cscrypto::GenerateSignature(signature, priv, transaction_bytes.data(), transaction_bytes.size());
-  transaction.set_signature(std::string(signature.begin(), signature.end()));
+  const auto transaction_bytes = transaction.to_byte_stream_for_sig();
+  const auto key = cscrypto::PrivateKey::readFromBytes(private_key);
+  cs::Signature signature;
+
+  cscrypto::GenerateSignature(signature, key, transaction_bytes.data(), transaction_bytes.size());
+  transaction.set_signature(signature);
 }
 
 void Spammer::SignTransaction(csdb::Transaction& transaction, const cscrypto::PrivateKey& private_key) {
-  auto transaction_bytes = transaction.to_byte_stream_for_sig();
-  cscrypto::Signature signature;
+  const auto transaction_bytes = transaction.to_byte_stream_for_sig();
+  cs::Signature signature;
+
   cscrypto::GenerateSignature(signature, private_key, transaction_bytes.data(), transaction_bytes.size());
-  transaction.set_signature(std::string(signature.begin(), signature.end()));
+  transaction.set_signature(signature);
 }
 
 }  // namespace cs

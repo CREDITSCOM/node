@@ -1919,7 +1919,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
   solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 }
 
-void Node::sendSmartStageReply(const uint8_t sender, const cscrypto::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
+void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
   csmeta(csdetails) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -1992,9 +1992,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   stat_.totalAcceptedTransactions_ += pool.value().transactions_count();
 
   // array
-  cs::Signature poolSignature;
-  const auto& signature = pool.value().signature();
-  std::copy(signature.begin(), signature.end(), poolSignature.begin());
+  const cs::Signature& poolSignature = pool.value().signature();
 
   //logPool(pool.value());
   sendRoundTable(roundTable, poolMetaInfo, poolSignature);
@@ -2394,15 +2392,15 @@ std::string Node::getSenderText(const cs::PublicKey& sender) {
 }
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil) {
-  cscrypto::Hash hash;
-  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cscrypto::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
+  cs::Hash hash;
+  cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), (const cs::Byte*)(roundNumber_), sizeof(cs::RoundNumber));
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
   return csdb::PoolHash::from_binary(bytesHash);
 }
 
 csdb::PoolHash Node::spoileHash(const csdb::PoolHash& hashToSpoil, cs::PublicKey pKey) {
-  cscrypto::Hash hash;
+  cs::Hash hash;
   cscrypto::CalculateHash(hash, hashToSpoil.to_binary().data(), hash.size(), pKey.data(), pKey.size());
   cs::Bytes bytesHash(hash.begin(), hash.end());
 
@@ -2421,7 +2419,7 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
     return;
   }
 
-  cscrypto::Signature signature;
+  cs::Signature signature;
   cscrypto::GenerateSignature(signature, solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
   sendDefault(respondent, MsgTypes::HashReply, roundNumber_, subRound_, signature, hash);
 }
@@ -2438,7 +2436,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
-  cscrypto::Signature signature;
+  cs::Signature signature;
   istream_ >> signature;
 
   csdb::PoolHash hash;

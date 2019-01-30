@@ -1,6 +1,7 @@
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 
+#include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <csdb/currency.hpp>
 #include <ContractExecutor.h>
@@ -635,6 +636,9 @@ namespace cs
     if(!src.is_valid()) {
       return csdb::Transaction {};
     }
+    cs::Signature sign;
+    sign.fill(0);
+
     csdb::Transaction result(
       src.innerID() + 1, // TODO: possible conflict with other innerIDs!
       src.target(), // contracts' key - source
@@ -643,7 +647,7 @@ namespace cs
       0, // amount*/
       src.max_fee(), // TODO:: how to calculate max fee?
       src.counted_fee(), // TODO:: how to calculate fee?
-      std::string {} //empty signature
+      sign //empty signature
     );
     // USRFLD1 - ref to start trx
     result.add_user_field(trx_uf::new_state::RefStart, contract.to_user_field());

@@ -94,7 +94,7 @@ class Transaction {
 
 public:
   Transaction(int64_t innerID, Address source, Address target, Currency currency, Amount amount,
-              AmountCommission max_fee, AmountCommission counted_fee, std::string signature);
+              AmountCommission max_fee, AmountCommission counted_fee, const cs::Signature& signature);
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
@@ -107,7 +107,7 @@ public:
   Amount amount() const noexcept;
   AmountCommission max_fee() const noexcept;
   AmountCommission counted_fee() const noexcept;
-  std::string signature() const noexcept;
+  const cs::Signature& signature() const noexcept;
 
   void set_innerID(int64_t innerID);
   void set_source(Address source);
@@ -117,7 +117,7 @@ public:
   void set_max_fee(AmountCommission max_fee);
   void set_counted_fee(AmountCommission counted_fee);
   void set_counted_fee_unsafe(AmountCommission counted_fee);
-  void set_signature(std::string signature);
+  void set_signature(const cs::Signature& signature);
 
   cs::Bytes to_binary();
   static Transaction from_binary(const cs::Bytes data);
