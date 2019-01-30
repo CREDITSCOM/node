@@ -86,8 +86,9 @@ struct SmartContractRef {
   // "serialization" methods
 
   csdb::UserField to_user_field() const;
-
   void from_user_field(const csdb::UserField fld);
+
+  csdb::TransactionID getTransactionID() const { return csdb::TransactionID(hash, transaction); }
 };
 
 struct SmartExecutionData {
