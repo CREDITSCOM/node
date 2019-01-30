@@ -460,11 +460,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
       ++maskIndex;
     }
-    Hash pkHash = cscrypto::CalculateHash(pKeys.data(),pKeys.size());
-    Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
+    //Hash pkHash = cscrypto::CalculateHash(pKeys.data(),pKeys.size());
+    //Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
 
-    csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
-    csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+    //csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
+    //csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
   
     if (maskIndex > mask.size()) {
       csmeta(cserror) << "hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;

@@ -1021,34 +1021,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   logBlockInfo(pool);
   csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
-  if(pool.sequence() > 1) {
-
-  csdebug() << "----------------------- Checking signatures of previously saved block #" << (pool.sequence() - 1)  << " until next round ----------------------";
-  const auto& pPool = loadBlock(pool.sequence() - 1);
-  auto& poolConfs = pPool.confidants();
-  int goodSigns = 0;
-  auto& poolSigns = pPool.signatures();
-  for(auto& it : poolSigns) {
-    if(it.first < poolConfs.size()) {
-      if(cscrypto::VerifySignature(it.second, poolConfs.at(it.first), pPool.hash().to_binary().data(), pPool.hash().to_binary().size())) {
-        csdebug() << "Signature #" << (int)it.first << " is Ok";
-        ++goodSigns;
-      }
-    }
-    else {
-      cserror() << "The number of confidants doesn't correspond to the number of signatures in pool";
-    }
-
-  }
-  if(goodSigns == poolSigns.size()) {
-    csdebug() << "All " << pPool.signatures().size() << " signatures are OK";
-  }
-  else {
-    csdebug() << "Only " << goodSigns << " of "  << poolSigns.size() << " are OK";
-  }
-  csdebug() << "----------------------------------- " << (pool.sequence() - 1) << " --------------------------------------";
-
-  }
   return std::make_pair(true, pool);
 }
 
@@ -1060,7 +1032,6 @@ bool BlockChain::addSignaturesToDeferredBlock(std::vector<std::pair<uint8_t, csc
         deferredBlock_.add_signature(it.first,it.second);
       }
       if(deferredBlock_.signatures().size() == blockSignatures.size()) {
-        csdebug() << __func__ << ": amount = " << blockSignatures.size() << " ... OK";
       }
       return true;
     }
