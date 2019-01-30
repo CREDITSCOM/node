@@ -217,10 +217,10 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
 }
 
 double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain) {
-  csdb::PoolHash block_from_hash = blockchain.getHashBySequence(num_block_from);
-  csdb::Pool block_from = blockchain.loadBlock(block_from_hash);
+  csdb::Pool block_from = blockchain.loadBlock(num_block_from);
   if (!block_from.is_valid()) {
-    cserror() << "Fee> " << blockchain.getStorage().last_error_message();
+    cserror() << "Fee> CountBlockTimeStampDifference> block_from is not valid";
+    return 0;
   }
   double time_stamp_from = std::stod(block_from.user_field(0).value<std::string>());
 
