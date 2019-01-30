@@ -2,6 +2,7 @@
 #define CONCURRENT_HPP
 
 #include <functional>
+#include <thread>
 #include <future>
 #include <memory>
 #include <type_traits>
@@ -140,6 +141,7 @@ protected:
   Id id_;
 
   inline static Id producedId = 0;
+  constexpr static std::chrono::milliseconds kAwaiterTime { 10 };
 
   template <typename Func>
   void callSignal(Func&& func) {
@@ -147,6 +149,15 @@ protected:
 
     future_ = Future<Result>();
     state_ = WatcherState::Compeleted;
+  }
+
+  template <typename Awaiter>
+  void await(const Awaiter& awaiter) {
+    if (cs::Connector::callbacks(&awaiter) != 0) {
+      return;
+    }
+
+    std::this_thread::sleep_for(kAwaiterTime);
   }
 };
 
@@ -182,13 +193,16 @@ protected:
       try {
         Result result = Super::future_.get();
 
-        auto signal = [=] {
+        auto lambda = [this](const Result& result) {
+          Super::await(finished);
           emit finished(result);
         };
 
         Super::callSignal(signal);
       }
       catch (std::exception& e) {
+        Super::await(failed);
+
         cserror() << "Concurrent execution with " << typeid(Result).name() << " failed, " << e.what();
         emit failed();
       }
@@ -234,12 +248,15 @@ protected:
         Super::future_.get();
 
         auto signal = [=] {
+          Super::await(finished);
           emit finished();
         };
 
         Super::callSignal(signal);
       }
       catch (std::exception& e) {
+        Super::await(failed);
+
         cserror() << "Concurrent execution with void result failed, " << e.what();
         emit failed();
       }
