@@ -16,7 +16,7 @@ void WaitingState::on(SolverContext &context) {
   for (auto& it : context.stage3_data()) {
     blockSignatures.emplace_back(it.sender,it.blockSignature);
   }
-
+  csdebug() << "Signatures to add: " << blockSignatures.size();
   if (context.addSignaturesToLastBlock(blockSignatures)) {
     csdebug() << "Signatures added to new block successfully";
   }

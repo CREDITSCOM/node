@@ -496,7 +496,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
   if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
-    csdebug() << "The  pool doesn't contain signatures";
+    csdebug() << "The  pool #" << pool.sequence() << " doesn't contain signatures";
     return false;
   }
 
@@ -946,7 +946,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
-
+  int signs =0;
   if(last_seq + 1 != pool_seq) {
     cserror() << "BLOCKCHAIN> cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
     return std::make_pair(false, std::nullopt);
@@ -970,7 +970,13 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
-
+    signs = deferredBlock_.signatures().size();
+    if (!deferredBlock_.recompose()) {
+      csdebug() << "The block binary representation updated successfully";
+    }
+    else {
+      csdebug() << "The block binary representation update failed";
+    }
     if(deferredBlock_.is_valid()) {
       deferredBlock_.set_storage(storage_);
       if(deferredBlock_.save()) {
@@ -987,7 +993,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   if(flushed_block_seq != NoSequence) {
 
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
-    csdebug() << "see block info above";
+    csdebug() << "signatures amount = " << signs << " see block info above";
     csdebug() << "----------------------------------------------------------------------------------";
 
     emit writeBlockEvent(flushed_block_seq);
@@ -1016,16 +1022,51 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
   if(pool.sequence() > 1) {
-    csdb::Pool pPool = loadBlock(pool.sequence() - 1);
-    csdebug() << "----------------------- Just history: #" << pPool.sequence() << " until next round ----------------------";
-    logBlockInfo(pPool);
-  }
 
+  csdebug() << "----------------------- Checking signatures of previously saved block #" << (pool.sequence() - 1)  << " until next round ----------------------";
+  const auto& pPool = loadBlock(pool.sequence() - 1);
+  auto& poolConfs = pPool.confidants();
+  int goodSigns = 0;
+  auto& poolSigns = pPool.signatures();
+  for(auto& it : poolSigns) {
+    if(it.first < poolConfs.size()) {
+      if(cscrypto::VerifySignature(it.second, poolConfs.at(it.first), pPool.hash().to_binary().data(), pPool.hash().to_binary().size())) {
+        csdebug() << "Signature #" << (int)it.first << " is Ok";
+        ++goodSigns;
+      }
+    }
+    else {
+      cserror() << "The number of confidants doesn't correspond to the number of signatures in pool";
+    }
+
+  }
+  if(goodSigns == poolSigns.size()) {
+    csdebug() << "All " << pPool.signatures().size() << " signatures are OK";
+  }
+  else {
+    csdebug() << "Only " << goodSigns << " of "  << poolSigns.size() << " are OK";
+  }
+  csdebug() << "----------------------------------- " << (pool.sequence() - 1) << " --------------------------------------";
+
+  }
   return std::make_pair(true, pool);
 }
 
 bool BlockChain::addSignaturesToDeferredBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) {
-  return true;
+  //{
+  //  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    if (deferredBlock_.is_valid()) {
+      for(auto& it : blockSignatures) {
+        deferredBlock_.add_signature(it.first,it.second);
+      }
+      if(deferredBlock_.signatures().size() == blockSignatures.size()) {
+        csdebug() << __func__ << ": amount = " << blockSignatures.size() << " ... OK";
+      }
+      return true;
+    }
+ /* }*/
+  cserror() << __func__ << " ... Failed!!!";
+  return false;
 }
 
 bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
@@ -1047,6 +1088,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
       return true;
     }
     else {
+      csdebug() << "BLOCKCHAIN> we have to rewrite #" << pool_seq ;
       removeLastBlock();
     }
   }
@@ -1080,6 +1122,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     return true;
   }
   // cache block for future recording
+  csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
   cachedBlocks_.emplace(pool_seq, BlockMeta{std::move(pool), by_sync});
   csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
   // cache always successful

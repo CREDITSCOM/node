@@ -144,6 +144,10 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
       continue;
     }
 
+    if (pool.signatures().size() == 0) {
+      cserror() << "PoolSyncronizer> No signatures in pool #" << pool.sequence();
+    }
+
     if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
       blockChain_->testCachedBlocks();
       lastWrittenSequence = blockChain_->getLastSequence();

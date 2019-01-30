@@ -206,6 +206,8 @@ public:
    */
   bool compose();
 
+  bool recompose();
+
   /**
    * @brief Хеш пула
    * @return Хеш пула, если пул находится в режиме read-only, и пустой хеш в противном

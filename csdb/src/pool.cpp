@@ -647,6 +647,7 @@ void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
   priv* data = d.data();
   data->is_valid_ = true;
   data->signatures_.emplace_back(std::make_pair(index, signature));
+  csdebug() << "The signature is added";
 }
 
 void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept
@@ -715,6 +716,16 @@ UserField Pool::user_field(user_field_id_t id) const noexcept {
     res.insert(it.first);
   }
   return res;
+}
+
+bool Pool::recompose() {
+  //if (d.constData()->read_only_) {
+  //  return true;
+  //}
+
+  d->compose();
+
+  return d.constData()->is_valid_;
 }
 
 bool Pool::compose() {

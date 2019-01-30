@@ -631,6 +631,11 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
   }
 
+  csdebug() << "Node> Sending blocks with signatures:";
+  for (const auto& it : poolsBlock) {
+    csdebug() << "#" << it.sequence() << " signs = " << it.signatures().size();
+  }
+
   std::size_t realBinSize = 0;
   RegionPtr memPtr = compressPoolsBlock(poolsBlock, realBinSize);
 
