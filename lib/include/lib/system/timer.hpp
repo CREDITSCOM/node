@@ -48,6 +48,11 @@ public:
   void stop();
 
   ///
+  /// @brief Restars timer.
+  ///
+  void restart();
+
+  ///
   /// @brief Returns timer status.
   ///
   bool isRunning() const;
@@ -87,7 +92,7 @@ private:
 
   unsigned int allowDifference_;
   std::chrono::milliseconds ms_;
-  std::chrono::nanoseconds ns_;
+  std::atomic<int64_t> ns_;
 
   std::chrono::milliseconds realMs_;
   std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;

@@ -44,6 +44,7 @@ public signals:  // Signals
 
 private slots:
   void onTimeOut();
+  void onRoundSimulation();
 
   void onWriteBlock(const cs::Sequence sequence);
   void onRemoveBlock(const cs::Sequence sequence);
@@ -101,16 +102,21 @@ private:  // struct
       sequences_.reserve(blockPoolsCount);
     }
 
-    inline void removeSequnce(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+    inline bool removeSequnce(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
       if (sequences_.empty()) {
-        return;
+        return false;
       }
+
+      bool success = true;
 
       switch (accuracy) {
         case SequenceRemovalAccuracy::EXACT: {
           auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
           if (it != sequences_.end()) {
             sequences_.erase(it);
+          }
+          else {
+            success = false;
           }
           break;
         }
@@ -120,10 +126,8 @@ private:  // struct
         case SequenceRemovalAccuracy::UPPER_BOUND:
           sequences_.erase(std::lower_bound(sequences_.begin(), sequences_.end(), sequence), sequences_.end());
           break;
-        default:
-          csmeta(cserror) << "UNKNOWN PRECISION REMOVABLE TYPE";
-          break;
       }
+      return success;
     }
     inline void setSequences(const PoolsRequestedSequences& sequences) {
       resetSequences();
@@ -218,6 +222,7 @@ private:  // Members
   std::vector<NeighboursSetElemet> neighbours_;
 
   cs::Timer timer_;
+  cs::Timer roundSimulation_;
 
   friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
 };
@@ -229,9 +234,6 @@ inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::Counte
       break;
     case PoolSynchronizer::CounterType::TIMER:
       os << "TIMER";
-      break;
-    default:
-      os << "UNKNOWN COUNTER TYPE";
       break;
   }
 

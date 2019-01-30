@@ -17,6 +17,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   refreshNeighbours();
 
   cs::Connector::connect(&timer_.timeOut, this, &cs::PoolSynchronizer::onTimeOut);
+  cs::Connector::connect(&roundSimulation_.timeOut, this, &cs::PoolSynchronizer::onRoundSimulation);
 
   // Print Pool Sync Data Info
   const uint8_t hl = 25;
@@ -62,12 +63,12 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
   const cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
   const cs::Sequence blocksRemaining = roundNum - totalBlocks;
-  csdebug() << "SYNC: Round Num: " << roundNum
-            << ", LastWritten: " << lastWrittenSequence
-            << ", Total blocks: " << totalBlocks
-            << ", Cached blocks size in blockchain: " << cachedBlocksSize;
+  csdebug() << "SYNC:\n Round num: " << roundNum
+            << "\n Conveyer round: " << cs::Conveyer::instance().currentRoundNumber()
+            << "\n Last written seq: " << lastWrittenSequence
+            << "\n Cached blocks: " << cachedBlocksSize
+            << "\n Total blocks: " << totalBlocks;
   cslog() << "SYNC: Blocks remaining: " << blocksRemaining;
-  csdebug() << "SYNC: Cached blocks size in blockchain: " << cachedBlocksSize;
 
   if (blocksRemaining == 0) {
     showSyncronizationProgress(lastWrittenSequence);
@@ -76,8 +77,8 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
   }
 
   const bool useTimer = syncData_.sequencesVerificationFrequency > 1;
-  const uint32_t delay =
-      useTimer ? cs::numeric_cast<uint32_t>(syncData_.sequencesVerificationFrequency) : cs::NeighboursRequestDelay;
+  const int delay = useTimer ? cs::numeric_cast<int>(syncData_.sequencesVerificationFrequency)
+                             : cs::numeric_cast<int>(cs::NeighboursRequestDelay);
 
   // already synchro start
   if (isSyncroStarted_ && !useTimer) {
@@ -88,7 +89,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
     // BigBang received
     if (isBigBand && !timer_.isRunning()) {
-      timer_.start(cs::numeric_cast<int>(delay));
+      timer_.start(delay);
     }
   }
 
@@ -101,10 +102,13 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     sendBlockRequest();
 
     if (isBigBand || useTimer) {
-      timer_.start(cs::numeric_cast<int>(delay));
+      timer_.start(delay);
     }
+
+    roundSimulation_.start(60000, cs::Timer::Type::HighPrecise);  // 1 Min
   }
   else if (syncData_.requestRepeatRoundCount > 0) {
+    roundSimulation_.restart();
     const bool isNeedRequest = checkActivity(CounterType::ROUND);
     bool isAvailable = false;
 
@@ -164,6 +168,8 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     csmeta(csdetails) << "Requested sequence: " << el.first << "(" << el.second << ")";
   }
 
+  bool success = false;
+
   for (auto& neighbour : neighbours_) {
     if (!getNeededSequences(neighbour)) {
       csmeta(csdetails) << "Neighbor: " << cs::numeric_cast<int>(neighbour.index()) << " is busy";
@@ -175,10 +181,13 @@ void cs::PoolSynchronizer::sendBlockRequest() {
       break;
     }
 
+    success = true;
     sendBlock(neighbour);
   }
 
-  printNeighbours("Info:");
+  if (success) {
+    printNeighbours("Info:");
+  }
 }
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
@@ -205,7 +214,6 @@ bool cs::PoolSynchronizer::isFastMode() const {
 
 void cs::PoolSynchronizer::onTimeOut() {
   CallsQueue::instance().insert([this] {
-    static uint8_t fastCounter = 0;
     if (!isSyncroStarted_) {
       return;
     }
@@ -213,15 +221,13 @@ void cs::PoolSynchronizer::onTimeOut() {
     bool isAvailable = false;
 
     if (isFastMode()) {
+      static uint8_t fastCounter = 0;
       ++fastCounter;
       if (fastCounter > 20) {
         fastCounter = 0;
         csmeta(csdetails) << "OnTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
         isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
       }
-    }
-    else {
-      fastCounter = 0;
     }
 
     if (!isAvailable) {
@@ -233,6 +239,15 @@ void cs::PoolSynchronizer::onTimeOut() {
       sendBlockRequest();
     }
   });
+}
+
+void cs::PoolSynchronizer::onRoundSimulation() {
+  csmeta(csdetails) << "on round simulation";
+  bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
+
+  if (isAvailable) {
+    sendBlockRequest();
+  }
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
@@ -295,10 +310,10 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
       break;
     case CounterType::TIMER:
       for (auto& neighbour : neighbours_) {
+        isNeedRequest = neighbour.sequences().empty();
         if (isNeedRequest) {
           break;
         }
-        isNeedRequest = neighbour.sequences().empty();
       }
       break;
   }
@@ -336,7 +351,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const bool isLastPacket = isLastRequest();
   if (isLastPacket && !requestedSequences_.empty()) {
     csmeta(csdetails) << "Is last packet: requested sequences: [" << requestedSequences_.begin()->first << ", "
-              << requestedSequences_.rbegin()->first << "]";
+                      << requestedSequences_.rbegin()->first << "]";
 
     const auto& sequences = neighbour.sequences();
     if (!sequences.empty() && requestedSequences_.find(sequences.front()) != requestedSequences_.end()) {
@@ -362,6 +377,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
 
   if (requiredBlocks.empty()) {
+    csmeta(csdebug) << "Required blocks is empty !!!";
     return true;
   }
 
@@ -415,8 +431,8 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
   }
   // Repeat request
   else if (isAvailableRequest(neighbour)) {
-    csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back()
-              << "]";
+    csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", "
+                      << neighbour.sequences().back() << "]";
     neighbour.resetRoundCounter();
     return true;
   }
@@ -444,7 +460,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
       // Within a valid pair
       if (sequence > requiredBlocks[j].first && sequence < requiredBlocks[j].second) {
         csmeta(csdetails) << "Check sequence interval: seq: " << sequence << ", Within a valid pair (" << j << "): ["
-                  << requiredBlocks[j].first << ", " << requiredBlocks[j].second << "]";
+                          << requiredBlocks[j].first << ", " << requiredBlocks[j].second << "]";
         break;
       }
       // Between pairs
@@ -464,19 +480,27 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 }
 
 void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+  if (neighbours_.empty() || neighbours_.front().sequences().empty()) {
+    return;
+  }
+
   csmeta(csdetails) << sequence;
 
+  bool success = false;
+
   for (auto& neighbour : neighbours_) {
-    neighbour.removeSequnce(sequence, accuracy);
+    success |= neighbour.removeSequnce(sequence, accuracy);
 
     if (neighbour.sequences().empty()) {
       neighbour.resetRoundCounter();
     }
   }
 
-  std::sort(neighbours_.begin(), neighbours_.end());
+  if (success) {
+    std::sort(neighbours_.begin(), neighbours_.end());
 
-  printNeighbours("Check seq:");
+    printNeighbours("Check seq:");
+  }
 }
 
 void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
@@ -496,9 +520,6 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
         break;
       case SequenceRemovalAccuracy::UPPER_BOUND:
         requestedSequences_.erase(requestedSequences_.lower_bound(sequence), requestedSequences_.end());
-        break;
-      default:
-        csmeta(cserror) << "UNKNOWN PRECISION REMOVABLE TYPE";
         break;
     }
   }
@@ -574,6 +595,9 @@ void cs::PoolSynchronizer::synchroFinished() {
   if (timer_.isRunning()) {
     timer_.stop();
   }
+  if (roundSimulation_.isRunning()) {
+    roundSimulation_.stop();
+  }
   isSyncroStarted_ = false;
   requestedSequences_.clear();
   neighbours_.clear();
@@ -605,7 +629,7 @@ void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
                       << " Neighbour index: " << neighbour.index()
                       << ", does not contained in transport. Neighbours сount: " << transport_->getNeighboursCount()
                       << ", neighbour key: "
-                      << cs::Utils::byteStreamToHex(neighbour.publicKey().data(), neighbour.publicKey().size());;
+                      << cs::Utils::byteStreamToHex(neighbour.publicKey().data(), neighbour.publicKey().size());
     }
   }
 }
