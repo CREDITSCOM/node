@@ -445,8 +445,10 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     return false;
   }
 
+  const cs::RoundNumber current_round = cs::Conveyer::instance().currentRoundNumber();
+
   if (!pack.isFragmented()) {
-    return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= node_->getRoundNumber();
+    return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= current_round;
   }
 
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
@@ -455,7 +457,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
   }
 
-  return !rn || rn >= node_->getRoundNumber();
+  return !rn || rn >= current_round;
 }
 
 void Transport::processNodeMessage(const Packet& pack) {

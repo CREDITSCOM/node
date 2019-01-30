@@ -2121,8 +2121,8 @@ void Node::sendRoundPackageToAll() {
   csdebug() << "------------------------------------------  SendRoundTable  ---------------------------------------";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   auto table = conveyer.roundTable(conveyer.currentRoundNumber());
-  cslog() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table->confidants.size();
-  cslog() << "Hashes count: " << table->hashes.size();
+  csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table->confidants.size();
+  csdebug() << "Hashes count: " << table->hashes.size();
 
   transport_->clearTasks();
   onRoundStart(*table);
