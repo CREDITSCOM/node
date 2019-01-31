@@ -189,7 +189,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
   onRoundStart(globalTable);
-  conveyer.updateRoundTable(std::move(globalTable));
+  conveyer.updateRoundTable(globalTable);
 
   poolSynchronizer_->processingSync(globalTable.round, true);
 
@@ -234,6 +234,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
 // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
 void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
+  csmeta(csdetails) << "round: " << globalTable.round;
   const auto& localTable = cs::Conveyer::instance().currentRoundTable();
 
   if (localTable.round == globalTable.round) {
@@ -2236,10 +2237,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   poolSynchronizer_->processingSync(conveyer.currentRoundNumber());
 
-  if (rNum == conveyer.currentRoundNumber() && subRound_ > subRound) {
-    cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
-    return;
-  }
+//  if (rNum == conveyer.currentRoundNumber() && subRound_ > subRound) {
+//    cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
+//    csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_)
+//                      << ", Received subRound: " << static_cast<int>(subRound);
+//    return;
+//  }
 
   subRound_ = subRound;
   cs::Bytes roundBytes;
@@ -2342,7 +2345,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   istream_ >> subRound;
 
   if (subRound > subRound_) {
-    cswarning() << "NODE> We got hash for the Node with SUBROUND: " << subRound << ", we don't have";
+    cswarning() << "NODE> We got hash for the Node with SUBROUND: " << static_cast<int>(subRound) << ", we don't have";
     // TODO : Maybe return
   }
 

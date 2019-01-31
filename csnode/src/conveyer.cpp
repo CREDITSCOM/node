@@ -158,7 +158,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
   return std::make_optional<decltype(data)>(std::move(data));
 }
 
-void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
+void cs::ConveyerBase::updateRoundTable(const cs::RoundTable& table) {
   cslog() << csname() << "updateRoundTable";
 
   {
@@ -169,7 +169,7 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
     }
   }
 
-  setTable(std::move(table));
+  setTable(table);
 }
 
 void cs::ConveyerBase::setTable(const RoundTable& table) {

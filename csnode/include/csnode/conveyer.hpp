@@ -94,7 +94,7 @@ public:
   void setTable(const cs::RoundTable& table);
 
   ///
-  /// @fn void ConveyerBase::updateRoundTable(cs::RoundTable&& table).
+  /// @fn void ConveyerBase::updateRoundTable(const cs::RoundTable& table).
   ///
   /// @brief Updates the round table described by table.
   ///
@@ -103,7 +103,7 @@ public:
   ///
   /// @param [in,out]    table   The new round table contains trusted nodes and round number.
   ///
-  void updateRoundTable(cs::RoundTable&& table);
+  void updateRoundTable(const RoundTable& table);
 
   ///
   /// @brief Returns current blockchain round table.
