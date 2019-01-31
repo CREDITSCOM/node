@@ -83,6 +83,30 @@ struct SmartContractRef {
   // transaction sequence in block, instead of ID
   size_t transaction;
 
+  SmartContractRef()
+    : sequence(0)
+    , transaction(0)
+  {}
+
+  SmartContractRef(const csdb::PoolHash block_hash, cs::Sequence block_sequence, size_t transaction_index)
+    : hash(block_hash)
+    , sequence(block_sequence)
+    , transaction(transaction_index)
+  {}
+
+  SmartContractRef(const csdb::UserField user_field)
+  {
+    from_user_field(user_field);
+  }
+
+  bool is_valid() const
+  {
+    if(hash.is_empty()) {
+      return false;
+    }
+    return (sequence != 0 || transaction != 0);
+  }
+
   // "serialization" methods
 
   csdb::UserField to_user_field() const;
@@ -220,8 +244,17 @@ private:
 
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
+  struct StateItem {
+    // reference to deploy transaction
+    SmartContractRef deploy;
+    // reference to last successful execution which state is stored by item, may be equal to deploy
+    SmartContractRef execution;
+    // current state which is result of last successful execution / deploy
+    std::string state;
+  };
+
   // last contract's state storage
-  std::map<csdb::Address, std::string> contract_state;
+  std::map<csdb::Address, StateItem> contract_state;
 
   // async watchers
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
@@ -344,6 +377,7 @@ private:
   // caller is responsible to test src is a smart-contract-invoke transaction
   csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
 
+  // update in contracts table appropriate item's state
   bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 };
 

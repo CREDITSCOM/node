@@ -51,7 +51,8 @@ void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHa
 {
   papi = api;
   node_id = id;
-  // validate contract states
+
+  // consolidate contract states addressed by public keys with by wallet ids
   auto pred = [](const auto& item) { return item.first.is_wallet_id(); };
   auto it = std::find_if(contract_state.cbegin(), contract_state.cend(), pred);
   size_t cnt = contract_state.size();
@@ -59,11 +60,40 @@ void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHa
     // non-absolute address item is always newer then absolute one:
     csdb::Address abs_addr = absolute_address(it->first);
     if(abs_addr.is_valid()) {
-      contract_state[abs_addr] = it->second;
+      const StateItem& opt_out = it->second;
+      if(!opt_out.state.empty()) {
+        StateItem& updated = contract_state[abs_addr];
+        if(opt_out.deploy.is_valid()) {
+          if(updated.deploy.is_valid()) {
+            cswarning() << name() << ": contract deploy is overwritten by subsequent deploy of the same contract";
+          }
+          updated.deploy = opt_out.deploy;
+          updated.state = opt_out.state;
+        }
+        if(opt_out.execution.is_valid()) {
+          updated.execution = opt_out.execution;
+          updated.state = opt_out.state;
+        }
+      }
+      else {
+        cswarning() << name() << ": empty state stored in contracts states table";
+      }
     }
     contract_state.erase(it);
     it = std::find_if(contract_state.begin(), contract_state.end(), pred);
   }
+
+  // validate contract states
+  for(const auto& item : contract_state) {
+    const StateItem& val = item.second;
+    if(val.state.empty()) {
+      cswarning() << name() << ": completely unsuccessful contract found, neither deployed, nor executed";
+    }
+    if(!val.deploy.is_valid()) {
+      cswarning() << name() << ": unsuccessfully deployed contract found";
+    }
+  }
+
   size_t new_cnt = contract_state.size();
   cslog() << name() << ": " << new_cnt << " smart contract states loaded";
   if(cnt > new_cnt) {
@@ -293,7 +323,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     cserror() << name() << ": incorrect trx index in block to enqueue smart contract";
     return;
   }
-  SmartContractRef new_item { block.hash(), block.sequence(), trx_idx };
+  SmartContractRef new_item(block.hash().clone(), block.sequence(), trx_idx);
   if (!exe_queue.empty()) {
     auto it = find_in_queue(new_item);
     // test duplicated contract call
@@ -461,10 +491,26 @@ void SmartContracts::onStoreBlock(csdb::Pool block) {
 void SmartContracts::onReadBlock(csdb::Pool block, bool* should_stop)
 {
   if(block.transactions_count() > 0) {
+    size_t tr_idx = 0;
     for(const auto& tr : block.transactions()) {
       if(is_new_state(tr)) {
         update_contract_state(tr, false /*force_absolute_address*/);
       }
+      else if(is_executable(tr)) {
+        // register execution if contract is unknown yet
+        csdb::Address addr = tr.target();
+        if(contract_state.count(addr) == 0) {
+          StateItem& val = contract_state[addr];
+          SmartContractRef ref(block.hash(), block.sequence(), tr_idx);
+          if(is_deploy(tr)) {
+            val.deploy = ref;
+          }
+          else {
+            val.execution = ref;
+          }
+        }
+      }
+      ++tr_idx;
     }
   }
   *should_stop = false;
@@ -530,7 +576,7 @@ bool SmartContracts::execute(const cs::SmartContractRef& item) {
     if (!deploy) {
       const auto it = contract_state.find(absolute_address(start_tr.target()));
       if (it != contract_state.cend()) {
-        state = it->second;
+        state = it->second.state;
       }
     }
 
@@ -593,11 +639,11 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   }
 
   csdb::Transaction result(
-      wallData.trxTail_.getLastTransactionId() + 1,  // TODO: possible conflict with other innerIDs!
-      src.target(),                                  // contracts' key - source
-      src.target(),                                  // contracts' key - target
+      wallData.trxTail_.getLastTransactionId() + 1,
+      src.target(),                                  // contracts is source
+      src.target(),                                  // contracts is target also
       src.currency(),
-      0,                  // amount*/
+      0,                  // amount
       src.max_fee(),      // TODO:: how to calculate max fee?
       src.counted_fee(),  // TODO:: how to calculate fee?
       SolverContext::zeroSignature // empty signature
@@ -690,18 +736,39 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
 
 bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absolute_address /*= true*/)
 {
-  csdb::UserField fld_state_value = t.user_field(trx_uf::new_state::Value);
-  if(!fld_state_value.is_valid()) {
+  using namespace trx_uf;
+  csdb::UserField fld = t.user_field(new_state::Value);
+  if(!fld.is_valid()) {
     cserror() << name() << ": contract state is not updated, transaction does not contain it";
     return false;
   }
-  std::string state_value = fld_state_value.value<std::string>();
+  std::string state_value = fld.value<std::string>();
   if(!state_value.empty()) {
+    // create or get contract state item
     csdb::Address addr = t.target();
     if(force_absolute_address) {
       addr = absolute_address(addr);
     }
-    contract_state[addr] = state_value;
+    StateItem& item = contract_state[addr];
+    // update last state (with non-empty one)
+    item.state = std::move(state_value);
+    // determine it is the result of whether deploy or execute
+    fld = t.user_field(new_state::RefStart);
+    if(fld.is_valid()) {
+      SmartContractRef ref(fld);
+      csdb::Transaction t_start = get_transaction(ref);
+      if(t_start.is_valid()) {
+        if(is_deploy(t_start)) {
+          item.deploy = ref;
+        }
+        else {
+          item.execution = ref;
+        }
+      }
+      else {
+        cswarning() << name() << ": incorrect new_state transaction does not refer to starter one";
+      }
+    }
   }
   else {
     cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
