@@ -15,6 +15,8 @@
 
 #include <lib/system/common.hpp>
 
+class BlockChain;
+
 namespace csdb {
 class Pool;
 class Transaction;
@@ -80,9 +82,9 @@ private:
     virtual bool findWalletId(const csdb::Address& address, WalletId& id) = 0;
 
   protected:
-    void load(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
-    double load(const csdb::Transaction& tr);
-    double loadTrxForSource(const csdb::Transaction& tr);
+    void load(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
+    double load(const csdb::Transaction& tr, const BlockChain& blockchain);
+    double loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain);
     void fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants);
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
@@ -106,7 +108,7 @@ public:
   class Initer : protected ProcessorBase {
   public:
     Initer(WalletsCache& data);
-    void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
+    void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
     bool isFinishedOk() const;
 
@@ -122,7 +124,7 @@ public:
   class Updater : protected ProcessorBase {
   public:
     Updater(WalletsCache& data);
-    void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants);
+    void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     const WalletData* findWallet(WalletId id) const;
     const Mask& getModified() const {
       return modified_;
@@ -144,6 +146,8 @@ public:
   WalletsCache& operator=(const WalletsCache&) = delete;
   WalletsCache(const WalletsCache&&) = delete;
   WalletsCache& operator=(const WalletsCache&&) = delete;
+
+  static csdb::Address findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain);
 
   std::unique_ptr<Initer> createIniter();
   std::unique_ptr<Updater> createUpdater();

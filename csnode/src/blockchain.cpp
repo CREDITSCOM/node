@@ -128,7 +128,7 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       // currently confidants are stored in related pool, not in previous one:
       //csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
       const auto& confidants = pool.confidants();
-      initer.loadPrevBlock(pool, confidants);
+      initer.loadPrevBlock(pool, confidants, *this);
 
       blockHashes_->initFromPrevBlock(pool);
 
@@ -785,7 +785,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
     // currently block stores own round confidants, not next round:
     const auto& currentRoundConfidants = nextPool.confidants();
-    walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants);
+    walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
     walletsPools_->loadNextBlock(nextPool);
 
     if (!blockHashes_->loadNextBlock(nextPool)) {
