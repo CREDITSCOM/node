@@ -260,60 +260,72 @@ void SmartContracts::checkAllExecutions() {
   }
 }
 
+std::optional<api::SmartContractInvocation> SmartContracts::SmartContracts::find_deploy_info(const csdb::Address abs_addr) const
+{
+  using namespace trx_uf;
+
+  const auto item = contract_state.find(abs_addr);
+  if(item != contract_state.cend()) {
+    const StateItem& val = item->second;
+    if(val.deploy.is_valid()) {
+      csdb::Transaction tr_deploy = get_transaction(val.deploy);
+      if(tr_deploy.is_valid()) {
+        csdb::UserField fld = tr_deploy.user_field(deploy::Code);
+        if(fld.is_valid()) {
+          std::string data = fld.value<std::string>();
+          if(!data.empty()) {
+            return std::make_optional(std::move(deserialize<api::SmartContractInvocation>(std::move(data))));
+          }
+        }
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction tr) const {
   // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
+  using namespace trx_uf;
 
   if (!is_smart_contract(tr)) {
     return std::nullopt;
   }
-  if (tr.user_field_ids().count(trx_uf::new_state::Value) > 0) {
-    // new state contains unique field id
-    const auto& smart_fld = tr.user_field(trx_uf::new_state::Value);
-    if (smart_fld.is_valid()) {
-      if (papi != nullptr) {
-        bool present;
-        const auto tmp = papi->getSmartContract(tr.source(), present);  // tr.target() is also allowed
-        if (present) {
-          return std::make_optional(tmp);
-        }
-      }
+
+  const csdb::Address abs_addr = absolute_address(tr.target());
+
+  // get info from private contracts table (faster), not from API
+ 
+  if(is_new_state(tr)) {
+    auto maybe_contract = find_deploy_info(abs_addr);
+    if(maybe_contract.has_value()) {
+      return maybe_contract;
     }
   }
-  // is executable:
+  // is executable (deploy or start):
   else {
-    const auto& smart_fld = tr.user_field(trx_uf::deploy::Code);  // trx_uf::start::Methods == trx_uf::deploy::Code
-    if (smart_fld.is_valid()) {
-      std::string data = smart_fld.value<std::string>();
+    const csdb::UserField fld = tr.user_field(deploy::Code);  // start::Methods == deploy::Code, so does not matter what type of executable is
+    if(fld.is_valid()) {
+      std::string data = fld.value<std::string>();
       if(!data.empty()) {
-        const auto invoke_info = deserialize<api::SmartContractInvocation>(smart_fld.value<std::string>());
-        if(invoke_info.method.empty()) {
+        auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+        if(invoke.method.empty()) {
           // is deploy
-          return std::make_optional(invoke_info);
+          return std::make_optional(std::move(invoke));
         }
         else {
           // is start
-          // currently invoke_info contains all info required to execute contract, so
-          // we need not acquire origin
-          constexpr bool api_pass_code_and_methods = false;
-          if constexpr (api_pass_code_and_methods) {
-            return std::make_optional(invoke_info);
-          }
-          // if api is refactored, we may need to acquire contract origin separately:
-          if constexpr (!api_pass_code_and_methods) {
-            bool present;
-            if (papi != nullptr) {
-              auto tmp = papi->getSmartContract(tr.target(), present);
-              if (present) {
-                tmp.method = invoke_info.method;
-                tmp.params = invoke_info.params;
-                return std::make_optional(tmp);
-              }
-            }
+          auto maybe_deploy = find_deploy_info(abs_addr);
+          if(maybe_deploy.has_value()) {
+            api::SmartContractInvocation& deploy = maybe_deploy.value();
+            deploy.method = invoke.method;
+            deploy.params = invoke.params;
+            return std::make_optional(deploy);
           }
         }
       }
     }
   }
+
   return std::nullopt;
 }
 
@@ -359,8 +371,7 @@ void SmartContracts::on_new_state(csdb::Pool block, size_t trx_idx) {
         cserror() << name() << ": new_state transaction does not contain reference to contract";
       }
       else {
-        SmartContractRef contract_ref;
-        contract_ref.from_user_field(fld_contract_ref);
+        SmartContractRef contract_ref(fld_contract_ref);
         // update state
         update_contract_state(new_state);
         remove_from_queue(contract_ref);
@@ -614,10 +625,8 @@ bool SmartContracts::execute(const cs::SmartContractRef& item) {
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
     cs::Connector::connect(&watcher->finished, this, &SmartContracts::onExecutionFinished);
-
     executions_.push_back(std::move(watcher));
 
-    csdb::Address addr = start_tr.target();
     return true;
   }
   else {
