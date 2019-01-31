@@ -23,16 +23,19 @@ void TransactionsValidator::reset(size_t transactionsNum) {
   cntRemovedTrxs_ = 0;
 }
 
-bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1) {
-  if (!validateTransactionAsSource(trx, trxInd, del1)) {
+bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState) {
+  if (!validateTransactionAsSource(trx, trxInd, del1, newState)) {
     return false;
   }
   return validateTransactionAsTarget(trx);
 }
 
-bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1) {
+bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState) {
   WalletsState::WalletId walletId{};
   WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
+
+  WalletsState::WalletId walletIdNewState{};
+  WalletsState::WalletData& wallStateIfNewState = walletsState_.getData(trx.target(), walletIdNewState);
 
 #ifndef WITHOUT_DELTA
   auto newBalance = wallState.balance_ - trx.amount().to_double() - trx.counted_fee().to_double();
@@ -44,7 +47,11 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 #endif
 
 #ifndef SPAMMER
-  if (!wallState.trxTail_.isAllowed(trx.innerID())) {
+  if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID())) {
+    del1 = -bitcnt;
+    return false;
+  }
+  else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID())) {
     del1 = -bitcnt;
     return false;
   }
@@ -54,18 +61,27 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   wallState.balance_ = newBalance;
 #else
 #ifndef SPAMMER
-  if (!wallState.trxTail_.isAllowed(trx.innerID()))
+  if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID()))
+    return false;
+  else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID()))
     return false;
 #endif
 
   wallState.balance_ = wallState.balance_ - trx.amount() - trx.counted_fee();
 #endif
-  wallState.trxTail_.push(trx.innerID());
-
-  trxList_[trxInd] = wallState.lastTrxInd_;
-  wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
+  if (!newState) {
+    wallState.trxTail_.push(trx.innerID());
+    trxList_[trxInd] = wallState.lastTrxInd_;
+    wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
+  } else {
+    wallStateIfNewState.trxTail_.push(trx.innerID());
+    trxList_[trxInd] = wallStateIfNewState.lastTrxInd_;
+    wallStateIfNewState.lastTrxInd_ = static_cast<decltype(wallStateIfNewState.lastTrxInd_)>(trxInd);
+    walletsState_.setModified(walletIdNewState);
+  }
 
   walletsState_.setModified(walletId);
+
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
