@@ -420,8 +420,7 @@ void Transport::processNodeMessage(const Message& msg) {
 
   switch (node_->chooseMessageAction(rNum, type)) {
     case Node::MessageActions::Process:
-      return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize,
-                                 msg.getFullSize() - StrippedDataSize);
+      return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize, msg.getFullSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:
       return postponePacket(rNum, type, msg.extractData());
     case Node::MessageActions::Drop:
@@ -466,8 +465,7 @@ void Transport::processNodeMessage(const Packet& pack) {
 
   switch (node_->chooseMessageAction(rNum, type)) {
     case Node::MessageActions::Process:
-      return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize,
-                                 pack.getMsgSize() - StrippedDataSize);
+      return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:
       return postponePacket(rNum, type, pack);
     case Node::MessageActions::Drop:

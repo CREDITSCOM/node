@@ -814,12 +814,20 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
   }
 
-  if (type == MsgTypes::FirstSmartStage || type == MsgTypes::SecondSmartStage || type == MsgTypes::ThirdSmartStage) {
-    return MessageActions::Process;
-  }
+  // always process this types
+  switch (type) {
+    case MsgTypes::FirstSmartStage:
+    case MsgTypes::SecondSmartStage:
+    case MsgTypes::ThirdSmartStage:
+    case MsgTypes::NodeStopRequest:
+    case MsgTypes::TransactionPacket:
+    case MsgTypes::TransactionsPacketRequest:
+    case MsgTypes::TransactionsPacketReply:
+    case MsgTypes::RoundTableRequest:
+      return MessageActions::Process;
 
-  if (type == MsgTypes::NodeStopRequest) {
-    return MessageActions::Process;
+    default:
+      break;
   }
 
   const auto round = cs::Conveyer::instance().currentRoundNumber();
@@ -864,26 +872,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
       return MessageActions::Drop;
     }
-  }
-
-  if (type == MsgTypes::NewCharacteristic) {
-    return MessageActions::Process;
-  }
-
-  if (type == MsgTypes::TransactionPacket) {
-    return MessageActions::Process;
-  }
-
-  if (type == MsgTypes::TransactionsPacketRequest) {
-    return MessageActions::Process;
-  }
-
-  if (type == TransactionsPacketReply) {
-    return MessageActions::Process;
-  }
-
-  if (type == MsgTypes::RoundTableRequest) {
-    return MessageActions::Process;
   }
 
   if (type == MsgTypes::RoundTableReply) {
