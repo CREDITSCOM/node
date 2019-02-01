@@ -295,6 +295,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     bool isToken = false;
 
     auto smartResult = getSmartStatus(transaction.id());
+    result.trxn.__set_smartInfo(api::SmartTransInfo{});
 
     if (is_smart_deploy(sci)) {
       result.trxn.type = api::TransactionType::TT_SmartDeploy;
@@ -363,6 +364,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   }
   else if (is_smart_state(transaction)) {
     result.trxn.type = api::TransactionType::TT_SmartState;
+    result.trxn.__set_smartInfo(api::SmartTransInfo{});
 
     api::SmartStateTransInfo sti;
     sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
