@@ -154,8 +154,9 @@ private:
   };
 
   struct PendingSmartTransactions {
-    std::queue<csdb::Transaction> queue;
+    std::queue<std::pair<cs::Sequence, csdb::Transaction>> queue;
     csdb::PoolHash last_pull_hash{};
+    cs::Sequence last_pull_sequence = 0;
   };
 
   struct SmartState {
@@ -175,6 +176,41 @@ private:
 #endif
   ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executor_transport;
   std::unique_ptr<client_type> executor;
+
+  struct SmartOperation {
+    enum class State: uint8_t {
+      Pending,
+      Success,
+      Failed
+    };
+
+    State state = State::Pending;
+    csdb::TransactionID stateTransaction;
+
+    bool hasRetval:1;
+    bool returnsBool:1;
+    bool boolResult:1;
+
+    SmartOperation(): hasRetval(false), returnsBool(false) { }
+    SmartOperation(const SmartOperation& rhs):
+      state(rhs.state),
+      stateTransaction(rhs.stateTransaction.clone()),
+      hasRetval(rhs.hasRetval),
+      returnsBool(rhs.returnsBool),
+      boolResult(rhs.boolResult) { }
+
+    SmartOperation(SmartOperation&&) = delete;
+    SmartOperation& operator=(const SmartOperation&) = delete;
+    SmartOperation& operator=(SmartOperation&&) = delete;
+
+    bool hasReturnValue() const { return hasRetval; }
+    bool getReturnedBool() const { return returnsBool && boolResult; }
+  };
+
+  SmartOperation getSmartStatus(const csdb::TransactionID);
+
+  cs::SpinLockable<std::map<csdb::TransactionID, SmartOperation>> smart_operations;
+  cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
 
   cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
   cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
