@@ -381,7 +381,7 @@ private:
   // update in contracts table appropriate item's state
   bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 
-  std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address abs_addr) const;
+  std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;
 };
 
 }  // namespace cs
