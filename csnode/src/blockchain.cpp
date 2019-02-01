@@ -1083,6 +1083,10 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
       //testCachedBlocks();
       return true;
     }
+    else {
+      removeLastBlock();
+      return false;
+    }
     removeWalletsInPoolFromCache(pool);
     csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
     return false;
