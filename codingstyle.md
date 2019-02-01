@@ -6,11 +6,14 @@ Glance coding style guide description.
 
 - C++17 standard
 - 2 spaces
-- camelCase naming style
+- only camelCase naming style
 
 ---
 
-### Brackets
+### Brackets and spaces
+
+- 1 space after if/else switch instructions
+- else operator use on the next line after closing bracket
 
 >```cpp
 >
@@ -26,6 +29,7 @@ Glance coding style guide description.
 
 - reference and pointer symbols add to right part of type
 >```cpp
+>int i = 0;
 >int& ref = i;
 >int* pointer = &ref;
 
@@ -57,7 +61,7 @@ Glance coding style guide description.
 >   int demoField;
 >};
 
-- method/function starts with lower case
+- method and function starts with lower case
 
 >```cpp
 >void runTransport() {
