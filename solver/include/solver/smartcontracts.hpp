@@ -115,7 +115,7 @@ struct SmartContractRef {
 };
 
 struct SmartExecutionData {
-  SmartContractRef contract;
+  SmartContractRef contract_ref;
   std::string state;
   ::general::Variant ret_val;
   std::string error;
@@ -211,7 +211,7 @@ public:
   bool is_closed_smart_contract(csdb::Address addr) const;
 
   bool is_known_smart_contract(csdb::Address addr) const {
-    return (contract_state.find(absolute_address(addr)) != contract_state.cend());
+    return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
   }
 
   // return true if SmartContracts provide special handling for transaction
@@ -224,16 +224,22 @@ public signals:
   SmartContractExecutedSignal signal_smart_executed;
 
 public slots:
-  void execute_async_completed(const SmartExecutionData& data);
+  void on_execute_async_completed(const SmartExecutionData& data);
 
   // called when next block is stored
-  void onStoreBlock(csdb::Pool block);
+  void on_store_block(csdb::Pool block);
 
   // called when next block is read from database
-  void onReadBlock(csdb::Pool block, bool* should_stop);
+  void on_read_block(csdb::Pool block, bool* should_stop);
 
 private:
   using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
+
+  const char *PayableName = "payable";
+  const char *PayableRetType = "void";
+  const char *PayableArgType = "java.lang.String";
+  const char *PayableNameArg0 = "amount";
+  const char *PayableNameArg1 = "currency";
 
   BlockChain& bc;
   CallsQueueScheduler& scheduler;
@@ -261,7 +267,7 @@ private:
   };
 
   // last contract's state storage
-  std::map<csdb::Address, StateItem> contract_state;
+  std::map<csdb::Address, StateItem> known_contracts;
 
   // async watchers
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
@@ -279,8 +285,6 @@ private:
     cs::RoundNumber round_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
-    // emitted transactions if any while execution running
-    std::vector<csdb::Transaction> created_transactions;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address)
       : contract(ref_contract)
@@ -322,8 +326,13 @@ private:
   // executiom queue
   std::vector<QueueItem> exe_queue;
 
-  // locks exe_queue when transaction emitted by smart contract
+  // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
   std::mutex mtx_emit_transaction;
+
+  // emitted transactions if any while execution running
+  std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
+
+  void clear_emitted_transactions(const csdb::Address abs_addr);
 
   std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
   {
@@ -403,6 +412,7 @@ private:
 
   // blocking call
   bool implements_payable(const api::SmartContractInvocation& contract);
+
 };
 
 }  // namespace cs
