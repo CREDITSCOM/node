@@ -397,9 +397,8 @@ private:
   // update in contracts table appropriate item's state
   bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 
-  std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;
   // get deploy info from cached deploy transaction reference
-  std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address abs_addr) const;
+  std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;
 
   // test if abs_addr is address of smart contract with payable() implemented;
   // may make a BLOCKING call to java executor
