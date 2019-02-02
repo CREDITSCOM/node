@@ -1689,8 +1689,12 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
-  if (!cscrypto::VerifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
-    cswarning() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+  if(confidant != sender) {
+    cserror() << "NODE> smart confidant not != sender";
+  }
+
+  if (!cscrypto::VerifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
+    cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
@@ -1701,7 +1705,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
                 << " - " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
   csdebug() << "Message hash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
-  csdebug() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
   solver_->addSmartStageOne(stage, false);
 }
 
@@ -1859,7 +1863,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
 
   if (!cscrypto::VerifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
-    csdebug() << "SmartStage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    csdebug() << "SmartStage Three from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
@@ -2174,7 +2178,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   }
   else {
     cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-                << " DOES NOT MATCH to my value " << lastHash.to_string();
+                << " does not match my value " << lastHash.to_string();
     sendHashReply(std::move(tmp), sender);
   }
 }

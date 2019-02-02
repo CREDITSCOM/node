@@ -283,9 +283,8 @@ namespace cs
       psmarts->force_execution = true;
     }
 #endif
-    if(psmarts->test_smart_contract_emits(tr)) {
-      // avoid pass to conveyer until execution of emitter contract has finished
-      csdebug() << "SolverCore: smart contract emits transaction";
+    if(psmarts->capture(tr)) {
+      // avoid pass to conveyer, psmarts provide special handling
       return;
     }
     cs::Conveyer::instance().addTransaction(tr);

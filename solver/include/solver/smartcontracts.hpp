@@ -116,10 +116,9 @@ struct SmartContractRef {
 };
 
 struct SmartExecutionData {
-  csdb::Transaction transaction;
+  SmartContractRef contract_ref;
   std::string state;
-  SmartContractRef smartContract;
-  executor::ExecuteByteCodeResult result;
+  ::general::Variant ret_val;
   std::string error;
 };
 
@@ -213,11 +212,11 @@ public:
   bool is_closed_smart_contract(csdb::Address addr) const;
 
   bool is_known_smart_contract(csdb::Address addr) const {
-    return (contract_state.find(absolute_address(addr)) != contract_state.cend());
+    return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
   }
 
-  // return true if currently executed smart contract emits passed transaction
-  bool test_smart_contract_emits(csdb::Transaction tr);
+  // return true if SmartContracts provide special handling for transaction
+  bool capture(csdb::Transaction tr);
 
   bool execution_allowed;
   bool force_execution;
@@ -226,16 +225,22 @@ public signals:
   SmartContractExecutedSignal signal_smart_executed;
 
 public slots:
-  void onExecutionFinished(const SmartExecutionData& data);
+  void on_execute_async_completed(const SmartExecutionData& data);
 
   // called when next block is stored
-  void onStoreBlock(csdb::Pool block);
+  void on_store_block(csdb::Pool block);
 
   // called when next block is read from database
-  void onReadBlock(csdb::Pool block, bool* should_stop);
+  void on_read_block(csdb::Pool block, bool* should_stop);
 
 private:
   using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
+
+  const char *PayableName = "payable";
+  const char *PayableRetType = "void";
+  const char *PayableArgType = "java.lang.String";
+  const char *PayableNameArg0 = "amount";
+  const char *PayableNameArg1 = "currency";
 
   BlockChain& bc;
   CallsQueueScheduler& scheduler;
@@ -245,9 +250,17 @@ private:
 
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
+  enum class PayableStatus : int {
+    Unknown = -1,
+    Absent = 0,
+    Implemented = 1
+  };
+
   struct StateItem {
     // reference to deploy transaction
     SmartContractRef deploy;
+    // payable() method is implemented
+    PayableStatus payable { PayableStatus::Unknown };
     // reference to last successful execution which state is stored by item, may be equal to deploy
     SmartContractRef execution;
     // current state which is result of last successful execution / deploy
@@ -255,7 +268,7 @@ private:
   };
 
   // last contract's state storage
-  std::map<csdb::Address, StateItem> contract_state;
+  std::map<csdb::Address, StateItem> known_contracts;
 
   // async watchers
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
@@ -273,8 +286,6 @@ private:
     cs::RoundNumber round_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
-    // emitted transactions if any while execution running
-    std::vector<csdb::Transaction> created_transactions;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address)
       : contract(ref_contract)
@@ -316,8 +327,13 @@ private:
   // executiom queue
   std::vector<QueueItem> exe_queue;
 
-  // locks exe_queue when transaction emitted by smart contract
+  // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
   std::mutex mtx_emit_transaction;
+
+  // emitted transactions if any while execution running
+  std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
+
+  void clear_emitted_transactions(const csdb::Address abs_addr);
 
   std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
   {
@@ -369,10 +385,10 @@ private:
   // returns false if execution canceled, so caller is responsible to call remove_from_queue(item) method
   bool invoke_execution(const SmartContractRef& contract);
 
-  // perform async execution via api to remote executor
+  // perform async execution via API to remote executor
   // is called from invoke_execution() method only
   // returns false if execution is canceled
-  bool execute(const cs::SmartContractRef& item);
+  bool execute_async(const cs::SmartContractRef& item);
 
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
@@ -382,6 +398,23 @@ private:
   bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 
   std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;
+  // get deploy info from cached deploy transaction reference
+  std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address abs_addr) const;
+
+  // test if abs_addr is address of smart contract with payable() implemented;
+  // may make a BLOCKING call to java executor
+  bool is_payable(const csdb::Address abs_addr);
+
+  // blocking call
+  bool execute(const std::string& invoker, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms);
+
+  // blocking call
+  bool execute_payable(const std::string& invoker, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
+    double amount);
+
+  // blocking call
+  bool implements_payable(const api::SmartContractInvocation& contract);
+
 };
 
 }  // namespace cs
