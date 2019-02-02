@@ -2178,7 +2178,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   }
   else {
     cswarning() << "NODE> Hash from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-                << " DOES NOT MATCH to my value " << lastHash.to_string();
+                << " does not match my value " << lastHash.to_string();
     sendHashReply(std::move(tmp), sender);
   }
 }
