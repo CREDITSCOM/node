@@ -339,7 +339,7 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
     packet = ++(requestedSequences_.at(sequence));
   }
 
-  cslog() << "SYNC: Sending block request sequences (" << sequences.size() << "): ["
+  csdebug() << "SYNC: Sending block request sequences (" << sequences.size() << "): ["
           << sequences.front() << ", " << sequences.back() << "], id: " << packet;
 
   csmeta(csdebug) << "Sending block request >>>>>>> target: " << target->getOut();
