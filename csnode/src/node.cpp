@@ -392,17 +392,22 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  csdebug() << "Real TrustedMask size = " << poolMetaInfo.realTrustedMask.size();
+  const cs::ConfidantsKeys& confidantsReference = table->confidants;
+  const std::size_t realTrustedMaskSize = poolMetaInfo.realTrustedMask.size();
 
-  for (size_t i = 0; i < poolMetaInfo.realTrustedMask.size(); ++i) {
-    if (!conveyer.isConfidantExists(i)) {
-      cserror() << csname() << "Bad index";
-      return;
-    }
+  csdebug() << "Real TrustedMask size = " << realTrustedMaskSize;
 
-    const auto& key = conveyer.confidantByIndex(i);
+  if (realTrustedMaskSize > confidantsReference.size()) {
+    csmeta(cserror) << ", real trusted mask size: " << realTrustedMaskSize
+                    << ", confidants count " << confidantsReference.size()
+                    << ", on round " << round;
+    return;
+  }
 
-    if (poolMetaInfo.realTrustedMask[i] == 0) {
+  for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
+    const auto& key = confidantsReference[idx];
+
+    if (poolMetaInfo.realTrustedMask[idx] == 0) {
       poolMetaInfo.writerKey = key;
       //csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
     }
@@ -419,31 +424,33 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csdebug() << "NODE> Sequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristic.mask.size();
   csdebug() << "NODE> Time: " << poolMetaInfo.timestamp;
 
-  if (blockChain_.getLastSequence() <= poolMetaInfo.sequenceNumber) {
-    // otherwise senseless, this block is already in chain
-    conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
+  if (blockChain_.getLastSequence() > poolMetaInfo.sequenceNumber) {
+    csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSequence()
+                      << " > pool meta info seq: " << poolMetaInfo.sequenceNumber;
+    return;
+  }
 
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+  // otherwise senseless, this block is already in chain
+  conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
 
-    if (!pool.has_value()) {
-      csmeta(cserror) << "Created pool is not valid";
-      return;
-    }
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
-    for (auto& it : poolSignatures) {
-      pool.value().add_signature(it.sender, it.signature);
-    }
+  if (!pool.has_value()) {
+    csmeta(cserror) << "Created pool is not valid";
+    return;
+  }
 
+  for (auto& it : poolSignatures) {
+    pool.value().add_signature(it.sender, it.signature);
+  }
 
-    pool.value().set_confidants(table->confidants);
+  pool.value().set_confidants(confidantsReference);
 
-    if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
-      cserror() << "NODE> failed to store block in BlockChain";
-    }
-    else {
-      blockChain_.testCachedBlocks();
-    }
-
+  if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
+    cserror() << "NODE> failed to store block in BlockChain";
+  }
+  else {
+    blockChain_.testCachedBlocks();
   }
 
   csmeta(csdetails) << "done";
