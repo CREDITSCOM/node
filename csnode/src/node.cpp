@@ -135,6 +135,8 @@ void Node::flushCurrentTasks() {
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
+  static std::map<cs::RoundNumber, uint8_t> recdBangs;
+
   cswarning() << "-----------------------------------------------------------";
   cswarning() << "NODE> BigBang #" << rNum
               << ": last written #" << blockChain_.getLastSequence()
@@ -143,6 +145,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
   istream_.init(data, size);
   istream_ >> subRound_;
+
+  if (subRound_ <= recdBangs[rNum]) {
+    cswarning() << "Old Big Bang received: " << rNum << "." << subRound_ << " is <= " << rNum << "." << recdBangs[rNum];
+    return;
+  }
+  recdBangs[rNum] = subRound_;
 
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
