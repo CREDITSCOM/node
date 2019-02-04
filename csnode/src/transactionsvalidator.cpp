@@ -2,6 +2,7 @@
 #include <intrin.h>
 #endif
 
+#include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
@@ -38,7 +39,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   WalletsState::WalletData& wallStateIfNewState = walletsState_.getData(trx.target(), walletIdNewState);
 
 #ifndef WITHOUT_DELTA
-  auto newBalance = wallState.balance_ - trx.amount().to_double() - trx.counted_fee().to_double();
+  auto newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
 
 #ifdef _MSC_VER
   int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
@@ -67,7 +68,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
     return false;
 #endif
 
-  wallState.balance_ = wallState.balance_ - trx.amount() - trx.counted_fee();
+  wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
 #endif
   if (!newState) {
     wallState.trxTail_.push(trx.innerID());
@@ -166,7 +167,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
+    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -205,7 +206,7 @@ bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount().to_double() + trx.counted_fee().to_double();
+    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -247,7 +248,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
+    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -282,7 +283,7 @@ bool TransactionsValidator::removeTransactions_NegativeAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_.to_double() + trx.amount().to_double() + trx.counted_fee().to_double();
+    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
