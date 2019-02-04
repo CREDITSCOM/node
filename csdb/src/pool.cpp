@@ -137,8 +137,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
     for (const auto& it : smartSignatures_) {
       os.put(it.smartKey);
       os.put(it.smartConsensusPool);
-      os.put(it.signatures_.size());
-      for (const auto& itt : it.signatures_) {
+      os.put(it.signatures.size());
+      for (const auto& itt : it.signatures) {
         os.put(itt.first);
         os.put(itt.second);
       }
@@ -264,9 +264,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
       SmartSignature sSig;
       sSig.smartConsensusPool = 0;
       sSig.smartKey.fill(0);
-      sSig.signatures_.clear();
-      
-      int index;
+      sSig.signatures.clear();
+
       if (!is.get(sSig.smartKey)) {
         return false;
       }
@@ -392,6 +391,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     priv result;
 
     result.is_valid_ = is_valid_;
+    result.read_only_ = read_only_;
     result.hash_ = hash_.clone();
     result.previous_hash_ = previous_hash_.clone();
     result.sequence_ = sequence_;
@@ -836,25 +836,27 @@ cs::Bytes Pool::to_byte_stream_for_sig() {
 
 void Pool::sign(const cscrypto::PrivateKey& private_key) {
   const auto& pool_bytes = this->to_byte_stream_for_sig();
-//  d->signature_ = cscrypto::GenerateSignature(private_key, pool_bytes.data(), pool_bytes.size());
+//  d->signature_ = cscrypto::generateSignature(private_key, pool_bytes.data(), pool_bytes.size());
 }
 
 bool Pool::verify_signature() {
- // const auto& pool_bytes = to_byte_stream_for_sig();
-  return true; //cscrypto::VerifySignature(signature().data(), writer_public_key().data(),
-                              //     pool_bytes.data(), pool_bytes.size());
+  //const auto& pool_bytes = to_byte_stream_for_sig();
+  //return cscrypto::verifySignature(signature().data(), writer_public_key().data(),
+  //                                 pool_bytes.data(), pool_bytes.size());
+  return true;
 }
 
 bool Pool::verify_signature(const cs::Signature& signature) {
   //const auto& pool_bytes = to_byte_stream_for_sig();
-  //const bool verify = cscrypto::VerifySignature(signature.data(), writer_public_key().data(),
+  //const bool verify = cscrypto::verifySignature(signature.data(), writer_public_key().data(),
   //                                              pool_bytes.data(), pool_bytes.size());
 
   //if (verify) {
   //  d->signature_ = signature;
   //}
 
-  return true;//verify;
+  //return verify;
+  return true;
 }
 
 Pool Pool::load(const PoolHash& hash, Storage storage) {

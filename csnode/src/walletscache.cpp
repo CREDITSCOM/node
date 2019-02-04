@@ -151,7 +151,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
   }
   WalletData& wallData = getWalletData(id, tr.source());
   wallData.balance_ -= tr.amount();
+
+  if (tr.source() != tr.target())
   wallData.balance_ -= tr.counted_fee().to_double();
+
   wallData.trxTail_.push(tr.innerID());
   setModified(id);
 

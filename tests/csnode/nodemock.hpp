@@ -73,7 +73,7 @@ public:
   MOCK_METHOD2(chooseMessageActionm, MessageActions(const cs::RoundNumber, const MsgTypes));
 
   MOCK_CONST_METHOD0(getMyPublicKey, const cs::PublicKey&());
-  MOCK_CONST_METHOD0(getMyLevel, NodeLevel());
+  MOCK_CONST_METHOD0(getMyLevel, Level());
   MOCK_METHOD0(getRoundNumber, uint32_t());
   MOCK_METHOD0(getMyConfNumber, uint8_t());
 

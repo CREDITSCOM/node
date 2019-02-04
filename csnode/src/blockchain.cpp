@@ -290,6 +290,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis, true);
   deferredBlock_ = genesis;
+  emit storeBlockEvent_(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
@@ -443,7 +444,6 @@ csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) 
     //return obsolete_block != res;
     return obsolete_block == res;
   });*/
-
   return res;
 }
 
@@ -509,7 +509,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
 
   for (auto& it : signatures) {
     if (it.first < confidants.size()) {
-      if (cscrypto::VerifySignature(it.second, confidants.at(it.first), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
+      if (cscrypto::verifySignature(it.second, confidants.at(it.first), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
         csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(it.first).data(), confidants.at(it.first).size()) << " is valid";
         ++truePoolSignatures;
       }
@@ -1011,7 +1011,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
       csdebug() << "the signatures of the block are incorrect";
       return std::make_pair(false, csdb::Pool{});
     }
-    pool = deferredBlock_;
+    pool = deferredBlock_.clone();
   }
 
   emit storeBlockEvent_(pool);

@@ -95,11 +95,11 @@ bool SolverContext::addSignaturesToLastBlock(std::vector<std::pair<uint8_t, cscr
 Role SolverContext::role() const {
   auto v = core.pnode->getNodeLevel();
   switch (v) {
-    case NodeLevel::Normal:
-    case NodeLevel::Main:
+    case Node::Level::Normal:
+    case Node::Level::Main:
       return Role::Normal;
-    case NodeLevel::Confidant:
-    case NodeLevel::Writer:
+    case Node::Level::Confidant:
+    case Node::Level::Writer:
       return Role::Trusted;
     default:
       break;

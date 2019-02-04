@@ -8,6 +8,7 @@
 #include <lib/system/common.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/signals.hpp>
+#include <lib/system/logger.hpp>
 
 #include <csnode/node.hpp>  // introduce Node::api_handler_ptr_t
 
@@ -27,46 +28,52 @@ class Transaction;
 
 namespace cs {
 // transactions user fields
-namespace trx_uf {
-// deploy transaction fields
-namespace deploy {
-// byte-code (string)
-constexpr csdb::user_field_id_t Code = 0;
-// count of user fields
-constexpr size_t Count = 1;
-}  // namespace deploy
-// start transaction fields
-namespace start {
-// methods with args (string)
-constexpr csdb::user_field_id_t Methods = 0;
-// reference to last state transaction
-constexpr csdb::user_field_id_t RefState = 1;
-// count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
-// constexpr size_t Count = {1,2};
-}  // namespace start
-// new state transaction fields
-namespace new_state {
-// new state value, new byte-code (string)
-constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
-// reference to start transaction
-constexpr csdb::user_field_id_t RefStart = 1;
-// fee value
-constexpr csdb::user_field_id_t Fee = 2;
-// return value
-constexpr csdb::user_field_id_t RetVal = 3;
-// count of user fields
-constexpr size_t Count = 4;
-}  // namespace new_state
-// smart-gen transaction field
-namespace smart_gen {
-// reference to start transaction
-constexpr csdb::user_field_id_t RefStart = 0;
-}  // namespace smart_gen
-// ordinary transaction field
-namespace ordinary {
-// no fields defined
-}
-}  // namespace trx_uf
+  namespace trx_uf
+  {
+    // deploy transaction fields
+    namespace deploy
+    {
+      // byte-code (string)
+      constexpr csdb::user_field_id_t Code = 0;
+      // count of user fields
+      constexpr size_t Count = 1;
+    }  // namespace deploy
+    // start transaction fields
+    namespace start
+    {
+      // methods with args (string)
+      constexpr csdb::user_field_id_t Methods = 0;
+      // reference to last state transaction
+      constexpr csdb::user_field_id_t RefState = 1;
+      // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
+      // constexpr size_t Count = {1,2};
+    }  // namespace start
+    // new state transaction fields
+    namespace new_state
+    {
+      // new state value, new byte-code (string)
+      constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
+      // reference to start transaction
+      constexpr csdb::user_field_id_t RefStart = 1;
+      // fee value
+      constexpr csdb::user_field_id_t Fee = 2;
+      // return value
+      constexpr csdb::user_field_id_t RetVal = 3;
+      // count of user fields
+      constexpr size_t Count = 4;
+    }  // namespace new_state
+    // smart-gen transaction field
+    namespace smart_gen
+    {
+      // reference to start transaction
+      constexpr csdb::user_field_id_t RefStart = 0;
+    }  // namespace smart_gen
+    // ordinary transaction field
+    namespace ordinary
+    {
+      // no fields defined
+    }
+  }  // namespace trx_uf
 
 struct SmartContractRef {
   // block hash
@@ -106,9 +113,14 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
 }
 
 enum class SmartContractStatus {
+  // is executing at the moment, is able to emit transactions
   Running,
+  // is waiting until execution starts
   Waiting,
-  Finished
+  // execution is finished, waiting for new state transaction, no more transaction emitting is allowed
+  Finished,
+  // contract is closed, neither new_state nor emitting transactions are allowed, should be removed from queue
+  Closed
 };
 
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
@@ -173,6 +185,8 @@ public:
 
   bool is_running_smart_contract(csdb::Address addr) const;
 
+  bool is_closed_smart_contract(csdb::Address addr) const;
+
   bool is_known_smart_contract(csdb::Address addr) const {
     return (contract_state.find(absolute_address(addr)) != contract_state.cend());
   }
@@ -217,12 +231,52 @@ private:
     SmartContractRef contract;
     // current status (running/waiting)
     SmartContractStatus status;
+    // enqueue round
+    cs::RoundNumber round_enqueue;
     // start round
-    cs::RoundNumber round;
+    cs::RoundNumber round_start;
+    // finish round
+    cs::RoundNumber round_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
     // emitted transactions if any while execution running
     std::vector<csdb::Transaction> created_transactions;
+
+    QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address)
+      : contract(ref_contract)
+      , status(SmartContractStatus::Waiting)
+      , round_enqueue(0)
+      , round_start(0)
+      , round_finish(0)
+      , abs_addr(absolute_address)
+    {}
+
+    void wait(cs::RoundNumber r)
+    {
+      round_enqueue = r;
+      status = SmartContractStatus::Waiting;
+      csdebug() << "Smart: contract is waiting from #" << r;
+    }
+
+    void start(cs::RoundNumber r)
+    {
+      round_start = r;
+      status = SmartContractStatus::Running;
+      csdebug() << "Smart: contract is running from #" << r;
+    }
+
+    void finish(cs::RoundNumber r)
+    {
+      round_finish = r;
+      status = SmartContractStatus::Finished;
+      csdebug() << "Smart: contract is finished on #" << r;
+    }
+
+    void close()
+    {
+      status = SmartContractStatus::Closed;
+      csdebug() << "Smart: contract is closed";
+    }
   };
 
   // executiom queue
@@ -231,10 +285,33 @@ private:
   // locks exe_queue when transaction emitted by smart contract
   std::mutex mtx_emit_transaction;
 
-  std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item) {
+  std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
+  {
     auto it = exe_queue.begin();
     for (; it != exe_queue.end(); ++it) {
       if (it->contract == item) {
+        break;
+      }
+    }
+    return it;
+  }
+
+  std::vector<QueueItem>::iterator find_in_queue(csdb::Address abs_addr)
+  {
+    auto it = exe_queue.begin();
+    for(; it != exe_queue.end(); ++it) {
+      if(it->abs_addr == abs_addr) {
+        break;
+      }
+    }
+    return it;
+  }
+
+  std::vector<QueueItem>::const_iterator find_in_queue(csdb::Address abs_addr) const
+  {
+    auto it = exe_queue.begin();
+    for(; it != exe_queue.end(); ++it) {
+      if(it->abs_addr == abs_addr) {
         break;
       }
     }
@@ -266,6 +343,8 @@ private:
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
   csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
+
+  bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
 };
 
 }  // namespace cs

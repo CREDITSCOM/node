@@ -30,11 +30,36 @@ struct cs::ConveyerBase::Impl {
 
 public signals:
   cs::PacketFlushSignal flushPacket;
+
+  // helpers
+  const cs::ConveyerMeta* validMeta() &;
 };
+
+inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
+  cs::ConveyerMeta* meta = metaStorage.get(currentRound);
+
+  if (meta != nullptr) {
+    return meta;
+  }
+
+  return &(metaStorage.max());
+}
 
 cs::ConveyerBase::ConveyerBase() {
   pimpl_ = std::make_unique<cs::ConveyerBase::Impl>();
   pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
+}
+
+void cs::ConveyerBase::setRound(cs::RoundNumber round) {
+  csmeta(csdebug) << "trying to change round to " << round;
+
+  if (currentRoundNumber() < round) {
+    pimpl_->currentRound = round;
+    csdebug() << csname() << "cached round updated";
+  }
+  else {
+    cswarning() << csname() << "current round " << currentRoundNumber();
+  }
 }
 
 cs::ConveyerBase::~ConveyerBase() = default;
@@ -90,15 +115,20 @@ const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const {
   return pimpl_->transactionsBlock;
 }
 
-std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
+std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket() const {
+  cs::Lock lock(sharedMutex_);
+
+  static constexpr size_t smartContractDetector = 1;
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
   if (!meta) {
-    cserror() << csname() << "Can not create transactions packet";
+    cserror() << csname() << "Can not create transactions packet at round " << currentRoundNumber();
     return std::nullopt;
   }
 
   cs::TransactionsPacket packet;
+  cs::Packets smartContractPackets;
+
   cs::PacketsHashes& hashes = meta->roundTable.hashes;
   cs::TransactionsPacketTable& table = pimpl_->packetsTable;
 
@@ -110,9 +140,11 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
       return std::nullopt;
     }
 
-    if (!iterator->second.signatures().empty()) {
-      //TODO: add code here to manage the smartSignatures
+    // to smarts
+    if (iterator->second.signatures().size() > smartContractDetector) {
+      smartContractPackets.push_back(iterator->second);
     }
+
     const auto& transactions = iterator->second.transactions();
 
     for (const auto& transaction : transactions) {
@@ -122,10 +154,11 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::createPacket() const {
     }
   }
 
-  return std::make_optional<cs::TransactionsPacket>(std::move(packet));
+  auto data = std::make_pair<cs::TransactionsPacket, cs::Packets>(std::move(packet), std::move(smartContractPackets));
+  return std::make_optional<decltype(data)>(std::move(data));
 }
 
-void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
+void cs::ConveyerBase::updateRoundTable(const cs::RoundTable& table) {
   cslog() << csname() << "updateRoundTable";
 
   {
@@ -136,14 +169,14 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundTable&& table) {
     }
   }
 
-  setRound(std::move(table));
+  setTable(table);
 }
 
-void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
+void cs::ConveyerBase::setTable(const RoundTable& table) {
   csmeta(csdebug) << "started";
 
-  if (table.round <= currentRoundNumber()) {
-    cserror() << csname() << "Setting round in conveyer failed";
+  if (table.round < currentRoundNumber()) {
+    cserror() << csname() << "Setting table in conveyer failed, current round " << currentRoundNumber() << ", table round " << table.round;
     return;
   }
 
@@ -163,15 +196,13 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
     csdetails() << csname() <<  "Need hash " << hash.toString();
   }
 
-  {
-    cs::Lock lock(sharedMutex_);
-    pimpl_->currentRound = table.round;
-  }
+  // atomic
+  pimpl_->currentRound = table.round;
 
   cs::ConveyerMetaStorage::Element element;
   element.round = table.round;
   element.meta.neededHashes = std::move(neededHashes);
-  element.meta.roundTable = std::move(table);
+  element.meta.roundTable = table;
 
   {
     cs::Lock lock(sharedMutex_);
@@ -188,8 +219,7 @@ void cs::ConveyerBase::setRound(cs::RoundTable&& table) {
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
-  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(pimpl_->currentRound);
-  return meta->roundTable;
+  return pimpl_->validMeta()->roundTable;
 }
 
 const cs::ConfidantsKeys& cs::ConveyerBase::confidants() const {
@@ -244,8 +274,12 @@ cs::RoundNumber cs::ConveyerBase::currentRoundNumber() const {
   return pimpl_->currentRound;
 }
 
+cs::RoundNumber cs::ConveyerBase::previousRoundNumber() const {
+  return pimpl_->currentRound - 1;
+}
+
 const cs::PacketsHashes& cs::ConveyerBase::currentNeededHashes() const {
-  return *(neededHashes(currentRoundNumber()));
+  return pimpl_->validMeta()->neededHashes;
 }
 
 const cs::PacketsHashes* cs::ConveyerBase::neededHashes(cs::RoundNumber round) const {
@@ -305,14 +339,13 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
 }
 
 const cs::Notifications& cs::ConveyerBase::notifications() const {
-  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
-  return meta->notifications;
+  return pimpl_->validMeta()->notifications;
 }
 
 void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
 
-  if (meta) {
+  if (meta != nullptr) {
     csdebug() << csname() << "Writer notification added";
     meta->notifications.push_back(bytes);
   }
@@ -372,7 +405,7 @@ std::optional<cs::CharacteristicMeta> cs::ConveyerBase::characteristicMeta(const
 void cs::ConveyerBase::setCharacteristic(const Characteristic& characteristic, cs::RoundNumber round) {
   cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
-  if (meta) {
+  if (meta != nullptr) {
     csdebug() << csname() << "Characteristic set to conveyer, #" << round;
     meta->characteristic = characteristic;
   }
@@ -475,8 +508,8 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     // create storage hash table and remove from current hash table
     hashTable.emplace(hash, std::move(packet));
   }
-  Hash pkHash = cscrypto::CalculateHash(pKeys.data(), pKeys.size());
-  Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
+  Hash pkHash = cscrypto::calculateHash(pKeys.data(), pKeys.size());
+  Hash comHash = cscrypto::calculateHash(commisions.data(), commisions.size());
 
   csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
   csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(comHash.data(), comHash.size());
@@ -501,10 +534,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.add_user_field(0, metaPoolInfo.timestamp);
   newPool.add_real_trusted(metaPoolInfo.realTrustedMask);
   //newPool.set_writer_public_key(metaPoolInfo.writerKey);
-  csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey.data(), metaPoolInfo.writerKey.size());
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
+  csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
   csmeta(csdetails) << "done";
+
   return std::make_optional<csdb::Pool>(std::move(newPool));
 }
 
