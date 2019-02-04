@@ -31,14 +31,13 @@ void TrustedStage1State::off(SolverContext& context) {
 }
 
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {
-  if (round < context.round()) {
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  if (round < conveyer.currentRoundNumber()) {
     cserror() << name() << ": cannot handle previous round transactions";
     return Result::Ignore;
   }
 
-  csdebug() << name() << ": -------> STARTING CONSENSUS #" << context.round() << " <------- ";
-
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  csdebug() << name() << ": -------> STARTING CONSENSUS #" << conveyer.currentRoundNumber() << " <------- ";
   auto data = conveyer.createPacket();
 
   if (!data.has_value()) {
@@ -103,7 +102,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     }
   }
   else {
-    csdebug() << name() << ": DOES NOT MATCH to my value " << lastHash.to_string();
+    cslog() << name() << ": DOES NOT MATCH to my value " << lastHash.to_string();
     context.sendHashReply(std::move(pool_hash), sender);
   }
 
@@ -164,13 +163,23 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     for (std::size_t i = 0; i < transactionsCount; ++i) {
       const auto& smarts = context.smart_contracts();
       const csdb::Transaction& transaction = transactions[i];
-      cs::Byte byte = static_cast<cs::Byte>(true);
-      if(!smarts.is_new_state(transaction)) {
-        byte = static_cast<cs::Byte>(ptransval->validateTransaction(transaction, i, del1));
+      bool byte = true;
+      bool is_smart_new_state = smarts.is_new_state(transaction);
+      if (!is_smart_new_state) {
+        byte = !(transaction.source() == transaction.target());
+        byte = byte && ptransval->validateTransaction(transaction, i, del1);
       }
       else {
         //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
+        if (context.smart_contracts().is_closed_smart_contract(transaction.target())) {
+          byte = false;
+          cslog() << name() << ": reject smart new_state trx because related contract is closed";
+        }
+      }
+
+      if (!byte) {
+        cslog() << name() << ": trx[" << i << "] rejected in validateTransaction()";
       }
 
       if (byte) {
@@ -182,29 +191,29 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
             byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
 
             if (!byte) {
-              csdebug() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
+              cslog() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
             }
           }
         }
 
         if (byte) {
           byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
-          if(!byte) {
-            csdebug() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+          if (!byte) {
+            cslog() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
           }
         }
       }
       else {
-        csdebug() << name() << ": trx[" << i << "] rejected by validateTransaction()";
+        cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
       }
 
-      characteristicMask.push_back(byte);
+      characteristicMask.push_back(byte ? cs::Byte(1) : cs::Byte(0));
     }
 
     csdb::Pool excluded;
     ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
     if (excluded.transactions_count() > 0) {
-      csdebug() << name() << ": " << excluded.transactions_count() << " transactions excluded in validateByGraph()";
+      cslog() << name() << ": " << excluded.transactions_count() << " transactions are rejected in validateByGraph()";
     }
 
     // test if smart-emitted transaction rejected, reject all transactions from this smart
@@ -213,36 +222,36 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
     std::set<csdb::Address> smart_rejected;
     size_t mask_size = characteristicMask.size();
     size_t i = 0;
-    for(const auto& tr : transactions) {
-      if(i < mask_size && *(characteristicMask.cbegin() + i) == 0) {
-        if(smarts.is_known_smart_contract(tr.source())) {
+    for (const auto& tr : transactions) {
+      if (i < mask_size && *(characteristicMask.cbegin() + i) == 0) {
+        if (smarts.is_known_smart_contract(tr.source())) {
           smart_rejected.insert(tr.source());
         }
       }
       ++i;
     }
-    if(!smart_rejected.empty()) {
-      cswarning() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
+    if (!smart_rejected.empty()) {
+      cslog() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
       cs::TransactionsPacket rejected;
 
       // 2. reject all trxs from those smarts & collect all rejected trxs
       size_t cnt_add_rejected = 0;
-      for(auto it = transactions.begin(); it != transactions.end(); ++it) {
-        if(smart_rejected.count(it->source()) > 0) {
+      for (auto it = transactions.begin(); it != transactions.end(); ++it) {
+        if (smart_rejected.count(it->source()) > 0) {
           auto itm = characteristicMask.begin() + (it - transactions.cbegin());
-          if(*itm > 0) {
+          if (*itm > 0) {
             *itm = 0;
             ++cnt_add_rejected;
           }
           rejected.addTransaction(*it);
         }
       }
-      if(cnt_add_rejected > 0) {
-        cswarning() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
+      if (cnt_add_rejected > 0) {
+        cslog() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
       }
 
       // 3. signal SmartContracts service some trxs are rejected
-      if(rejected.transactionsCount() > 0) {
+      if (rejected.transactionsCount() > 0) {
         context.smart_contracts().on_reject(rejected);
       }
     }
@@ -251,7 +260,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
   }
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  conveyer.setCharacteristic(characteristic, context.round());
+  conveyer.setCharacteristic(characteristic, conveyer.currentRoundNumber());
 
   if (characteristic.mask.size() != transactionsCount) {
     cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
@@ -261,10 +270,10 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
   if (characteristic.mask.empty()) {
     auto round = conveyer.currentRoundNumber();
-    hash = cscrypto::CalculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
+    hash = cscrypto::calculateHash(reinterpret_cast<cs::Byte*>(&round), sizeof(cs::RoundNumber));
   }
   else {
-    hash = cscrypto::CalculateHash(characteristic.mask.data(), characteristic.mask.size());
+    hash = cscrypto::calculateHash(characteristic.mask.data(), characteristic.mask.size());
   }
 
   csdebug() << name() << ": generated hash: " << cs::Utils::byteStreamToHex(hash.data(), hash.size());
@@ -274,9 +283,9 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
   csdb::Address src = transaction.source();
-  //TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
+  // TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
   // currently will be rejected
-  if(!context.smart_contracts().is_smart_contract(transaction)) {
+  if (!context.smart_contracts().is_smart_contract(transaction)) {
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
       return transaction.verify_signature(data_to_fetch_pulic_key.address_);
@@ -285,15 +294,15 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
     return transaction.verify_signature(src.public_key());
   }
   else {
-    if(context.smart_contracts().is_new_state(transaction)) {
+    if (context.smart_contracts().is_new_state(transaction)) {
       // special rule for new_state transactions
-      if(src != transaction.target()) {
+      if (src != transaction.target()) {
         csdebug() << name() << ": smart state trx has different source and target";
         return false;
       }
       return true;
     }
-    //TODO: add here code for validating signatures in the smart contract transaction
+    // TODO: add here code for validating signatures in the smart contract transaction
     return true;
   }
 }

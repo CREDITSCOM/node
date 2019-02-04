@@ -420,12 +420,22 @@ void Transport::processNodeMessage(const Message& msg) {
 
   switch (node_->chooseMessageAction(rNum, type)) {
     case Node::MessageActions::Process:
-      return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize,
-                                 msg.getFullSize() - StrippedDataSize);
+      return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize, msg.getFullSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:
       return postponePacket(rNum, type, msg.extractData());
     case Node::MessageActions::Drop:
       return;
+  }
+}
+
+constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
+  switch (type) {
+  case MsgTypes::FirstSmartStage:
+  case MsgTypes::SecondSmartStage:
+  case MsgTypes::ThirdSmartStage:
+    return 100;
+  default:
+    return 5;
   }
 }
 
@@ -434,19 +444,19 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     return false;
   }
 
-  const auto rLim = std::max(cs::Conveyer::instance().currentRoundNumber(), static_cast<cs::RoundNumber>(1)) - 1;
+  const cs::RoundNumber current_round = cs::Conveyer::instance().currentRoundNumber();
 
   if (!pack.isFragmented()) {
-    return pack.getRoundNum() >= rLim;
+    return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= current_round;
   }
 
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
 
   if (pack.getFragmentId() == 0) {
-    rn = pack.getRoundNum();
+    rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
   }
 
-  return !rn || rn >= rLim;
+  return !rn || rn >= current_round;
 }
 
 void Transport::processNodeMessage(const Packet& pack) {
@@ -455,8 +465,7 @@ void Transport::processNodeMessage(const Packet& pack) {
 
   switch (node_->chooseMessageAction(rNum, type)) {
     case Node::MessageActions::Process:
-      return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize,
-                                 pack.getMsgSize() - StrippedDataSize);
+      return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:
       return postponePacket(rNum, type, pack);
     case Node::MessageActions::Drop:
@@ -500,8 +509,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return;
   }
 
-  constexpr cs::RoundNumber roundDifferent = 5;
-
   // never cut packets
   switch (type) {
     case MsgTypes::BlockRequest:
@@ -523,13 +530,13 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
   }
 
   // cut slow packs
-  if ((rNum + roundDifferent) < cs::Conveyer::instance().currentRoundNumber()) {
+  if ((rNum + getRoundTimeout(type)) < cs::Conveyer::instance().currentRoundNumber()) {
     csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << getMsgTypesString(type) << ", fragments " << firstPack.getFragmentsNum();
     return;
   }
 
   if (type == MsgTypes::ThirdSmartStage) {
-    cslog() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
+    csdebug() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
   }
 
   // packets which transport may cut

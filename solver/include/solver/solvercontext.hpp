@@ -327,7 +327,7 @@ public:
 
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {
-      if(core.markUntrusted[sender] < 255) {
+      if(core.markUntrusted[sender] < std::numeric_limits<uint8_t>::max()) {
         ++(core.markUntrusted[sender]);
       }
     }
@@ -338,23 +338,6 @@ public:
       return (core.markUntrusted[sender]);
     }
     return 0;
-  }
-
-  /**
-   * @fn  uint32_t SolverContext::round() const;
-   *
-   * @brief   Gets the current round number.
-   *
-   * @author  aae
-   * @date    03.10.2018
-   *
-   * @return  An int32_t.
-   *
-   * ### remarks  Aae, 30.09.2018.
-   */
-
-  cs::RoundNumber round() const {
-    return core.cur_round;
   }
 
   /**

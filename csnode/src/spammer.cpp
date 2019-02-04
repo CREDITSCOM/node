@@ -47,7 +47,7 @@ void Spammer::GenerateMyWallets() {
   cscrypto::PublicKey public_key;
   cscrypto::PrivateKey private_key;
   for (auto i = 0u; i < kMyWalletsNum; ++i) {
-    private_key = cscrypto::GenerateKeyPair(public_key);
+    private_key = cscrypto::generateKeyPair(public_key);
     my_wallets_.push_back(std::pair<csdb::Address, cscrypto::PrivateKey>(csdb::Address::from_public_key(public_key), private_key));
   }
 }
@@ -147,13 +147,13 @@ void Spammer::SignTransaction(csdb::Transaction& transaction, const std::vector<
   const auto transaction_bytes = transaction.to_byte_stream_for_sig();
   const auto key = cscrypto::PrivateKey::readFromBytes(private_key);
 
-  cs::Signature signature = cscrypto::GenerateSignature(key, transaction_bytes.data(), transaction_bytes.size());
+  cs::Signature signature = cscrypto::generateSignature(key, transaction_bytes.data(), transaction_bytes.size());
   transaction.set_signature(signature);
 }
 
 void Spammer::SignTransaction(csdb::Transaction& transaction, const cscrypto::PrivateKey& private_key) {
   const auto transaction_bytes = transaction.to_byte_stream_for_sig();
-  cs::Signature signature = cscrypto::GenerateSignature(private_key, transaction_bytes.data(), transaction_bytes.size());
+  cs::Signature signature = cscrypto::generateSignature(private_key, transaction_bytes.data(), transaction_bytes.size());
   transaction.set_signature(signature);
 }
 

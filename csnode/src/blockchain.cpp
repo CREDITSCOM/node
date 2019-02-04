@@ -290,6 +290,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis);
   deferredBlock_ = genesis;
+  emit storeBlockEvent_(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
@@ -443,7 +444,6 @@ csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) 
     //return obsolete_block != res;
     return obsolete_block == res;
   });*/
-
   return res;
 }
 
@@ -887,9 +887,9 @@ void BlockChain::recount_trxns(const std::optional<csdb::Pool>& new_pool) {
       transactionsCount_[addr_send].sendCount++;
       transactionsCount_[addr_recv].recvCount++;
     }
-//#ifdef TRANSACTIONS_INDEX
-    //total_transactions_count_+= new_pool.value().transactions().size();
-//#endif
+    //#ifdef TRANSACTIONS_INDEX
+        //total_transactions_count_+= new_pool.value().transactions().size();
+    //#endif
   }
 }
 
@@ -955,7 +955,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
     finalizeBlock(deferredBlock_);
-    pool = deferredBlock_;
+    pool = deferredBlock_.clone();
   }
 
   emit storeBlockEvent_(pool);

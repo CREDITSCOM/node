@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  if (!cscrypto::CryptoInit()) {
+  if (!cscrypto::cryptoInit()) {
     std::cout << "Couldn't initialize the crypto library" << std::endl;
     panic();
   }
