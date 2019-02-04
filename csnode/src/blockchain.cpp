@@ -508,13 +508,14 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   size_t truePoolSignatures = 0;
 
   for (auto& it : signatures) {
-    if (it.first < confidants.size()) {
-      if (cscrypto::verifySignature(it.second, confidants.at(it.first), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
-        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(it.first).data(), confidants.at(it.first).size()) << " is valid";
+    const std::size_t idx = static_cast<std::size_t>(it.first);
+    if (idx < confidants.size()) {
+      if (cscrypto::verifySignature(it.second, confidants.at(idx), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
+        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is valid";
         ++truePoolSignatures;
       }
       else {
-        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(it.first).data(), confidants.at(it.first).size()) << " is NOT VALID";
+        csdebug() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is NOT VALID";
       }
     }
     else {
@@ -946,7 +947,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
-  int signs =0;
+
   if(last_seq + 1 != pool_seq) {
     cserror() << "BLOCKCHAIN> cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
     return std::make_pair(false, std::nullopt);
@@ -970,7 +971,6 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    signs = deferredBlock_.signatures().size();
     if (!deferredBlock_.recompose()) {
       csdebug() << "The block binary representation updated successfully";
     }
@@ -993,7 +993,7 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
   if(flushed_block_seq != NoSequence) {
 
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
-    csdebug() << "signatures amount = " << signs << " see block info above";
+    csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << " see block info above";
     csdebug() << "----------------------------------------------------------------------------------";
 
     emit writeBlockEvent(flushed_block_seq);
@@ -1091,6 +1091,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
     return false;
   }
+
   if (cachedBlocks_.count(pool_seq) > 0) {
     csdebug() << "BLOCKCHAIN> ignore duplicated block #" << pool_seq << " in cache";
     // it is not error, so caller code nothing to do with it
