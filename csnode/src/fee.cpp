@@ -19,13 +19,13 @@
 
 namespace cs {
 namespace {
-constexpr auto kMaxRoundNumWithFixedFee = 10;
+constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
+constexpr auto kMaxRoundNumWithFixedFee = std::numeric_limits<size_t>::max();
 constexpr auto kLengthOfCommonTransaction = 152;
 constexpr double kMarketRateCS = 0.18;
-constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
+constexpr double kFixedOneByteFee = kMinFee * 0.01; // 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
-constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
 constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
 }  // namespace
 
@@ -70,15 +70,13 @@ inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) 
 
 void Fee::SetCountedFee() {
 
-  constexpr double fixed = kMinFee;
-
   if (current_pool_ != nullptr) {
     std::vector<csdb::Transaction>& transactions = current_pool_->transactions();
     size_t size_of_transaction;
     double counted_fee;
     for (auto& transaction : transactions) {
       size_of_transaction = transaction.to_byte_stream().size();
-      counted_fee = fixed; // one_byte_cost_ * size_of_transaction;
+      counted_fee = one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
         transaction.set_counted_fee(csdb::AmountCommission(kMinFee));
       }
@@ -93,7 +91,7 @@ void Fee::SetCountedFee() {
     double counted_fee;
     for (size_t i = 0; i < transactions.size(); ++i) {
       size_of_transaction = transactions[i].to_byte_stream().size();
-      counted_fee = fixed; // one_byte_cost_ * size_of_transaction;
+      counted_fee = one_byte_cost_ * size_of_transaction;
       if (counted_fee < kMinFee) {
         transactions[i].set_counted_fee(csdb::AmountCommission(kMinFee));
       }
