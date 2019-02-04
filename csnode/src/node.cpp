@@ -2229,10 +2229,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   // sync state check
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-  csmeta(csdetails) << "current round number: " << conveyer.currentRoundNumber()
-                    << ", Received round number: " << rNum;
-
-  if (subRound_ > subRound) {
+  if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
     cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
     csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_)
                       << ", Received subRound: " << static_cast<int>(subRound);
