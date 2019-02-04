@@ -834,7 +834,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   // USRFLD1 - ref to start trx
   result.add_user_field(trx_uf::new_state::RefStart, contract.to_user_field());
   // USRFLD2 - total fee
-  result.add_user_field(trx_uf::new_state::Fee, csdb::UserField(csdb::Amount(src.max_fee().to_double())));
+  result.add_user_field(trx_uf::new_state::Fee, 0);
 
   return result;
 }
