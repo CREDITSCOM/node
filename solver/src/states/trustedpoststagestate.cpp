@@ -108,6 +108,10 @@ Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageTh
     csdebug() << name() << ": enough stage-3 received amount = " << cnt_recv_stages;
     return Result::Finish;
   }
+  if (context.stagesThree() == context.cnt_trusted()) {
+    csdebug() << name() << ": there is no availability to continut this consensus - not enough stages 3 with hashes like mine";
+    return Result::Failure;
+  }
   return Result::Ignore;
 }
 

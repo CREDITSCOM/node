@@ -192,6 +192,15 @@ bool SolverCore::stateCompleted(Result res) {
   return (Result::Finish == res);
 }
 
+bool SolverCore::stateFailed(Result res) {
+  if (Result::Failure == res) {
+    cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+    return true;
+  }
+  return false;
+
+}
+
 void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes,
                                   const std::vector<cs::TransactionsPacketHash>& hashes,
                                   std::string&& currentTimeStamp, cs::StageThree& stage3) {

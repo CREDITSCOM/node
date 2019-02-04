@@ -308,10 +308,18 @@ namespace cs
     if(stateCompleted(pstate->onStage3(*pcontext, stage))) {
       handleTransitions(Event::Stage3Enough);
     }
+    if (stateFailed(pstate->onStage3(*pcontext, stage))) {
+      pnode->getBlockChain().removeLastBlock();
+      handleTransitions(Event::SetNormal);
+    }
   }
 
   size_t SolverCore::trueStagesThree() {
     return trueStageThreeStorage.size();
+  }
+
+  size_t SolverCore::stagesThree() {
+    return stageThreeStorage.size();
   }
   
 
