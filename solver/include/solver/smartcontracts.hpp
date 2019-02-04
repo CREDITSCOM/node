@@ -407,10 +407,10 @@ private:
   bool is_payable(const csdb::Address abs_addr);
 
   // blocking call
-  bool execute(const std::string& invoker, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms);
+  bool execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms);
 
   // blocking call
-  bool execute_payable(const std::string& invoker, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
+  bool execute_payable(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
     double amount);
 
   // blocking call

@@ -618,7 +618,7 @@ bool SmartContracts::invoke_execution(const SmartContractRef& contract) {
   return true;
 }
 
-bool SmartContracts::execute(const std::string& invoker, const api::SmartContractInvocation& contract,
+bool SmartContracts::execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract,
   /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms) {
 
   csdebug() << name() << ": execute " << contract.method << "()";
@@ -626,7 +626,7 @@ bool SmartContracts::execute(const std::string& invoker, const api::SmartContrac
   executor::ExecuteByteCodeResult result;
   result.status.code = 0;
   try {
-    get_api()->getExecutor().executeByteCode(result, invoker, contract.smartContractDeploy.byteCodeObjects,
+    get_api()->getExecutor().executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects,
       data.state, contract.method, contract.params, timeout_ms);
   }
   catch(std::exception& x) {
@@ -645,7 +645,7 @@ bool SmartContracts::execute(const std::string& invoker, const api::SmartContrac
   return true;
 }
 
-bool SmartContracts::execute_payable(const std::string& invoker, const api::SmartContractInvocation& contract,
+bool SmartContracts::execute_payable(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract,
   /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms, double amount) {
 
   api::SmartContractInvocation payable = contract;
@@ -662,7 +662,7 @@ bool SmartContracts::execute_payable(const std::string& invoker, const api::Smar
   payable.params.push_back(a1);
 
   csdebug() << name() << ": execute " << PayableName << "(" << PayableNameArg0 << " = " << amount << ", " << PayableNameArg1 << " = 1)";
-  return execute(invoker, payable, data, timeout_ms);
+  return execute(invoker, smart_address, payable, data, timeout_ms);
 }
 
 // returns false if execution canceled, so caller may call to remove_from_queue()
@@ -705,6 +705,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
     // create runnable object
     auto runnable = [=]() mutable {
       std::string invoker = absolute_address(start_tr.source()).to_api_addr();
+      std::string smart_address = absolute_address(start_tr.target()).to_api_addr();
       SmartExecutionData data;
       data.contract_ref = item;
       data.state = state;
@@ -713,14 +714,14 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
         return data;
       }
       if(call_payable) {
-        if(!execute_payable(invoker, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
+        if(!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
           data.error = "failed to execute payable() before call to method";
           return data;
         }
       }
       // replenish is true only if neither deploy nor start transaction:
       if( !replenish_contract ) {
-        if( !execute( invoker, invoke_info, data, Consensus::T_smart_contract ) ) {
+        if( !execute( invoker, smart_address, invoke_info, data, Consensus::T_smart_contract ) ) {
           if( deploy ) {
             data.error = "failed to deploy contract";
           }
@@ -733,7 +734,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
       // after deploy should call to payable() if tr_amount > 0,
       // contract has already been pre-registered and payable method is checked:
       if(deploy && call_payable) {
-        if(!execute_payable(invoker, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
+        if(!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
           data.error = "failed to execute payable() after deployment";
         }
         else {

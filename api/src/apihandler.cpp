@@ -589,7 +589,7 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
   return s;
 }
 
-void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address,
+void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address,
                                       const std::vector<general::ByteCodeObject>& code, const std::string& state, const std::string& method,
                                       const std::vector<general::Variant>& params) {
   static std::mutex m;
@@ -606,7 +606,7 @@ void APIHandler::execute_byte_code(executor::ExecuteByteCodeResult& resp, const 
 
   static const uint32_t MAX_EXECUTION_TIME = 1000;
   if(!code.empty())
-    executor->executeByteCode(resp, address, code, state, method, params, MAX_EXECUTION_TIME);
+    executor->executeByteCode(resp, address, smart_address, code, state, method, params, MAX_EXECUTION_TIME);
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -668,10 +668,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
     // --
     auto source_pk = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    auto target_pk = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
     executor::ExecuteByteCodeResult api_resp;
     const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
     if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-      execute_byte_code(api_resp, source_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
+      execute_byte_code(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params);
 
       if (api_resp.status.code) {
         _return.status.code = api_resp.status.code;

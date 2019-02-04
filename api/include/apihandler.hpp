@@ -199,7 +199,7 @@ private:
       returnsBool(rhs.returnsBool),
       boolResult(rhs.boolResult) { }
 
-    SmartOperation(SmartOperation&&) = delete;
+    //SmartOperation(SmartOperation&&) = delete; //not compiled!? (will not be called because there is "SmartOperation (const SmartOperation & rhs)")
     SmartOperation& operator=(const SmartOperation&) = delete;
     SmartOperation& operator=(SmartOperation&&) = delete;
 
@@ -226,7 +226,7 @@ private:
 
 private:
   void state_updater_work_function();
-  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::vector<general::ByteCodeObject> &code,
+  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject> &code,
                          const std::string& state, const std::string& method,
                          const std::vector<general::Variant>& params); //::general::Variant
 
