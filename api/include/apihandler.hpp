@@ -61,9 +61,6 @@ class ContractExecutorConcurrentClient;
 }  // namespace executor
 
 namespace api {
-namespace custom {
-class APIProcessor;
-}
 class APIFaker : public APINull {
 public:
   APIFaker(BlockChain&, cs::SolverCore&) {
@@ -186,7 +183,6 @@ private:
   std::map<csdb::PoolHash, api::Pool> poolCache;
   std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
   std::thread state_updater;
-  std::map<std::string, cs::WorkerQueue<std::tuple<>>> work_queues;
 
   api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
@@ -214,51 +210,11 @@ private:
 
   bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
 
-  friend class api::custom::APIProcessor;
-
   ::csdb::Transaction make_transaction(const ::api::Transaction&);
   void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
   void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
 
   TokensMaster tm;
-};
-
-class SequentialProcessorFactory;
-
-namespace custom {
-class APIProcessor : public api::APIProcessor {
-public:
-  APIProcessor(::apache::thrift::stdcxx::shared_ptr<APIHandler> iface);
-  cs::SweetSpot ss;
-
-protected:
-  bool dispatchCall(::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot,
-                    const std::string& fname, int32_t seqid, void* callContext) override;
-
-private:
-  friend class ::api::SequentialProcessorFactory;
-};
-}  // namespace custom
-
-class SequentialProcessorFactory : public ::apache::thrift::TProcessorFactory {
-public:
-  SequentialProcessorFactory(api::custom::APIProcessor& processor)
-  : processor_(processor) {
-  }
-
-  ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::TProcessor> getProcessor(
-      const ::apache::thrift::TConnectionInfo&) override {
-
-    processor_.ss.occupy();
-
-    const auto deleter = [](api::custom::APIProcessor* p) {
-      p->ss.leave();
-    };
-    return ::apache::thrift::stdcxx::shared_ptr<api::custom::APIProcessor>(&processor_, deleter);
-  }
-
-private:
-  api::custom::APIProcessor& processor_;
 };
 }  // namespace api
 
