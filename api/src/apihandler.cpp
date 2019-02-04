@@ -13,29 +13,6 @@ constexpr csdb::user_field_id_t smart_state_idx = ~1;
 using namespace api;
 using namespace ::apache;
 
-api::custom::APIProcessor::APIProcessor(::apache::thrift::stdcxx::shared_ptr<APIHandler> iface)
-: api::APIProcessor(iface)
-, ss() {
-}
-
-bool custom::APIProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot,
-                                        ::apache::thrift::protocol::TProtocol* oprot, const std::string& fname,
-                                        int32_t seqid, void* callContext) {
-#ifndef FAKE_API_HANDLING
-  auto custom_iface_ = std::dynamic_pointer_cast<APIHandler>(iface_);
-  auto it = custom_iface_->work_queues.find(fname);
-  if (it != custom_iface_->work_queues.end())
-    it->second.get_position();
-
-  ss.leave();
-#else
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(200ms);
-#endif
-  auto res = api::APIProcessor::dispatchCall(iprot, oprot, fname, seqid, callContext);
-  return res;
-}
-
 APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const csconnector::Config& config)
 : s_blockchain(blockchain)
 , solver(_solver)
@@ -52,7 +29,6 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, const cs
   if (!s_blockchain.isGood())
     return;
 
-  work_queues["TransactionFlow"];  // init value with default // constructors
   auto lapooh = s_blockchain.getLastHash();
   while (update_smart_caches_once(lapooh, true));
 
@@ -574,7 +550,6 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
 }
 
 void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-  work_queues["TransactionFlow"].yield();
   auto tr = make_transaction(transaction);
   if (!transaction.userFields.empty())
     tr.add_user_field(1, transaction.userFields);
@@ -652,7 +627,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return (*smart_state)[smart_addr];
   }();
 
-  work_queues["TransactionFlow"].yield();
   contract_state_entry.get_position();
 
   if (input_smart.forgetNewState) {
