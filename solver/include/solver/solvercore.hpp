@@ -5,6 +5,7 @@
 #include "consensus.hpp"
 #include "inodestate.hpp"
 #include "stage.hpp"
+#include "smartconsensus.hpp"
 
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
@@ -129,6 +130,16 @@ public:
   /// <param name="tr">   The transaction </param>
 
   void send_wallet_transaction(const csdb::Transaction& tr);
+
+  cs::SmartContracts& smart_contracts() const
+  {
+    return *psmarts;
+  }
+  //
+  //CallsQueueScheduler& scheduler() {
+  //  return &scheduler;
+  //}
+
 
 private:
   // to use private data while serve for states as SolverCore context:
@@ -321,6 +332,9 @@ private:
 
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;
+  std::vector<cs::SmartConsensus> smartProcesses_;
+  //SmartConsensus smartProcess_;
+  const size_t simultaneuosSmartsNumber_ = 20;
 };
 
 }  // namespace slv2

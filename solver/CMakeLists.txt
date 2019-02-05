@@ -23,6 +23,7 @@ add_library(${PROJECT_NAME} STATIC
 	include/solver/callsqueuescheduler.hpp
 	include/solver/timeouttracking.hpp
 	include/solver/smartcontracts.hpp
+	include/solver/smartconsensus.hpp
 
 	include/solver/states/defaultstatebehavior.hpp
 	include/solver/states/handlebbstate.hpp
@@ -45,6 +46,7 @@ add_library(${PROJECT_NAME} STATIC
 	src/callsqueuescheduler.cpp
 	src/timeouttracking.cpp
 	src/smartcontracts.cpp
+	src/smartconsensus.cpp
 
 	src/states/defaultstatebehavior.cpp
 	src/states/handlebbstate.cpp

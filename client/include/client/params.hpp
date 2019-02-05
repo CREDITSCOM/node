@@ -7,7 +7,7 @@
 */
 //#define MONITOR_NODE
 //#define WEB_WALLET_NODE
-//#define SPAMMER
+#define SPAMMER
 
 #define NODE_API
 #define AJAX_IFACE

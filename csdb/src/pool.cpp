@@ -656,7 +656,7 @@ void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
   priv* data = d.data();
   data->is_valid_ = true;
   data->signatures_.emplace_back(std::make_pair(index, signature));
-  csdebug() << "The signature is added";
+  //csdebug() << "The signature is added";
 }
 
 void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept

@@ -234,6 +234,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
     // all trusted nodes must send stage3 data
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
+    //TODO: The pool building is starting here <===
     context.spawn_next_round(stage);
     csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
     context.add_stage3(stage);  //, stage.writer != stage.sender);
