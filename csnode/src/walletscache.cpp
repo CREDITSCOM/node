@@ -144,8 +144,10 @@ double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const Bloc
 double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
   csdb::Address wallAddress;
 
+  bool smartIniter = false;
   if (SmartContracts::is_new_state(tr)) {
     wallAddress = findSmartContractIniter(tr, blockchain);
+    smartIniter = true;
   } else {
     wallAddress = tr.source();
   }
@@ -158,8 +160,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
-  wallData.balance_ -= tr.amount();
   wallData.balance_ -= tr.counted_fee().to_double();
+
+  if (!smartIniter) {
+  wallData.balance_ -= tr.amount();
 
   wallData.trxTail_.push(tr.innerID());
   setModified(id);
@@ -172,6 +176,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #ifdef TRANSACTIONS_INDEX
   wallData.lastTransaction_ = tr.id();
 #endif
+  }
 
   return tr.counted_fee().to_double();
 }

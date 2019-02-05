@@ -151,6 +151,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     return;
   }
   recdBangs[rNum] = subRound_;
+  //cs::Conveyer::instance().setRound(rNum);
 
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
