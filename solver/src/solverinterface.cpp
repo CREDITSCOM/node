@@ -308,16 +308,14 @@ size_t SolverCore::stagesThree() {
 void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
   // DEBUG:
 #if defined(DEBUG_SMARTS)
-  if (SmartContracts::is_smart_contract(tr)) {
+    if(SmartContracts::is_smart_contract(tr)) {
     psmarts->force_execution = true;
   }
 #endif
-  if (psmarts->test_smart_contract_emits(tr)) {
-    // avoid pass to conveyer until execution of emitter contract has finished
-    csdebug() << "SolverCore: smart contract emits transaction";
+    if(psmarts->capture(tr)) {
+      // avoid pass to conveyer, psmarts provide special handling
     return;
   }
-
   cs::Conveyer::instance().addTransaction(tr);
 }
 
