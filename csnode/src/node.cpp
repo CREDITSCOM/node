@@ -2005,7 +2005,7 @@ void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signat
     solver_->smartRoundNumber(), signature, message);
   csmeta(csdetails) << "done";
 }
-
+//TODO: this function is a part of new block building <===
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3) {
   csmeta(csdetails) << " timestamp = " << timeStamp;
 
@@ -2034,6 +2034,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   }
 
   pool.value().set_confidants(confidants);
+  //TODO: retrive the same functionality from this function and place it to solverCore <===
   pool = blockChain_.createBlock(pool.value());
 
   if (!pool.has_value()) {
@@ -2053,7 +2054,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   //logPool(pool.value());
   prepareRoundTable(roundTable, poolMetaInfo, st3);
 }
-
+//TODO: this function is a part of round table building <===
 void Node::addRoundSignature(const cs::StageThree& st3) {
   lastSentSignatures_.poolSignatures.push_back(cs::SignaturePair(st3.sender, st3.blockSignature));
   lastSentSignatures_.roundSignatures.push_back(cs::SignaturePair(st3.sender, st3.roundSignature));
@@ -2122,7 +2123,7 @@ void Node::sendRoundTable() {
   conveyer.setTable(table);
   sendRoundPackageToAll();
 }
-
+//TODO: this function is a part of round table building <===
 void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::PoolMetaInfo& poolMetaInfo,
                                  const cs::Characteristic& characteristic, cs::StageThree& st3) {
   lastSentRoundData_.roundTable.round = newRoundTable.round;

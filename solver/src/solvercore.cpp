@@ -202,7 +202,7 @@ bool SolverCore::stateFailed(Result res) {
   return false;
 
 }
-
+//TODO: this function is to be implemented the block and RoundTable building <====
 void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes,
                                   const std::vector<cs::TransactionsPacketHash>& hashes,
                                   std::string&& currentTimeStamp, cs::StageThree& stage3) {
