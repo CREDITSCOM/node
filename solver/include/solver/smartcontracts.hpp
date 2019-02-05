@@ -288,6 +288,8 @@ private:
     cs::RoundNumber round_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
+    // 
+    std::unique_ptr<SmartConsensus> pconsensus;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address)
       : contract(ref_contract)

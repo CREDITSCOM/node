@@ -120,6 +120,8 @@ public:
   void requestSmartStages(int st);
   void requestSmartStagesNeighbors(int st);
   void markSmartOutboundNodes();
+  cs::PublicKeys smartConfidants(cs::PublicKey smartKey);
+
 
   const std::vector<cs::PublicKey>& smartConfidants() const;
 

@@ -6,8 +6,9 @@
 #include <csnode/node.hpp>
 #pragma warning(pop)
 
+#include <csnode/datastream.hpp>
 #include <solvercore.hpp>
-#include <csnode/node.hpp>
+
 
 namespace cs{
 
@@ -32,6 +33,7 @@ namespace cs{
         cs::SmartContractRef smartRef;
         smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
         smartRoundNumber_ = smartRef.sequence;
+        
       }
     }
     if (0 == smartRoundNumber_) {
@@ -41,19 +43,21 @@ namespace cs{
     }
     smartConfidants_ = pnode_->retriveSmartConfidants(smartRoundNumber_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
-
-    cslog() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_)
-      << "] =========================";
-    csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
       return;
     }
+
+    cslog() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_)
+      << "] =========================";
+    csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
+
     // cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
     pack.makeHash();
     auto tmp = pack.hash().toBinary();
     std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
     currentSmartTransactionPack_ = pack;
+    st1.smartAddress = pack.transactions().at(0).source().public_key();
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);
@@ -123,7 +127,7 @@ namespace cs{
     memset(st3.signature.data(), 0, st3.signature.size());
     memset(st2.signature.data(), 0, st3.signature.size());
 
-    pnode_->smartStagesStorageClear(cSize);
+    //smartStagesStorageClear(cSize);
 
     smartUntrusted.clear();
     smartUntrusted.resize(cSize);
@@ -134,7 +138,7 @@ namespace cs{
 
   void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     if (send) {
-      pnode_->sendSmartStageOne(stage);
+      pnode_->sendSmartStageOne(smartConfidants_, stage);
     }
     if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
       return;
@@ -157,7 +161,7 @@ namespace cs{
     if (send) {
       st2.sender = ownSmartsConfNum_;
       st2.sRoundNum = smartRoundNumber_;
-      pnode_->sendSmartStageTwo(stage);
+      pnode_->sendSmartStageTwo(smartConfidants_, stage);
     }
     auto& stageTwo = smartStageTwoStorage_.at(stage.sender);
     if (stageTwo.sender == stage.sender) {
@@ -169,6 +173,10 @@ namespace cs{
       startTimer(2);
       processStages();
     }
+  }
+
+  cs::PublicKey SmartConsensus::smartAddress() {
+    return smartAddress_;
   }
 
   void SmartConsensus::processStages() {
@@ -262,7 +270,7 @@ namespace cs{
       csdebug() << "____ 1.";
       stage.sender = ownSmartsConfNum_;
       stage.sRoundNum = smartRoundNumber_;
-      pnode_->sendSmartStageThree(stage);
+      pnode_->sendSmartStageThree(smartConfidants_, stage);
     }
     if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
       return;
@@ -494,6 +502,5 @@ namespace cs{
   bool SmartConsensus::smartConfidantExist(uint8_t confidantIndex) {
     return confidantIndex < smartConfidants_.size();
   }
-
 
 }
