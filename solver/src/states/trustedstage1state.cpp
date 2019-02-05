@@ -9,6 +9,7 @@
 #include <lib/system/logger.hpp>
 #include <csnode/walletscache.hpp>
 #include <lib/system/utils.hpp>
+#include <csdb/amount.hpp>
 
 #include <cscrypto/cscrypto.hpp>
 
@@ -150,7 +151,11 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       bool is_smart_new_state = smarts.is_new_state(transaction);
       if(!is_smart_new_state) {
         byte = !(transaction.source() == transaction.target());
-        byte = byte && ptransval->validateTransaction(transaction, i, del1);
+        if (csdb::Amount(transaction.max_fee().to_double()) >= csdb::Amount(transaction.counted_fee().to_double())) {
+          byte = byte && ptransval->validateTransaction(transaction, i, del1);
+        } else {
+          byte = false;
+        }
       }
       else {
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
@@ -158,10 +163,16 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
           byte = false;
           cslog() << name() << ": reject smart new_state trx because related contract is closed";
         }
-        csdb::Address initerAddress = WalletsCache::findSmartContractIniter(transaction, context.blockchain());
-        csdb::Transaction new_state_tr(transaction);
-        new_state_tr.set_source(initerAddress);
-        byte = byte && ptransval->validateTransaction(new_state_tr, i, del1, true);
+        csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(transaction, context.blockchain());
+        if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
+            >= csdb::Amount(transaction.counted_fee().to_double())) {
+          csdb::Address initerAddress = WalletsCache::findSmartContractIniter(transaction, context.blockchain());
+          csdb::Transaction new_state_tr(transaction);
+          new_state_tr.set_source(initerAddress);
+          byte = byte && ptransval->validateTransaction(new_state_tr, i, del1, true);
+        } else {
+          byte = false;
+        }
       }
 
       if(!byte) {
