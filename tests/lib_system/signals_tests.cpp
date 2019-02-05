@@ -270,3 +270,25 @@ TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
   ASSERT_EQ(foo(), 8);
   ASSERT_EQ(lambda(), 8);
 }
+
+TEST(Signals, ConstObjectConnection) {
+  static bool isCalled = false;
+
+  class A {
+  public signals:
+    cs::Signal<void()> signal;
+  };
+
+  class B {
+  public slots:
+    void onSignal() const {
+      std::cout << "B on signal called" << std::endl;
+      isCalled = true;
+    }
+  };
+
+  const A a;
+  const B b;
+
+  cs::Connector::connect(&a.signal, &b, &B::onSignal);
+}

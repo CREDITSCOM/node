@@ -138,17 +138,17 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
 
   if (st3.sender != InvalidConfidantIndex) {
     writer_idx = st3.writer;
-    csdebug() << "writer idx = " << static_cast<int>(writer_idx);
+    //csdebug() << "writer idx = " << static_cast<int>(writer_idx);
   }
   else {
     cserror() << "Writer wans't elected on this node";
     return;
   }
   if (writer_idx != InvalidConfidantIndex) {
-    csdebug() << "writer_idx != invalid";
+    //csdebug() << "writer_idx != invalid";
     auto ptr = stage1(writer_idx);
     if (ptr != nullptr) {
-      csdebug() << "ptr(my stage 1) != nullptr";
+      //csdebug() << "ptr(my stage 1) != nullptr";
       tStamp = ptr->roundTimeStamp;
     }
   }

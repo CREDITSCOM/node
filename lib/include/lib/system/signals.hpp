@@ -344,7 +344,7 @@ public:
   static void connect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
     using ObjectPointer = void*;
     constexpr int size = Args::GetArguments<Slot>();
-    auto obj = reinterpret_cast<ObjectPointer>(const_cast<Object&>(slotObj));
+    auto obj = ObjectPointer(slotObj);  // need only rude force
 
     cs::Lock lock(mutex_);
     const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
