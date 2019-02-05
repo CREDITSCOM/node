@@ -59,7 +59,8 @@ SolverCore::SolverCore()
 , smartRoundNumber_(0)
 , pnode(nullptr)
 , pws(nullptr)
-, psmarts(nullptr) {
+, psmarts(nullptr)
+/*, smartProcess_(this)*/{
   if constexpr (MonitorModeOn) {
     cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
     InitMonitorModeTransitions();
@@ -78,18 +79,19 @@ SolverCore::SolverCore()
   }
 }
 
-// actual constructor
-SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address StartAddress)
-: SolverCore() {
-  addr_genesis = GenesisAddress;
-  addr_start = StartAddress;
-  pnode = pNode;
-  auto& bc = pNode->getBlockChain();
-  pws = std::make_unique<cs::WalletsState>(bc);
-  psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
-  // bind signals
-  cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
-}
+  // actual constructor
+  SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address StartAddress)
+    : SolverCore() {
+    addr_genesis = GenesisAddress;
+    addr_start = StartAddress;
+    pnode = pNode;
+    auto& bc = pNode->getBlockChain();
+    pws = std::make_unique<cs::WalletsState>(bc);
+    psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
+    smartProcesses_.reserve(simultaneuosSmartsNumber_);
+    // bind signals
+    cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
+  }
 
 SolverCore::~SolverCore() {
   scheduler.Stop();
@@ -227,28 +229,30 @@ const std::vector<cs::PublicKey>& SolverCore::smartConfidants() const {
   return smartConfidants_;
 }
 
-void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
-  if (pack.transactionsCount() == 0) {
-    // TODO: fix failure of smart execution, clear it from exe_queue
-    cserror() << "SolverCore: empty packet must not finish smart contract execution";
-    return;
-  }
-  smartConfidants_.clear();
-  smartRoundNumber_ = 0;
-  for (const auto& tr : pack.transactions()) {
-    if (psmarts->is_new_state(tr)) {
-      cs::SmartContractRef smartRef;
-      smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
-      smartRoundNumber_ = smartRef.sequence;
+  void SolverCore::getSmartResult(cs::TransactionsPacket pack) {
+    if (pack.transactionsCount() == 0) {
+      // TODO: fix failure of smart execution, clear it from exe_queue
+      cserror() << "SolverCore: empty packet must not finish smart contract execution";
+      return;
     }
-  }
-  if (0 == smartRoundNumber_) {
-    // TODO: fix failure of smart execution, clear it from exe_queue
-    cserror() << "SolverCore: smart contract result packet must contain new state transaction";
-    return;
-  }
-  smartConfidants_ = pnode->retriveSmartConfidants(smartRoundNumber_);
-  ownSmartsConfNum_ = calculateSmartsConfNum();
+    //smartProcesses_.emplace_back(this, pnode, pack);
+
+    smartConfidants_.clear();
+    smartRoundNumber_ = 0;
+    for (const auto& tr : pack.transactions()) {
+      if (psmarts->is_new_state(tr)) {
+        cs::SmartContractRef smartRef;
+        smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+        smartRoundNumber_ = smartRef.sequence;
+      }
+    }
+    if (0 == smartRoundNumber_) {
+      // TODO: fix failure of smart execution, clear it from exe_queue
+      cserror() << "SolverCore: smart contract result packet must contain new state transaction";
+      return;
+    }
+    smartConfidants_ = pnode->retriveSmartConfidants(smartRoundNumber_);
+    ownSmartsConfNum_ = calculateSmartsConfNum();
 
   csdebug() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_) << "] =========================";
   csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
