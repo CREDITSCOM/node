@@ -59,7 +59,8 @@ SolverCore::SolverCore()
 // previous solver version instance
 , pnode(nullptr)
 , pws(nullptr)
-, psmarts(nullptr) {
+, psmarts(nullptr)
+/*, smartProcess_(this)*/{
   if constexpr (MonitorModeOn) {
     cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
     InitMonitorModeTransitions();
@@ -87,6 +88,7 @@ SolverCore::SolverCore()
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
+    smartProcesses_.reserve(simultaneuosSmartsNumber_);
     // bind signals
     cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
   }
@@ -234,6 +236,8 @@ void SolverCore::sendRoundTable() {
       cserror() << "SolverCore: empty packet must not finish smart contract execution";
       return;
     }
+    //smartProcesses_.emplace_back(this, pnode, pack);
+
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
     for (const auto& tr : pack.transactions()) {
