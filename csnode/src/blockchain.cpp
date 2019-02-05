@@ -971,11 +971,11 @@ std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool po
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    if (!deferredBlock_.recompose()) {
+    if (deferredBlock_.recompose()) {
       csdebug() << "The block binary representation updated successfully";
     }
     else {
-      csdebug() << "The block binary representation update failed";
+      cserror() << "The block binary representation update failed";
     }
     if(deferredBlock_.is_valid()) {
       deferredBlock_.set_storage(storage_);
