@@ -1068,6 +1068,7 @@ std::string SmartContracts::get_executed_method(const SmartContractRef & ref)
     os << PayableName << "(" << PayableNameArg0 << " = " << t.amount().to_double() << ", " << PayableNameArg1 << " = 1)";
     return os.str();
   }
+  return std::string("???");
 }
 
 }  // namespace cs
