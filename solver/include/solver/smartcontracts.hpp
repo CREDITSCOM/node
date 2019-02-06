@@ -158,7 +158,7 @@ public:
 
   ~SmartContracts();
 
-  void init(const cs::PublicKey&, csconnector::connector::ApiHandlerPtr);
+  void init(const cs::PublicKey&, Node* node);
 
   // test transaction methods
 
@@ -191,7 +191,7 @@ public:
   void enqueue(csdb::Pool block, size_t trx_idx);
   void on_new_state(csdb::Pool block, size_t trx_idx);
 
-  void set_execution_result(cs::TransactionsPacket& pack) const;
+  bool set_execution_result(cs::TransactionsPacket& pack) const;
 
   // get & handle rejected transactions
   // usually ordinary consensus may reject smart-related transactions
@@ -298,6 +298,7 @@ private:
       , round_start(0)
       , round_finish(0)
       , abs_addr(absolute_address)
+      , pconsensus(nullptr)
     {}
 
     void wait(cs::RoundNumber r)
@@ -330,6 +331,7 @@ private:
 
   // executiom queue
   std::vector<QueueItem> exe_queue;
+  Node* pnode;
 
   // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
   std::mutex mtx_emit_transaction;

@@ -21,7 +21,7 @@ void SolverCore::setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& pri
   auto pconnector = pnode->getConnector();
 
   if (pconnector != nullptr) {
-    psmarts->init(pub, pconnector->apiHandler());
+    psmarts->init(pub, pnode);
   }
   else {
     psmarts->init(pub, nullptr);

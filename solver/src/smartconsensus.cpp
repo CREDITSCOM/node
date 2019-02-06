@@ -12,11 +12,11 @@
 
 namespace cs{
 
-  SmartConsensus::SmartConsensus(SolverCore* core, Node* node, cs::TransactionsPacket pack){
+  SmartConsensus::SmartConsensus(Node* node){
     
-    pcore_ = core;
+    //pcore_ = core;
     pnode_ = node;
-    initSmartRound(pack);
+    //initSmartRound(pack);
   }
 
   SmartConsensus::~SmartConsensus() {}
@@ -25,16 +25,18 @@ namespace cs{
     return smartConfidants_;
   }
 
-  void SmartConsensus::initSmartRound(cs::TransactionsPacket pack) {
+  void SmartConsensus::initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts) {
+    pnode_ = node;
+    psmarts_ = smarts;
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
     for (const auto& tr : pack.transactions()) {
-      if (pcore_->smart_contracts().is_new_state(tr)) {
-        cs::SmartContractRef smartRef;
-        smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
-        smartRoundNumber_ = smartRef.sequence;
-        
-      }
+      //if (pcore_->smart_contracts().is_new_state(tr)) {
+      //  cs::SmartContractRef smartRef;
+      //  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+      //  smartRoundNumber_ = smartRef.sequence;
+      //  
+      //}
     }
     if (0 == smartRoundNumber_) {
       // TODO: fix failure of smart execution, clear it from exe_queue

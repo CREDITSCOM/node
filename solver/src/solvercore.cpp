@@ -90,7 +90,7 @@ SolverCore::SolverCore()
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
     smartProcesses_.reserve(simultaneuosSmartsNumber_);
     // bind signals
-    cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
+    //cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
   }
 
 SolverCore::~SolverCore() {
@@ -235,7 +235,7 @@ const std::vector<cs::PublicKey>& SolverCore::smartConfidants() const {
       cserror() << "SolverCore: empty packet must not finish smart contract execution";
       return;
     }
-    smartProcesses_.emplace_back(this, pnode, pack);
+    //smartProcesses_.emplace_back(this, pnode, pack);
   }
 
   cs::PublicKeys SolverCore::smartConfidants(cs::PublicKey smartKey) {

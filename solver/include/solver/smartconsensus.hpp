@@ -23,17 +23,18 @@ class Node;
 
 namespace cs {
   class SolverCore;
+  class SmartContracts;
 
   class SmartConsensus{
     public:
 
       /*SmartConsensus();*/
 
-      SmartConsensus(SolverCore* core, Node* node, cs::TransactionsPacket pack/*, QueueItem&*/);
+      SmartConsensus(Node* node);
 
       ~SmartConsensus();
 
-      void initSmartRound(cs::TransactionsPacket pack);
+      void initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts);
       uint8_t calculateSmartsConfNum();
       uint8_t ownSmartsConfidantNumber();
 
@@ -80,6 +81,7 @@ namespace cs {
 
       SolverCore* pcore_;
       Node* pnode_;
+      SmartContracts* psmarts_;
       //CallsQueueScheduler scheduler;
 
       std::vector<cs::StageOneSmarts> smartStageOneStorage_;

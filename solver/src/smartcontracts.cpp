@@ -48,9 +48,10 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 
 SmartContracts::~SmartContracts() = default;
 
-void SmartContracts::init(const cs::PublicKey& id, csconnector::connector::ApiHandlerPtr api)
+void SmartContracts::init(const cs::PublicKey& id, Node* node)
 {
-  papi = api;
+  pnode = node;
+  papi = (pnode->getConnector())->apiHandler();
   node_id = id;
 
   size_t cnt = known_contracts.size();
@@ -806,7 +807,9 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
     clear_emitted_transactions(it->abs_addr);
   }
 
-  set_execution_result(packet);
+  if (set_execution_result(packet)) {
+    it->pconsensus->initSmartRound(packet, pnode, this);/*, it));*/
+  }
   checkAllExecutions();
 }
 
@@ -840,7 +843,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   return result;
 }
 
-void SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
+bool SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
   cslog() << "  _____";
   cslog() << " /     \\";
   cslog() << "/   =   \\";
@@ -855,12 +858,14 @@ void SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
     }
     else {
       cserror() << name() << ": trx[0] in packet is not new_state transaction";
+      return false;
     }
-
-    emit signal_smart_executed(pack);
+    return true;
+    //emit signal_smart_executed(pack);
   }
   else {
     cserror() << name() << ": no transactions in execution result pack";
+    return false;
   }
 }
 
