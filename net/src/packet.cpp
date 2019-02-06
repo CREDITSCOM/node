@@ -88,7 +88,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
   MessagePtr msg;
 
   {
-    cs::SpinGuard l(mLock_);
+    cs::Lock l(mLock_);
     msgPtr = &map_.tryStore(pack.getHeaderHash());
   }
 
@@ -104,7 +104,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
   }
 
   {
-    cs::SpinGuard lock(msg->pLock_);
+    cs::Lock lock(msg->pLock_);
     auto goodPlace = msg->packets_ + pack.getFragmentId();
 
     if (!*goodPlace) {
