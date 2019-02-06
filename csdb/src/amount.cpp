@@ -11,8 +11,8 @@
 
 namespace {
 template<typename T, typename U>
-T constexpr pow(T base, U exponent) {
-    return exponent == 0 ? 1 : base * pow(base, exponent - 1);
+T constexpr gen_pow(T base, U exponent) {
+    return exponent == 0 ? 1 : base * gen_pow(base, exponent - 1);
 }
 }  // anonymous namespace
 
@@ -30,7 +30,7 @@ Amount::Amount(double value) {
 
   double frac = value - static_cast<double>(integral_);
   constexpr uint64_t digits = std::numeric_limits<double>::digits10;
-  constexpr uint64_t factor = pow(static_cast<uint64_t>(10), digits);
+  constexpr uint64_t factor = gen_pow(static_cast<uint64_t>(10), digits);
   constexpr uint64_t multiplier = AMOUNT_MAX_FRACTION / factor;
   frac *= factor;
 
