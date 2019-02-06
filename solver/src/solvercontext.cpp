@@ -72,8 +72,8 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
   core.gotStageThree(stage, 1);
 }
 
-size_t SolverContext::own_conf_number() const {
-  return static_cast<size_t>(core.pnode->getConfidantNumber());
+uint8_t SolverContext::own_conf_number() const {
+  return core.pnode->getConfidantNumber();
 }
 
 size_t SolverContext::cnt_trusted() const {

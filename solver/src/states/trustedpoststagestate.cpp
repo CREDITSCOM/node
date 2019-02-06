@@ -8,7 +8,7 @@ void TrustedPostStageState::on(SolverContext& context) {
 
   cnt_recv_stages = 0;
   //// decide to write
-  // const auto ptr = context.stage3((uint8_t) context.own_conf_number());
+  // const auto ptr = context.stage3(context.own_conf_number());
   // if(ptr != nullptr) {
   //    if(ptr->sender == ptr->writer) {
   //        context.request_role(Role::Writer);
@@ -76,7 +76,7 @@ void TrustedPostStageState::off(SolverContext& /*context*/) {
 // requests stages from corresponded nodes
 void TrustedPostStageState::request_stages(SolverContext& context) {
   uint8_t cnt = (uint8_t)context.cnt_trusted();
-  auto& realTrusted = context.stage3((uint8_t)context.own_conf_number())->realTrustedMask;
+  auto& realTrusted = context.stage3(context.own_conf_number())->realTrustedMask;
   if (realTrusted.size() != cnt) {
     csmeta(cserror) << ": The size of real Trusted doesn't match the size of Confidants!" ;
     return;

@@ -17,7 +17,7 @@ void TrustedStage3State::on(SolverContext& context) {
   cnt_recv_stages = 0;
   stage.realTrustedMask.clear();
   stage.realTrustedMask.resize(context.cnt_trusted());
-  stage.sender = static_cast<uint8_t>(context.own_conf_number());
+  stage.sender = context.own_conf_number();
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
     cswarning() << name() << ": stage one result not found";
@@ -144,7 +144,7 @@ void TrustedStage3State::mark_outbound_nodes(SolverContext& context, cs::RoundNu
 }
 
 Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&) {
-  const auto ptr = context.stage2(static_cast<uint8_t>(context.own_conf_number()));
+  const auto ptr = context.stage2(context.own_conf_number());
   ++cnt_recv_stages;
   if (ptr != nullptr && cnt_recv_stages == context.cnt_trusted()) {
     csdebug() << name() << ": enough stage-2 received";
@@ -369,7 +369,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
       size_t hashes_amount = stage_i.hashesCandidates.size();
       //csdebug() << "My conf number = " << context.own_conf_number();
-      if (stage_i.sender == static_cast<uint8_t>(context.own_conf_number())) {
+      if (stage_i.sender == context.own_conf_number()) {
         myHashes = stage_i.hashesCandidates;
         myPacks = stage_i.hashesCandidates.size();
       }

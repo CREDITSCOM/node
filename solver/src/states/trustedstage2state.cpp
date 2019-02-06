@@ -8,7 +8,7 @@ void TrustedStage2State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
   cnt_recv_stages = 0;
   context.init_zero(stage);
-  stage.sender = (uint8_t)context.own_conf_number();
+  stage.sender = context.own_conf_number();
   const auto ptr = context.stage1(stage.sender);
   if (ptr == nullptr) {
     cswarning() << name() << ": stage one result not found";
@@ -22,12 +22,12 @@ void TrustedStage2State::on(SolverContext& context) {
     csdebug() << name() << ": handle early received stages-1";
     bool finish = false;
     for (const auto& st : context.stage1_data()) {
-      csdebug() << name() << ": stage-1 [" << (int) st.sender << "]";
+      csdebug() << name() << ": stage-1 [" << static_cast<int>(st.sender) << "]";
       if (Result::Finish == onStage1(context, st)) {
         finish = true;
       }
     }
-    if(finish) {
+    if (finish) {
       context.complete_stage2();
       return;
     }
@@ -77,7 +77,7 @@ void TrustedStage2State::off(SolverContext& /*context*/) {
   if (timeout_request_neighbors.cancel()) {
     csdebug() << name() << ": cancel track timeout to request neighbors about stages-1";
   }
-  if(timeout_force_transition.cancel()) {
+  if (timeout_force_transition.cancel()) {
     csdebug() << name() << ": cancel track timeout to force transition to next state";
   }
 }
@@ -89,7 +89,7 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
   if (cnt_recv_stages == context.cnt_trusted()) {
     csdebug() << name() << ": enough stage-1 received";
     /*signing of the second stage should be placed here*/
-    csdebug() << name() << ": --> stage-2 [" << (int)stage.sender << "]";
+    csdebug() << name() << ": --> stage-2 [" << static_cast<int>(stage.sender) << "]";
     context.add_stage2(stage, true);
     return Result::Finish;
   }
@@ -98,7 +98,7 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
 
 // requests stages from corresponded nodes
 void TrustedStage2State::request_stages(SolverContext& context) {
-  uint8_t cnt = (uint8_t)context.cnt_trusted();
+  const uint8_t cnt = static_cast<uint8_t>(context.cnt_trusted());
   int cnt_requested = 0;
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage1(i) == nullptr) {
@@ -106,7 +106,7 @@ void TrustedStage2State::request_stages(SolverContext& context) {
       ++cnt_requested;
     }
   }
-  if(0 == cnt_requested) {
+  if (!cnt_requested) {
     csdebug() << name() << ": no node to request";
   }
 }
@@ -114,7 +114,7 @@ void TrustedStage2State::request_stages(SolverContext& context) {
 // requests stages from any available neighbor nodes
 void TrustedStage2State::request_stages_neighbors(SolverContext& context) {
   const auto& stage2_data = context.stage2_data();
-  uint8_t cnt = (uint8_t)context.cnt_trusted();
+  const uint8_t cnt = static_cast<uint8_t>(context.cnt_trusted());
   int cnt_requested = 0;
   for (uint8_t i = 0; i < cnt; ++i) {
     if (context.stage1(i) == nullptr) {
@@ -126,7 +126,7 @@ void TrustedStage2State::request_stages_neighbors(SolverContext& context) {
       }
     }
   }
-  if(0 == cnt_requested) {
+  if (0 == cnt_requested) {
     csdebug() << name() << ": no node to request";
   }
 }
@@ -134,10 +134,11 @@ void TrustedStage2State::request_stages_neighbors(SolverContext& context) {
 // forces transition to next stage
 void TrustedStage2State::mark_outbound_nodes(SolverContext& context)
 {
-  uint8_t cnt = (uint8_t) context.cnt_trusted();
-  for(uint8_t i = 0; i < cnt; ++i) {
-    if(context.stage1(i) == nullptr) {
-      // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+  const uint8_t cnt = static_cast<uint8_t>(context.cnt_trusted());
+  for (uint8_t i = 0; i < cnt; ++i) {
+    if (context.stage1(i) == nullptr) {
+      // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem,
+      // simply execute method until end
       context.fake_stage1(i);
     }
   }
