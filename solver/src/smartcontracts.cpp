@@ -349,7 +349,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     cslog() << "/   +   \\";
   }
   cslog() << "\\       /";
-  cslog() << " \\_____/";
+  cslog() << " \\_____/" << "  " << get_executed_method(new_item);
 
   exe_queue.emplace_back(QueueItem(new_item, abs_addr)).wait(new_item.sequence);
   test_exe_queue();
@@ -455,7 +455,8 @@ bool SmartContracts::capture(csdb::Transaction tr)
   }
 
   // test smart contract as target of transaction (is it payable?)
-  if(is_known_smart_contract(tr.target())) {
+  abs_addr = absolute_address(tr.target());
+  if(is_known_smart_contract(abs_addr)) {
     double amount = tr.amount().to_double();
     // possible blocking call to executor for the first time:
     if(!is_payable(abs_addr)) {
@@ -588,7 +589,7 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   cslog() << " /     \\";
   cslog() << "/   -   \\";
   cslog() << "\\       /";
-  cslog() << " \\_____/";
+  cslog() << " \\_____/" << "  " << get_executed_method(it->contract);
 
   clear_emitted_transactions(it->abs_addr);
   exe_queue.erase(it);
@@ -621,7 +622,7 @@ bool SmartContracts::invoke_execution(const SmartContractRef& contract) {
 bool SmartContracts::execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract,
   /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms) {
 
-  csdebug() << name() << ": execute " << contract.method << "()";
+  csdebug() << name() << ": execute " << (contract.method.empty() ? "constructor" : contract.method) << "()";
 
   executor::ExecuteByteCodeResult result;
   result.status.code = 0;
@@ -673,8 +674,8 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
     replenish_contract = is_payable_target( start_tr );
     if( !replenish_contract ) {
       cserror() << name() << ": unable execute neither deploy nor start transaction";
+      return false;
     }
-    return false;
   }
   bool deploy = is_deploy(start_tr);
 
@@ -685,7 +686,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
   if (maybe_invoke_info.has_value()) {
     const auto& invoke_info = maybe_invoke_info.value();
     std::string state;
-    bool call_payable = false; // only for start or renewal, not for deploy
+    bool call_payable = false; // only for start or replenish, not for deploy
     double tr_amount = start_tr.amount().to_double();
 
     const auto it = known_contracts.find(absolute_address(start_tr.target()));
@@ -715,7 +716,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
       }
       if(call_payable) {
         if(!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
-          data.error = "failed to execute payable() before call to method";
+          data.error = "failed to execute payable()";
           return data;
         }
       }
@@ -950,7 +951,7 @@ bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absol
         }
       }
       else {
-        cswarning() << name() << ": incorrect new_state transaction does not refer to starter one";
+        cswarning() << name() << ": new_state transaction does not refer to starter one";
       }
     }
   }
@@ -1032,6 +1033,41 @@ bool SmartContracts::implements_payable(const api::SmartContractInvocation& cont
   }
 
   return false;
+}
+
+std::string SmartContracts::get_executed_method(const SmartContractRef & ref)
+{
+  csdb::Transaction t = get_transaction(ref);
+  if(!t.is_valid()) {
+    return std::string();
+  }
+  if(is_executable(t)) {
+    const auto maybe_invoke_info = get_smart_contract(t);
+    if(!maybe_invoke_info.has_value()) {
+      return std::string();
+    }
+    const auto& invoke_info = maybe_invoke_info.value();
+    if(invoke_info.method.empty()) {
+      return std::string("constructor()");
+    }
+    std::ostringstream os;
+    os << invoke_info.method << '(';
+    size_t cnt_params = 0;
+    for(const auto& p : invoke_info.params) {
+      if(cnt_params > 0) {
+        os << ',';
+      }
+      p.printTo(os);
+      ++cnt_params;
+    }
+    os << ')';
+    return os.str();
+  }
+  if(is_payable_target(t)) {
+    std::ostringstream os;
+    os << PayableName << "(" << PayableNameArg0 << " = " << t.amount().to_double() << ", " << PayableNameArg1 << " = 1)";
+    return os.str();
+  }
 }
 
 }  // namespace cs

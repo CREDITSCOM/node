@@ -416,6 +416,8 @@ private:
   // blocking call
   bool implements_payable(const api::SmartContractInvocation& contract);
 
+  // extracts and returns name of method executed by referenced transaction
+  std::string get_executed_method(const SmartContractRef& ref);
 };
 
 }  // namespace cs
