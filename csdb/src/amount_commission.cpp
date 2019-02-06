@@ -29,6 +29,7 @@ void AmountCommission::put(priv::obstream& os) const {
 }
 
 bool AmountCommission::get(priv::ibstream& is) {
+  cached_.store(false, std::memory_order_relaxed);
   return is.get(u_.bits);
 }
 

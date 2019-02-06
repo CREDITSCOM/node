@@ -154,19 +154,29 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
     return 0;
+
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
     cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
     return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
-  wallData.balance_ -= tr.counted_fee().to_double();
+
+  if (SmartContracts::is_executable(tr)) {
+    wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+  } else if (SmartContracts::is_new_state(tr)) {
+    csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
+    wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
+      - csdb::Amount(initTransaction.counted_fee().to_double())
+      - csdb::Amount(tr.counted_fee().to_double());
+  } else {
+    wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+  }
+
 
   if (!smartIniter) {
   wallData.balance_ -= tr.amount();
-
   wallData.trxTail_.push(tr.innerID());
-  setModified(id);
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
@@ -178,6 +188,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #endif
   }
 
+  setModified(id);
   return tr.counted_fee().to_double();
 }
 
