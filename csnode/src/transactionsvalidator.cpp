@@ -7,6 +7,7 @@
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/transactionsvalidator.hpp>
+#include <smartcontracts.hpp>
 
 namespace cs {
 TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
@@ -39,8 +40,14 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   WalletsState::WalletData& wallStateIfNewState = walletsState_.getData(trx.target(), walletIdNewState);
 
 #ifndef WITHOUT_DELTA
-  auto newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
-
+  csdb::Amount newBalance;
+  if (!newState && !SmartContracts::is_executable(trx)) {
+    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+  } else if (!newState && SmartContracts::is_executable(trx)) {
+    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+  } else {
+    newBalance = wallState.balance_ - trx.amount();
+  }
 #ifdef _MSC_VER
   int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
 #else
@@ -67,8 +74,14 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID()))
     return false;
 #endif
+  if (!newState && !SmartContracts::is_executable(trx)) {
+    wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+  } else if (!newState && SmartContracts::is_executable(trx)) {
+    wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+  } else {
+    wallState.balance_ = wallState.balance_ - trx.amount();
+  }
 
-  wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
 #endif
   if (!newState) {
     wallState.trxTail_.push(trx.innerID());
