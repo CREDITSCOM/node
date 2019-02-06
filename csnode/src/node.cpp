@@ -136,11 +136,12 @@ void Node::flushCurrentTasks() {
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
   static std::map<cs::RoundNumber, uint8_t> recdBangs;
+  auto& conveyer = cs::Conveyer::instance();
 
   cswarning() << "-----------------------------------------------------------";
   cswarning() << "NODE> BigBang #" << rNum
               << ": last written #" << blockChain_.getLastSequence()
-              << ", current #" << cs::Conveyer::instance().currentRoundNumber();
+              << ", current #" << conveyer.currentRoundNumber();
   cswarning() << "-----------------------------------------------------------";
 
   istream_.init(data, size);
@@ -150,6 +151,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "Old Big Bang received: " << rNum << "." << subRound_ << " is <= " << rNum << "." << recdBangs[rNum];
     return;
   }
+
+  // cache
+  auto cachedRound = conveyer.currentRoundNumber();
+
+  // update round data
+  conveyer.setRound(rNum);
   recdBangs[rNum] = subRound_;
 
   cs::Hash lastBlockHash;
@@ -192,13 +199,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   // resend all this round data available
   csdebug() << "NODE> resend last block hash after BigBang";
 
-  cs::Conveyer& conveyer = cs::Conveyer::instance();
   globalTable.hashes = conveyer.currentRoundTable().hashes;
 
   csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
   onRoundStart(globalTable);
-  conveyer.updateRoundTable(globalTable);
+  conveyer.updateRoundTable(cachedRound, globalTable);
 
   poolSynchronizer_->processingSync(globalTable.round, true);
 
@@ -417,10 +423,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
     if (poolMetaInfo.realTrustedMask[idx] == 0) {
       poolMetaInfo.writerKey = key;
-      //csdebug() << "WriterKey =" << cs::Utils::byteStreamToHex(poolMetaInfo.writerKey.data(), poolMetaInfo.writerKey.size());
-    }
-    else {
-      //csdebug() << "PublicKey =" << cs::Utils::byteStreamToHex(key.data(), key.size());
     }
   }
 
@@ -827,7 +829,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
   // BB: every round (for now) may be handled:
   if ((type == MsgTypes::BigBang)) {
-    cs::Conveyer::instance().setRound(rNum);
     return MessageActions::Process;
   }
 
