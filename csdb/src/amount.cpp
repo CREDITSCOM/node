@@ -9,6 +9,13 @@
 
 #include "binary_streams.hpp"
 
+namespace {
+template<typename T, typename U>
+T constexpr pow(T base, U exponent) {
+    return exponent == 0 ? 1 : base * pow(base, exponent - 1);
+}
+}  // anonymous namespace
+
 namespace csdb {
 Amount::Amount(double value) {
   if ((value < static_cast<double>(std::numeric_limits<int32_t>::min())) ||
@@ -22,11 +29,10 @@ Amount::Amount(double value) {
   }
 
   double frac = value - static_cast<double>(integral_);
-  uint64_t multiplier = AMOUNT_MAX_FRACTION;
-  for (int i = 0; i < std::numeric_limits<double>::digits10; ++i) {
-    frac *= 10;
-    multiplier /= 10;
-  }
+  constexpr uint64_t digits = std::numeric_limits<double>::digits10;
+  constexpr uint64_t factor = pow(static_cast<uint64_t>(10), digits);
+  constexpr uint64_t multiplier = AMOUNT_MAX_FRACTION / factor;
+  frac *= factor;
 
   fraction_ = static_cast<uint64_t>(frac + 0.5) * multiplier;
   if (fraction_ >= AMOUNT_MAX_FRACTION) {
