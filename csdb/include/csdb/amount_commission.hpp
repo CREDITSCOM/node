@@ -75,10 +75,10 @@ private:
 
 namespace {
 double tens_pows[32] = {
-  10e-18, 10e-17, 10e-16, 10e-15, 10e-14, 10e-13, 10e-12, 10e-11,
-  10e-10,  10e-9,  10e-8,  10e-7,  10e-6,  10e-5,  10e-4,  10e-3,
-   10e-2,  10e-1,     1.,    10.,   10e2,   10e3,   10e4,   10e5,
-    10e6,   10e7,   10e8,   10e9,  10e10,  10e11,  10e12,  10e13 };
+  1e-18, 1e-17, 1e-16, 1e-15, 1e-14, 1e-13, 1e-12, 1e-11,
+  1e-10,  1e-9,  1e-8,  1e-7,  1e-6,  1e-5,  1e-4,  1e-3,
+   1e-2,  1e-1,    1.,   1e1,   1e2,   1e3,   1e4,   1e5,
+    1e6,   1e7,   1e8,   1e9,  1e10,  1e11,  1e12,  1e13 };
 }  // anonymous namspace
 
 inline double AmountCommission::to_double() const noexcept {
