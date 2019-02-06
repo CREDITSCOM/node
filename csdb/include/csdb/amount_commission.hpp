@@ -8,6 +8,7 @@
 
 #include <cinttypes>
 #include <type_traits>
+#include <atomic>
 
 #include <boost/endian/conversion.hpp>
 
@@ -25,6 +26,13 @@ class ibstream;
 class AmountCommission {
 public:
   inline AmountCommission() = default;
+  inline AmountCommission(const AmountCommission& other) {
+    *this = other;
+  }
+  inline csdb::AmountCommission& operator=(const AmountCommission& other) {
+    u_ = other.u_;
+    return *this;
+  }
 
   explicit AmountCommission(uint16_t value);
   explicit AmountCommission(double value);
@@ -59,6 +67,9 @@ private:
 #endif
     } fIEEE;
   } u_;
+
+  mutable double cachedDouble_;
+  mutable std::atomic_bool cached_ = false;
 };
 #pragma pack(pop)
 
@@ -71,8 +82,11 @@ double tens_pows[32] = {
 }  // anonymous namspace
 
 inline double AmountCommission::to_double() const noexcept {
+  if (cached_.load(std::memory_order_relaxed)) return cachedDouble_;
   const double _1_1024 = 1. / 1024;
-  return (u_.fIEEE.sign != 0u ? -1. : 1.) * u_.fIEEE.frac * _1_1024 * tens_pows[u_.fIEEE.exp];
+  cachedDouble_ = (u_.fIEEE.sign != 0u ? -1. : 1.) * u_.fIEEE.frac * _1_1024 * tens_pows[u_.fIEEE.exp];
+  cached_.store(true, std::memory_order_release);
+  return cachedDouble_;
 }
 
 }  // namespace csdb
