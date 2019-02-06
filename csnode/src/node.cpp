@@ -158,6 +158,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   // update round data
   conveyer.setRound(rNum);
   recdBangs[rNum] = subRound_;
+  cs::Conveyer::instance().setRound(rNum);
 
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
@@ -828,7 +829,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   }
 
   // BB: every round (for now) may be handled:
-  if ((type == MsgTypes::BigBang)) {
+  if (type == MsgTypes::BigBang) {
     return MessageActions::Process;
   }
 
@@ -1595,7 +1596,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   csmeta(csdetails) << "done";
 }
 
-void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
+void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo) {
   csmeta(csdebug) << "started";
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
@@ -1617,6 +1618,7 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
 
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
+  stream << stageOneInfo.smartAddress;
   stream << stageOneInfo.hash;
 
   // hash of message
@@ -1631,12 +1633,12 @@ void Node::sendSmartStageOne(cs::StageOneSmarts& stageOneInfo) {
   // signature of round number + calculated hash
   stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
 
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+  sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload
     stageOneInfo.sRoundNum, stageOneInfo.signature, message);
 
   // cache
-  smartStageOneMessage_[solver_->ownSmartsConfidantNumber()] = std::move(message);
+  stageOneInfo.message = std::move(message);
   csmeta(csdebug) << "done";
 }
 
@@ -1723,23 +1725,29 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
+  stream >> stage.smartAddress;
   stream >> stage.hash;
 
-  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+  const cs::ConfidantsKeys& smartConfs = solver_->smartConfidants(stage.smartAddress);
 
-  if (stage.sender >= smartConfidants.size()) {
+  if (stage.sender >= smartConfs.size()) {
     cswarning() << "NODE> WRONG sender number";
     return;
   }
 
-  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
+  const cs::PublicKey& confidant = smartConfs.at(stage.sender);
 
-  if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
-    cswarning() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+  if (confidant != sender) {
+    cswarning() << "NODE> Smart stage One: the sender doesn't correspond to the conf index!!!";
     return;
   }
 
-  smartStageOneMessage_[stage.sender] = std::move(bytes);
+  if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
+    cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    return;
+  }
+
+  stage.message = std::move(bytes);
 
   csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender)
                 << ", sender key: " << cs::Utils::byteStreamToHex(confidant.data(), confidant.size())
@@ -1750,7 +1758,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   solver_->addSmartStageOne(stage, false);
 }
 
-void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
+void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::StageTwoSmarts& stageTwoInfo) {
   csmeta(csdebug) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -1773,12 +1781,12 @@ void Node::sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo) {
 
   // create signature
   stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(),
+  sendToList(smartConfidants, stageTwoInfo.sender,
              MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(),
              stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
 
   // cash our stage two
-  smartStageTwoMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
+  stageTwoInfo.message = std::move(bytes);
   csmeta(csdebug) << "done";
 }
 
@@ -1817,14 +1825,19 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
   csmeta(csdebug) << "Sender:" << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
+  const cs::PublicKeys& smartConfs = solver_->smartConfidants(stage.smartAddress);
 
-  if (stage.sender >= smartConfidants.size()) {
-    cswarning() << "NODE> WRONG SmartStage-2 sender number";
+  if (stage.sender >= smartConfs.size()) {
+    cswarning() << "NODE> Smart stage Two: WRONG sender number";
     return;
   }
 
-  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
+  const cs::PublicKey& confidant = smartConfs.at(stage.sender);
+
+  if (confidant != sender) {
+    cswarning() << "NODE> Smart stage Two: the sender doesn't correspond to the conf index!!!";
+    return;
+  }
 
   if (!cscrypto::verifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "NODE> Smart Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
@@ -1838,7 +1851,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   solver_->addSmartStageTwo(stage, false);
 }
 
-void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
+void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo) {
   csmeta(csdebug) << "started";
 
   if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -1860,12 +1873,12 @@ void Node::sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo) {
   stream << stageThreeInfo.packageSignature;
 
   stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-  sendToList(solver_->smartConfidants(), solver_->ownSmartsConfidantNumber(), MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+  sendToList(smartConfidants, stageThreeInfo.sender, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload:
              stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
   
   // cach stage three
-  smartStageThreeMessage_[solver_->ownSmartsConfidantNumber()] = std::move(bytes);
+  stageThreeInfo.message = std::move(bytes);
   csmeta(csdebug) << "done";
 }
 
@@ -1906,13 +1919,19 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     return;
   }
 
-  const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
-  if (stage.sender >= smartConfidants.size()) {
-    cswarning() << "NODE> WRONG SmartStage-3 sender number: " << stage.sender << ", smartConf size: " << smartConfidants.size();
+  const cs::PublicKeys& smartConfs = solver_->smartConfidants(stage.smartAddress);
+
+  if (stage.sender >= smartConfs.size()) {
+    cswarning() << "NODE> Smart stage Two: WRONG sender number";
     return;
   }
 
-  const cs::PublicKey& confidant = smartConfidants.at(stage.sender);
+  const cs::PublicKey& confidant = smartConfs.at(stage.sender);
+
+  if (confidant != sender) {
+    cswarning() << "NODE> Smart stage Two: the sender doesn't correspond to the conf index!!!";
+    return;
+  }
 
   if (!cscrypto::verifySignature(stage.signature, confidant, bytes.data(), bytes.size())) {
     csdebug() << "SmartStage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
@@ -2006,7 +2025,7 @@ void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signat
     solver_->smartRoundNumber(), signature, message);
   csmeta(csdetails) << "done";
 }
-
+//TODO: this function is a part of new block building <===
 void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3) {
   csmeta(csdetails) << " timestamp = " << timeStamp;
 
@@ -2035,6 +2054,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   }
 
   pool.value().set_confidants(confidants);
+  //TODO: retrive the same functionality from this function and place it to solverCore <===
   pool = blockChain_.createBlock(pool.value());
 
   if (!pool.has_value()) {
@@ -2054,7 +2074,7 @@ void Node::prepareMetaForSending(cs::RoundTable& roundTable, std::string timeSta
   //logPool(pool.value());
   prepareRoundTable(roundTable, poolMetaInfo, st3);
 }
-
+//TODO: this function is a part of round table building <===
 void Node::addRoundSignature(const cs::StageThree& st3) {
   lastSentSignatures_.poolSignatures.push_back(cs::SignaturePair(st3.sender, st3.blockSignature));
   lastSentSignatures_.roundSignatures.push_back(cs::SignaturePair(st3.sender, st3.roundSignature));
@@ -2123,7 +2143,7 @@ void Node::sendRoundTable() {
   conveyer.setTable(table);
   sendRoundPackageToAll();
 }
-
+//TODO: this function is a part of round table building <===
 void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::PoolMetaInfo& poolMetaInfo,
                                  const cs::Characteristic& characteristic, cs::StageThree& st3) {
   lastSentRoundData_.roundTable.round = newRoundTable.round;

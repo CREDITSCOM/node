@@ -46,8 +46,7 @@ public:
 
 private:
   ApiHandlerPtr api_handler;
-  ::api::custom::APIProcessor api_processor;
-  ::apache::thrift::stdcxx::shared_ptr<api::SequentialProcessorFactory> p_api_processor_factory;
+  ::apache::thrift::stdcxx::shared_ptr<::api::APIProcessor> p_api_processor;
 #ifdef BINARY_TCP_API
   ::apache::thrift::server::TThreadedServer server;
   std::thread thread;
@@ -56,7 +55,6 @@ private:
   ::apache::thrift::server::TThreadedServer ajax_server;
   std::thread ajax_thread;
 #endif
-  friend class ::api::custom::APIProcessor;
 };
 }  // namespace csconnector
 

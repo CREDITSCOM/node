@@ -7,7 +7,9 @@
 #include <csnode/conveyer.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <lib/system/logger.hpp>
+#include <csnode/walletscache.hpp>
 #include <lib/system/utils.hpp>
+#include <csdb/amount.hpp>
 
 #include <cscrypto/cscrypto.hpp>
 
@@ -102,7 +104,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     }
   }
   else {
-    cslog() << name() << ": DOES NOT MATCH to my value " << lastHash.to_string();
+    cslog() << name() << ": DOES NOT MATCH my value " << lastHash.to_string();
     context.sendHashReply(std::move(pool_hash), sender);
   }
 
@@ -165,20 +167,33 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
       const csdb::Transaction& transaction = transactions[i];
       bool byte = true;
       bool is_smart_new_state = smarts.is_new_state(transaction);
-      if (!is_smart_new_state) {
+      if(!is_smart_new_state) {
         byte = !(transaction.source() == transaction.target());
+        if (csdb::Amount(transaction.max_fee().to_double()) >= csdb::Amount(transaction.counted_fee().to_double())) {
         byte = byte && ptransval->validateTransaction(transaction, i, del1);
+        } else {
+          byte = false;
+        }
       }
       else {
-        //TODO: implement appropriate validation of smart-state transactions
         csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
-        if (context.smart_contracts().is_closed_smart_contract(transaction.target())) {
+        if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
           byte = false;
           cslog() << name() << ": reject smart new_state trx because related contract is closed";
         }
+        csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(transaction, context.blockchain());
+        if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
+            >= csdb::Amount(transaction.counted_fee().to_double())) {
+          csdb::Address initerAddress = WalletsCache::findSmartContractIniter(transaction, context.blockchain());
+          csdb::Transaction new_state_tr(transaction);
+          new_state_tr.set_source(initerAddress);
+          byte = byte && ptransval->validateTransaction(new_state_tr, i, del1, true);
+        } else {
+          byte = false;
+        }
       }
 
-      if (!byte) {
+      if(!byte) {
         cslog() << name() << ": trx[" << i << "] rejected in validateTransaction()";
       }
 
@@ -188,7 +203,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
           auto sci = context.smart_contracts().get_smart_contract(transaction);
           if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
             csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY); 
-            byte = static_cast<cs::Byte>(SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target());
+            byte = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
 
             if (!byte) {
               cslog() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
@@ -197,8 +212,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
         }
 
         if (byte) {
-          byte = static_cast<cs::Byte>(check_transaction_signature(context, transaction));
-          if (!byte) {
+          byte = check_transaction_signature(context, transaction);
+          if(!byte) {
             cslog() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
           }
         }
