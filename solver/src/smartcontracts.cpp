@@ -42,8 +42,13 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 #endif
 
   // signals subscription
+  
+  // as event receiver:
   cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
   cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
+  // as event source:
+  cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
+  cs::Connector::connect(&signal_payable_timeout, &bc, &BlockChain::onPayableContractTimeout);
 }
 
 SmartContracts::~SmartContracts() = default;
@@ -506,6 +511,13 @@ void SmartContracts::on_store_block(csdb::Pool block) {
           << " blocks (from #," << item.round_start << "), cancel it without transaction";
         item.close();
         retest_required = true;
+
+        csdb::Transaction starter = get_transaction(item.contract);
+        if(starter.is_valid()) {
+          if(is_payable_target(starter)) {
+            emit signal_payable_timeout(starter);
+          }
+        }
       }
       else if(item.status == SmartContractStatus::Closed) {
         retest_required = true;
@@ -542,6 +554,7 @@ void SmartContracts::on_store_block(csdb::Pool block) {
       else if( is_payable_target( tr ) ) {
         // execute payable method
         csdebug() << name() << ": enqueue renewal of smart contract balance";
+        emit signal_payable_invoke(tr);
         enqueue( block, tr_idx );
       }
       ++tr_idx;

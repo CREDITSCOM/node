@@ -130,6 +130,12 @@ public:
       return modified_;
     }
 
+    void invokeReplenishPayableContract(const csdb::Transaction&)
+    {}
+
+    void rollbackReplenishPayableContract(const csdb::Transaction&)
+    {}
+
   protected:
     bool findWalletId(const csdb::Address& address, WalletId& id) override;
     WalletData& getWalletData(WalletId id, const csdb::Address& address) override;

@@ -287,6 +287,17 @@ public signals:
   /** @brief The remove block event. Raised when the next block is flushed to storage */
   cs::ChangeBlockSignal removeBlockEvent;
 
+public slots:
+
+  // prototype is void (csdb::Transaction)
+  // subscription is placed in SmartContracts constructor
+  void onPayableContractReplenish(csdb::Transaction starter) {
+    this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
+  }
+  void onPayableContractTimeout(csdb::Transaction starter) {
+    this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
+  }
+
 private:
 
   /**
