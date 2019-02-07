@@ -3,14 +3,6 @@
 const constexpr std::size_t v4Size = 4;
 const constexpr std::size_t v6Size = 16;
 
-cs::DataStreamException::DataStreamException(const std::string& message)
-: message_(message) {
-}
-
-const char* cs::DataStreamException::what() const noexcept {
-  return message_.c_str();
-}
-
 cs::DataStream::DataStream(char* packet, std::size_t dataSize)
 : data_(packet)
 , index_(0)

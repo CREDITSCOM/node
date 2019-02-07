@@ -16,18 +16,6 @@
 
 namespace cs {
 ///
-/// Exception for packet stream.
-///
-class DataStreamException : public std::exception {
-public:
-  explicit DataStreamException(const std::string& message);
-  virtual const char* what() const noexcept override;
-
-private:
-  const std::string message_;
-};
-
-///
 /// The Data stream class represents an entity that controls data from any char array.
 ///
 class DataStream {
