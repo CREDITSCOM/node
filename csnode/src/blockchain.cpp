@@ -35,6 +35,10 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , cacheMutex_()
 , waitersLocker_()
 , fee_(std::make_unique<cs::Fee>()) {
+
+  cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
+  walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+  blockHashes_ = std::make_unique<cs::BlockHashes>();
 }
 
 BlockChain::~BlockChain() {
@@ -59,19 +63,17 @@ bool BlockChain::init(const std::string& path)
 
   cslog() << "\rDB is opened, loaded " << total_loaded << " blocks";
 
-  blockHashes_ = std::make_unique<cs::BlockHashes>();
-
   if(storage_.last_hash().is_empty()) {
     csdebug() << "Last hash is empty...";
     if(storage_.size()) {
       cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
       return false;
     }
-    walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     writeGenesisBlock();
     generateCheatDbFile(path, *blockHashes_);
   }
   else {
+    /*
     csdebug() << "Last hash is not empty. Reading wallets";
     {
       std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
@@ -83,9 +85,11 @@ bool BlockChain::init(const std::string& path)
         return false;
       }
     }
+    */
 
-    walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-
+    if(!postInitFromDB()) {
+      return false;
+    }
     if(!validateCheatDbFile(path, *blockHashes_)) {
       cserror() << "Bad database version";
       return false;
@@ -109,6 +113,21 @@ bool BlockChain::init(const std::string& path)
 
 bool BlockChain::isGood() const {
   return good_;
+}
+
+void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
+{
+  if(!updateWalletIds(block, *walletsCacheUpdater_.get())) {
+    cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
+    *should_stop = true;
+  }
+  else {
+    walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+    if(!blockHashes_->initFromPrevBlock(block)) {
+      cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
+      *should_stop = true;
+    }
+  }
 }
 
 bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
@@ -172,6 +191,20 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
   }
 
   return res;
+}
+
+bool BlockChain::postInitFromDB() {
+  auto func = [](const WalletData::Address&, const WalletData& wallet) {
+    double bal = wallet.balance_.to_double();
+    if(bal < -std::numeric_limits<double>::min()) {
+      cslog() << "Wallet with negative balance (" << bal << ") detected: "
+        << cs::Utils::byteStreamToHex(wallet.address_.data(), wallet.address_.size())
+        << " (" << EncodeBase58(wallet.address_.data(), wallet.address_.data() + wallet.address_.size()) << ")";
+    }
+    return true;
+  };
+  walletsCacheStorage_->iterateOverWallets(func);
+  return true;
 }
 
 #ifdef TRANSACTIONS_INDEX

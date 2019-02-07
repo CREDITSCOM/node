@@ -36,14 +36,17 @@ Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_)
-, solver_(new cs::SolverCore(this, genesisAddress_, startAddress_))
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
-, ostream_(&packStreamAllocator_, nodeIdKey_) {
+, ostream_(&packStreamAllocator_, nodeIdKey_)
+, stat_() {
+
+  solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
   std::cout << "Start transport... ";
   transport_ = new Transport(config, this);
   std::cout << "Done\n";
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
+
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent_, &stat_, &cs::RoundStat::onStoreBlock);
   good_ = init(config);

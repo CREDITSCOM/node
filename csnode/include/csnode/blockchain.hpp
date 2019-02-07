@@ -176,6 +176,8 @@ private:
   void finalizeBlock(csdb::Pool& pool);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
+  void onReadFromDB(csdb::Pool block, bool* should_stop);
+  bool postInitFromDB();
 
   template <typename WalletCacheProcessor>
   bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
