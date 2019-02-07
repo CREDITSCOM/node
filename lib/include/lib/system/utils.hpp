@@ -390,6 +390,14 @@ inline constexpr cs::BytesView bytesView_cast(const TBytes& bytes) {
   static_assert(std::is_same_v<typename TBytes::value_type, cs::Byte>, "Only bytes storages can use bytesView_cast func");
   return cs::BytesView(bytes.data(), bytes.size());
 }
+
+class Console {
+public:
+  template <typename... Args>
+  static void writeLine(Args&&... args) {
+    (std::cout << ... << std::forward<Args>(args)) << std::endl;
+  }
+};
 }  // namespace cs
 
 inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {
