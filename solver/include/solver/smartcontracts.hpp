@@ -183,7 +183,11 @@ public:
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
 
+  // true if target of transaction is smart contract which implements payable() method
   bool is_payable_target( const csdb::Transaction tr );
+
+  // true if transaction replenishes balance of smart contract
+  bool is_replenish_contract(const csdb::Transaction tr);
 
   std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
@@ -279,6 +283,9 @@ private:
 
   // last contract's state storage
   std::map<csdb::Address, StateItem> known_contracts;
+
+  // contract replenish transactions stored during reading from DB on stratup
+  std::vector<SmartContractRef> replenish_contract;
 
   // async watchers
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
