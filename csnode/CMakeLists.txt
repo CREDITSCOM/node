@@ -61,7 +61,6 @@ add_library(csnode
   src/conveyer.cpp
   src/transactionspacket.cpp
   src/dynamicbuffer.cpp
-  src/datastream.cpp
   src/walletscache.cpp
   src/walletsids.cpp
   src/walletspools.cpp

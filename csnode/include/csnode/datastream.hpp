@@ -14,23 +14,46 @@
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
+namespace cs::csval {
+const constexpr std::size_t v4Size = 4;
+const constexpr std::size_t v6Size = 16;
+}
+
 namespace cs {
 ///
 /// The Data stream class represents an entity that controls data from any char array.
 ///
 class DataStream {
 public:
+  enum class Status {
+    Read,
+    Write
+  };
+
   ///
   /// Constructors to read data from packet
   ///
-  explicit DataStream(char* packet, std::size_t dataSize);
-  explicit DataStream(const char* packet, std::size_t dataSize);
-  explicit DataStream(const uint8_t* packet, std::size_t dataSize);
+  explicit DataStream(char* packet, std::size_t dataSize)
+  : data_(packet)
+  , index_(0)
+  , dataSize_(dataSize) {
+    head_ = data_;
+  }
+
+  explicit DataStream(const char* packet, std::size_t dataSize)
+  : DataStream(const_cast<char*>(packet), dataSize) {
+  }
+
+  explicit DataStream(const uint8_t* packet, std::size_t dataSize)
+  : DataStream(reinterpret_cast<const char*>(packet), dataSize) {
+  }
 
   ///
   /// Constructor to write data
   ///
-  explicit DataStream(cs::Bytes& storage);
+  explicit DataStream(cs::Bytes& storage)
+  : bytes_(&storage) {
+  }
 
   ///
   /// Try to get enpoint from data.
@@ -38,14 +61,69 @@ public:
   /// @return Returns current end point from data.
   /// If data stream can not return valid enpoint then returns empty enpoint.
   ///
-  boost::asio::ip::udp::endpoint endpoint();
+  boost::asio::ip::udp::endpoint parseEndpoint() {
+    boost::asio::ip::udp::endpoint point;
+
+    if (!isAvailable(sizeof(char))) {
+      badState();
+      return point;
+    }
+
+    char flags = *(data_ + index_);
+    char v6 = flags & 1;
+    char addressFlag = (flags >> 1) & 1;
+    char portFlag = (flags >> 2) & 1;
+
+    ++index_;
+
+    std::size_t size = 0;
+
+    if (addressFlag) {
+      size += (v6) ? csval::v6Size : csval::v4Size;
+    }
+
+    if (portFlag) {
+      size += sizeof(uint16_t);
+    }
+
+    if (!isAvailable(size)) {
+      badState();
+      return point;
+    }
+
+    boost::asio::ip::address address;
+
+    if ((index_ + size) <= dataSize_) {
+      if (addressFlag) {
+        address = v6 ? boost::asio::ip::address(createAddress<boost::asio::ip::address_v6>()):
+                       boost::asio::ip::address(createAddress<boost::asio::ip::address_v4>());
+      }
+
+      uint16_t port = 0;
+
+      if (portFlag) {
+        port = *(reinterpret_cast<uint16_t*>(data_ + index_));
+        index_ += sizeof(uint16_t);
+      }
+
+      point = boost::asio::ip::udp::endpoint(address, port);
+    }
+
+    return point;
+  }
 
   ///
   /// Returns current state of stream.
   ///
   /// @return Returns state of stream.
   ///
-  bool isValid() const;
+  bool isValid() const {
+    if (index_ > dataSize_) {
+      return false;
+    }
+
+    return state_;
+  }
 
   ///
   /// Returns state of available bytes.
@@ -53,12 +131,21 @@ public:
   /// @param size Count of bytes.
   /// @return Returns state of available bytes.
   ///
-  bool isAvailable(std::size_t size);
+  bool isAvailable(std::size_t size) {
+    return (index_ + size) <= dataSize_;
+  }
 
   ///
   /// Returns pointer to start of the data.
   ///
-  char* data() const;
+  char* data() const {
+    if (!bytes_) {
+      return data_ + index_;
+    }
+    else {
+      return reinterpret_cast<char*>(bytes_->data());
+    }
+  }
 
   ///
   /// Try to get field from stream by sizeof(T).
@@ -67,7 +154,7 @@ public:
   /// If stream can not return field than returns empty T().
   ///
   template <typename T>
-  inline T streamField() {
+  inline T parseValue() {
     if (!isAvailable(sizeof(T))) {
       badState();
       return T();
@@ -85,25 +172,25 @@ public:
   /// @param streamField Added type.
   ///
   template <typename T>
-  inline void setStreamField(const T& streamField) {
+  inline void addValue(const T& streamField) {
     if (bytes_) {
       const char* ptr = reinterpret_cast<const char*>(&streamField);
 
       for (std::size_t i = 0; i < sizeof(T); ++i) {
-        bytes_->push_back(*(ptr + i));
+        bytes_->push_back(static_cast<cs::Byte>(*(ptr + i)));
       }
     }
   }
 
   ///
-  /// Returns char array from stream.
+  /// Returns byte array from stream.
   ///
-  /// @return Returns char array.
-  /// If stream can not return valid array than returns empty char array.
+  /// @return Returns byte array.
+  /// If stream can not return valid array than returns empty byte array.
   ///
-  template <std::size_t size>
-  inline std::array<char, size> streamArray() {
-    std::array<char, size> array = {0};
+  template <typename T, std::size_t size>
+  inline std::array<T, size> parseArray() {
+    std::array<T, size> array = {0};
 
     if (!isAvailable(size)) {
       badState();
@@ -111,11 +198,10 @@ public:
     }
 
     for (std::size_t i = 0; i < size; ++i) {
-      array[i] = data_[i + index_];
+      array[i] = static_cast<T>(data_[i + index_]);
     }
 
     index_ += size;
-
     return array;
   }
 
@@ -124,46 +210,11 @@ public:
   ///
   /// @param array Char array.
   ///
-  template <std::size_t size>
-  inline void setStreamArray(const std::array<char, size>& array) {
+  template <typename T, std::size_t size>
+  inline void addArray(const std::array<T, size>& array) {
     if (bytes_) {
       bytes_->insert(bytes_->end(), array.begin(), array.end());
     }
-  }
-
-  ///
-  /// Adds array to stream.
-  ///
-  /// @param array Byte array.
-  ///
-  template <std::size_t size>
-  inline void setByteArray(const ByteArray<size>& array) {
-    if (bytes_) {
-      bytes_->insert(bytes_->end(), array.begin(), array.end());
-    }
-  }
-
-  ///
-  /// Returns static byte array.
-  ///
-  /// @return Returns byte array.
-  /// If stream can not returns valid byte array it returns empty array.
-  ///
-  template <std::size_t size>
-  inline ByteArray<size> byteArray() {
-    ByteArray<size> result = {0};
-
-    if (!isAvailable(size)) {
-      badState();
-      return result;
-    }
-
-    for (std::size_t i = 0; i < size; ++i) {
-      result[i] = static_cast<unsigned char>(data_[i + index_]);
-    }
-
-    index_ += size;
-    return result;
   }
 
   ///
@@ -172,7 +223,7 @@ public:
   /// @param fixedString Template FixedString.
   ///
   template <std::size_t size>
-  inline void setFixedString(const FixedString<size>& fixedString) {
+  inline void addFixedString(const FixedString<size>& fixedString) {
     if (bytes_) {
       bytes_->insert(bytes_->end(), fixedString.begin(), fixedString.end());
     }
@@ -185,7 +236,7 @@ public:
   /// If stream can not return available bytes size it returns zero FixedString.
   ///
   template <std::size_t size>
-  inline FixedString<size> fixedString() {
+  inline FixedString<size> parseFixedString() {
     FixedString<size> str;
 
     if (!isAvailable(size)) {
@@ -207,14 +258,50 @@ public:
   ///
   /// @return Returns data stream size.
   ///
-  std::size_t size() const;
+  std::size_t size() const {
+    if (!bytes_) {
+      return dataSize_ - index_;
+    }
+    else {
+      return bytes_->size();
+    }
+  }
+
+  ///
+  /// @brief Returns Read/Write status of stream.
+  ///
+  Status status() const {
+    if (bytes_ != nullptr) {
+      return Status::Write;
+    }
+
+    return Status::Read;
+  }
 
   ///
   /// Adds enpoint to stream.
   ///
   /// @param enpoint Boost enpoint.
   ///
-  void addEndpoint(const boost::asio::ip::udp::endpoint& endpoint);
+  void addEndpoint(const boost::asio::ip::udp::endpoint& endpoint) {
+    if (!bytes_) {
+      return;
+    }
+
+    char v6 = endpoint.address().is_v6();
+    bytes_->push_back(static_cast<cs::Byte>((v6 | 6)));
+
+    if (v6) {
+      boost::asio::ip::address_v6::bytes_type bytes = endpoint.address().to_v6().to_bytes();
+      addArray(bytes);
+    }
+    else {
+      boost::asio::ip::address_v4::bytes_type bytes = endpoint.address().to_v4().to_bytes();
+      addArray(bytes);
+    }
+
+    addValue(endpoint.port());
+  }
 
   ///
   /// Skips compile time size.
@@ -232,25 +319,15 @@ public:
   }
 
   ///
-  /// Adds transactions packet hash to stream.
-  ///
-  /// @param hash Data base transactions packet hash.
-  ///
-  void addTransactionsHash(const cs::TransactionsPacketHash& hash);
-
-  ///
-  /// Returns packet hash.
-  ///
-  /// @return Returns packet hash.
-  /// If stream can not return hash it returns empty hash.
-  ///
-  cs::TransactionsPacketHash transactionsHash();
-
-  ///
   /// Adds bytes vector to stream.
   /// @param data Vector of bytes to write.
   ///
-  void addVector(const cs::Bytes& data);
+  void addVector(const cs::Bytes& data) {
+    if (bytes_) {
+      addValue(data.size());
+      bytes_->insert(bytes_->end(), data.begin(), data.end());
+    }
+  }
 
   ///
   /// Returns bytes vector.
@@ -258,70 +335,91 @@ public:
   /// @return Returns byte vector.
   /// If stream can not return size of bytes it returns empty vector.
   ///
-  cs::Bytes byteVector();
+  cs::Bytes parseVector() {
+    cs::Bytes result;
+
+    if (!isAvailable(sizeof(std::size_t))) {
+      badState();
+      return result;
+    }
+
+    std::size_t size = parseValue<size_t>();
+
+    if (isAvailable(size)) {
+      result = cs::Bytes(data_ + index_, data_ + index_ + size);
+      index_ += size;
+    }
+    else {
+      badState();
+    }
+
+    return result;
+  }
 
   ///
   /// Adds std::string chars to stream.
   ///
   /// @param string Any information represented as std::string.
   ///
-  void addString(const std::string& string);
+  void addString(const std::string& string) {
+    if (bytes_) {
+      addValue(string.size());
+      bytes_->insert(bytes_->end(), string.begin(), string.end());
+    }
+  }
 
   ///
   /// @return Returns std::string by arguments size.
   /// If stream can not return size of bytes it returns empty std::string.
   ///
-  std::string string();
+  std::string parseString() {
+    std::string result;
 
-  ///
-  /// Adds hash vector to stream.
-  ///
-  /// @param hashVector HashVector structure.
-  ///
-  void addHashVector(const cs::HashVector& hashVector);
+    if (!isAvailable(sizeof(std::size_t))) {
+      badState();
+      return result;
+    }
 
-  ///
-  /// Returns parsed hash vector structure.
-  ///
-  cs::HashVector hashVector();
+    std::size_t size = parseValue<size_t>();
 
-  ///
-  /// Adds hash matrix structure to stream.
-  ///
-  /// @param matrix Hash matrix that should be added to stream.
-  ///
-  void addHashMatrix(const cs::HashMatrix& matrix);
+    if (isAvailable(size)) {
+      result = std::string(data_ + index_, data_ + index_ + size);
+      index_ += size;
+    }
+    else {
+      badState();
+    }
 
-  ///
-  /// Returns parsed hash matrix.
-  ///
-  /// @return Initialized HashMatrix structure.
-  ///
-  cs::HashMatrix hashMatrix();
-
-  ///
-  /// Adds transaction packet to stream.
-  ///
-  /// @param packet Packet that should be added to stream.
-  ///
-  void addTransactionsPacket(const cs::TransactionsPacket& packet);
-
-  ///
-  /// Returns parsed transaction packet from stream.
-  ///
-  /// @return Initialized and parsed transaction packet
-  ///
-  cs::TransactionsPacket transactionPacket();
+    return result;
+  }
 
   ///
   /// @brief Adds bytesView entity to stream.
   ///
-  void addBytesView(const cs::BytesView& bytesView);
+  void addBytesView(const cs::BytesView& bytesView) {
+    if (bytes_) {
+      addValue(bytesView.size());
+      insertBytes(bytesView.data(), bytesView.size());
+    }
+  }
 
   ///
   /// @brief Returns BytesView entity if can, otherwise return empty object.
   ///
-  cs::BytesView bytesView();
+  cs::BytesView parseBytesView() {
+    cs::BytesView bytesView;
+    size_t size = parseValue<size_t>();
+
+    if (isAvailable(size)) {
+      bytesView = cs::BytesView(reinterpret_cast<cs::Byte*>(data_), size);
+      index_ += size;
+    }
+    else {
+      badState();
+    }
+
+    return bytesView;
+  }
 
   ///
   /// Peeks next parameter.
@@ -356,11 +454,20 @@ private:
   std::size_t dataSize_ = 0;
   bool state_ = true;
 
+  // main storage
   cs::Bytes* bytes_ = nullptr;
 
   // creates template address
   template <typename T>
-  T createAddress();
+  T createAddress() {
+    typename T::bytes_type bytes;
+
+    for (std::size_t i = 0; i < bytes.size(); ++i, ++index_) {
+      bytes[i] = static_cast<unsigned char>(data_[index_]);
+    }
+
+    return T(bytes);
+  }
 
   inline void badState() {
     state_ = false;
@@ -381,43 +488,26 @@ private:
 /// Gets next end point from stream to end point variable.
 ///
 inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint& endPoint) {
-  endPoint = stream.endpoint();
-  return stream;
-}
-
-///
-/// Gets from stream to uint8_t variable.
-///
-template <typename T>
-inline DataStream& operator>>(DataStream& stream, T& streamField) {
-  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
-  streamField = stream.streamField<T>();
+  endPoint = stream.parseEndpoint();
   return stream;
 }
 
 ///
 /// Gets from stream to array.
 ///
-template <std::size_t size>
-inline DataStream& operator>>(DataStream& stream, std::array<char, size>& array) {
-  array = stream.streamArray<size>();
+template <typename T, std::size_t size>
+inline DataStream& operator>>(DataStream& stream, std::array<T, size>& array) {
+  array = stream.template parseArray<T, size>();
   return stream;
 }
 
 ///
-/// Gets from stream to byte array.
+/// Gets from stream to T variable.
 ///
-template <std::size_t size>
-inline DataStream& operator>>(DataStream& stream, ByteArray<size>& array) {
-  array = stream.byteArray<size>();
-  return stream;
-}
-
-///
-/// Gets from stream to transactions packet hash.
-///
-inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& hash) {
-  hash = stream.transactionsHash();
+template <typename T>
+inline DataStream& operator>>(DataStream& stream, T& value) {
+  static_assert(std::is_trivial_v<T>, "Template parameter to must be trivial. Overload this function for non-trivial type");
+  value = stream.template parseValue<T>();
   return stream;
 }
 
@@ -425,7 +515,7 @@ inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& ha
 /// Gets from stream to bytes vector (stream would use data size of vector to create bytes).
 ///
 inline DataStream& operator>>(DataStream& stream, cs::Bytes& data) {
-  data = stream.byteVector();
+  data = stream.parseVector();
   return stream;
 }
 
@@ -433,7 +523,7 @@ inline DataStream& operator>>(DataStream& stream, cs::Bytes& data) {
 /// Gets from stream to std::string (stream would use data size of string to create bytes).
 ///
 inline DataStream& operator>>(DataStream& stream, std::string& data) {
-  data = stream.string();
+  data = stream.parseString();
   return stream;
 }
 
@@ -442,7 +532,7 @@ inline DataStream& operator>>(DataStream& stream, std::string& data) {
 ///
 template <std::size_t size>
 inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString) {
-  fixedString = stream.fixedString<size>();
+  fixedString = stream.template parseFixedString<size>();
   return stream;
 }
 
@@ -450,15 +540,35 @@ inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString
 /// Gets hashVector structure from stream.
 ///
 inline DataStream& operator>>(DataStream& stream, cs::HashVector& hashVector) {
-  hashVector = stream.hashVector();
+  stream >> hashVector.sender >> hashVector.hash >> hashVector.signature;
   return stream;
 }
 
 ///
 /// Gets hash matrix structure from stream.
 ///
-inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& hashMatrix) {
-  hashMatrix = stream.hashMatrix();
+inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& matrix) {
+  stream >> matrix.sender;
+
+  for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    stream >> matrix.hashVector[i];
+  }
+
+  stream >> matrix.signature;
+  return stream;
+}
+
+///
+/// Gets from stream to transactions packet hash.
+///
+inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& hash) {
+  cs::Bytes bytes;
+  stream >> bytes;
+
+  if (!bytes.empty()) {
+    hash = cs::TransactionsPacketHash::fromBinary(bytes);
+  }
+
   return stream;
 }
 
@@ -466,7 +576,13 @@ inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& hashMatrix) {
 /// Gets transaction packet structure from stream.
 ///
 inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacket& packet) {
-  packet = stream.transactionPacket();
+  cs::Bytes bytes;
+  stream >> bytes;
+
+  if (!bytes.empty()) {
+    packet = cs::TransactionsPacket::fromBinary(bytes);
+  }
+
   return stream;
 }
 
@@ -477,7 +593,9 @@ inline DataStream& operator>>(DataStream& stream, csdb::PoolHash& hash) {
   cs::Bytes bytes;
   stream >> bytes;
 
-  hash = csdb::PoolHash::from_binary(std::move(bytes));
+  if (!bytes.empty()) {
+    hash = csdb::PoolHash::from_binary(std::move(bytes));
+  }
 
   return stream;
 }
@@ -489,7 +607,9 @@ inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool) {
   cs::Bytes bytes;
   stream >> bytes;
 
-  pool = csdb::Pool::from_binary(std::move(bytes));
+  if (!bytes.empty()) {
+    pool = csdb::Pool::from_binary(std::move(bytes));
+  }
 
   return stream;
 }
@@ -503,7 +623,6 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
   stream >> size;
 
   if (size == 0) {
-    //cserror() << "Data stream parsing of vector: nothing to parse";
     return stream;
   }
 
@@ -529,7 +648,7 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
 /// Gets pool from stream.
 ///
 inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
-  bytesView = stream.bytesView();
+  bytesView = stream.parseBytesView();
   return stream;
 }
 
@@ -545,9 +664,9 @@ inline DataStream& operator>>(DataStream& stream, cs::SignaturePair& signaturePa
 ///
 /// Writes array to stream.
 ///
-template <std::size_t size>
-inline DataStream& operator<<(DataStream& stream, const std::array<char, size>& array) {
-  stream.setStreamArray(array);
+template <typename T, std::size_t size>
+inline DataStream& operator<<(DataStream& stream, const std::array<T, size>& array) {
+  stream.addArray(array);
   return stream;
 }
 
@@ -555,9 +674,17 @@ inline DataStream& operator<<(DataStream& stream, const std::array<char, size>& 
 /// Writes T to stream.
 ///
 template <typename T>
-inline DataStream& operator<<(DataStream& stream, const T& streamField) {
-  static_assert(std::is_trivial<T>::value, "Template parameter to must be trivial. Overload this function for non-trivial type");
-  stream.setStreamField(streamField);
+inline DataStream& operator<<(DataStream& stream, const T& value) {
+  static_assert(std::is_trivial_v<T>, "Template parameter to must be trivial. Overload this function for non-trivial type");
+  stream.addValue(value);
+  return stream;
+}
+
+///
+/// Writes vector of bytes to stream.
+///
+inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
+  stream.addVector(data);
   return stream;
 }
 
@@ -570,27 +697,10 @@ inline DataStream& operator<<(DataStream& stream, const boost::asio::ip::udp::en
 }
 
 ///
-/// Writes byte array to stream.
-///
-template <std::size_t size>
-inline DataStream& operator<<(DataStream& stream, const ByteArray<size>& array) {
-  stream.setByteArray(array);
-  return stream;
-}
-
-///
 /// Writes hash binary to stream.
 ///
 inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacketHash& hash) {
-  stream.addTransactionsHash(hash);
-  return stream;
-}
-
-///
-/// Writes vector of bytes to stream.
-///
-inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
-  stream.addVector(data);
+  stream << hash.toBinary();
   return stream;
 }
 
@@ -607,7 +717,7 @@ inline DataStream& operator<<(DataStream& stream, const std::string& data) {
 ///
 template <std::size_t size>
 inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString) {
-  stream.setFixedString(fixedString);
+  stream.addFixedString(fixedString);
   return stream;
 }
 
@@ -615,15 +725,23 @@ inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixed
 /// Writes hash vector structure to stream.
 ///
 inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector) {
-  stream.addHashVector(hashVector);
+  stream << hashVector.sender;
+  stream << hashVector.hash;
+  stream << hashVector.signature;
   return stream;
 }
 
 ///
 /// Writes hash matrix structure to stream.
 ///
-inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& hashMatrix) {
-  stream.addHashMatrix(hashMatrix);
+inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& matrix) {
+  stream << matrix.sender;
+
+  for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    stream << matrix.hashVector[i];
+  }
+
+  stream << matrix.signature;
   return stream;
 }
 
@@ -631,7 +749,7 @@ inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& hashMatr
 /// Writes hash matrix structure to stream.
 ///
 inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacket& packet) {
-  stream.addTransactionsPacket(packet);
+  stream << packet.toBinary();
   return stream;
 }
 
