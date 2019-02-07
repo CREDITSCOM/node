@@ -268,8 +268,13 @@ csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr,
   SmartContractRef smartRef;
   smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
   csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-  return trWithIniter.source();
+  auto& transactions = pool.transactions();
+  if (transactions.size() > smartRef.transaction) {
+    csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
+    return trWithIniter.source();
+  }
+
+  return csdb::Address{};
 }
 
 csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
