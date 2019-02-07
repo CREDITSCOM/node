@@ -60,6 +60,44 @@ void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::Confidants
   load(curr, confidants, blockchain);
 }
 
+void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Transaction& transaction) {
+  csdb::Address wallAddress = transaction.target();
+  if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+    return;
+  }
+  WalletId id{};
+  if (!findWalletId(wallAddress, id)) {
+    cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
+    return;
+  }
+  WalletData& wallData = getWalletData(id, wallAddress);
+  wallData.balance_ -= transaction.amount();
+  setModified(id);
+  data_.smartPayableTransactions_.push_back(transaction);
+}
+
+void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction) {
+  csdb::Address wallAddress = transaction.source();
+  if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+    return;
+  }
+  WalletId id{};
+  if (!findWalletId(wallAddress, id)) {
+    cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
+    return;
+  }
+  WalletData& wallData = getWalletData(id, wallAddress);
+  wallData.balance_ += transaction.amount();
+  setModified(id);
+  for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
+    if (it->source() == transaction.source() &&
+        it->innerID() == transaction.innerID()) {
+      data_.smartPayableTransactions_.erase(it);
+      break;
+    }
+  }
+}
+
 // ProcessorBase
 void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
@@ -166,9 +204,13 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
   } else if (SmartContracts::is_new_state(tr)) {
     csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
-    wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
-      - csdb::Amount(initTransaction.counted_fee().to_double())
-      - csdb::Amount(tr.counted_fee().to_double());
+    if (SmartContracts::is_executable(initTransaction)) {
+      wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
+        - csdb::Amount(initTransaction.counted_fee().to_double())
+        - csdb::Amount(tr.counted_fee().to_double());
+    } else {
+      checkSmartWaitingForMoney(initTransaction, tr);
+    }
   } else {
     wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
   }
@@ -190,6 +232,36 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   setModified(id);
   return tr.counted_fee().to_double();
+}
+
+void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
+  if (newStateTransaction.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
+    return rollbackReplenishPayableContract(initTransaction);
+  }
+  bool waitingSmart = false;
+  for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
+    if (it->source() == initTransaction.source() &&
+        it->innerID() == initTransaction.innerID()) {
+      data_.smartPayableTransactions_.erase(it);
+      waitingSmart = true;
+      break;
+    }
+  }
+
+  if (waitingSmart) {
+    csdb::Address wallAddress = initTransaction.target();
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+      return;
+    }
+    WalletId id{};
+    if (!findWalletId(wallAddress, id)) {
+      cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
+      return;
+    }
+    WalletData& wallData = getWalletData(id, wallAddress);
+    wallData.balance_ += initTransaction.amount();
+    setModified(id);
+  }
 }
 
 csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
