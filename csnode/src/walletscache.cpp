@@ -3,6 +3,8 @@
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <lib/system/logger.hpp>
+#include <solver/smartcontracts.hpp>
+#include <blockchain.hpp>
 
 using namespace std;
 
@@ -43,8 +45,8 @@ WalletsCache::Initer::Initer(WalletsCache& data)
   walletsSpecial_.reserve(data_.config_.initialWalletsNum_);
 }
 
-void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants) {
-  load(curr, confidants);
+void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
+  load(curr, confidants, blockchain);
 }
 
 // Updater
@@ -53,13 +55,13 @@ WalletsCache::Updater::Updater(WalletsCache& data)
   modified_.resize(data.wallets_.size(), false);
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants) {
+void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
   modified_.reset();
-  load(curr, confidants);
+  load(curr, confidants, blockchain);
 }
 
 // ProcessorBase
-void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants) {
+void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
   double totalAmountOfCountedFee = 0;
 #ifdef MONITOR_NODE
@@ -88,7 +90,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 #endif
 
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
-    totalAmountOfCountedFee += load(*itTrx);
+    totalAmountOfCountedFee += load(*itTrx, blockchain);
   }
 #ifdef MONITOR_NODE
   it_writer->second.totalFee += totalAmountOfCountedFee;
@@ -134,13 +136,21 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, 
   }
 }
 
-double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr) {
+double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const BlockChain& blockchain) {
   loadTrxForTarget(tr);
-  return loadTrxForSource(tr);
+  return loadTrxForSource(tr, blockchain);
 }
 
-double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr) {
-  csdb::Address wallAddress = tr.source();
+double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
+  csdb::Address wallAddress;
+
+  bool smartIniter = false;
+  if (SmartContracts::is_new_state(tr)) {
+    wallAddress = findSmartContractIniter(tr, blockchain);
+    smartIniter = true;
+  } else {
+    wallAddress = tr.source();
+  }
 
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
     return 0;
@@ -150,10 +160,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
-  wallData.balance_ -= tr.amount();
-
-  if (tr.source() != tr.target())
   wallData.balance_ -= tr.counted_fee().to_double();
+
+  if (!smartIniter) {
+    wallData.balance_ -= tr.amount();
 
   wallData.trxTail_.push(tr.innerID());
   setModified(id);
@@ -166,8 +176,25 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #ifdef TRANSACTIONS_INDEX
   wallData.lastTransaction_ = tr.id();
 #endif
+  }
 
   return tr.counted_fee().to_double();
+}
+
+csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
+  SmartContractRef smartRef;
+  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
+  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
+  return trWithIniter.source();
+}
+
+csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
+  SmartContractRef smartRef;
+  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
+  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
+  return trWithIniter;
 }
 
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {

@@ -7,7 +7,6 @@
 #define _CREDITS_CSDB_AMOUNT_COMMISSION_H_INCLUDED_
 
 #include <cinttypes>
-#include <cmath>
 #include <type_traits>
 
 #include <boost/endian/conversion.hpp>
@@ -63,9 +62,17 @@ private:
 };
 #pragma pack(pop)
 
+namespace {
+double tens_pows[32] = {
+  10e-18, 10e-17, 10e-16, 10e-15, 10e-14, 10e-13, 10e-12, 10e-11,
+  10e-10,  10e-9,  10e-8,  10e-7,  10e-6,  10e-5,  10e-4,  10e-3,
+   10e-2,  10e-1,     1.,    10.,   10e2,   10e3,   10e4,   10e5,
+    10e6,   10e7,   10e8,   10e9,  10e10,  10e11,  10e12,  10e13 };
+}  // anonymous namspace
+
 inline double AmountCommission::to_double() const noexcept {
   const double _1_1024 = 1. / 1024;
-  return (u_.fIEEE.sign != 0u ? -1. : 1.) * u_.fIEEE.frac * _1_1024 * std::pow(10., u_.fIEEE.exp - 18);
+  return (u_.fIEEE.sign != 0u ? -1. : 1.) * u_.fIEEE.frac * _1_1024 * tens_pows[u_.fIEEE.exp];
 }
 
 }  // namespace csdb

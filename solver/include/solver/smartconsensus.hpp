@@ -29,7 +29,7 @@ namespace cs {
 
       /*SmartConsensus();*/
 
-      SmartConsensus(SolverCore* core, Node* node, cs::TransactionsPacket pack);
+      SmartConsensus(SolverCore* core, Node* node, cs::TransactionsPacket pack/*, QueueItem&*/);
 
       ~SmartConsensus();
 
@@ -44,7 +44,11 @@ namespace cs {
       void killTimer(int st);
       void fakeStage(uint8_t confIndex);
 
+
+      cs::PublicKey smartAddress();
       //Solver smarts consensus methods
+      void smartStagesStorageClear(size_t cSize);
+
       void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
       void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
       void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
@@ -84,14 +88,21 @@ namespace cs {
       bool smartStagesStorageRefreshed_ = false;
       std::vector<cs::PublicKey> smartConfidants_;
       uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
-      cs::Sequence smartRoundNumber_;
       cs::TransactionsPacket currentSmartTransactionPack_;
       cs::StageOneSmarts st1;
       cs::StageTwoSmarts st2;
       cs::StageThreeSmarts st3;
       std::vector <int> smartUntrusted;
       std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
+      cs::Sequence smartRoundNumber_;
+      cs::PublicKey smartAddress_;
 
+      std::vector<cs::Bytes> smartStageOneMessage_;
+      std::vector<cs::Bytes> smartStageTwoMessage_;
+      std::vector<cs::Bytes> smartStageThreeMessage_;
+
+      std::vector<cs::Stage> smartStageTemporary_;
+      bool isSmartStageStorageCleared_ = false;
 
   };
 }

@@ -69,11 +69,11 @@ public:
   void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
   //smart-contracts consensus communicatioin
-  void sendSmartStageOne(cs::StageOneSmarts& stageOneInfo);
+  void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo);
   void getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum,  const cs::PublicKey& sender);
-  void sendSmartStageTwo(cs::StageTwoSmarts& stageTwoInfo);
+  void sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::StageTwoSmarts& stageTwoInfo);
   void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
-  void sendSmartStageThree(cs::StageThreeSmarts& stageThreeInfo);
+  void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
   void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
   void smartStageEmptyReply(uint8_t requesterNumber);
   void smartStageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required);

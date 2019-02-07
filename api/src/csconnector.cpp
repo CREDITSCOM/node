@@ -25,14 +25,13 @@ using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
 : api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, config))
-, api_processor(api_handler)
-, p_api_processor_factory(new api::SequentialProcessorFactory(api_processor))
+, p_api_processor(make_shared<api::APIProcessor>(api_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor_factory, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
+, server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
          make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor_factory, make_shared<TServerSocket>(config.ajax_port),
+, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port),
               make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 {

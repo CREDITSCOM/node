@@ -304,40 +304,49 @@ const std::vector<cs::PublicKey>& SolverCore::smartConfidants() const {
       cserror() << "SolverCore: empty packet must not finish smart contract execution";
       return;
     }
-    //smartProcesses_.emplace_back(this, pnode, pack);
+    smartProcesses_.emplace_back(this, pnode, pack);
+  }
 
-    smartConfidants_.clear();
-    smartRoundNumber_ = 0;
-    for (const auto& tr : pack.transactions()) {
-      if (psmarts->is_new_state(tr)) {
-        cs::SmartContractRef smartRef;
-        smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
-        smartRoundNumber_ = smartRef.sequence;
+  cs::PublicKeys SolverCore::smartConfidants(cs::PublicKey smartKey) {
+    for(auto& it : smartProcesses_) {
+      if(it.smartAddress()==smartKey) {
+        return it.smartConfidants();
       }
     }
-    if (0 == smartRoundNumber_) {
-      // TODO: fix failure of smart execution, clear it from exe_queue
-      cserror() << "SolverCore: smart contract result packet must contain new state transaction";
-      return;
-    }
-    smartConfidants_ = pnode->retriveSmartConfidants(smartRoundNumber_);
-    ownSmartsConfNum_ = calculateSmartsConfNum();
 
-  csdebug() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_) << "] =========================";
-  csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
-  refreshSmartStagesStorage();
-  if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
-    return;
   }
-  // cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
-  pack.makeHash();
-  auto tmp = pack.hash().toBinary();
-  std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
-  currentSmartTransactionPack_ = pack;
-  st1.sender = ownSmartsConfNum_;
-  st1.sRoundNum = smartRoundNumber_;
-  addSmartStageOne(st1, true);
-}
+  //  smartConfidants_.clear();
+  //  smartRoundNumber_ = 0;
+  //  for (const auto& tr : pack.transactions()) {
+  //    if (psmarts->is_new_state(tr)) {
+  //      cs::SmartContractRef smartRef;
+  //      smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  //      smartRoundNumber_ = smartRef.sequence;
+  //    }
+  //  }
+  //  if (0 == smartRoundNumber_) {
+  //    // TODO: fix failure of smart execution, clear it from exe_queue
+  //    cserror() << "SolverCore: smart contract result packet must contain new state transaction";
+  //    return;
+  //  }
+  //  smartConfidants_ = pnode->retriveSmartConfidants(smartRoundNumber_);
+  //  ownSmartsConfNum_ = calculateSmartsConfNum();
+
+  //csdebug() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_) << "] =========================";
+  //csdebug() << "SMART confidants (" << smartConfidants_.size() << "):";
+  //refreshSmartStagesStorage();
+  //if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
+  //  return;
+  //}
+  //// cscrypto::CalculateHash(st1.hash,transaction.to_byte_stream().data(), transaction.to_byte_stream().size());
+  //pack.makeHash();
+  //auto tmp = pack.hash().toBinary();
+  //std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
+  //currentSmartTransactionPack_ = pack;
+  //st1.sender = ownSmartsConfNum_;
+  //st1.sRoundNum = smartRoundNumber_;
+  //addSmartStageOne(st1, true);
+
 
 uint8_t SolverCore::calculateSmartsConfNum() {
   uint8_t i = 0;
@@ -411,7 +420,7 @@ void SolverCore::refreshSmartStagesStorage() {
 
 void SolverCore::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
   if (send) {
-    pnode->sendSmartStageOne(stage);
+    pnode->sendSmartStageOne(smartConfidants(), stage);
   }
   if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
     return;
@@ -434,7 +443,7 @@ void SolverCore::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
   if (send) {
     st2.sender = ownSmartsConfNum_;
     st2.sRoundNum = smartRoundNumber_;
-    pnode->sendSmartStageTwo(stage);
+    pnode->sendSmartStageTwo(smartConfidants(),stage);
   }
   auto& stageTwo = smartStageTwoStorage_.at(stage.sender);
   if (stageTwo.sender == stage.sender) {
@@ -539,7 +548,7 @@ void SolverCore::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
     csdebug() << "____ 1.";
     stage.sender = ownSmartsConfNum_;
     stage.sRoundNum = smartRoundNumber_;
-    pnode->sendSmartStageThree(stage);
+    pnode->sendSmartStageThree(smartConfidants(), stage);
   }
   if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
     return;

@@ -216,7 +216,7 @@ private:
 
   bool good_;
 
-  mutable cs::SpinLock dbLock_;
+  mutable std::recursive_mutex dbLock_;
   csdb::Storage storage_;
 
   std::unique_ptr<cs::BlockHashes> blockHashes_;
