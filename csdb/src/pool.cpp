@@ -174,18 +174,22 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
     if (!is.get(previous_hash_)) {
+      csmeta(cswarning) << "get previous hash is failed";
       return false;
     }
 
     if (!is.get(sequence_)) {
+      csmeta(cswarning) << "get sequence is failed";
       return false;
     }
 
     if (!is.get(user_fields_)) {
+      csmeta(cswarning) << "get user fields is failed";
       return false;
     }
 
     if (!is.get(cnt)) {
+      csmeta(cswarning) << "get cnt is failed";
       return false;
     }
 
@@ -245,7 +249,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     signatures_.clear();
     signatures_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      int index;
+      cs::Byte index = 0;
       cs::Signature sig;
 
       if (!is.get(index)) {
@@ -314,34 +318,42 @@ class Pool::priv : public ::csdb::internal::shared_data {
   bool get(::csdb::priv::ibstream& is) {
     size_t cnt;
     if (!get_meta(is, cnt)) {
+      csmeta(cswarning) << "get meta is failed";
       return false;
     }
 
     if (!getTransactions(is, cnt)) {
+      csmeta(cswarning) << "get transactions is failed";
       return false;
     }
 
     if (!getNewWallets(is)) {
+      csmeta(cswarning) << "get new wallets is failed";
       return false;
     }
 
     if (!getConfidants(is)) {
+      csmeta(cswarning) << "get confidants is failed";
       return false;
     }
 
     if (!is.get(realTrusted_)) {
+      csmeta(cswarning) << "get real trusted is failed";
       return false;
     }
 
     if(!is.get(hashingLength_)) {
+      csmeta(cswarning) << "get hashing length is failed";
       return false;
     }
 
     if (!getSignatures(is)) {
+      csmeta(cswarning) << "get signatures is failed";
       return false;
     }
 
     if (!getSmartSignatures(is)) {
+      csmeta(cswarning) << "get smart signatures is failed";
       return false;
     }
     is_valid_ = true;
@@ -441,7 +453,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   std::vector<uint8_t> realTrusted_;
   size_t hashingLength_ = 0;
   //cs::PublicKey writer_public_key_;
-  ::std::vector<std::pair<int, cs::Signature>> signatures_;
+  cs::BlockSignatures signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -589,7 +601,7 @@ const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
   return d->next_confidants_;
 }
 
-const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noexcept {
+const cs::BlockSignatures& Pool::signatures() const noexcept {
   return d->signatures_;
 }
 
@@ -649,14 +661,15 @@ void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept
   data->next_confidants_ = confidants;
 }
 
-void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
-  //if (d.constData()->read_only_) {
-  //  return;
-  //}
+void Pool::set_signatures(cs::BlockSignatures&& blockSignatures) noexcept {
+  if (d.constData()->read_only_) {
+    csmeta(cswarning) << "Set signatures is failed. Data is read only!";
+    return;
+  }
+
   priv* data = d.data();
   data->is_valid_ = true;
-  data->signatures_.emplace_back(std::make_pair(index, signature));
-  //csdebug() << "The signature is added";
+  data->signatures_ = std::move(blockSignatures);
 }
 
 void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept
@@ -725,16 +738,6 @@ UserField Pool::user_field(user_field_id_t id) const noexcept {
     res.insert(it.first);
   }
   return res;
-}
-
-bool Pool::recompose() {
-  //if (d.constData()->read_only_) {
-  //  return true;
-  //}
-
-  d->compose();
-
-  return d.constData()->is_valid_;
 }
 
 bool Pool::compose() {

@@ -188,97 +188,60 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
-  const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
   if (find_stage3(stage.sender) != nullptr) {
     // duplicated
     return;
   }
 
-  // if()
+  auto lamda = [this] (const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
+                                   stageTo.blockHash.data(), stageTo.blockHash.size())) {
+      cswarning() << "Block Signatures is not valid !";
+      return;
+    }
+
+    if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
+                                   stageTo.roundHash.data(), stageTo.roundHash.size())) {
+      cswarning() << "Round Signatures is not valid !";
+      return;
+    }
+
+    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
+      cswarning() << "Real Trusted is not valid !";
+      return;
+    }
+
+    if (!(stageFrom.writer == stageTo.writer)) {
+      cswarning() << "Writer is not valid !";
+      return;
+    }
+
+    trueStageThreeStorage.emplace_back(stageFrom);
+    pnode->addRoundSignature(stageFrom);
+    csdebug() << "Stage3 [" << static_cast<int>(stageFrom.sender) << "] - signatures are OK";
+  };
+
   switch (flagg) {
     case 0:
-      stageThreeStorage.push_back(stage);
       break;
 
     case 1:
-      for (auto& st : stageThreeStorage) {
-        //          csdebug() << "OUR:";
-        //          printStage3(stage);
-        //          csdebug() << "GOT:";
-        //          st.print();
-        // TODO: change the routine of pool signing
-        bool blockSignaturesOk = cscrypto::verifySignature(st.blockSignature, conveyer.confidantByIndex(st.sender),
-                                                           stage.blockHash.data(), stage.blockHash.size());
-        if (!blockSignaturesOk) {
-          csdebug() << "Block Signatures are not ok";
-        }
-
-        bool roundSignaturesOk = cscrypto::verifySignature(st.roundSignature, conveyer.confidantByIndex(st.sender),
-                                                           stage.roundHash.data(), stage.roundHash.size());
-        if (!roundSignaturesOk) {
-          csdebug() << "Round Signatures are not ok";
-        }
-
-        bool realTrustedOk = (st.realTrustedMask == stage.realTrustedMask);
-        if (!realTrustedOk) {
-          csdebug() << "Real Trusted are not ok";
-        }
-
-        bool writerOk = st.writer == stage.writer;
-        if (!writerOk) {
-          csdebug() << "Writer is not ok";
-        }
-
-        if (blockSignaturesOk && roundSignaturesOk && realTrustedOk && writerOk) {
-          trueStageThreeStorage.push_back(st);
-          pnode->addRoundSignature(st);
-          csdebug() << "Stage3 [" << static_cast<int>(st.sender) << "] - signatures are OK";
-        }
+      // TODO: change the routine of pool signing
+      for (const auto& st : stageThreeStorage) {
+        lamda(st, stage);
       }
-
       trueStageThreeStorage.push_back(stage);
       pnode->addRoundSignature(stage);
-      stageThreeStorage.push_back(stage);
       break;
 
     case 2:
       const auto st = find_stage3(pnode->getConfidantNumber());
-      //        csdebug() << "OUR:";
-      //        st->print();
-      //        csdebug() << "GOT:";
-      //        printStage3(stage);
-      bool blockSignaturesOk = cscrypto::verifySignature(stage.blockSignature, conveyer.confidantByIndex(stage.sender),
-                                                         st->blockHash.data(), st->blockHash.size());
-      if (!blockSignaturesOk) {
-        csdebug() << "Block Signatures are not ok";
-      }
-
-      bool roundSignaturesOk = cscrypto::verifySignature(stage.roundSignature, conveyer.confidantByIndex(stage.sender),
-                                                         st->roundHash.data(), st->roundHash.size());
-      if (!roundSignaturesOk) {
-        csdebug() << "Round Signatures are not ok";
-      }
-
-      bool realTrustedOk = (st->realTrustedMask == stage.realTrustedMask);
-      if (!realTrustedOk) {
-        csdebug() << "Real Trusted are not ok";
-      }
-
-      bool writerOk = st->writer == stage.writer;
-      if (!writerOk) {
-        csdebug() << "Writer is not ok";
-      }
-
-      if (blockSignaturesOk && roundSignaturesOk && realTrustedOk && writerOk) {
-        trueStageThreeStorage.push_back(stage);
-        pnode->addRoundSignature(stage);
-        csdebug() << "Stage3 [" << static_cast<int>(stage.sender) << "] - signatures are OK";
-      }
-
-      stageThreeStorage.push_back(stage);
+      lamda(stage, *st);
       break;
   }
+
+  stageThreeStorage.push_back(stage);
 
   csdebug() << "SolverCore: <-- stage-3 [" << static_cast<int>(stage.sender) << "] = " << stageThreeStorage.size()
             << " : " << trueStageThreeStorage.size();

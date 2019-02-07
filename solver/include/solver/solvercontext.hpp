@@ -119,7 +119,7 @@ public:
    */
 
 
-  bool addSignaturesToLastBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) const;
+  bool addSignaturesToLastBlock(BlockSignatures&& blockSignatures);
 
   void spawn_next_round(cs::StageThree& st3);
 
@@ -129,11 +129,10 @@ public:
 
   void sendRoundTable();
 
-  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes) {
-    std::vector<cs::PublicKey> tmp(nodes);
-    std::vector<cs::TransactionsPacketHash> tmpHashes(hashes);
-    std::swap(core.trusted_candidates, tmp);
-    std::swap(core.hashes_candidates, tmpHashes);
+  void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes,
+                               const std::vector<cs::TransactionsPacketHash>& hashes = std::vector<cs::TransactionsPacketHash>()) {
+    core.trusted_candidates = nodes;
+    core.hashes_candidates = hashes;
   }
 
   // Fast access methods, may be removed at the end

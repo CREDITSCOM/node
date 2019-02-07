@@ -391,45 +391,42 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   }
 
   csdebug() << name() << ": election table ready";
-  unsigned int max_conf = int(4. + 1.85 * log(candidatesElection.size() / 4.));
+  size_t max_conf = 0;
   if (candidatesElection.size() < 4) {
-    max_conf = static_cast<unsigned int>(candidatesElection.size());
+    max_conf = candidatesElection.size();
     csdebug() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
   }
+  else {
+    max_conf = static_cast<size_t>(4. + 1.85 * log(candidatesElection.size() / 4.));
+  }
+  csdebug() << name() << ": max confidant: " << max_conf;
 
   for (auto& it : candidatesElection) {
     // csdebug() << byteStreamToHex(it.first.str, cscrypto::kPublicKeySize) << " - " << (int) it.second;
     if (it.second > cr) {
-      aboveThreshold.push_back(it.first);
+      aboveThreshold.emplace_back(it.first);
     }
     else {
-      belowThreshold.push_back(it.first);
+      belowThreshold.emplace_back(it.first);
     }
   }
 
-  //csdebug() << name() << ": HASHES election table ready (" << hashesElection.size() << "):";
   for (auto& it : hashesElection) {
-  //  csdebug() << cs::Utils::byteStreamToHex(it.first.toBinary().data(), cscrypto::kHashSize) << " - " << (int)it.second;
     if (it.second > cr) {
-      next_round_hashes.push_back(it.first);
+      next_round_hashes.emplace_back(it.first);
     }
   }
   size_t acceptedPacks = 0;
-  bool rejectedFound;
-  //csdebug() << "Accepted hashes from THIS NODE: ";
-  for (auto& itt : myHashes) {
-    rejectedFound = true;
-    //csdebug() << "    " << cs::Utils::byteStreamToHex(it.toBinary().data(), it.size());
-    for (auto& it : next_round_hashes) {
-      if (memcmp(it.toBinary().data(), itt.toBinary().data(), cscrypto::kHashSize)) {}
-      else {
+  for (const auto& hash : myHashes) {
+    bool rejectedFound = true;
+    for (const auto& next_hash : next_round_hashes) {
+      if (next_hash != hash) {
         ++acceptedPacks;
         rejectedFound = false;
-      //  csdebug() << "    + (" << acceptedPacks << ") " << cs::Utils::byteStreamToHex(itt.toBinary().data(), itt.size());
       }
     }
     if (rejectedFound) {
-      myRejectedHashes.push_back(itt);
+      myRejectedHashes.emplace_back(hash);
     }
   }
 
@@ -439,21 +436,23 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
   for (size_t i = 0; i < aboveThreshold.size(); i++) {
     const auto& tmp = aboveThreshold[i];
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+              << " - " << static_cast<int>(candidatesElection.at(tmp));
   }
 
   csdebug() << "------------------------------------------------------";
   for (size_t i = 0; i < belowThreshold.size(); i++) {
     const auto& tmp = belowThreshold[i];
-    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
+    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+              << " - " << static_cast<int>(candidatesElection.at(tmp));
   }
 
   csdebug() << name() << ": final list of next round trusted:";
 
   if (aboveThreshold.size() >= max_conf) {  // Consensus::MinTrustedNodes) {
-    for (unsigned int i = 0; i < max_conf; ++i) {
+    for (size_t i = 0; i < max_conf; ++i) {
       const auto& tmp = aboveThreshold.at(i);
-      next_round_trust.push_back(tmp);
+      next_round_trust.emplace_back(tmp);
       csdebug() << "\t" << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
     }
   }
@@ -461,13 +460,13 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     if (belowThreshold.size() >= max_conf - aboveThreshold.size()) {
       for (size_t i = 0; i < aboveThreshold.size(); i++) {
         const auto& tmp = aboveThreshold.at(i);
-        next_round_trust.push_back(tmp);
+        next_round_trust.emplace_back(tmp);
         csdebug() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
-      size_t toAdd = max_conf - next_round_trust.size();
+      const size_t toAdd = max_conf - next_round_trust.size();
       for (size_t i = 0; i < toAdd; i++) {
         const auto& tmp = belowThreshold.at(i);
-        next_round_trust.push_back(tmp);
+        next_round_trust.emplace_back(tmp);
         csdebug() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
       }
     }

@@ -13,7 +13,7 @@ void WaitingState::on(SolverContext &context) {
     return;
   }
 
-  std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures;
+  cs::BlockSignatures blockSignatures;
   blockSignatures.reserve(context.stage3_data().size());
   for (auto& it : context.stage3_data()) {
     blockSignatures.emplace_back(it.sender, it.blockSignature);
@@ -21,9 +21,12 @@ void WaitingState::on(SolverContext &context) {
 
   //TODO: The pool should be send to blockchain here <===
   csmeta(csdebug) << "Signatures to add: " << blockSignatures.size();
-  if (context.addSignaturesToLastBlock(blockSignatures)) {
-    csmeta(csdebug) << "Signatures added to new block successfully";
+  if (!context.addSignaturesToLastBlock(std::move(blockSignatures))) {
+    csmeta(cserror) << "Signatures added to new block failed";
+    return;
   }
+
+  csmeta(csdebug) << "Signatures added to new block successfully";
 
   std::ostringstream os;
   os << prefix_ << "-" << static_cast<size_t>(writingQueueNumber_);

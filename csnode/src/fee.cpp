@@ -52,7 +52,7 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
 
   Init(blockchain, pool);
 
-  if (pool->transactions().size() < 1) {
+  if (pool->transactions().empty()) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
@@ -72,7 +72,7 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
 
   Init(blockchain, packet);
 
-  if (packet->transactionsCount() < 1) {
+  if (packet->transactionsCount() == 0) {
     EstimateNumOfNodesInNetwork(blockchain);
     return;
   }
@@ -219,7 +219,7 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
 double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain) {
   csdb::Pool block_from = blockchain.loadBlock(num_block_from);
   if (!block_from.is_valid()) {
-    cserror() << "Fee> CountBlockTimeStampDifference> block_from is not valid";
+    csmeta(cserror) << "load block: " << num_block_from << " is not valid";
     return 0;
   }
   double time_stamp_from = std::stod(block_from.user_field(0).value<std::string>());

@@ -54,12 +54,12 @@ SolverCore::SolverCore()
 , tag_state_expired(CallsQueueScheduler::no_tag)
 , req_stop(true)
 // consensus data
-, smartStagesStorageRefreshed_(false)
-, ownSmartsConfNum_(cs::InvalidConfidant)
-, smartRoundNumber_(0)
 , pnode(nullptr)
 , pws(nullptr)
 , psmarts(nullptr)
+, smartStagesStorageRefreshed_(false)
+, ownSmartsConfNum_(cs::InvalidConfidant)
+, smartRoundNumber_(0)
 /*, smartProcess_(this)*/{
   if constexpr (MonitorModeOn) {
     cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
@@ -203,25 +203,94 @@ bool SolverCore::stateFailed(Result res) {
 
 }
 //TODO: this function is to be implemented the block and RoundTable building <====
-void SolverCore::spawn_next_round(const std::vector<cs::PublicKey>& nodes,
-                                  const std::vector<cs::TransactionsPacketHash>& hashes,
-                                  std::string&& currentTimeStamp, cs::StageThree& stage3) {
-  //cslog() << "SolverCore: TRUSTED -> WRITER, do write & send block";
-
+void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
+                                  const cs::PacketsHashes& hashes,
+                                  std::string&& currentTimeStamp,
+                                  cs::StageThree& stage3) {
+  csmeta(csdetails) << "start";
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
   cs::RoundTable table;
-  table.round = cs::Conveyer::instance().currentRoundNumber() + 1;
+  table.round = conveyer.currentRoundNumber() + 1;
   table.confidants = nodes;
   table.hashes = hashes;
 
-  csdebug() << "Applying " << hashes.size() << " hashes to ROUND Table";
+  csmeta(csdetails) << "Applying " << hashes.size() << " hashes to ROUND Table";
+  csmeta(csdetails) << "Timestamp: " << currentTimeStamp;
   for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csdetails() << '\t' << i << ". " << hashes[i].toString();
+    csmeta(csdetails) << '\t' << i << ". " << hashes[i].toString();
   }
-  pnode->prepareMetaForSending(table, currentTimeStamp, stage3);
+
+  // only for new consensus
+  cs::PoolMetaInfo poolMetaInfo;
+  poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
+  poolMetaInfo.timestamp = std::move(currentTimeStamp);
+
+  if (stage3.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
+    const cs::ConfidantsKeys& confidants = conveyer.confidants();
+    if (stage3.writer < confidants.size()) {
+      poolMetaInfo.writerKey = confidants[stage3.writer];
+    }
+    else {
+      csmeta(cserror) << "stage-3 writer index: " << static_cast<int>(stage3.writer)
+                      << ", out of range is current confidants size: " << confidants.size();
+    }
+  }
+
+  poolMetaInfo.realTrustedMask = stage3.realTrustedMask;
+  poolMetaInfo.previousHash = pnode->getBlockChain().getLastHash();
+
+  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+
+  if (!pool.has_value()) {
+    csmeta(cserror) << "ApplyCharacteristic() failed to create block";
+    return;
+  }
+
+  uint32_t binSize = 0;
+  deferredBlock_ = std::move(pool.value());
+  deferredBlock_.set_confidants(conveyer.confidants());
+
+  csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
+  pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
+  pnode->getBlockChain().setTransactionsFees(deferredBlock_);
+
+  deferredBlock_.to_byte_stream(binSize);
+  deferredBlock_.hash();
+
+  const auto lastHashBin = deferredBlock_.hash().to_binary();
+  std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
+  stage3.blockSignature = cscrypto::generateSignature(private_key,
+                                                      stage3.blockHash.data(),
+                                                      stage3.blockHash.size());
+
+  pnode->prepareRoundTable(table, poolMetaInfo, stage3);
+  csmeta(csdetails) << "end";
 }
 
 void SolverCore::sendRoundTable() {
   pnode->sendRoundTable();
+}
+
+bool SolverCore::addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatures) {
+  csmeta(csdetails) << "begin";
+  if (!deferredBlock_.is_valid()) {
+    csmeta(cserror) << " ... Failed!!!";
+    return false;
+  }
+
+  deferredBlock_.set_signatures(std::move(blockSignatures));
+
+  auto resPool = pnode->getBlockChain().createBlock(deferredBlock_);
+
+  if (!resPool.has_value()) {
+    csmeta(cserror) << "Blockchain failed to write new block";
+    return false;
+  }
+
+  deferredBlock_ = csdb::Pool();
+
+  csmeta(csdetails) << "end";
+  return true;
 }
 
 // smart-part begin VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
