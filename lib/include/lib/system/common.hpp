@@ -35,6 +35,9 @@ using Signature = cscrypto::Signature;
 using Hash = cscrypto::Hash;
 using PrivateKey = cscrypto::PrivateKey;
 
+using ConfidantSignature = std::pair<Byte, Signature>;
+using BlockSignatures = std::vector<ConfidantSignature>;
+
 // sync types
 using SharedMutex = std::shared_mutex;
 using SpinLock = boost::detail::spinlock;

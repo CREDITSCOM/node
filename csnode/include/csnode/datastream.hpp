@@ -653,11 +653,12 @@ inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
 }
 
 ///
-/// Writes signature pair to stream.
+/// Writes pair to stream.
 ///
-inline DataStream& operator>>(DataStream& stream, cs::SignaturePair& signaturePair) {
-  stream >> signaturePair.sender;
-  stream >> signaturePair.signature;
+template <typename T, typename U>
+inline DataStream& operator>>(DataStream& stream, std::pair<T, U>& pair) {
+  stream >> pair.first;
+  stream >> pair.second;
   return stream;
 }
 
@@ -794,11 +795,12 @@ inline DataStream& operator<<(DataStream& stream, const cs::BytesView& bytesView
 }
 
 ///
-/// Writes signature pair to stream.
+/// Writes pair to stream.
 ///
-inline DataStream& operator<<(DataStream& stream, const cs::SignaturePair& signaturePair) {
-  stream << signaturePair.sender;
-  stream << signaturePair.signature;
+template <typename T, typename U>
+inline DataStream& operator<<(DataStream& stream, const std::pair<T, U>& pair) {
+  stream << pair.first;
+  stream << pair.second;
   return stream;
 }
 }  // namespace cs

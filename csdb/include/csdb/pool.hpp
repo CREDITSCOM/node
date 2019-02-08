@@ -154,7 +154,7 @@ public:
   const cs::PublicKey& writer_public_key() const noexcept;
   const cs::Signature& signature() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
-  const ::std::vector<std::pair<int, cs::Signature>>& signatures() const noexcept;
+  const cs::BlockSignatures& signatures() const noexcept;
   const ::std::vector<csdb::Pool::SmartSignature>& smartSignatures() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
@@ -163,7 +163,7 @@ public:
   void set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept;
   void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
-  void add_signature(int index, const cs::Signature& signature) noexcept;
+  void set_signatures(cs::BlockSignatures&& blockSignatures) noexcept;
   void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
   void add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept;
 
@@ -205,8 +205,6 @@ public:
    * Для read-only пулов функция не делает ничего и просто возвращает true.
    */
   bool compose();
-
-  bool recompose();
 
   /**
    * @brief Хеш пула

@@ -197,18 +197,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
   for (it->seek_to_first(); it->is_valid(); it->next()) {
     cs::Bytes v = it->value();
 
-    // Хеш в ключе совпадает с реальным хешем блока?
-    PoolHash real_hash = PoolHash::calc_from_data(v);
-
     Pool p = Pool::from_binary(std::move(v));
     if (!p.is_valid()) {
-      set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key '%s'.", real_hash.to_string().c_str());
-      return false;
-    }
-
-    if (p.hash() != real_hash) {
-      set_last_error(Storage::DataIntegrityError, "Data integrity error: key does not match real hash (key: '%s'; real hash: '%s')",
-                     p.hash().to_string().c_str(), real_hash.to_string().c_str());
+      set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key'.");
       return false;
     }
 
