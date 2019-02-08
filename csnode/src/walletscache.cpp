@@ -265,24 +265,37 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
 }
 
 csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
-  SmartContractRef smartRef;
-  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
+  if (!smartRef.is_valid()) {
+    return csdb::Address{};
+  }
   csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
   auto& transactions = pool.transactions();
   if (transactions.size() > smartRef.transaction) {
     csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-    return trWithIniter.source();
+    if (trWithIniter.id() == smartRef.getTransactionID()) {
+      return trWithIniter.source();
+    }
   }
 
   return csdb::Address{};
 }
 
 csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
-  SmartContractRef smartRef;
-  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
+  if (!smartRef.is_valid()) {
+    return csdb::Transaction{};
+  }
   csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-  return trWithIniter;
+  auto& transactions = pool.transactions();
+  if (transactions.size() > smartRef.transaction) {
+    csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
+    if (trWithIniter.id() == smartRef.getTransactionID()) {
+      return trWithIniter;
+    }
+  }
+
+  return csdb::Transaction{};
 }
 
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {
