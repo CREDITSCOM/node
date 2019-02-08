@@ -4,8 +4,6 @@
 #include "consensus.hpp"
 #include "stage.hpp"
 
-#include <csdb/pool.hpp>
-
 //#include <csnode/node.hpp>
 //#include <solvercore.hpp>
 #include <csnode/transactionspacket.hpp>
@@ -30,11 +28,11 @@ namespace cs {
 
       /*SmartConsensus();*/
 
-      SmartConsensus(Node* node);
+      SmartConsensus(/*Node* node*/);
 
       ~SmartConsensus();
 
-      void initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts);
+      void initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts/*, std::vector<SmartContracts::QueueItem>::iterator it*/);
       uint8_t calculateSmartsConfNum();
       uint8_t ownSmartsConfidantNumber();
 
@@ -105,6 +103,7 @@ namespace cs {
 
       std::vector<cs::Stage> smartStageTemporary_;
       bool isSmartStageStorageCleared_ = false;
+      //std::vector<SmartContracts::QueueItem>::iterator currentSmartPointer_;
 
   };
 }

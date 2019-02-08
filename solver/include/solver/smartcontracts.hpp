@@ -183,6 +183,7 @@ public:
 
   static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
 
+  SmartConsensus* getSmartConsensus(cs::PublicKey smartAddr);
   // non-static variant
   csdb::Transaction get_transaction(const SmartContractRef& contract) const {
     return SmartContracts::get_transaction(bc, contract);
@@ -298,7 +299,7 @@ private:
       , round_start(0)
       , round_finish(0)
       , abs_addr(absolute_address)
-      , pconsensus(nullptr)
+      , pconsensus(new SmartConsensus())
     {}
 
     void wait(cs::RoundNumber r)

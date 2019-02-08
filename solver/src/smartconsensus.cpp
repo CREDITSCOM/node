@@ -12,11 +12,13 @@
 
 namespace cs{
 
-  SmartConsensus::SmartConsensus(Node* node){
+  SmartConsensus::SmartConsensus(/*Node* node*/){
     
-    //pcore_ = core;
-    pnode_ = node;
+    pcore_ = nullptr;
+    pnode_ = nullptr;
+    psmarts_ = nullptr;
     //initSmartRound(pack);
+
   }
 
   SmartConsensus::~SmartConsensus() {}
@@ -25,18 +27,19 @@ namespace cs{
     return smartConfidants_;
   }
 
-  void SmartConsensus::initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts) {
+  void SmartConsensus::initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts/*, std::vector<SmartContracts::QueueItem>::iterator it*/) {
+    csdebug() << "SmartConsensus: starting ... ";
     pnode_ = node;
     psmarts_ = smarts;
+    //currentSmartPointer_ = it;
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
     for (const auto& tr : pack.transactions()) {
-      //if (pcore_->smart_contracts().is_new_state(tr)) {
-      //  cs::SmartContractRef smartRef;
-      //  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
-      //  smartRoundNumber_ = smartRef.sequence;
-      //  
-      //}
+      if (psmarts_->is_new_state(tr)) {
+        cs::SmartContractRef smartRef;
+        smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+        smartRoundNumber_ = smartRef.sequence;
+      }
     }
     if (0 == smartRoundNumber_) {
       // TODO: fix failure of smart execution, clear it from exe_queue
@@ -60,6 +63,13 @@ namespace cs{
     std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
     currentSmartTransactionPack_ = pack;
     st1.smartAddress = pack.transactions().at(0).source().public_key();
+    // signals subscription
+    //cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
+    //cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
+    cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
+    cs::Connector::connect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
+    pnode_->addSmartConsensus(st1.smartAddress);
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);
@@ -135,10 +145,11 @@ namespace cs{
     smartUntrusted.resize(cSize);
 
     std::fill(smartUntrusted.begin(), smartUntrusted.end(), 0);
-    startTimer(1);
+    //startTimer(1);
   }
 
   void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
+    csdebug() << __func__;
     if (send) {
       pnode_->sendSmartStageOne(smartConfidants_, stage);
     }
@@ -153,9 +164,10 @@ namespace cs{
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
-      killTimer(1);
+      //killTimer(1);
+      cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
       addSmartStageTwo(st2, true);
-      startTimer(2);
+      //startTimer(2);
     }
   }
 
@@ -172,7 +184,8 @@ namespace cs{
     stageTwo = stage;
     csdebug() << ": <-- SMART-Stage-2 [" << static_cast<int>(stage.sender) << "] = " << smartStageTwoStorage_.size();
     if (smartStageTwoEnough()) {
-      startTimer(2);
+      //startTimer(2);
+      cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
       processStages();
     }
   }
@@ -242,7 +255,8 @@ namespace cs{
     if (k < 0) {
       k = -k;
     }
-    size_t idx_writer = static_cast<size_t>(k) % cnt_active;
+    csdebug() << "Smart's consensus result 1";
+    size_t idx_writer = static_cast<size_t>(k % cnt_active);
     size_t idx = 0;
     for (size_t i = 0; i < cnt; ++i) {
       if (stage.realTrustedMask.at(i) != InvalidConfidantIndex) {
@@ -252,6 +266,7 @@ namespace cs{
         ++idx;
       }
     }
+    csdebug() << "Smart's consensus result 2";
     idx = 0;
     for (size_t i = stage.writer; i < cnt + stage.writer; ++i) {
       size_t c = i % cnt;
@@ -260,8 +275,9 @@ namespace cs{
         ++idx;
       }
     }
-    startTimer(3);
-    stage.packageSignature = cscrypto::generateSignature(pcore_->getPrivateKey(), hash_t.data(), hash_t.size());
+    csdebug() << "Smart's consensus result 3";
+    //startTimer(3);
+    stage.packageSignature = cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), hash_t.data(), hash_t.size());
     csmeta(cslog) << "done";
     addSmartStageThree(stage, true);
   }
@@ -292,7 +308,8 @@ namespace cs{
     });
     cslog() << ": <-- SMART-Stage-3 [" << static_cast<int>(stage.sender) << "] = " << smartStorageSize;
     if (smartStageThreeEnough()) {
-      killTimer(3);
+      //killTimer(3);
+      cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
       createFinalTransactionSet();
     }
   }
@@ -346,15 +363,15 @@ namespace cs{
   }
 
   bool SmartConsensus::smartStageOneEnough() {
-    return smartStageEnough(smartStageOneStorage_, "StageOne");
+    return smartStageEnough(smartStageOneStorage_, "SmartStageOne");
   }
 
   bool SmartConsensus::smartStageTwoEnough() {
-    return smartStageEnough(smartStageTwoStorage_, "StageTwo");
+    return smartStageEnough(smartStageTwoStorage_, "SmartStageTwo");
   }
 
   bool SmartConsensus::smartStageThreeEnough() {
-    return smartStageEnough(smartStageThreeStorage_, "StageThree");
+    return smartStageEnough(smartStageThreeStorage_, "SmartStageThree");
   }
 
   template<class T>
@@ -365,8 +382,14 @@ namespace cs{
         ++stageSize;
       }
     }
-    const size_t cSize = smartConfidants_.size() / 2 + 1;
-    csmeta(csdetails) << ":        " << funcName << " Completed " << stageSize << " of " << cSize;
+    size_t cSize;
+    if(funcName=="StageThree") {
+      cSize = smartConfidants_.size() / 2 + 1;
+    }
+    else {
+      cSize = smartConfidants_.size();
+    }
+    csdebug() << ":        " << funcName << " completed " << stageSize << " of " << cSize;
     return stageSize == cSize;
   }
 

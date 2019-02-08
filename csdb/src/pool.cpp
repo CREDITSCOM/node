@@ -95,7 +95,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   , previous_hash_(std::move(previous_hash))
   , sequence_(sequence)
   , storage_(std::move(storage)) {
-    //writer_public_key_.fill(0);
+    writer_public_key_.fill(0) ;
     //signature_.fill(0);
   }
 
@@ -431,7 +431,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   //cs::Signature signature_;
   std::vector<uint8_t> realTrusted_;
-  //cs::PublicKey writer_public_key_;
+  cs::PublicKey writer_public_key_;
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
@@ -562,6 +562,10 @@ cs::Sequence Pool::sequence() const noexcept {
 }
 
 const cs::PublicKey& Pool::writer_public_key() const noexcept {
+  if (d->next_confidants_.size() == 0) {
+    cserror() << "The pool #" << d->sequence_ << " doesn't contain the confidants!!!";
+    return d->writer_public_key_;
+  }
   size_t index = 0;
   for (auto& it : d->realTrusted_) {
     if (it == 0) {
@@ -617,7 +621,7 @@ void Pool::set_writer_public_key(const cs::PublicKey& writer_public_key) noexcep
 
   //priv* data = d.data();
   //data->is_valid_ = true;
-  //data->writer_public_key_ = writer_public_key;
+  //data->writer_public_key_.fill(0);
 }
 
 void Pool::set_signature(const cs::Signature& signature) noexcept {

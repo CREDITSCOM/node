@@ -80,6 +80,10 @@ public:
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
 
+  void addSmartConsensus(cs::PublicKey smartAddress);
+  void removeSmartConsensus(cs::PublicKey smartAddress);
+  void checkForSavedSmartStages(cs::PublicKey smartAddress);
+
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
   //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
@@ -190,6 +194,15 @@ public:
     return api_.get();
   }
 #endif
+
+  using SmartStageOneSignal = cs::Signal<void(cs::StageOneSmarts, bool)>;
+  using SmartStageTwoSignal = cs::Signal<void(cs::StageTwoSmarts, bool)>;
+  using SmartStageThreeSignal = cs::Signal<void(cs::StageThreeSmarts, bool)>;
+
+public signals:
+  SmartStageOneSignal gotSmartStageOne;
+  SmartStageTwoSignal gotSmartStageTwo;
+  SmartStageThreeSignal gotSmartStageThree;
 
 public slots:
   void processTimer();
@@ -330,10 +343,15 @@ private:
   std::vector<cs::Bytes> smartStageTwoMessage_;
   std::vector<cs::Bytes> smartStageThreeMessage_;
 
+  std::vector<cs::StageOneSmarts> smartStageOneStorage_;
+  std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
+  std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
+
   bool isSmartStageStorageCleared_ = false;
   int corruptionLevel_ = 0;
 
   std::vector<cs::Stage> smartStageTemporary_;
+  std::vector< cs::PublicKey> activeSmartConsensuses_;
 
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;

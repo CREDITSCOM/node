@@ -77,6 +77,9 @@ public:
 
   //Solver smarts consensus methods
   void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
+  void gotSmartStageOne(cs::StageOneSmarts& stage);
+  void gotSmartStageTwo(cs::StageTwoSmarts& stage);
+  void gotSmartStageThree(cs::StageThreeSmarts& stage);
   void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
   void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
   void getSmartResult(const cs::TransactionsPacket pack);

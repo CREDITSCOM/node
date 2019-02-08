@@ -51,7 +51,9 @@ SmartContracts::~SmartContracts() = default;
 void SmartContracts::init(const cs::PublicKey& id, Node* node)
 {
   pnode = node;
-  papi = (pnode->getConnector())->apiHandler();
+  if(pnode->getConnector()!=nullptr) {
+    papi = (pnode->getConnector())->apiHandler();
+  }
   node_id = id;
 
   size_t cnt = known_contracts.size();
@@ -808,7 +810,8 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
   }
 
   if (set_execution_result(packet)) {
-    it->pconsensus->initSmartRound(packet, pnode, this);/*, it));*/
+    csdebug() << "Starting SMARTCONSENSUS";
+    it->pconsensus->initSmartRound(packet, pnode, this);
   }
   checkAllExecutions();
 }
@@ -861,7 +864,7 @@ bool SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
       return false;
     }
     return true;
-    //emit signal_smart_executed(pack);
+    emit signal_smart_executed(pack);
   }
   else {
     cserror() << name() << ": no transactions in execution result pack";
@@ -1037,6 +1040,17 @@ bool SmartContracts::implements_payable(const api::SmartContractInvocation& cont
   }
 
   return false;
+}
+
+SmartConsensus* SmartContracts::getSmartConsensus(cs::PublicKey smartAddr)
+{
+  for (auto& it : exe_queue) {
+    if (it.abs_addr == csdb::Address::from_public_key(smartAddr)) {
+      return it.pconsensus.get();
+    }
+  }
+  csdebug() << "No such smartconsensus ing the list!";
+  return nullptr;
 }
 
 }  // namespace cs

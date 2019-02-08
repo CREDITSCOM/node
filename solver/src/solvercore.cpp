@@ -88,7 +88,7 @@ SolverCore::SolverCore()
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc);
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
-    smartProcesses_.reserve(simultaneuosSmartsNumber_);
+    //smartProcesses_.reserve(simultaneuosSmartsNumber_);
     // bind signals
     //cs::Connector::connect(&psmarts->signal_smart_executed, this, &cs::SolverCore::getSmartResult);
   }
@@ -368,6 +368,36 @@ void SolverCore::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     addSmartStageTwo(st2, true);
     startTimer(2);
   }
+}
+
+void SolverCore::gotSmartStageOne(cs::StageOneSmarts& stage) {
+  csdebug() << __func__;
+  auto pconsensus = psmarts->getSmartConsensus(stage.smartAddress);
+  if (pconsensus == nullptr) {
+    csdebug() << "No such smart in exe_queue";
+    return;
+  }
+  //pconsensus->addSmartStageOne(stage, false);
+}
+
+void SolverCore::gotSmartStageTwo(cs::StageTwoSmarts& stage) {
+  csdebug() << __func__;
+  auto pconsensus = psmarts->getSmartConsensus(stage.smartAddress);
+  if (pconsensus == nullptr) {
+    csdebug() << "No such smart in exe_queue";
+    return;
+  }
+  pconsensus->addSmartStageTwo(stage, false);
+}
+
+void SolverCore::gotSmartStageThree(cs::StageThreeSmarts& stage) {
+  csdebug() << __func__;
+  auto pconsensus = psmarts->getSmartConsensus(stage.smartAddress);
+  if (pconsensus == nullptr) {
+    csdebug() << "No such smart in exe_queue";
+    return;
+  }
+  pconsensus->addSmartStageThree(stage, false);
 }
 
 void SolverCore::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
