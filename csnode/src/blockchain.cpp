@@ -127,6 +127,20 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
       cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
       *should_stop = true;
     }
+    else {
+#ifdef TRANSACTIONS_INDEX
+      const auto cnt_tr = block.transactions_count();
+      if(cnt_tr > 0) {
+        total_transactions_count_ += cnt_tr;
+
+        if(lastNonEmptyBlock_.transCount && block.hash() != lastNonEmptyBlock_.hash) {
+          previousNonEmpty_[block.hash()] = lastNonEmptyBlock_;
+        }
+        lastNonEmptyBlock_.hash = block.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(block.transactions().size());
+      }
+#endif
+    }
   }
 }
 
@@ -169,18 +183,6 @@ bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
       ++cnt;
     }
     std::cout << "\rDone, handled " << cnt - 1 << " blocks\n";
-
-    auto func = [=](const WalletData::Address&, const WalletData& wallet) {
-      double bal = wallet.balance_.to_double();
-      if(bal < -std::numeric_limits<double>::min()) {
-        cslog() << "Wallet with negative balance (" << bal << ") detected: "
-          << cs::Utils::byteStreamToHex(wallet.address_.data(), wallet.address_.size())
-          << " (" << EncodeBase58(wallet.address_.data(), wallet.address_.data() + wallet.address_.size()) << ")";
-      }
-      return true;
-    };
-    walletsCacheStorage_->iterateOverWallets(func);
-
     res = true;
   }
   catch (std::exception& e) {
