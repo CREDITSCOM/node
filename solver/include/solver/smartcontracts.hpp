@@ -397,6 +397,7 @@ private:
 
   void test_exe_queue();
 
+  // tests passed list of trusted nodes to contain own node
   bool contains_me(const std::vector<cs::PublicKey>& list) const {
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
   }
@@ -414,7 +415,7 @@ private:
   csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
 
   // update in contracts table appropriate item's state
-  bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
+  bool update_contract_state(csdb::Transaction t);
 
   // get deploy info from cached deploy transaction reference
   std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;

@@ -41,7 +41,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
   execution_allowed = false;
 #endif
 
-  // signals subscription
+  // signals subscription (MUST execute AFTER the BlockChains has already subscribed)
   
   // as event receiver:
   cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
@@ -296,13 +296,13 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
   return std::nullopt;
 }
 
-bool SmartContracts::is_payable_target( const csdb::Transaction tr ) {
-  csdb::Address abs_addr = absolute_address( tr.target() );
-  if( !is_known_smart_contract( abs_addr ) ) {
+bool SmartContracts::is_payable_target(const csdb::Transaction tr) {
+  csdb::Address abs_addr = absolute_address(tr.target());
+  if(!is_known_smart_contract(abs_addr)) {
     return false;
   }
   // may do blocking call to API::executor
-  return is_payable( abs_addr );
+  return is_payable(abs_addr);
 }
 
 void SmartContracts::clear_emitted_transactions(const csdb::Address abs_addr) {
@@ -335,7 +335,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
   csdb::Address abs_addr = absolute_address(t.target());
   bool payable = false;
   if(is_deploy(t)) {
-    // pre-register in known_contracts if payable
+    // pre-register in known_contracts
     auto maybe_invoke_info = get_smart_contract(t);
     if(maybe_invoke_info.has_value()) {
       const auto& invoke_info = maybe_invoke_info.value();
@@ -573,7 +573,7 @@ void SmartContracts::on_store_block(csdb::Pool block) {
 
 void SmartContracts::on_read_block(csdb::Pool block, bool* should_stop) {
   // control round-based timeout
-  // assume block arrive in right order
+  // assume block arrive in increasing sequence order
   while(!replenish_contract.empty()) {
     const auto it = replenish_contract.cbegin();
     if(block.sequence() - it->sequence <= Consensus::MaxRoundsExecuteSmart) {
@@ -591,25 +591,32 @@ void SmartContracts::on_read_block(csdb::Pool block, bool* should_stop) {
     size_t tr_idx = 0;
     for(const auto& tr : block.transactions()) {
       if(is_new_state(tr)) {
-        update_contract_state(tr, false /*force_absolute_address*/);
+        update_contract_state(tr);
       }
       else {
-        csdb::Address addr = tr.target();
-        if(known_contracts.count(addr) == 0) {
-          if(is_executable(tr)) {
-            // register execution ONLY if contract is unknown yet,
-            // known contracts will be updated on new_state handling
-            StateItem& val = known_contracts[addr];
-            SmartContractRef& ref = is_deploy(tr) ? val.deploy : val.execution;
-            ref.hash = block.hash();
-            ref.sequence = block.sequence();
-            ref.transaction = tr_idx;
-          }
+        csdb::Address abs_addr = absolute_address(tr.target());
+        if(!abs_addr.is_valid()) {
+          cserror() << name() << ": failed convert optimized address";
         }
         else {
-          // replenish smart contract
-          emit signal_payable_invoke(tr);
-          replenish_contract.emplace_back(block.hash(), block.sequence(), tr_idx);
+          if(!is_known_smart_contract(abs_addr)) {
+            if(is_executable(tr)) {
+              // register execution ONLY if contract is unknown yet,
+              // known contracts will be updated on new_state handling
+              StateItem& val = known_contracts[abs_addr];
+              SmartContractRef& ref = is_deploy(tr) ? val.deploy : val.execution;
+              ref.hash = block.hash();
+              ref.sequence = block.sequence();
+              ref.transaction = tr_idx;
+            }
+          }
+          else {
+            if(!is_executable(tr)) {
+              // replenish smart contract
+              emit signal_payable_invoke(tr);
+              replenish_contract.emplace_back(block.hash(), block.sequence(), tr_idx);
+            }
+          }
         }
       }
       ++tr_idx;
@@ -942,15 +949,13 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
             unchanged_pack.addTransaction(tr);
           }
           else {
-            cserror() << name() << ": failed to fix smart contract failure, remove from execution queue";
+            cserror() << name() << ": failed to store smart contract failure, remove from execution queue";
             remove_from_queue(it);
             test_exe_queue();
           }
           break;
         }
       }
-
-      auto it = known_contracts.find(absolute_address(t.source()));
     }
 
     if (unchanged_pack.transactionsCount() > 0) {
@@ -962,7 +967,7 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
   }
 }
 
-bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absolute_address /*= true*/)
+bool SmartContracts::update_contract_state(csdb::Transaction t)
 {
   using namespace trx_uf;
   csdb::UserField fld = t.user_field(new_state::Value);
@@ -973,45 +978,47 @@ bool SmartContracts::update_contract_state(csdb::Transaction t, bool force_absol
   std::string state_value = fld.value<std::string>();
   if(!state_value.empty()) {
     // create or get contract state item
-    csdb::Address addr = t.target();
-    if(force_absolute_address) {
-      addr = absolute_address(addr);
-    }
-    StateItem& item = known_contracts[addr];
-    // update last state (with non-empty one)
-    item.state = std::move(state_value);
-    // determine it is the result of whether deploy or execute
-    fld = t.user_field(new_state::RefStart);
-    if(fld.is_valid()) {
-      SmartContractRef ref(fld);
-      csdb::Transaction t_start = get_transaction(ref);
-      if(t_start.is_valid()) {
-        if(is_executable(t_start)) {
-          if(is_deploy(t_start)) {
-            item.deploy = ref;
+    csdb::Address abs_addr = absolute_address(t.target());
+    if(abs_addr.is_valid()) {
+      StateItem& item = known_contracts[abs_addr];
+      // update last state (with non-empty one)
+      item.state = std::move(state_value);
+      // determine it is the result of whether deploy or execute
+      fld = t.user_field(new_state::RefStart);
+      if(fld.is_valid()) {
+        SmartContractRef ref(fld);
+        csdb::Transaction t_start = get_transaction(ref);
+        if(t_start.is_valid()) {
+          if(is_executable(t_start)) {
+            if(is_deploy(t_start)) {
+              item.deploy = ref;
+            }
+            else {
+              item.execution = ref;
+            }
           }
           else {
+            // handle replenish during startup reading
+            if(!replenish_contract.empty()) {
+              const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref);
+              if(it != replenish_contract.cend()) {
+                replenish_contract.erase(it);
+              }
+            }
+            // handle replenish from on-the-air blocks
+            if(item.payable != PayableStatus::Implemented) {
+              cserror() << name() << ": non-payable contract state is updated by replenish transaction";
+            }
             item.execution = ref;
           }
         }
         else {
-          // handle replenish during startup reading
-          if(!replenish_contract.empty()) {
-            const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref);
-            if(it != replenish_contract.cend()) {
-              replenish_contract.erase(it);
-            }
-          }
-          // handle replenish from on-the-air blocks
-          if(item.payable != PayableStatus::Implemented) {
-            cserror() << name() << ": non-payable contract state is updated by replenish transaction";
-          }
-          item.execution = ref;
+          cswarning() << name() << ": new_state transaction does not refer to starter one";
         }
       }
-      else {
-        cswarning() << name() << ": new_state transaction does not refer to starter one";
-      }
+    }
+    else {
+      cserror() << name() << ": failed to convert optimized address";
     }
   }
   else {
