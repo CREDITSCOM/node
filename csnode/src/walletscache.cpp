@@ -265,28 +265,28 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
 }
 
 csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
-  SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
-  if (!smartRef.is_valid()) {
-    return csdb::Address{};
+  csdb::Transaction t = findSmartContractInitTrx(tr, blockchain);
+  if(t.is_valid()) {
+    return t.source();
   }
-  csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-  auto& transactions = pool.transactions();
-  if (transactions.size() > smartRef.transaction) {
-    csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-    if (trWithIniter.id() == smartRef.getTransactionID()) {
-      return trWithIniter.source();
-    }
-  }
-
   return csdb::Address{};
 }
 
 csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
+  if(!SmartContracts::is_new_state(tr)) {
+    cserror() << "Wallets cache: incorrect new_state transaction to get starter";
+    return csdb::Transaction {};
+  }
   SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
   if (!smartRef.is_valid()) {
+    cserror() << "Wallets cache: incorrect reference to starter transaction in new_state";
     return csdb::Transaction{};
   }
   csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
+  if(!pool.is_valid()) {
+    cserror() << "Wallets cache: failed load block with starter for new_state";
+    return csdb::Transaction {};
+  }
   auto& transactions = pool.transactions();
   if (transactions.size() > smartRef.transaction) {
     csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
@@ -294,7 +294,7 @@ csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction
       return trWithIniter;
     }
   }
-
+  cserror() << "Wallets cache: incorrect starter transaction for new_state";
   return csdb::Transaction{};
 }
 
