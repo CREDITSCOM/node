@@ -84,8 +84,8 @@ struct SmartContractRef {
   size_t transaction;
 
   SmartContractRef()
-    : sequence(0)
-    , transaction(0)
+    : sequence(std::numeric_limits<decltype(sequence)>().max())
+    , transaction(std::numeric_limits<decltype(sequence)>().max())
   {}
 
   SmartContractRef(const csdb::PoolHash block_hash, cs::Sequence block_sequence, size_t transaction_index)
@@ -104,7 +104,9 @@ struct SmartContractRef {
     if(hash.is_empty()) {
       return false;
     }
-    return (sequence != 0 || transaction != 0);
+    return (sequence != std::numeric_limits<decltype(sequence)>().max() &&
+      transaction != std::numeric_limits<decltype(sequence)>().max() &&
+      !hash.is_empty());
   }
 
   // "serialization" methods
