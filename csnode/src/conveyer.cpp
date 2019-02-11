@@ -623,7 +623,7 @@ void cs::ConveyerBase::flushTransactions() {
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
       }
       else {
-        cserror() << csname() << "Logical error, adding transactions packet more than one time";
+        csdebug() << csname() << "Same transaction packet already in packet table";
       }
 
       allTransactionsCount += transactionsCount;
