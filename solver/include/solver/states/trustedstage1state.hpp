@@ -66,6 +66,9 @@ protected:
   void filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
   bool check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction);
   cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
+  cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
+  void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
+  void checkRejectedSmarts(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
 };
 
 }  // namespace slv2
