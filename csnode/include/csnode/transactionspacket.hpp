@@ -157,7 +157,7 @@ public:  // Interface
   /// @brief Returns transactions
   /// @return Reference to signatures vector
   ///
-  const std::vector<std::pair<cs::Byte, cs::Signature>>& signatures() const noexcept;
+  const cs::BlockSignatures& signatures() const noexcept;
 
   ///
   /// @brief Returns trabsactions, non const version
@@ -176,7 +176,7 @@ private:  // Service
 
 private:  // Members
   TransactionsPacketHash m_hash;
-  std::vector<std::pair<cs::Byte, cs::Signature>> m_signatures;
+  cs::BlockSignatures m_signatures;
   std::vector<csdb::Transaction> m_transactions;
 };
 }  // namespace cs

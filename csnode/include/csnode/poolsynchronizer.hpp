@@ -45,6 +45,7 @@ private slots:
   void onTimeOut();
   void onRoundSimulation();
 
+  void onWriteBlock(const csdb::Pool pool);
   void onWriteBlock(const cs::Sequence sequence);
   void onRemoveBlock(const cs::Sequence sequence);
 
@@ -64,7 +65,7 @@ private:  // Service
 
   void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
 
-  void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy = SequenceRemovalAccuracy::EXACT);
+  void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
 
   void refreshNeighbours();
 
@@ -104,25 +105,33 @@ private:  // struct
         return false;
       }
 
-      bool success = true;
+      bool success = false;
 
       switch (accuracy) {
         case SequenceRemovalAccuracy::EXACT: {
           auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
           if (it != sequences_.end()) {
             sequences_.erase(it);
-          }
-          else {
-            success = false;
+            success = true;
           }
           break;
         }
-        case SequenceRemovalAccuracy::LOWER_BOUND:
-          sequences_.erase(sequences_.begin(), std::upper_bound(sequences_.begin(), sequences_.end(), sequence));
+        case SequenceRemovalAccuracy::LOWER_BOUND: {
+          auto it = std::upper_bound(sequences_.begin(), sequences_.end(), sequence);
+          if (it != sequences_.begin()) {
+            sequences_.erase(sequences_.begin(), it);
+            success = true;
+          }
           break;
-        case SequenceRemovalAccuracy::UPPER_BOUND:
-          sequences_.erase(std::lower_bound(sequences_.begin(), sequences_.end(), sequence), sequences_.end());
+        }
+        case SequenceRemovalAccuracy::UPPER_BOUND: {
+          auto it = std::lower_bound(sequences_.begin(), sequences_.end(), sequence);
+          if (it != sequences_.end()) {
+            sequences_.erase(it, sequences_.end());
+            success = true;
+          }
           break;
+        }
       }
       return success;
     }
@@ -222,6 +231,7 @@ private:  // Members
   cs::Timer roundSimulation_;
 
   friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
+  friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);
 };
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType type) {
@@ -232,6 +242,22 @@ inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::Counte
     case PoolSynchronizer::CounterType::TIMER:
       os << "TIMER";
       break;
+  }
+
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::SequenceRemovalAccuracy type) {
+  switch (type) {
+  case PoolSynchronizer::SequenceRemovalAccuracy::EXACT:
+    os << "EXACT";
+    break;
+  case PoolSynchronizer::SequenceRemovalAccuracy::LOWER_BOUND:
+    os << "LOWER_BOUND";
+    break;
+  case PoolSynchronizer::SequenceRemovalAccuracy::UPPER_BOUND:
+    os << "UPPER_BOUND";
+    break;
   }
 
   return os;

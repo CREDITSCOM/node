@@ -255,7 +255,6 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   }
 
   if (stateFailed(pstate->onStage3(*pcontext, stage))) {
-    pnode->getBlockChain().removeLastBlock();
     handleTransitions(Event::SetNormal);
   }
 }

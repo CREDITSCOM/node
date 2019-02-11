@@ -96,7 +96,8 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
   if (!isSyncroStarted_) {
     isSyncroStarted_ = true;
-    cs::Connector::connect(&blockChain_->writeBlockEvent, this, &cs::PoolSynchronizer::onWriteBlock);
+    cs::Connector::connect(&blockChain_->storeBlockEvent_, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+    cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
     cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 
     refreshNeighbours();
@@ -138,7 +139,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
   for (auto& pool : poolsBlock) {
     const auto sequence = pool.sequence();
 
-    removeExistingSequence(sequence);
+    removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
 
     if (lastWrittenSequence > sequence) {
       continue;
@@ -172,6 +173,9 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
   for (const auto& el : requestedSequences_) {
     csmeta(csdetails) << "Requested sequence: " << el.first << "(" << el.second << ")";
+  }
+  if (requestedSequences_.empty()) {
+    csmeta(csdetails) << "Requested sequence size: 0";
   }
 
   bool success = false;
@@ -256,8 +260,12 @@ void cs::PoolSynchronizer::onRoundSimulation() {
   }
 }
 
+void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool pool) {
+  onWriteBlock(pool.sequence());
+}
+
 void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
-  removeExistingSequence(sequence);
+  removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
 }
 
 void cs::PoolSynchronizer::onRemoveBlock(const cs::Sequence sequence) {
@@ -312,8 +320,10 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
           isNeedRequest = true;
         }
       }
+      csmeta(csdetails) << "isNeedRequest: " << isNeedRequest;
       printNeighbours("Activity Round:");
       break;
+
     case CounterType::TIMER:
       for (auto& neighbour : neighbours_) {
         isNeedRequest = neighbour.sequences().empty();
@@ -321,6 +331,7 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
           break;
         }
       }
+      csmeta(csdetails) << "isNeedRequest: " << isNeedRequest;
       break;
   }
 
@@ -504,12 +515,14 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, c
 
   if (success) {
     std::sort(neighbours_.begin(), neighbours_.end());
-
+    csmeta(csdetails) << "Remove success sequence: " << sequence;
     printNeighbours("Check seq:");
   }
 }
 
 void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy) {
+  csmeta(csdetails) << "sequence: " << sequence
+                    << ", accuracy: " << accuracy;
   checkNeighbourSequence(sequence, accuracy);
 
   if (!requestedSequences_.empty()) {
@@ -576,7 +589,20 @@ void cs::PoolSynchronizer::refreshNeighbours() {
   for (uint8_t i = neededNeighboursCount; i < nSize; ++i) {
     const auto& seqs = neighbours_.back().sequences();
     for (const auto& seq : seqs) {
-      requestedSequences_.erase(seq);
+      bool isAvailable = true;
+
+      if (neighbours_.size() > 1) {
+        auto res = std::find_if(neighbours_.begin(), neighbours_.end() - 1, [seq](const NeighboursSetElemet& el) {
+                                  return std::find(el.sequences().begin(), el.sequences().end(), seq) != el.sequences().end();
+                                });
+        if (res != neighbours_.end() - 1) {
+          isAvailable = false;
+        }
+      }
+
+      if (isAvailable) {
+        requestedSequences_.erase(seq);
+      }
     }
     neighbours_.pop_back();
   }
@@ -596,7 +622,8 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
-  cs::Connector::disconnect(&blockChain_->writeBlockEvent);
+  cs::Connector::disconnect(&blockChain_->storeBlockEvent_);
+  cs::Connector::disconnect(&blockChain_->cachedBlockEvent);
   cs::Connector::disconnect(&blockChain_->removeBlockEvent);
   if (timer_.isRunning()) {
     timer_.stop();

@@ -81,9 +81,9 @@ public:
   void sendSmartStageReply(const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature
       , const MsgTypes msgType, const cs::PublicKey requester);
 
-  void addSmartConsensus(cs::PublicKey smartAddress);
-  void removeSmartConsensus(cs::PublicKey smartAddress);
-  void checkForSavedSmartStages(cs::PublicKey smartAddress);
+  void addSmartConsensus(const cs::PublicKey& smartAddress);
+  void removeSmartConsensus(const cs::PublicKey& smartAddress);
+  void checkForSavedSmartStages(const cs::PublicKey& smartAddress);
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);

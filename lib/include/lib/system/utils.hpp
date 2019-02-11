@@ -100,15 +100,15 @@ private:
   // random value generation helper
   template<typename R, typename T>
   static R randomValueImpl(T min, T max) {
-    std::random_device randomDevice;
-    std::mt19937 generator(randomDevice());
+    static std::random_device randomDevice;
+    static std::mt19937 generator(randomDevice());
 
     if constexpr (std::is_integral_v<T>) {
-      std::uniform_int_distribution<> dist(min, max);
+      static std::uniform_int_distribution<> dist(min, max);
       return static_cast<R>(dist(generator));
     }
     else {
-      std::uniform_real_distribution<> distribution(min, max);
+      static std::uniform_real_distribution<> distribution(min, max);
       return static_cast<R>(distribution(generator));
     }
   }

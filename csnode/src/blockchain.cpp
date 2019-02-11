@@ -987,8 +987,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
     csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << " see block info above";
     csdebug() << "----------------------------------------------------------------------------------";
-
-    emit writeBlockEvent(flushed_block_seq);
   }
 
   {
@@ -1087,6 +1085,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
   cachedBlocks_.emplace(pool_seq, BlockMeta{std::move(pool), by_sync});
   csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
+  cachedBlockEvent(pool_seq);
   // cache always successful
   return true;
 }
