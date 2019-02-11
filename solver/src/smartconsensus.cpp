@@ -343,7 +343,7 @@ namespace cs{
     //csdebug() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
-  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress, uint8_t requesterNumber, uint8_t requiredNumber) {
+  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, const cs::PublicKey& smartAddress, uint8_t requesterNumber, uint8_t requiredNumber) {
     if (smartAddress_ != smartAddress) {
       return;
     }

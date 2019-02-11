@@ -1595,7 +1595,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo) {
   csmeta(csdebug) << "started";
-  if (std::find(smartConfidants.cbegin(),smartConfidants.cend(),solver_->getPublicKey()) == smartConfidants.cend()) {
+  if (std::find(smartConfidants.cbegin(), smartConfidants.cend(), solver_->getPublicKey()) == smartConfidants.cend()) {
     cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
     return;
   }
@@ -1942,7 +1942,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, uint8_t respondent, uint8_t required) {
+void Node::smartStageRequest(MsgTypes msgType, const cs::PublicKey& smartAddress, uint8_t respondent, uint8_t required) {
   //if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
   //  csdebug() << "NODE> Only confidant nodes can send smart-contract consensus stages";
   //  return;
@@ -2022,7 +2022,7 @@ void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signat
   //csmeta(csdetails) << "done";
 }
 
-void Node::addSmartConsensus(cs::PublicKey smartAddress) {
+void Node::addSmartConsensus(const cs::PublicKey& smartAddress) {
   if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress) != activeSmartConsensuses_.cend()) {
     csdebug() << "The smartConsensus for smartContract #" << cs::Utils::byteStreamToHex(smartAddress.data(), smartAddress.size()) << " is already active";
     return;
@@ -2031,7 +2031,7 @@ void Node::addSmartConsensus(cs::PublicKey smartAddress) {
   checkForSavedSmartStages(smartAddress);
 }
 
-void Node::removeSmartConsensus(cs::PublicKey smartAddress) {
+void Node::removeSmartConsensus(const cs::PublicKey& smartAddress) {
   if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress) == activeSmartConsensuses_.cend()) {
     csdebug() << "The smartConsensus for smartContract #" << cs::Utils::byteStreamToHex(smartAddress.data(), smartAddress.size()) << " is not active";
     return;
@@ -2039,7 +2039,7 @@ void Node::removeSmartConsensus(cs::PublicKey smartAddress) {
   activeSmartConsensuses_.erase(std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress));
 }
 
-void Node::checkForSavedSmartStages(cs::PublicKey smartAddress) {
+void Node::checkForSavedSmartStages(const cs::PublicKey& smartAddress) {
   for (auto& it : smartStageOneStorage_) {
     if (it.smartAddress == smartAddress) {
       emit gotSmartStageOne(it, false);

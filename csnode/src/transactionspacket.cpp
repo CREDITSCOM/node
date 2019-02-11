@@ -166,7 +166,7 @@ bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature&
   return true;
  }
 
-const std::vector<std::pair<cs::Byte, cs::Signature>>& TransactionsPacket::signatures() const noexcept {
+const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
   return m_signatures;
 }
 
