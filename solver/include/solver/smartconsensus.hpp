@@ -62,7 +62,8 @@ namespace cs {
 
       void createFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
-      void gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress, uint8_t requesterNumber, uint8_t requiredNumber);
+      void gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
+        , uint8_t requesterNumber, uint8_t requiredNumber, cs::PublicKey& requester);
 
       void requestSmartStages(int st);
       void requestSmartStagesNeighbors(int st);

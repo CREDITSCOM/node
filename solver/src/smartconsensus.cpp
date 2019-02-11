@@ -69,7 +69,7 @@ namespace cs{
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
     cs::Connector::connect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
-    cs::Connector::connect(&pnode_->gotSmartStageRequest, this, &cs::SmartConsensus::gotSmartStageRequest);
+    cs::Connector::connect(&pnode_->receivedSmartStageRequest, this, &cs::SmartConsensus::gotSmartStageRequest);
     pnode_->addSmartConsensus(st1.smartAddress);
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
@@ -343,29 +343,41 @@ namespace cs{
     //csdebug() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
-  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress, uint8_t requesterNumber, uint8_t requiredNumber) {
+  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
+      , uint8_t requesterNumber, uint8_t requiredNumber, cs::PublicKey& requester) {
+    
     if (smartAddress_ != smartAddress) {
       return;
     }
-    
+
+    if (!smartConfidantExist(requesterNumber)) {
+      return;
+    }
+    if (requester != smartConfidants().at(requesterNumber)) {
+      return;
+    }
+    //const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey requester
     switch (msgType) {
     case MsgTypes::SmartFirstStageRequest:
       if (smartStageOneStorage_.at(requiredNumber).sender == cs::ConfidantConsts::InvalidConfidantIndex) {
         pnode_->smartStageEmptyReply(requesterNumber);
       }
-      pnode_->sendSmartStageReply(requiredNumber, smartStageOneStorage_.at(requiredNumber).signature, MsgTypes::FirstSmartStage, requesterNumber);
+      pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartStageOneStorage_.at(requiredNumber).sRoundNum
+          , smartStageOneStorage_.at(requiredNumber).signature, MsgTypes::FirstSmartStage, requester);
       break;
     case MsgTypes::SmartSecondStageRequest:
       if (smartStageTwoStorage_.at(requiredNumber).sender == cs::ConfidantConsts::InvalidConfidantIndex) {
         pnode_->smartStageEmptyReply(requesterNumber);
       }
-      pnode_->sendSmartStageReply(requiredNumber, smartStageTwoStorage_.at(requiredNumber).signature, MsgTypes::SecondSmartStage, requesterNumber);
+      pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartStageTwoStorage_.at(requiredNumber).sRoundNum
+        , smartStageTwoStorage_.at(requiredNumber).signature, MsgTypes::FirstSmartStage, requester);
       break;
     case MsgTypes::SmartThirdStageRequest:
       if (smartStageThreeStorage_.at(requiredNumber).sender == cs::ConfidantConsts::InvalidConfidantIndex) {
         pnode_->smartStageEmptyReply(requesterNumber);
       }
-      pnode_->sendSmartStageReply(requiredNumber, smartStageThreeStorage_.at(requiredNumber).signature, MsgTypes::ThirdSmartStage, requesterNumber);
+      pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartStageThreeStorage_.at(requiredNumber).sRoundNum
+        , smartStageThreeStorage_.at(requiredNumber).signature, MsgTypes::FirstSmartStage, requester);
       break;
     }
   }
@@ -469,7 +481,9 @@ namespace cs{
       }
 
       if (sender == cs::ConfidantConsts::InvalidConfidantIndex) {
-        pnode_->smartStageRequest(msg, smartAddress_, i, i);
+        if (i != ownSmartsConfNum_ && i != sender && smartConfidantExist(i)) {
+          pnode_->smartStageRequest(msg, smartAddress_, smartConfidants_.at(i), ownSmartsConfNum_, i);
+        }
         isRequested = true;
       }
     }
@@ -504,8 +518,8 @@ namespace cs{
       }
 
       if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
-        if (idx != ownSmartsConfNum_ && idx != required) {
-          pnode_->smartStageRequest(messageType, smartAddress_, idx, required);
+        if (idx != ownSmartsConfNum_ && idx != required && smartConfidantExist(idx)) {
+          pnode_->smartStageRequest(messageType, smartAddress_, smartConfidants_.at(idx), ownSmartsConfNum_, required);
           isRequested = true;
         }
       }

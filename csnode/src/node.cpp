@@ -1738,7 +1738,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
                 << "Smart#: " << cs::Utils::byteStreamToHex(stage.smartAddress.data(), stage.smartAddress.size());
   csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
-  csdebug() << "NODE> Stage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
+  csdebug() << "NODE> SmartStage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
   //solver_->gotSmartStageOne(stage);
   if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.smartAddress) == activeSmartConsensuses_.cend()) {
     csdebug() << "The SmartConsensus #" << cs::Utils::byteStreamToHex(stage.smartAddress.data(),stage.smartAddress.size()) 
@@ -1931,7 +1931,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   //}
 
   if (!cscrypto::verifySignature(stage.signature, sender, bytes.data(), bytes.size())) {
-    csdebug() << "SmartStage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+    csdebug() << "SmartStage Three from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
   }
 
@@ -1942,39 +1942,20 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, uint8_t respondent, uint8_t required) {
-  //if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
-  //  csdebug() << "NODE> Only confidant nodes can send smart-contract consensus stages";
-  //  return;
-  //}
+void Node::smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
 
-  //if (!solver_->smartConfidantExist(respondent)) {
-  //  return;
-  //}
-
-  //const cs::ConfidantsKeys& smartConfidants = solver_->smartConfidants();
-  //const cs::PublicKey& confidant = smartConfidants.at(respondent);
-  //sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartAddress ,respondent, required);
-  //csmeta(csdetails) << "done";
+  sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartAddress ,respondent, required);
+  csmeta(csdetails) << "done";
 }
 
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
- /* csmeta(csdetails) << "started";
-
-  if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
-    cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
-    return;
-  }
+csmeta(csdetails) << "started";
 
   istream_.init(data, size);
 
   uint8_t requesterNumber = 0;
   cs::PublicKey smartAddress;
   istream_ >> smartAddress >> requesterNumber;
-
-  if (requester != solver_->smartConfidants().at(requesterNumber)) {
-    return;
-  }
 
   uint8_t requiredNumber = 0;
   istream_ >> requiredNumber;
@@ -1984,42 +1965,21 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     return;
   }
 
-  emit gotSmartStageRequest(msgType, smartAddress, requesterNumber, requiredNumber);*/
+  cs::PublicKey req = requester;
+
+  emit receivedSmartStageRequest(msgType, smartAddress, requesterNumber, requiredNumber, req);
   //solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 }
 
-void Node::sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
-  //csmeta(csdetails) << "started";
+void Node::sendSmartStageReply(const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey requester) {
+  csmeta(csdetails) << "started";
 
   //if (solver_->ownSmartsConfidantNumber() == cs::ConfidantConsts::InvalidConfidantIndex) {
   //  cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
   //  return;
   //}
-
-  //if (!solver_->smartConfidantExist(requester)) {
-  //  return;
-  //}
-
-  //cs::Bytes message;
-
-  //switch (msgType) {
-  //case MsgTypes::FirstSmartStage:
-  //  message = smartStageOneMessage_[sender];
-  //  break;
-  //case MsgTypes::SecondSmartStage:
-  //  message = smartStageTwoMessage_[sender];
-  //  break;
-  //case MsgTypes::ThirdSmartStage:
-  //  message = smartStageThreeMessage_[sender];
-  //  break;
-  //default:
-  //  break;
-  //}
-
-  //sendDefault(solver_->smartConfidants().at(requester), msgType, cs::Conveyer::instance().currentRoundNumber(),
-  //  // payload:
-  //  solver_->smartRoundNumber(), signature, message);
-  //csmeta(csdetails) << "done";
+  sendDefault(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), smartRNum, signature, message);
+  csmeta(csdetails) << "done";
 }
 
 void Node::addSmartConsensus(cs::PublicKey smartAddress) {

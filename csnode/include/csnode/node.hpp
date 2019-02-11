@@ -76,9 +76,10 @@ public:
   void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
   void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
   void smartStageEmptyReply(uint8_t requesterNumber);
-  void smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, uint8_t respondent, uint8_t required);
+  void smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendSmartStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+  void sendSmartStageReply(const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature
+      , const MsgTypes msgType, const cs::PublicKey requester);
 
   void addSmartConsensus(cs::PublicKey smartAddress);
   void removeSmartConsensus(cs::PublicKey smartAddress);
@@ -196,15 +197,13 @@ public:
   using SmartStageOneSignal = cs::Signal<void(cs::StageOneSmarts, bool)>;
   using SmartStageTwoSignal = cs::Signal<void(cs::StageTwoSmarts, bool)>;
   using SmartStageThreeSignal = cs::Signal<void(cs::StageThreeSmarts, bool)>;
-  using SmartStageRequestSignal = cs::Signal<void(uint8_t , cs::PublicKey , uint8_t , uint8_t )>;
-  using SmartStageReplySignal = cs::Signal<void(cs::StageThreeSmarts, bool)>;
+  using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::PublicKey, uint8_t, uint8_t, cs::PublicKey&)>;
 
-public signals:
+  public signals:
   SmartStageOneSignal gotSmartStageOne;
   SmartStageTwoSignal gotSmartStageTwo;
   SmartStageThreeSignal gotSmartStageThree;
-  SmartStageRequestSignal gotSmartStageRequest;
-  SmartStageReplySignal gotSmartStageReply;
+  SmartStageRequestSignal receivedSmartStageRequest;
 
 public slots:
   void processTimer();

@@ -197,18 +197,18 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.blockHash.data(), stageTo.blockHash.size())) {
-      cswarning() << "Block Signatures is not valid !";
+      cswarning() << "Block Signatures are not valid !";
       return;
     }
 
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
-      cswarning() << "Round Signatures is not valid !";
+      cswarning() << "Round Signatures are not valid !";
       return;
     }
 
     if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
-      cswarning() << "Real Trusted is not valid !";
+      cswarning() << "Real Trusted are not valid !";
       return;
     }
 
