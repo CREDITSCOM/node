@@ -318,17 +318,17 @@ private:
   std::vector<cs::StageThree> trueStageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
-  std::vector<cs::StageOneSmarts> smartStageOneStorage_;
-  std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
-  std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-  bool smartStagesStorageRefreshed_;
-  std::vector<cs::PublicKey> smartConfidants_;
-  uint8_t ownSmartsConfNum_;
-  cs::Sequence smartRoundNumber_;
-  cs::TransactionsPacket currentSmartTransactionPack_;
-  cs::StageOneSmarts st1;
-  cs::StageTwoSmarts st2;
-  cs::StageThreeSmarts st3;
+  //std::vector<cs::StageOneSmarts> smartStageOneStorage_;
+  //std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
+  //std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
+  //bool smartStagesStorageRefreshed_;
+  //std::vector<cs::PublicKey> smartConfidants_;
+  //uint8_t ownSmartsConfNum_;
+  //cs::Sequence smartRoundNumber_;
+  //cs::TransactionsPacket currentSmartTransactionPack_;
+  //cs::StageOneSmarts st1;
+  //cs::StageTwoSmarts st2;
+  //cs::StageThreeSmarts st3;
   std::vector <int> smartUntrusted;
   std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
   // stores candidates for next round

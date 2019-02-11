@@ -139,7 +139,7 @@ public:  // Interface
   /// @brief Adds signature to transaction vector
   /// @param signature Signature to add
   ///
-  bool addSignature(const cs::Signature& signature);
+  bool addSignature(const cs::Byte index, const cs::Signature& signature);
 
   ///
   /// @brief Adds transaction to transaction vector
@@ -157,7 +157,7 @@ public:  // Interface
   /// @brief Returns transactions
   /// @return Reference to signatures vector
   ///
-  const std::vector<cs::Signature>& signatures() const noexcept;
+  const std::vector<std::pair<cs::Byte, cs::Signature>>& signatures() const noexcept;
 
   ///
   /// @brief Returns trabsactions, non const version
@@ -176,7 +176,7 @@ private:  // Service
 
 private:  // Members
   TransactionsPacketHash m_hash;
-  std::vector<cs::Signature> m_signatures;
+  std::vector<std::pair<cs::Byte, cs::Signature>> m_signatures;
   std::vector<csdb::Transaction> m_transactions;
 };
 }  // namespace cs

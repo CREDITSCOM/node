@@ -69,6 +69,7 @@ namespace cs{
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
     cs::Connector::connect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
+    cs::Connector::connect(&pnode_->gotSmartStageRequest, this, &cs::SmartConsensus::gotSmartStageRequest);
     pnode_->addSmartConsensus(st1.smartAddress);
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
@@ -322,12 +323,15 @@ namespace cs{
 
     for (auto& st : smartStageThreeStorage_) {
       if (st.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
-        if (currentSmartTransactionPack_.addSignature(st.packageSignature)) {
-          cslog() << "Signature added to the Transactions Packet";
+        if (currentSmartTransactionPack_.addSignature(st.sender, st.packageSignature)) {
+          csdebug() << "Signature of T[" << static_cast<int>(st.sender) << "] added to the Transactions Packet";
+        } 
+        else{
+          csdebug() << "Signature of T[" << static_cast<int>(st.sender) << "] isn't added";
         }
       }
     }
-    cslog() << "Adding separate package with " << currentSmartTransactionPack_.signatures().size() << " signatures";
+    csdebug() << "Adding separate package with " << currentSmartTransactionPack_.signatures().size() << " signatures";
     conv.addSeparatePacket(currentSmartTransactionPack_);
 
     // TODO: 
@@ -339,7 +343,11 @@ namespace cs{
     //csdebug() << __func__ << "(): ==============================================> someone SENT TRANSACTION TO CONVEYER";
   }
 
-  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber) {
+  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress, uint8_t requesterNumber, uint8_t requiredNumber) {
+    if (smartAddress_ != smartAddress) {
+      return;
+    }
+    
     switch (msgType) {
     case MsgTypes::SmartFirstStageRequest:
       if (smartStageOneStorage_.at(requiredNumber).sender == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -383,7 +391,7 @@ namespace cs{
       }
     }
     size_t cSize;
-    if(funcName=="StageThree") {
+    if(funcName == "SmartStageThree") {
       cSize = smartConfidants_.size() / 2 + 1;
     }
     else {
@@ -461,7 +469,7 @@ namespace cs{
       }
 
       if (sender == cs::ConfidantConsts::InvalidConfidantIndex) {
-        pnode_->stageRequest(msg, i, i);
+        pnode_->smartStageRequest(msg, smartAddress_, i, i);
         isRequested = true;
       }
     }
@@ -497,7 +505,7 @@ namespace cs{
 
       if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
         if (idx != ownSmartsConfNum_ && idx != required) {
-          pnode_->smartStageRequest(messageType, idx, required);
+          pnode_->smartStageRequest(messageType, smartAddress_, idx, required);
           isRequested = true;
         }
       }

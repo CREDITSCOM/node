@@ -126,7 +126,7 @@ public:
   struct SmartSignature {
     cs::PublicKey smartKey;
     cs::Sequence smartConsensusPool;
-    std::vector<std::pair<int, cs::Signature>> signatures;
+    std::vector<std::pair<cs::Byte, cs::Signature>> signatures;
   };
 
   using NewWallets = std::vector<NewWalletInfo>;
