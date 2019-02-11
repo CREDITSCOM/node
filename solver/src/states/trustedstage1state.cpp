@@ -205,10 +205,9 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
   uint8_t del1;
   // validate each transaction
   for (std::size_t i = 0; i < transactionsCount; ++i) {
-    const auto& smarts = context.smart_contracts();
     const csdb::Transaction& transaction = transactions[i];
     bool byte = true;
-    bool is_smart_new_state = smarts.is_new_state(transaction);
+    bool is_smart_new_state = SmartContracts::is_new_state(transaction);
     if(!is_smart_new_state) {
       byte = !(transaction.source() == transaction.target());
       if (csdb::Amount(transaction.max_fee().to_double()) >= csdb::Amount(transaction.counted_fee().to_double())) {
@@ -222,22 +221,26 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
         byte = false;
         cslog() << name() << ": reject smart new_state trx because related contract is closed";
       } else {
+        bool ok = false;
         csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(transaction, context.blockchain());
-        csdb::Amount feeForExecution(transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
-        if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
-            >= csdb::Amount(transaction.counted_fee().to_double()) + feeForExecution) {
-          csdb::Address initerAddress = WalletsCache::findSmartContractIniter(transaction, context.blockchain());
-          csdb::Transaction new_state_tr(transaction);
-          new_state_tr.set_source(initerAddress);
-          byte = ptransval->validateTransaction(new_state_tr, i, del1, true);
-        } else {
-          byte = false;
+        if(initTransaction.is_valid()) {
+          csdb::UserField fee_fld = transaction.user_field(trx_uf::new_state::Fee);
+          if(fee_fld.is_valid()) {
+            csdb::Amount feeForExecution(fee_fld.value<csdb::Amount>());
+            if((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
+              >= csdb::Amount(transaction.counted_fee().to_double()) + feeForExecution) {
+              csdb::Transaction new_state_tr(transaction);
+              new_state_tr.set_source(initTransaction.source());
+              ok = ptransval->validateTransaction(new_state_tr, i, del1, true);
+            }
+          }
         }
+        byte = ok;
       }
     }
     if (byte) {
       // yrtimd: test with get_valid_smart_address() only for deploy transactions:
-      if (smarts.is_deploy(transaction)) {
+      if (SmartContracts::is_deploy(transaction)) {
         auto sci = context.smart_contracts().get_smart_contract(transaction);
         if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
           csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
