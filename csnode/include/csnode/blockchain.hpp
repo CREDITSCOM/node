@@ -295,9 +295,8 @@ public signals:
   /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
   cs::StoreBlockSignal storeBlockEvent_;
 
-
-  /** @brief The write block event. Raised when the next block is flushed to storage */
-  cs::ChangeBlockSignal writeBlockEvent;
+  /** @brief The cached block event. Raised when the next block is flushed to storage */
+  cs::ChangeBlockSignal cachedBlockEvent;
 
   /** @brief The remove block event. Raised when the next block is flushed to storage */
   cs::ChangeBlockSignal removeBlockEvent;
