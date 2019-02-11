@@ -221,7 +221,8 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
         byte = false;
         cslog() << name() << ": reject smart new_state trx because related contract is closed";
       } else {
-        bool ok = false;
+        // set to false, then test by validator:
+        byte = false;
         csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(transaction, context.blockchain());
         if(initTransaction.is_valid()) {
           csdb::UserField fee_fld = transaction.user_field(trx_uf::new_state::Fee);
@@ -231,11 +232,10 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
               >= csdb::Amount(transaction.counted_fee().to_double()) + feeForExecution) {
               csdb::Transaction new_state_tr(transaction);
               new_state_tr.set_source(initTransaction.source());
-              ok = ptransval->validateTransaction(new_state_tr, i, del1, true);
+              byte = ptransval->validateTransaction(new_state_tr, i, del1, true);
             }
           }
         }
-        byte = ok;
       }
     }
     if (byte) {
