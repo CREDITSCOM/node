@@ -207,7 +207,8 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     if (SmartContracts::is_executable(initTransaction)) {
       wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
         - csdb::Amount(initTransaction.counted_fee().to_double())
-        - csdb::Amount(tr.counted_fee().to_double());
+        - csdb::Amount(tr.counted_fee().to_double())
+        - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
     } else {
       checkSmartWaitingForMoney(initTransaction, tr);
     }
@@ -250,17 +251,27 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
 
   if (waitingSmart) {
     csdb::Address wallAddress = initTransaction.target();
-    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+    csdb::Address wallAddressIniter = initTransaction.source();
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_ ||
+        wallAddressIniter == data_.genesisAddress_ || wallAddressIniter == data_.startAddress_) {
       return;
     }
     WalletId id{};
+    WalletId sourceId{};
     if (!findWalletId(wallAddress, id)) {
       cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
       return;
     }
+    if (!findWalletId(wallAddressIniter, sourceId)) {
+      cserror() << "Cannot find source wallet, source is " << wallAddressIniter.to_string();
+      return;
+    }
     WalletData& wallData = getWalletData(id, wallAddress);
+    WalletData& wallDataIniter = getWalletData(sourceId, wallAddressIniter);
+    wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
     wallData.balance_ += initTransaction.amount();
     setModified(id);
+    setModified(sourceId);
   }
 }
 

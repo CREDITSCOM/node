@@ -38,6 +38,10 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 
   WalletsState::WalletId walletIdNewState{};
   WalletsState::WalletData& wallStateIfNewState = walletsState_.getData(trx.target(), walletIdNewState);
+  csdb::Amount feeForExecution(0);
+  if (newState) {
+    feeForExecution = trx.user_field(trx_uf::new_state::Fee).value<csdb::Amount>();
+  }
 
 #ifndef WITHOUT_DELTA
   csdb::Amount newBalance;
@@ -46,7 +50,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   } else if (!newState && SmartContracts::is_executable(trx)) {
     newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
   } else {
-    newBalance = wallState.balance_ - trx.amount();
+    newBalance = wallState.balance_ - trx.amount() - feeForExecution;
   }
 #ifdef _MSC_VER
   int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
@@ -79,7 +83,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   } else if (!newState && SmartContracts::is_executable(trx)) {
     wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
   } else {
-    wallState.balance_ = wallState.balance_ - trx.amount();
+    wallState.balance_ = wallState.balance_ - trx.amount() - feeForExecution;
   }
 
 #endif
