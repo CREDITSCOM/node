@@ -1022,6 +1022,21 @@ bool SmartContracts::update_contract_state(csdb::Transaction t)
     }
   }
   else {
+    // state_value is empty - erase replenish_contract item if exists
+    if(!replenish_contract.empty()) {
+      fld = t.user_field(new_state::RefStart);
+      if(fld.is_valid()) {
+        SmartContractRef ref(fld);
+        csdb::Transaction t_start = get_transaction(ref);
+        if(t_start.is_valid()) {
+          // handle replenish during startup reading
+          const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref);
+          if(it != replenish_contract.cend()) {
+            replenish_contract.erase(it);
+          }
+        }
+      }
+    }
     cswarning() << name() << ": contract state is not updated, new state is empty meaning execution is failed";
     return false;
   }
