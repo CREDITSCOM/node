@@ -129,7 +129,7 @@ void Transport::run() {
   acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
 
   {
-    cs::SpinGuard lock(oLock_);
+    cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_);
     regPack_ = *(oPackStream_.getPackets());
@@ -345,7 +345,7 @@ void Transport::refillNeighbourhood() {
     cslog() << "Connecting to Signal Server on " << ssEp_;
 
     {
-      cs::SpinGuard lock(oLock_);
+      cs::Lock lock(oLock_);
       formSSConnectPack(config_, oPackStream_, myPublicKey_);
       ssStatus_ = SSBootstrapStatus::Requested;
       net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
@@ -587,7 +587,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
   auto end = pack + packNum;
 
   for (auto ptr = pack; ptr != end; ++ptr) {
-    cs::SpinGuard lock(sendPacksFlag_);
+    cs::Lock lock(sendPacksFlag_);
     PackSendTask pst;
     pst.pack = *ptr;
     pst.incrementId = incrementWhenResend;
@@ -604,7 +604,7 @@ void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhen
 }
 
 void Transport::clearTasks() {
-  cs::SpinGuard lock(sendPacksFlag_);
+  cs::Lock lock(sendPacksFlag_);
   sendPacks_.clear();
 }
 
@@ -674,7 +674,7 @@ void Transport::resetNeighbours() {
 void Transport::sendRegistrationRequest(Connection& conn) {
   cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
   *regPackConnId_ = conn.id;
   memcpy(req.data(), regPack_.data(), regPack_.size());
@@ -686,7 +686,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
   cslog() << "Confirming registration with " << conn.getOut();
 
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::RegistrationConfirmed << requestedId << conn.id << myPublicKey_;
 
@@ -697,7 +697,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
   cslog() << "Refusing registration with " << conn.in;
 
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::RegistrationRefused << conn.id << reason;
 
@@ -821,7 +821,7 @@ bool Transport::gotSSReRegistration() {
   cswarning() << "ReRegistration on Signal Server";
 
   {
-    cs::SpinGuard lock(oLock_);
+    cs::Lock lock(oLock_);
     formSSConnectPack(config_, oPackStream_, myPublicKey_);
     net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
   }
@@ -868,7 +868,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
   conn.in = net_->resolve(config_.getSignalServerEndpoint());
   conn.specialOut = false;
 
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
 
@@ -913,7 +913,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isNeighbors() << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
@@ -934,7 +934,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 }
 
 void Transport::sendPackRenounce(const cs::Hash& hash, const Connection& addr) {
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
 
   oPackStream_ << NetworkCommand::PackRenounce << hash;
@@ -967,7 +967,7 @@ void Transport::askForMissingPackages() {
 
   while (true) {
     {
-      cs::SpinGuard lock(uLock_);
+      cs::Lock lock(uLock_);
 
       if (i >= uncollected_.size()) {
         break;
@@ -984,7 +984,7 @@ void Transport::askForMissingPackages() {
     }
 
     {
-      cs::SpinGuard lock(msg->pLock_);
+      cs::Lock lock(msg->pLock_);
       const auto end = msg->packets_ + msg->packetsTotal_;
 
       uint16_t start = 0;
@@ -1025,7 +1025,7 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
   Packet p;
 
   {
-    cs::SpinGuard lock(oLock_);
+    cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::PackRequest << hash << start << req;
     p = *(oPackStream_.getPackets());
@@ -1040,7 +1040,7 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
 }
 
 void Transport::registerMessage(MessagePtr msg) {
-  cs::SpinGuard lock(uLock_);
+  cs::Lock lock(uLock_);
   uncollected_.emplace(msg);
 }
 
@@ -1081,7 +1081,7 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 }
 
 void Transport::sendPingPack(const Connection& conn) {
-  cs::SpinGuard lock(oLock_);
+  cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
   oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastSequence() << myPublicKey_;
   sendDirect(oPackStream_.getPackets(), conn);

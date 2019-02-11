@@ -16,8 +16,7 @@ void PrimitiveWriteState::on(SolverContext& context) {
                                    [pctx, this]() {
                                      csdebug() << name() << ": it is time to spawn first round";
                                      trusted_candidates.assign(Consensus::MinTrustedNodes, pctx->public_key());
-                                     std::vector<cs::TransactionsPacketHash> hashes_candidates;
-                                     pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
+                                     pctx->next_trusted_candidates(trusted_candidates);
                                      trusted_candidates.clear();
                                      pctx->spawn_first_round();
                                    },
@@ -35,8 +34,7 @@ void PrimitiveWriteState::on(SolverContext& context) {
         trusted_candidates.emplace_back(pctx->public_key());
       }
     }
-    std::vector<cs::TransactionsPacketHash> hashes_candidates;
-    pctx->next_trusted_candidates(trusted_candidates, hashes_candidates);
+    pctx->next_trusted_candidates(trusted_candidates);
     trusted_candidates.clear();
 
     cs::StageThree stageThree;

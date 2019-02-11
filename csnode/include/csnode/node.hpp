@@ -86,7 +86,6 @@ public:
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
-  //void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp);
 
   cs::ConfidantsKeys retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const;
 
@@ -94,7 +93,6 @@ public:
   void startConsensus();
 
   void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
-  void prepareMetaForSending(cs::RoundTable& roundTable, std::string timeStamp, cs::StageThree& st3);
   void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 
@@ -118,7 +116,7 @@ public:
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                         const cs::PublicKey& sender, std::vector<cs::SignaturePair>&& poolSignatures);
+                         const cs::PublicKey& sender, cs::BlockSignatures&& poolSignatures);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -324,15 +322,13 @@ private:
 
   // round package sent data storage
   struct SentRoundData {
-    cs::RoundTable roundTable;
+    cs::RoundTable table;
     cs::Byte subRound;
-    cs::PoolMetaInfo poolMetaInfo;
-    cs::Characteristic characteristic;
   };
 
   struct SentSignatures {
-    std::vector<cs::SignaturePair> poolSignatures;
-    std::vector<cs::SignaturePair> roundSignatures;
+    cs::BlockSignatures poolSignatures;
+    cs::BlockSignatures roundSignatures;
   };
 
   cs::Bytes lastRoundTableMessage_;

@@ -124,22 +124,10 @@ struct ConveyerMeta {
   cs::TransactionsPacket invalidTransactions;
 };
 
-struct SignaturePair {
-  uint8_t sender =  cs::ConfidantConsts::InvalidConfidantIndex;
-  cs::Signature signature;
-
-  SignaturePair() = default;
-
-  SignaturePair(const uint8_t Sender, const cs::Signature& Sign) :
-    sender(Sender)
-  , signature(Sign)
-  {}
-};
-
 struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
-  std::vector<cs::SignaturePair> signatures;
+  cs::BlockSignatures signatures;
 };
 
 // meta storages

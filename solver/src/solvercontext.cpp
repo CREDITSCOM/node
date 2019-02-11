@@ -72,8 +72,8 @@ void SolverContext::add_stage3(cs::StageThree& stage) {
   core.gotStageThree(stage, 1);
 }
 
-size_t SolverContext::own_conf_number() const {
-  return static_cast<size_t>(core.pnode->getConfidantNumber());
+uint8_t SolverContext::own_conf_number() const {
+  return core.pnode->getConfidantNumber();
 }
 
 size_t SolverContext::cnt_trusted() const {
@@ -88,8 +88,8 @@ void SolverContext::request_round_table() const {
   //        core.pnode->sendRoundTableRequest(core.cur_round);
 }
 
-bool SolverContext::addSignaturesToLastBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures) const {
-  return core.pnode->getBlockChain().addSignaturesToDeferredBlock(blockSignatures);
+bool SolverContext::addSignaturesToLastBlock(BlockSignatures&& blockSignatures) {
+  return core.addSignaturesToDeferredBlock(std::move(blockSignatures));
 }
 
 Role SolverContext::role() const {
@@ -110,50 +110,21 @@ Role SolverContext::role() const {
 }
 
 void SolverContext::spawn_next_round(cs::StageThree& st3) {
-  std::string tStamp;
-  uint8_t writer_idx = InvalidConfidantIndex;
-
-  //if(own_stage3 != nullptr) {
-  //  writer_idx = own_stage3->writer;
-  //  csdebug() << "writer idx = " << (int)writer_idx ;
-  //}
-  //else {
-  //csdebug() << "else" ;
-  //  for(const auto& s3 : stage3_data()) {
-  //    writer_idx = s3.writer;
-  //    if(writer_idx != InvalidConfidantIndex) {
-  //      break;
-  //    }
-  //  }
-  //}
-  //if(writer_idx != InvalidConfidantIndex) {
-  //  csdebug() << "writer_idx != invalid";
-  //  auto ptr = stage1(writer_idx);
-  //  if(ptr != nullptr) {
-  //    csdebug() << "ptr(my stage 1) != nullptr";
-  //    tStamp = ptr->roundTimeStamp;
-  //  }
-  //}
-
-
-  if (st3.sender != InvalidConfidantIndex) {
-    writer_idx = st3.writer;
-    //csdebug() << "writer idx = " << static_cast<int>(writer_idx);
-  }
-  else {
+  if (st3.sender == InvalidConfidantIndex) {
     cserror() << "Writer wans't elected on this node";
     return;
   }
-  if (writer_idx != InvalidConfidantIndex) {
-    //csdebug() << "writer_idx != invalid";
-    auto ptr = stage1(writer_idx);
+
+  std::string tStamp;
+
+  if (st3.writer != InvalidConfidantIndex) {
+    auto ptr = stage1(st3.writer);
     if (ptr != nullptr) {
-      //csdebug() << "ptr(my stage 1) != nullptr";
       tStamp = ptr->roundTimeStamp;
     }
   }
 
-  if(tStamp.empty()) {
+  if (tStamp.empty()) {
     cswarning() << "SolverCore: cannot act as writer because lack writer timestamp";
     return;
   }
@@ -162,12 +133,14 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
   if (core.trusted_candidates.empty()) {
     cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
   }
+
   csdebug() << "SolverCore: new confidant nodes: ";
   int i = 0;
-  for (auto& it : core.trusted_candidates) {
+  for (const auto& it : core.trusted_candidates) {
     csdebug() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
     ++i;
   }
+
   csdebug() << "SolverCore: new hashes count is " << core.hashes_candidates.size();
   core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp), st3);
 }

@@ -401,7 +401,7 @@ public:
     IntType** place = freeChunksLast_.load(std::memory_order_acquire);
     do {
       if (!place) {
-        cs::SpinGuard l(allocFlag_);
+        cs::Lock l(allocFlag_);
 
         place = freeChunksLast_.load(std::memory_order_relaxed);
         if (place)
@@ -418,7 +418,7 @@ public:
   void remove(IntType* toFree) {
     toFree->~IntType();
     {
-      cs::SpinGuard l(freeFlag_);
+      cs::Lock l(freeFlag_);
       IntType** place = freeChunksLast_.load(std::memory_order_acquire);
       IntType** nextPlace;
 

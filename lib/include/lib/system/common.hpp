@@ -35,14 +35,26 @@ using Signature = cscrypto::Signature;
 using Hash = cscrypto::Hash;
 using PrivateKey = cscrypto::PrivateKey;
 
+using ConfidantSignature = std::pair<Byte, Signature>;
+using BlockSignatures = std::vector<ConfidantSignature>;
+
 // sync types
 using SharedMutex = std::shared_mutex;
 using SpinLock = boost::detail::spinlock;
 
 // RAII locks
-using Lock = std::lock_guard<cs::SharedMutex>;
-using SharedLock = std::shared_lock<cs::SharedMutex>;
-using SpinGuard = std::lock_guard<SpinLock>;
+// TODO: simple lock_guard and shared_lock using next?
+template<typename T>
+class Lock : public std::lock_guard<T> {
+public:
+  explicit inline Lock(T& lockable) noexcept : std::lock_guard<T>(lockable) {}
+};
+
+template<typename T>
+class SharedLock : public std::shared_lock<T> {
+public:
+  explicit inline SharedLock(T& lockable) noexcept : std::shared_lock<T>(lockable) {}
+};
 
 // aliasing, C++ 17 scoped lock, C++ 17 constructor template parameters deduction
 template<typename... T>

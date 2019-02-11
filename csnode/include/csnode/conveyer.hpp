@@ -101,9 +101,11 @@ public:
   /// @author Alexander Avramenko.
   /// @date  29.11.2018.
   ///
+  /// @param cachedRound Remove conveyer meta storage to this point.
   /// @param [in,out]    table   The new round table contains trusted nodes and round number.
+  /// @warning all meta in conveyer will be removed from cached round to table round number.
   ///
-  void updateRoundTable(const RoundTable& table);
+  void updateRoundTable(cs::RoundNumber cachedRound, const RoundTable& table);
 
   ///
   /// @brief Returns current blockchain round table.

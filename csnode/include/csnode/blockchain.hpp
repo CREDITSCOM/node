@@ -72,14 +72,15 @@ public:
    *
    * @param pool    The pool representing block to store in blockchain. Its sequence number MUST be
    *                set. It will be modified.
-   * @param by_sync False if block is new, just constructed, true if block is received via sync subsystem
+   * @param by_sync False if block is new, just constructed, true if block is received via sync subsystem.
+   *                False - addNewWalletsToPool() called. If true updateWalletIds() called.
    *
    * @return    True if it succeeds, false if it fails. True DOES NOT MEAN the block recorded to
    *            chain. It means block is correct and possibly recorded. If it is not recorded now, it is cached
    *            for future use and will be recorded on time
    */
 
-  bool  storeBlock(csdb::Pool pool, bool by_sync);
+  bool storeBlock(csdb::Pool pool, bool by_sync);
 
   /**
    * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -94,7 +95,9 @@ public:
    * @return    The new recorded block if ok, otherwise nullopt.
    */
 
-  std::optional<csdb::Pool> createBlock(csdb::Pool pool);
+  inline std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+    return recordBlock(pool, true);
+  }
 
 private:
   void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
@@ -119,8 +122,6 @@ public:
   cs::Sequence getRequestedBlockNumber() const;
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
-
-  bool addSignaturesToDeferredBlock(std::vector<std::pair<uint8_t, cscrypto::Signature>> blockSignatures);
 
 #ifdef MONITOR_NODE
   void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
@@ -162,8 +163,11 @@ public:
 
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
+  void setTransactionsFees(csdb::Pool pool);
 
   const csdb::Storage& getStorage() const;
+
+  void addNewWalletsToPool(csdb::Pool& pool);
 
   struct AddrTrnxCount {
     uint64_t sendCount;
@@ -193,7 +197,6 @@ private:
   bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
   bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-  void addNewWalletsToPool(csdb::Pool& pool);
   void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
                           csdb::Pool::NewWallets& newWallets);
 
@@ -302,21 +305,20 @@ public signals:
 private:
 
   /**
-   * @fn    std::pair<bool, std::optional<csdb::Pool>> BlockChain::recordBlock(csdb::Pool pool, bool requireAddWallets, std::optional<cs::PrivateKey> writer_key);
+   * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
    *
    * @brief Finish pool, sign it or test signature, then record block to chain
    *
    * @author    Alexander Avramenko
    * @date  23.11.2018
    *
-   * @param pool                The pool to finish &amp; record to chain.
-   * @param requireAddWallets   If set, addNewWalletsToPool() called, otherwise updateWalletIds().
+   * @param pool    The pool to finish &amp; record to chain.
    *
    * @return    A std::pair of bool (success or fail) and std::optional&lt;csdb::Pool&gt; (recorded
    *            pool)
    */
 
-  std::pair<bool, std::optional<csdb::Pool>> recordBlock(csdb::Pool pool, bool requireAddWallets, bool isTrusted);
+  std::optional<csdb::Pool> recordBlock(csdb::Pool pool, bool isTrusted);
 
   // to store outrunning blocks until the time to insert them comes
   // stores pairs of <block, sender> sorted by sequence number

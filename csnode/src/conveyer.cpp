@@ -158,14 +158,19 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
   return std::make_optional<decltype(data)>(std::move(data));
 }
 
-void cs::ConveyerBase::updateRoundTable(const cs::RoundTable& table) {
+void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::RoundTable& table) {
   cslog() << csname() << "updateRoundTable";
 
   {
     cs::Lock lock(sharedMutex_);
-    while (table.round <= currentRoundNumber()) {
-      pimpl_->metaStorage.extract(currentRoundNumber());
-      --pimpl_->currentRound;
+
+    while (table.round <= cachedRound) {
+      pimpl_->metaStorage.extract(cachedRound);
+      --cachedRound;
+    }
+
+    if (pimpl_->metaStorage.contains(table.round)) {
+      cserror() << csname() << "Round table updation failed";
     }
   }
 

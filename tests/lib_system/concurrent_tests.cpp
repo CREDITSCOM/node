@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "lib/system/concurrent.hpp"
+#include <lib/system/utils.hpp>
 
 #include <iostream>
 #include <string>
@@ -12,17 +13,12 @@ using Ref = std::reference_wrapper<T>;
 
 static const uint64_t sleepTimeMs = 2500;
 
-template<typename... Types>
-void print(Types&& ...args) {
-  (std::cout << ... << std::forward<Types>(args)) << std::endl;
-}
-
 #define GENERATE_THREAD_VALUES()\
   std::atomic<bool> isRunningFinished = false;\
   ThreadId mainId = std::this_thread::get_id();\
   ThreadId concurrentId;\
   static std::atomic<bool> called = false;\
-  print("Main thread id: ", mainId);\
+  cs::Console::writeLine("Main thread id: ", mainId);\
   (void)called
 
 TEST(Concurrent, SimpleRunWithBinding) {
@@ -33,8 +29,8 @@ TEST(Concurrent, SimpleRunWithBinding) {
     void method(const std::string& message, Ref<ThreadId> wrapper, Ref<std::atomic<bool>> finished) {
       wrapper.get() = std::this_thread::get_id();
 
-      print("Concurrent thread id: ", wrapper);
-      print(message);
+      cs::Console::writeLine("Concurrent thread id: ", wrapper);
+      cs::Console::writeLine(message);
 
       finished.get() = true;
     }
@@ -56,8 +52,8 @@ TEST(Concurrent, SimpleRunWithoutBinding) {
     void method(const std::string& message, Ref<ThreadId> wrapper, Ref<std::atomic<bool>> finished) {
       wrapper.get() = std::this_thread::get_id();
 
-      print("Concurrent thread id: ", wrapper);
-      print(message);
+      cs::Console::writeLine("Concurrent thread id: ", wrapper);
+      cs::Console::writeLine(message);
 
       finished.get() = true;
     }
@@ -77,8 +73,8 @@ TEST(Concurrent, SimpleRunLambda) {
   auto lambda = [&] {
     concurrentId = std::this_thread::get_id();
 
-    print("Concurrent thread id: ", concurrentId);
-    print("Finished");
+    cs::Console::writeLine("Concurrent thread id: ", concurrentId);
+    cs::Console::writeLine("Finished");
 
     isRunningFinished = true;
   };
@@ -97,20 +93,20 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
     void method(const std::string& message, Ref<ThreadId> wrapper, Ref<std::atomic<bool>> finished) {
       wrapper.get() = std::this_thread::get_id();
 
-      print("Concurrent thread id: ", wrapper);
-      print(message);
+      cs::Console::writeLine("Concurrent thread id: ", wrapper);
+      cs::Console::writeLine(message);
 
       finished.get() = true;
     }
 
   public slots:
     void onWatcherFinished() {
-      print("Watcher finished slot activated");
+      cs::Console::writeLine("Watcher finished slot activated");
       called = true;
     }
 
     void onFailed() {
-      print("Execution failed");
+      cs::Console::writeLine("Execution failed");
     }
   };
 
@@ -119,7 +115,7 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   auto binder = std::bind(&Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
-  print("Not connected yet");
+  cs::Console::writeLine("Not connected yet");
 
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
   cs::Connector::connect(&watcher->failed, &demo, &Demo::onFailed);
@@ -131,11 +127,11 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   }
 
   if (!called && isRunningFinished) {
-    print("Method executed, but does not generate finished signal");
+    cs::Console::writeLine("Method executed, but does not generate finished signal");
   }
 
-  print("Called value is ", called);
-  print("isRunnings value is ", isRunningFinished);
+  cs::Console::writeLine("Called value is ", called);
+  cs::Console::writeLine("isRunnings value is ", isRunningFinished);
 
   ASSERT_NE(mainId, concurrentId);
   ASSERT_EQ(called, true);
@@ -149,20 +145,20 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
     void method(const std::string& message, Ref<ThreadId> wrapper, Ref<std::atomic<bool>> finished) {
       wrapper.get() = std::this_thread::get_id();
 
-      print("Concurrent thread id: ", wrapper);
-      print(message);
+      cs::Console::writeLine("Concurrent thread id: ", wrapper);
+      cs::Console::writeLine(message);
 
       finished.get() = true;
     }
 
   public slots:
     void onWatcherFinished() {
-      print("Watcher finished slot activated");
+      cs::Console::writeLine("Watcher finished slot activated");
       called = true;
     }
 
     void onFailed() {
-      print("Execution failed");
+      cs::Console::writeLine("Execution failed");
     }
   };
 
@@ -170,7 +166,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   std::string message = "Finished";
 
   cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
-  print("Not connected yet");
+  cs::Console::writeLine("Not connected yet");
 
   // look at watcher
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
@@ -179,15 +175,15 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   while(!isRunningFinished);
 
   if (!called) {
-    print("Not called, sleeping...");
+    cs::Console::writeLine("Not called, sleeping...");
     std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
   }
 
-  print("Called value is ", called);
-  print("isRunnings value is ", isRunningFinished);
+  cs::Console::writeLine("Called value is ", called);
+  cs::Console::writeLine("isRunnings value is ", isRunningFinished);
 
   if (!called && isRunningFinished) {
-    print("Method executed, but does not generate finished signal");
+    cs::Console::writeLine("Method executed, but does not generate finished signal");
   }
 
   ASSERT_NE(mainId, concurrentId);

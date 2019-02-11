@@ -125,7 +125,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
     if (doHash) {
       return;
     }
-    size_t hashingLength = os.buffer().size();
+
+    const_cast<size_t&>(hashingLength_) = os.buffer().size();
+    os.put(hashingLength_);
 
     os.put(signatures_.size());
     for (const auto& it : signatures_) {
@@ -143,8 +145,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
         os.put(itt.second);
       }
     }
-    os.put(hashingLength);
-
   }
 
   void put_for_sig(::csdb::priv::obstream& os) const {
@@ -174,18 +174,22 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
     if (!is.get(previous_hash_)) {
+      csmeta(cswarning) << "get previous hash is failed";
       return false;
     }
 
     if (!is.get(sequence_)) {
+      csmeta(cswarning) << "get sequence is failed";
       return false;
     }
 
     if (!is.get(user_fields_)) {
+      csmeta(cswarning) << "get user fields is failed";
       return false;
     }
 
     if (!is.get(cnt)) {
+      csmeta(cswarning) << "get cnt is failed";
       return false;
     }
 
@@ -193,6 +197,16 @@ class Pool::priv : public ::csdb::internal::shared_data {
     is_valid_ = true;
 
     return true;
+  }
+
+  void updateHash() {
+    const auto begin = binary_representation_.data();
+    const auto end = begin + hashingLength_;
+    hash_ = PoolHash::calc_from_data(cs::Bytes(begin, end));
+  }
+
+  void updateHash(const cs::Bytes& data) {
+    hash_ = PoolHash::calc_from_data(data);
   }
 
   bool getTransactions(::csdb::priv::ibstream& is, size_t cnt) {
@@ -235,7 +249,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     signatures_.clear();
     signatures_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      int index;
+      cs::Byte index = 0;
       cs::Signature sig;
 
       if (!is.get(index)) {
@@ -304,38 +318,44 @@ class Pool::priv : public ::csdb::internal::shared_data {
   bool get(::csdb::priv::ibstream& is) {
     size_t cnt;
     if (!get_meta(is, cnt)) {
+      csmeta(cswarning) << "get meta is failed";
       return false;
     }
 
     if (!getTransactions(is, cnt)) {
+      csmeta(cswarning) << "get transactions is failed";
       return false;
     }
 
     if (!getNewWallets(is)) {
+      csmeta(cswarning) << "get new wallets is failed";
       return false;
     }
 
     if (!getConfidants(is)) {
+      csmeta(cswarning) << "get confidants is failed";
       return false;
     }
 
     if (!is.get(realTrusted_)) {
+      csmeta(cswarning) << "get real trusted is failed";
+      return false;
+    }
+
+    if(!is.get(hashingLength_)) {
+      csmeta(cswarning) << "get hashing length is failed";
       return false;
     }
 
     if (!getSignatures(is)) {
+      csmeta(cswarning) << "get signatures is failed";
       return false;
     }
 
     if (!getSmartSignatures(is)) {
+      csmeta(cswarning) << "get smart signatures is failed";
       return false;
     }
-
-    size_t hashingLength;
-    if(!is.get(hashingLength)) {
-      return false;
-    }
-
     is_valid_ = true;
     return true;
   }
@@ -354,21 +374,18 @@ class Pool::priv : public ::csdb::internal::shared_data {
   void update_binary_representation() {
     ::csdb::priv::obstream os;
     put(os, false);
-    binary_representation_ = std::move(const_cast<cs::Bytes&>(os.buffer()));
+    update_binary_representation(std::move(const_cast<cs::Bytes&>(os.buffer())));
+  }
+
+  void update_binary_representation(cs::Bytes&& bytes) {
+    binary_representation_ = std::move(bytes);
   }
 
   void update_transactions() {
     read_only_ = true;
-    size_t hashingLength = 0;
-    ::csdb::priv::ibstream is(binary_representation_.data() + binary_representation_.size() - sizeof(size_t), sizeof(size_t));
-    if (!is.get(hashingLength)) {
-      return;
-    }
 
+    updateHash();
 
-    const auto pointer = binary_representation_.data();;
-    cs::Bytes binRep(pointer, pointer + hashingLength);
-    hash_ = PoolHash::calc_from_data(binRep);
     for (size_t idx = 0; idx < transactions_.size(); ++idx) {
       transactions_[idx].d->_update_id(hash_, idx);
     }
@@ -396,16 +413,19 @@ class Pool::priv : public ::csdb::internal::shared_data {
     result.previous_hash_ = previous_hash_.clone();
     result.sequence_ = sequence_;
     result.next_confidants_ = next_confidants_;
+    result.hashingLength_ = hashingLength_;
 
     result.transactions_.reserve(transactions_.size());
-    for (auto& t : transactions_)
+    for (auto& t : transactions_) {
       result.transactions_.push_back(t.clone());
+    }
 
     result.transactionsCount_ = transactionsCount_;
     result.newWallets_ = newWallets_;
 
-    for (auto& uf : user_fields_)
+    for (auto& uf : user_fields_) {
       result.user_fields_[uf.first] = uf.second.clone();
+    }
 
     //result.signature_ = signature_;
     //result.writer_public_key_ = writer_public_key_;
@@ -431,8 +451,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   //cs::Signature signature_;
   std::vector<uint8_t> realTrusted_;
+  size_t hashingLength_ = 0;
   cs::PublicKey writer_public_key_;
-  ::std::vector<std::pair<int, cs::Signature>> signatures_;
+  cs::BlockSignatures signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -454,8 +475,9 @@ bool Pool::is_read_only() const noexcept {
 
 PoolHash Pool::hash() const noexcept {
   if (d->hash_.is_empty()) {
-    const_cast<PoolHash&>(d->hash_) = PoolHash::calc_from_data(d->binary_representation_);
+    const_cast<Pool*>(this)->d->updateHash();
   }
+
   return d->hash_;
 }
 
@@ -470,9 +492,8 @@ Storage Pool::storage() const noexcept {
 Transaction Pool::transaction(size_t index) const {
   return (d->transactions_.size() > index) ? d->transactions_[index] : Transaction{};
 }
-const std::vector<uint8_t>& Pool::realTrusted() const noexcept
-{
-  // TODO: вставьте здесь оператор return
+
+const std::vector<uint8_t>& Pool::realTrusted() const noexcept {
   return d->realTrusted_;
 }
 
@@ -584,7 +605,7 @@ const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
   return d->next_confidants_;
 }
 
-const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noexcept {
+const cs::BlockSignatures& Pool::signatures() const noexcept {
   return d->signatures_;
 }
 
@@ -644,14 +665,15 @@ void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept
   data->next_confidants_ = confidants;
 }
 
-void Pool::add_signature(int index, const cs::Signature& signature) noexcept {
-  //if (d.constData()->read_only_) {
-  //  return;
-  //}
+void Pool::set_signatures(cs::BlockSignatures&& blockSignatures) noexcept {
+  if (d.constData()->read_only_) {
+    csmeta(cswarning) << "Set signatures is failed. Data is read only!";
+    return;
+  }
+
   priv* data = d.data();
   data->is_valid_ = true;
-  data->signatures_.emplace_back(std::make_pair(index, signature));
-  //csdebug() << "The signature is added";
+  data->signatures_ = std::move(blockSignatures);
 }
 
 void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept
@@ -722,16 +744,6 @@ UserField Pool::user_field(user_field_id_t id) const noexcept {
   return res;
 }
 
-bool Pool::recompose() {
-  //if (d.constData()->read_only_) {
-  //  return true;
-  //}
-
-  d->compose();
-
-  return d.constData()->is_valid_;
-}
-
 bool Pool::compose() {
   if (d.constData()->read_only_) {
     return true;
@@ -756,7 +768,7 @@ Pool Pool::from_binary(cs::Bytes&& data) {
   if (!p->get(is)) {
     return Pool();
   }
-  p->binary_representation_ = std::move(data);
+  p->update_binary_representation(std::move(data));
   p->update_transactions();
   return Pool(p.release());
 }
@@ -769,7 +781,7 @@ Pool Pool::meta_from_binary(cs::Bytes&& data, size_t& cnt) {
     return Pool();
   }
 
-  p->binary_representation_ = std::move(data);
+  p->update_binary_representation(std::move(data));
   return Pool(p.release());
 }
 
@@ -795,7 +807,7 @@ Pool Pool::from_lz4_byte_stream(size_t uncompressedSize) {
     return Pool();
   }
 
-  p->hash_ = PoolHash::calc_from_data(p->binary_representation_);
+  p->updateHash();
 
   return Pool(p.release());
 }
@@ -820,7 +832,7 @@ bool Pool::save(Storage storage) {
   }
 
   if (d->hash_.is_empty()) {
-    d->hash_ = PoolHash::calc_from_data(to_byte_stream_for_sig());
+    d->updateHash();
   }
 
   if (s.pool_save(*this)) {
