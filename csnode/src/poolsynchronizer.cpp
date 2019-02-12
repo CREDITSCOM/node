@@ -622,9 +622,10 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
-  cs::Connector::disconnect(&blockChain_->storeBlockEvent_);
-  cs::Connector::disconnect(&blockChain_->cachedBlockEvent);
-  cs::Connector::disconnect(&blockChain_->removeBlockEvent);
+  cs::Connector::disconnect(&blockChain_->storeBlockEvent_, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+  cs::Connector::disconnect(&blockChain_->cachedBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
+  cs::Connector::disconnect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
+
   if (timer_.isRunning()) {
     timer_.stop();
   }
