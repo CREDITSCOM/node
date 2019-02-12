@@ -64,8 +64,6 @@ namespace cs{
     currentSmartTransactionPack_ = pack;
     st1.smartAddress = pack.transactions().at(0).source().public_key();
     // signals subscription
-    //cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
-    //cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
     cs::Connector::connect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
