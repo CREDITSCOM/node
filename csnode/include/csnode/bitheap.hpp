@@ -16,6 +16,7 @@ public:
   : greatest_(std::numeric_limits<T>::max())
   , isValueSet_(false) {
   }
+
   void push(T val) {
     if (!isValueSet_) {
       greatest_ = val;
@@ -40,9 +41,33 @@ public:
     }
   }
 
+  void pop(T val) {
+    if (val < greatest_) {
+      size_t ind = greatest_ - val - 1;
+      if (ind < BitSize) {
+        bits_.reset(ind);
+      }
+      return;
+    }
+    if (val == greatest_) {
+      --greatest_;
+      int count = BitSize;
+      while(!bits_[0] && count--) {
+        bits_ >>= 1;
+        --greatest_;
+      }
+      if (count < 0) {
+        isValueSet_ = false;
+        return;
+      }
+      bits_ >>= 1;
+    }
+  }
+
   bool empty() const {
     return !isValueSet_;
   }
+
   MinMaxRange minMaxRange() const {
     return std::make_pair(greatest_ - BitSize, greatest_);
   }

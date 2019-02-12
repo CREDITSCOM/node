@@ -75,34 +75,35 @@ const Periods collectionPeriods = {secondsPerDay, secondsPerDay * 7, secondsPerD
 
 class csstats {
 public:
-  csstats(BlockChain& blockchain_);
+  csstats(BlockChain& blockchain);
 
   StatsPerPeriod getStats();
 
   ~csstats();
 
 private:
+  std::thread thread;
+
+  std::mutex mutex;
   using ScopedLock = std::lock_guard<std::mutex>;
+  std::atomic<bool> quit = {false};
 
-  std::thread thread_;
-  std::mutex mutex_;
-  std::atomic<bool> quit_ = {false};
+  StatsPerPeriod currentStats;
+  StatsCut statsCut;
+  csdb::PoolHash lastHash;
 
-  StatsPerPeriod currentStats_;
-  StatsCut statsCut_;
-  csdb::PoolHash lastHash_;
+  std::mutex currentStatsMutex;
+  std::chrono::system_clock::time_point lastUpdateTime = std::chrono::system_clock::from_time_t(0);
 
-  std::mutex currentStatsMutex_;
-  std::chrono::system_clock::time_point lastUpdateTime_ = std::chrono::system_clock::from_time_t(0);
-
-  BlockChain& blockchain_;
-  std::map<std::string, Currency> indexedCurrencies_ = {{"CS", 1}};
+  BlockChain& blockchain;
 
   StatsPerPeriod collectStats(const Periods& periods);
   AllStats collectAllStats(const Periods& periods);
 
   template <class F>
   void matchPeriod(const Periods& periods, period_t period, F func);
+
+  std::map<std::string, Currency> currencies_indexed = {{"CS", 1}};
 };
 }  // namespace csstats
 

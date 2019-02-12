@@ -6,14 +6,11 @@
 // 4706 - assignment within conditional expression
 // 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
 //         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
-#pragma warning(disable: 4706 4373 4244 4244 4267)
+#pragma warning(disable: 4706 4373)
 #endif
 
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 #include <csnode/blockchain.hpp>
 
@@ -154,12 +151,14 @@ private:
   };
 
   struct PendingSmartTransactions {
-    std::queue<csdb::Transaction> queue;
+    std::queue<std::pair<cs::Sequence, csdb::Transaction>> queue;
     csdb::PoolHash last_pull_hash{};
+    cs::Sequence last_pull_sequence = 0;
   };
 
   struct SmartState {
     std::string state;
+    bool lastEmpty;
     csdb::TransactionID transaction;
     csdb::TransactionID initer;
   };
@@ -175,6 +174,41 @@ private:
   ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executor_transport;
   std::unique_ptr<client_type> executor;
 
+  struct SmartOperation {
+    enum class State: uint8_t {
+      Pending,
+      Success,
+      Failed
+    };
+
+    State state = State::Pending;
+    csdb::TransactionID stateTransaction;
+
+    bool hasRetval:1;
+    bool returnsBool:1;
+    bool boolResult:1;
+
+    SmartOperation(): hasRetval(false), returnsBool(false) { }
+    SmartOperation(const SmartOperation& rhs):
+      state(rhs.state),
+      stateTransaction(rhs.stateTransaction.clone()),
+      hasRetval(rhs.hasRetval),
+      returnsBool(rhs.returnsBool),
+      boolResult(rhs.boolResult) { }
+
+    //SmartOperation(SmartOperation&&) = delete; //not compiled!? (will not be called because there is "SmartOperation (const SmartOperation & rhs)")
+    SmartOperation& operator=(const SmartOperation&) = delete;
+    SmartOperation& operator=(SmartOperation&&) = delete;
+
+    bool hasReturnValue() const { return hasRetval; }
+    bool getReturnedBool() const { return returnsBool && boolResult; }
+  };
+
+  SmartOperation getSmartStatus(const csdb::TransactionID);
+
+  cs::SpinLockable<std::map<csdb::TransactionID, SmartOperation>> smart_operations;
+  cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
+
   cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
   cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
   cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
@@ -188,7 +222,7 @@ private:
 
 private:
   void state_updater_work_function();
-  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::vector<general::ByteCodeObject> &code,
+  void execute_byte_code(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject> &code,
                          const std::string& state, const std::string& method,
                          const std::vector<general::Variant>& params); //::general::Variant
 
@@ -245,5 +279,12 @@ std::string serialize(const T& sc) {
 }
 
 bool is_deploy_transaction(const csdb::Transaction& tr);
+bool is_smart(const csdb::Transaction& tr);
+bool is_smart_state(const csdb::Transaction& tr);
+bool is_smart_deploy(const api::SmartContractInvocation& smart);
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #endif  // APIHANDLER_HPP

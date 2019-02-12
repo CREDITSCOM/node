@@ -53,7 +53,6 @@ SolverCore::SolverCore()
 , pcontext(std::make_unique<SolverContext>(*this))
 , tag_state_expired(CallsQueueScheduler::no_tag)
 , req_stop(true)
-// consensus data
 , pnode(nullptr)
 , pws(nullptr)
 , psmarts(nullptr)

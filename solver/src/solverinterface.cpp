@@ -276,10 +276,10 @@ void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
 #endif
     if(psmarts->capture(tr)) {
       // avoid pass to conveyer, psmarts provide special handling
-    return;
+      return;
+    }
+    cs::Conveyer::instance().addTransaction(tr);
   }
-  cs::Conveyer::instance().addTransaction(tr);
-}
 
 void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round) {
   csdebug() << "SolverCore: got round info request from " << cs::Utils::byteStreamToHex(requester.data(), requester.size());

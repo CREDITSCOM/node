@@ -311,10 +311,10 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotPackInform(task, sender);
       break;
     case NetworkCommand::PackRenounce:
-      gotPackRenounce(task, sender);
+      //gotPackRenounce(task, sender);
       break;
     case NetworkCommand::PackRequest:
-      gotPackRequest(task, sender);
+      //gotPackRequest(task, sender);
       break;
     default:
       result = false;

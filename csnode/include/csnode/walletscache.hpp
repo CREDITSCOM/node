@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <list>
 
 #include <lib/system/common.hpp>
 
@@ -89,6 +90,9 @@ private:
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
+    void invokeReplenishPayableContract(const csdb::Transaction&);
+    void rollbackReplenishPayableContract(const csdb::Transaction&);
+    void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
 
 /*#ifdef MONITOR_NODE
     std::map<WalletData::Address, WriterData> writers_;
@@ -107,6 +111,8 @@ private:
 public:
   class Initer : protected ProcessorBase {
   public:
+    using ProcessorBase::invokeReplenishPayableContract;
+    using ProcessorBase::rollbackReplenishPayableContract;
     Initer(WalletsCache& data);
     void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
@@ -123,12 +129,15 @@ public:
 
   class Updater : protected ProcessorBase {
   public:
+    using ProcessorBase::invokeReplenishPayableContract;
+    using ProcessorBase::rollbackReplenishPayableContract;
     Updater(WalletsCache& data);
     void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     const WalletData* findWallet(WalletId id) const;
     const Mask& getModified() const {
       return modified_;
     }
+
 
   protected:
     bool findWalletId(const csdb::Address& address, WalletId& id) override;
@@ -158,6 +167,7 @@ private:
   WalletsIds& walletsIds_;
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
+  std::list<csdb::Transaction> smartPayableTransactions_;
 
 #ifdef MONITOR_NODE
   std::map<WalletData::Address, TrustedData> trusted_info_;

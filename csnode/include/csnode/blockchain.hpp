@@ -168,16 +168,6 @@ public:
   const csdb::Storage& getStorage() const;
 
   void addNewWalletsToPool(csdb::Pool& pool);
-
-  struct AddrTrnxCount {
-    uint64_t sendCount;
-    uint64_t recvCount;
-    uint64_t total_trxns_count;
-  };
-
-  void recount_trxns(const std::optional<csdb::Pool>& new_pool);
-  const AddrTrnxCount& get_trxns_count(const csdb::Address& addr);
-  //std::vector<csdb::Transaction> genesisTrxns_;
 private:
 
   void writeGenesisBlock();
@@ -191,6 +181,8 @@ private:
   bool finalizeBlock(csdb::Pool& pool, bool is_Trusted);
 
   bool initFromDB(cs::WalletsCache::Initer& initer);
+  void onReadFromDB(csdb::Pool block, bool* should_stop);
+  bool postInitFromDB();
 
   template <typename WalletCacheProcessor>
   bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
@@ -231,7 +223,6 @@ private:
 
   std::condition_variable_any newBlockCv_;
   cs::SpinLock waitersLocker_;
-  std::map<csdb::Address, AddrTrnxCount> transactionsCount_;
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;
@@ -300,6 +291,17 @@ public signals:
 
   /** @brief The remove block event. Raised when the next block is flushed to storage */
   cs::ChangeBlockSignal removeBlockEvent;
+
+public slots:
+
+  // prototype is void (csdb::Transaction)
+  // subscription is placed in SmartContracts constructor
+  void onPayableContractReplenish(csdb::Transaction starter) {
+    this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
+  }
+  void onPayableContractTimeout(csdb::Transaction starter) {
+    this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
+  }
 
 private:
 

@@ -60,6 +60,44 @@ void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::Confidants
   load(curr, confidants, blockchain);
 }
 
+void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Transaction& transaction) {
+  csdb::Address wallAddress = transaction.target();
+  if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+    return;
+  }
+  WalletId id{};
+  if (!findWalletId(wallAddress, id)) {
+    cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
+    return;
+  }
+  WalletData& wallData = getWalletData(id, wallAddress);
+  wallData.balance_ -= transaction.amount();
+  setModified(id);
+  data_.smartPayableTransactions_.push_back(transaction);
+}
+
+void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction) {
+  csdb::Address wallAddress = transaction.source();
+  if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+    return;
+  }
+  WalletId id{};
+  if (!findWalletId(wallAddress, id)) {
+    cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
+    return;
+  }
+  WalletData& wallData = getWalletData(id, wallAddress);
+  wallData.balance_ += transaction.amount();
+  setModified(id);
+  for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
+    if (it->source() == transaction.source() &&
+        it->innerID() == transaction.innerID()) {
+      data_.smartPayableTransactions_.erase(it);
+      break;
+    }
+  }
+}
+
 // ProcessorBase
 void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
@@ -154,19 +192,34 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
     return 0;
+
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
     cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
     return 0;
   }
   WalletData& wallData = getWalletData(id, tr.source());
-  wallData.balance_ -= tr.counted_fee().to_double();
+
+  if (SmartContracts::is_executable(tr)) {
+    wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+  } else if (SmartContracts::is_new_state(tr)) {
+    csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
+    if (SmartContracts::is_executable(initTransaction)) {
+      wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
+        - csdb::Amount(initTransaction.counted_fee().to_double())
+        - csdb::Amount(tr.counted_fee().to_double())
+        - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+    } else {
+      checkSmartWaitingForMoney(initTransaction, tr);
+    }
+  } else {
+    wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+  }
+
 
   if (!smartIniter) {
-    wallData.balance_ -= tr.amount();
-
+  wallData.balance_ -= tr.amount();
   wallData.trxTail_.push(tr.innerID());
-  setModified(id);
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
@@ -178,23 +231,82 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #endif
   }
 
+  setModified(id);
   return tr.counted_fee().to_double();
 }
 
+void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
+  if (newStateTransaction.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
+    return rollbackReplenishPayableContract(initTransaction);
+  }
+  bool waitingSmart = false;
+  for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
+    if (it->source() == initTransaction.source() &&
+        it->innerID() == initTransaction.innerID()) {
+      data_.smartPayableTransactions_.erase(it);
+      waitingSmart = true;
+      break;
+    }
+  }
+
+  if (waitingSmart) {
+    csdb::Address wallAddress = initTransaction.target();
+    csdb::Address wallAddressIniter = initTransaction.source();
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_ ||
+        wallAddressIniter == data_.genesisAddress_ || wallAddressIniter == data_.startAddress_) {
+      return;
+    }
+    WalletId id{};
+    WalletId sourceId{};
+    if (!findWalletId(wallAddress, id)) {
+      cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
+      return;
+    }
+    if (!findWalletId(wallAddressIniter, sourceId)) {
+      cserror() << "Cannot find source wallet, source is " << wallAddressIniter.to_string();
+      return;
+    }
+    WalletData& wallData = getWalletData(id, wallAddress);
+    WalletData& wallDataIniter = getWalletData(sourceId, wallAddressIniter);
+    wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+    wallData.balance_ += initTransaction.amount();
+    setModified(id);
+    setModified(sourceId);
+  }
+}
+
 csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
-  SmartContractRef smartRef;
-  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
-  csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-  return trWithIniter.source();
+  csdb::Transaction t = findSmartContractInitTrx(tr, blockchain);
+  if(t.is_valid()) {
+    return t.source();
+  }
+  return csdb::Address{};
 }
 
 csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
-  SmartContractRef smartRef;
-  smartRef.from_user_field(tr.user_field(trx_uf::new_state::RefStart));
+  if(!SmartContracts::is_new_state(tr)) {
+    cserror() << "Wallets cache: incorrect new_state transaction to get starter";
+    return csdb::Transaction {};
+  }
+  SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
+  if (!smartRef.is_valid()) {
+    cserror() << "Wallets cache: incorrect reference to starter transaction in new_state";
+    return csdb::Transaction{};
+  }
   csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-  csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-  return trWithIniter;
+  if(!pool.is_valid()) {
+    cserror() << "Wallets cache: failed load block with starter for new_state";
+    return csdb::Transaction {};
+  }
+  auto& transactions = pool.transactions();
+  if (transactions.size() > smartRef.transaction) {
+    csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
+    if (trWithIniter.id() == smartRef.getTransactionID()) {
+      return trWithIniter;
+    }
+  }
+  cserror() << "Wallets cache: incorrect starter transaction for new_state";
+  return csdb::Transaction{};
 }
 
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {
@@ -215,7 +327,7 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
 
 #ifdef MONITOR_NODE
   if (tr.source() != tr.target())  // Already counted in loadTrxForSource
-    ++wallData.transNum_;
+  ++wallData.transNum_;
 
   setWalletTime(wallData.address_, tr.get_time());
 #endif

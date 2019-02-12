@@ -7,6 +7,7 @@
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/transactionsvalidator.hpp>
+#include <smartcontracts.hpp>
 
 namespace cs {
 TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
@@ -37,10 +38,20 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 
   WalletsState::WalletId walletIdNewState{};
   WalletsState::WalletData& wallStateIfNewState = walletsState_.getData(trx.target(), walletIdNewState);
+  csdb::Amount feeForExecution(0);
+  if (newState) {
+    feeForExecution = trx.user_field(trx_uf::new_state::Fee).value<csdb::Amount>();
+  }
 
 #ifndef WITHOUT_DELTA
-  auto newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
-
+  csdb::Amount newBalance;
+  if (!newState && !SmartContracts::is_executable(trx)) {
+    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+  } else if (!newState && SmartContracts::is_executable(trx)) {
+    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+  } else {
+    newBalance = wallState.balance_ - trx.amount() - feeForExecution;
+  }
 #ifdef _MSC_VER
   int8_t bitcnt = static_cast<decltype(bitcnt)>(__popcnt(newBalance.integral()) + __popcnt64(newBalance.fraction()));
 #else
@@ -67,14 +78,19 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID()))
     return false;
 #endif
+  if (!newState && !SmartContracts::is_executable(trx)) {
+    wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+  } else if (!newState && SmartContracts::is_executable(trx)) {
+    wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+  } else {
+    wallState.balance_ = wallState.balance_ - trx.amount() - feeForExecution;
+  }
 
-  wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
 #endif
   if (!newState) {
-  wallState.trxTail_.push(trx.innerID());
-
-  trxList_[trxInd] = wallState.lastTrxInd_;
-  wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
+    wallState.trxTail_.push(trx.innerID());
+    trxList_[trxInd] = wallState.lastTrxInd_;
+    wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
   } else {
     wallStateIfNewState.trxTail_.push(trx.innerID());
     trxList_[trxInd] = wallStateIfNewState.lastTrxInd_;
@@ -83,6 +99,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   }
 
   walletsState_.setModified(walletId);
+
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);

@@ -182,6 +182,7 @@ template <> std::string getVariantAs(const general::Variant& var) { return var.v
 template <typename RetType>
 void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
                     const api::Address& addr,
+                    const api::Address& addr_smart,
                     const std::vector<general::ByteCodeObject> &byteCodeObjects,
                     const std::string& state,
                     const std::string& method,
@@ -194,6 +195,7 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
     return;
   executor.executeByteCode(result,
                            addr,
+                           addr_smart,
                            byteCodeObjects,
                            state,
                            method,
@@ -215,13 +217,20 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   std::string name, symbol, totalSupply;
 
   if (byteCodeObjects.empty()) return;
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
+  csdb::Address deployer;
+  {
+    std::lock_guard<decltype(dataMut_)> l(dataMut_);
+    deployer = tokens_[token].owner;
+  }
+  api::Address dpAddr = std::string((char*)deployer.public_key().data(), deployer.public_key().size());
+
+  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
                  "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
+  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
                  "getSymbol", std::vector<general::Variant>(), 250,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
@@ -232,7 +241,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                    }
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), addr, byteCodeObjects, newState,
+  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount(newSupp);
@@ -240,7 +249,6 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   std::vector<csdb::Address> holders;
 
-  csdb::Address deployer;
   {
     std::lock_guard<decltype(dataMut_)> l(dataMut_);
     auto& t = tokens_[token];
@@ -248,14 +256,9 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
     t.symbol = symbol;
     t.totalSupply = totalSupply;
 
-    deployer = t.owner;
-
     holders.reserve(t.holders.size());
     for (auto& h : t.holders) holders.push_back(h.first);
   }
-
-  const auto dp = deployer.public_key();
-  api::Address dpAddr = std::string((char*)dp.data(), dp.size());
 
   std::vector<std::vector<general::Variant>> holderKeysParams;
   holderKeysParams.reserve(holders.size());
@@ -271,7 +274,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   if (byteCodeObjects.empty())
     return;
   api_->getExecutor().
-    executeByteCodeMultiple(result, dpAddr, byteCodeObjects, newState,
+    executeByteCodeMultiple(result, dpAddr, addr, byteCodeObjects, newState,
                             "balanceOf", holderKeysParams, 100);
 
   if (!result.status.code &&

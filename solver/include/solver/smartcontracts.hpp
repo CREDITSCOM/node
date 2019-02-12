@@ -84,8 +84,8 @@ struct SmartContractRef {
   size_t transaction;
 
   SmartContractRef()
-    : sequence(0)
-    , transaction(0)
+    : sequence(std::numeric_limits<decltype(sequence)>().max())
+    , transaction(std::numeric_limits<decltype(sequence)>().max())
   {}
 
   SmartContractRef(const csdb::PoolHash block_hash, cs::Sequence block_sequence, size_t transaction_index)
@@ -104,7 +104,9 @@ struct SmartContractRef {
     if(hash.is_empty()) {
       return false;
     }
-    return (sequence != 0 || transaction != 0);
+    return (sequence != std::numeric_limits<decltype(sequence)>().max() &&
+      transaction != std::numeric_limits<decltype(sequence)>().max() &&
+      !hash.is_empty());
   }
 
   // "serialization" methods
@@ -147,7 +149,13 @@ enum class SmartContractStatus {
   Closed
 };
 
+// informs subscribed slots on deploy/execute/replenish occur
+// passes to every slot packet with result transactions
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
+
+// informs subscribed slots on deploy/execution/replenish timeout
+// passes to every slot the "starter" transaction
+using PayableSmartContractSignal = cs::Signal<void(csdb::Transaction)>;
 
 class SmartContracts final {
 public:
@@ -180,7 +188,11 @@ public:
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
 
+  // true if target of transaction is smart contract which implements payable() method
   bool is_payable_target( const csdb::Transaction tr );
+
+  // true if transaction replenishes balance of smart contract
+  bool is_replenish_contract(const csdb::Transaction tr);
 
   std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction tr);
 
@@ -229,6 +241,8 @@ public:
 
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
+  PayableSmartContractSignal signal_payable_invoke;
+  PayableSmartContractSignal signal_payable_timeout;
 
 public slots:
   void on_execute_async_completed(const SmartExecutionData& data);
@@ -275,6 +289,9 @@ private:
 
   // last contract's state storage
   std::map<csdb::Address, StateItem> known_contracts;
+
+  // contract replenish transactions stored during reading from DB on stratup
+  std::vector<SmartContractRef> replenish_contract;
 
   // async watchers
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
@@ -388,6 +405,7 @@ private:
 
   void test_exe_queue();
 
+  // tests passed list of trusted nodes to contain own node
   bool contains_me(const std::vector<cs::PublicKey>& list) const {
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
   }
@@ -405,7 +423,7 @@ private:
   csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
 
   // update in contracts table appropriate item's state
-  bool update_contract_state(csdb::Transaction t, bool force_absolute_address = true);
+  bool update_contract_state(csdb::Transaction t);
 
   // get deploy info from cached deploy transaction reference
   std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address abs_addr) const;
@@ -424,6 +442,8 @@ private:
   // blocking call
   bool implements_payable(const api::SmartContractInvocation& contract);
 
+  // extracts and returns name of method executed by referenced transaction
+  std::string get_executed_method(const SmartContractRef& ref);
 };
 
 }  // namespace cs
