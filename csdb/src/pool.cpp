@@ -103,6 +103,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(sequence_);
 
     os.put(user_fields_);
+    os.put(round_cost_);
 
     os.put(transactions_.size());
     for (const auto& it : transactions_) {
@@ -134,6 +135,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(sequence_);
 
     os.put(user_fields_);
+    os.put(round_cost_);
 
     os.put(transactions_.size());
     for (const auto& it : transactions_) {
@@ -163,6 +165,10 @@ class Pool::priv : public ::csdb::internal::shared_data {
     }
 
     if (!is.get(user_fields_)) {
+      return false;
+    }
+
+    if (!is.get(round_cost_)) {
       return false;
     }
 
@@ -343,6 +349,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     result.signature_ = signature_;
     result.writer_public_key_ = writer_public_key_;
+    result.round_cost_ = round_cost_;
     result.signatures_ = signatures_;
     result.binary_representation_ = binary_representation_;
 
@@ -363,6 +370,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   cs::Signature signature_;
   cs::PublicKey writer_public_key_;
+  csdb::Amount round_cost_;
   ::std::vector<std::pair<int, cs::Signature>> signatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -502,6 +510,10 @@ const ::std::vector<std::pair<int, cs::Signature>>& Pool::signatures() const noe
   return d->signatures_;
 }
 
+const csdb::Amount& Pool::round_cost() const noexcept {
+  return d->round_cost_;
+}
+
 void Pool::set_sequence(cs::Sequence seq) noexcept {
   if (d.constData()->read_only_) {
     return;
@@ -510,6 +522,16 @@ void Pool::set_sequence(cs::Sequence seq) noexcept {
   priv* data = d.data();
   data->is_valid_ = true;
   data->sequence_ = seq;
+}
+
+void Pool::set_round_cost(const csdb::Amount& round_cost) noexcept {
+  if (d.constData()->read_only_) {
+    return;
+  }
+
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->round_cost_ = round_cost;
 }
 
 void Pool::set_previous_hash(PoolHash previous_hash) noexcept {

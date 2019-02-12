@@ -148,6 +148,7 @@ public:
   const cs::Signature& signature() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
   const ::std::vector<std::pair<int, cs::Signature>>& signatures() const noexcept;
+  const csdb::Amount& round_cost() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
@@ -156,6 +157,7 @@ public:
   void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void add_signature(int index, const cs::Signature& signature) noexcept;
+  void set_round_cost(const csdb::Amount& round_cost) noexcept;
 
   Transactions& transactions();
   const Transactions& transactions() const;
