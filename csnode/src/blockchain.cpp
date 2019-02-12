@@ -73,20 +73,6 @@ bool BlockChain::init(const std::string& path)
     generateCheatDbFile(path, *blockHashes_);
   }
   else {
-    /*
-    csdebug() << "Last hash is not empty. Reading wallets";
-    {
-      std::unique_ptr<WalletsCache::Initer> initer = walletsCacheStorage_->createIniter();
-      if(!initFromDB(*initer))
-        return false;
-
-      if(!initer->isFinishedOk()) {
-        cserror() << "Initialization from DB finished with error";
-        return false;
-      }
-    }
-    */
-
     if(!postInitFromDB()) {
       return false;
     }
@@ -143,57 +129,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 #endif
     }
   }
-}
-
-bool BlockChain::initFromDB(cs::WalletsCache::Initer& initer) {
-  bool res = false;
-  try {
-    csdb::Pool pool = loadBlock(getLastHash());
-    const cs::Sequence last_written_sequence = pool.sequence();
-    cs::Sequence current_sequence = 0;
-
-    size_t cnt = 1;
-    std::cout << "Reading wallets...\n";
-    while (current_sequence <= last_written_sequence) {
-      pool = loadBlock(current_sequence);
-      if (!updateWalletIds(pool, initer)) {
-        return false;
-      }
-      // currently confidants are stored in related pool, not in previous one:
-      //csdb::Pool prev_pool = this->loadBlock(pool.previous_hash());
-      const auto& confidants = pool.confidants();
-      initer.loadPrevBlock(pool, confidants, *this);
-
-      blockHashes_->initFromPrevBlock(pool);
-
-      ++current_sequence;
-#ifdef TRANSACTIONS_INDEX
-      if(pool.transactions().size()) {
-        total_transactions_count_ += pool.transactions().size();
-
-        if(lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
-          previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
-
-        lastNonEmptyBlock_.hash = pool.hash();
-        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
-      }
-#endif
-      if(cnt % 1000 == 0) {
-        std::cout << '\r' << cnt;
-      }
-      ++cnt;
-    }
-    std::cout << "\rDone, handled " << cnt - 1 << " blocks\n";
-    res = true;
-  }
-  catch (std::exception& e) {
-    cserror() << "Exc=" << e.what();
-  }
-  catch (...) {
-    cserror() << "Exc=...";
-  }
-
-  return res;
 }
 
 bool BlockChain::postInitFromDB() {

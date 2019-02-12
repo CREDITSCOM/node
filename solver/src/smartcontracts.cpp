@@ -859,7 +859,10 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
     clear_emitted_transactions(it->abs_addr);
   }
 
-  set_execution_result(packet);
+  if (set_execution_result(packet)) {
+    csdebug() << "Starting SMARTCONSENSUS";
+    it->pconsensus->initSmartRound(packet, pnode, this);
+  }
   checkAllExecutions();
 }
 

@@ -180,7 +180,6 @@ private:
   // Thread unsafe
   bool finalizeBlock(csdb::Pool& pool, bool is_Trusted);
 
-  bool initFromDB(cs::WalletsCache::Initer& initer);
   void onReadFromDB(csdb::Pool block, bool* should_stop);
   bool postInitFromDB();
 
