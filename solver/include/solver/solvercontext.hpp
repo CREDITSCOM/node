@@ -258,6 +258,10 @@ public:
     return core.stageThreeStorage;
   }
 
+  const std::vector<cs::StageThree>& final_stage3_data() const {
+    return core.trueStageThreeStorage;
+  }
+
   const cs::StageOne* stage1(uint8_t sender) const {
     return core.find_stage1(sender);
   }

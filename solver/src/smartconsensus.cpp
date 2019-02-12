@@ -417,7 +417,7 @@ namespace cs{
   {
     //csmeta(csdetails) << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
     //timeout_request_stage.start(
-    //  pcore_->scheduler(), Consensus::T_stage_request,
+    //  psmarts_->getScheduler(), Consensus::T_stage_request,
     //  // timeout #1 handler:
     //  [this, st]() {
     //  csdebug() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
@@ -426,14 +426,14 @@ namespace cs{
     //  csdebug() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
     //    << " ms to request neighbors about stages-" << st;
     //  timeout_request_neighbors.start(
-    //    pcore_->scheduler(), Consensus::T_stage_request,
+    //    psmarts_->getScheduler(), Consensus::T_stage_request,
     //    // timeout #2 handler:
     //    [this, st]() {
     //    csdebug() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
     //    requestSmartStagesNeighbors(st);
     //    // timeout #3 handler
     //    timeout_force_transition.start(
-    //      pcore_->scheduler(), Consensus::T_stage_request,
+    //      psmarts_->getScheduler(), Consensus::T_stage_request,
     //      [this, st]() {
     //      csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
     //      markSmartOutboundNodes();

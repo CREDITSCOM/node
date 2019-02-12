@@ -14,8 +14,8 @@ void WaitingState::on(SolverContext &context) {
   }
 
   cs::BlockSignatures blockSignatures;
-  blockSignatures.reserve(context.stage3_data().size());
-  for (auto& it : context.stage3_data()) {
+  blockSignatures.reserve(context.final_stage3_data().size());
+  for (auto& it : context.final_stage3_data()) {
     blockSignatures.emplace_back(it.sender, it.blockSignature);
   }
 

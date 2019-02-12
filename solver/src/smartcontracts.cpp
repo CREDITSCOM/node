@@ -1053,4 +1053,8 @@ SmartConsensus* SmartContracts::getSmartConsensus(cs::PublicKey smartAddr)
   return nullptr;
 }
 
+//CallsQueueScheduler* SmartContracts::getScheduler() {
+//  return *scheduler;
+//}
+
 }  // namespace cs

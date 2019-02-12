@@ -173,6 +173,9 @@ public:
   // new state of contract, result of invocation of executable transaction
   static bool is_new_state(const csdb::Transaction);
 
+
+  CallsQueueScheduler* getScheduler();
+
   /* Assuming deployer.is_public_key(), not a WalletId */
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
