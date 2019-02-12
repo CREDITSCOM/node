@@ -910,7 +910,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
 
-  if(last_seq + 1 != pool_seq) {
+  if (last_seq + 1 != pool_seq) {
     cserror() << "BLOCKCHAIN> cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
     return std::nullopt;
   }
@@ -922,9 +922,9 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
 
   {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    if(deferredBlock_.is_valid()) {
+    if (deferredBlock_.is_valid()) {
       deferredBlock_.set_storage(storage_);
-      if(deferredBlock_.save()) {
+      if (deferredBlock_.save()) {
         flushed_block_seq = deferredBlock_.sequence();
         std::lock_guard<decltype(waitersLocker_)> l2(waitersLocker_);
         newBlockCv_.notify_all();
@@ -935,8 +935,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
     }
   }
 
-  if(flushed_block_seq != NoSequence) {
-
+  if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
     csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << " see block info above";
     csdebug() << "----------------------------------------------------------------------------------";
@@ -947,9 +946,9 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
 
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
-    if(finalizeBlock(deferredBlock_, isTrusted)) {
+    if (finalizeBlock(deferredBlock_, isTrusted)) {
       csdebug() << "The block is correct";
-    } 
+    }
     else {
       csdebug() << "the signatures of the block are incorrect";
       return std::nullopt;
