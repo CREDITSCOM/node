@@ -339,6 +339,9 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
     return deferredBlock_.clone();
   }
   // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
+  if (sequence > getLastSequence()) {
+	  return csdb::Pool{};
+  }
   return storage_.pool_load(sequence + 1);
 }
 
