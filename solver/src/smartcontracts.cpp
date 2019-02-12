@@ -365,7 +365,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
   cslog() << "\\       /";
   cslog() << " \\_____/" << "  " << get_executed_method(new_item);
 
-  exe_queue.emplace_back(QueueItem(new_item, abs_addr)).wait(new_item.sequence);
+  exe_queue.emplace_back(QueueItem(new_item, abs_addr, csdb::Amount(t.max_fee().to_double()))).wait(new_item.sequence);
   test_exe_queue();
 }
 
@@ -411,7 +411,7 @@ void SmartContracts::test_exe_queue() {
       break;
     }
     if(next->status == SmartContractStatus::Finished) {
-      // some contract is already running
+      // some contract is under consensus
       csdebug() << name() << ": finished contract is in queue";
       break;
     }
@@ -510,32 +510,8 @@ bool SmartContracts::capture(csdb::Transaction tr)
 }
 
 void SmartContracts::on_store_block(csdb::Pool block) {
-  // control round-based timeout
-  bool retest_required = false;
-  for (auto& item : exe_queue) {
-    const auto seq = block.sequence();
-    if(seq > item.round_start && seq - item.round_start > Consensus::MaxRoundsExecuteSmart) {
-      if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
-        cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
-          << " blocks (from #," << item.round_start << "), cancel it without transaction";
-        item.close();
-        retest_required = true;
-
-        csdb::Transaction starter = get_transaction(item.contract);
-        if(starter.is_valid()) {
-          if(is_payable_target(starter)) {
-            emit signal_payable_timeout(starter);
-          }
-        }
-      }
-      else if(item.status == SmartContractStatus::Closed) {
-        retest_required = true;
-      }
-    }
-  }
-  if (retest_required) {
-    test_exe_queue();
-  }
+  test_exe_conditions(block);
+  test_exe_queue();
 
   // inspect transactions against smart contracts, raise special event on every item found:
   if (block.transactions_count() > 0) {
@@ -572,6 +548,9 @@ void SmartContracts::on_store_block(csdb::Pool block) {
 }
 
 void SmartContracts::on_read_block(csdb::Pool block, bool* should_stop) {
+  // uncomment when exe_queue is updated during blocks reading on startup:
+  //test_exe_conditions(block);
+
   // control round-based timeout
   // assume block arrive in increasing sequence order
   while(!replenish_contract.empty()) {
@@ -624,6 +603,44 @@ void SmartContracts::on_read_block(csdb::Pool block, bool* should_stop) {
   }
 
   *should_stop = false;
+}
+
+// tests max fee amount and round-based timeout on executed smart contracts;
+// invoked on every new block ready
+void SmartContracts::test_exe_conditions(csdb::Pool block) {
+  if(!exe_queue.empty()) {
+    csdb::Amount round_fee = smart_round_fee(block);
+    for(auto& item : exe_queue) {
+      // if smart is in executor or is under smart-consensus:
+      if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
+        // test out-of-fee:
+        item.current_fee += round_fee;
+        if(item.current_fee >= item.max_fee) {
+          cswarning() << name() << ": contract is out of fee, cancel it without transaction";
+          item.close();
+        }
+        // round-based timeout
+        const auto seq = block.sequence();
+        if(seq > item.round_start && seq - item.round_start > Consensus::MaxRoundsExecuteSmart) {
+          cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
+            << " blocks (from #," << item.round_start << "), cancel it without transaction";
+          item.close();
+        }
+        // if item has just been closed:
+        if(item.status == SmartContractStatus::Closed) {
+          csdb::Transaction starter = get_transaction(item.contract);
+          if(starter.is_valid()) {
+            if(is_payable_target(starter)) {
+              emit signal_payable_timeout(starter);
+            }
+            else {
+              emit signal_smart_timeout(item.contract);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
@@ -810,6 +827,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
 
 void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
 {
+  csdb::Amount fee(0);
   auto it = find_in_queue(data.contract_ref);
   if(it != exe_queue.end()) {
     if(it->status == SmartContractStatus::Finished || it->status == SmartContractStatus::Closed) {
@@ -817,12 +835,13 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
       return;
     }
     it->finish(bc.getLastSequence());
+    fee = it->current_fee;
   }
   else {
     cserror() << name() << ": cannot find in queue just completed contract";
   }
 
-  csdb::Transaction result = result_from_smart_ref(data.contract_ref);
+  csdb::Transaction result = result_from_smart_ref(data.contract_ref, fee);
   cs::TransactionsPacket packet;
 
   if(!data.error.empty()) {
@@ -861,7 +880,7 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data)
   checkAllExecutions();
 }
 
-csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& contract) const {
+csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& contract, csdb::Amount fee) const {
   csdb::Transaction src = get_transaction(contract);
   if (!src.is_valid()) {
     return csdb::Transaction{};
@@ -886,8 +905,7 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   // USRFLD1 - ref to start trx
   result.add_user_field(trx_uf::new_state::RefStart, contract.to_user_field());
   // USRFLD2 - total fee
-  result.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-
+  result.add_user_field(trx_uf::new_state::Fee, fee);
   return result;
 }
 
@@ -942,7 +960,7 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
           done.push_back(abs_addr);
           csdebug() << name() << ": send to conveyer smart contract failed status (related trxs or state are rejected)";
           // send to consensus
-          csdb::Transaction tr = result_from_smart_ref(it->contract);
+          csdb::Transaction tr = result_from_smart_ref(it->contract, it->current_fee);
           // result contains empty USRFLD[state::Value]
           tr.add_user_field(trx_uf::new_state::Value, std::string{});
           if (tr.is_valid()) {
@@ -1013,7 +1031,7 @@ bool SmartContracts::update_contract_state(csdb::Transaction t)
           }
         }
         else {
-          cswarning() << name() << ": new_state transaction does not refer to starter one";
+          cserror() << name() << ": new_state transaction does not refer to starter one";
         }
       }
     }
@@ -1150,6 +1168,18 @@ std::string SmartContracts::get_executed_method(const SmartContractRef & ref)
     return os.str();
   }
   return std::string("???");
+}
+
+csdb::Amount SmartContracts::smart_round_fee(csdb::Pool block)
+{
+  csdb::Amount fee = block.round_cost();
+  if(fee > csdb::Amount(0)) {
+    return fee;
+  }
+  // see fee.cpp:
+  constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
+  double cnt = kMinFee * std::max((size_t) Consensus::MinTrustedNodes, block.confidants().size());
+  return csdb::Amount( kMinFee * cnt );
 }
 
 }  // namespace cs

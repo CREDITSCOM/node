@@ -149,11 +149,15 @@ enum class SmartContractStatus {
   Closed
 };
 
-// informs subscribed slots on deploy/execute/replenish occur
+// to inform subscribed slots on deploy/execute/replenish occur
 // passes to every slot packet with result transactions
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
-// informs subscribed slots on deploy/execution/replenish timeout
+// to inform subscribed slots on contract execution timeout
+// passes starter info
+using SmartContractTimeoutSignal = cs::Signal<void(const cs::SmartContractRef&)>;
+
+// to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
 using PayableSmartContractSignal = cs::Signal<void(csdb::Transaction)>;
 
@@ -237,6 +241,7 @@ public:
 
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
+  SmartContractTimeoutSignal signal_smart_timeout;
   PayableSmartContractSignal signal_payable_invoke;
   PayableSmartContractSignal signal_payable_timeout;
 
@@ -305,14 +310,20 @@ private:
     cs::RoundNumber round_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
+    // max fee taken from contract starter transaction
+    csdb::Amount max_fee;
+    // current fee
+    csdb::Amount current_fee;
 
-    QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address)
+    QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Amount execution_fee_limit)
       : contract(ref_contract)
       , status(SmartContractStatus::Waiting)
       , round_enqueue(0)
       , round_start(0)
       , round_finish(0)
       , abs_addr(absolute_address)
+      , max_fee(execution_fee_limit)
+      , current_fee(0)
     {}
 
     void wait(cs::RoundNumber r)
@@ -412,7 +423,7 @@ private:
 
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
-  csdb::Transaction result_from_smart_ref(const SmartContractRef& contract) const;
+  csdb::Transaction result_from_smart_ref(const SmartContractRef& contract, csdb::Amount fee) const;
 
   // update in contracts table appropriate item's state
   bool update_contract_state(csdb::Transaction t);
@@ -436,6 +447,13 @@ private:
 
   // extracts and returns name of method executed by referenced transaction
   std::string get_executed_method(const SmartContractRef& ref);
+
+  // calculates from block a one smart round costs
+  csdb::Amount smart_round_fee(csdb::Pool block);
+
+  // tests max fee amount and round-based timeout on executed smart contracts;
+  // invoked on every new block ready
+  void test_exe_conditions(csdb::Pool block);
 };
 
 }  // namespace cs
