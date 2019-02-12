@@ -46,15 +46,15 @@ Glance coding style guide description.
 >class ExampleClass {
 >};
 
-- class fields starts with lower case and ends with symbol _
+- private fields starts with lower case and ends with symbol _
 
 >```cpp
 >class A {
->public:
+>private:
 >   int exampleField_;
 >};
 
-- struct fields starts with lower case
+- public fields starts with lower case
 
 >```cpp
 >struct A {
