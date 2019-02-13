@@ -20,8 +20,8 @@
 namespace cs {
 namespace {
 constexpr auto kMaxRoundNumWithFixedFee = 10;
-constexpr auto kLengthOfCommonTransaction = 152;
-constexpr double kMarketRateCS = 0.18;
+constexpr auto kLengthOfCommonTransaction = 100;
+constexpr double kMarketRateCS = 0.06;
 constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
