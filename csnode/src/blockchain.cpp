@@ -506,7 +506,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
       return false;
     }
   }
-  if (truePoolSignatures == confidants.size() / 2U + 1U) {
+  if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
     cslog() << "The number of signatures is sufficient ant all of them are OK!";
   }
   else {
