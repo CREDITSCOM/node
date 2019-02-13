@@ -32,7 +32,7 @@ namespace cs {
 
       ~SmartConsensus();
 
-      void initSmartRound(cs::TransactionsPacket pack, Node* node, SmartContracts* smarts/*, std::vector<SmartContracts::QueueItem>::iterator it*/);
+      bool initSmartRound(const cs::TransactionsPacket& pack, Node* node, SmartContracts* smarts);
       uint8_t calculateSmartsConfNum();
       uint8_t ownSmartsConfidantNumber();
 
@@ -42,7 +42,6 @@ namespace cs {
       void startTimer(int st);
       void killTimer(int st);
       void fakeStage(uint8_t confIndex);
-
 
       cs::PublicKey smartAddress();
       //Solver smarts consensus methods
@@ -77,8 +76,6 @@ namespace cs {
     private:
       //Node pnode_;
   
-
-      SolverCore* pcore_;
       Node* pnode_;
       SmartContracts* psmarts_;
       //CallsQueueScheduler scheduler;

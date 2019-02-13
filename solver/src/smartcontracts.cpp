@@ -830,7 +830,7 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data) 
     packet.addTransaction(result);
   }
   else {
-    csdebug() << name() << ": execution of smart contract is successful";
+    csdebug() << name() << ": execution of smart contract is successful, new state size = " << data.state.size();
     result.add_user_field(trx_uf::new_state::Value, data.state);
     result.add_user_field(trx_uf::new_state::RetVal, serialize<decltype(data.ret_val)>(data.ret_val));
     packet.addTransaction(result);
@@ -853,12 +853,17 @@ void SmartContracts::on_execute_async_completed(const SmartExecutionData& data) 
 
   if (it != exe_queue.end()) {
     clear_emitted_transactions(it->abs_addr);
+
+    csdebug() << name() << ": starting smart contract consensus";
+    if (!it->start_consensus(packet, pnode, this)) {
+      cserror() << name() << ": smart contract consensus failed, remove item from queue";
+      remove_from_queue(it);
+    }
   }
 
-  if (set_execution_result(packet)) {
-    csdebug() << "Starting SMARTCONSENSUS";
-    it->pconsensus->initSmartRound(packet, pnode, this);
-  }
+  // inform slots if any, packet does not contain smart consensus' data!
+  emit signal_smart_executed(packet);
+
   checkAllExecutions();
 }
 
@@ -892,35 +897,8 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
   return result;
 }
 
-bool SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
-  //csdebug() << "  _____";
-  //csdebug() << " /     \\";
-  //csdebug() << "/   =   \\";
-  //csdebug() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
-  //csdebug() << " \\_____/";
-  csdebug() << name() << ": execution has completed with " << pack.transactionsCount() << " transaction(s)";
-
-  if (pack.transactionsCount() > 0) {
-    const auto tr = pack.transactions().front();
-    csdb::UserField f = tr.user_field(trx_uf::new_state::Value);
-    if (f.is_valid()) {
-      csdebug() << name() << ": new state size " << f.value<std::string>().size();
-    }
-    else {
-      cserror() << name() << ": trx[0] in packet is not new_state transaction";
-      return false;
-    }
-    emit signal_smart_executed(pack);
-	return true;
-  }
-  else {
-    cserror() << name() << ": no transactions in execution result pack";
-    return false;
-  }
-}
-
 // get & handle rejected transactions
-// usually ordinary consensus may reject smart-related transactions
+// usually ordinary consensus may not reject smart-related transactions
 void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
   if (exe_queue.empty()) {
     cserror() << name() << ": get rejected smart transactions but execution queue is empty";
@@ -1153,13 +1131,4 @@ std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
   return std::string("???");
 }
 
-SmartConsensus* SmartContracts::getSmartConsensus(cs::PublicKey smartAddr) {
-  for (auto& it : exe_queue) {
-    if (it.abs_addr == csdb::Address::from_public_key(smartAddr)) {
-      return it.pconsensus.get();
-    }
-  }
-  csdebug() << "No such smartconsensus ing the list!";
-  return nullptr;
-}
 }  // namespace cs
