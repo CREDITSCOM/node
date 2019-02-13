@@ -10,6 +10,7 @@
 #include <map>
 
 #include <lib/system/common.hpp>
+#include <csdb/amount.hpp>
 
 class BlockChain;
 
@@ -36,8 +37,8 @@ public:
   *  @param pool/packet - counted fee will be set for each transaction
   *                       in this pool/packet.
   */
-  void CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
-  void CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
+  csdb::Amount CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool);
+  csdb::Amount CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet);
 
   void ResetTrustedCache(const BlockChain&);
 

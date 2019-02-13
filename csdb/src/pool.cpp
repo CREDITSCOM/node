@@ -104,6 +104,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(sequence_);
 
     os.put(user_fields_);
+    os.put(roundCost_);
 
     os.put(transactions_.size());
     for (const auto& it : transactions_) {
@@ -153,6 +154,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(sequence_);
 
     os.put(user_fields_);
+    os.put(roundCost_);
 
     os.put(transactions_.size());
     for (const auto& it : transactions_) {
@@ -185,6 +187,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     if (!is.get(user_fields_)) {
       csmeta(cswarning) << "get user fields is failed";
+      return false;
+    }
+
+    if (!is.get(roundCost_)) {
+      csmeta(cswarning) << "get round cost is failed";
       return false;
     }
 
@@ -414,6 +421,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     result.sequence_ = sequence_;
     result.next_confidants_ = next_confidants_;
     result.hashingLength_ = hashingLength_;
+    result.roundCost_ = roundCost_;
 
     result.transactions_.reserve(transactions_.size());
     for (auto& t : transactions_) {
@@ -453,6 +461,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   std::vector<uint8_t> realTrusted_;
   size_t hashingLength_ = 0;
   cs::PublicKey writer_public_key_;
+  csdb::Amount roundCost_;
   cs::BlockSignatures signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
@@ -615,6 +624,10 @@ const ::std::vector<csdb::Pool::SmartSignature>& Pool::smartSignatures() const n
   return d->smartSignatures_;
 }
 
+const csdb::Amount& Pool::roundCost() const noexcept {
+  return d->roundCost_;
+}
+
 void Pool::set_sequence(cs::Sequence seq) noexcept {
   if (d.constData()->read_only_) {
     return;
@@ -623,6 +636,16 @@ void Pool::set_sequence(cs::Sequence seq) noexcept {
   priv* data = d.data();
   data->is_valid_ = true;
   data->sequence_ = seq;
+}
+
+void Pool::setRoundCost(const csdb::Amount& roundCost) noexcept {
+  if (d.constData()->read_only_) {
+    return;
+  }
+
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->roundCost_ = roundCost;
 }
 
 void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
