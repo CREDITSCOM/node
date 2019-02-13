@@ -211,10 +211,6 @@ public:
     return papi;
   }
 
-  const char* name() const {
-    return "Smart";
-  }
-
   csdb::Address absolute_address(csdb::Address optimized_address) const {
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
   }
