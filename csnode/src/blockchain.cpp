@@ -507,10 +507,10 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     }
   }
   if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
-    cslog() << "The number of signatures is sufficient ant all of them are OK!";
+    csdebug() << "The number of signatures is sufficient ant all of them are OK!";
   }
   else {
-    cserror() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+    cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
     return false;
   }
 
