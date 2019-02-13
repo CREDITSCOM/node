@@ -355,16 +355,17 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     payable = is_payable(abs_addr);
   }
 
-  cslog() << "  _____";
-  cslog() << " /     \\";
-  if(payable) {
-    cslog() << "/   $   \\";
-  }
-  else {
-    cslog() << "/   +   \\";
-  }
-  cslog() << "\\       /";
-  cslog() << " \\_____/" << "  " << get_executed_method(new_item);
+ // csdebug() << "  _____";
+ // csdebug() << " /     \\";
+ // if(payable) {
+	//csdebug() << "/   $   \\";
+ // }
+ // else {
+ //   csdebug() << "/   +   \\";
+ // }
+ // csdebug() << "\\       /";
+ // csdebug() << " \\_____/" << "  " << get_executed_method(new_item);
+  csdebug() << name() << ": enqueue " << get_executed_method(new_item);
 
   exe_queue.emplace_back(QueueItem(new_item, abs_addr)).wait(new_item.sequence);
   test_exe_queue();
@@ -636,11 +637,12 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   if(it != exe_queue.cbegin()) {
     cswarning() << name() << ": completed contract is not at the top of queue";
   }
-  cslog() << "  _____";
-  cslog() << " /     \\";
-  cslog() << "/   -   \\";
-  cslog() << "\\       /";
-  cslog() << " \\_____/" << "  " << get_executed_method(it->contract);
+  //csdebug() << "  _____";
+  //csdebug() << " /     \\";
+  //csdebug() << "/   -   \\";
+  //csdebug() << "\\       /";
+  //csdebug() << " \\_____/" << "  " << get_executed_method(it->contract);
+  csdebug() << name() << ": remove from queue " << get_executed_method(it->contract);
 
   clear_emitted_transactions(it->abs_addr);
   exe_queue.erase(it);
@@ -891,11 +893,12 @@ csdb::Transaction SmartContracts::result_from_smart_ref(const SmartContractRef& 
 }
 
 bool SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
-  cslog() << "  _____";
-  cslog() << " /     \\";
-  cslog() << "/   =   \\";
-  cslog() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
-  cslog() << " \\_____/";
+  //csdebug() << "  _____";
+  //csdebug() << " /     \\";
+  //csdebug() << "/   =   \\";
+  //csdebug() << "\\  " << std::setw(3) << pack.transactionsCount() << "  /";
+  //csdebug() << " \\_____/";
+  csdebug() << name() << ": execution has completed with " << pack.transactionsCount() << " transaction(s)";
 
   if (pack.transactionsCount() > 0) {
     const auto tr = pack.transactions().front();
@@ -907,9 +910,8 @@ bool SmartContracts::set_execution_result(cs::TransactionsPacket& pack) const {
       cserror() << name() << ": trx[0] in packet is not new_state transaction";
       return false;
     }
-
     emit signal_smart_executed(pack);
-    return true;
+	return true;
   }
   else {
     cserror() << name() << ": no transactions in execution result pack";
