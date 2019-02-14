@@ -89,7 +89,8 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
 }
 
 bool WalletsIds::Normal::remove(const WalletAddress& address) {
-  if (address.is_public_key()) {
+  if (address.is_wallet_id()) {
+    cserror() << __func__ << ": wrong address type";
     return false;
   }
   norm_.data_.erase(address);

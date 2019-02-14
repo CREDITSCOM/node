@@ -443,9 +443,23 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
 }
 
 void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
-  const auto& new_wallets = pool.newWallets();
-  for (const auto& it : new_wallets) {
-    walletIds_->normal().remove(csdb::Address::from_wallet_id(it.walletId_));
+  try {
+    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    const csdb::Pool::NewWallets& newWallets = pool.newWallets();
+    for (const auto& newWall : newWallets) {
+      csdb::Address newWallAddress;
+      if (!pool.getWalletAddress(newWall, newWallAddress)) {
+        cserror() << "Wrong new wallet data";
+        return;
+      }
+      if (!walletIds_->normal().remove(newWallAddress)) {
+        cswarning() << "Wallet was not removed";
+      }
+    }
+  } catch (std::exception& e) {
+    cserror() << "Exc=" << e.what();
+  } catch (...) {
+    cserror() << "Exc=...";
   }
 }
 
