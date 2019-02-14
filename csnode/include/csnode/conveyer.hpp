@@ -294,6 +294,7 @@ public slots:
 
 protected:
   void removeHashesFromTable(const cs::PacketsHashes& hashes);
+  cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
 private:
   /// pointer implementation

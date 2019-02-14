@@ -443,9 +443,23 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
 }
 
 void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
-  const auto& new_wallets = pool.newWallets();
-  for (const auto& it : new_wallets) {
-    walletIds_->normal().remove(csdb::Address::from_wallet_id(it.walletId_));
+  try {
+    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    const csdb::Pool::NewWallets& newWallets = pool.newWallets();
+    for (const auto& newWall : newWallets) {
+      csdb::Address newWallAddress;
+      if (!pool.getWalletAddress(newWall, newWallAddress)) {
+        cserror() << "Wrong new wallet data";
+        return;
+      }
+      if (!walletIds_->normal().remove(newWallAddress)) {
+        cswarning() << "Wallet was not removed";
+      }
+    }
+  } catch (std::exception& e) {
+    cserror() << "Exc=" << e.what();
+  } catch (...) {
+    cserror() << "Exc=...";
   }
 }
 
@@ -489,7 +503,9 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   }
 
   size_t truePoolSignatures = 0;
-
+  csdebug() << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
+  csdebug() << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
+  csdebug() << "Pool: " << cs::Utils::byteStreamToHex(pool.to_binary().data(),pool.to_binary().size());
   for (auto& it : signatures) {
     const std::size_t idx = static_cast<std::size_t>(it.first);
     if (idx < confidants.size()) {
@@ -507,7 +523,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     }
   }
   if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
-    csdebug() << "The number of signatures is sufficient ant all of them are OK!";
+    csdebug() << "The number of signatures is sufficient and all of them are OK!";
   }
   else {
     cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
@@ -986,7 +1002,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     }
     else {
       csdebug() << "BLOCKCHAIN> we have to rewrite #" << pool_seq ;
-      removeLastBlock();
+      //removeLastBlock();
     }
   }
 

@@ -81,21 +81,31 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
     return;
   }
+
   WalletId id{};
   if (!findWalletId(wallAddress, id)) {
     cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
     return;
   }
+
   WalletData& wallData = getWalletData(id, wallAddress);
   wallData.balance_ += transaction.amount();
-  setModified(id);
-  for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
-    if (it->source() == transaction.source() &&
-        it->innerID() == transaction.innerID()) {
-      data_.smartPayableTransactions_.erase(it);
-      break;
+
+  if (SmartContracts::is_executable(transaction)) {
+    wallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
+    wallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
+    data_.closedSmarts_.push_back(transaction);
+  } else {
+    for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
+      if (it->source() == transaction.source() &&
+          it->innerID() == transaction.innerID()) {
+        data_.smartPayableTransactions_.erase(it);
+        break;
+      }
     }
   }
+
+  setModified(id);
 }
 
 // ProcessorBase
@@ -129,6 +139,9 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 
   for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
     totalAmountOfCountedFee += load(*itTrx, blockchain);
+    if (SmartContracts::is_new_state(*itTrx)) {
+      fundConfidantsWalletsWithExecFee(*itTrx, blockchain);
+    }
   }
 #ifdef MONITOR_NODE
   it_writer->second.totalFee += totalAmountOfCountedFee;
@@ -174,6 +187,41 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, 
   }
 }
 
+void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain) {
+  if (!SmartContracts::is_new_state(transaction)) {
+    cswarning() << __func__ << ": transaction is not new state";
+    return;
+  }
+  if (isClosedSmart(transaction)) {
+    cserror() << "This transaction must be blocked in consensus";
+    return;
+  }
+  SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
+  if (!smartRef.is_valid()) {
+    cserror() << __func__ << ": incorrect reference to starter transaction in new state";
+    return;
+  }
+  csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
+  if (!pool.is_valid()) {
+    cserror() << __func__ << ": invalid pool";
+    return;
+  }
+  const ConfidantsKeys& confidants = pool.confidants();
+  csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()
+                                    / static_cast<int32_t>(confidants.size()); // csdb::Amount operator/
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    WalletId confidantId{};
+    csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
+    if (!findWalletId(confidantAddress, confidantId)) {
+      cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
+      return;
+    }
+    WalletData& walletData = getWalletData(confidantId, confidantAddress);
+    walletData.balance_ += feeToEachConfidant;
+    setModified(confidantId);
+  }
+}
+
 double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const BlockChain& blockchain) {
   loadTrxForTarget(tr);
   return loadTrxForSource(tr, blockchain);
@@ -202,13 +250,19 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   if (SmartContracts::is_executable(tr)) {
     wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+    checkClosedSmart(tr);
   } else if (SmartContracts::is_new_state(tr)) {
     csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
+    if (isClosedSmart(initTransaction)) {
+      cserror() << "This transaction must be blocked in consensus!";
+      wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())
+                         + csdb::Amount(initTransaction.counted_fee().to_double());
+    }
     if (SmartContracts::is_executable(initTransaction)) {
       wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double())
-        - csdb::Amount(initTransaction.counted_fee().to_double())
-        - csdb::Amount(tr.counted_fee().to_double())
-        - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+                         - csdb::Amount(initTransaction.counted_fee().to_double())
+                         - csdb::Amount(tr.counted_fee().to_double())
+                         - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
     } else {
       checkSmartWaitingForMoney(initTransaction, tr);
     }
@@ -233,6 +287,23 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   setModified(id);
   return tr.counted_fee().to_double();
+}
+
+bool WalletsCache::ProcessorBase::isClosedSmart(const csdb::Transaction& transaction) {
+  for (auto& smart : data_.closedSmarts_) {
+    if (smart.target() == transaction.target()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& transaction) {
+  for (auto it = data_.closedSmarts_.begin(); it != data_.closedSmarts_.end(); ++it) {
+    if (it->target() == transaction.target()) {
+      data_.closedSmarts_.erase(it);
+    }
+  }
 }
 
 void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {

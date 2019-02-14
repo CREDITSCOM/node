@@ -60,7 +60,7 @@ namespace cs
       {pTrusted3, {defaultRT, defaultBB, {Event::Stage2Enough, pTrustedPost}}},
 
       // Trusted PostStageState after enough Stage3 (confirmation)are received (confidant node)
-      {pTrustedPost, {defaultRT, defaultBB, {Event::Stage3Enough, pWaiting}}},
+      {pTrustedPost, {defaultRT, defaultBB, {Event::Stage3Enough, pWaiting}, {Event::SetNormal, pNormal}}},
 
       // Trusted pre-Writing (confidant node)
       {pWaiting, {defaultRT, defaultBB, {Event::SetWriter, pWriting}}},

@@ -250,12 +250,15 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     return;
   }
 
-  if (stateCompleted(pstate->onStage3(*pcontext, stage))) {
-    handleTransitions(Event::Stage3Enough);
-  }
-
-  if (stateFailed(pstate->onStage3(*pcontext, stage))) {
-    handleTransitions(Event::SetNormal);
+  switch (pstate->onStage3(*pcontext, stage)) {
+    case Result::Finish: 
+      handleTransitions(Event::Stage3Enough);
+      break;
+    case Result::Failure:
+      cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+      removeDeferredBlock();
+      handleTransitions(Event::SetNormal);
+      break;
   }
 }
 

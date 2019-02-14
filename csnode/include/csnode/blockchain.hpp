@@ -100,9 +100,9 @@ public:
   }
 
 private:
-  void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
-
+ 
 public:
+  void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
   size_t getSize() const;
   csdb::PoolHash getLastHash() const;
 

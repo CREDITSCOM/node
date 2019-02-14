@@ -344,8 +344,6 @@ private:
   std::vector<cs::StageOneSmarts> smartStageOneStorage_;
   std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
   std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-
-  bool isSmartStageStorageCleared_ = false;
   int corruptionLevel_ = 0;
 
   std::vector<cs::Stage> smartStageTemporary_;

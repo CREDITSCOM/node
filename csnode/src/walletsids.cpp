@@ -1,6 +1,7 @@
 #include <csnode/walletsids.hpp>
 #include <lib/system/logger.hpp>
 #include <limits>
+#include <lib/system/utils.hpp>
 
 using namespace std;
 
@@ -89,12 +90,21 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
 }
 
 bool WalletsIds::Normal::remove(const WalletAddress& address) {
-  if (address.is_public_key()) {
+  if (address.is_wallet_id()) {
+    cserror() << __func__ << ": wrong address type";
     return false;
+  }
+  csdebug() << "Keys before erasing address " << address.to_string();
+  for (auto& it : norm_.data_) {
+    csdebug() << it.second << " - " << it.first.to_string();
   }
   norm_.data_.erase(address);
   if (norm_.nextId_ > 0) {
     --norm_.nextId_;
+  }
+  csdebug() << "Keys after erasing";
+  for (auto& it : norm_.data_) {
+    csdebug() << it.second << " - " << it.first.to_string();
   }
   return true;
 }

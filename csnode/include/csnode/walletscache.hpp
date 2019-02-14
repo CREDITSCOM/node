@@ -93,6 +93,9 @@ private:
     void invokeReplenishPayableContract(const csdb::Transaction&);
     void rollbackReplenishPayableContract(const csdb::Transaction&);
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
+    bool isClosedSmart(const csdb::Transaction& transaction);
+    void checkClosedSmart(const csdb::Transaction& transaction);
+    void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
 /*#ifdef MONITOR_NODE
     std::map<WalletData::Address, WriterData> writers_;
@@ -168,6 +171,7 @@ private:
   const csdb::Address genesisAddress_;
   const csdb::Address startAddress_;
   std::list<csdb::Transaction> smartPayableTransactions_;
+  std::list<csdb::Transaction> closedSmarts_;
 
 #ifdef MONITOR_NODE
   std::map<WalletData::Address, TrustedData> trusted_info_;

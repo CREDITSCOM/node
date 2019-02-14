@@ -235,7 +235,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
 
   poolMetaInfo.realTrustedMask = stage3.realTrustedMask;
   poolMetaInfo.previousHash = pnode->getBlockChain().getLastHash();
-
+  //TODO: in this method we delete the local hashes - so if we need to rebuild thid pool again from the roundTable it's impossible
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
   if (!pool.has_value()) {
@@ -288,6 +288,12 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatu
 
   csmeta(csdetails) << "end";
   return true;
+}
+
+void SolverCore::removeDeferredBlock() {
+  pnode->getBlockChain().removeWalletsInPoolFromCache(deferredBlock_);
+  deferredBlock_ = csdb::Pool();
+  csdebug() << "SolverCore: just created new block was thrown away";
 }
 
 uint8_t SolverCore::subRound() {
