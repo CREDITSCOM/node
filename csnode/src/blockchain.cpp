@@ -503,7 +503,9 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   }
 
   size_t truePoolSignatures = 0;
-
+  csdebug() << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
+  csdebug() << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
+  csdebug() << "Pool: " << cs::Utils::byteStreamToHex(pool.to_binary().data(),pool.to_binary().size());
   for (auto& it : signatures) {
     const std::size_t idx = static_cast<std::size_t>(it.first);
     if (idx < confidants.size()) {
@@ -521,7 +523,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     }
   }
   if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
-    csdebug() << "The number of signatures is sufficient ant all of them are OK!";
+    csdebug() << "The number of signatures is sufficient and all of them are OK!";
   }
   else {
     cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
@@ -1000,7 +1002,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     }
     else {
       csdebug() << "BLOCKCHAIN> we have to rewrite #" << pool_seq ;
-      removeLastBlock();
+      //removeLastBlock();
     }
   }
 
