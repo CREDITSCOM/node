@@ -37,14 +37,17 @@ public:
   constexpr static uint32_t T_stage_request = 4000;
 
   /** @brief   Max timeout (msec) to execute smart contract */
-  constexpr static uint32_t T_smart_contract = 50000;
+  constexpr static uint32_t T_smart_contract = 90000;
 
   /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
   constexpr static uint32_t T_coll_trans = 500;
 
-  /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
-  constexpr static size_t maxStageOneHashes = 250;
+  /** @brief   Max hashes count to include in stage one data */
+  constexpr static size_t MaxStageOneHashes = 250;
 
-  /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
-  constexpr static unsigned int MaxRoundsExecuteSmart = 100;
+  /** @brief   Max count of rounds to execute smart contract */
+  constexpr static unsigned int MaxRoundsCancelContract = 30;
+
+  /** @brief The maximum count of rounds to store in chain new_state transaction */
+  constexpr static unsigned int MaxRoundsCloseContract = 26;
 };

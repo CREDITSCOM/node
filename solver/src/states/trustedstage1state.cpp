@@ -69,7 +69,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
       if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
         stage.hashesCandidates.push_back(element.first);
 
-        if (stage.hashesCandidates.size() > Consensus::maxStageOneHashes) {
+        if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
           break;
         }
       }

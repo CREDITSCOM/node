@@ -978,7 +978,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     auto sp = lockedReference(this->smarts_pending);
     auto so = lockedReference(this->smart_operations);
     for (auto it = sp->begin(); it != sp->end(); it = sp->erase(it)) {
-      if ((it->first + Consensus::MaxRoundsExecuteSmart) > pending_smart_transactions->last_pull_sequence)
+      if ((it->first + Consensus::MaxRoundsCancelContract) > pending_smart_transactions->last_pull_sequence)
         break;
 
       for (auto& sm : it->second) {
