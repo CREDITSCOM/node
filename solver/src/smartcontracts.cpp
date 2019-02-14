@@ -359,7 +359,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     payable = is_payable(abs_addr);
   }
 
-  cslog() << log_prefix << "enqueue " << get_executed_method(new_item);
+  cslog() << std::endl << log_prefix << "enqueue " << get_executed_method(new_item) << std::endl;
   exe_queue.emplace_back(QueueItem(new_item, abs_addr, t)).wait(new_item.sequence);
   test_exe_queue();
 }
@@ -654,7 +654,7 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   if(it != exe_queue.cbegin()) {
     cswarning() << log_prefix << "completed contract is not at the top of queue";
   }
-  cslog() << log_prefix << "remove from queue completed " << get_executed_method(it->contract);
+  cslog() << std::endl << log_prefix << "remove from queue completed " << get_executed_method(it->contract) << std::endl;
 
   clear_emitted_transactions(it->abs_addr);
   exe_queue.erase(it);
