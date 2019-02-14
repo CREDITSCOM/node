@@ -1002,7 +1002,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     }
     else {
       csdebug() << "BLOCKCHAIN> we have to rewrite #" << pool_seq ;
-      removeLastBlock();
+      //removeLastBlock();
     }
   }
 
