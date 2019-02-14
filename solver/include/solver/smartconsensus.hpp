@@ -103,7 +103,6 @@ namespace cs {
       std::vector<cs::Bytes> smartStageThreeMessage_;
 
       std::vector<cs::Stage> smartStageTemporary_;
-      bool isSmartStageStorageCleared_ = false;
       //std::vector<SmartContracts::QueueItem>::iterator currentSmartPointer_;
 
   };
