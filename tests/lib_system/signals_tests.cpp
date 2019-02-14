@@ -292,3 +292,32 @@ TEST(Signals, ConstObjectConnection) {
 
   cs::Connector::connect(&a.signal, &b, &B::onSignal);
 }
+
+TEST(Signals, UnexpectedDisconnect) {
+  static bool isCalled = false;
+
+  class A {
+  public signals:
+    cs::Signal<void(const std::string&)> signal;
+  };
+
+  class B : public cs::IConnectable {
+  public slots:
+    void onSignal(const std::string& msg) {
+      isCalled = true;
+      cs::Console::writeLine(msg);
+    }
+  };
+
+  A a;
+
+  {
+    B b;
+    cs::Connector::connect(&a.signal, &b, &B::onSignal);
+  }
+
+  emit a.signal("cs");
+
+  ASSERT_EQ(isCalled, false);
+  ASSERT_EQ(cs::Connector::callbacks(&a.signal), 0);
+}
