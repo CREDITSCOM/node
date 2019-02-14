@@ -450,16 +450,10 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     return std::nullopt;
   }
 
-  ////This code is only for testing  -- should be removed after finding bugs
-  cs::Bytes pKeys;
-  cs::Bytes commisions;
-  cs::DataStream pKeysStream(pKeys);
-  cs::DataStream commisionStream(commisions);
-  ///////
   cs::TransactionsPacketTable hashTable;
   const cs::PacketsHashes& localHashes = meta->roundTable.hashes;
   const cs::Characteristic& characteristic = meta->characteristic;
-  cs::TransactionsPacketTable& currentHashTable = pimpl_->packetsTable;
+  cs::TransactionsPacketTable& currentHashTable = poolTable(round);
 
   csmeta(csdetails) << "characteristic: " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
   csmeta(csdebug) << "characteristic bytes size " << characteristic.mask.size();
@@ -488,8 +482,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
       if (maskIndex < mask.size()) {
         if (mask[maskIndex] != 0u) {
           newPool.add_transaction(transaction);
-          pKeysStream << transaction.source().public_key();
-          commisionStream << transaction.to_byte_stream();
         }
         else {
           invalidTransactions.addTransaction(transaction);
@@ -498,11 +490,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
       ++maskIndex;
     }
-    //Hash pkHash = cscrypto::CalculateHash(pKeys.data(),pKeys.size());
-    //Hash comHash = cscrypto::CalculateHash(commisions.data(), commisions.size());
-
-    //csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
-    //csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
   
     if (maskIndex > mask.size()) {
       csmeta(cserror) << "hash failed, mask size: " << mask.size() << " mask index: " << maskIndex;
@@ -513,11 +500,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     // create storage hash table and remove from current hash table
     hashTable.emplace(hash, std::move(packet));
   }
-  Hash pkHash = cscrypto::calculateHash(pKeys.data(), pKeys.size());
-  Hash comHash = cscrypto::calculateHash(commisions.data(), commisions.size());
 
-  csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
-  csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(comHash.data(), comHash.size());
   // remove current hashes from table
   removeHashesFromTable(localHashes);
 
@@ -538,7 +521,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
   newPool.add_real_trusted(metaPoolInfo.realTrustedMask);
-  //newPool.set_writer_public_key(metaPoolInfo.writerKey);
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
@@ -639,6 +621,20 @@ void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
   for (const auto& hash : hashes) {
     pimpl_->packetsTable.erase(hash);
   }
+}
+
+cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) {
+  cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
+
+  if (!meta) {
+    return pimpl_->packetsTable;
+  }
+
+  if (!meta->hashTable.empty()) {
+    return meta->hashTable;
+  }
+
+  return pimpl_->packetsTable;
 }
 
 cs::Conveyer& cs::Conveyer::instance() {
