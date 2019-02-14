@@ -20,8 +20,8 @@
 namespace cs {
 namespace {
 constexpr auto kMaxRoundNumWithFixedFee = 10;
-constexpr auto kLengthOfCommonTransaction = 152;
-constexpr double kMarketRateCS = 0.18;
+constexpr auto kLengthOfCommonTransaction = 100;
+constexpr double kMarketRateCS = 0.06;
 constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
@@ -40,7 +40,7 @@ Fee::Fee()
     current_pool_(nullptr),
     transactions_packet_(nullptr) {}
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
+csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
   if (num_of_last_block_ > blockchain.getLastSequence()) {
     ResetTrustedCache(blockchain);
     update_trusted_cache_ = false;
@@ -54,13 +54,14 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
 
   if (pool->transactions().empty()) {
     EstimateNumOfNodesInNetwork(blockchain);
-    return;
+    return csdb::Amount(0);
   }
   CountOneByteCost(blockchain);
   SetCountedFee();
+  return csdb::Amount(one_round_cost_);
 }
 
-void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
+csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
   if (num_of_last_block_ > blockchain.getLastSequence()) {
     ResetTrustedCache(blockchain);
     update_trusted_cache_ = false;
@@ -74,10 +75,11 @@ void Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* pack
 
   if (packet->transactionsCount() == 0) {
     EstimateNumOfNodesInNetwork(blockchain);
-    return;
+    return csdb::Amount(0);
   }
   CountOneByteCost(blockchain);
   SetCountedFee();
+  return csdb::Amount(one_round_cost_);
 }
 
 inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
@@ -97,8 +99,7 @@ void Fee::SetCountedFee() {
 
   if (current_pool_ != nullptr) {
     transactions = &(current_pool_->transactions());
-  }
-  else {
+  } else {
     transactions = &(transactions_packet_->transactions());
   }
 
@@ -132,8 +133,7 @@ void Fee::CountTotalTransactionsLength() {
 
   if (current_pool_ != nullptr) {
     transactions = &(current_pool_->transactions());
-  }
-  else {
+  } else {
     transactions = &(transactions_packet_->transactions());
   }
 
@@ -181,11 +181,10 @@ size_t Fee::EstimateNumOfNodesInNetwork(const BlockChain& blockchain) {
     auto it = last_trusted_.find(conf);
     if (it != last_trusted_.end()) {
       --(it->second);
-      if (it->second == 0){
+      if (it->second == 0) {
         last_trusted_.erase(it);
       }
-    }
-    else {
+    } else {
       cserror() << "Fee> Confidants to remove is not contained to last trusted confidants.";
       cserror() << "Fee> Confidant: " << cs::Utils::byteStreamToHex(conf.data(), conf.size())
                 << ", Round: " << sequence_to_remove;
@@ -203,13 +202,12 @@ void Fee::CountRoundsFrequency(const BlockChain& blockchain) {
   size_t block_number_from;
   if (num_of_last_block_ > kNumOfBlocksToCountFrequency) {
     block_number_from = num_of_last_block_ - kNumOfBlocksToCountFrequency;
-  }
-  else {
+  } else {
     block_number_from = 1;
   }
 
   double time_stamp_diff = CountBlockTimeStampDifference(block_number_from, blockchain);
-  if(fabs(time_stamp_diff) > std::numeric_limits<double>::epsilon()) {
+  if (fabs(time_stamp_diff) > std::numeric_limits<double>::epsilon()) {
     rounds_frequency_ = time_stamp_diff / (num_of_last_block_ - block_number_from + 1) / 1000;
   } else {
     rounds_frequency_ = kDefaultRoundFrequency;
@@ -228,12 +226,10 @@ double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChai
   csdb::Pool block_to = blockchain.loadBlock(block_to_hash);
   double time_stamp_to = time_stamp_from;
   const auto str = block_to.user_field(0).value<std::string>();
-  if(!str.empty()) {
+  if (!str.empty()) {
     try {
       time_stamp_to = std::stod(str);
-    }
-    catch(...) {
-    }
+    } catch (...) {}
   }
 
   return time_stamp_to - time_stamp_from;
@@ -267,10 +263,9 @@ void Fee::AddConfidants(const std::vector<cs::PublicKey>& confidants) {
     auto it = last_trusted_.find(conf);
     if (it != last_trusted_.end()) {
       ++(it->second);
-    }
-    else {
+    } else {
       last_trusted_.emplace(std::make_pair(conf, 1));
     }
-  };
+  }
 }
 }  // namespace cs

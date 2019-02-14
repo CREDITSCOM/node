@@ -181,9 +181,6 @@ public:
   // new state of contract, result of invocation of executable transaction
   static bool is_new_state(const csdb::Transaction);
 
-
-  CallsQueueScheduler* getScheduler();
-
   /* Assuming deployer.is_public_key(), not a WalletId */
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
@@ -198,7 +195,6 @@ public:
 
   static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
 
-  SmartConsensus* getSmartConsensus(cs::PublicKey smartAddr);
   // non-static variant
   csdb::Transaction get_transaction(const SmartContractRef& contract) const {
     return SmartContracts::get_transaction(bc, contract);
@@ -207,18 +203,12 @@ public:
   void enqueue(csdb::Pool block, size_t trx_idx);
   void on_new_state(csdb::Pool block, size_t trx_idx);
 
-  bool set_execution_result(cs::TransactionsPacket& pack) const;
-
   // get & handle rejected transactions
   // usually ordinary consensus may reject smart-related transactions
   void on_reject(cs::TransactionsPacket& pack);
 
   csconnector::connector::ApiHandlerPtr get_api() const {
     return papi;
-  }
-
-  const char* name() const {
-    return "Smart";
   }
 
   csdb::Address absolute_address(csdb::Address optimized_address) const {
@@ -319,7 +309,6 @@ private:
       , round_start(0)
       , round_finish(0)
       , abs_addr(absolute_address)
-      , pconsensus(new SmartConsensus())
     {}
 
     void wait(cs::RoundNumber r)
@@ -348,6 +337,12 @@ private:
       status = SmartContractStatus::Closed;
       csdebug() << "Smart: contract is closed";
     }
+
+	  bool start_consensus(const cs::TransactionsPacket& pack, Node* pNode, SmartContracts* pSmarts)
+	  {
+		  pconsensus = std::make_unique<SmartConsensus>();
+		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
+	  }
   };
 
   // executiom queue
