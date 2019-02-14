@@ -153,10 +153,6 @@ enum class SmartContractStatus {
 // passes to every slot packet with result transactions
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
-// to inform subscribed slots on contract execution timeout
-// passes starter info
-using SmartContractTimeoutSignal = cs::Signal<void(const cs::SmartContractRef&)>;
-
 // to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
 using PayableSmartContractSignal = cs::Signal<void(csdb::Transaction)>;
@@ -235,7 +231,6 @@ public:
 
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
-  SmartContractTimeoutSignal signal_smart_timeout;
   PayableSmartContractSignal signal_payable_invoke;
   PayableSmartContractSignal signal_payable_timeout;
 

@@ -648,13 +648,13 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
         // test out-of-fee:
         item.current_fee += round_fee;
         if(item.current_fee >= item.max_fee) {
-          cswarning() << name() << ": contract is out of fee, cancel it without transaction";
+          cswarning() << log_prefix << "contract is out of fee, cancel it without transaction";
           item.close();
         }
         // round-based timeout
         const auto seq = block.sequence();
         if(seq > item.round_start && seq - item.round_start > Consensus::MaxRoundsExecuteSmart) {
-          cswarning() << name() << ": contract is in queue over " << Consensus::MaxRoundsExecuteSmart
+          cswarning() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsExecuteSmart
             << " blocks (from #," << item.round_start << "), cancel it without transaction";
           item.close();
         }
@@ -662,12 +662,7 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
         if(item.status == SmartContractStatus::Closed) {
           csdb::Transaction starter = get_transaction(item.contract);
           if(starter.is_valid()) {
-            if(is_payable_target(starter)) {
-              emit signal_payable_timeout(starter);
-            }
-            else {
-              emit signal_smart_timeout(item.contract);
-            }
+            emit signal_payable_timeout(starter);
           }
         }
       }
@@ -1176,10 +1171,10 @@ std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
 
 csdb::Amount SmartContracts::smart_round_fee(csdb::Pool block)
 {
-  csdb::Amount fee = block.round_cost();
-  if(fee > csdb::Amount(0)) {
-    return fee;
-  }
+  csdb::Amount fee(0); //= block.round_cost();
+  //if(fee > csdb::Amount(0)) {
+  //  return fee;
+  //}
   // see fee.cpp:
   constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
   double cnt = kMinFee * std::max((size_t) Consensus::MinTrustedNodes, block.confidants().size());
