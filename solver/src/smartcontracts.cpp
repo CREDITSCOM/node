@@ -402,12 +402,10 @@ void SmartContracts::test_exe_queue() {
     }
     if(next->status == SmartContractStatus::Running) {
       // some contract is already running
-      csdebug() << log_prefix << "running contract is in queue";
       break;
     }
     if(next->status == SmartContractStatus::Finished) {
       // some contract is under consensus
-      csdebug() << log_prefix << "finished contract is in queue";
       break;
     }
     csdebug() << log_prefix << "set running status to next contract in queue";
@@ -416,10 +414,6 @@ void SmartContracts::test_exe_queue() {
     if (!invoke_execution(next->contract)) {
       remove_from_queue(next);
     }
-  }
-
-  if (exe_queue.empty()) {
-    csdebug() << log_prefix << "contract queue is empty, nothing to execute";
   }
 }
 
@@ -664,6 +658,13 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
 
   clear_emitted_transactions(it->abs_addr);
   exe_queue.erase(it);
+
+  if (exe_queue.empty()) {
+    csdebug() << log_prefix << "contract queue is empty, nothing to execute";
+  }
+  else {
+    csdebug() << log_prefix << exe_queue.size() << " item(s) in queue";
+  }
 }
 
 // returns false if failed, and caller must remove_from_queue() the item

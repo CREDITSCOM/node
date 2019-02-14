@@ -21,6 +21,8 @@ namespace cs{
   }
 
   SmartConsensus::~SmartConsensus() {
+    cslog() << "======================  SMART-ROUND " << smartRoundNumber_ << " END =====================";
+
     pnode_->removeSmartConsensus(this->smartAddress_);
     cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -53,14 +55,14 @@ namespace cs{
       }
     }
     if (0 == smartRoundNumber_ || !contract_addr.is_valid()) {
-      cserror() << "SmartConsensus: smart contract result packet must contain new state transaction";
+      cserror() << log_prefix << "smart contract result packet must contain new state transaction";
       return false;
     }
     smartConfidants_ = pnode_->retriveSmartConfidants(smartRoundNumber_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
-      cserror() << "SmartConsensus: cannot determine own number in confidant list";
+      cserror() << log_prefix << "cannot determine own number in confidant list";
       return false;
     }
 
@@ -289,7 +291,7 @@ namespace cs{
     csdebug() << log_prefix << "smart consensus result 3 from 3";
     //startTimer(3);
     stage.packageSignature = cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), hash_t.data(), hash_t.size());
-    csmeta(cslog) << "done";
+    csmeta(csdebug) << "done";
     addSmartStageThree(stage, true);
   }
 
@@ -348,8 +350,6 @@ namespace cs{
     size_t fieldsNumber = currentSmartTransactionPack_.transactions().at(0).user_field_ids().size();
     csdetails() << log_prefix << "transaction user fields = " << fieldsNumber;
     csdebug() << log_prefix << "==============================================> TRANSACTION SENT TO CONVEYER";
-
-    cslog() << "======================  SMART-ROUND " << smartRoundNumber_ << " END =====================";
   }
 
   void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
