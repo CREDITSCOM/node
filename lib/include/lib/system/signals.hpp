@@ -11,6 +11,9 @@
 #define emit
 
 namespace cs {
+using ObjectPointer = void*;
+
+// signal - slot controling entity
 class Connector;
 
 class ISignal {
@@ -28,7 +31,6 @@ public:
 }
 
 class IConnectable {
-  using Converter = void*;
 public:
   virtual ~IConnectable() {
     for (auto signal : signals_) {
@@ -57,7 +59,6 @@ class Signal<Return(InArgs...)> : public ISignal {
 public:
   using Argument = std::function<Return(InArgs...)>;
   using Signature = Return(InArgs...);
-  using ObjectPointer = void*;
   using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
@@ -160,7 +161,6 @@ class Signal<std::function<T>> : public ISignal {
 public:
   using Argument = std::function<T>;
   using Signature = T;
-  using ObjectPointer = void*;
   using Slots = std::vector<std::pair<ObjectPointer, Argument>>;
 
   ///
@@ -362,8 +362,6 @@ public:
 /// Signal - slot connection entity
 ///
 class Connector {
-  using ObjectPointer = void*;
-
   template <typename Object>
   static ObjectPointer checkConnection(const ISignal* signal, const Object& object, std::true_type) {
     IConnectable* connectable = static_cast<IConnectable*>(object);
@@ -548,7 +546,7 @@ private:
 
 // forward realization
 template <typename Object>
-void cshelper::ConnectorForwarder::disconnect(const ISignal* signal, const Object& object) {
+inline void cshelper::ConnectorForwarder::disconnect(const ISignal* signal, const Object& object) {
   cs::Connector::disconnect(signal, object);
 }
 
