@@ -95,6 +95,7 @@ private:
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
     bool isClosedSmart(const csdb::Transaction& transaction);
     void checkClosedSmart(const csdb::Transaction& transaction);
+    void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
 /*#ifdef MONITOR_NODE
     std::map<WalletData::Address, WriterData> writers_;
