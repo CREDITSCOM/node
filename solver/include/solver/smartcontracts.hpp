@@ -27,7 +27,23 @@ class Transaction;
 }
 
 namespace cs {
-// transactions user fields
+
+  // smart contract related error codes
+  namespace error
+  {
+    // timeout during operation
+    constexpr uint8_t TimeExpired = 1;
+    // insufficient funds to complete operation
+    constexpr uint8_t OutOfFunds = 2;
+    // std::exception thrown
+    constexpr uint8_t StdException = 3;
+    // other exception thrown
+    constexpr uint8_t Exception = 4;
+    // replenished contract does not implement payable()
+    constexpr uint8_t UnpayableReplenish = 5;
+  }
+
+  // transactions user fields
   namespace trx_uf
   {
     // deploy transaction fields
@@ -235,7 +251,7 @@ public signals:
   PayableSmartContractSignal signal_payable_timeout;
 
 public slots:
-  void on_execute_async_completed(const SmartExecutionData& data);
+  void on_execute_completed(const SmartExecutionData& data);
 
   // called when next block is stored
   void on_store_block(csdb::Pool block);
@@ -300,22 +316,30 @@ private:
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
     // max fee taken from contract starter transaction
-    csdb::Amount max_fee;
+    csdb::Amount avail_fee;
+    // new_state fee prediction
+    csdb::Amount new_state_fee;
     // current fee
-    csdb::Amount current_fee;
-    // 
+    csdb::Amount consumed_fee;
+    // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
 
-    QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Amount execution_fee_limit)
+    QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
       : contract(ref_contract)
       , status(SmartContractStatus::Waiting)
       , round_enqueue(0)
       , round_start(0)
       , round_finish(0)
       , abs_addr(absolute_address)
-      , max_fee(execution_fee_limit)
-      , current_fee(0)
-    {}
+      , consumed_fee(0)
+    {
+      avail_fee = csdb::Amount(tr_start.max_fee().to_double());
+      csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
+      avail_fee -= tr_start_fee;
+      // here new_state_fee prediction may be implemented, currently it is equal to starter fee
+      new_state_fee = tr_start_fee;
+      avail_fee -= new_state_fee;
+    }
 
     void wait(cs::RoundNumber r)
     {
@@ -421,7 +445,7 @@ private:
 
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
-  csdb::Transaction result_from_smart_ref(const SmartContractRef& contract, csdb::Amount fee) const;
+  csdb::Transaction create_new_state(const QueueItem& queue_item) const;
 
   // update in contracts table appropriate item's state
   bool update_contract_state(csdb::Transaction t);
