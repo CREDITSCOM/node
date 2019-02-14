@@ -78,16 +78,16 @@ public:
   }
 
   //Solver smarts consensus methods
-  void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
-  void gotSmartStageOne(cs::StageOneSmarts& stage);
-  void gotSmartStageTwo(cs::StageTwoSmarts& stage);
-  void gotSmartStageThree(cs::StageThreeSmarts& stage);
-  void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
-  void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
-  void getSmartResult(const cs::TransactionsPacket pack);
-  void refreshSmartStagesStorage();
-  void processStages();
-  bool stageOneEnough();
+  //void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
+  //void gotSmartStageOne(cs::StageOneSmarts& stage);
+  //void gotSmartStageTwo(cs::StageTwoSmarts& stage);
+  //void gotSmartStageThree(cs::StageThreeSmarts& stage);
+  //void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
+  //void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
+  //void getSmartResult(const cs::TransactionsPacket pack);
+  //void refreshSmartStagesStorage();
+  //void processStages();
+  //bool stageOneEnough();
 
   // TODO: requires revision
   const cs::PublicKey& getWriterPublicKey() const;
@@ -109,26 +109,28 @@ public:
   void gotStageThreeRequest(uint8_t requester, uint8_t required);
   void printStage3(const cs::StageThree& stage);
 
-  bool smartStageOneEnough();
-  bool smartStageTwoEnough();
-  bool smartStageThreeEnough();
-  cs::Sequence smartRoundNumber();
-  uint8_t calculateSmartsConfNum();
-  uint8_t ownSmartsConfidantNumber();
-  void createFinalTransactionSet();
-  bool smartConfidantExist(uint8_t);
-  void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
+  void removeDeferredBlock();
+
+  //bool smartStageOneEnough();
+  //bool smartStageTwoEnough();
+  //bool smartStageThreeEnough();
+  //cs::Sequence smartRoundNumber();
+  //uint8_t calculateSmartsConfNum();
+  //uint8_t ownSmartsConfidantNumber();
+  //void createFinalTransactionSet();
+  //bool smartConfidantExist(uint8_t);
+  //void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
   size_t trueStagesThree();
   size_t stagesThree();
   bool stateFailed(Result res);
 
-  void requestSmartStages(int st);
-  void requestSmartStagesNeighbors(int st);
-  void markSmartOutboundNodes();
-  cs::PublicKeys smartConfidants(cs::PublicKey smartKey);
+  //void requestSmartStages(int st);
+  //void requestSmartStagesNeighbors(int st);
+  //void markSmartOutboundNodes();
+  //cs::PublicKeys smartConfidants(cs::PublicKey smartKey);
 
 
-  const std::vector<cs::PublicKey>& smartConfidants() const;
+  //const std::vector<cs::PublicKey>& smartConfidants() const;
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -238,8 +240,8 @@ private:
   void killTimer(int st);
   void fakeStage(uint8_t confIndex);
 
-  template<class T>
-  bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
+  //template<class T>
+  //bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
 
   // timeout tracking
 

@@ -513,11 +513,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     // create storage hash table and remove from current hash table
     hashTable.emplace(hash, std::move(packet));
   }
-  Hash pkHash = cscrypto::calculateHash(pKeys.data(), pKeys.size());
-  Hash comHash = cscrypto::calculateHash(commisions.data(), commisions.size());
-
-  csdebug() << "Block PublicKeys Hash = " << cs::Utils::byteStreamToHex(pkHash.data(), pkHash.size());
-  csdebug() << "Commisions       Hash = " << cs::Utils::byteStreamToHex(comHash.data(), comHash.size());
   // remove current hashes from table
   removeHashesFromTable(localHashes);
 

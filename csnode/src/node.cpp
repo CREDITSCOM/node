@@ -1346,6 +1346,13 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     return;
   }
 
+  //to remove ->
+  auto& confs = cs::Conveyer::instance().confidants();
+  if (std::find(confs.cbegin(), confs.cend(), sender) == confs.cbegin()) {
+      return;
+   }
+  //<- to remove
+
   csdebug() << "NODE> getting stage-2 from " << getSenderText(sender);
 
   istream_.init(data, size);
@@ -1535,6 +1542,10 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 
   if (!conveyer.isConfidantExists(requesterNumber) ||
       requester != conveyer.confidantByIndex(requesterNumber)) {
+    return;
+  }
+  
+  if (!conveyer.isConfidantExists(requiredNumber)) {
     return;
   }
 
