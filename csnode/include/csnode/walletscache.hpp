@@ -86,7 +86,8 @@ private:
     void load(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     double load(const csdb::Transaction& tr, const BlockChain& blockchain);
     double loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain);
-    void fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants);
+    void fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants,
+                                      const std::vector<uint8_t>& realTrusted);
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
