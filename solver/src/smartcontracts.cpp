@@ -360,7 +360,9 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
   }
 
   cslog() << std::endl << log_prefix << "enqueue " << get_executed_method(new_item) << std::endl;
-  exe_queue.emplace_back(QueueItem(new_item, abs_addr, t)).wait(new_item.sequence);
+  auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
+  queue_item.wait(new_item.sequence);
+  queue_item.consumed_fee += smart_round_fee(block); // taling costs of initial round
   test_exe_queue();
 }
 
@@ -410,7 +412,7 @@ void SmartContracts::test_exe_queue() {
     }
     csdebug() << log_prefix << "set running status to next contract in queue";
     clear_emitted_transactions(next->abs_addr); // insurance
-    next->start( bc.getLastSequence()); // use blockchain based round counting
+    next->start(bc.getLastSequence()); // use blockchain based round counting
     if (!invoke_execution(next->contract)) {
       remove_from_queue(next);
     }
