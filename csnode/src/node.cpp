@@ -159,9 +159,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   auto cachedRound = conveyer.currentRoundNumber();
 
   // update round data
-  conveyer.setRound(rNum);
   recdBangs[rNum] = subRound_;
-  cs::Conveyer::instance().setRound(rNum);
 
   cs::Hash lastBlockHash;
   istream_ >> lastBlockHash;
@@ -1623,8 +1621,6 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
   stream << stageOneInfo.smartAddress;
-  stream << stageOneInfo.fee.integral();
-  stream << stageOneInfo.fee.fraction();
   stream << stageOneInfo.hash;
 
   // hash of message
@@ -1641,7 +1637,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload
-    stageOneInfo.sRoundNum, stageOneInfo.signature, message);
+    stageOneInfo.sRoundNum, stageOneInfo.signature, message, stageOneInfo.fee.integral(), stageOneInfo.fee.fraction());
 
   // cache
   stageOneInfo.message = std::move(message);
@@ -1658,9 +1654,12 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   cs::StageOneSmarts stage;
   istream_ >> stage.sRoundNum >> stage.signature;
 
+  int32_t fee_integral = 0;
+  uint64_t fee_fraction = 0;
   cs::Bytes bytes;
   istream_ >> bytes;
-
+  istream_ >> fee_integral;
+  istream_ >> fee_fraction;
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad Smart Stage One packet format";
     return;
@@ -1675,17 +1674,15 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   signedStream << stage.sRoundNum;
   signedStream << stage.messageHash;
 
-  uint32_t fee_integral = 0;
-  uint64_t fee_fraction = 0;
+
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
   stream >> stage.smartAddress;
-  stream >> fee_integral;
-  stream >> fee_fraction;
-  stream >> stage.hash;
-  csdb::Amount fee(fee_integral,fee_fraction);
-  stage.fee += fee;
+    stream >> stage.hash;
+  csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
+  csdebug() << "MsgHash: fee constructed: " << fee.to_string();
+  stage.fee = fee;
 
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] (" 
@@ -2164,6 +2161,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     return;
   }
 
+  //TODO: here shoud be placed the DPOS check 
   csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
   istream_.init(data, size);
