@@ -22,7 +22,6 @@ namespace cs{
 
   SmartConsensus::~SmartConsensus() {
     cslog() << "======================  SMART-ROUND " << smartRoundNumber_ << " END =====================";
-
     pnode_->removeSmartConsensus(this->smartAddress_);
     cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
