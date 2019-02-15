@@ -373,6 +373,11 @@ private:
 		  pconsensus = std::make_unique<SmartConsensus>();
 		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
 	  }
+
+    bool is_trusted() const
+    {
+      return (bool) pconsensus;
+    }
   };
 
   // executiom queue

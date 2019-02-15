@@ -39,10 +39,10 @@ namespace cs{
     psmarts_ = smarts;
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
-	  csdb::Address contract_addr;
+	  csdb::Address abs_addr;
     for (const auto& tr : pack.transactions()) {
       if (SmartContracts::is_new_state(tr)) {
-        contract_addr = tr.source();
+        abs_addr = smarts->absolute_address(tr.source());
         csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
         if (fld.is_valid()) {
           SmartContractRef ref(fld);
@@ -53,7 +53,7 @@ namespace cs{
         break;
       }
     }
-    if (0 == smartRoundNumber_ || !contract_addr.is_valid()) {
+    if (0 == smartRoundNumber_ || !abs_addr.is_valid()) {
       cserror() << log_prefix << "smart contract result packet must contain new state transaction";
       return false;
     }
@@ -74,13 +74,13 @@ namespace cs{
     currentSmartTransactionPack_.makeHash();
     auto tmp = currentSmartTransactionPack_.hash().toBinary();
     std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
-    st1.smartAddress = contract_addr.public_key();
+    st1.smartAddress = smartAddress_ = abs_addr.public_key();
     // signals subscription
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
     cs::Connector::connect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
     cs::Connector::connect(&pnode_->receivedSmartStageRequest, this, &cs::SmartConsensus::gotSmartStageRequest);
-    pnode_->addSmartConsensus(st1.smartAddress);
+    pnode_->addSmartConsensus(smartAddress_);
     st1.sender = ownSmartsConfNum_;
     st1.sRoundNum = smartRoundNumber_;
     addSmartStageOne(st1, true);

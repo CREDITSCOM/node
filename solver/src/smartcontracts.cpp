@@ -619,7 +619,7 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
               << " blocks (from #," << item.round_start << "), remove it without transaction";
             item.close();
           }
-          else if (delta > Consensus::MaxRoundsCloseContract) {
+          else if (item.is_trusted() && delta > Consensus::MaxRoundsCloseContract) {
             cslog() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCloseContract
               << " blocks (from #," << item.round_start << "), cancel it";
             SmartExecutionData data;
