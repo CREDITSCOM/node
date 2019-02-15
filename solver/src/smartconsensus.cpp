@@ -336,25 +336,14 @@ namespace cs{
   //TODO: finalize the function 
   csdb::Amount SmartConsensus::calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount) {
     csdb::Amount fee{0};
-    csdebug() << "Fee 1 = " << fee.to_string(17);
-    csdebug() << "Fee 2 = " << finalFee.to_string(17);
     uint32_t trustedNumber = static_cast<uint32_t> (realTrustedAmount);
     fee += finalFee;
-    csdebug() << "Fee 3 = " << fee.to_string(17);
     fee /= (trustedNumber * trustedNumber);
-    csdebug() << "Fee 4 = " << fee.to_string(17);
-    fee /= 1000;
-    csdebug() << "Fee 5 = " << fee.to_string(17);
-    fee *= 1000;
+    //csdebug() << "Fee 4 = " << fee.to_string(17);
+    //fee /= 1000;
+    //csdebug() << "Fee 5 = " << fee.to_string(17);
+    fee = fee * static_cast<int32_t>(realTrustedAmount); // the overloaded operator *= doesn't work correct
     csdebug() << "Final fee = " << fee.to_string(17);
-    //uint64_t fract = fee.fraction();
-    //uint64_t divider = 10;
-    //uint32_t meaningSigns = 4;
-    //uint32_t fRange = 0;
-    //while (fract!=0) {
-    //  fract/= divider;
-    //  ++fRange;
-    //}
     return fee;
   }
 

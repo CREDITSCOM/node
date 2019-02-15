@@ -1679,12 +1679,10 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
   stream >> stage.smartAddress;
-  csdebug() << "MsgHash: fee got: integral = " << fee_integral << ", fraction = " << fee_fraction;
-  stream >> stage.hash;
- // csdb::Amount fee{fee_integral,fee_fraction};
-  csdebug() << "MsgHash: fee constructed";
-  //stage.fee = fee;
-  csdebug() << "MsgHash: fee applied";
+    stream >> stage.hash;
+  csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
+  csdebug() << "MsgHash: fee constructed: " << fee.to_string();
+  stage.fee = fee;
 
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] (" 
