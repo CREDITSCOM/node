@@ -53,13 +53,16 @@ namespace cs {
       //void getSmartResult(const cs::TransactionsPacket pack);
       void refreshSmartStagesStorage();
       void processStages();
+      csdb::Amount calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount);
+
 
       bool smartStageOneEnough();
       bool smartStageTwoEnough();
       bool smartStageThreeEnough();
       cs::Sequence smartRoundNumber();
 
-      void createFinalTransactionSet();
+      void createFinalTransactionSet(const csdb::Amount finalFee);
+      void sendFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
       void gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
         , uint8_t requesterNumber, uint8_t requiredNumber, cs::PublicKey& requester);
@@ -87,6 +90,8 @@ namespace cs {
       std::vector<cs::PublicKey> smartConfidants_;
       uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
       cs::TransactionsPacket currentSmartTransactionPack_;
+      cs::TransactionsPacket finalSmartTransactionPack_;
+      csdb::Transaction tmpNewState_;
       cs::StageOneSmarts st1;
       cs::StageTwoSmarts st2;
       cs::StageThreeSmarts st3;

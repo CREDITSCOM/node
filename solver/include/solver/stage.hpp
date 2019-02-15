@@ -65,6 +65,7 @@ struct StageOneSmarts {
   uint8_t sender;
   cs::Sequence sRoundNum;
   cs::PublicKey smartAddress;
+  csdb::Amount fee;
   Hash hash;
   Hash messageHash;
   Signature signature;
