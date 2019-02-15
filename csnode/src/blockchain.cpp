@@ -382,6 +382,11 @@ void BlockChain::removeLastBlock() {
     return;
   }
 
+  if (pool.sequence() == 0) {
+    csmeta(cswarning) << "Attempt to remove Genesis block !!!!!";
+    return;
+  }
+
   const auto lastHash = blockHashes_->getLast();
   const csdb::PoolHash poolHash = pool.hash();
 
@@ -493,37 +498,36 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
   if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
-    csdebug() << "The  pool #" << pool.sequence() << " doesn't contain signatures";
+     csmeta(csdebug) << "The pool #" << pool.sequence() << " doesn't contain signatures";
     return false;
   }
 
   if (signatures.size() < confidants.size() / 2U + 1U && !isTrusted && pool.sequence() != 0) {
-    csdebug() << "The number of signatures is insufficient";
+     csmeta(csdebug) << "The number of signatures is insufficient";
     return false;
   }
 
   size_t truePoolSignatures = 0;
-  csdebug() << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
-  csdebug() << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
-  csdebug() << "Pool: " << cs::Utils::byteStreamToHex(pool.to_binary().data(),pool.to_binary().size());
+  csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
+  csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
   for (auto& it : signatures) {
     const std::size_t idx = static_cast<std::size_t>(it.first);
     if (idx < confidants.size()) {
       if (cscrypto::verifySignature(it.second, confidants.at(idx), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
-        csdebug() << "The confidant #" << idx << " signature is valid";
+        csmeta(csdebug) << "The confidant #" << idx << " signature is valid";
         ++truePoolSignatures;
       }
       else {
-        cserror() << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is NOT VALID";
+        csmeta(cserror) << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is NOT VALID";
       }
     }
     else {
-      cserror() << "The number of confidants in pool doesn't correspond the indexes of the signatures";
+      csmeta(cserror) << "The number of confidants in pool doesn't correspond the indexes of the signatures";
       return false;
     }
   }
   if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
-    csdebug() << "The number of signatures is sufficient and all of them are OK!";
+    csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
   }
   else {
     cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";

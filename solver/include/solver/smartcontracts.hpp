@@ -32,15 +32,15 @@ namespace cs {
   namespace error
   {
     // timeout during operation
-    constexpr uint8_t TimeExpired = 1;
+    constexpr uint8_t TimeExpired = 254;
     // insufficient funds to complete operation
-    constexpr uint8_t OutOfFunds = 2;
+    constexpr uint8_t OutOfFunds = 253;
     // std::exception thrown
-    constexpr uint8_t StdException = 3;
+    constexpr uint8_t StdException = 252;
     // other exception thrown
-    constexpr uint8_t Exception = 4;
+    constexpr uint8_t Exception = 251;
     // replenished contract does not implement payable()
-    constexpr uint8_t UnpayableReplenish = 5;
+    constexpr uint8_t UnpayableReplenish = 250;
   }
 
   // transactions user fields
@@ -373,6 +373,11 @@ private:
 		  pconsensus = std::make_unique<SmartConsensus>();
 		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
 	  }
+
+    bool is_trusted() const
+    {
+      return (bool) pconsensus;
+    }
   };
 
   // executiom queue

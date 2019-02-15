@@ -8,6 +8,10 @@
 
 using namespace std;
 
+namespace {
+const uint8_t kUntrustedMarker = 255;
+} // namespace
+
 namespace cs {
 void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress) {
   walletAddress = address.public_key();
@@ -148,7 +152,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 #endif
 
   if (totalAmountOfCountedFee > 0) {
-    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants);
+    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, pool.realTrusted());
   }
 
   [[maybe_unused]] auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
@@ -168,22 +172,31 @@ bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& addre
 }
 #endif
 
-void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants) {
+void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants,
+                                                               const std::vector<uint8_t>& realTrusted) {
   if (!confidants.size()) {
     cslog() << "WALLETS CACHE>> NO CONFIDANTS";
     return;
   }
-  double feeToEachConfidant = totalFee / confidants.size();
-  for (size_t i = 0; i < confidants.size(); ++i) {
-    WalletId confidantId{};
-    csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
-    if (!findWalletId(confidantAddress, confidantId)) {
-      cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
-      return;
+  size_t realTrustedNumber = 0;
+  for (const auto& trustedMarker : realTrusted) {
+    if (trustedMarker != kUntrustedMarker) {
+      ++realTrustedNumber; 
     }
-    WalletData& walletData = getWalletData(confidantId, confidantAddress);
-    walletData.balance_ += feeToEachConfidant;
-    setModified(confidantId);
+  }
+  double feeToEachConfidant = totalFee / realTrustedNumber;
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
+      WalletId confidantId{};
+      csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
+      if (!findWalletId(confidantAddress, confidantId)) {
+        cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
+        return;
+      }
+      WalletData& walletData = getWalletData(confidantId, confidantAddress);
+      walletData.balance_ += feeToEachConfidant;
+      setModified(confidantId);
+    }
   }
 }
 
@@ -207,18 +220,27 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
     return;
   }
   const ConfidantsKeys& confidants = pool.confidants();
-  csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()
-                                    / static_cast<int32_t>(confidants.size()); // csdb::Amount operator/
-  for (size_t i = 0; i < confidants.size(); ++i) {
-    WalletId confidantId{};
-    csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
-    if (!findWalletId(confidantAddress, confidantId)) {
-      cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
-      return;
+  const std::vector<uint8_t>& realTrusted = pool.realTrusted();
+  int32_t realTrustedNumber = 0; // int32_t due to csdb::Amount operator/
+  for (const auto& trustedMarker : realTrusted) {
+    if (trustedMarker != kUntrustedMarker) {
+      ++realTrustedNumber;
     }
-    WalletData& walletData = getWalletData(confidantId, confidantAddress);
-    walletData.balance_ += feeToEachConfidant;
-    setModified(confidantId);
+  }
+  csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()
+                                  / realTrustedNumber;
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
+      WalletId confidantId{};
+      csdb::Address confidantAddress = csdb::Address::from_public_key(confidants[i]);
+      if (!findWalletId(confidantAddress, confidantId)) {
+        cserror() << "Cannot find confidant wallet, source is " << confidantAddress.to_string();
+        return;
+      }
+      WalletData& walletData = getWalletData(confidantId, confidantAddress);
+      walletData.balance_ += feeToEachConfidant;
+      setModified(confidantId);
+    }
   }
 }
 
@@ -273,7 +295,6 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   if (!smartIniter) {
   wallData.balance_ -= tr.amount();
-  wallData.trxTail_.push(tr.innerID());
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
@@ -285,6 +306,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #endif
   }
 
+  wallData.trxTail_.push(tr.innerID());
   setModified(id);
   return tr.counted_fee().to_double();
 }

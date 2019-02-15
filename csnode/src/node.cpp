@@ -1621,6 +1621,8 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
   stream << stageOneInfo.smartAddress;
+  stream << stageOneInfo.fee.integral();
+  stream << stageOneInfo.fee.fraction();
   stream << stageOneInfo.hash;
 
   // hash of message
@@ -1671,11 +1673,17 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   signedStream << stage.sRoundNum;
   signedStream << stage.messageHash;
 
+  uint32_t fee_integral = 0;
+  uint64_t fee_fraction = 0;
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
   stream >> stage.smartAddress;
+  stream >> fee_integral;
+  stream >> fee_fraction;
   stream >> stage.hash;
+  csdb::Amount fee(fee_integral,fee_fraction);
+  stage.fee += fee;
 
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] (" 
