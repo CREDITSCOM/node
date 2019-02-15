@@ -739,7 +739,7 @@ bool SmartContracts::execute_payable(const std::string& invoker, const std::stri
   a1.__set_v_string(std::string("1"));
   payable.params.push_back(a1);
 
-  csdebug() << log_prefix << "execute " << PayableName << "(" << PayableNameArg0 << " = " << amount << ", " << PayableNameArg1 << " = 1)";
+  csdebug() << log_prefix << "execute " << PayableName << "(" << PayableNameArg0 << " = " << os0.str() << ", " << PayableNameArg1 << " = 1)";
   return execute(invoker, smart_address, payable, data, timeout_ms);
 }
 
@@ -815,14 +815,14 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
         // after deploy should call to payable() if tr_amount > 0,
         // contract has already been pre-registered and payable method is checked:
         if (deploy && tr_amount > std::numeric_limits<double>::epsilon()) {
-          if (!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
+          if (!is_payable) {
+            data.ret_val.__set_v_byte(error::UnpayableReplenish);
+            data.error = "deployed contract does not implement payable() while transaction amount > 0";
+          }
+          else if (!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
             if (data.error.empty()) {
               data.error = "failed to execute payable() after deployment";
             }
-          }
-          else if (!is_payable) {
-            data.ret_val.__set_v_byte(error::UnpayableReplenish);
-            data.error = "deployed contract does not implement payable() while transaction amount > 0";
           }
         }
       }
@@ -865,7 +865,7 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
 
   cs::TransactionsPacket packet;
   if (!data.error.empty()) {
-    cserror() << log_prefix << data.error;
+    cserror() << std::endl << log_prefix << data.error << std::endl;
     // result contains empty USRFLD[state::Value]
     result.add_user_field(trx_uf::new_state::Value, std::string{});
     // result contains error code from ret_val
@@ -923,7 +923,7 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
   }
 
   csdb::Transaction result(
-      wallData.trxTail_.getLastTransactionId() + 1,
+    wallData.trxTail_.empty() ? 1 : wallData.trxTail_.getLastTransactionId() + 1, // see: APIHandler::WalletDataGet(...) in apihandler.cpp
       src.target(),     // contracts is source
       src.target(),     // contracts is target also
       src.currency(),

@@ -295,7 +295,6 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
   if (!smartIniter) {
   wallData.balance_ -= tr.amount();
-  wallData.trxTail_.push(tr.innerID());
 
 #ifdef MONITOR_NODE
   ++wallData.transNum_;
@@ -307,6 +306,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #endif
   }
 
+  wallData.trxTail_.push(tr.innerID());
   setModified(id);
   return tr.counted_fee().to_double();
 }
