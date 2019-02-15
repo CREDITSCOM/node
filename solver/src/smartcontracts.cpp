@@ -330,7 +330,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     // test duplicated contract call
     if (it != exe_queue.cend()) {
       cserror() << log_prefix << "attempt to queue duplicated contract transaction, already queued on round #"
-                << it->round_enqueue;
+                << it->seq_enqueue;
       return;
     }
   }
@@ -387,6 +387,11 @@ void SmartContracts::on_new_state(csdb::Pool block, size_t trx_idx) {
         update_contract_state(new_state);
         remove_from_queue(contract_ref);
       }
+      csdb::UserField fld_fee = new_state.user_field(trx_uf::new_state::Fee);
+      if (fld_fee.is_valid()) {
+        cslog() << log_prefix << "contract execution fee " << fld_fee.value<csdb::Amount>().to_double();
+        cslog() << log_prefix << "contract new state fee " << new_state.counted_fee().to_double();
+      }
     }
   }
 
@@ -413,7 +418,7 @@ void SmartContracts::test_exe_queue() {
     csdebug() << log_prefix << "set running status to next contract in queue";
     clear_emitted_transactions(next->abs_addr); // insurance
     next->start(bc.getLastSequence()); // use blockchain based round counting
-    if (!invoke_execution(next->contract)) {
+    if (!invoke_execution(next->ref_start)) {
       remove_from_queue(next);
     }
   }
@@ -606,7 +611,7 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
         if(item.avail_fee - item.consumed_fee <= item.new_state_fee) {
           cswarning() << log_prefix << "contract is out of fee, cancel it";
           SmartExecutionData data;
-          data.contract_ref = item.contract;
+          data.contract_ref = item.ref_start;
           data.error = "contract execution is out of funds";
           data.ret_val.__set_v_byte(error::OutOfFunds);
           on_execute_completed(data);
@@ -614,18 +619,18 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
         }
         // round-based timeout
         const auto seq = block.sequence();
-        if (seq > item.round_start) {
-          size_t delta = seq - item.round_start;
+        if (seq > item.seq_start) {
+          size_t delta = seq - item.seq_start;
           if (delta > Consensus::MaxRoundsCancelContract) {
             cswarning() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCancelContract
-              << " blocks (from #," << item.round_start << "), remove it without transaction";
+              << " blocks (from #," << item.seq_start << "), remove it without transaction";
             item.close();
           }
-          else if (item.is_trusted() && delta > Consensus::MaxRoundsCloseContract) {
+          else if (item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsCloseContract && item.is_trusted()) {
             cslog() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCloseContract
-              << " blocks (from #," << item.round_start << "), cancel it";
+              << " blocks (from #," << item.seq_start << "), cancel it";
             SmartExecutionData data;
-            data.contract_ref = item.contract;
+            data.contract_ref = item.ref_start;
             data.error = "contract execution timeout";
             data.ret_val.__set_v_byte(error::TimeExpired);
             on_execute_completed(data);
@@ -634,7 +639,7 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
         }
         // if item has just been closed:
         if(item.status == SmartContractStatus::Closed) {
-          csdb::Transaction starter = get_transaction(item.contract);
+          csdb::Transaction starter = get_transaction(item.ref_start);
           if(starter.is_valid()) {
             emit signal_payable_timeout(starter);
           }
@@ -656,7 +661,7 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   if(it != exe_queue.cbegin()) {
     cswarning() << log_prefix << "completed contract is not at the top of queue";
   }
-  cslog() << std::endl << log_prefix << "remove from queue completed " << get_executed_method(it->contract) << std::endl;
+  cslog() << std::endl << log_prefix << "remove from queue completed " << get_executed_method(it->ref_start) << std::endl;
 
   clear_emitted_transactions(it->abs_addr);
   exe_queue.erase(it);
@@ -913,7 +918,7 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
 }
 
 csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) const {
-  csdb::Transaction src = get_transaction(queue_item.contract);
+  csdb::Transaction src = get_transaction(queue_item.ref_start);
   if (!src.is_valid()) {
     return csdb::Transaction{};
   }
@@ -935,9 +940,10 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
       SolverContext::zeroSignature // empty signature
   );
   // USRFLD1 - ref to start trx
-  result.add_user_field(trx_uf::new_state::RefStart, queue_item.contract.to_user_field());
+  result.add_user_field(trx_uf::new_state::RefStart, queue_item.ref_start.to_user_field());
   // USRFLD2 - total fee
   result.add_user_field(trx_uf::new_state::Fee, queue_item.consumed_fee);
+  cslog() << log_prefix << "new_state fee " << result.counted_fee().to_double() << ", contract execution fee " << queue_item.consumed_fee.to_double();
   return result;
 }
 
@@ -1183,8 +1189,8 @@ csdb::Amount SmartContracts::smart_round_fee(csdb::Pool block)
   //}
   // see fee.cpp:
   constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
-  double cnt = kMinFee * std::max((size_t) Consensus::MinTrustedNodes, block.confidants().size());
-  return csdb::Amount( kMinFee * cnt );
+  size_t cnt = kMinFee * std::max((size_t) Consensus::MinTrustedNodes, block.confidants().size());
+  return csdb::Amount( kMinFee * (double) cnt );
 }
 
 }  // namespace cs
