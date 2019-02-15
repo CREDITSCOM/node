@@ -41,12 +41,12 @@ namespace cs{
     psmarts_ = smarts;
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
-	  csdb::Address contract_addr;
+	  csdb::Address abs_addr;
     cs::TransactionsPacket tmpPacket;
 
     for (const auto& tr : pack.transactions()) {
       if (SmartContracts::is_new_state(tr)) {
-        contract_addr = smarts->absolute_address(tr.source());
+        abs_addr = smarts->absolute_address(tr.source());
 
         csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
         if (fld.is_valid()) {
@@ -81,7 +81,7 @@ namespace cs{
       }
       
     }
-    if (0 == smartRoundNumber_ || !contract_addr.is_valid()) {
+    if (0 == smartRoundNumber_ || !abs_addr.is_valid()) {
       cserror() << log_prefix << "smart contract result packet must contain new state transaction";
       return false;
     }
