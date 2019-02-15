@@ -163,7 +163,7 @@ public:
 
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
-  void setTransactionsFees(csdb::Pool pool);
+  void setTransactionsFees(csdb::Pool& pool);
 
   const csdb::Storage& getStorage() const;
 
