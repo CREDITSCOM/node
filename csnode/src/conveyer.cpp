@@ -169,6 +169,8 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
       --cachedRound;
     }
 
+    pimpl_->currentRound = table.round;
+
     if (pimpl_->metaStorage.contains(table.round)) {
       cserror() << csname() << "Round table updation failed";
     }
