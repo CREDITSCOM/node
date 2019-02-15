@@ -42,6 +42,7 @@ namespace cs{
     smartConfidants_.clear();
     smartRoundNumber_ = 0;
 	  csdb::Address abs_addr;
+    csdb::Amount executor_fee{0};
     cs::TransactionsPacket tmpPacket;
 
     for (const auto& tr : pack.transactions()) {
@@ -57,7 +58,7 @@ namespace cs{
         }
         csdb::UserField fld2 = tr.user_field(trx_uf::new_state::Fee);
         if (fld2.is_valid()) {
-           st1.fee = fld2.value<csdb::Amount>();
+          executor_fee += fld2.value<csdb::Amount>();
         }
         //break;
         //creating fee free copy of state transaction
@@ -95,7 +96,7 @@ namespace cs{
 
     cslog() << "======================  SMART-ROUND: " << smartRoundNumber_ << " [" << static_cast<int>(ownSmartsConfNum_)
       << "] =========================";
-    csdebug() << log_prefix << "SMART confidants (" << smartConfidants_.size() << "):";
+    csdebug() << log_prefix << "SMART confidants (" << smartConfidants_.size() << "), proposed fee: " << executor_fee.to_string(18);
 
     //pack_.transactions(0).user_field(1) = 0;
 
@@ -105,6 +106,7 @@ namespace cs{
     auto tmp = tmpPacket.hash().toBinary();
     std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
     st1.smartAddress = smartAddress_ = abs_addr.public_key();
+    st1.fee = executor_fee;
     // signals subscription
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -333,18 +335,26 @@ namespace cs{
   }
   //TODO: finalize the function 
   csdb::Amount SmartConsensus::calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount) {
-    csdb::Amount fee(0,2);
+    csdb::Amount fee{0};
+    csdebug() << "Fee 1 = " << fee.to_string(17);
+    csdebug() << "Fee 2 = " << finalFee.to_string(17);
     uint32_t trustedNumber = static_cast<uint32_t> (realTrustedAmount);
     fee += finalFee;
+    csdebug() << "Fee 3 = " << fee.to_string(17);
     fee /= (trustedNumber * trustedNumber);
-    uint64_t fract = fee.fraction();
-    uint64_t divider = 10;
-    uint32_t meaningSigns = 4;
-    uint32_t fRange = 0;
-    while (fract!=0) {
-      fract/= divider;
-      ++fRange;
-    }
+    csdebug() << "Fee 4 = " << fee.to_string(17);
+    fee /= 1000;
+    csdebug() << "Fee 5 = " << fee.to_string(17);
+    fee *= 1000;
+    csdebug() << "Final fee = " << fee.to_string(17);
+    //uint64_t fract = fee.fraction();
+    //uint64_t divider = 10;
+    //uint32_t meaningSigns = 4;
+    //uint32_t fRange = 0;
+    //while (fract!=0) {
+    //  fract/= divider;
+    //  ++fRange;
+    //}
     return fee;
   }
 
