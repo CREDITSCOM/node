@@ -400,6 +400,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
 
+  if (myLevel_ == Level::Confidant) {
+    csdebug() << "We probably don't have enouch confirmations so we try to throw our last deferred block";
+    solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
+  }
+
   csdebug() << "Trying to get confidants from round " << round;
   const auto table = conveyer.roundTable(round);
 
@@ -1647,7 +1652,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
   //csmeta(csdetails) << "started";
   csdebug() << __func__ << ": starting";
-  csdetails() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
+  //csdetails() << "Get Smart Stage One Message(recover): " << cs::Utils::byteStreamToHex(data, size);
 
   istream_.init(data, size);
 
@@ -1664,7 +1669,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     cserror() << "Bad Smart Stage One packet format";
     return;
   }
-
+  csdebug() << __func__ << ": starting #" << stage.sRoundNum;
   // hash of part received message
   stage.messageHash = cscrypto::calculateHash(bytes.data(), bytes.size());
   //csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
@@ -1681,7 +1686,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   stream >> stage.smartAddress;
     stream >> stage.hash;
   csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
-  csdebug() << "MsgHash: fee constructed: " << fee.to_string();
+  csdebug() << "Fee constructed: " << fee.to_string();
   stage.fee = fee;
   csdebug() << "StageHash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
