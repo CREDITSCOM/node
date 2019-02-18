@@ -256,7 +256,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       break;
     case Result::Failure:
       cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
-      removeDeferredBlock();
+      removeDeferredBlock(deferredBlock_.sequence());
       handleTransitions(Event::SetNormal);
       break;
   }

@@ -400,6 +400,11 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
 
+  if (myLevel_ == Level::Confidant) {
+    csdebug() << "We probably don't have enouch confirmations so we try to throw our last deferred block";
+    solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
+  }
+
   csdebug() << "Trying to get confidants from round " << round;
   const auto table = conveyer.roundTable(round);
 
