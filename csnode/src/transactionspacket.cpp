@@ -99,7 +99,8 @@ TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t s
 
 TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
 : m_hash(std::move(packet.m_hash))
-, m_transactions(std::move(packet.m_transactions)) {
+, m_transactions(std::move(packet.m_transactions))
+, m_signatures(std::move(packet.m_signatures)){
   packet.m_hash = TransactionsPacketHash();
   packet.m_transactions.clear();
 }
@@ -157,14 +158,17 @@ bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
 }
 
 bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature& signature) {
-  for (auto& it : m_signatures) {
-    if (it.first == index) {
-      return false;
-    }
+  auto iter = std::find_if(m_signatures.begin(), m_signatures.end(), [&](const auto& element) {
+    return index == element.first;
+  });
+
+  if (iter != m_signatures.end()) {
+    return false;
   }
-  m_signatures.emplace_back(std::make_pair(index,signature));
+
+  m_signatures.push_back(std::make_pair(index, signature));
   return true;
- }
+}
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
   return m_signatures;
@@ -246,7 +250,7 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
       return false;
     }
 
-    m_signatures.emplace_back(std::make_pair(index, signature));
+    m_signatures.push_back(std::make_pair(index, signature));
   }
 
   return true;
