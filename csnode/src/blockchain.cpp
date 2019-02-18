@@ -1151,7 +1151,7 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
   }
 }
 
-void BlockChain::setTransactionsFees(csdb::Pool pool) {
+void BlockChain::setTransactionsFees(csdb::Pool& pool) {
   if (fee_) {
     fee_->CountFeesInPool(*this, &pool);
   }

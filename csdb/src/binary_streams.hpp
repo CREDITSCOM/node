@@ -108,14 +108,14 @@ typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value, vo
 inline obstream::put(T value)
 {
   buffer_.insert(buffer_.end(), reinterpret_cast<uint8_t *>(&value),
-    reinterpret_cast<uint8_t *>(&value) + sizeof(value));
+  reinterpret_cast<uint8_t *>(&value) + sizeof(value));
 }
 
 template<typename T>
 decltype(std::declval<T>().put(std::declval<obstream&>()))
 inline obstream::put(const T& value)
 {
-	value.put(*this);
+  value.put(*this);
 }
 
 template<typename T>

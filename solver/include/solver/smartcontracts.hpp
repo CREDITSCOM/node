@@ -304,15 +304,15 @@ private:
 
   struct QueueItem {
     // reference to smart in blockchain (block/transaction) that spawns execution
-    SmartContractRef contract;
+    SmartContractRef ref_start;
     // current status (running/waiting)
     SmartContractStatus status;
     // enqueue round
-    cs::RoundNumber round_enqueue;
+    cs::Sequence seq_enqueue;
     // start round
-    cs::RoundNumber round_start;
+    cs::Sequence seq_start;
     // finish round
-    cs::RoundNumber round_finish;
+    cs::Sequence seq_finish;
     // smart contract wallet/pub.key absolute address
     csdb::Address abs_addr;
     // max fee taken from contract starter transaction
@@ -325,11 +325,11 @@ private:
     std::unique_ptr<SmartConsensus> pconsensus;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-      : contract(ref_contract)
+      : ref_start(ref_contract)
       , status(SmartContractStatus::Waiting)
-      , round_enqueue(0)
-      , round_start(0)
-      , round_finish(0)
+      , seq_enqueue(0)
+      , seq_start(0)
+      , seq_finish(0)
       , abs_addr(absolute_address)
       , consumed_fee(0)
     {
@@ -343,21 +343,21 @@ private:
 
     void wait(cs::RoundNumber r)
     {
-      round_enqueue = r;
+      seq_enqueue = r;
       status = SmartContractStatus::Waiting;
       csdebug() << "Smart: contract is waiting from #" << r;
     }
 
     void start(cs::RoundNumber r)
     {
-      round_start = r;
+      seq_start = r;
       status = SmartContractStatus::Running;
       csdebug() << "Smart: contract is running from #" << r;
     }
 
     void finish(cs::RoundNumber r)
     {
-      round_finish = r;
+      seq_finish = r;
       status = SmartContractStatus::Finished;
       csdebug() << "Smart: contract is finished on #" << r;
     }
@@ -396,7 +396,7 @@ private:
   {
     auto it = exe_queue.begin();
     for (; it != exe_queue.end(); ++it) {
-      if (it->contract == item) {
+      if (it->ref_start == item) {
         break;
       }
     }
