@@ -104,11 +104,11 @@ private:
     static std::mt19937 generator(randomDevice());
 
     if constexpr (std::is_integral_v<T>) {
-      static std::uniform_int_distribution<> dist(min, max);
+      std::uniform_int_distribution<> dist(min, max);
       return static_cast<R>(dist(generator));
     }
     else {
-      static std::uniform_real_distribution<> distribution(min, max);
+      std::uniform_real_distribution<> distribution(min, max);
       return static_cast<R>(distribution(generator));
     }
   }
