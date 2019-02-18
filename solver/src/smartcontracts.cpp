@@ -38,7 +38,6 @@ void SmartContractRef::from_user_field(csdb::UserField fld) {
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : execution_allowed(true)
-, force_execution(false)
 , bc(blockchain)
 , scheduler(calls_queue_scheduler) {
 #if defined(DEBUG_SMARTS)
@@ -417,9 +416,21 @@ void SmartContracts::test_exe_queue() {
     }
     csdebug() << log_prefix << "set running status to next contract in queue";
     clear_emitted_transactions(next->abs_addr); // insurance
-    next->start(bc.getLastSequence()); // use blockchain based round counting
-    if (!invoke_execution(next->ref_start)) {
+    csdb::Pool block = bc.loadBlock(next->ref_start.sequence);
+    if (!block.is_valid()) {
+      cserror() << log_prefix << "load block with smart contract failed, cancel execution";
       remove_from_queue(next);
+    }
+    else {
+      next->start(block.sequence()); // use blockchain based round counting
+      // call to executor only if currently is trusted
+      next->is_executor = execution_allowed && contains_me(block.confidants());
+      if (next->is_executor) {
+        csdebug() << log_prefix << "execute current contract now";
+      }
+      else {
+        csdebug() << log_prefix << "skip contract execution, not in trusted list";
+      }
     }
   }
 }
@@ -449,7 +460,8 @@ bool SmartContracts::capture(csdb::Transaction tr)
 {
   // test smart contract as source of transaction
   csdb::Address abs_addr = absolute_address(tr.source());
-  if(known_contracts.find(abs_addr) != known_contracts.end()) {
+  auto it = known_contracts.find(abs_addr);
+  if(it != known_contracts.end()) {
     if(is_running_smart_contract(abs_addr)) {
       // expect calls from api when trxs received
       std::lock_guard<std::mutex> lock(mtx_emit_transaction);
@@ -466,7 +478,14 @@ bool SmartContracts::capture(csdb::Transaction tr)
 
   // test smart contract as target of transaction (is it payable?)
   abs_addr = absolute_address(tr.target());
-  if(is_known_smart_contract(abs_addr)) {
+  it = known_contracts.find(abs_addr);
+  if(it != known_contracts.end()) {
+    // test contract was deployed (and maybe called successfully)
+    if (it->second.state.empty()) {
+      cslog() << log_prefix << "unable execute not successfully deployed contract, drop transaction";
+      return true;
+    }
+
     double amount = tr.amount().to_double();
     // possible blocking call to executor for the first time:
     if(!is_payable(abs_addr)) {
@@ -623,17 +642,22 @@ void SmartContracts::test_exe_conditions(csdb::Pool block) {
           size_t delta = seq - item.seq_start;
           if (delta > Consensus::MaxRoundsCancelContract) {
             cswarning() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCancelContract
-              << " blocks (from #," << item.seq_start << "), remove it without transaction";
+              << " blocks (from #" << item.seq_start << "), remove it without transaction";
             item.close();
           }
-          else if (item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsCloseContract && item.is_trusted()) {
-            cslog() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCloseContract
-              << " blocks (from #," << item.seq_start << "), cancel it";
-            SmartExecutionData data;
-            data.contract_ref = item.ref_start;
-            data.error = "contract execution timeout";
-            data.ret_val.__set_v_byte(error::TimeExpired);
-            on_execute_completed(data);
+          else if (item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsExecuteContract && item.is_executor) {
+            cslog() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsExecuteContract
+              << " blocks (from #" << item.seq_start << "), cancel it";
+            if (item.is_executor) {
+              SmartExecutionData data;
+              data.contract_ref = item.ref_start;
+              data.error = "contract execution timeout";
+              data.ret_val.__set_v_byte(error::TimeExpired);
+              on_execute_completed(data);
+            }
+            else {
+              item.finish(seq);
+            }
             continue;
           }
         }
@@ -664,6 +688,11 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   cslog() << std::endl << log_prefix << "remove from queue completed " << get_executed_method(it->ref_start) << std::endl;
 
   clear_emitted_transactions(it->abs_addr);
+  const cs::Sequence seq = bc.getLastSequence();
+  const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
+  if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
+    cslog() << log_prefix << seq_cancel - seq << " round(s) were to unconditional contract timeout";
+  }
   exe_queue.erase(it);
 
   if (exe_queue.empty()) {
@@ -672,30 +701,6 @@ void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it
   else {
     csdebug() << log_prefix << exe_queue.size() << " item(s) in queue";
   }
-}
-
-// returns false if failed, and caller must remove_from_queue() the item
-bool SmartContracts::invoke_execution(const SmartContractRef& contract) {
-  csdb::Pool block = bc.loadBlock(contract.sequence);
-  if (!block.is_valid()) {
-    cserror() << log_prefix << "load block with smart contract failed, cancel execution";
-    return false;
-  }
-  // call to executor only if currently is trusted
-  if (force_execution || (execution_allowed && contains_me(block.confidants()))) {
-    csdebug() << log_prefix << "execute current contract now";
-    return execute_async(contract);
-  }
-  else {
-    if (!execution_allowed) {
-      csdebug() << log_prefix << "skip contract execution, it is disabled";
-    }
-    else {
-      csdebug() << log_prefix << "skip contract execution, not in trusted list";
-    }
-  }
-  // ask caller do not remove item from queue:
-  return true;
 }
 
 bool SmartContracts::execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract,
@@ -753,17 +758,17 @@ bool SmartContracts::execute_payable(const std::string& invoker, const std::stri
 // returns false if execution canceled, so caller may call to remove_from_queue()
 bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
   csdb::Transaction start_tr = get_transaction(item);
-  bool req_replenish = false;  // means indirect call to payable()
+  bool replenish_only = false;  // means indirect call to payable()
   if (!is_executable(start_tr)) {
-    req_replenish = is_payable_target(start_tr);
-    if (!req_replenish) {
+    replenish_only = is_payable_target(start_tr);
+    if (!replenish_only) {
       cserror() << log_prefix << "unable execute neither deploy nor start/replenish transaction";
       return false;
     }
   }
   bool deploy = is_deploy(start_tr);
 
-  csdebug() << log_prefix << "invoke api to remote executor to " << (deploy ? "deploy" : (!req_replenish ? "execute" : "replenish")) << " contract";
+  csdebug() << log_prefix << "invoke api to remote executor to " << (deploy ? "deploy" : (!replenish_only ? "execute" : "replenish")) << " contract";
 
   auto maybe_invoke_info = get_smart_contract(start_tr);
   if (maybe_invoke_info.has_value()) {
@@ -779,7 +784,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
       is_payable = (val.payable == PayableStatus::Implemented);
       if (!deploy) {
         state = val.state;
-        call_payable = (is_payable && tr_amount > std::numeric_limits<double>::epsilon()) || req_replenish;
+        call_payable = (is_payable && tr_amount > std::numeric_limits<double>::epsilon()) || replenish_only;
       }
     }
     else {
@@ -805,8 +810,8 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
           return data;
         }
       }
-      // req_replenish is true only if neither deploy nor start transaction: replenish smarts' wallet
-      if (!req_replenish) {
+      // replenish_only is true only if neither deploy nor start transaction: replenish smarts' wallet
+      if (!replenish_only) {
         if (!execute(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract)) {
           if (data.error.empty()) {
             if (deploy) {
@@ -1085,21 +1090,21 @@ bool SmartContracts::is_payable(const csdb::Address abs_addr) {
     return val.payable == PayableStatus::Implemented;
   }
 
-// get byte code
-auto maybe_deploy = find_deploy_info(abs_addr);
-if (!maybe_deploy.has_value()) {
-  val.payable = PayableStatus::Absent;  // to avoid subsequent unsuccessful calls
-  return false;
-}
-const auto& deploy = maybe_deploy.value();
+  // get byte code
+  auto maybe_deploy = find_deploy_info(abs_addr);
+  if (!maybe_deploy.has_value()) {
+    val.payable = PayableStatus::Absent;  // to avoid subsequent unsuccessful calls
+    return false;
+  }
+  const auto& deploy = maybe_deploy.value();
 
-// make blocking call to executor
-if (implements_payable(deploy)) {
-  val.payable = PayableStatus::Implemented;
-  return true;
-}
-val.payable = PayableStatus::Absent;
-return false;
+  // make blocking call to executor
+  if (implements_payable(deploy)) {
+    val.payable = PayableStatus::Implemented;
+    return true;
+  }
+  val.payable = PayableStatus::Absent;
+  return false;
 }
 
 bool SmartContracts::implements_payable(const api::SmartContractInvocation& contract) {

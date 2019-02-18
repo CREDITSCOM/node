@@ -242,8 +242,8 @@ public:
   // return true if SmartContracts provide special handling for transaction
   bool capture(csdb::Transaction tr);
 
+  // flag to allow execution, depends on executor presence
   bool execution_allowed;
-  bool force_execution;
 
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
@@ -321,6 +321,8 @@ private:
     csdb::Amount new_state_fee;
     // current fee
     csdb::Amount consumed_fee;
+    // actively taking part in smart consensus, and perform a call to executor
+    bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
 
@@ -332,6 +334,7 @@ private:
       , seq_finish(0)
       , abs_addr(absolute_address)
       , consumed_fee(0)
+      , is_executor(false)
     {
       avail_fee = csdb::Amount(tr_start.max_fee().to_double());
       csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
@@ -374,10 +377,6 @@ private:
 		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
 	  }
 
-    bool is_trusted() const
-    {
-      return (bool) pconsensus;
-    }
   };
 
   // executiom queue
@@ -440,11 +439,7 @@ private:
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
   }
 
-  // returns false if execution canceled, so caller is responsible to call remove_from_queue(item) method
-  bool invoke_execution(const SmartContractRef& contract);
-
   // perform async execution via API to remote executor
-  // is called from invoke_execution() method only
   // returns false if execution is canceled
   bool execute_async(const cs::SmartContractRef& item);
 
