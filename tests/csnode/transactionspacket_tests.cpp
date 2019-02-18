@@ -13,7 +13,22 @@
 
 #include <lib/system/utils.hpp>
 
-cs::TransactionsPacket packet;
+static cs::TransactionsPacket packet;
+
+static csdb::Transaction makeTransaction(int64_t innerId) {
+  csdb::Transaction transaction;
+
+  auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
+  cs::PublicKey myPublicForSig;
+
+  transaction.set_target(csdb::Address::from_public_key(myPublicForSig));
+  transaction.set_source(startAddress);
+  transaction.set_currency(1);
+  transaction.set_amount(csdb::Amount(10000, 0));
+  transaction.set_innerID(innerId);
+
+  return transaction;
+}
 
 TEST(TransactionsPacket, createPacket) {
   ASSERT_TRUE(packet.isHashEmpty());
@@ -21,7 +36,7 @@ TEST(TransactionsPacket, createPacket) {
 
 TEST(TransactionsPacket, addTransactions) {
   auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
-  cscrypto::PublicKey myPublicForSig;
+  cs::PublicKey myPublicForSig;
 
   csdb::Transaction transaction;
   transaction.set_target(csdb::Address::from_public_key(myPublicForSig));
@@ -35,7 +50,7 @@ TEST(TransactionsPacket, addTransactions) {
   const auto oldtransactionsCount = packet.transactionsCount();
 
   for (std::size_t i = 0; i < randomTransactionsCount; ++i) {
-    transaction.set_innerID(i + startInnerID);
+    transaction.set_innerID(static_cast<int64_t>(i + startInnerID));
     ASSERT_TRUE(packet.addTransaction(transaction));
   }
 
@@ -114,4 +129,42 @@ TEST(TransactionsPacket, makeTransactionsPacketFromByteStream) {
 
   ASSERT_EQ(mainHash, hashFromStreamHash);
   ASSERT_EQ(mainHash.toBinary(), hashFromStreamHash.toBinary());
+}
+
+TEST(TransactionsPacket, signaturesSerialization) {
+  constexpr size_t maxTransactionsCount = 100;
+  const size_t count = cs::Utils::generateRandomValue<size_t>(0, maxTransactionsCount);
+  cs::Console::writeLine("Generated transactions count ", count);
+
+  cs::TransactionsPacket pack;
+
+  for (size_t i = 0; i < count; ++i) {
+    pack.addTransaction(makeTransaction(static_cast<int64_t>(i)));
+  }
+
+  cs::Signature signature;
+
+  // 0
+  signature.fill(0xFF);
+  pack.addSignature(0, signature);
+
+  // 1
+  signature.fill(0xAA);
+  pack.addSignature(1, signature);
+
+  // 2
+  signature.fill(0xDD);
+  pack.addSignature(2, signature);
+
+  ASSERT_EQ(pack.signatures().size(), 3);
+
+  pack.makeHash();
+  cs::TransactionsPacket expectedPacket = cs::TransactionsPacket::fromBinary(pack.toBinary());
+
+  cs::Console::writeLine("Pack binary ", cs::Utils::byteStreamToHex(pack.toBinary()));
+  cs::Console::writeLine("Expected pack packet binary ", cs::Utils::byteStreamToHex(expectedPacket.toBinary()));
+
+  ASSERT_EQ(pack.toBinary(), expectedPacket.toBinary());
+  ASSERT_EQ(pack.signatures().size(), expectedPacket.signatures().size());
+  ASSERT_EQ(pack.hash(), expectedPacket.hash());
 }
