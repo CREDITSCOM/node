@@ -83,11 +83,7 @@ bool PoolHash::get(::csdb::priv::ibstream& is) {
 }
 
 class Pool::priv : public ::csdb::internal::shared_data {
-  priv() :
-    ::csdb::internal::shared_data()
-  {
-    //writer_public_key_.fill(0);
-    //signature_.fill(0);
+  priv() : ::csdb::internal::shared_data() {
   }
 
   priv(PoolHash previous_hash, cs::Sequence sequence, ::csdb::Storage::WeakPtr storage)
@@ -95,8 +91,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
   , previous_hash_(std::move(previous_hash))
   , sequence_(sequence)
   , storage_(std::move(storage)) {
-    writer_public_key_.fill(0) ;
-    //signature_.fill(0);
   }
 
   void put(::csdb::priv::obstream& os, bool doHash) const {
@@ -435,8 +429,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
       result.user_fields_[uf.first] = uf.second.clone();
     }
 
-    //result.signature_ = signature_;
-    //result.writer_public_key_ = writer_public_key_;
     result.signatures_ = signatures_;
     result.smartSignatures_ = smartSignatures_;
     result.realTrusted_ = realTrusted_;
@@ -457,18 +449,21 @@ class Pool::priv : public ::csdb::internal::shared_data {
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
-  //cs::Signature signature_;
   std::vector<uint8_t> realTrusted_;
   size_t hashingLength_ = 0;
-  cs::PublicKey writer_public_key_;
   csdb::Amount roundCost_;
   cs::BlockSignatures signatures_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
+
+  static cs::PublicKey zero_writer_public_key_;
   friend class Pool;
 };
 SHARED_DATA_CLASS_IMPLEMENTATION(Pool)
+
+/*static*/
+cs::PublicKey csdb::Pool::priv::zero_writer_public_key_;
 
 Pool::Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage)
 : d(new priv(std::move(previous_hash), sequence, storage.weak_ptr())) {
@@ -593,11 +588,13 @@ cs::Sequence Pool::sequence() const noexcept {
 
 const cs::PublicKey& Pool::writer_public_key() const noexcept {
   if (d->next_confidants_.size() == 0) {
-    cserror() << "The pool #" << d->sequence_ << " doesn't contain the confidants!!!";
-    return d->writer_public_key_;
+    if (d->sequence_ > 0) {
+      cserror() << "The pool #" << d->sequence_ << " doesn't contain the confidants";
+    }
+    return csdb::Pool::priv::zero_writer_public_key_;
   }
   size_t index = 0;
-  for (auto& it : d->realTrusted_) {
+  for (const auto& it : d->realTrusted_) {
     if (it == 0) {
       break;
     }
@@ -656,26 +653,6 @@ void Pool::set_previous_hash(PoolHash previous_hash) noexcept {
   priv* data = d.data();
   data->is_valid_ = true;
   data->previous_hash_ = std::move(previous_hash);
-}
-
-void Pool::set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept {
-  //if (d.constData()->read_only_) {
-  //  return;
-  //}
-
-  //priv* data = d.data();
-  //data->is_valid_ = true;
-  //data->writer_public_key_.fill(0);
-}
-
-void Pool::set_signature(const cs::Signature& signature) noexcept {
-  //if (d.constData()->read_only_) {
-  //  return;
-  //}
-
-  //priv* data = d.data();
-  //data->is_valid_ = true;
-  //data->signature_ = signature;
 }
 
 void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept {
@@ -871,31 +848,6 @@ cs::Bytes Pool::to_byte_stream_for_sig() {
   d->put(os, true);
   cs::Bytes result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
   return result;
-}
-
-void Pool::sign(const cscrypto::PrivateKey& private_key) {
-  const auto& pool_bytes = this->to_byte_stream_for_sig();
-//  d->signature_ = cscrypto::generateSignature(private_key, pool_bytes.data(), pool_bytes.size());
-}
-
-bool Pool::verify_signature() {
-  //const auto& pool_bytes = to_byte_stream_for_sig();
-  //return cscrypto::verifySignature(signature().data(), writer_public_key().data(),
-  //                                 pool_bytes.data(), pool_bytes.size());
-  return true;
-}
-
-bool Pool::verify_signature(const cs::Signature& signature) {
-  //const auto& pool_bytes = to_byte_stream_for_sig();
-  //const bool verify = cscrypto::verifySignature(signature.data(), writer_public_key().data(),
-  //                                              pool_bytes.data(), pool_bytes.size());
-
-  //if (verify) {
-  //  d->signature_ = signature;
-  //}
-
-  //return verify;
-  return true;
 }
 
 Pool Pool::load(const PoolHash& hash, Storage storage) {

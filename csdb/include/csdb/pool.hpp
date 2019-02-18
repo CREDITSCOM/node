@@ -138,7 +138,7 @@ public:
   static Pool meta_from_binary(cs::Bytes&& data, size_t& cnt);
   static Pool load(const PoolHash& hash, Storage storage = Storage());
 
-  static Pool from_byte_stream(const char* data, size_t size);
+  //static Pool from_byte_stream(const char* data, size_t size);
   char* to_byte_stream(uint32_t&);
   cs::Bytes to_byte_stream_for_sig();
 
@@ -152,7 +152,6 @@ public:
   Storage storage() const noexcept;
   size_t transactions_count() const noexcept;
   const cs::PublicKey& writer_public_key() const noexcept;
-  const cs::Signature& signature() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
   const cs::BlockSignatures& signatures() const noexcept;
   const ::std::vector<csdb::Pool::SmartSignature>& smartSignatures() const noexcept;
@@ -161,8 +160,6 @@ public:
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
   void set_storage(const Storage& storage) noexcept;
-  void set_writer_public_key(const cs::PublicKey& writer_public_key) noexcept;
-  void set_signature(const cs::Signature& signature) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void set_signatures(cs::BlockSignatures&& blockSignatures) noexcept;
   void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
@@ -299,10 +296,6 @@ public:
   *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
   */
   Transaction get_last_by_target(const Address& target) const noexcept;
-
-  void sign(const cscrypto::PrivateKey& private_key);
-  bool verify_signature();
-  bool verify_signature(const cs::Signature& signature);
 
   friend class Storage;
 };
