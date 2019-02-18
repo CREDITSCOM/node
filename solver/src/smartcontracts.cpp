@@ -1085,21 +1085,21 @@ bool SmartContracts::is_payable(const csdb::Address abs_addr) {
     return val.payable == PayableStatus::Implemented;
   }
 
-  // get byte code
-  auto maybe_deploy = find_deploy_info(abs_addr);
-  if (!maybe_deploy.has_value()) {
-    val.payable = PayableStatus::Absent;  // to avoid subsequent unsuccessful calls
-    return false;
-  }
-  const auto& deploy = maybe_deploy.value();
-
-  // make blocking call to executor
-  if (implements_payable(deploy)) {
-    val.payable = PayableStatus::Implemented;
-    return true;
-  }
-  val.payable = PayableStatus::Absent;
+// get byte code
+auto maybe_deploy = find_deploy_info(abs_addr);
+if (!maybe_deploy.has_value()) {
+  val.payable = PayableStatus::Absent;  // to avoid subsequent unsuccessful calls
   return false;
+}
+const auto& deploy = maybe_deploy.value();
+
+// make blocking call to executor
+if (implements_payable(deploy)) {
+  val.payable = PayableStatus::Implemented;
+  return true;
+}
+val.payable = PayableStatus::Absent;
+return false;
 }
 
 bool SmartContracts::implements_payable(const api::SmartContractInvocation& contract) {
@@ -1183,14 +1183,13 @@ std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
 
 csdb::Amount SmartContracts::smart_round_fee(csdb::Pool block)
 {
-  csdb::Amount fee(0); //= block.round_cost();
-  //if(fee > csdb::Amount(0)) {
-  //  return fee;
-  //}
-  // see fee.cpp:
-  constexpr double kMinFee = 0.0001428 * 3.0; // Eugeniy: should increase min fee by 3 times
-  size_t cnt = kMinFee * std::max((size_t) Consensus::MinTrustedNodes, block.confidants().size());
-  return csdb::Amount( kMinFee * (double) cnt );
+  csdb::Amount fee(0);
+  if (block.transactions_count() > 0) {
+    for (const auto& t : block.transactions()) {
+      fee += csdb::Amount(t.counted_fee().to_double());
+    }
+  }
+  return fee;
 }
 
 }  // namespace cs
