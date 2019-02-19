@@ -3,6 +3,7 @@
 #include <csdb/transaction.hpp>
 #include <csnode/datastream.hpp>
 
+#include <solver/smartcontracts.hpp>
 
 #include <exception>
 #include <iomanip>
@@ -480,6 +481,31 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     auto packet = std::move(optionalPacket).value();
     const auto& transactions = packet.transactions();
 
+    // first look at signatures if it is smarts packet
+    if (packet.signatures().size() > 1) {
+      const auto& stateTransaction = transactions.front();
+
+      // check range
+      if (maskIndex < mask.size() && mask[maskIndex] != 0) {
+        csdb::Pool::SmartSignature smartSignatures;
+        csdb::UserField userField = stateTransaction.user_field(trx_uf::new_state::RefStart);
+
+        if (userField.is_valid()) {
+          SmartContractRef reference(userField);
+
+          if (reference.is_valid()) {
+            smartSignatures.smartConsensusPool = reference.sequence;
+          }
+        }
+
+        smartSignatures.smartKey = stateTransaction.source().public_key();
+        smartSignatures.signatures = packet.signatures();
+
+        newPool.add_smart_signature(smartSignatures);
+      }
+    }
+
+    // look all next transactions
     for (const auto& transaction : transactions) {
       if (maskIndex < mask.size()) {
         if (mask[maskIndex] != 0u) {
