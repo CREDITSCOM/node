@@ -11,9 +11,9 @@ void DisplayRawData(const void* data, const size_t size) {
   std::cout << "data = {";
   for (auto i = 0u; i < size; i++) {
     std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
-              << (int)((uint8_t*)data)[i] << ", ";
+              << int(static_cast<const uint8_t*>(data)[i]) << ", ";
   }
-  std::cout << "}" << std::endl;
+  std::cout << "}" << std::dec << std::endl;
 }
 
 void displayStreamData(cs::OPackStream& stream) {

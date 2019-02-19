@@ -2464,45 +2464,17 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     return;
   }
 
-  uint8_t senderNumber;
   cs::Signature signature;
   istream_ >> signature;
 
+  uint8_t senderNumber;
   istream_ >> senderNumber;
 
   csdb::PoolHash hash;
   istream_ >> hash;
 
-  if (!conveyer.isConfidantExists(sender)) {
+  if (!conveyer.isConfidantExists(senderNumber)) {
     csmeta(csdebug) << "The message of WRONG HASH was sent by false confidant!";
-    return;
-  }
-
-  if (senderNumber >= cs::Conveyer::instance().currentRoundTable().confidants.size()) {
-    return;
-  }
-
-  if (cs::Conveyer::instance().currentRoundTable().confidants.at(senderNumber) != sender) {
-    return;
-  }
-
-  if (badHashReplyCounter_.at(senderNumber) == 0) {
-    badHashReplyCounter_.at(senderNumber) = 1;
-  }
-
-  if (badHashReplyCounter_.at(senderNumber) == 1) {
-    return;
-  }
-
-  if (senderNumber >= conveyer.confidantsCount()) {
-    csmeta(csdetails) << "Sender num: " << senderNumber
-                      << " >=  confidants count conveyer: " << conveyer.confidantsCount();
-    return;
-  }
-
-  if (conveyer.confidantByIndex(senderNumber) != sender) {
-    csmeta(csdetails) << "Sender: " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-                      << " is not correspond by index at conveyer: " << senderNumber;
     return;
   }
 
