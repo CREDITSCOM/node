@@ -53,7 +53,6 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   csdebug() << name() << ": packet of " << packet.transactionsCount() << " transactions in" << typeid(conveyer).name();
   csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
 
-  // TODO: do something with smartContractPackets
   checkSignaturesSmartSource(context, smartContractPackets);
 
   // review & validate transactions
