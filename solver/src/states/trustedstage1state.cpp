@@ -53,7 +53,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   csdebug() << name() << ": packet of " << packet.transactionsCount() << " transactions in" << typeid(conveyer).name();
   csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
 
-  // TODO: do something with smartContractPackets
+  checkSignaturesSmartSource(context, smartContractPackets);
 
   // review & validate transactions
   context.blockchain().setTransactionsFees(packet);
@@ -80,6 +80,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 
   return (enough_hashes ? Result::Finish : Result::Ignore);
 }
+
 
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash,
                                   const cs::PublicKey& sender) {
@@ -308,26 +309,75 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
   csdb::Address src = transaction.source();
   // TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
   // currently will be rejected
-  if (!context.smart_contracts().is_smart_contract(transaction)) {
+  bool smartSourceTransaction = false;
+  bool isSmart = context.smart_contracts().is_smart_contract(transaction);
+  if (!isSmart) {
+    smartSourceTransaction = context.smart_contracts().is_known_smart_contract(transaction.source());
+  }
+  if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
     if (src.is_wallet_id()) {
       context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
       return transaction.verify_signature(data_to_fetch_pulic_key.address_);
     }
-
     return transaction.verify_signature(src.public_key());
-  }
-  else {
-    if (context.smart_contracts().is_new_state(transaction)) {
-      // special rule for new_state transactions
-      if (src != transaction.target()) {
-        csdebug() << name() << ": smart state trx has different source and target";
-        return false;
-      }
-      return true;
+  } else {
+    // special rule for new_state transactions
+    if (SmartContracts::is_new_state(transaction) && src != transaction.target()) {
+      csdebug() << name() << ": smart state trx has different source and target";
+      return false;
     }
-    // TODO: add here code for validating signatures in the smart contract transaction
+    auto it = smartSourceInvalidSignatures_.find(transaction.source());
+    if (it != smartSourceInvalidSignatures_.end()) {
+      return false;
+    }
     return true;
   }
 }
 
+void TrustedStage1State::checkSignaturesSmartSource(SolverContext& context, cs::Packets& smartContractsPackets) {
+  smartSourceInvalidSignatures_.clear();
+
+  for (auto& smartContractPacket : smartContractsPackets) {
+    if (smartContractPacket.transactions().size() > 0) {
+      const auto& transaction = smartContractPacket.transactions()[0];
+
+      SmartContractRef smartRef;
+      if (SmartContracts::is_new_state(transaction)) {
+        smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
+      } else {
+        smartRef.from_user_field(transaction.user_field(trx_uf::smart_gen::RefStart));
+      }
+      if (!smartRef.is_valid()) {
+        cslog() << __func__ << ": SmartContractRef is not valid";
+        smartSourceInvalidSignatures_.insert(transaction.source());
+        continue;
+      }
+
+      csdb::Pool poolWithInitTr = context.blockchain().loadBlock(smartRef.sequence);
+      if (!poolWithInitTr.is_valid()) {
+        cslog() << __func__ << ": poolWithInitTr is not valid";
+        smartSourceInvalidSignatures_.insert(transaction.source());
+        continue;
+      }
+
+      const auto& confidants = poolWithInitTr.confidants();
+      const auto& signatures = smartContractPacket.signatures();
+      size_t correctSignaturesCounter = 0;
+      for (const auto& signature : signatures) {
+        if (signature.first < confidants.size()) {
+          const auto& confidantPublicKey = confidants[signature.first];
+          const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
+          if (cscrypto::verifySignature(signature.second, confidantPublicKey,
+                                        signedHash, cscrypto::kHashSize)) {
+            ++correctSignaturesCounter;
+          }
+        }
+      }
+      if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
+        cslog() << __func__ << ": not enough correct signatures";
+      }
+    }
+
+  }
+}
 }  // namespace slv2
