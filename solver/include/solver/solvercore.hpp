@@ -77,22 +77,8 @@ public:
     return private_key;
   }
 
-  //Solver smarts consensus methods
-  //void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
-  //void gotSmartStageOne(cs::StageOneSmarts& stage);
-  //void gotSmartStageTwo(cs::StageTwoSmarts& stage);
-  //void gotSmartStageThree(cs::StageThreeSmarts& stage);
-  //void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
-  //void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
-  //void getSmartResult(const cs::TransactionsPacket pack);
-  //void refreshSmartStagesStorage();
-  //void processStages();
-  //bool stageOneEnough();
-
   // TODO: requires revision
   const cs::PublicKey& getWriterPublicKey() const;
-
-  void gotBigBang();
 
   void beforeNextRound();
   void nextRound();
@@ -111,26 +97,9 @@ public:
 
   void removeDeferredBlock(cs::Sequence);
 
-  //bool smartStageOneEnough();
-  //bool smartStageTwoEnough();
-  //bool smartStageThreeEnough();
-  //cs::Sequence smartRoundNumber();
-  //uint8_t calculateSmartsConfNum();
-  //uint8_t ownSmartsConfidantNumber();
-  //void createFinalTransactionSet();
-  //bool smartConfidantExist(uint8_t);
-  //void gotSmartStageRequest(uint8_t msgType, uint8_t requesterNumber, uint8_t requiredNumber);
   size_t trueStagesThree();
   size_t stagesThree();
   bool stateFailed(Result res);
-
-  //void requestSmartStages(int st);
-  //void requestSmartStagesNeighbors(int st);
-  //void markSmartOutboundNodes();
-  //cs::PublicKeys smartConfidants(cs::PublicKey smartKey);
-
-
-  //const std::vector<cs::PublicKey>& smartConfidants() const;
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -144,10 +113,6 @@ public:
   {
     return *psmarts;
   }
-  //
-  //CallsQueueScheduler& scheduler() {
-  //  return &scheduler;
-  //}
 
 
 private:
@@ -231,18 +196,6 @@ private:
                         std::string&& currentTimeStamp,
                         cs::StageThree& st3);
 
-  void store_received_block(csdb::Pool& p, bool defer_write);
-  bool is_block_deferred() const;
-  void flush_deferred_block();
-  void drop_deferred_block();
-
-  void startTimer(int st);
-  void killTimer(int st);
-  void fakeStage(uint8_t confIndex);
-
-  //template<class T>
-  //bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
-
   // timeout tracking
 
   TimeoutTracking timeout_request_stage;
@@ -325,17 +278,6 @@ private:
   std::vector<cs::StageThree> trueStageThreeStorage;
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
-  //std::vector<cs::StageOneSmarts> smartStageOneStorage_;
-  //std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
-  //std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-  //bool smartStagesStorageRefreshed_;
-  //std::vector<cs::PublicKey> smartConfidants_;
-  //uint8_t ownSmartsConfNum_;
-  //cs::Sequence smartRoundNumber_;
-  //cs::TransactionsPacket currentSmartTransactionPack_;
-  //cs::StageOneSmarts st1;
-  //cs::StageTwoSmarts st2;
-  //cs::StageThreeSmarts st3;
   std::vector <int> smartUntrusted;
   std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
   // stores candidates for next round
@@ -346,7 +288,6 @@ private:
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;
   std::vector<cs::SmartConsensus> smartProcesses_;
-  //SmartConsensus smartProcess_;
   const size_t simultaneuosSmartsNumber_ = 20;
 };
 

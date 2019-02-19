@@ -111,7 +111,8 @@ namespace cs
 
     transitions = {
       // transition on the first round
-      {pNone, {{Event::Start, pNormal}}}
+      {pNone, {{Event::Start, pNormal}}},
+      {pNormal, {{Event::Start, pNormal}}}
     };
   }
 
@@ -126,7 +127,8 @@ namespace cs
 
     transitions = {
       // transition on the first round
-      {pNone, {{Event::Start, pNormal}}}
+      {pNone, {{Event::Start, pNormal}}},
+      {pNormal, {{Event::Start, pNormal}}}
     };
   }
 } // namespace slv2

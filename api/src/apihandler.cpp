@@ -267,7 +267,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
   result.trxn.timeCreation = transaction.get_time();
 
   if (is_smart(transaction)) {
-    auto sci = deserialize<api::SmartContractInvocation>(transaction.user_field(0).value<std::string>());
+    using namespace cs::trx_uf;
+    auto sci = deserialize<api::SmartContractInvocation>(transaction.user_field(deploy::Code).value<std::string>());
     bool isToken = false;
 
     auto smartResult = getSmartStatus(transaction.id());
@@ -470,10 +471,11 @@ api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
 }
 
 api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction&  tr) {
+  using namespace cs::trx_uf;
   api::SmartContract res;
   if (!tr.is_valid())
     return res;
-  const auto sci = deserialize<api::SmartContractInvocation>(tr.user_field(0).value<std::string>());
+  const auto sci = deserialize<api::SmartContractInvocation>(tr.user_field(deploy::Code).value<std::string>());
   res.smartContractDeploy.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
   res.smartContractDeploy.sourceCode  = sci.smartContractDeploy.sourceCode;
   res.smartContractDeploy.hashState   = sci.smartContractDeploy.hashState;

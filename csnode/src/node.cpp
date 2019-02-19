@@ -90,6 +90,7 @@ bool Node::init(const Config& config) {
   std::cout << "Everything is init\n";
 
   solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
+  solver_->startDefault();
 
 #ifdef SPAMMER
   runSpammer();
