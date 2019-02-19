@@ -156,6 +156,7 @@ public:
   const cs::BlockSignatures& signatures() const noexcept;
   const ::std::vector<csdb::Pool::SmartSignature>& smartSignatures() const noexcept;
   const csdb::Amount& roundCost() const noexcept;
+  const cs::BlockSignatures& trustedConfirmation() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
@@ -165,6 +166,7 @@ public:
   void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
   void add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept;
   void setRoundCost(const csdb::Amount& roundCost) noexcept;
+  void add_trusted_confirmations(const cs::BlockSignatures& confirmations) noexcept;
 
   Transactions& transactions();
   const Transactions& transactions() const;

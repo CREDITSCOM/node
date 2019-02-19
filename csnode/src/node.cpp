@@ -292,7 +292,6 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
   istream_.init(data, size);
-
   cs::TransactionsPacket packet;
   istream_ >> packet;
 
@@ -300,7 +299,6 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
     cswarning() << "Received transaction packet hash is empty";
     return;
   }
-
   processTransactionsPacket(std::move(packet));
 }
 
@@ -489,7 +487,6 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     cswarning() << "Send transaction packet with empty hash failed";
     return;
   }
-
   sendBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 
