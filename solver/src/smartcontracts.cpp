@@ -76,15 +76,15 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
       const StateItem& opt_out = it->second;
       if(!opt_out.state.empty()) {
         StateItem& updated = known_contracts[abs_addr];
-        if(opt_out.deploy.is_valid()) {
-          if(updated.deploy.is_valid()) {
+        if(opt_out.ref_deploy.is_valid()) {
+          if(updated.ref_deploy.is_valid()) {
             cswarning() << log_prefix << "contract deploy is overwritten by subsequent deploy of the same contract";
           }
-          updated.deploy = opt_out.deploy;
+          updated.ref_deploy = opt_out.ref_deploy;
           updated.state = opt_out.state;
         }
-        if(opt_out.execution.is_valid()) {
-          updated.execution = opt_out.execution;
+        if(opt_out.ref_execute.is_valid()) {
+          updated.ref_execute = opt_out.ref_execute;
           updated.state = opt_out.state;
         }
       }
@@ -102,7 +102,7 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
     if(val.state.empty()) {
       cswarning() << log_prefix << "completely unsuccessful contract found, neither deployed, nor executed";
     }
-    if(!val.deploy.is_valid()) {
+    if(!val.ref_deploy.is_valid()) {
       cswarning() << log_prefix << "unsuccessfully deployed contract found";
     }
   }
@@ -225,8 +225,8 @@ std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(con
   const auto item = known_contracts.find(abs_addr);
   if (item != known_contracts.cend()) {
     const StateItem& val = item->second;
-    if (val.deploy.is_valid()) {
-      csdb::Transaction tr_deploy = get_transaction(val.deploy);
+    if (val.ref_deploy.is_valid()) {
+      csdb::Transaction tr_deploy = get_transaction(val.ref_deploy);
       if (tr_deploy.is_valid()) {
         csdb::UserField fld = tr_deploy.user_field(deploy::Code);
         if (fld.is_valid()) {
@@ -344,7 +344,7 @@ void SmartContracts::enqueue(csdb::Pool block, size_t trx_idx) {
     if(maybe_invoke_info.has_value()) {
       const auto& invoke_info = maybe_invoke_info.value();
       StateItem& val = known_contracts[abs_addr];
-      val.deploy = new_item;
+      val.ref_deploy = new_item;
       if(implements_payable(invoke_info)) {
         val.payable = PayableStatus::Implemented;
         payable = true;
@@ -435,25 +435,15 @@ void SmartContracts::test_exe_queue() {
   }
 }
 
-bool SmartContracts::is_running_smart_contract(csdb::Address addr) const {
+SmartContractStatus SmartContracts::get_smart_contrcat_status(csdb::Address addr) const
+{
   if (!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));
-    if(it != exe_queue.cend()) {
-      return it->status == SmartContractStatus::Running;
+    if (it != exe_queue.cend()) {
+      return it->status;
     }
   }
-  return false;
-}
-
-bool SmartContracts::is_closed_smart_contract(csdb::Address addr) const
-{
-  if(!exe_queue.empty()) {
-    const auto it = find_in_queue(absolute_address(addr));
-    if(it != exe_queue.cend()) {
-      return it->status == SmartContractStatus::Closed;
-    }
-  }
-  return true;
+  return SmartContractStatus::Idle;
 }
 
 bool SmartContracts::capture(csdb::Transaction tr)
@@ -596,7 +586,7 @@ void SmartContracts::on_read_block(csdb::Pool block, bool* should_stop) {
               // register execution ONLY if contract is unknown yet,
               // known contracts will be updated on new_state handling
               StateItem& val = known_contracts[abs_addr];
-              SmartContractRef& ref = is_deploy(tr) ? val.deploy : val.execution;
+              SmartContractRef& ref = is_deploy(tr) ? val.ref_deploy : val.ref_execute;
               ref.hash = block.hash();
               ref.sequence = block.sequence();
               ref.transaction = tr_idx;
@@ -1027,10 +1017,10 @@ bool SmartContracts::update_contract_state(csdb::Transaction t) {
         if (t_start.is_valid()) {
           if (is_executable(t_start)) {
             if (is_deploy(t_start)) {
-              item.deploy = ref;
+              item.ref_deploy = ref;
             }
             else {
-              item.execution = ref;
+              item.ref_execute = ref;
             }
           }
           else {
@@ -1045,7 +1035,7 @@ bool SmartContracts::update_contract_state(csdb::Transaction t) {
             if (item.payable != PayableStatus::Implemented) {
               cserror() << log_prefix << "non-payable contract state is updated by replenish transaction";
             }
-            item.execution = ref;
+            item.ref_execute = ref;
           }
         }
         else {

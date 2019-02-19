@@ -155,11 +155,13 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
 }
 
 enum class SmartContractStatus {
-  // is executing at the moment, is able to emit transactions
-  Running,
+  // contract is not involved in any way
+  Idle,
   // is waiting until execution starts
   Waiting,
-  // execution is finished, waiting for new state transaction, no more transaction emitting is allowed
+  // is executing at the moment, is able to emit transactions
+  Running,
+  // execution is finished, waiting for new state transaction in blockchain, no more transaction emitting is allowed
   Finished,
   // contract is closed, neither new_state nor emitting transactions are allowed, should be removed from queue
   Closed
@@ -231,9 +233,17 @@ public:
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
   }
 
-  bool is_running_smart_contract(csdb::Address addr) const;
+  SmartContractStatus get_smart_contrcat_status(csdb::Address addr) const;
 
-  bool is_closed_smart_contract(csdb::Address addr) const;
+  bool is_running_smart_contract(csdb::Address addr) const
+  {
+    return get_smart_contrcat_status(addr) == SmartContractStatus::Running;
+  }
+
+  bool is_closed_smart_contract(csdb::Address addr) const
+  {
+    return get_smart_contrcat_status(addr) == SmartContractStatus::Closed;
+  }
 
   bool is_known_smart_contract(csdb::Address addr) const {
     return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
@@ -283,12 +293,12 @@ private:
   };
 
   struct StateItem {
-    // reference to deploy transaction
-    SmartContractRef deploy;
     // payable() method is implemented
-    PayableStatus payable { PayableStatus::Unknown };
-    // reference to last successful execution which state is stored by item, may be equal to deploy
-    SmartContractRef execution;
+    PayableStatus payable{ PayableStatus::Unknown };
+    // reference to deploy transaction
+    SmartContractRef ref_deploy;
+    // reference to last successful execution which state is stored by item, may be equal to ref_deploy
+    SmartContractRef ref_execute;
     // current state which is result of last successful execution / deploy
     std::string state;
   };
@@ -321,7 +331,7 @@ private:
     csdb::Amount new_state_fee;
     // current fee
     csdb::Amount consumed_fee;
-    // actively taking part in smart consensus, and perform a call to executor
+    // actively taking part in smart consensus, perform a call to executor
     bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
