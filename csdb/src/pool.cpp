@@ -431,6 +431,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     result.signatures_ = signatures_;
     result.smartSignatures_ = smartSignatures_;
+    result.trustedConfirmation_ = trustedConfirmation_;
     result.realTrusted_ = realTrusted_;
     result.binary_representation_ = binary_representation_;
 
