@@ -130,6 +130,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it.second);
     }
 
+    os.put(trustedConfirmation_.size());
+    for (const auto& it : trustedConfirmation_){
+      os.put(it.first);
+      os.put(it.second);
+    }
+
     os.put(smartSignatures_.size());
     for (const auto& it : smartSignatures_) {
       os.put(it.smartKey);
@@ -265,6 +271,30 @@ class Pool::priv : public ::csdb::internal::shared_data {
     return true;
   }
 
+  bool getTrustedConfirmation(::csdb::priv::ibstream& is) {
+    size_t cnt = 0;
+    if (!is.get(cnt)) {
+      return false;
+    }
+
+    trustedConfirmation_.clear();
+    trustedConfirmation_.reserve(cnt);
+    for (size_t i = 0; i < cnt; ++i) {
+      cs::Byte index = 0;
+      cs::Signature sig;
+
+      if (!is.get(index)) {
+        return false;
+      }
+      if (!is.get(sig)) {
+        return false;
+      }
+
+      trustedConfirmation_.emplace_back(make_pair(index, sig));
+    }
+    return true;
+  }
+
   bool getSmartSignatures(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
     size_t confCount = 0;
@@ -352,6 +382,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       csmeta(cswarning) << "get signatures is failed";
       return false;
     }
+
+    if (!getTrustedConfirmation(is)) {
+      csmeta(cswarning) << "get signatures is failed";
+      return false;
+    }
+
 
     if (!getSmartSignatures(is)) {
       csmeta(cswarning) << "get smart signatures is failed";

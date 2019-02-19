@@ -185,6 +185,8 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
   csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(stage.blockSignature);
   csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(stage.roundHash);
   csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(stage.roundSignature);
+  csdebug() << "     TrustHash = " << cs::Utils::byteStreamToHex(stage.trustedHash);
+  csdebug() << "     TrustSign = " << cs::Utils::byteStreamToHex(stage.trustedSignature);
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {

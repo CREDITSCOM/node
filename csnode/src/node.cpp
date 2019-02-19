@@ -2012,12 +2012,18 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   stream << poolMetaInfo.realTrustedMask;
   stream << poolMetaInfo.previousHash;
   //stream << lastSentRoundData_.poolMetaInfo.writerKey; -- we don't need to send this
+  cs::Bytes trustedList;
+  cs::DataStream tStream(trustedList);
+  tStream << newRoundTable.round;
+  tStream << newRoundTable.confidants;
 
+  st3.trustedHash = cscrypto::calculateHash(trustedList.data(), trustedList.size());
   st3.roundHash = cscrypto::calculateHash(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
   //cs::DataStream signStream(messageToSign);
   //signStream << roundNumber_;
   //signStream << subRound_;
   //signStream << st3.roundHash;
+  st3.trustedSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.trustedHash.data(), st3.trustedHash.size());
   st3.roundSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
 
   //here should be placed parcing of round table

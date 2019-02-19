@@ -43,10 +43,12 @@ struct StageThree {
       realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
     }
     csdebug() << "     SENDER = " << static_cast<int>(sender) << ", WRITER = " << static_cast<int>(writer) << ", RealTrusted = " << realTrustedString;
-    csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(blockHash.data(), blockHash.size());
-    csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(blockSignature.data(), blockSignature.size());
-    csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(roundHash.data(), roundHash.size());
-    csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(roundSignature.data(), roundSignature.size());
+    csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(blockHash);
+    csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(blockSignature);
+    csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(roundHash);
+    csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(roundSignature);
+    csdebug() << "     TrustHash = " << cs::Utils::byteStreamToHex(trustedHash);
+    csdebug() << "     TrustSign = " << cs::Utils::byteStreamToHex(trustedSignature);
   }
 
   uint8_t sender;
@@ -56,6 +58,8 @@ struct StageThree {
   Hash blockHash;
   Signature roundSignature;
   Hash roundHash;
+  Hash trustedHash;
+  Signature trustedSignature;
   Signature signature;
 
 };
