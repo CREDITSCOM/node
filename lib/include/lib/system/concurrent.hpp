@@ -355,7 +355,7 @@ public:
     conditionalVariable_.wait(l, [&]() { return j(state_); });
 
     tidMap_.erase(std::this_thread::get_id());
-        conditionalVariable_.notify_all();
+    conditionalVariable_.notify_all();
   }
 
   void yield() {
