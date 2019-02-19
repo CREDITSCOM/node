@@ -91,7 +91,6 @@ TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t s
   if (!res.get(is)) {
     return TransactionsPacket();
   }
-
   res.makeHash();
 
   return res;
@@ -112,6 +111,7 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
 
   m_hash = packet.m_hash;
   m_transactions = packet.m_transactions;
+  m_signatures = packet.m_signatures;
 
   return *this;
 }
@@ -234,7 +234,6 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
   if (!is.get(signaturesCount)) {
     return false;
   }
-
   m_signatures.clear();
   m_signatures.reserve(signaturesCount);
 
@@ -245,11 +244,9 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
     if (!is.get(index)) {
       return false;
     }
-
     if (!is.get(signature)) {
       return false;
     }
-
     m_signatures.push_back(std::make_pair(index, signature));
   }
 

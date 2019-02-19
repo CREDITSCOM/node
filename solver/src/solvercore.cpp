@@ -290,10 +290,15 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatu
   return true;
 }
 
-void SolverCore::removeDeferredBlock() {
+void SolverCore::removeDeferredBlock(cs::Sequence seq)  {
+  if(deferredBlock_.sequence() == seq) {
   pnode->getBlockChain().removeWalletsInPoolFromCache(deferredBlock_);
   deferredBlock_ = csdb::Pool();
   csdebug() << "SolverCore: just created new block was thrown away";
+  }
+  else {
+    csdebug() << "SolverCore: we don't have the correct block to throw";
+  }
 }
 
 uint8_t SolverCore::subRound() {

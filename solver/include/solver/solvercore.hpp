@@ -109,7 +109,7 @@ public:
   void gotStageThreeRequest(uint8_t requester, uint8_t required);
   void printStage3(const cs::StageThree& stage);
 
-  void removeDeferredBlock();
+  void removeDeferredBlock(cs::Sequence);
 
   //bool smartStageOneEnough();
   //bool smartStageTwoEnough();

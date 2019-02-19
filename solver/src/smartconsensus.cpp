@@ -193,6 +193,9 @@ namespace cs{
   }
 
   void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
+    if (stage.sRoundNum != smartRoundNumber_) {
+      return;
+    }
     csmeta(csdetails) << "start";
     if (send) {
       pnode_->sendSmartStageOne(smartConfidants_, stage);
@@ -201,32 +204,44 @@ namespace cs{
       return;
     }
     smartStageOneStorage_.at(stage.sender) = stage;
+    std::string stagesPlot; 
     for (size_t i = 0; i < smartConfidants_.size(); ++i) {
-      csdebug() << log_prefix << "[" << i << "] - " << static_cast<int>(smartStageOneStorage_.at(i).sender);
+      //csdebug() << log_prefix << "[" << i << "] - " << static_cast<int>(smartStageOneStorage_.at(i).sender);
+      stagesPlot = stagesPlot + "[" + std::to_string(static_cast<int>(smartStageOneStorage_.at(i).sender)) + "] ";
     }
-    csdebug() << log_prefix << " <-- SMART-Stage-1 [" << static_cast<int>(stage.sender) << "]";
+    csdebug() << log_prefix << " <-- SMART-Stage-1 " << stagesPlot;
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
       //killTimer(1);
       cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
+      st2.sender = ownSmartsConfNum_;
+      st2.sRoundNum = smartRoundNumber_;
       addSmartStageTwo(st2, true);
       //startTimer(2);
     }
   }
 
   void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
-    if (send) {
-      st2.sender = ownSmartsConfNum_;
-      st2.sRoundNum = smartRoundNumber_;
+    if (stage.sRoundNum != smartRoundNumber_) {
+      return;
+    }
+  if (send) {
       pnode_->sendSmartStageTwo(smartConfidants_, stage);
     }
+
     auto& stageTwo = smartStageTwoStorage_.at(stage.sender);
     if (stageTwo.sender == stage.sender) {
       return;
     }
-    stageTwo = stage;
-    csdebug() << log_prefix << " <-- SMART-Stage-2 [" << static_cast<int>(stage.sender) << "] = " << smartStageTwoStorage_.size();
+    //stageTwo = stage;
+    std::string stagesPlot;
+    for (size_t i = 0; i < smartConfidants_.size(); ++i){
+      smartStageTwoStorage_.at(stage.sender) = stage;
+      stagesPlot = stagesPlot + "[" + std::to_string(static_cast<int>(smartStageTwoStorage_.at(i).sender)) + "] ";
+    }
+    csdebug() << log_prefix << " <-- SMART-Stage-2 - SmartRound(" << st2.sRoundNum << ") "  << stagesPlot;
+    //csdebug() << log_prefix << " <-- SMART-Stage-2 [" << static_cast<int>(stage.sender) << "]";
     if (smartStageTwoEnough()) {
       //startTimer(2);
       cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -306,10 +321,10 @@ namespace cs{
     csdb::Amount sumFee(0);
     //here will the fee be calculated too
     for (size_t i = 0; i < cnt; ++i) {
-      if (stage.realTrustedMask.at(i) != InvalidConfidantIndex) {
+      if (st3.realTrustedMask.at(i) != InvalidConfidantIndex) {
         sumFee += smartStageOneStorage_.at(i).fee;
         if (idx == idx_writer) {
-          stage.writer = static_cast<uint8_t>(i);
+          st3.writer = static_cast<uint8_t>(i);
         }
         ++idx;
       }
@@ -317,22 +332,25 @@ namespace cs{
     csdb::Amount finalFee = calculateFinalFee(sumFee,idx);
     csdebug() << log_prefix << "smart consensus result 2 from 3";
     idx = 0;
-    for (size_t i = stage.writer; i < cnt + stage.writer; ++i) {
+    for (size_t i = st3.writer; i < cnt + st3.writer; ++i) {
       size_t c = i % cnt;
-      if (stage.realTrustedMask.at(c) != InvalidConfidantIndex) {
-        stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+      if (st3.realTrustedMask.at(c) != InvalidConfidantIndex) {
+        st3.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
         ++idx;
       }
     }
     csdebug() << log_prefix << "smart consensus result 3 from 3";
     //startTimer(3);
     createFinalTransactionSet(finalFee);
-    stage.packageSignature = cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey()
+    st3.packageSignature = cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey()
         , finalSmartTransactionPack_.hash().toBinary().data()
         , finalSmartTransactionPack_.hash().toBinary().size());
     csmeta(cslog) << "done";
-    addSmartStageThree(stage, true);
+    st3.sender = ownSmartsConfNum_;
+    st3.sRoundNum = smartRoundNumber_;
+    addSmartStageThree(st3, true);
   }
+
   //TODO: finalize the function 
   csdb::Amount SmartConsensus::calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount) {
     csdb::Amount fee{0};
@@ -348,18 +366,19 @@ namespace cs{
   }
 
   void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
+    if (stage.sRoundNum != smartRoundNumber_) {
+      return;
+    }
     csmeta(csdetails);
     if (send) {
       csdebug() << log_prefix << "____ 1.";
-      stage.sender = ownSmartsConfNum_;
-      stage.sRoundNum = smartRoundNumber_;
       pnode_->sendSmartStageThree(smartConfidants_, stage);
     }
     if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
       return;
     }
     if (stage.sender != ownSmartsConfNum_) {
-      const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
+      //const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
       if (!cscrypto::verifySignature(stage.packageSignature, smartConfidants().at(stage.sender)
           , finalSmartTransactionPack_.hash().toBinary().data()
           , finalSmartTransactionPack_.hash().toBinary().size())) {
