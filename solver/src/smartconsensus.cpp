@@ -378,7 +378,7 @@ namespace cs{
       return;
     }
     if (stage.sender != ownSmartsConfNum_) {
-      const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
+      //const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
       if (!cscrypto::verifySignature(stage.packageSignature, smartConfidants().at(stage.sender)
           , finalSmartTransactionPack_.hash().toBinary().data()
           , finalSmartTransactionPack_.hash().toBinary().size())) {

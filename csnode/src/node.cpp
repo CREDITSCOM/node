@@ -1669,7 +1669,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   csdebug() << __func__ << ": starting #" << stage.sRoundNum;
   // hash of part received message
   stage.messageHash = cscrypto::calculateHash(bytes.data(), bytes.size());
-  csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
+  //csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
   cs::Bytes signedMessage;
   cs::DataStream signedStream(signedMessage);
@@ -1685,7 +1685,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
   csdebug() << "Fee constructed: " << fee.to_string();
   stage.fee = fee;
-
+  csdebug() << "StageHash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] (" 
       << cs::Utils::byteStreamToHex(stage.smartAddress.data(), stage.smartAddress.size()) << ") -  WRONG SIGNATURE!!!";
