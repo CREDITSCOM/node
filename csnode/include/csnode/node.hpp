@@ -327,6 +327,7 @@ private:
   struct SentSignatures {
     cs::BlockSignatures poolSignatures;
     cs::BlockSignatures roundSignatures;
+    cs::BlockSignatures trustedConfirmation;
   };
 
   cs::Bytes lastRoundTableMessage_;

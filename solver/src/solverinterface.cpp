@@ -209,6 +209,12 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       return;
     }
 
+    if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
+                                    stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
+      cswarning() << "Trusted Signatures are not valid !";
+      return;
+    }
+
     if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
       cswarning() << "Real Trusted are not valid !";
       return;

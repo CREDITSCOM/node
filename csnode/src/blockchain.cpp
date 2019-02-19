@@ -957,7 +957,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
 
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
-    csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << " see block info above";
+    csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << ", smartSignatures amount = " << deferredBlock_.smartSignatures().size() << ", see block info above";
     csdebug() << "----------------------------------------------------------------------------------";
   }
 
