@@ -436,7 +436,7 @@ void SmartContracts::test_exe_queue() {
   }
 }
 
-SmartContractStatus SmartContracts::get_smart_contrcat_status(const csdb::Address& addr) const
+SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Address& addr) const
 {
   if (!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));

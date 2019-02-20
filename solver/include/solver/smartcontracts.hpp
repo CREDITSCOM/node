@@ -235,16 +235,16 @@ public:
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
   }
 
-  SmartContractStatus get_smart_contrcat_status(const csdb::Address& addr) const;
+  SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
   bool is_running_smart_contract(const csdb::Address& addr) const
   {
-    return get_smart_contrcat_status(addr) == SmartContractStatus::Running;
+    return get_smart_contract_status(addr) == SmartContractStatus::Running;
   }
 
   bool is_closed_smart_contract(const csdb::Address& addr) const
   {
-    return get_smart_contrcat_status(addr) == SmartContractStatus::Closed;
+    return get_smart_contract_status(addr) == SmartContractStatus::Closed;
   }
 
   bool is_known_smart_contract(const csdb::Address& addr) const {
