@@ -64,8 +64,8 @@ namespace cs {
       void createFinalTransactionSet(const csdb::Amount finalFee);
       void sendFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
-      void gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
-        , uint8_t requesterNumber, uint8_t requiredNumber, cs::PublicKey& requester);
+      void gotSmartStageRequest(uint8_t msgType, const cs::PublicKey& smartAddress
+        , uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
 
       void requestSmartStages(int st);
       void requestSmartStagesNeighbors(int st);
@@ -105,7 +105,5 @@ namespace cs {
       std::vector<cs::Bytes> smartStageThreeMessage_;
 
       std::vector<cs::Stage> smartStageTemporary_;
-      //std::vector<SmartContracts::QueueItem>::iterator currentSmartPointer_;
-
   };
 }
