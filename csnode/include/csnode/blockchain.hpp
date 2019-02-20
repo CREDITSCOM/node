@@ -43,6 +43,12 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
+struct TrustedConfirmation {
+  bool bigBang = false;
+  cs::ConfidantsKeys confidants;
+  cs::BlockSignatures signatures;
+};
+
 class BlockChain {
 public:
   using Transactions  = std::vector<csdb::Transaction>;
@@ -118,6 +124,9 @@ public:
   cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
+
+  void addConfirmationToList(cs::RoundNumber, bool, cs::ConfidantsKeys, cs::BlockSignatures);
+  void removeConfirmationFromList(cs::RoundNumber);
 
   cs::Sequence getRequestedBlockNumber() const;
 
@@ -336,6 +345,9 @@ private:
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;
+  //confidant confirmation
+  std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
+
 };
 
 class TransactionsIterator {

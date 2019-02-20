@@ -198,6 +198,18 @@ cs::Sequence BlockChain::getLastSequence() const {
   }
 }
 
+void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::BlockSignatures confirmation) {
+  TrustedConfirmation tConfirmation;
+  tConfirmation.bigBang = bang;
+  tConfirmation.confidants = confidants;
+  tConfirmation.signatures = confirmation;
+  confirmationList_.emplace(rNum, tConfirmation);
+}
+
+void BlockChain::removeConfirmationFromList(cs::RoundNumber rNum) {
+  confirmationList_.erase(rNum);
+}
+
 const std::string CHEAT_FILENAME = "__integr.seq";
 
 std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
@@ -494,15 +506,64 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     csmeta(cserror) << "Couldn't compose block: " << pool.sequence();
     return false;
   }
-
+  cs::Sequence currentSequence = pool.sequence();
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
+  const auto rtMask = pool.realTrusted();
+  //size_t neededConfNumber = confidants.size() / 2U + 1U;
+  size_t neededConfNumber = rtMask.size() - std::count(rtMask.cbegin(), rtMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex);
+
+  csdebug() << "Finalize: starting confidants validation procedure";
+  if (currentSequence > 1) { 
+    cs::Bytes trustedToHash;
+    cs::DataStream tth(trustedToHash);
+    tth << currentSequence;
+    tth << confidants;
+
+
+
+    cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
+    if(confirmationList_.find(currentSequence) != confirmationList_.cend()){
+      const auto& prevConfidants = confirmationList_.at(currentSequence).confidants;
+      size_t signaturesCount = 0;
+      cs::BlockSignatures blockSigs = confirmationList_.at(currentSequence).signatures;
+      for (auto&[idxSender, signature] : blockSigs) {
+        if (idxSender >= confidants.size()) {
+          cserror() << "BlockChain> The number of signatures of Next Round Trusted doesn't correspond to the amount of last round confidants";
+          //return;
+        }
+
+        if (cscrypto::verifySignature(signature, prevConfidants.at(idxSender), trustedHash.data(), trustedHash.size())) {
+          ++signaturesCount;
+          csdebug() << "BlockChain> Signature of [" << static_cast<int>(idxSender) << "] is valid";
+        }
+        else {
+          csdebug() << "BlockChain> Signature of [" << static_cast<int>(idxSender) << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signature);
+        }
+      }
+
+      if (signaturesCount == blockSigs.size() && signaturesCount == neededConfNumber) {
+        csdebug() << "BlockChain> All confirmations of prepared this block Confidants are ok!";
+      }
+      else {
+        csdebug() << "BlockChain> Some  confirmations of prepared this block Confidants failed - We can't admit this block valid ... (return) continue";
+        //return;
+      }
+    }
+    else {
+      csdebug() << "BlockChain> There is no cell from round #:" << currentSequence;
+    }
+
+  }
+
   if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
      csmeta(csdebug) << "The pool #" << pool.sequence() << " doesn't contain signatures";
     return false;
   }
 
-  if (signatures.size() < confidants.size() / 2U + 1U && !isTrusted && pool.sequence() != 0) {
+  //if (signatures.size() < confidants.size() / 2U + 1U && !isTrusted && pool.sequence() != 0) {
+  if (signatures.size() < neededConfNumber && !isTrusted && pool.sequence() != 0) {
+  
      csmeta(csdebug) << "The number of signatures is insufficient";
     return false;
   }
@@ -954,7 +1015,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
       }
     }
   }
-
+  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
     csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << ", smartSignatures amount = " << deferredBlock_.smartSignatures().size() << ", see block info above";

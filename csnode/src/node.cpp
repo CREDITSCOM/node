@@ -1969,6 +1969,9 @@ void Node::sendRoundTable() {
   becomeWriter();
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
+  csdebug() << "SendRoundTable: addConfirmation for round " << conveyer.currentRoundTable().round << " trusted";
+  getBlockChain().addConfirmationToList(lastSentRoundData_.table.round, false, conveyer.confidants(), lastSentSignatures_.trustedConfirmation);
+
   conveyer.setRound(lastSentRoundData_.table.round);
 
   subRound_ = 0;
@@ -2069,7 +2072,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   // sync state check
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-
+  cs::ConfidantsKeys prevConfidants = conveyer.confidants();
   if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
     cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
     csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_)
@@ -2147,13 +2150,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   tth << confidants;
   cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
   //<-TR check start
-  if(rNum > 2){
+  if(rNum > 1){
     if (rt != nullptr){
       size_t signaturesCount = 0;
       for (auto&[idxSender, signature] : trustedConfirmation) {
         if (idxSender >= rt->confidants.size()) {
           cserror() << "NODE> The number of signatures of Next Round Trusted doesn't correspond to the amount of last round confidants";
-          return;
+          //return;
         }
 
         if (cscrypto::verifySignature(signature, rt->confidants.at(idxSender), trustedHash.data(), trustedHash.size())) {
@@ -2172,10 +2175,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
       }
       else {
         csdebug() << "NODE> Some  confirmations of NextRound Confidants failed - RoundTable is not valid! We can't go on ... return";
-        return;
+        //return;
       }
     }
   }
+  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, trustedConfirmation);
   //<-TR check finish
 
   cs::PacketsHashes hashes;

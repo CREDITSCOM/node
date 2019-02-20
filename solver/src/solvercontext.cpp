@@ -80,6 +80,11 @@ size_t SolverContext::cnt_trusted() const {
   return cs::Conveyer::instance().confidantsCount();
 }
 
+size_t SolverContext::cnt_real_trusted() const {
+  const auto rtMask = stage3(own_conf_number())->realTrustedMask;
+  return rtMask.size() - std::count(rtMask.cbegin(),rtMask.cend(),cs::ConfidantConsts::InvalidConfidantIndex);
+}
+
 const std::vector<cs::PublicKey>& SolverContext::trusted() const {
   return cs::Conveyer::instance().confidants();
 }
