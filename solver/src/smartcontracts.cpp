@@ -997,6 +997,11 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
           csdb::Transaction tr = create_new_state(*it);
           // result contains empty USRFLD[state::Value]
           tr.add_user_field(trx_uf::new_state::Value, std::string{});
+          // result contains error code "rejected by consensus"
+          using namespace cs::trx_uf;
+          ::general::Variant err_code;
+          err_code.__set_v_byte(error::ConsensusRejected);
+          tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
           if (tr.is_valid()) {
             unchanged_pack.addTransaction(tr);
           }

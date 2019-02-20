@@ -41,6 +41,8 @@ namespace cs {
     constexpr uint8_t Exception = 251;
     // replenished contract does not implement payable()
     constexpr uint8_t UnpayableReplenish = 250;
+    // the trusted consensus have rejected new_state (and emitted transactions)
+    constexpr uint8_t ConsensusRejected = 249;
   }
 
   // transactions user fields
