@@ -503,7 +503,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   
   if(is_contract) {
     // test contract was deployed (and maybe called successfully)
-    if (has_state) {
+    if (!has_state) {
       cslog() << log_prefix << "unable execute not successfully deployed contract, drop transaction";
       return true; // block from conveyer sync
     }
@@ -1126,37 +1126,41 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
 
 bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
 
-  std::shared_lock lock_read(known_contracts_lock);
-
-  auto item = known_contracts.find(abs_addr);
-  if (item == known_contracts.end()) {
-    // unknown contract
-    return false;
+  {
+    // the most frequent fast test
+    std::shared_lock lock_read(known_contracts_lock);
+    auto item = known_contracts.find(abs_addr);
+    if (item == known_contracts.end()) {
+      // unknown contract
+      return false;
+    }
+    const StateItem& val = item->second;
+    if (val.payable != PayableStatus::Unknown) {
+      return val.payable == PayableStatus::Implemented;
+    }
   }
 
-  lock_read.unlock();
-  std::unique_lock lock_write(known_contracts_lock);
-
-  StateItem& val = item->second;
-  if (val.payable != PayableStatus::Unknown) {
-    return val.payable == PayableStatus::Implemented;
-  }
-
-  // get byte code
+  // the first time test
   auto maybe_deploy = find_deploy_info(abs_addr);
+  PayableStatus result = PayableStatus::Unknown;
   if (!maybe_deploy.has_value()) {
-    val.payable = PayableStatus::Absent;  // to avoid subsequent unsuccessful calls
-    return false;
+    result = PayableStatus::Absent;
   }
-  const auto& deploy = maybe_deploy.value();
+  else {
+    if (implements_payable(maybe_deploy.value())) {
+      result = PayableStatus::Implemented;
+    }
+    else {
+      result = PayableStatus::Absent;
+    }
+  }
 
-  // make blocking call to executor
-  if (implements_payable(deploy)) {
-    val.payable = PayableStatus::Implemented;
-    return true;
+  std::unique_lock lock_write(known_contracts_lock);
+  auto item = known_contracts.find(abs_addr);
+  if (item != known_contracts.end()) {
+    item->second.payable = result;
   }
-  val.payable = PayableStatus::Absent;
-  return false;
+  return result == PayableStatus::Implemented;
 }
 
 bool SmartContracts::implements_payable(const api::SmartContractInvocation& contract) {
