@@ -99,9 +99,6 @@ public:
     return recordBlock(pool, true);
   }
 
-private:
- 
-public:
   void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
   size_t getSize() const;
   csdb::PoolHash getLastHash() const;
@@ -115,7 +112,6 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
-  cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
 
@@ -168,6 +164,7 @@ public:
   const csdb::Storage& getStorage() const;
 
   void addNewWalletsToPool(csdb::Pool& pool);
+
 private:
 
   void writeGenesisBlock();
