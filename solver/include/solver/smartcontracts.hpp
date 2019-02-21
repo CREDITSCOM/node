@@ -261,7 +261,7 @@ public:
 
 private:
   // capture_transaction implementation
-  void capture(const csdb::Transaction& tr, std::promise<bool> is_captured);
+  void capture(const csdb::Transaction& tr, std::shared_ptr< std::promise<bool> > pcaptured);
 
 public:
   // flag to allow execution, depends on executor presence

@@ -9,6 +9,7 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <functional>
 
 namespace {
   const char *log_prefix = "Smart: ";
@@ -66,7 +67,7 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
 
   size_t cnt = known_contracts.size();
 
-  // consolidate contract states addressed by public keys with by wallet ids
+  // consolidate contract states addressed by public keys with those addressed by wallet ids
   auto pred = [](const auto& item) { return item.first.is_wallet_id(); };
   auto it = std::find_if(known_contracts.cbegin(), known_contracts.cend(), pred);
   while(it != known_contracts.cend()) {
@@ -450,23 +451,28 @@ SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Addres
 bool SmartContracts::capture_transaction(const csdb::Transaction& t)
 {
   // prepare call from SmartContracts' thread
-  std::promise<bool> is_captured;
-  std::future<bool> capture_result = is_captured.get_future();
-  csdb::Transaction clone = t.clone();
+  std::shared_ptr< std::promise<bool> > presult = std::make_shared<std::promise<bool>>();
+  std::future<bool> result = presult->get_future();
+  csdebug() << log_prefix << "schedule call to capture() from its thread, presult use_cnt is " << presult.use_count();
+
   // perform async call to capture() from SmartContracts' thread
   scheduler.InsertOnce(
-    0,
-    [&]() {
-      capture(clone, std::move(is_captured));
+    0, // immediately
+    [this, tr = std::move(t.clone()), presult]() {
+      csdebug() << log_prefix << "make call to capture() from SmartContracts thread, presult use_cnt is " << presult.use_count();
+      capture(tr, presult);
     },
-    false);
+    false // do not replace existing
+  );
 
-  // wait until call to capture() in SmartsContracts' thread completed and get the result
-  bool result = capture_result.get();
-  return result;
+  csdebug() << log_prefix << "call to capture() completed getting result, presult use_cnt is " << presult.use_count();
+  // wait until call to capture() in SmartsContracts' thread completed and return the result
+  bool ret = result.get();
+  csdebug() << log_prefix << "result is " << ret << ", presult use_cnt is " << presult.use_count();
+  return ret;
 }
 
-void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_captured)
+void SmartContracts::capture(const csdb::Transaction& tr, std::shared_ptr< std::promise<bool> > pcaptured)
 {
   // test smart contract as source of transaction
   csdb::Address abs_addr = absolute_address(tr.source());
@@ -483,7 +489,7 @@ void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_
     else {
       csdebug() << log_prefix << "smart contract is not allowed to emit transaction, drop it";
     }
-    is_captured.set_value(true); // block from conveyer sync
+    pcaptured->set_value(true); // block from conveyer sync
     return; 
   }
 
@@ -494,7 +500,7 @@ void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_
     // test contract was deployed (and maybe called successfully)
     if (it->second.state.empty()) {
       cslog() << log_prefix << "unable execute not successfully deployed contract, drop transaction";
-      is_captured.set_value(true); // block from conveyer sync
+      pcaptured->set_value(true); // block from conveyer sync
       return;
     }
 
@@ -503,14 +509,14 @@ void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_
     if(!is_payable(abs_addr)) {
       if(amount > std::numeric_limits<double>::epsilon()) {
         cslog() << log_prefix << "unable replenish balance of contract without payable() feature, drop transaction";
-        is_captured.set_value(true); // block from conveyer sync
+        pcaptured->set_value(true); // block from conveyer sync
         return;
       }
       else /*amount is 0*/ {
         if(!is_smart_contract(tr)) {
           // not deploy/execute/new_state transaction as well as smart is not payable
           cslog() << log_prefix << "unable call to payable(), feature is not implemented in contract, drop transaction";
-          is_captured.set_value(true); // block from conveyer sync
+          pcaptured->set_value(true); // block from conveyer sync
           return;
         }
       }
@@ -525,7 +531,7 @@ void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_
             auto invoke = deserialize<api::SmartContractInvocation>( std::move( data ) );
             if( invoke.method == PayableName ) {
               cslog() << log_prefix << "unable call to payable() directly, drop transaction";
-              is_captured.set_value(true); // block from conveyer sync
+              pcaptured->set_value(true); // block from conveyer sync
               return;
             }
           }
@@ -536,7 +542,7 @@ void SmartContracts::capture(const csdb::Transaction& tr, std::promise<bool> is_
     }
   }
 
-  is_captured.set_value(false); // allow pass to conveyer sync
+  pcaptured->set_value(false); // allow pass to conveyer sync
 }
 
 void SmartContracts::on_store_block(const csdb::Pool& block) {
