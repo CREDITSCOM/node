@@ -41,11 +41,8 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 : execution_allowed(true)
 , bc(blockchain)
 , scheduler(calls_queue_scheduler) {
-#if defined(DEBUG_SMARTS)
-  execution_allowed = false;
-#endif
 
-  // signals subscription (MUST execute AFTER the BlockChains has already subscribed)
+  // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
   
   // as event receiver:
   cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
@@ -333,13 +330,17 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     return;
   }
   SmartContractRef new_item(block.hash().clone(), block.sequence(), trx_idx);
-  if (!exe_queue.empty()) {
-    auto it = find_in_queue(new_item);
-    // test duplicated contract call
-    if (it != exe_queue.cend()) {
-      cserror() << log_prefix << "attempt to queue duplicated contract transaction, already queued on round #"
-                << it->seq_enqueue;
-      return;
+  
+  {
+    std::lock_guard l(exe_queue_lock);
+    if (!exe_queue.empty()) {
+      auto it = find_in_queue(new_item);
+      // test duplicated contract call
+      if (it != exe_queue.cend()) {
+        cserror() << log_prefix << "attempt to queue duplicated contract transaction, already queued on round #"
+          << it->seq_enqueue;
+        return;
+      }
     }
   }
 
@@ -370,9 +371,12 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   }
 
   cslog() << std::endl << log_prefix << "enqueue " << get_executed_method(new_item) << std::endl;
-  auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
-  queue_item.wait(new_item.sequence);
-  queue_item.consumed_fee += smart_round_fee(block); // taling costs of initial round
+  {
+    std::lock_guard l(exe_queue_lock);
+    auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
+    queue_item.wait(new_item.sequence);
+    queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
+  }
   test_exe_queue();
 }
 
@@ -409,6 +413,9 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
 }
 
 void SmartContracts::test_exe_queue() {
+
+  std::lock_guard l(exe_queue_lock);
+  
   // select next queue item
   while (!exe_queue.empty()) {
     auto next = exe_queue.begin();
@@ -449,6 +456,8 @@ void SmartContracts::test_exe_queue() {
 
 SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Address& addr) const
 {
+  std::lock_guard l(exe_queue_lock);
+
   if (!exe_queue.empty()) {
     const auto it = find_in_queue(absolute_address(addr));
     if (it != exe_queue.cend()) {
@@ -635,6 +644,9 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
 // tests max fee amount and round-based timeout on executed smart contracts;
 // invoked on every new block ready
 void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
+
+  std::lock_guard l(exe_queue_lock);
+
   if(!exe_queue.empty()) {
     for(auto& item : exe_queue) {
       // if smart is in executor or is under smart-consensus:
@@ -692,6 +704,8 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 
 void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
 {
+  std::lock_guard l(exe_queue_lock);
+
   if(it == exe_queue.cend()) {
     cserror() << log_prefix << "contract to remove is not in queue";
     return;
@@ -872,6 +886,9 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
 }
 
 void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
+  
+  std::lock_guard l(exe_queue_lock);
+
   auto it = find_in_queue(data.contract_ref);
   csdb::Transaction result{};
   if (it != exe_queue.end()) {
@@ -972,6 +989,9 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
 // get & handle rejected transactions
 // usually ordinary consensus may not reject smart-related transactions
 void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
+  
+  std::lock_guard l(exe_queue_lock);
+
   if (exe_queue.empty()) {
     cserror() << log_prefix << "get rejected smart transactions but execution queue is empty";
     return;

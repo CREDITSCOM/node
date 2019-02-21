@@ -207,31 +207,11 @@ public:
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
 
-  // true if target of transaction is smart contract which implements payable() method
-  bool is_payable_target( const csdb::Transaction& tr );
-
-  // true if transaction replenishes balance of smart contract
-  bool is_replenish_contract(const csdb::Transaction& tr);
-
   std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr);
-
-  static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
-
-  // non-static variant
-  csdb::Transaction get_transaction(const SmartContractRef& contract) const {
-    return SmartContracts::get_transaction(bc, contract);
-  }
-
-  void enqueue(const csdb::Pool& block, size_t trx_idx);
-  void on_new_state(const csdb::Pool& block, size_t trx_idx);
 
   // get & handle rejected transactions
   // usually ordinary consensus may reject smart-related transactions
   void on_reject(cs::TransactionsPacket& pack);
-
-  csconnector::connector::ApiHandlerPtr get_api() const {
-    return papi;
-  }
 
   csdb::Address absolute_address(const csdb::Address& optimized_address) const {
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
@@ -260,7 +240,7 @@ public:
   // method is thread-safe to be called from API thread
   bool capture_transaction(const csdb::Transaction& t);
 
-  // flag to allow execution, depends on executor presence
+  // flag to allow execution, also depends on executor presence
   bool execution_allowed;
 
 public signals:
@@ -401,6 +381,9 @@ private:
 
   // executiom queue
   std::vector<QueueItem> exe_queue;
+  // is locked in const methods:
+  mutable std::recursive_mutex exe_queue_lock;
+
   Node* pnode;
 
   // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
@@ -447,6 +430,7 @@ private:
   void remove_from_queue(std::vector<QueueItem>::const_iterator it);
 
   void remove_from_queue(const SmartContractRef& item) {
+    std::lock_guard l(exe_queue_lock);
     remove_from_queue(find_in_queue(item));
   }
 
@@ -454,10 +438,31 @@ private:
 
   void test_exe_queue();
 
+  // true if target of transaction is smart contract which implements payable() method
+  bool is_payable_target(const csdb::Transaction& tr);
+
+  // true if transaction replenishes balance of smart contract
+  bool is_replenish_contract(const csdb::Transaction& tr);
+
   // tests passed list of trusted nodes to contain own node
   bool contains_me(const std::vector<cs::PublicKey>& list) const {
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
   }
+
+  csconnector::connector::ApiHandlerPtr get_api() const {
+    return papi;
+  }
+
+  static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
+
+  // non-static variant
+  csdb::Transaction get_transaction(const SmartContractRef& contract) const {
+    return SmartContracts::get_transaction(bc, contract);
+  }
+
+  void enqueue(const csdb::Pool& block, size_t trx_idx);
+
+  void on_new_state(const csdb::Pool& block, size_t trx_idx);
 
   // perform async execution via API to remote executor
   // returns false if execution is canceled
