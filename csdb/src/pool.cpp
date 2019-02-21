@@ -130,6 +130,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it.second);
     }
 
+    os.put(trustedConfirmation_.size());
+    for (const auto& it : trustedConfirmation_){
+      os.put(it.first);
+      os.put(it.second);
+    }
+
     os.put(smartSignatures_.size());
     for (const auto& it : smartSignatures_) {
       os.put(it.smartKey);
@@ -265,6 +271,30 @@ class Pool::priv : public ::csdb::internal::shared_data {
     return true;
   }
 
+  bool getTrustedConfirmation(::csdb::priv::ibstream& is) {
+    size_t cnt = 0;
+    if (!is.get(cnt)) {
+      return false;
+    }
+
+    trustedConfirmation_.clear();
+    trustedConfirmation_.reserve(cnt);
+    for (size_t i = 0; i < cnt; ++i) {
+      cs::Byte index = 0;
+      cs::Signature sig;
+
+      if (!is.get(index)) {
+        return false;
+      }
+      if (!is.get(sig)) {
+        return false;
+      }
+
+      trustedConfirmation_.emplace_back(make_pair(index, sig));
+    }
+    return true;
+  }
+
   bool getSmartSignatures(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
     size_t confCount = 0;
@@ -353,6 +383,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
+    if (!getTrustedConfirmation(is)) {
+      csmeta(cswarning) << "get signatures is failed";
+      return false;
+    }
+
+
     if (!getSmartSignatures(is)) {
       csmeta(cswarning) << "get smart signatures is failed";
       return false;
@@ -431,6 +467,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     result.signatures_ = signatures_;
     result.smartSignatures_ = smartSignatures_;
+    result.trustedConfirmation_ = trustedConfirmation_;
     result.realTrusted_ = realTrusted_;
     result.binary_representation_ = binary_representation_;
 
@@ -453,6 +490,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   size_t hashingLength_ = 0;
   csdb::Amount roundCost_;
   cs::BlockSignatures signatures_;
+  cs::BlockSignatures trustedConfirmation_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -499,6 +537,10 @@ Transaction Pool::transaction(size_t index) const {
 
 const std::vector<uint8_t>& Pool::realTrusted() const noexcept {
   return d->realTrusted_;
+}
+
+const cs::BlockSignatures& Pool::trustedConfirmation() const noexcept {
+  return d->trustedConfirmation_;
 }
 
 Transaction Pool::transaction(TransactionID id) const {
@@ -617,7 +659,6 @@ const cs::BlockSignatures& Pool::signatures() const noexcept {
 
 const ::std::vector<csdb::Pool::SmartSignature>& Pool::smartSignatures() const noexcept
 {
-  // TODO: вставьте здесь оператор return
   return d->smartSignatures_;
 }
 
@@ -678,9 +719,16 @@ void Pool::set_signatures(cs::BlockSignatures&& blockSignatures) noexcept {
 
 void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept
 {
-  //priv* data = d.data();
-  //data->is_valid_ = true;
-  //data->smartSignatures_.emplace_back(smartSignature);
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->smartSignatures_.emplace_back(smartSignature);
+}
+
+void Pool::add_trusted_confirmations(const cs::BlockSignatures& confirmations) noexcept
+{
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->trustedConfirmation_ = std::move(confirmations);
 }
 
 void Pool::add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept

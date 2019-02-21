@@ -7,6 +7,7 @@
 #include <csnode/transactionsvalidator.hpp>
 
 #include <memory>
+#include <set>
 
 namespace cs {
 class TransactionsPacket;
@@ -50,6 +51,7 @@ protected:
 
   cs::StageOne stage;
   std::unique_ptr<cs::TransactionsValidator> ptransval;
+  std::set<csdb::Address> smartSourceInvalidSignatures_;
 
   /**
    * @fn  void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
@@ -69,6 +71,7 @@ protected:
   cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
   void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
   void checkRejectedSmarts(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
+  void checkSignaturesSmartSource(SolverContext&, cs::Packets& smartContractsPackets);
 };
 
 }  // namespace slv2

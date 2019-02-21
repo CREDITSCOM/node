@@ -438,8 +438,8 @@ namespace cs{
     csdebug() << log_prefix << "==============================================> TRANSACTION SENT TO CONVEYER";
   }
 
-  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::PublicKey smartAddress
-      , uint8_t requesterNumber, uint8_t requiredNumber, cs::PublicKey& requester) {
+  void SmartConsensus::gotSmartStageRequest(uint8_t msgType, const cs::PublicKey& smartAddress
+      , uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester) {
     
     if (smartAddress_ != smartAddress) {
       return;

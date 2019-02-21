@@ -185,6 +185,8 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
   csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(stage.blockSignature);
   csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(stage.roundHash);
   csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(stage.roundSignature);
+  csdebug() << "     TrustHash = " << cs::Utils::byteStreamToHex(stage.trustedHash);
+  csdebug() << "     TrustSign = " << cs::Utils::byteStreamToHex(stage.trustedSignature);
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
@@ -204,6 +206,12 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
       cswarning() << "Round Signatures are not valid !";
+      return;
+    }
+
+    if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
+                                    stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
+      cswarning() << "Trusted Signatures are not valid !";
       return;
     }
 
@@ -271,13 +279,7 @@ size_t SolverCore::stagesThree() {
 }
 
 void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
-  // DEBUG:
-#if defined(DEBUG_SMARTS)
-    if(SmartContracts::is_smart_contract(tr)) {
-    psmarts->force_execution = true;
-  }
-#endif
-    if(psmarts->capture(tr)) {
+    if(psmarts->capture_transaction(tr)) {
       // avoid pass to conveyer, psmarts provide special handling
       return;
     }
