@@ -250,6 +250,7 @@ public:
   }
 
   bool is_known_smart_contract(const csdb::Address& addr) const {
+    std::shared_lock lock_read(known_contracts_lock);
     return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
   }
 
@@ -259,11 +260,6 @@ public:
   // method is thread-safe to be called from API thread
   bool capture_transaction(const csdb::Transaction& t);
 
-private:
-  // capture_transaction implementation
-  void capture(const csdb::Transaction& tr, std::shared_ptr< std::promise<bool> > pcaptured);
-
-public:
   // flag to allow execution, depends on executor presence
   bool execution_allowed;
 
@@ -317,6 +313,8 @@ private:
 
   // last contract's state storage
   std::map<csdb::Address, StateItem> known_contracts;
+  // is locked in const methods also:
+  mutable std::shared_mutex known_contracts_lock;
 
   // contract replenish transactions stored during reading from DB on stratup
   std::vector<SmartContractRef> replenish_contract;
@@ -325,7 +323,7 @@ private:
   std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
 
   struct QueueItem {
-    // reference to smart in blockchain (block/transaction) that spawns execution
+    // reference to smart in block chain (block/transaction) that spawns execution
     SmartContractRef ref_start;
     // current status (running/waiting)
     SmartContractStatus status;
@@ -406,7 +404,7 @@ private:
   Node* pnode;
 
   // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
-  std::mutex mtx_emit_transaction;
+  cs::SpinLock emit_transaction_lock;
 
   // emitted transactions if any while execution running
   std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
