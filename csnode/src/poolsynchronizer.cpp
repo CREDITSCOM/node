@@ -25,11 +25,11 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
   csmeta(csdebug) << "Pool sync data : \n"
                   << std::setw(hl) << "Fast mode:        " << std::setw(vl) << syncData_.isFastMode << "\n"
                   << std::setw(hl) << "One reply block:  " << std::setw(vl) << syncData_.oneReplyBlock << "\n"
-                  << std::setw(hl) << "Block pools:      " << std::setw(vl) << cs::numeric_cast<int>(syncData_.blockPoolsCount) << "\n"
+                  << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(syncData_.blockPoolsCount) << "\n"
                   << std::setw(hl) << "Request round:    " << std::setw(vl)
-                  << cs::numeric_cast<int>(syncData_.requestRepeatRoundCount) << "\n"
+                  << static_cast<int>(syncData_.requestRepeatRoundCount) << "\n"
                   << std::setw(hl) << "Neighbour packets:" << std::setw(vl)
-                  << cs::numeric_cast<int>(syncData_.neighbourPacketsCount) << "\n"
+                  << static_cast<int>(syncData_.neighbourPacketsCount) << "\n"
                   << std::setw(hl) << "Polling frequency:" << std::setw(vl) << syncData_.sequencesVerificationFrequency;
 }
 
@@ -78,8 +78,8 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
   const bool useTimer = syncData_.sequencesVerificationFrequency > 1;
   const int delay = useTimer ?
-                    cs::numeric_cast<int>(syncData_.sequencesVerificationFrequency) :
-                    cs::numeric_cast<int>(cs::NeighboursRequestDelay);
+                    static_cast<int>(syncData_.sequencesVerificationFrequency) :
+                    static_cast<int>(cs::NeighboursRequestDelay);
 
   // already synchro start
   if (isSyncroStarted_ && !useTimer) {
@@ -182,7 +182,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
   for (auto& neighbour : neighbours_) {
     if (!getNeededSequences(neighbour)) {
-      csmeta(csdetails) << "Neighbor: " << cs::numeric_cast<int>(neighbour.index()) << " is busy";
+      csmeta(csdetails) << "Neighbor: " << static_cast<int>(neighbour.index()) << " is busy";
       continue;
     }
 
@@ -215,7 +215,7 @@ bool cs::PoolSynchronizer::isFastMode() const {
 
   const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() -
                            blockChain_->getCachedBlocksSize();
-  return sum > cs::numeric_cast<cs::Sequence>(syncData_.blockPoolsCount * 3);  // roundDifferentForSync_
+  return sum > static_cast<cs::Sequence>(syncData_.blockPoolsCount * 3);  // roundDifferentForSync_
 }
 
 //
@@ -289,8 +289,8 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
   const float last = float(lastWrittenSequence + cachedBlocksSize);
   const float global = float(globalSequence - 1);
   const float maxValue = 100.0f;
-  const uint32_t syncStatus = cs::numeric_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
-  const uint32_t remaining = cs::numeric_cast<uint32_t>(global - last);
+  const uint32_t syncStatus = static_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
+  const uint32_t remaining = static_cast<uint32_t>(global - last);
 
   ProgressBar bar;
   std::cout << "\n";
@@ -381,7 +381,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
 
     neighbour.reset();
-    const int nhIdx = cs::numeric_cast<int>(neighbour.index());
+    const int nhIdx = static_cast<int>(neighbour.index());
     for (const auto& [sequence, packet] : requestedSequences_) {
       (void)packet;
       neighbour.addSequences(sequence);
@@ -545,16 +545,16 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
-  const uint8_t neededNeighboursCount = cs::numeric_cast<uint8_t>(transport_->getNeighboursCountWithoutSS());
-  const uint8_t nSize = cs::numeric_cast<uint8_t>(neighbours_.size());
+  const uint8_t neededNeighboursCount = static_cast<uint8_t>(transport_->getNeighboursCountWithoutSS());
+  const uint8_t nSize = static_cast<uint8_t>(neighbours_.size());
 
   if (nSize == neededNeighboursCount) {
     return;
   }
 
-  csmeta(csdetails) << "Neighbours count without ss: " << cs::numeric_cast<int>(neededNeighboursCount);
+  csmeta(csdetails) << "Neighbours count without ss: " << static_cast<int>(neededNeighboursCount);
 
-  const uint8_t allNeighboursCount = cs::numeric_cast<uint8_t>(transport_->getNeighboursCount());
+  const uint8_t allNeighboursCount = static_cast<uint8_t>(transport_->getNeighboursCount());
 
   // Add new neighbours
   if (nSize < neededNeighboursCount) {
