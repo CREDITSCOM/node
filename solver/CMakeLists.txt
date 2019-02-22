@@ -5,6 +5,7 @@ project(solver)
 # turn off optimization for this project in RelWithDebInfo only
 if (MSVC)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
+    set(CMAKE_CXX_FLAGS_RELSPAM "${CMAKE_CXX_FLAGS_RELSPAM} /Od /Ob0")
 endif()
 
 add_definitions(-D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
