@@ -78,8 +78,8 @@ public:
   void smartStageEmptyReply(uint8_t requesterNumber);
   void smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendSmartStageReply(const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature
-      , const MsgTypes msgType, const cs::PublicKey requester);
+  void sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature
+      , const MsgTypes msgType, const cs::PublicKey& requester);
 
   void addSmartConsensus(const cs::PublicKey& smartAddress);
   void removeSmartConsensus(const cs::PublicKey& smartAddress);

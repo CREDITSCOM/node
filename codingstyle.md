@@ -14,15 +14,19 @@ Glance coding style guide description.
 
 - 1 space after if/else switch instructions
 - else operator use on the next line after closing bracket
+- if/else operator with one code line must be used with brackets
 
 >```cpp
 >
 >void bracketsExample() {
+>   foo();
 >}
 >
 >if (transactions.empty()) {
+>   foo();
 >}
 >else {
+>   bar();
 >}
 
 ### Types
@@ -32,6 +36,12 @@ Glance coding style guide description.
 >int i = 0;
 >int& ref = i;
 >int* pointer = &ref;
+
+- variable instantiation must starts on new line
+>```cpp
+>int first = 0;
+>int second = 0;
+>int* third = &second;
 
 ### Naming convention
 

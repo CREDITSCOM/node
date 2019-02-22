@@ -37,7 +37,7 @@ class Fee;
 class TransactionsPacket;
 
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
-using StoreBlockSignal = cs::Signal<void(const csdb::Pool)>;
+using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
@@ -106,9 +106,6 @@ public:
     return recordBlock(pool, true);
   }
 
-private:
- 
-public:
   void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
   size_t getSize() const;
   csdb::PoolHash getLastHash() const;
@@ -122,7 +119,6 @@ public:
   void removeLastBlock();
 
   static csdb::Address getAddressFromKey(const std::string&);
-  cs::Bytes getKeyFromAddress(csdb::Address&) const;
 
   cs::Sequence getLastSequence() const;
 
@@ -181,6 +177,7 @@ public:
   const csdb::Storage& getStorage() const;
 
   void addNewWalletsToPool(csdb::Pool& pool);
+
 private:
 
   void writeGenesisBlock();
@@ -308,10 +305,10 @@ public slots:
 
   // prototype is void (csdb::Transaction)
   // subscription is placed in SmartContracts constructor
-  void onPayableContractReplenish(csdb::Transaction starter) {
+  void onPayableContractReplenish(const csdb::Transaction& starter) {
     this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
   }
-  void onPayableContractTimeout(csdb::Transaction starter) {
+  void onPayableContractTimeout(const csdb::Transaction& starter) {
     this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
   }
 

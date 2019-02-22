@@ -437,8 +437,6 @@ void BlockChain::removeLastBlock() {
 
   removeWalletsInPoolFromCache(pool);
 
-  cachedBlocks_.erase(cachedBlocks_.lower_bound(pool.sequence()), cachedBlocks_.end());
-
   emit removeBlockEvent(pool.sequence());
 
   csmeta(csdebug) << "done";
@@ -1157,11 +1155,11 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   if (pool_seq == last_seq + 1) {
     if (pool.previous_hash() != getLastHash()) {
       csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
-      if(getLastHash().is_empty()) {
-        cswarning() << "BLOCKCHAIN> own last hash is empty";
+      if (getLastHash().is_empty()) {
+        cserror() << "BLOCKCHAIN> own last hash is empty";
       }
-      if(pool.previous_hash().is_empty()) {
-        cswarning() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
+      if (pool.previous_hash().is_empty()) {
+        cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
       }
       removeLastBlock();
       return false;
@@ -1184,7 +1182,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     if (recordBlock(pool, false).has_value()) {
       csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
       // unable to call because stack overflow in case of huge written blocks amount possible:
-      //testCachedBlocks();
+      // testCachedBlocks();
       return true;
     }
     csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
@@ -1210,39 +1208,41 @@ void BlockChain::testCachedBlocks() {
   csdebug() << "BLOCKCHAIN> test cached blocks";
   if (cachedBlocks_.empty()) {
     csdebug() << "BLOCKCHAIN> no cached blocks";
+    return;
   }
-  // retrieve blocks until cache empty or block sequence is interrupted
-  while (!cachedBlocks_.empty()) {
-    size_t desired_seq = getLastSequence() + 1;
-    const auto oldest = cachedBlocks_.cbegin();
-    if (oldest->first < desired_seq) {
-      // clear outdated block and select next one:
-      csdebug() << "BLOCKCHAIN> remove outdated block #" << oldest->first << " from cache";
-      cachedBlocks_.erase(oldest);
+
+  auto lastSeq = getLastSequence() + 1;
+  // clear unnecessary sequence
+  if (cachedBlocks_.cbegin()->first < lastSeq) {
+    auto it = cachedBlocks_.lower_bound(lastSeq);
+    if (it != cachedBlocks_.begin()) {
+      csdebug() << "BLOCKCHAIN> Remove outdated blocks up to #" << (*it).first << " from cache";
+      cachedBlocks_.erase(cachedBlocks_.begin(), it);
     }
-    else if (oldest->first == desired_seq) {
-      csdebug() << "BLOCKCHAIN> retrieve required block #" << desired_seq << " from cache";
+  }
+
+  while (!cachedBlocks_.empty()) {
+    const auto firstBlockInCache = cachedBlocks_.cbegin();
+
+    if ((*firstBlockInCache).first == lastSeq) {
+      csdebug() << "BLOCKCHAIN> Retrieve required block #" << lastSeq << " from cache";
       // retrieve and use block if it is exactly what we need:
-      auto& data = cachedBlocks_.at(desired_seq);
-      bool ok = storeBlock(data.pool, data.by_sync);
+
+      const bool ok = storeBlock((*firstBlockInCache).second.pool, (*firstBlockInCache).second.by_sync);
+      cachedBlocks_.erase(firstBlockInCache);
       if (!ok) {
-        cserror() << "BLOCKCHAIN> failed to record cached block to chain, drop it & wait to request again";
+        cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";
+        break;
       }
-      cachedBlocks_.erase(desired_seq);
+      ++lastSeq;
     }
     else {
       // stop processing, we have not got required block in cache yet
+      csdebug() << "BLOCKCHAIN> Stop store block from cache. Next blocks in cache #" << (*firstBlockInCache).first;
       break;
     }
   }
 }
-
-/*cs::Bytes BlockChain::getKeyFromAddress(csdb::Address& addr) const {
-  if (!addr.is_public_key())
-    findAddrByWalletId(addr.wallet_id(), addr);
-
-  return addr.public_key();
-}*/
 
 std::size_t BlockChain::getCachedBlocksSize() const {
   return cachedBlocks_.size();
