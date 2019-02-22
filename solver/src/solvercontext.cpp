@@ -93,8 +93,8 @@ void SolverContext::request_round_table() const {
   //        core.pnode->sendRoundTableRequest(core.cur_round);
 }
 
-bool SolverContext::addSignaturesToLastBlock(BlockSignatures&& blockSignatures) {
-  return core.addSignaturesToDeferredBlock(std::move(blockSignatures));
+bool SolverContext::addSignaturesToLastBlock(Signatures&& signatures) {
+  return core.addSignaturesToDeferredBlock(std::move(signatures));
 }
 
 Role SolverContext::role() const {

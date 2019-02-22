@@ -368,7 +368,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender, cs::BlockSignatures&& poolSignatures) {
+                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures) {
   csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -395,7 +395,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.timestamp;
   poolStream >> characteristic.mask;
   poolStream >> poolMetaInfo.sequenceNumber;
-  poolStream >> poolMetaInfo.realTrustedMask;
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
 
@@ -1912,9 +1911,22 @@ void Node::checkForSavedSmartStages(const cs::PublicKey& smartAddress) {
 
 //TODO: this function is a part of round table building <===
 void Node::addRoundSignature(const cs::StageThree& st3) {
-  lastSentSignatures_.poolSignatures.emplace_back(st3.sender, st3.blockSignature);
-  lastSentSignatures_.roundSignatures.emplace_back(st3.sender, st3.roundSignature);
-  lastSentSignatures_.trustedConfirmation.emplace_back(st3.sender,st3.trustedSignature);
+  size_t pos =0;
+  for (size_t i = 0; i < st3.realTrustedMask.size(); i++) {
+    if (i == static_cast<size_t>(st3.sender)) {
+      break;
+    }
+    if (st3.realTrustedMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
+      ++pos;
+    }
+  }
+  csdebug() << "NODE> pos = " << pos 
+    << ", poolSigsSize = "<< lastSentSignatures_.poolSignatures.size()
+    << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
+    << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
+  std::copy(st3.blockSignature.cbegin(), st3.blockSignature.cend(), lastSentSignatures_.poolSignatures[pos].begin());
+  std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend() ,lastSentSignatures_.roundSignatures[pos].begin());
+  std::copy(st3.trustedSignature.cbegin(), st3.trustedSignature.cend(), lastSentSignatures_.trustedConfirmation[pos].begin());
 
   csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
             << ") = " << lastSentSignatures_.roundSignatures.size();
@@ -1970,7 +1982,7 @@ void Node::sendRoundTable() {
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   csdebug() << "SendRoundTable: addConfirmation for round " << conveyer.currentRoundTable().round << " trusted";
-  getBlockChain().addConfirmationToList(lastSentRoundData_.table.round, false, conveyer.confidants(), lastSentSignatures_.trustedConfirmation);
+  getBlockChain().addConfirmationToList(lastSentRoundData_.table.round, false, conveyer.confidants(), getBlockChain().getLastBlockTrustedMask(), lastSentSignatures_.trustedConfirmation);
 
   conveyer.setRound(lastSentRoundData_.table.round);
 
@@ -2013,11 +2025,11 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   lastRoundTableMessage_.reserve(expectedMessageSize);
   cs::DataStream stream(lastRoundTableMessage_);
   stream << lastSentRoundData_.table.confidants;
+  stream << poolMetaInfo.realTrustedMask;
   stream << lastSentRoundData_.table.hashes;
   stream << poolMetaInfo.timestamp;
   stream << lastSentRoundData_.table.characteristic.mask;
   stream << poolMetaInfo.sequenceNumber;
-  stream << poolMetaInfo.realTrustedMask;
   stream << poolMetaInfo.previousHash;
   //stream << lastSentRoundData_.poolMetaInfo.writerKey; -- we don't need to send this
   cs::Bytes trustedList;
@@ -2036,9 +2048,18 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
   st3.roundSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
 
   //here should be placed parcing of round table
+
+  size_t sigSize = getBlockChain().realTrustedValue(poolMetaInfo.realTrustedMask);
+  csdebug() << "NODE> PoolSignatures reserved to size = " << sigSize;
   lastSentSignatures_.poolSignatures.clear();
+  lastSentSignatures_.poolSignatures.resize(sigSize);
   lastSentSignatures_.roundSignatures.clear();
+  lastSentSignatures_.roundSignatures.resize(sigSize);
   lastSentSignatures_.trustedConfirmation.clear();
+  lastSentSignatures_.trustedConfirmation.resize(sigSize);
+  csdebug() << "NODE> poolSigsSize = " << lastSentSignatures_.poolSignatures.size()
+    << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
+    << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
 }
 
 void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3) {
@@ -2094,15 +2115,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
   cs::DataStream stream(bytes.data(), bytes.size());
 
-  cs::BlockSignatures poolSignatures;
+  cs::Signatures poolSignatures;
   stream >> poolSignatures;
   csdebug() << "NODE> PoolSignatures Amount = " << poolSignatures.size();
 
-  cs::BlockSignatures roundSignatures;
+  cs::Signatures roundSignatures;
   stream >> roundSignatures;
 
-  cs::BlockSignatures trustedConfirmation;
+  cs::Signatures trustedConfirmation;
   stream >> trustedConfirmation;
+
 
   csdebug() << "NODE> TrustedSignatures Amount = " << trustedConfirmation.size();
   csdebug() << "NODE> RoundSignatures Amount = " << roundSignatures.size();
@@ -2111,37 +2133,48 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   auto rt = conveyer.roundTable(rNum - 1);
 
   cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
-  if (rt != nullptr) {
-    size_t signaturesCount = 0;
-    for (auto& [idxSender, signature] : roundSignatures) {
-      if (idxSender >= rt->confidants.size()) {
-        cserror() << "NODE> The number of signatures in Round Table doesn't correspond to the amount of last round confidants";
-        return;
-      }
+  //if (rt != nullptr) {
+  //  size_t signaturesCount = 0;
+  //  for (auto& [idxSender, signature] : roundSignatures) {
+  //    if (idxSender >= rt->confidants.size()) {
+  //      cserror() << "NODE> The number of signatures in Round Table doesn't correspond to the amount of last round confidants";
+  //      return;
+  //    }
 
-      if (cscrypto::verifySignature(signature, rt->confidants.at(idxSender), tempHash.data(), tempHash.size())) {
-        ++signaturesCount;
-      }
-    }
+  //    if (cscrypto::verifySignature(signature, rt->confidants.at(idxSender), tempHash.data(), tempHash.size())) {
+  //      ++signaturesCount;
+  //    }
+  //  }
 
-    size_t neededConfNumber = rt->confidants.size() / 2U + 1U;
+  //  size_t neededConfNumber = rt->confidants.size() / 2U + 1U;
 
-    if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
-      csdebug() << "NODE> All signatures in RoundTable are ok!";
-    }
-    else {
-      csdebug() << "NODE> RoundTable is not valid! But we continue ...";
-      //return;
-    }
-  }
+  //  if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
+  //    csdebug() << "NODE> All signatures in RoundTable are ok!";
+  //  }
+  //  else {
+  //    csdebug() << "NODE> RoundTable is not valid! But we continue ...";
+  //    //return;
+  //  }
+  //}
 
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
-
   if (confidants.empty()) {
     csmeta(cserror) << "Illegal confidants count in round table";
     return;
+  }
+  cs::Bytes realTrusted;
+  roundStream >> realTrusted;
+  if (realTrusted.size() != prevConfidants.size()) {
+    csmeta(cserror) << "Illegal trusted mask count in round table";
+    return;
+  }
+  if (!getBlockChain().checkGroupSignature(prevConfidants, realTrusted, roundSignatures, tempHash)) {
+    csdebug() << "NODE> The roundtable signatures are NOT OK";
+  }
+  else {
+    csdebug() << "NODE> The roundtable signatures are ok";
   }
 
   cs::Bytes trustedToHash;
@@ -2149,37 +2182,20 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   tth << rNum;
   tth << confidants;
   cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-  //<-TR check start
+  auto& mask = getBlockChain().getLastBlockTrustedMask();
+  //<-TR check start 
+  size_t cnt = 0;
   if(rNum > 1){
     if (rt != nullptr){
-      size_t signaturesCount = 0;
-      for (auto&[idxSender, signature] : trustedConfirmation) {
-        if (idxSender >= rt->confidants.size()) {
-          cserror() << "NODE> The number of signatures of Next Round Trusted doesn't correspond to the amount of last round confidants";
-          //return;
-        }
-
-        if (cscrypto::verifySignature(signature, rt->confidants.at(idxSender), trustedHash.data(), trustedHash.size())) {
-          ++signaturesCount;
-          csdebug() << "NODE> Signature of [" <<  static_cast<int>(idxSender) <<  "] is valid";
-        }
-        else {
-          csdebug() << "NODE> Signature of [" << static_cast<int>(idxSender) << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signature);
-        }
-      }
-
-      size_t neededConfNumber = rt->confidants.size() / 2U + 1U;
-
-      if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
-        csdebug() << "NODE> All confirmations of NextRound Confidants are ok!";
+      if(getBlockChain().checkGroupSignature(prevConfidants,mask,trustedConfirmation,trustedHash)) {
+        csdebug() << "NODE> The trusted confirmation for the next round are ok";
       }
       else {
-        csdebug() << "NODE> Some  confirmations of NextRound Confidants failed - RoundTable is not valid! We can't go on ... return";
-        //return;
+        csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";
       }
     }
   }
-  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, trustedConfirmation);
+  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, realTrusted, trustedConfirmation);
   //<-TR check finish
 
   cs::PacketsHashes hashes;

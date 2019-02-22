@@ -110,31 +110,28 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(wall);
     }
 
-    os.put(next_confidants_.size());
-    for (const auto& it : next_confidants_) {
+    os.put(realTrusted_);
+
+    for (const auto& it : confidants_) {
       os.put(it);
     }
 
-    os.put(realTrusted_);
+    os.put(roundConfirmationMask_);
+    for (const auto& it : roundConfirmations_){
+      os.put(it);
+    }
 
     if (doHash) {
       return;
     }
-
     const_cast<size_t&>(hashingLength_) = os.buffer().size();
     os.put(hashingLength_);
 
-    os.put(signatures_.size());
     for (const auto& it : signatures_) {
-      os.put(it.first);
-      os.put(it.second);
+      os.put(it);
     }
 
-    os.put(trustedConfirmation_.size());
-    for (const auto& it : trustedConfirmation_){
-      os.put(it.first);
-      os.put(it.second);
-    }
+
 
     os.put(smartSignatures_.size());
     for (const auto& it : smartSignatures_) {
@@ -166,8 +163,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(wall);
     }
 
-    os.put(next_confidants_.size());
-    for (const auto& it : next_confidants_) {
+    os.put(confidants_.size());
+    for (const auto& it : confidants_) {
       os.put(it);
     }
 
@@ -231,66 +228,82 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool getConfidants(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt)) {
-      return false;
+    //if (!is.get(cnt)) {
+    //  return false;
+    //}
+    for (auto& it : realTrusted_) {
+      if (it != 255) {
+        ++cnt;
+      }
     }
 
-    next_confidants_.clear();
-    next_confidants_.reserve(cnt);
+    confidants_.clear();
+    confidants_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       cs::PublicKey conf;
       if (!is.get(conf)) {
         return false;
       }
-      next_confidants_.emplace_back(conf);
+      confidants_.emplace_back(conf);
     }
     return true;
   }
 
   bool getSignatures(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt)) {
-      return false;
+    //if (!is.get(cnt)) {
+    //  return false;
+    //}
+
+    for (auto& it : realTrusted_) {
+      if (it != 255) {
+        ++cnt;
+      }
     }
 
     signatures_.clear();
     signatures_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      cs::Byte index = 0;
+      //cs::Byte index = 0;
       cs::Signature sig;
 
-      if (!is.get(index)) {
-        return false;
-      }
+      //if (!is.get(index)) {
+      //  return false;
+      //}
       if (!is.get(sig)) {
         return false;
       }
 
-      signatures_.emplace_back(make_pair(index, sig));
+      signatures_.push_back(sig);
     }
     return true;
   }
 
   bool getTrustedConfirmation(::csdb::priv::ibstream& is) {
     size_t cnt = 0;
-    if (!is.get(cnt)) {
-      return false;
+    //if (!is.get(cnt)) {
+    //  return false;
+    //}
+
+    for (auto& it : realTrusted_) {
+      if (it != 255) {
+        ++cnt;
+      }
     }
 
-    trustedConfirmation_.clear();
-    trustedConfirmation_.reserve(cnt);
+    roundConfirmations_.clear();
+    roundConfirmations_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-      cs::Byte index = 0;
       cs::Signature sig;
 
-      if (!is.get(index)) {
-        return false;
-      }
+      //if (!is.get(index)) {
+      //  return false;
+      //}
       if (!is.get(sig)) {
         return false;
       }
 
-      trustedConfirmation_.emplace_back(make_pair(index, sig));
+      roundConfirmations_.push_back(sig);//emplace_back(make_pair(index, sig));
     }
     return true;
   }
@@ -348,6 +361,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool get(::csdb::priv::ibstream& is) {
     size_t cnt;
+
     if (!get_meta(is, cnt)) {
       csmeta(cswarning) << "get meta is failed";
       return false;
@@ -363,17 +377,29 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    if (!getConfidants(is)) {
-      csmeta(cswarning) << "get confidants is failed";
-      return false;
-    }
-
     if (!is.get(realTrusted_)) {
       csmeta(cswarning) << "get real trusted is failed";
       return false;
     }
 
-    if(!is.get(hashingLength_)) {
+    if (!getConfidants(is)) {
+      csmeta(cswarning) << "get confidants is failed";
+      return false;
+    }
+
+    if (!is.get(roundConfirmationMask_)) {
+      csmeta(cswarning) << "get real trusted is failed";
+      return false;
+    }
+
+
+    if (!getTrustedConfirmation(is)) {
+      csmeta(cswarning) << "get signatures is failed";
+      return false;
+    }
+
+
+    if (!is.get(hashingLength_)) {
       csmeta(cswarning) << "get hashing length is failed";
       return false;
     }
@@ -382,12 +408,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
       csmeta(cswarning) << "get signatures is failed";
       return false;
     }
-
-    if (!getTrustedConfirmation(is)) {
-      csmeta(cswarning) << "get signatures is failed";
-      return false;
-    }
-
 
     if (!getSmartSignatures(is)) {
       csmeta(cswarning) << "get smart signatures is failed";
@@ -449,7 +469,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     result.hash_ = hash_.clone();
     result.previous_hash_ = previous_hash_.clone();
     result.sequence_ = sequence_;
-    result.next_confidants_ = next_confidants_;
+    result.confidants_ = confidants_;
     result.hashingLength_ = hashingLength_;
     result.roundCost_ = roundCost_;
 
@@ -467,8 +487,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
     result.signatures_ = signatures_;
     result.smartSignatures_ = smartSignatures_;
-    result.trustedConfirmation_ = trustedConfirmation_;
+    result.roundConfirmations_ = roundConfirmations_;
     result.realTrusted_ = realTrusted_;
+    result.roundConfirmationMask_ = roundConfirmationMask_;
     result.binary_representation_ = binary_representation_;
 
     result.storage_ = storage_;
@@ -481,16 +502,17 @@ class Pool::priv : public ::csdb::internal::shared_data {
   PoolHash hash_;
   PoolHash previous_hash_;
   cs::Sequence sequence_ {};
-  std::vector<cs::PublicKey> next_confidants_;
+  std::vector<cs::PublicKey> confidants_;
   ::std::vector<Transaction> transactions_;
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
   std::vector<uint8_t> realTrusted_;
+  std::vector<uint8_t> roundConfirmationMask_;
   size_t hashingLength_ = 0;
   csdb::Amount roundCost_;
-  cs::BlockSignatures signatures_;
-  cs::BlockSignatures trustedConfirmation_;
+  std::vector<cs::Signature> signatures_;
+  std::vector<cs::Signature> roundConfirmations_;
   ::std::vector<csdb::Pool::SmartSignature> smartSignatures_;
   cs::Bytes binary_representation_;
   ::csdb::Storage::WeakPtr storage_;
@@ -539,8 +561,12 @@ const std::vector<uint8_t>& Pool::realTrusted() const noexcept {
   return d->realTrusted_;
 }
 
-const cs::BlockSignatures& Pool::trustedConfirmation() const noexcept {
-  return d->trustedConfirmation_;
+const std::vector<uint8_t>& Pool::roundConfirmationMask() const noexcept {
+  return d->roundConfirmationMask_;
+}
+
+const std::vector<cs::Signature>& Pool::roundConfirmations() const noexcept {
+  return d->roundConfirmations_;
 }
 
 Transaction Pool::transaction(TransactionID id) const {
@@ -629,7 +655,7 @@ cs::Sequence Pool::sequence() const noexcept {
 }
 
 const cs::PublicKey& Pool::writer_public_key() const noexcept {
-  if (d->next_confidants_.size() == 0) {
+  if (d->confidants_.size() == 0) {
     if (d->sequence_ > 0) {
       cserror() << "The pool #" << d->sequence_ << " doesn't contain the confidants";
     }
@@ -642,7 +668,7 @@ const cs::PublicKey& Pool::writer_public_key() const noexcept {
     }
     ++index;
   }
-  return d->next_confidants_.at(index);
+  return d->confidants_.at(index);
 }
 
 //const cs::Signature& Pool::signature() const noexcept {
@@ -650,10 +676,10 @@ const cs::PublicKey& Pool::writer_public_key() const noexcept {
 //}
 
 const std::vector<cs::PublicKey>& Pool::confidants() const noexcept {
-  return d->next_confidants_;
+  return d->confidants_;
 }
 
-const cs::BlockSignatures& Pool::signatures() const noexcept {
+const std::vector<cs::Signature>& Pool::signatures() const noexcept {
   return d->signatures_;
 }
 
@@ -703,10 +729,10 @@ void Pool::set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept
 
   priv* data = d.data();
   data->is_valid_ = true;
-  data->next_confidants_ = confidants;
+  data->confidants_ = confidants;
 }
 
-void Pool::set_signatures(cs::BlockSignatures&& blockSignatures) noexcept {
+void Pool::set_signatures(std::vector<cs::Signature>& blockSignatures) noexcept {
   if (d.constData()->read_only_) {
     csmeta(cswarning) << "Set signatures is failed. Data is read only!";
     return;
@@ -724,11 +750,11 @@ void Pool::add_smart_signature(const csdb::Pool::SmartSignature& smartSignature)
   data->smartSignatures_.emplace_back(smartSignature);
 }
 
-void Pool::add_trusted_confirmations(const cs::BlockSignatures& confirmations) noexcept
+void Pool::add_round_confirmations(const std::vector<cs::Signature>& confirmations) noexcept
 {
   priv* data = d.data();
   data->is_valid_ = true;
-  data->trustedConfirmation_ = std::move(confirmations);
+  data->roundConfirmations_ = std::move(confirmations);
 }
 
 void Pool::add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept

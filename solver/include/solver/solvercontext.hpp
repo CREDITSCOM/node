@@ -119,7 +119,7 @@ public:
    */
 
 
-  bool addSignaturesToLastBlock(BlockSignatures&& blockSignatures);
+  bool addSignaturesToLastBlock(Signatures&& blockSignatures);
 
   void spawn_next_round(cs::StageThree& st3);
 

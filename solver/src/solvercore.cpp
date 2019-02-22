@@ -268,7 +268,7 @@ void SolverCore::sendRoundTable() {
   pnode->sendRoundTable();
 }
 
-bool SolverCore::addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatures) {
+bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) {
   csmeta(csdetails) << "begin";
   if (!deferredBlock_.is_valid()) {
     csmeta(cserror) << " ... Failed!!!";

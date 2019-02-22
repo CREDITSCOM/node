@@ -59,7 +59,7 @@ public:
 
   void sendRoundTable();
 
-  bool addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatures);
+  bool addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures);
 
   uint8_t subRound(); 
   // Solver "public" interface,

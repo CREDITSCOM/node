@@ -117,7 +117,7 @@ public:
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                         const cs::PublicKey& sender, cs::BlockSignatures&& poolSignatures);
+                         const cs::PublicKey& sender, cs::Signatures&& poolSignatures);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -325,9 +325,9 @@ private:
   };
 
   struct SentSignatures {
-    cs::BlockSignatures poolSignatures;
-    cs::BlockSignatures roundSignatures;
-    cs::BlockSignatures trustedConfirmation;
+    cs::Signatures poolSignatures;
+    cs::Signatures roundSignatures;
+    cs::Signatures trustedConfirmation;
   };
 
   cs::Bytes lastRoundTableMessage_;

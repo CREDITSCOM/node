@@ -198,16 +198,27 @@ cs::Sequence BlockChain::getLastSequence() const {
   }
 }
 
-void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::BlockSignatures confirmation) {
+void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask,cs::Signatures confirmation) {
   TrustedConfirmation tConfirmation;
   tConfirmation.bigBang = bang;
   tConfirmation.confidants = confidants;
+  tConfirmation.mask = confirmationsMask;
   tConfirmation.signatures = confirmation;
   confirmationList_.emplace(rNum, tConfirmation);
 }
 
 void BlockChain::removeConfirmationFromList(cs::RoundNumber rNum) {
   confirmationList_.erase(rNum);
+}
+
+cs::Bytes BlockChain::getLastBlockTrustedMask() {
+  if(deferredBlock_.is_valid()) {
+    return deferredBlock_.realTrusted();
+  }
+  else {
+    auto pool = loadBlock(getLastSequence());
+    return pool.realTrusted();
+  }
 }
 
 const std::string CHEAT_FILENAME = "__integr.seq";
@@ -509,9 +520,10 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
   cs::Sequence currentSequence = pool.sequence();
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
-  const auto rtMask = pool.realTrusted();
+  const auto& realTrusted = pool.realTrusted();
+  const auto& confMask = pool.roundConfirmationMask();
   //size_t neededConfNumber = confidants.size() / 2U + 1U;
-  size_t neededConfNumber = rtMask.size() - std::count(rtMask.cbegin(), rtMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex);
+  size_t neededConfNumber = confMask.size() - std::count(confMask.cbegin(), confMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex);
 
   csdebug() << "Finalize: starting confidants validation procedure";
   if (currentSequence > 1) { 
@@ -519,36 +531,50 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     cs::DataStream tth(trustedToHash);
     tth << currentSequence;
     tth << confidants;
-
-
-
+       
     cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
+    const auto& prevConfidants = confirmationList_.at(currentSequence).confidants;
+    cs::Signatures sigs = confirmationList_.at(currentSequence).signatures;
+
+    csdebug() << "BlockChain> The Confidants confirmations are OK";
     if(confirmationList_.find(currentSequence) != confirmationList_.cend()){
-      const auto& prevConfidants = confirmationList_.at(currentSequence).confidants;
-      size_t signaturesCount = 0;
-      cs::BlockSignatures blockSigs = confirmationList_.at(currentSequence).signatures;
-      for (auto&[idxSender, signature] : blockSigs) {
-        if (idxSender >= confidants.size()) {
-          cserror() << "BlockChain> The number of signatures of Next Round Trusted doesn't correspond to the amount of last round confidants";
-          //return;
-        }
-
-        if (cscrypto::verifySignature(signature, prevConfidants.at(idxSender), trustedHash.data(), trustedHash.size())) {
-          ++signaturesCount;
-          csdebug() << "BlockChain> Signature of [" << static_cast<int>(idxSender) << "] is valid";
-        }
-        else {
-          csdebug() << "BlockChain> Signature of [" << static_cast<int>(idxSender) << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signature);
-        }
-      }
-
-      if (signaturesCount == blockSigs.size() && signaturesCount == neededConfNumber) {
-        csdebug() << "BlockChain> All confirmations of prepared this block Confidants are ok!";
+      if(!checkGroupSignature(prevConfidants, realTrusted, sigs, trustedHash)){
+        csdebug() << "BlockChain> The Confidants confirmations are not OK";
       }
       else {
-        csdebug() << "BlockChain> Some  confirmations of prepared this block Confidants failed - We can't admit this block valid ... (return) continue";
-        //return;
+        csdebug() << "BlockChain> The Confidants confirmations are OK";
       }
+
+    //  const auto& prevConfidants = confirmationList_.at(currentSequence).confidants;
+    //  size_t signaturesCount = 0;
+    //  cs::Signatures sigs = confirmationList_.at(currentSequence).signatures;
+
+    //  if(prevConfidants.size()==confMask.size()){
+    //    for (int i=0; i< confMask.size(); ++i) {
+    //      //if (idxSender >= confidants.size()) {
+    //      //  cserror() << "BlockChain> The number of signatures of Next Round Trusted doesn't correspond to the amount of last round confidants";
+    //      //  //return;
+    //      //}
+    //      if (confMask[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+    //        continue;
+    //      }
+    //      if (cscrypto::verifySignature(sigs[i], prevConfidants[i], trustedHash.data(), trustedHash.size())) {
+    //        ++signaturesCount;
+    //        csdebug() << "BlockChain> Signature of [" << i << "] is valid";
+    //      }
+    //      else {
+    //        csdebug() << "BlockChain> Signature of [" << i << "] is NOT VALID: " << cs::Utils::byteStreamToHex(sigs[i]);
+    //      }
+    //    }
+    //  }
+
+    //  if (signaturesCount == sigs.size() && signaturesCount == neededConfNumber) {
+    //    csdebug() << "BlockChain> All confirmations of prepared this block Confidants are ok!";
+    //  }
+    //  else {
+    //    csdebug() << "BlockChain> Some  confirmations of prepared this block Confidants failed - We can't admit this block valid ... (return) continue";
+    //    //return;
+    //  }
     }
     else {
       csdebug() << "BlockChain> There is no cell from round #:" << currentSequence;
@@ -556,7 +582,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
 
   }
 
-  if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
+  if (signatures.empty() && (!isTrusted || pool.sequence() != 0)) {
      csmeta(csdebug) << "The pool #" << pool.sequence() << " doesn't contain signatures";
     return false;
   }
@@ -567,19 +593,21 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
      csmeta(csdebug) << "The number of signatures is insufficient";
     return false;
   }
-
+  auto& mask = pool.realTrusted();
   size_t truePoolSignatures = 0;
   csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
   csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
-  for (auto& it : signatures) {
-    const std::size_t idx = static_cast<std::size_t>(it.first);
-    if (idx < confidants.size()) {
-      if (cscrypto::verifySignature(it.second, confidants.at(idx), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
-        csmeta(csdebug) << "The confidant #" << idx << " signature is valid";
-        ++truePoolSignatures;
-      }
-      else {
-        csmeta(cserror) << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is NOT VALID";
+  for (int i=0;i<mask.size();++i) {
+    csmeta(csdebug) << "Conf size = " << confidants.size();
+    if (i < confidants.size()) {
+      if(mask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
+        if (cscrypto::verifySignature(signatures[i], confidants[i], pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
+          csmeta(csdebug) << "The confidant #" << i << " signature is valid";
+          ++truePoolSignatures;
+        }
+        else {
+          csmeta(cserror) << "The confidant #" << i << " signature is NOT VALID: " << cs::Utils::byteStreamToHex(confidants[i].data(), confidants[i].size());
+        }
       }
     }
     else {
@@ -587,7 +615,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
       return false;
     }
   }
-  if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
+  if (truePoolSignatures == realTrustedValue(mask) || pool.sequence() == 0) {
     csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
   }
   else {
@@ -623,6 +651,61 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
 
 cs::Sequence BlockChain::getRequestedBlockNumber() const {
   return getLastSequence() + 1;
+}
+
+bool BlockChain::checkGroupSignature(cs::ConfidantsKeys confidants, cs::Bytes mask, cs::Signatures signatures, cs::Hash hash)
+{
+  if(confidants.size() != mask.size()) {
+    cserror() << "The number of confidants doesn't correspond the mask size";
+    return false;
+  }
+
+  size_t signatureCount = 0;
+  for (auto& it : mask) {
+    if (it == cs::ConfidantConsts::InvalidConfidantIndex) {
+      continue;
+    }
+    ++signatureCount;
+  }
+
+  if(signatures.size() != signatureCount) {
+    cserror() << "The number of signatures doesn't correspond the mask value";
+    return false;
+  }
+
+  signatureCount = 0;
+  size_t cnt = 0;
+  for (auto& it : mask){
+    if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
+      if (cscrypto::verifySignature(signatures[signatureCount], confidants[cnt], hash.data(), hash.size())) {
+        ++signatureCount;
+        csdebug() << "NODE> Signature of [" << cnt << "] is valid";
+      }
+      else {
+        csdebug() << "NODE> Signature of [" << cnt << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signatures[signatureCount]);
+      }
+    }
+    ++cnt;
+  }
+  if(signatures.size() != signatureCount) {
+    csdebug() << "Some signatures are not valid";
+    return false;
+  }
+  else {
+    csdebug() << "The signatures are valid";
+    return true;
+  }
+}
+
+size_t BlockChain::realTrustedValue(cs::Bytes mask)
+{
+  size_t cnt = 0;
+  for(auto& it : mask) {
+    if(it!=cs::ConfidantConsts::InvalidConfidantIndex) {
+      ++cnt;
+    }
+  }
+  return cnt;
 }
 
 uint64_t BlockChain::getWalletsCount() {

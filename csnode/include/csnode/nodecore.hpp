@@ -127,7 +127,7 @@ struct ConveyerMeta {
 struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
-  cs::BlockSignatures signatures;
+  cs::Signatures signatures;
 };
 
 // meta storages

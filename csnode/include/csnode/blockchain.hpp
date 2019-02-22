@@ -46,7 +46,8 @@ using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 struct TrustedConfirmation {
   bool bigBang = false;
   cs::ConfidantsKeys confidants;
-  cs::BlockSignatures signatures;
+  cs::Bytes mask;
+  cs::Signatures signatures;
 };
 
 class BlockChain {
@@ -125,10 +126,13 @@ public:
 
   cs::Sequence getLastSequence() const;
 
-  void addConfirmationToList(cs::RoundNumber, bool, cs::ConfidantsKeys, cs::BlockSignatures);
+  void addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask, cs::Signatures confirmation);
   void removeConfirmationFromList(cs::RoundNumber);
-
+  cs::Bytes getLastBlockTrustedMask();
   cs::Sequence getRequestedBlockNumber() const;
+
+  bool checkGroupSignature(cs::ConfidantsKeys, cs::Bytes, cs::Signatures, cs::Hash);
+  size_t realTrustedValue(cs::Bytes);
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
