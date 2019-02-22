@@ -285,7 +285,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     //  return false;
     //}
 
-    for (auto& it : realTrusted_) {
+    for (auto& it : roundConfirmationMask_) {
       if (it != 255) {
         ++cnt;
       }

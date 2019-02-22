@@ -128,6 +128,7 @@ struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
   cs::Signatures signatures;
+  cs::Bytes realTrusted;
 };
 
 // meta storages

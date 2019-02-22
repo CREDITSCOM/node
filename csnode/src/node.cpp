@@ -368,7 +368,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures) {
+                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted) {
   csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -381,6 +381,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     meta.bytes = std::move(characteristicBytes);
     meta.sender = sender;
     meta.signatures = std::move(poolSignatures);
+    meta.realTrusted = std::move(realTrusted);
 
     conveyer.addCharacteristicMeta(round, std::move(meta));
     return;
@@ -397,7 +398,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.sequenceNumber;
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
-
+  poolMetaInfo.realTrustedMask = realTrusted;
   if (myLevel_ == Level::Confidant) {
     csdebug() << "We probably don't have enouch confirmations so we try to throw our last deferred block";
     solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
@@ -713,7 +714,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
     if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
       csdebug() << "NODE> Run characteristic meta";
-      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender, std::move(meta->signatures));
+      getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender, std::move(meta->signatures), std::move(meta->realTrusted));
     }
 
     // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
@@ -2133,29 +2134,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   auto rt = conveyer.roundTable(rNum - 1);
 
   cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
-  //if (rt != nullptr) {
-  //  size_t signaturesCount = 0;
-  //  for (auto& [idxSender, signature] : roundSignatures) {
-  //    if (idxSender >= rt->confidants.size()) {
-  //      cserror() << "NODE> The number of signatures in Round Table doesn't correspond to the amount of last round confidants";
-  //      return;
-  //    }
-
-  //    if (cscrypto::verifySignature(signature, rt->confidants.at(idxSender), tempHash.data(), tempHash.size())) {
-  //      ++signaturesCount;
-  //    }
-  //  }
-
-  //  size_t neededConfNumber = rt->confidants.size() / 2U + 1U;
-
-  //  if (signaturesCount == roundSignatures.size() && signaturesCount >= neededConfNumber) {
-  //    csdebug() << "NODE> All signatures in RoundTable are ok!";
-  //  }
-  //  else {
-  //    csdebug() << "NODE> RoundTable is not valid! But we continue ...";
-  //    //return;
-  //  }
-  //}
 
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
@@ -2185,8 +2163,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   auto& mask = getBlockChain().getLastBlockTrustedMask();
   //<-TR check start 
   size_t cnt = 0;
-  if(rNum > 1){
+  if(rNum > 2){
     if (rt != nullptr){
+      csdebug() << "Mask size = " << mask.size() << "for next confidants:";
+      for (auto& it : prevConfidants) {
+        csdebug() << cs::Utils::byteStreamToHex(it.data(),it.size());
+      }
       if(getBlockChain().checkGroupSignature(prevConfidants,mask,trustedConfirmation,trustedHash)) {
         csdebug() << "NODE> The trusted confirmation for the next round are ok";
       }
@@ -2212,7 +2194,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   conveyer.setTable(roundTable);
 
   // create pool by previous round, then change conveyer state.
-  getCharacteristic(reinterpret_cast<cs::Byte*>(roundStream.data()), roundStream.size(), conveyer.previousRoundNumber(), sender, std::move(poolSignatures));
+  getCharacteristic(reinterpret_cast<cs::Byte*>(roundStream.data()), roundStream.size()
+    , conveyer.previousRoundNumber(), sender, std::move(poolSignatures), std::move(realTrusted));
 
   onRoundStart(conveyer.currentRoundTable());
   reviewConveyerHashes();
