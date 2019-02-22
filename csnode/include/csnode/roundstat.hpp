@@ -42,6 +42,7 @@ private:
   //std::multiset<size_t> longestRounds_;
 
   size_t node_start_round;
+  size_t start_skip_rounds;
 };
 
 }  // namespace cs

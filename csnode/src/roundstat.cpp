@@ -9,11 +9,13 @@ RoundStat::RoundStat()
 , deferredTransactionsCount_(0)
 , totalDurationMs_(0)
 , node_start_round(0)
+, start_skip_rounds(2)
 {}
 
 void RoundStat::onRoundStart(RoundNumber round) {
   // minimal statistics, skip 0 & 1 rounds because of possibility extra timeouts
-  if (node_start_round == 0) {
+  if (start_skip_rounds > 0) {
+    start_skip_rounds--;
     node_start_round = round;
     startPointMs_ = std::chrono::steady_clock::now();
     totalDurationMs_ = 0;
