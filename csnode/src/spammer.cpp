@@ -49,6 +49,10 @@ void Spammer::GenerateMyWallets() {
   for (auto i = 0u; i < kMyWalletsNum; ++i) {
     private_key = cscrypto::generateKeyPair(public_key);
     my_wallets_.push_back(std::pair<csdb::Address, cscrypto::PrivateKey>(csdb::Address::from_public_key(public_key), private_key));
+    csdebug() << "Spammer: wallet[" << i << "] "
+      << EncodeBase58(public_key.data(), public_key.data() + public_key.size())
+      << " - "
+      << EncodeBase58(private_key.access().data(), private_key.access().data() + private_key.access().size());
   }
 }
 
@@ -57,7 +61,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   FundMyWallets(node);
   csdb::Transaction transaction;
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(1, 0));
+  transaction.set_amount(csdb::Amount(0.01));
   transaction.set_max_fee(csdb::AmountCommission(0.1));
 
   size_t target_wallet_counter = 0;

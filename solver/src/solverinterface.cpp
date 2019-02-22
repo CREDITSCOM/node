@@ -279,13 +279,7 @@ size_t SolverCore::stagesThree() {
 }
 
 void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
-  // DEBUG:
-#if defined(DEBUG_SMARTS)
-    if(SmartContracts::is_smart_contract(tr)) {
-    psmarts->force_execution = true;
-  }
-#endif
-    if(psmarts->capture(tr)) {
+    if(psmarts->capture_transaction(tr)) {
       // avoid pass to conveyer, psmarts provide special handling
       return;
     }

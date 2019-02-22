@@ -1878,7 +1878,7 @@ csmeta(csdetails) << "started";
   //solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 }
 
-void Node::sendSmartStageReply(const cs::Bytes message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey requester) {
+void Node::sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
   csmeta(csdetails) << "started";
 
   sendDefault(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), smartRNum, signature, message);

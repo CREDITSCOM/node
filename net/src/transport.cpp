@@ -1081,9 +1081,10 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 }
 
 void Transport::sendPingPack(const Connection& conn) {
+  cs::Sequence seq = node_->getBlockChain().getLastSequence();
   cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::Ping << conn.id << node_->getBlockChain().getLastSequence() << myPublicKey_;
+  oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
   sendDirect(oPackStream_.getPackets(), conn);
   oPackStream_.clear();
 }

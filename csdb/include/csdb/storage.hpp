@@ -27,7 +27,7 @@ class Transaction;
 class TransactionID;
 
 /** @brief The read block signal, caller may assign test_failed to true if block is logically corrupted */
-using ReadBlockSignal = cs::Signal<void(const csdb::Pool block, bool* test_failed)>;
+using ReadBlockSignal = cs::Signal<void(const csdb::Pool& block, bool* test_failed)>;
 
 /**
  * @brief Объект хранилища.

@@ -375,6 +375,7 @@ void TrustedStage1State::checkSignaturesSmartSource(SolverContext& context, cs::
       }
       if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
         cslog() << __func__ << ": not enough correct signatures";
+        smartSourceInvalidSignatures_.insert(transaction.source());
       }
     }
 
