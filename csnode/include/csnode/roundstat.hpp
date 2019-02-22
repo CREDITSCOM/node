@@ -38,8 +38,10 @@ private:
   std::chrono::steady_clock::time_point startPointMs_;
   size_t totalDurationMs_;
 
-  std::multiset<size_t> shortestRounds_;
-  std::multiset<size_t> longestRounds_;
+  //std::multiset<size_t> shortestRounds_;
+  //std::multiset<size_t> longestRounds_;
+
+  size_t node_start_round;
 };
 
 }  // namespace cs

@@ -7,13 +7,14 @@ RoundStat::RoundStat()
 : totalReceivedTransactions_(0)
 , totalAcceptedTransactions_(0)
 , deferredTransactionsCount_(0)
-, totalDurationMs_(0) {
-  startPointMs_ = std::chrono::steady_clock::now();
-}
+, totalDurationMs_(0)
+, node_start_round(0)
+{}
 
 void RoundStat::onRoundStart(RoundNumber round) {
   // minimal statistics, skip 0 & 1 rounds because of possibility extra timeouts
-  if (round < 2) {
+  if (node_start_round == 0) {
+    node_start_round = round;
     startPointMs_ = std::chrono::steady_clock::now();
     totalDurationMs_ = 0;
   }
@@ -22,7 +23,11 @@ void RoundStat::onRoundStart(RoundNumber round) {
     auto new_duration_ms = duration_cast<milliseconds>(steady_clock::now() - startPointMs_).count();
     auto last_round_ms = cs::numeric_cast<size_t>(new_duration_ms) - totalDurationMs_;
     totalDurationMs_ = cs::numeric_cast<size_t>(new_duration_ms);
-    auto ave_round_ms = totalDurationMs_ / round;
+    size_t cnt_r = 1;
+    if (round > node_start_round) {
+      cnt_r = round - node_start_round;
+    }
+    auto ave_round_ms = totalDurationMs_ / cnt_r;
 
     // shortest_rounds.insert(last_round_ms);
     // longest_rounds.insert(last_round_ms);
