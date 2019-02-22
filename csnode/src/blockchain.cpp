@@ -210,6 +210,12 @@ void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::Conf
 void BlockChain::removeConfirmationFromList(cs::RoundNumber rNum) {
   confirmationList_.erase(rNum);
 }
+TrustedConfirmation BlockChain::confirmationList(cs::RoundNumber rNum) {
+  if (confirmationList_.find(rNum) == confirmationList_.end()) {
+    return TrustedConfirmation{};
+  }
+  return confirmationList_.at(rNum);
+}
 
 cs::Bytes BlockChain::getLastBlockTrustedMask() {
   if(deferredBlock_.is_valid()) {
@@ -546,7 +552,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
       }
       if (!checkGroupSignature(prevConfidants, confMask, sigs, trustedHash)) {
         csdebug() << "           The Confidants confirmations are not OK";
-        //return false;
+        return false;
       }
       else {
         csdebug() << "           The Confidants confirmations are OK";
@@ -566,54 +572,26 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     return false;
   }
   auto& mask = pool.realTrusted();
+
   //pool signatures check: start
   if(pool.sequence() > 0){
-    //size_t truePoolSignatures = 0;
-    csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
-    csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
+  //  csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
+  //  csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
     Hash tempHash;
     auto hash = pool.hash().to_binary();
-    //tempHash.fill(0);
     std::copy(hash.cbegin(), hash.cend(), tempHash.data());
     if(checkGroupSignature(confidants,mask,signatures,tempHash)) {
       csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
     }
     else {
       cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
-      //return false;
+      return false;
     }
   }
   else {
     csmeta(csdebug) << "Genesis block will be written without signatures verification";
   }
   //pool signatures check: end
-
-
-  /*for (int i=0;i<mask.size();++i) {
-    csmeta(csdebug) << "Conf size = " << confidants.size();
-    if (i < confidants.size()) {
-      if(mask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
-        if (cscrypto::verifySignature(signatures[i], confidants[i], pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
-          csmeta(csdebug) << "The confidant #" << i << " signature is valid";
-          ++truePoolSignatures;
-        }
-        else {
-          csmeta(cserror) << "The confidant #" << i << " signature is NOT VALID: " << cs::Utils::byteStreamToHex(confidants[i].data(), confidants[i].size());
-        }
-      }
-    }
-    else {
-      csmeta(cserror) << "The number of confidants in pool doesn't correspond the indexes of the signatures";
-      return false;
-    }
-  }
-  if (truePoolSignatures == realTrustedValue(mask) || pool.sequence() == 0) {
-    csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
-  }
-  else {
-    cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
-    return false;
-  }*/
 
 #ifdef TRANSACTIONS_INDEX
   createTransactionsIndex(pool);

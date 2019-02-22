@@ -2160,10 +2160,15 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   tth << rNum;
   tth << confidants;
   cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-  auto& mask = getBlockChain().getLastBlockTrustedMask();
+
+  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, realTrusted, trustedConfirmation);
+  
+  auto& mask = getBlockChain().confirmationList(rNum - 1).mask ;//getBlockChain().getLastBlockTrustedMask();
+  prevConfidants.clear();
+  prevConfidants = getBlockChain().confirmationList(rNum-1).confidants;
   //<-TR check start 
   size_t cnt = 0;
-  if(rNum > 2){
+  if(rNum > 2 && mask.size()!=0){
     if (rt != nullptr){
       csdebug() << "Mask size = " << mask.size() << "for next confidants:";
       for (auto& it : prevConfidants) {
@@ -2177,7 +2182,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
       }
     }
   }
-  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, realTrusted, trustedConfirmation);
+
   //<-TR check finish
 
   cs::PacketsHashes hashes;

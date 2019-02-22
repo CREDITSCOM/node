@@ -128,6 +128,8 @@ public:
 
   void addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask, cs::Signatures confirmation);
   void removeConfirmationFromList(cs::RoundNumber);
+  TrustedConfirmation confirmationList(cs::RoundNumber);
+
   cs::Bytes getLastBlockTrustedMask();
   cs::Sequence getRequestedBlockNumber() const;
 
