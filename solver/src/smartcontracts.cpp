@@ -376,6 +376,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
     queue_item.wait(new_item.sequence);
     queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
+    queue_item.is_executor = (execution_allowed && contains_me(block.confidants()));
   }
   test_exe_queue();
 }
@@ -441,8 +442,7 @@ void SmartContracts::test_exe_queue() {
     }
     else {
       next->start(block.sequence()); // use blockchain based round counting
-      // call to executor only if currently is trusted
-      next->is_executor = execution_allowed && contains_me(block.confidants());
+      // call to executor only if is trusted relatively to this contract
       if (next->is_executor) {
         csdebug() << log_prefix << "execute current contract now";
         execute_async(next->ref_start);
