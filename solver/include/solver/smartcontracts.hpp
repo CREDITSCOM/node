@@ -348,27 +348,27 @@ private:
     {
       seq_enqueue = r;
       status = SmartContractStatus::Waiting;
-      csdebug() << "Smart: contract is waiting from #" << r;
+      csdebug() << "Smart: contract {" << seq_enqueue << "} is waiting from #" << r;
     }
 
     void start(cs::RoundNumber r)
     {
       seq_start = r;
       status = SmartContractStatus::Running;
-      csdebug() << "Smart: contract is running from #" << r;
+      csdebug() << "Smart: contract {" << seq_enqueue << "} is running from #" << r;
     }
 
     void finish(cs::RoundNumber r)
     {
       seq_finish = r;
       status = SmartContractStatus::Finished;
-      csdebug() << "Smart: contract is finished on #" << r;
+      csdebug() << "Smart: contract {" << seq_enqueue << "} is finished on #" << r;
     }
 
     void close()
     {
       status = SmartContractStatus::Closed;
-      csdebug() << "Smart: contract is closed";
+      csdebug() << "Smart: contract {" << seq_enqueue << "} is closed";
     }
 
 	  bool start_consensus(const cs::TransactionsPacket& pack, Node* pNode, SmartContracts* pSmarts)
@@ -384,6 +384,9 @@ private:
   // is locked in const methods:
   mutable std::recursive_mutex exe_queue_lock;
 
+  using queue_iterator = std::vector<QueueItem>::iterator;
+  using queue_const_iterator = std::vector<QueueItem>::const_iterator;
+
   Node* pnode;
 
   // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
@@ -394,7 +397,7 @@ private:
 
   void clear_emitted_transactions(const csdb::Address& abs_addr);
 
-  std::vector<QueueItem>::iterator find_in_queue(const SmartContractRef& item)
+  queue_iterator find_in_queue(const SmartContractRef& item)
   {
     auto it = exe_queue.begin();
     for (; it != exe_queue.end(); ++it) {
@@ -405,7 +408,7 @@ private:
     return it;
   }
 
-  std::vector<QueueItem>::iterator find_in_queue(const csdb::Address& abs_addr)
+  queue_iterator find_first_in_queue(const csdb::Address& abs_addr)
   {
     auto it = exe_queue.begin();
     for(; it != exe_queue.end(); ++it) {
@@ -416,7 +419,7 @@ private:
     return it;
   }
 
-  std::vector<QueueItem>::const_iterator find_in_queue(const csdb::Address& abs_addr) const
+  queue_const_iterator find_first_in_queue(const csdb::Address& abs_addr) const
   {
     auto it = exe_queue.begin();
     for(; it != exe_queue.end(); ++it) {
@@ -427,7 +430,8 @@ private:
     return it;
   }
 
-  void remove_from_queue(std::vector<QueueItem>::const_iterator it);
+  // return next element in queue, the only exception is end() which returns unmodified
+  queue_iterator remove_from_queue(queue_iterator it);
 
   void remove_from_queue(const SmartContractRef& item) {
     std::lock_guard l(exe_queue_lock);

@@ -46,11 +46,11 @@ public:
   constexpr static size_t MaxStageOneHashes = 250;
 
   /** @brief   Max count of rounds to execute smart contract. After that contract is assumed failed unconditionally */
-  constexpr static unsigned int MaxRoundsCancelContract = 30;
+  constexpr static unsigned int MaxRoundsCancelContract = 100;
 
   /** @brief The maximum count of rounds to store in chain new_state transaction. If contract still is "in the executor" timeout is fixed.
    * After that 5 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) remains to complete consensus and put timeout new_state
    * into chain, otherwise  contract is assumed failed unconditionally
    */
-  constexpr static unsigned int MaxRoundsExecuteContract = 25;
+  constexpr static unsigned int MaxRoundsExecuteContract = 95;
 };
