@@ -44,6 +44,7 @@ private:
   void readerRoutine(const Config&);
   void writerRoutine(const Config&);
   void processorRoutine();
+  inline void processTask(TaskPtr<IPacMan>&);
 
   ip::udp::socket* getSocketInThread(const bool, const EndpointData&, std::atomic<ThreadStatus>&, const bool useIPv6);
 
@@ -60,6 +61,8 @@ private:
 
   Transport* transport_;
 
+  FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap_;
+
   // Only needed in a one-socket configuration
   __cacheline_aligned std::atomic<bool> singleSockOpened_ = {false};
   __cacheline_aligned std::atomic<ip::udp::socket*> singleSock_ = {nullptr};
@@ -73,6 +76,10 @@ private:
   std::thread processorThread_;
 
   PacketCollector collector_;
+#ifdef __linux__
+  int readerEventfd_;
+  std::atomic<int> count_ = 0;
+#endif
 };
 
 #endif  // NETWORK_HPP

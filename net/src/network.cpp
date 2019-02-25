@@ -3,7 +3,11 @@
 #include <chrono>
 #include <lib/system/utils.hpp>
 #include <net/logger.hpp>
-#include <sys/timeb.h>
+
+#ifdef __linux__
+#include <sys/eventfd.h>
+#include <unistd.h>
+#endif
 
 #include "network.hpp"
 #include "transport.hpp"
@@ -27,7 +31,7 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
 #endif
 
-    sock.non_blocking(true);
+//    sock.non_blocking(true);
 
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
@@ -94,24 +98,31 @@ void Network::readerRoutine(const Config& config) {
     auto& task = iPacMan_.allocNext();
 
     size_t packetSize = 0;
-    uint32_t cnt = 0;
+//    uint32_t cnt = 0;
 
-    do {
+//    do {
       if (stopReaderRoutine) {
         return;
       }
 
       packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
       task.size = task.pack.decode(packetSize);
-
+/*
       if (++cnt == 10) {
         cnt = 0;
         std::this_thread::yield();
       }
-    } while (!stopReaderRoutine && lastError == boost::asio::error::would_block);
+*/
+//    } while (!stopReaderRoutine && lastError == boost::asio::error::would_block);
 
     if (!lastError) {
       iPacMan_.enQueueLast();
+#ifdef __linux__
+      static uint64_t one = 1;
+      int s = write(readerEventfd_, &one, sizeof(uint64_t));
+      ++count_;
+//      cslog() << "eventfd write " << s << " size";
+#endif
 #ifdef LOG_NET
       csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
@@ -172,62 +183,78 @@ void Network::writerRoutine(const Config& config) {
 }
 
 // Processors
-
 void Network::processorRoutine() {
-  FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   while (stopProcessorRoutine == false) {
     externals.callAll();
 
+#ifdef __linux__
+    uint64_t tasks;
+    int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
+    count_ -= tasks;
+
+    if (s != sizeof(uint64_t)) continue;
+
+    //cslog() << "eventfd tasks " << tasks << " balance " << count_;
+    for (uint64_t i = 0; i < tasks; i++) {
+      auto task = iPacMan_.getNextTask();
+      processTask(task);
+    }
+#else
     auto task = iPacMan_.getNextTask();
-    auto remoteSender = transport_->getPackSenderEntry(task->sender);
-
-    if (remoteSender->isBlackListed()) {
-      cswarning() << "Blacklisted";
-      continue;
-    }
-
-    if (!(task->pack.isHeaderValid())) {
-      static constexpr size_t limit = 100;
-      auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
-
-      cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
-      remoteSender->addStrike();
-      continue;
-    }
-
-    // Pure network processing
-    if (task->pack.isNetwork()) {
-      transport_->processNetworkTask(task, remoteSender);
-      continue;
-    }
-
-    // Non-network data
-    uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
-    if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
-      if (task->pack.isFragmented() || task->pack.isCompressed()) {
-        bool newFragmentedMsg = false;
-        MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
-        transport_->gotPacket(task->pack, remoteSender);
-
-        if (newFragmentedMsg) {
-          transport_->registerMessage(msg);
-        }
-
-        if (msg->isComplete()) {
-          transport_->processNodeMessage(**msg);
-        }
-      }
-      else {
-        transport_->processNodeMessage(task->pack);
-      }
-    }
-
-    transport_->redirectPacket(task->pack, remoteSender);
-    ++recCounter;
+    processTask(task);
+#endif
   }
   cswarning() << "processorRoutine STOPPED!!!\n";
+}
+
+inline void Network::processTask(TaskPtr<IPacMan> &task) {
+  auto remoteSender = transport_->getPackSenderEntry(task->sender);
+
+  if (remoteSender->isBlackListed()) {
+    cswarning() << "Blacklisted";
+    return;
+  }
+
+  if (!(task->pack.isHeaderValid())) {
+    static constexpr size_t limit = 100;
+    auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+
+    cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+    remoteSender->addStrike();
+    return;
+  }
+
+  // Pure network processing
+  if (task->pack.isNetwork()) {
+    transport_->processNetworkTask(task, remoteSender);
+    return;
+  }
+
+  // Non-network data
+  uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
+  if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
+    if (task->pack.isFragmented() || task->pack.isCompressed()) {
+      bool newFragmentedMsg = false;
+      MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
+      transport_->gotPacket(task->pack, remoteSender);
+
+      if (newFragmentedMsg) {
+        transport_->registerMessage(msg);
+      }
+
+      if (msg->isComplete()) {
+        transport_->processNodeMessage(**msg);
+      }
+    }
+    else {
+      transport_->processNodeMessage(task->pack);
+    }
+  }
+
+  transport_->redirectPacket(task->pack, remoteSender);
+  ++recCounter;
 }
 
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
@@ -242,10 +269,23 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 Network::Network(const Config& config, Transport* transport)
 : resolver_(context_)
 , transport_(transport)
+#ifndef __linux__
 , readerThread_{ &Network::readerRoutine, this, config }
 , writerThread_{ &Network::writerRoutine, this, config }
 , processorThread_{ &Network::processorRoutine, this }
+#endif
 {
+#ifdef __linux__
+  readerEventfd_ = eventfd(0, 0);
+  if (readerEventfd_ == -1) {
+    good_ = false;
+    return;
+  }
+
+  readerThread_ = std::thread(&Network::readerRoutine, this, config);
+  writerThread_ = std::thread(&Network::writerRoutine, this, config);
+  processorThread_ = std::thread(&Network::processorRoutine, this);
+#endif
   if (!config.hasTwoSockets()) {
     auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 
@@ -262,6 +302,7 @@ Network::Network(const Config& config, Transport* transport)
   while (writerStatus_.load() == ThreadStatus::NonInit);
 
   good_ = (readerStatus_.load() == ThreadStatus::Success && writerStatus_.load() == ThreadStatus::Success);
+
 
   if (!good_) {
     cserror() << "Cannot start the network: error binding sockets";
