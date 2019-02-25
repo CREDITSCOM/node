@@ -80,6 +80,13 @@ private:
   int readerEventfd_;
   int writerEventfd_;
   std::atomic<int> count_ = 0;
+#elif WIN32
+  HANDLE readerEvent_;
+  HANDLE writerEvent_;
+  int readerTaskCount_ = 0;
+  int writerTaskCount_ = 0;
+  std::atomic_flag readerLock = ATOMIC_FLAG_INIT;
+  std::atomic_flag writerLock = ATOMIC_FLAG_INIT;
 #endif
 };
 

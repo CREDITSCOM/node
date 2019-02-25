@@ -31,8 +31,6 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
 #endif
 
-//    sock.non_blocking(true);
-
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
     DWORD dwBytesReturned = 0;
@@ -97,23 +95,13 @@ void Network::readerRoutine(const Config& config) {
   while (stopReaderRoutine == false) { // changed from true
     auto& task = iPacMan_.allocNext();
 
-    size_t packetSize = 0;
-//    uint32_t cnt = 0;
-
-//    do {
-      if (stopReaderRoutine) {
+    if (stopReaderRoutine) {
         return;
-      }
+    }
 
-      packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
-      task.size = task.pack.decode(packetSize);
-/*
-      if (++cnt == 10) {
-        cnt = 0;
-        std::this_thread::yield();
-      }
-*/
-//    } while (!stopReaderRoutine && lastError == boost::asio::error::would_block);
+    size_t packetSize = 0;
+    packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+    task.size = task.pack.decode(packetSize);
 
     if (!lastError) {
       iPacMan_.enQueueLast();
@@ -121,7 +109,12 @@ void Network::readerRoutine(const Config& config) {
       static uint64_t one = 1;
       int s = write(readerEventfd_, &one, sizeof(uint64_t));
       ++count_;
-//      cslog() << "eventfd write " << s << " size";
+#elif WIN32
+      while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+        ; // spin
+      ++readerTaskCount_;
+      SetEvent(readerEvent_);
+      readerLock.clear(std::memory_order_release); // release lock
 #endif
 #ifdef LOG_NET
       csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
@@ -185,6 +178,18 @@ void Network::writerRoutine(const Config& config) {
       auto task = oPacMan_.getNextTask();
       sendPack(*sock, task, task->endpoint);
     }
+#elif WIN32
+    WaitForSingleObject(writerEvent_, INFINITE);
+    while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+      ; // spin
+    int tasks = writerTaskCount_;
+    writerTaskCount_ = 0;
+    writerLock.clear(std::memory_order_release); // release lock
+
+    for (int i = 0; i < tasks; i++) {
+      auto task = oPacMan_.getNextTask();
+      sendPack(*sock, task, task->endpoint);
+    }
 #else
     auto task = oPacMan_.getNextTask();
     sendPack(*sock, task, task->endpoint);
@@ -208,8 +213,19 @@ void Network::processorRoutine() {
 
     if (s != sizeof(uint64_t)) continue;
 
-    //cslog() << "eventfd tasks " << tasks << " balance " << count_;
     for (uint64_t i = 0; i < tasks; i++) {
+      auto task = iPacMan_.getNextTask();
+      processTask(task);
+    }
+#elif WIN32
+    WaitForSingleObject(readerEvent_, INFINITE);
+    while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+      ; // spin
+    int tasks = readerTaskCount_;
+    readerTaskCount_ = 0;
+    readerLock.clear(std::memory_order_release); // release lock
+
+    for (int i = 0; i < tasks; i++) {
       auto task = iPacMan_.getNextTask();
       processTask(task);
     }
@@ -279,13 +295,19 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 #ifdef __linux__
   static uint64_t one = 1;
   int s = write(writerEventfd_, &one, sizeof(uint64_t));
+#elif WIN32
+  while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+    ; // spin
+  ++writerTaskCount_;
+  SetEvent(writerEvent_);
+  writerLock.clear(std::memory_order_release); // release lock
 #endif
 }
 
 Network::Network(const Config& config, Transport* transport)
 : resolver_(context_)
 , transport_(transport)
-#ifndef __linux__
+#if !(__linux__ || WIN32)
 , readerThread_{ &Network::readerRoutine, this, config }
 , writerThread_{ &Network::writerRoutine, this, config }
 , processorThread_{ &Network::processorRoutine, this }
@@ -300,6 +322,33 @@ Network::Network(const Config& config, Transport* transport)
 
   writerEventfd_ = eventfd(0, 0);
   if (writerEventfd_ == -1) {
+    good_ = false;
+    return;
+  }
+  readerThread_ = std::thread(&Network::readerRoutine, this, config);
+  writerThread_ = std::thread(&Network::writerRoutine, this, config);
+  processorThread_ = std::thread(&Network::processorRoutine, this);
+#elif WIN32
+  writerEvent_ = CreateEvent(
+    NULL,               // default security attributes
+    FALSE,              // automatic-reset event
+    FALSE,              // initial state is nonsignaled
+    TEXT("WriteEvent")  // object name
+  );
+
+  if (writerEvent_ == NULL) {
+    good_ = false;
+    return;
+  }
+
+  readerEvent_ = CreateEvent(
+    NULL,               // default security attributes
+    FALSE,              // automatic-reset event
+    FALSE,              // initial state is nonsignaled
+    TEXT("ReadEvent")   // object name
+  );
+
+  if (writerEvent_ == NULL) {
     good_ = false;
     return;
   }
