@@ -94,6 +94,9 @@ public:
     core.handleTransitions(SolverCore::Event::Stage3Enough);
   }
 
+  void back_to_stage3() {
+    core.handleTransitions(SolverCore::Event::Stage3NonComplete);
+  }
   /**
    * @fn  NodeLevel SolverContext::level() const;
    *
@@ -270,6 +273,20 @@ public:
     return core.trueStagesThree();
   }
 
+  bool realTrustedChanged() const {
+    return core.realTrustedChanged();
+  }
+
+  void realTrustedChangedSet(bool val) const {
+    return core.realTrustedChangedSet(val);
+  }
+
+  void realTrustedSet(cs::Byte index, cs::Byte value) const {
+    //realTrustedChangedSet(true);
+    //return core.realTrustedSet(value);
+  }
+
+
   size_t stagesThree() const {
     return core.stagesThree();
   }
@@ -326,14 +343,14 @@ public:
     }
   }
 
-  //void fake_stage3(uint8_t from)
-  //{
-  //  if(core.find_stage3(from) == nullptr) {
-  //    cs::StageThree fake;
-  //    fake.sender = from;
-  //    core.gotStageThree(fake);
-  //  }
-  //}
+  void fake_stage3(uint8_t from)
+  {
+    if(core.find_stage3(from) == nullptr) {
+      cs::StageThree fake;
+      fake.sender = from;
+      core.gotStageThree(fake, false);
+    }
+  }
 
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {

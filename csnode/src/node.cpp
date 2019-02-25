@@ -1422,7 +1422,8 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   const int k1 = (corruptionLevel_ / 4) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-  if (k1 == 1 && k2 == myConfidantIndex_) {
+  if (false/*myConfidantIndex_ == 1*/) {
+  /*if (k1 == 1 && k2 == myConfidantIndex_) {*/
     csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
   }
   else {
@@ -1561,6 +1562,9 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 }
 
 void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
+ /* if (myConfidantIndex_ == 1) {
+    return;
+  }*/
   csmeta(csdetails) << "started";
 
   if (myLevel_ != Level::Confidant) {

@@ -13,11 +13,28 @@
 namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
-
+  if(!context.realTrustedChanged()) {
+    stage.realTrustedMask.clear();
+    stage.realTrustedMask.resize(context.cnt_trusted());
+    stage.sender = context.own_conf_number();
+  }
+  else {
+    stage.realTrustedMask.clear();
+    stage.realTrustedMask = context.stage3(stage.sender)->realTrustedMask;// we delete this storage so the realtrusted will be zero
+  }
+  context.realTrustedChangedSet(false);
   cnt_recv_stages = 0;
-  stage.realTrustedMask.clear();
-  stage.realTrustedMask.resize(context.cnt_trusted());
-  stage.sender = context.own_conf_number();
+
+  if (std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > 0) {
+    if (Result::Finish == finalizeStageThree(context)) {
+      context.complete_stage3();
+      return;
+    } 
+    else {
+      cswarning() << name() << "the stage can't finish successfully, waiting for Big Bang";
+    }
+  }
+
   const auto ptr = context.stage2(stage.sender);
   if (ptr == nullptr) {
     cswarning() << name() << ": stage one result not found";
@@ -245,6 +262,16 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
   csdebug() << name() << ": continue to receive stages-2";
   return Result::Ignore;
+}
+
+Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
+//TODO : here write the code to clean stage three storage, perhaps add st3 iterations
+  csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";
+  context.spawn_next_round(stage);
+  csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
+  context.add_stage3(stage);  //, stage.writer != stage.sender);
+
+  return Result::Finish;
 }
 
 bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {

@@ -19,6 +19,10 @@ enum class Result {
   ///< value
   Failure,
 
+    ///< Some errors occur, but there is a possibility to retry another time to do it better 
+  ///< value
+  Retry,
+
   ///< State must implement handler for the event but it has not done yet
   NotImplemented
 };

@@ -1,6 +1,7 @@
 #include <solvercontext.hpp>
 #include <states/trustedpoststagestate.hpp>
 #include <lib/system/logger.hpp>
+#include <csnode/conveyer.hpp>
 
 namespace cs {
 void TrustedPostStageState::on(SolverContext& context) {
@@ -52,8 +53,8 @@ void TrustedPostStageState::on(SolverContext& context) {
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
                 [pctx, this]() {
-                  csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-//                  mark_outbound_nodes(*pctx, rnum);
+                  csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound and recalculate the signatures";
+                  mark_outbound_nodes(*pctx);
                 },
                 true/*replace if exists*/);
         },
@@ -103,25 +104,36 @@ void TrustedPostStageState::request_stages_neighbors(SolverContext& context) {
     }
   }
 }
-//
-//void TrustedPostStageState::mark_outbound_nodes(SolverContext& context, cs::RoundNumber round) {
-//  csdebug() << name() << ": mark outbound nodes in round #" << round;
-//  auto cnt = static_cast<uint8_t>(context.cnt_trusted());
-//  for (uint8_t i = 0; i < cnt; ++i) {
-//    if (context.stage3(i) == nullptr) {
-//      // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
-//      // csdebug() << name() << ": making fake stage-2 in round " << round;
-//      //context.fake_stage2(i);
-//      // this procedute can cause the round change
-//      if (round != cs::Conveyer::instance().currentRoundNumber()) {
-//        return;
-//      }
-//    }
-//  }
-//}
+
+void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
+  cs::RoundNumber rNum = cs::Conveyer::instance().currentRoundNumber();
+  csdebug() << name() << ": mark outbound nodes in round #" << rNum;
+  auto cnt = static_cast<uint8_t>(context.cnt_trusted());
+  cs::Bytes realTrusted = context.stage3(context.own_conf_number())->realTrustedMask;
+  if(realTrusted.size() == cnt){
+    for (uint8_t i = 0; i < cnt; ++i) {
+      if (context.stage3(i) == nullptr) {
+        // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
+        csdebug() << name() << ": making fake stage-3 [" << static_cast<int>(i) << "] in round " << rNum;
+        context.fake_stage3(i);
+        // this procedute can cause the round change
+        realTrusted[i] = cs::ConfidantConsts::InvalidConfidantIndex;
+        //context.
+        context.realTrustedSet(i, cs::ConfidantConsts::InvalidConfidantIndex);
+
+      }
+    }
+  }
+  //TODO: add the code to go to the third stage -> 
+}
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
+  csdebug() << name() << "TrueStages3 amount = " <<  context.trueStagesThree() << ", realTrusted.value = " << context.cnt_real_trusted();
   if(context.trueStagesThree() == context.cnt_real_trusted()) {// / 2U + 1U) {
+    if (context.realTrustedChanged()) {
+      csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
+      return Result::Retry;
+    }
     csdebug() << name() << ": enough stage-3 received amount = " << context.trueStagesThree();
     return Result::Finish;
   }

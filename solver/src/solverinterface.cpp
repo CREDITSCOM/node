@@ -101,6 +101,7 @@ void SolverCore::nextRound() {
   stageThreeStorage.clear();
   trueStageThreeStorage.clear();
   trusted_candidates.clear();
+  realTrustedChanged_ = false;
 
   if (!pstate) {
     return;
@@ -262,6 +263,11 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     case Result::Finish: 
       handleTransitions(Event::Stage3Enough);
       break;
+    case Result::Retry:
+      stageThreeStorage.clear();
+      trueStageThreeStorage.clear();//how to put the realTrusted value to the on-stage3
+      handleTransitions(Event::Stage3NonComplete);
+      break;
     case Result::Failure:
       cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
       removeDeferredBlock(deferredBlock_.sequence());
@@ -273,6 +279,20 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 size_t SolverCore::trueStagesThree() {
   return trueStageThreeStorage.size();
 }
+
+bool SolverCore::realTrustedChanged() const {
+  return realTrustedChanged_;
+}
+
+void SolverCore::realTrustedChangedSet(bool val) {
+  realTrustedChanged_ = val;
+}
+
+//void SolverCore::realTrustedSet(cs::Byte index, cs::Byte value) {
+//
+//}
+
+
 
 size_t SolverCore::stagesThree() {
   return stageThreeStorage.size();

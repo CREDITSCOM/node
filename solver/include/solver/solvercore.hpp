@@ -96,8 +96,11 @@ public:
   void printStage3(const cs::StageThree& stage);
 
   void removeDeferredBlock(cs::Sequence);
-
+  bool realTrustedChanged() const;
+  void realTrustedChangedSet(bool);
+  void realTrustedSet(cs::Byte index, cs::Byte value);
   size_t trueStagesThree();
+
   size_t stagesThree();
   bool stateFailed(Result res);
 
@@ -135,6 +138,7 @@ private:
     Stage1Enough,
     Stage2Enough,
     Stage3Enough,
+    Stage3NonComplete,
     SmartDeploy,
     SmartResult,
     Expired,
@@ -276,6 +280,8 @@ private:
   std::vector<cs::StageTwo> stageTwoStorage;
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector<cs::StageThree> trueStageThreeStorage;
+  bool realTrustedChanged_;
+
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
   std::vector <int> smartUntrusted;

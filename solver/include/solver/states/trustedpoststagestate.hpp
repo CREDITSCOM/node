@@ -32,7 +32,7 @@ public:
   }
   void request_stages(SolverContext& context);
   void request_stages_neighbors(SolverContext& context);
-  void mark_outbound_nodes(SolverContext& context, cs::RoundNumber round);
+  void mark_outbound_nodes(SolverContext& context);
 
 protected:
 
