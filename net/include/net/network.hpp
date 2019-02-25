@@ -78,6 +78,7 @@ private:
   PacketCollector collector_;
 #ifdef __linux__
   int readerEventfd_;
+  int writerEventfd_;
   std::atomic<int> count_ = 0;
 #endif
 };

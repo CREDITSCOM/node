@@ -175,8 +175,20 @@ void Network::writerRoutine(const Config& config) {
   }
 
   while (stopWriterRoutine == false) { //changed from true
+#ifdef __linux__
+    uint64_t tasks;
+    int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
+
+    if (s != sizeof(uint64_t)) continue;
+
+    for (uint64_t i = 0; i < tasks; i++) {
+      auto task = oPacMan_.getNextTask();
+      sendPack(*sock, task, task->endpoint);
+    }
+#else
     auto task = oPacMan_.getNextTask();
     sendPack(*sock, task, task->endpoint);
+#endif
   }
 
   cswarning() << "writerRoutine STOPPED!!!\n";
@@ -264,6 +276,10 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   qePtr->element.pack = p;
 
   oPacMan_.enQueueLast(qePtr);
+#ifdef __linux__
+  static uint64_t one = 1;
+  int s = write(writerEventfd_, &one, sizeof(uint64_t));
+#endif
 }
 
 Network::Network(const Config& config, Transport* transport)
@@ -278,6 +294,12 @@ Network::Network(const Config& config, Transport* transport)
 #ifdef __linux__
   readerEventfd_ = eventfd(0, 0);
   if (readerEventfd_ == -1) {
+    good_ = false;
+    return;
+  }
+
+  writerEventfd_ = eventfd(0, 0);
+  if (writerEventfd_ == -1) {
     good_ = false;
     return;
   }
