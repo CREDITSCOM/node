@@ -65,7 +65,23 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
   return SolverContext::zeroKey;
 }
 
+bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
+  BlockChain::WalletData wData;
+  BlockChain::WalletId wId;
+  pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData, wId);
+  if (wData.balance_ < Consensus::MinStakeValue) {
+    return false;
+  }
+  return true;
+}
+
 void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
+//DPOS check start -> comment if unnecessary
+  //if (!checkNodeCache(sender)) {
+  //  csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
+  //  return;
+  //}
+//DPOS check finish
   cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSequence();
   if (delta > 1) {
     recv_hash.push_back(std::make_pair<>(hash, sender));
@@ -102,6 +118,7 @@ void SolverCore::nextRound() {
   trueStageThreeStorage.clear();
   trusted_candidates.clear();
   realTrustedChanged_ = false;
+  tempRealTrusted_.clear();
 
   if (!pstate) {
     return;
@@ -288,9 +305,16 @@ void SolverCore::realTrustedChangedSet(bool val) {
   realTrustedChanged_ = val;
 }
 
-//void SolverCore::realTrustedSet(cs::Byte index, cs::Byte value) {
-//
-//}
+void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
+  csdebug() << __func__ << ": realtrusted in solvercore set, realTrustedChanged switched to true";
+  realTrustedChangedSet(true);
+  tempRealTrusted_ = realTrusted;
+}
+
+cs::Bytes SolverCore::getRealTrusted()
+{
+  return tempRealTrusted_;
+}
 
 
 

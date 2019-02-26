@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef> // : for size_t
+#include <csdb/amount.hpp>
 
 class Consensus {
 public:
@@ -26,6 +27,9 @@ public:
 
   /** @brief   The maximum trusted nodes to take part in consensus */
   constexpr static unsigned int MaxTrustedNodes = 5;
+
+  /** @brief   The minimum trusted nodes to start consensus */
+  constexpr static csdb::Amount MinStakeValue = csdb::Amount{100};
 
   /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
   constexpr static uint8_t GeneralNotSelected = 100;

@@ -57,7 +57,7 @@ namespace cs
       {pTrusted2, {defaultRT, defaultBB, {Event::Stage1Enough, pTrusted3}}},
 
       // Trusted state 3 after enough Stage2 messages are received (confidant node)
-      {pTrusted3, {defaultRT, defaultBB, {Event::Stage2Enough, pTrustedPost}}},
+      {pTrusted3, {defaultRT, defaultBB, {Event::Stage2Enough, pTrustedPost}, {Event::FailConsensus, pNormal}}},
 
       // Trusted PostStageState after enough Stage3 (confirmation)are received (confidant node)
       {pTrustedPost, {defaultRT, defaultBB, {Event::Stage3Enough, pWaiting}, {Event::SetNormal, pNormal}, {Event::Stage3NonComplete, pTrusted3}}},

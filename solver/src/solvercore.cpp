@@ -130,6 +130,7 @@ void SolverCore::setState(const StatePtr& pState) {
   }
 
   if (pstate) {
+    csdebug() << "SolverCore: pstate-off";
     pstate->off(*pcontext);
   }
   if (Consensus::Log) {

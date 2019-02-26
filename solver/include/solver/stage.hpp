@@ -53,6 +53,7 @@ struct StageThree {
 
   uint8_t sender;
   uint8_t writer;
+  uint8_t iteration;
   std::vector<uint8_t> realTrustedMask;
   Signature blockSignature;
   Hash blockHash;

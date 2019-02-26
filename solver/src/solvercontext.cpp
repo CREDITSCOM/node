@@ -151,7 +151,11 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
 }
 
 void SolverContext::sendRoundTable() {
-  core.sendRoundTable();
+  if(own_conf_number()==1) {
+    return;
+  }
+    core.sendRoundTable();
+
 }
 
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {

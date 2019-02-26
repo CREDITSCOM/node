@@ -110,30 +110,32 @@ void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
   csdebug() << name() << ": mark outbound nodes in round #" << rNum;
   auto cnt = static_cast<uint8_t>(context.cnt_trusted());
   cs::Bytes realTrusted = context.stage3(context.own_conf_number())->realTrustedMask;
+
   if(realTrusted.size() == cnt){
     for (uint8_t i = 0; i < cnt; ++i) {
       if (context.stage3(i) == nullptr) {
         // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
         csdebug() << name() << ": making fake stage-3 [" << static_cast<int>(i) << "] in round " << rNum;
+        realTrusted[i] = cs::ConfidantConsts::InvalidConfidantIndex;
+        context.realTrustedSet(realTrusted);
         context.fake_stage3(i);
         // this procedute can cause the round change
-        realTrusted[i] = cs::ConfidantConsts::InvalidConfidantIndex;
-        //context.
-        context.realTrustedSet(i, cs::ConfidantConsts::InvalidConfidantIndex);
-
       }
     }
+    //csdebug() << name() << ": here the real trusted should be set";
+    //context.realTrustedSet(realTrusted);
+    //csdebug() << name() << ": here the real trusted are set";
   }
   //TODO: add the code to go to the third stage -> 
 }
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
-  csdebug() << name() << "TrueStages3 amount = " <<  context.trueStagesThree() << ", realTrusted.value = " << context.cnt_real_trusted();
-  if(context.trueStagesThree() == context.cnt_real_trusted()) {// / 2U + 1U) {
-    if (context.realTrustedChanged()) {
-      csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
-      return Result::Retry;
-    }
+  csdebug() << name() << ": TrueStages3 amount = " <<  context.trueStagesThree() << ", realTrusted.value = " << context.cnt_real_trusted();
+  if (context.realTrustedChanged()) {
+    csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
+    return Result::Retry;
+  }
+ if(context.trueStagesThree() == context.cnt_real_trusted()) {// / 2U + 1U) {
     csdebug() << name() << ": enough stage-3 received amount = " << context.trueStagesThree();
     return Result::Finish;
   }

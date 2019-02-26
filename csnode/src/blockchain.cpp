@@ -583,7 +583,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
     }
     else {
       cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
-      return false;
+      //return false;
     }
   }
   else {

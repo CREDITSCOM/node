@@ -14,13 +14,15 @@ namespace cs {
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
   if(!context.realTrustedChanged()) {
+    stage.iteration = 0;
     stage.realTrustedMask.clear();
     stage.realTrustedMask.resize(context.cnt_trusted());
     stage.sender = context.own_conf_number();
   }
   else {
+    ++(stage.iteration);
     stage.realTrustedMask.clear();
-    stage.realTrustedMask = context.stage3(stage.sender)->realTrustedMask;// we delete this storage so the realtrusted will be zero
+    stage.realTrustedMask = context.getRealTrusted();// we delete this storage so the realtrusted will be zero
   }
   context.realTrustedChangedSet(false);
   cnt_recv_stages = 0;
@@ -32,6 +34,8 @@ void TrustedStage3State::on(SolverContext& context) {
     } 
     else {
       cswarning() << name() << "the stage can't finish successfully, waiting for Big Bang";
+      context.fail_stage3();
+      return;
     }
   }
 
@@ -42,16 +46,21 @@ void TrustedStage3State::on(SolverContext& context) {
   // process already received stage-2, possible to go further to stage-3
   if (!context.stage2_data().empty()) {
     csdebug() << name() << ": handle early received stages-2";
-    bool finish = false;
+    Result finish = Result::Ignore;
     for (const auto& st : context.stage2_data()) {
       csdebug() << name() << ": stage-2[" << static_cast<int>(st.sender) << "]";
       if (Result::Finish == onStage2(context, st)) {
-        finish = true;
+        finish = Result::Finish;
       }
     }
 
-    if (finish) {
+    if (finish == Result::Finish) {
       context.complete_stage3();
+      return;
+    }
+
+    if (finish == Result::Failure) {
+      context.fail_stage3();
       return;
     }
   }
@@ -211,6 +220,13 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
         if (tCandSize > 0) {
           for (size_t outer = 0; outer < tCandSize - 1; outer++) {
+//DPOS check start -> comment if unnecessary
+            //if (!context.checkNodeCache(ptrStage1->trustedCandidates.at(outer))) {
+            //  cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (low-value candidates)";
+            //  context.mark_untrusted(it.sender);
+            //  break;
+            //}
+//DPOS check finish
             for (size_t inner = outer + 1; inner < tCandSize; inner++) {
               if (ptrStage1->trustedCandidates.at(outer) == ptrStage1->trustedCandidates.at(inner)) {
                 cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (duplicated candidates)";
@@ -266,6 +282,13 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
 
 Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
 //TODO : here write the code to clean stage three storage, perhaps add st3 iterations
+  if (take_urgent_decision(context)) {  // to be redesigned
+    csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
+  }
+  else {
+    cslog() << "\tconsensus failed waiting for BigBang";
+    return Result::Failure;
+  }
   csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";
   context.spawn_next_round(stage);
   csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
@@ -546,6 +569,9 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
       stage.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
       ++idx;
     }
+  }
+  if (std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > stage.realTrustedMask.size() / 2U + 1U) {
+    return false;
   }
   return true;
 }

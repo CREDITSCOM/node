@@ -90,6 +90,10 @@ public:
     core.handleTransitions(SolverCore::Event::Stage2Enough);
   }
 
+  void fail_stage3() {
+    core.handleTransitions(SolverCore::Event::FailConsensus);
+  }
+
   void complete_post_stage() {
     core.handleTransitions(SolverCore::Event::Stage3Enough);
   }
@@ -281,9 +285,17 @@ public:
     return core.realTrustedChangedSet(val);
   }
 
-  void realTrustedSet(cs::Byte index, cs::Byte value) const {
-    //realTrustedChangedSet(true);
-    //return core.realTrustedSet(value);
+  void realTrustedSet(cs::Bytes realTrusted) {
+    csdebug() << __func__;
+    core.realTrustedSet(realTrusted);
+  }
+
+  cs::Bytes getRealTrusted() {
+    return core.getRealTrusted();
+  }
+
+  bool checkNodeCache(cs::PublicKey sender) const {
+    return core.checkNodeCache(sender);
   }
 
 

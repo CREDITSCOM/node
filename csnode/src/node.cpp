@@ -925,6 +925,8 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
       return false;
     }
   }
+  //cs::Signature sig;
+  //istream_ >>sig;
 
   if (!istream_.good() || confidants.size() < confSize) {
     cswarning() << "Bad round table format, ignoring";
@@ -1410,6 +1412,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   cs::DataStream stream(bytes);
   stream << stageThreeInfo.sender;
   stream << stageThreeInfo.writer;
+  stream << stageThreeInfo.iteration;
   stream << stageThreeInfo.blockSignature;
   stream << stageThreeInfo.roundSignature;
   stream << stageThreeInfo.trustedSignature;
@@ -1422,7 +1425,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   const int k1 = (corruptionLevel_ / 4) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-  if (false/*myConfidantIndex_ == 1*/) {
+  if (myConfidantIndex_ == 1) {
   /*if (k1 == 1 && k2 == myConfidantIndex_) {*/
     csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
   }
@@ -1468,10 +1471,12 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
   stream >> stage.writer;
+  stream >> stage.iteration;//this is a potential problem!!!
   stream >> stage.blockSignature;
   stream >> stage.roundSignature;
   stream >> stage.trustedSignature;
   stream >> stage.realTrustedMask;
+
 
   const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -1562,9 +1567,9 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 }
 
 void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
- /* if (myConfidantIndex_ == 1) {
+  if (myConfidantIndex_ == 1) {
     return;
-  }*/
+  }
   csmeta(csdetails) << "started";
 
   if (myLevel_ != Level::Confidant) {

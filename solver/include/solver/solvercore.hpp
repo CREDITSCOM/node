@@ -98,7 +98,9 @@ public:
   void removeDeferredBlock(cs::Sequence);
   bool realTrustedChanged() const;
   void realTrustedChangedSet(bool);
-  void realTrustedSet(cs::Byte index, cs::Byte value);
+  void realTrustedSet(cs::Bytes realTrusted);
+  bool checkNodeCache(const cs::PublicKey& sender);
+  cs::Bytes getRealTrusted();
   size_t trueStagesThree();
 
   size_t stagesThree();
@@ -137,6 +139,7 @@ private:
     Hashes,
     Stage1Enough,
     Stage2Enough,
+    FailConsensus,
     Stage3Enough,
     Stage3NonComplete,
     SmartDeploy,
@@ -281,6 +284,7 @@ private:
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector<cs::StageThree> trueStageThreeStorage;
   bool realTrustedChanged_;
+  cs::Bytes tempRealTrusted_;
 
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
