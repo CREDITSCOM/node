@@ -207,7 +207,11 @@ public:
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
 
-  std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr);
+  std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr)
+  {
+    cs::Lock lock(public_access_lock);
+    return std::move(get_smart_contract_impl(tr));
+  }
 
   // get & handle rejected transactions
   // usually ordinary consensus may reject smart-related transactions
@@ -217,26 +221,19 @@ public:
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
   }
 
-  SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
-
-  bool is_running_smart_contract(const csdb::Address& addr) const
-  {
-    return get_smart_contract_status(addr) == SmartContractStatus::Running;
-  }
-
   bool is_closed_smart_contract(const csdb::Address& addr) const
   {
+    cs::Lock lock(public_access_lock);
     return get_smart_contract_status(addr) == SmartContractStatus::Closed;
   }
 
   bool is_known_smart_contract(const csdb::Address& addr) const {
-    std::shared_lock lock_read(known_contracts_lock);
-    return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
+    cs::Lock lock(public_access_lock);
+    return in_known_contracts(addr);
   }
 
   // return true if SmartContracts provide special handling for transaction, so
   // the transaction is not pass through conveyer
-  //
   // method is thread-safe to be called from API thread
   bool capture_transaction(const csdb::Transaction& t);
 
@@ -249,7 +246,12 @@ public signals:
   SmartContractSignal signal_payable_timeout;
 
 public slots:
-  void on_execution_completed(const SmartExecutionData& data);
+  // called when execute_async() completed
+  void on_execution_completed(const SmartExecutionData& data)
+  {
+    cs::Lock lock(public_access_lock);
+    on_execution_completed_impl(data);
+  }
 
   // called when next block is stored
   void on_store_block(const csdb::Pool& block);
@@ -293,8 +295,6 @@ private:
 
   // last contract's state storage
   std::map<csdb::Address, StateItem> known_contracts;
-  // is locked in const methods also:
-  mutable std::shared_mutex known_contracts_lock;
 
   // contract replenish transactions stored during reading from DB on stratup
   std::vector<SmartContractRef> replenish_contract;
@@ -381,16 +381,15 @@ private:
 
   // executiom queue
   std::vector<QueueItem> exe_queue;
-  // is locked in const methods:
-  mutable std::recursive_mutex exe_queue_lock;
+
+  // is locked in all non-static public methods
+  // is locked in const methods also
+  mutable cs::SpinLock public_access_lock;
 
   using queue_iterator = std::vector<QueueItem>::iterator;
   using queue_const_iterator = std::vector<QueueItem>::const_iterator;
 
   Node* pnode;
-
-  // locks 'emitted_transactions' when transaction is emitted by smart contract, or when it's time to collect them
-  cs::SpinLock emit_transaction_lock;
 
   // emitted transactions if any while execution running
   std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
@@ -434,9 +433,10 @@ private:
   queue_iterator remove_from_queue(queue_iterator it);
 
   void remove_from_queue(const SmartContractRef& item) {
-    std::lock_guard l(exe_queue_lock);
     remove_from_queue(find_in_queue(item));
   }
+
+  SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
   void checkAllExecutions();
 
@@ -505,6 +505,15 @@ private:
   // tests max fee amount and round-based timeout on executed smart contracts;
   // invoked on every new block ready
   void test_exe_conditions(const csdb::Pool& block);
+
+  bool in_known_contracts(const csdb::Address& addr) const
+  {
+    return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
+  }
+
+  std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
+
+  void on_execution_completed_impl(const SmartExecutionData& data);
 };
 
 }  // namespace cs
