@@ -668,7 +668,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
           data.contract_ref = item.ref_start;
           data.error = "contract execution is out of funds";
           data.ret_val.__set_v_byte(error::OutOfFunds);
-          on_execute_completed(data);
+          on_execution_completed(data);
           continue;
         }
         // round-based timeout
@@ -688,7 +688,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
               data.contract_ref = item.ref_start;
               data.error = "contract execution timeout";
               data.ret_val.__set_v_byte(error::TimeExpired);
-              on_execute_completed(data);
+              on_execution_completed(data);
             }
             else {
               item.finish(seq);
@@ -883,7 +883,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
 
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execute_completed);
+    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
     executions_.push_back(std::move(watcher));
 
     return true;
@@ -894,7 +894,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
   return false;
 }
 
-void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
+void SmartContracts::on_execution_completed(const SmartExecutionData& data) {
   
   std::lock_guard l(exe_queue_lock);
 
@@ -905,6 +905,7 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
       // already finished (by timeout), no transaction required
       return;
     }
+    csdebug() << log_prefix << "executor has returned call to contract {" << it->seq_enqueue << "}";
     it->finish(bc.getLastSequence());
     result = create_new_state(*it);
   }

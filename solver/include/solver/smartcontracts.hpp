@@ -249,7 +249,7 @@ public signals:
   SmartContractSignal signal_payable_timeout;
 
 public slots:
-  void on_execute_completed(const SmartExecutionData& data);
+  void on_execution_completed(const SmartExecutionData& data);
 
   // called when next block is stored
   void on_store_block(const csdb::Pool& block);
