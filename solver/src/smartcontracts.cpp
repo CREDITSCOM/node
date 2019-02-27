@@ -417,7 +417,7 @@ void SmartContracts::test_exe_queue() {
     if(it->status == SmartContractStatus::Finished) {
       // some contract is under consensus
       ++it;
-      break;
+      continue;
     }
     // status: Waiting
     const::csdb::Address lookup_abs_addr = it->abs_addr;
