@@ -278,8 +278,8 @@ size_t SolverCore::stagesThree() {
   return stageThreeStorage.size();
 }
 
-void SolverCore::send_wallet_transaction(const csdb::Transaction& tr, bool from_contract /*= false*/) {
-    if(psmarts->capture_transaction(tr, from_contract)) {
+void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
+    if(psmarts->capture_transaction(tr)) {
       // avoid pass to conveyer, psmarts provide special handling
       return;
     }

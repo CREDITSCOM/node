@@ -234,7 +234,8 @@ public:
 
   // return true if SmartContracts provide special handling for transaction, so
   // the transaction is not pass through conveyer
-  bool capture_transaction(const csdb::Transaction& t, bool from_contract);
+  // method is thread-safe to be called from API thread
+  bool capture_transaction(const csdb::Transaction& t);
 
   // flag to allow execution, also depends on executor presence
   bool execution_allowed;
