@@ -56,6 +56,8 @@ SmartContracts::~SmartContracts() = default;
 
 void SmartContracts::init(const cs::PublicKey& id, Node* node)
 {
+  cs::Lock lock(public_access_lock);
+
   pnode = node;
   if(pnode->getConnector()!=nullptr) {
     papi = (pnode->getConnector())->apiHandler();
@@ -64,8 +66,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
 
   // currently, blockchain is read in such manner that does not require absolute/optimized consolidation post-factum
   // anyway this tested code may become useful in future
-
-  std::unique_lock lock_write(known_contracts_lock);
 
   size_t cnt = known_contracts.size();
   // consolidate contract states addressed by public keys with those addressed by wallet ids
@@ -97,9 +97,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
     known_contracts.erase(it);
     it = std::find_if(known_contracts.begin(), known_contracts.end(), pred);
   }
-
-  lock_write.unlock();
-  std::shared_lock lock_read(known_contracts_lock);
 
   // validate contract states
   for(const auto& item : known_contracts) {
@@ -150,7 +147,7 @@ bool SmartContracts::is_deploy(const csdb::Transaction& tr) {
     return false;
   }
 
-  const auto invoke = deserialize<api::SmartContractInvocation>(uf.value<std::string>());  // get_smart_contract(tr);
+  const auto invoke = deserialize<api::SmartContractInvocation>(uf.value<std::string>());
   // deploy ~ start but method in invoke info is empty
   return invoke.method.empty();
 }
@@ -226,8 +223,6 @@ void SmartContracts::checkAllExecutions() {
 
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
   using namespace trx_uf;
-  std::shared_lock lock_read(known_contracts_lock);
-
   const auto item = known_contracts.find(abs_addr);
   if (item != known_contracts.cend()) {
     const StateItem& val = item->second;
@@ -253,11 +248,12 @@ bool SmartContracts::is_replenish_contract(const csdb::Transaction& tr)
     // must not be deploy/execute/new_state transaction
     return false;
   }
-  return is_known_smart_contract(tr.target());
+  return in_known_contracts(tr.target());
 }
 
-std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(const csdb::Transaction& tr) {
-    // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
+std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract_impl(const csdb::Transaction& tr)
+{
+  // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
   using namespace trx_uf;
 
   bool is_replenish_contract = false;
@@ -308,7 +304,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract(c
 
 bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
   csdb::Address abs_addr = absolute_address(tr.target());
-  if(!is_known_smart_contract(abs_addr)) {
+  if(!in_known_contracts(abs_addr)) {
     return false;
   }
   // may do blocking call to API::executor
@@ -316,8 +312,6 @@ bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
 }
 
 void SmartContracts::clear_emitted_transactions(const csdb::Address& abs_addr) {
-  cs::Lock lock(emit_transaction_lock);
-
   if(emitted_transactions.count(abs_addr) > 0) {
     emitted_transactions.erase(abs_addr);
   }
@@ -331,16 +325,13 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   }
   SmartContractRef new_item(block.hash().clone(), block.sequence(), trx_idx);
   
-  {
-    std::lock_guard l(exe_queue_lock);
-    if (!exe_queue.empty()) {
-      auto it = find_in_queue(new_item);
-      // test duplicated contract call
-      if (it != exe_queue.cend()) {
-        cserror() << log_prefix << "attempt to queue duplicated contract transaction, already queued on round #"
-          << it->seq_enqueue;
-        return;
-      }
+  if (!exe_queue.empty()) {
+    auto it = find_in_queue(new_item);
+    // test duplicated contract call
+    if (it != exe_queue.cend()) {
+      cserror() << log_prefix << "attempt to queue duplicated contract {" << it->seq_enqueue << "} transaction, already queued on round #"
+        << it->seq_enqueue;
+      return;
     }
   }
 
@@ -350,11 +341,9 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   bool payable = false;
   if(is_deploy(t)) {
     // pre-register in known_contracts
-    auto maybe_invoke_info = get_smart_contract(t);
+    auto maybe_invoke_info = get_smart_contract_impl(t);
     if(maybe_invoke_info.has_value()) {
       const auto& invoke_info = maybe_invoke_info.value();
-
-      std::unique_lock lock_write(known_contracts_lock);
       StateItem& val = known_contracts[abs_addr];
       val.ref_deploy = new_item;
       if(implements_payable(invoke_info)) {
@@ -371,12 +360,11 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   }
 
   cslog() << std::endl << log_prefix << "enqueue " << get_executed_method(new_item) << std::endl;
-  {
-    std::lock_guard l(exe_queue_lock);
-    auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
-    queue_item.wait(new_item.sequence);
-    queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
-  }
+  auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
+  queue_item.wait(new_item.sequence);
+  queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
+  queue_item.is_executor = (execution_allowed && contains_me(block.confidants()));
+
   test_exe_queue();
 }
 
@@ -413,53 +401,53 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
 }
 
 void SmartContracts::test_exe_queue() {
-
-  std::lock_guard l(exe_queue_lock);
-  
-  // select next queue item
-  while (!exe_queue.empty()) {
-    auto next = exe_queue.begin();
-    if (next->status == SmartContractStatus::Closed) {
-      csdebug() << log_prefix << "finished contract still in queue, remove it";
-      remove_from_queue(exe_queue.cbegin());
+  // update queue items status
+  auto it = exe_queue.begin();
+  while (it != exe_queue.end()) {
+    if (it->status == SmartContractStatus::Closed) {
+      csdebug() << log_prefix << "finished contract {" << it->seq_enqueue << "} still in queue, remove it";
+      it = remove_from_queue(it);
       continue;
     }
-    if(next->status == SmartContractStatus::Running) {
+    if(it->status == SmartContractStatus::Running) {
       // some contract is already running
-      break;
+      ++it;
+      continue;
     }
-    if(next->status == SmartContractStatus::Finished) {
+    if(it->status == SmartContractStatus::Finished) {
       // some contract is under consensus
-      break;
+      ++it;
+      continue;
     }
-    csdebug() << log_prefix << "set running status to next contract in queue";
-    clear_emitted_transactions(next->abs_addr); // insurance
-    csdb::Pool block = bc.loadBlock(next->ref_start.sequence);
-    if (!block.is_valid()) {
-      cserror() << log_prefix << "load block with smart contract failed, cancel execution";
-      remove_from_queue(next);
+    // status: Waiting
+    const::csdb::Address lookup_abs_addr = it->abs_addr;
+    auto it_locked = std::find_if(exe_queue.cbegin(), exe_queue.cend(),
+      [this, lookup_abs_addr](const QueueItem& item) {return item.abs_addr ==lookup_abs_addr && item.status != SmartContractStatus::Waiting; });
+    if (it_locked != exe_queue.cend()) {
+      csdebug() << log_prefix << "contract {" << it->seq_enqueue << "} still is locked, wait to execute";
+      ++it;
+      continue;
+    }
+    csdebug() << log_prefix << "set running status to contract {" << it->seq_enqueue << "}";
+    clear_emitted_transactions(it->abs_addr); // insurance from obsolete transactions
+    it->start(bc.getLastSequence()); // use blockchain based round counting
+    // call to executor only if is trusted relatively to this contract
+    if (it->is_executor) {
+      csdebug() << log_prefix << "execute contract {" << it->seq_enqueue << "} now";
+      execute_async(it->ref_start);
     }
     else {
-      next->start(block.sequence()); // use blockchain based round counting
-      // call to executor only if currently is trusted
-      next->is_executor = execution_allowed && contains_me(block.confidants());
-      if (next->is_executor) {
-        csdebug() << log_prefix << "execute current contract now";
-        execute_async(next->ref_start);
-      }
-      else {
-        csdebug() << log_prefix << "skip contract execution, not in trusted list";
-      }
+      csdebug() << log_prefix << "skip contract {" << it->seq_enqueue << "} execution, not in trusted list";
     }
+
+    ++it;
   }
 }
 
 SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Address& addr) const
 {
-  std::lock_guard l(exe_queue_lock);
-
   if (!exe_queue.empty()) {
-    const auto it = find_in_queue(absolute_address(addr));
+    const auto it = find_first_in_queue(absolute_address(addr));
     if (it != exe_queue.cend()) {
       return it->status;
     }
@@ -469,14 +457,14 @@ SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Addres
 
 bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
 {
+  cs::Lock lock(public_access_lock);
+
   // test smart contract as source of transaction
   // the new_state transaction is unable met here, we are the only one source of new_state
-  if(is_known_smart_contract(tr.source())) {
-    csdb::Address abs_addr = absolute_address(tr.source());
-    if(is_running_smart_contract(abs_addr)) {
+  csdb::Address abs_addr = absolute_address(tr.source());
+  if(in_known_contracts(abs_addr)) {
+    if(get_smart_contract_status(abs_addr) == SmartContractStatus::Running) {
       // expect calls from api when trxs received
-      cs::Lock lock(emit_transaction_lock);
-
       auto& vect = emitted_transactions[abs_addr];
       vect.push_back(tr.clone());
       csdebug() << log_prefix << "smart contract emits transaction, add, total " << vect.size();
@@ -488,17 +476,13 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   }
 
   // test smart contract as target of transaction (is it payable?)
-  csdb::Address abs_addr = absolute_address(tr.target());
+  abs_addr = absolute_address(tr.target());
   bool is_contract = false;
   bool has_state = false;
-
-  {
-    std::shared_lock lock_read(known_contracts_lock);
-    const auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.end()) {
-      is_contract = true;
-      has_state = !it->second.state.empty();
-    }
+  const auto it = known_contracts.find(abs_addr);
+  if (it != known_contracts.end()) {
+    is_contract = true;
+    has_state = !it->second.state.empty();
   }
   
   if(is_contract) {
@@ -523,7 +507,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
         }
       }
     }
-    else /*is payable*/ {
+    else /* is payable */ {
       // test if payable() is not directly called
       if( is_executable( tr ) ) {
         const csdb::UserField fld = tr.user_field( cs::trx_uf::start::Methods );
@@ -537,9 +521,12 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
             }
           }
         }
+        csdebug() << log_prefix << "allow deploy/executable transaction";
       }
-      // contract is payable and transaction addresses it, ok then
-      csdebug() << log_prefix << "allow transaction targeting to payable contract";
+      else /* not executable transaction */ {
+        // contract is payable and transaction addresses it, ok then
+        csdebug() << log_prefix << "allow transaction targeting to payable contract";
+      }
     }
   }
 
@@ -547,6 +534,9 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
 }
 
 void SmartContracts::on_store_block(const csdb::Pool& block) {
+
+  cs::Lock lock(public_access_lock);
+
   test_exe_conditions(block);
   test_exe_queue();
   // inspect transactions against smart contracts, raise special event on every item found:
@@ -582,7 +572,10 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
   }
 }
 
-void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
+void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*/) {
+
+  cs::Lock lock(public_access_lock);
+
   // uncomment when exe_queue is updated during blocks reading on startup:
   //test_exe_conditions(block);
 
@@ -613,16 +606,14 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
           cserror() << log_prefix << "failed convert optimized address";
         }
         else {
-          if(!is_known_smart_contract(abs_addr)) {
-            if(is_executable(tr)) {
-              // register execution ONLY if contract is unknown yet,
+          if(!in_known_contracts(abs_addr)) {
+            if(is_deploy(tr)) {
+              // register ONLY contract deploy,
               // known contracts will be updated on new_state handling
-              std::unique_lock lock_write(known_contracts_lock);
               StateItem& val = known_contracts[abs_addr];
-              SmartContractRef& ref = is_deploy(tr) ? val.ref_deploy : val.ref_execute;
-              ref.hash = block.hash();
-              ref.sequence = block.sequence();
-              ref.transaction = tr_idx;
+              val.ref_deploy.hash = block.hash();
+              val.ref_deploy.sequence = block.sequence();
+              val.ref_deploy.transaction = tr_idx;
             }
           }
           else {
@@ -638,15 +629,13 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     }
   }
 
-  *should_stop = false;
+  // do not assign stop flag not to overwrite value set by other subscribers:
+  //*should_stop = false;
 }
 
 // tests max fee amount and round-based timeout on executed smart contracts;
 // invoked on every new block ready
 void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
-
-  std::lock_guard l(exe_queue_lock);
-
   if(!exe_queue.empty()) {
     for(auto& item : exe_queue) {
       // if smart is in executor or is under smart-consensus:
@@ -654,12 +643,12 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
         // test out-of-fee:
         item.consumed_fee += smart_round_fee(block);
         if(item.avail_fee - item.consumed_fee <= item.new_state_fee) {
-          cswarning() << log_prefix << "contract is out of fee, cancel it";
+          cswarning() << log_prefix << "contract {" << item.seq_enqueue << "} is out of fee, cancel it";
           SmartExecutionData data;
           data.contract_ref = item.ref_start;
           data.error = "contract execution is out of funds";
           data.ret_val.__set_v_byte(error::OutOfFunds);
-          on_execute_completed(data);
+          on_execution_completed_impl(data);
           continue;
         }
         // round-based timeout
@@ -667,19 +656,19 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
         if (seq > item.seq_start) {
           size_t delta = seq - item.seq_start;
           if (delta > Consensus::MaxRoundsCancelContract) {
-            cswarning() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsCancelContract
+            cswarning() << log_prefix << "contract {" << item.seq_enqueue << "} is in queue over " << Consensus::MaxRoundsCancelContract
               << " blocks (from #" << item.seq_start << "), remove it without transaction";
             item.close();
           }
           else if (item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsExecuteContract && item.is_executor) {
-            cslog() << log_prefix << "contract is in queue over " << Consensus::MaxRoundsExecuteContract
+            cslog() << log_prefix << "contract {" << item.seq_enqueue << "} is in queue over " << Consensus::MaxRoundsExecuteContract
               << " blocks (from #" << item.seq_start << "), cancel it";
             if (item.is_executor) {
               SmartExecutionData data;
               data.contract_ref = item.ref_start;
               data.error = "contract execution timeout";
               data.ret_val.__set_v_byte(error::TimeExpired);
-              on_execute_completed(data);
+              on_execution_completed_impl(data);
             }
             else {
               item.finish(seq);
@@ -694,7 +683,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
             emit signal_payable_timeout(starter);
           }
           else {
-            cserror() << log_prefix << "cannot handle execution timeout";
+            cserror() << log_prefix << "cannot handle contract {" << item.seq_enqueue << "} execution timeout";
           }
         }
       }
@@ -702,33 +691,31 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
   }
 }
 
-void SmartContracts::remove_from_queue(std::vector<QueueItem>::const_iterator it)
+// return next element in queue
+SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it)
 {
-  std::lock_guard l(exe_queue_lock);
-
   if(it == exe_queue.cend()) {
-    cserror() << log_prefix << "contract to remove is not in queue";
-    return;
-  }
-  if(it != exe_queue.cbegin()) {
-    cswarning() << log_prefix << "completed contract is not at the top of queue";
-  }
-  cslog() << std::endl << log_prefix << "remove from queue completed " << get_executed_method(it->ref_start) << std::endl;
-
-  clear_emitted_transactions(it->abs_addr);
-  const cs::Sequence seq = bc.getLastSequence();
-  const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
-  if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
-    cslog() << log_prefix << seq_cancel - seq << " round(s) were to unconditional contract timeout";
-  }
-  exe_queue.erase(it);
-
-  if (exe_queue.empty()) {
-    csdebug() << log_prefix << "contract queue is empty, nothing to execute";
+    cserror() << log_prefix << "contract {" << it->seq_enqueue << "} to remove is not in queue";
   }
   else {
-    csdebug() << log_prefix << exe_queue.size() << " item(s) in queue";
+    cslog() << std::endl << log_prefix << "remove from queue completed {" << it->seq_enqueue << "} " << get_executed_method(it->ref_start) << std::endl;
+    clear_emitted_transactions(it->abs_addr);
+    const cs::Sequence seq = bc.getLastSequence();
+    const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
+    if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
+      cslog() << log_prefix << seq_cancel - seq << " round(s) were to unconditional contract {" << it->seq_enqueue << "} timeout";
+    }
+    it = exe_queue.erase(it);
+
+    if (exe_queue.empty()) {
+      csdebug() << log_prefix << "contract queue is empty, nothing to execute";
+    }
+    else {
+      csdebug() << log_prefix << exe_queue.size() << " item(s) in queue";
+    }
   }
+
+  return it;
 }
 
 bool SmartContracts::execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract,
@@ -798,7 +785,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
 
   csdebug() << log_prefix << "invoke api to remote executor to " << (deploy ? "deploy" : (!replenish_only ? "execute" : "replenish")) << " contract";
 
-  auto maybe_invoke_info = get_smart_contract(start_tr);
+  auto maybe_invoke_info = get_smart_contract_impl(start_tr);
   if (maybe_invoke_info.has_value()) {
     const auto& invoke_info = maybe_invoke_info.value();
     std::string state;
@@ -806,20 +793,17 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
     bool call_payable = false;  // only for start or replenish, not for deploy
     double tr_amount = start_tr.amount().to_double();
 
-    {
-      std::shared_lock lock_read(known_contracts_lock);
-      const auto it = known_contracts.find(absolute_address(start_tr.target()));
-      if (it != known_contracts.cend()) {
-        const StateItem& val = it->second;
-        is_payable = (val.payable == PayableStatus::Implemented);
-        if (!deploy) {
-          state = val.state;
-          call_payable = (is_payable && tr_amount > std::numeric_limits<double>::epsilon()) || replenish_only;
-        }
+    const auto it = known_contracts.find(absolute_address(start_tr.target()));
+    if (it != known_contracts.cend()) {
+      const StateItem& val = it->second;
+      is_payable = (val.payable == PayableStatus::Implemented);
+      if (!deploy) {
+        state = val.state;
+        call_payable = (is_payable && tr_amount > std::numeric_limits<double>::epsilon()) || replenish_only;
       }
-      else {
-        cserror() << log_prefix << "contract state is not found in private table";
-      }
+    }
+    else {
+      cserror() << log_prefix << "contract state is not found in private table";
     }
 
     // create runnable object
@@ -874,7 +858,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
 
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execute_completed);
+    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
     executions_.push_back(std::move(watcher));
 
     return true;
@@ -885,10 +869,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
   return false;
 }
 
-void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
-  
-  std::lock_guard l(exe_queue_lock);
-
+void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data) {
   auto it = find_in_queue(data.contract_ref);
   csdb::Transaction result{};
   if (it != exe_queue.end()) {
@@ -896,6 +877,7 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
       // already finished (by timeout), no transaction required
       return;
     }
+    csdebug() << log_prefix << "executor has returned call to contract {" << it->seq_enqueue << "}";
     it->finish(bc.getLastSequence());
     result = create_new_state(*it);
   }
@@ -925,17 +907,15 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
     packet.addTransaction(result);
 
     if (it != exe_queue.end()) {
-      cs::Lock lock(emit_transaction_lock);
-
       if (emitted_transactions.count(it->abs_addr) > 0) {
         const auto& vect = emitted_transactions[it->abs_addr];
         for (const auto& tr : vect) {
           packet.addTransaction(tr);
         }
-        csdebug() << log_prefix << "add " << vect.size() << " emitted trx to contract state";
+        csdebug() << log_prefix << "add " << vect.size() << " emitted transaction(s) to contract {" << it->seq_enqueue << "} state";
       }
       else {
-        csdebug() << log_prefix << "no emitted trx added to contract state";
+        csdebug() << log_prefix << "no emitted transaction added to contract state";
       }
     }
   }
@@ -943,9 +923,9 @@ void SmartContracts::on_execute_completed(const SmartExecutionData& data) {
   if (it != exe_queue.end()) {
     clear_emitted_transactions(it->abs_addr);
 
-    csdebug() << log_prefix << "starting smart contract consensus";
+    csdebug() << log_prefix << "starting contract {" << it->seq_enqueue << "} consensus";
     if (!it->start_consensus(packet, pnode, this)) {
-      cserror() << log_prefix << "smart contract consensus failed, remove item from queue";
+      cserror() << log_prefix << "contract {" << it->seq_enqueue << "} consensus failed, remove item from queue";
       remove_from_queue(it);
     }
   }
@@ -989,60 +969,60 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
 // get & handle rejected transactions
 // usually ordinary consensus may not reject smart-related transactions
 void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
-  
-  std::lock_guard l(exe_queue_lock);
 
-  if (exe_queue.empty()) {
-    cserror() << log_prefix << "get rejected smart transactions but execution queue is empty";
-    return;
-  }
+  cs::Lock lock(public_access_lock);
 
+  bool retest_queue_required = false;
   // will contain "unchanged" states of rejected smart contract calls:
   cs::TransactionsPacket unchanged_pack;
-
   const auto cnt = pack.transactionsCount();
-  if (cnt > 0) {
-    csdebug() << log_prefix << "" << cnt << " trxs are rejected";
-    std::vector<csdb::Address> done;
-    for (const auto t : pack.transactions()) {
-      csdb::Address abs_addr = absolute_address(t.source());
-      if (std::find(done.cbegin(), done.cend(), abs_addr) != done.cend()) {
-        continue;
-      }
+  if (cnt == 0) {
+    cserror() << log_prefix << "rejected transactions list is empty";
+    return;
+  }
+  csdebug() << log_prefix << "" << cnt << " transactions are rejected";
+  std::vector<csdb::Address> done;
 
-      // find source contract in queue
-      for (auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {
-        if (it->abs_addr == abs_addr) {
-          done.push_back(abs_addr);
-          csdebug() << log_prefix << "send to conveyer smart contract failed status (related trxs or state are rejected)";
-          // send to consensus
-          csdb::Transaction tr = create_new_state(*it);
-          // result contains empty USRFLD[state::Value]
-          tr.add_user_field(trx_uf::new_state::Value, std::string{});
-          // result contains error code "rejected by consensus"
-          using namespace cs::trx_uf;
-          ::general::Variant err_code;
-          err_code.__set_v_byte(error::ConsensusRejected);
-          tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
-          if (tr.is_valid()) {
-            unchanged_pack.addTransaction(tr);
-          }
-          else {
-            cserror() << log_prefix << "failed to store smart contract failure, remove from execution queue";
-            remove_from_queue(it);
-            test_exe_queue();
-          }
-          break;
-        }
-      }
+  for (const auto t : pack.transactions()) {
+    csdb::Address abs_addr = absolute_address(t.source());
+    if (std::find(done.cbegin(), done.cend(), abs_addr) != done.cend()) {
+      continue;
     }
 
-    if (unchanged_pack.transactionsCount() > 0) {
-      Conveyer::instance().addSeparatePacket(unchanged_pack);
+    // find source contract in queue
+    queue_iterator it = find_first_in_queue(abs_addr);
+    if (it == exe_queue.end()) {
+      cserror() << log_prefix << "cannot find in queue source contract for rejected transactions";
+    }
+    else {
+      done.push_back(abs_addr);
+      csdebug() << log_prefix << "send to conveyer contract {" << it->seq_enqueue << "} failed status (emitted transactions or state are rejected)";
+      // send to consensus
+      csdb::Transaction tr = create_new_state(*it);
+      // result contains empty USRFLD[state::Value]
+      tr.add_user_field(trx_uf::new_state::Value, std::string{});
+      // result contains error code "rejected by consensus"
+      using namespace cs::trx_uf;
+      ::general::Variant err_code;
+      err_code.__set_v_byte(error::ConsensusRejected);
+      tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
+      if (tr.is_valid()) {
+        unchanged_pack.addTransaction(tr);
+      }
+      else {
+        cserror() << log_prefix << "failed to store contract {" << it->seq_enqueue << "} failure, remove from execution queue";
+        it->close();
+        retest_queue_required = true;
+      }
     }
   }
-  else {
-    cserror() << log_prefix << "trxs are rejected but list is empty";
+
+  if (unchanged_pack.transactionsCount() > 0) {
+    Conveyer::instance().addSeparatePacket(unchanged_pack);
+  }
+
+  if (retest_queue_required) {
+    test_exe_queue();
   }
 }
 
@@ -1058,9 +1038,6 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
     // create or get contract state item
     csdb::Address abs_addr = absolute_address(t.target());
     if (abs_addr.is_valid()) {
-
-      std::unique_lock lock_write(known_contracts_lock);
-
       StateItem& item = known_contracts[abs_addr];
       // update last state (with non-empty one)
       item.state = std::move(state_value);
@@ -1126,18 +1103,15 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
 
 bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
 
-  {
-    // the most frequent fast test
-    std::shared_lock lock_read(known_contracts_lock);
-    auto item = known_contracts.find(abs_addr);
-    if (item == known_contracts.end()) {
-      // unknown contract
-      return false;
-    }
-    const StateItem& val = item->second;
-    if (val.payable != PayableStatus::Unknown) {
-      return val.payable == PayableStatus::Implemented;
-    }
+  // the most frequent fast test
+  auto item = known_contracts.find(abs_addr);
+  if (item == known_contracts.end()) {
+    // unknown contract
+    return false;
+  }
+  const StateItem& val = item->second;
+  if (val.payable != PayableStatus::Unknown) {
+    return val.payable == PayableStatus::Implemented;
   }
 
   // the first time test
@@ -1155,11 +1129,7 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
     }
   }
 
-  std::unique_lock lock_write(known_contracts_lock);
-  auto item = known_contracts.find(abs_addr);
-  if (item != known_contracts.end()) {
-    item->second.payable = result;
-  }
+  item->second.payable = result;
   return result == PayableStatus::Implemented;
 }
 
@@ -1213,7 +1183,7 @@ std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
     return std::string();
   }
   if (is_executable(t)) {
-    const auto maybe_invoke_info = get_smart_contract(t);
+    const auto maybe_invoke_info = get_smart_contract_impl(t);
     if (!maybe_invoke_info.has_value()) {
       return std::string();
     }
