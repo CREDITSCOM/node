@@ -51,7 +51,9 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   auto&& [packet, smartContractPackets] = std::move(data).value();
 
   csdebug() << name() << ": packet of " << packet.transactionsCount() << " transactions in" << typeid(conveyer).name();
-  csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
+  if (!smartContractPackets.empty()) {
+    csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
+  }
 
   checkSignaturesSmartSource(context, smartContractPackets);
 
@@ -323,11 +325,12 @@ bool TrustedStage1State::check_transaction_signature(SolverContext& context, con
   } else {
     // special rule for new_state transactions
     if (SmartContracts::is_new_state(transaction) && src != transaction.target()) {
-      csdebug() << name() << ": smart state trx has different source and target";
+      csdebug() << name() << ": smart state transaction has different source and target";
       return false;
     }
     auto it = smartSourceInvalidSignatures_.find(transaction.source());
     if (it != smartSourceInvalidSignatures_.end()) {
+      csdebug() << name() << ": smart contract transaction has invalid signature";
       return false;
     }
     return true;

@@ -77,11 +77,9 @@ namespace cs {
       TimeoutTracking timeout_request_neighbors;
       TimeoutTracking timeout_force_transition;
     private:
-      //Node pnode_;
   
       Node* pnode_;
       SmartContracts* psmarts_;
-      //CallsQueueScheduler scheduler;
 
       std::vector<cs::StageOneSmarts> smartStageOneStorage_;
       std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
