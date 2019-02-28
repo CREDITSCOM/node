@@ -101,13 +101,21 @@ public:
   size_t stagesThree();
   bool stateFailed(Result res);
 
-  /// <summary>   Adds a transaction passed to send pool </summary>
-  ///
-  /// <remarks>   Aae, 14.10.2018. </remarks>
-  ///
-  /// <param name="tr">   The transaction </param>
+  /**
+   * @fn  void SolverCore::send_wallet_transaction(const csdb::Transaction& tr, bool from_contract = false);
+   *
+   * @brief Adds a transaction passed to send pool
+   *
+   * @author  Alexander Avramenko
+   * @date  28.02.2019
+   *
+   * @param tr            The transaction.
+   * @param from_contract (Optional) True in case of transaction is emitted by contract, transfer type or execute type. False if transaction is sent by wallet
+   *
+   * ### remarks  Aae, 14.10.2018.
+   */
 
-  void send_wallet_transaction(const csdb::Transaction& tr);
+  void send_wallet_transaction(const csdb::Transaction& tr, bool from_contract = false);
 
   cs::SmartContracts& smart_contracts() const
   {

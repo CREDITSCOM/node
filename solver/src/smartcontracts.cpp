@@ -455,7 +455,7 @@ SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Addres
   return SmartContractStatus::Idle;
 }
 
-bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
+bool SmartContracts::capture_transaction(const csdb::Transaction& tr, bool from_contract)
 {
   cs::Lock lock(public_access_lock);
 
