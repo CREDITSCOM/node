@@ -642,7 +642,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
       if(item.status == SmartContractStatus::Running || item.status == SmartContractStatus::Finished) {
         // test out-of-fee:
         item.consumed_fee += smart_round_fee(block);
-        if(item.avail_fee - item.consumed_fee <= item.new_state_fee) {
+        if(item.is_executor && item.avail_fee - item.consumed_fee <= item.new_state_fee) {
           cswarning() << log_prefix << "contract {" << item.seq_enqueue << "} is out of fee, cancel it";
           SmartExecutionData data;
           data.contract_ref = item.ref_start;
@@ -660,7 +660,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
               << " blocks (from #" << item.seq_start << "), remove it without transaction";
             item.close();
           }
-          else if (item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsExecuteContract && item.is_executor) {
+          else if (item.is_executor && item.status == SmartContractStatus::Running && delta > Consensus::MaxRoundsExecuteContract) {
             cslog() << log_prefix << "contract {" << item.seq_enqueue << "} is in queue over " << Consensus::MaxRoundsExecuteContract
               << " blocks (from #" << item.seq_start << "), cancel it";
             if (item.is_executor) {
@@ -877,7 +877,7 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
       // already finished (by timeout), no transaction required
       return;
     }
-    csdebug() << log_prefix << "executor has returned call to contract {" << it->seq_enqueue << "}";
+    csdebug() << log_prefix << "execution of contract {" << it->seq_enqueue << "} has completed";
     it->finish(bc.getLastSequence());
     result = create_new_state(*it);
   }
