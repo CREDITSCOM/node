@@ -286,7 +286,7 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
     csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
   }
   else {
-    cslog() << "\tconsensus failed waiting for BigBang";
+    cslog() << "\tconsensus failed: waiting for BigBang";
     return Result::Failure;
   }
   csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";

@@ -90,6 +90,8 @@ struct PoolMetaInfo {
   cs::Sequence sequenceNumber;
   cs::Bytes realTrustedMask;
   std::vector <csdb::Pool::SmartSignature> smartSignatures;
+  cs::Bytes confirmationMask;
+  cs::Signatures confirmations;
 };
 
 struct HashVector {

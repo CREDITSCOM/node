@@ -94,6 +94,9 @@ public:
   void startConsensus();
 
   void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
+  bool receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& roundBytes, const cs::RoundNumber rNum
+      , const cs::Bytes& trustedMask, const cs::ConfidantsKeys& newConfidants
+      , cs::Signatures& poolSignatures);
   void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 

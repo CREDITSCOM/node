@@ -190,7 +190,7 @@ private:
   void logBlockInfo(csdb::Pool& pool);
 
   // Thread unsafe
-  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted);
+  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
 
   void onReadFromDB(csdb::Pool block, bool* should_stop);
   bool postInitFromDB();

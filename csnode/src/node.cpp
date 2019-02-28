@@ -431,7 +431,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.writerKey = key;
     }
   }
-
+  if(round!=0){
+    poolMetaInfo.confirmationMask = getBlockChain().confirmationList(round).mask;
+    poolMetaInfo.confirmations = getBlockChain().confirmationList(round).signatures;
+  }
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
     return;
@@ -1425,8 +1428,8 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
   const int k1 = (corruptionLevel_ / 4) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-  if (myConfidantIndex_ == 1) {
-  /*if (k1 == 1 && k2 == myConfidantIndex_) {*/
+  //if (myConfidantIndex_ == 1 && std::count(stageThreeInfo.realTrustedMask.cbegin(), stageThreeInfo.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex)==0) {
+  if (k1 == 1 && k2 == myConfidantIndex_) {
     csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
   }
   else {
@@ -1567,9 +1570,9 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 }
 
 void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester) {
-  if (myConfidantIndex_ == 1) {
-    return;
-  }
+  //if (myConfidantIndex_ == 1) {
+  //  return;
+  //}
   csmeta(csdetails) << "started";
 
   if (myLevel_ != Level::Confidant) {
@@ -2085,6 +2088,58 @@ void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo&
   csdebug() << "NODE> StageThree prepared:";
   st3.print();
 }
+bool Node::receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& roundBytes, const cs::RoundNumber rNum
+    , const cs::Bytes& trustedMask, const cs::ConfidantsKeys& newConfidants
+    , cs::Signatures& poolSignatures) {
+
+  cs::Conveyer& conveyer = cs::Conveyer::instance();
+  cs::ConfidantsKeys currentConfidants = conveyer.confidants();
+
+  cs::DataStream stream(sigBytes.data(), sigBytes.size());
+
+  stream >> poolSignatures;
+  
+  cs::Signatures roundSignatures;
+  stream >> roundSignatures;
+
+  cs::Signatures trustedConfirmation;
+  stream >> trustedConfirmation;
+
+  csdebug() << "NODE> PoolSigs Amnt = " << poolSignatures.size() 
+            << ", TrustedSigs Amnt = " << trustedConfirmation.size()
+            << ", RoundSigs Amnt = " << roundSignatures.size();
+
+  if (trustedMask.size() != currentConfidants.size()) {
+    csmeta(cserror) << "Illegal trusted mask count in round table";
+    return false;
+  }
+  cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
+
+  if (!getBlockChain().checkGroupSignature(currentConfidants, trustedMask, roundSignatures, tempHash)) {
+    csdebug() << "NODE> The roundtable signatures are NOT OK";
+    return false;
+  }
+  else {
+    csdebug() << "NODE> The roundtable signatures are ok";
+  }
+
+  cs::Bytes trustedToHash;
+  cs::DataStream tth(trustedToHash);
+  tth << rNum;
+  tth << newConfidants;
+  cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
+  
+  if (getBlockChain().checkGroupSignature(currentConfidants, trustedMask, trustedConfirmation, trustedHash)) {
+    csdebug() << "NODE> The trusted confirmation for the next round are ok";
+    getBlockChain().addConfirmationToList(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
+  }
+  else {
+    csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";
+    //return false;
+  }
+
+  return true;
+}
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csdebug() << "NODE> next round table received, round: " << rNum;
@@ -2123,27 +2178,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   cs::Bytes bytes;
   istream_ >> bytes;
 
-  cs::DataStream stream(bytes.data(), bytes.size());
-
-  cs::Signatures poolSignatures;
-  stream >> poolSignatures;
-  csdebug() << "NODE> PoolSignatures Amount = " << poolSignatures.size();
-
-  cs::Signatures roundSignatures;
-  stream >> roundSignatures;
-
-  cs::Signatures trustedConfirmation;
-  stream >> trustedConfirmation;
-
-
-  csdebug() << "NODE> TrustedSignatures Amount = " << trustedConfirmation.size();
-  csdebug() << "NODE> RoundSignatures Amount = " << roundSignatures.size();
-
-
-  auto rt = conveyer.roundTable(rNum - 1);
-
-  cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
-
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
@@ -2153,46 +2187,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
   cs::Bytes realTrusted;
   roundStream >> realTrusted;
-  if (realTrusted.size() != prevConfidants.size()) {
-    csmeta(cserror) << "Illegal trusted mask count in round table";
-    return;
-  }
-  if (!getBlockChain().checkGroupSignature(prevConfidants, realTrusted, roundSignatures, tempHash)) {
-    csdebug() << "NODE> The roundtable signatures are NOT OK";
-  }
-  else {
-    csdebug() << "NODE> The roundtable signatures are ok";
-  }
 
-  cs::Bytes trustedToHash;
-  cs::DataStream tth(trustedToHash);
-  tth << rNum;
-  tth << confidants;
-  cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-
-  getBlockChain().addConfirmationToList(rNum, false, prevConfidants, realTrusted, trustedConfirmation);
-  
-  auto& mask = getBlockChain().confirmationList(rNum - 1).mask ;//getBlockChain().getLastBlockTrustedMask();
-  prevConfidants.clear();
-  prevConfidants = getBlockChain().confirmationList(rNum-1).confidants;
-  //<-TR check start 
-  size_t cnt = 0;
-  if(rNum > 2 && mask.size()!=0){
-    if (rt != nullptr){
-      csdebug() << "Mask size = " << mask.size() << "for next confidants:";
-      for (auto& it : prevConfidants) {
-        csdebug() << cs::Utils::byteStreamToHex(it.data(),it.size());
-      }
-      if(getBlockChain().checkGroupSignature(prevConfidants,mask,trustedConfirmation,trustedHash)) {
-        csdebug() << "NODE> The trusted confirmation for the next round are ok";
-      }
-      else {
-        csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";
-      }
-    }
+  cs::Signatures poolSignatures;
+  if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)){
+    //return;
   }
-
-  //<-TR check finish
 
   cs::PacketsHashes hashes;
   roundStream >> hashes;

@@ -64,6 +64,7 @@ void TrustedPostStageState::on(SolverContext& context) {
 }
 
 void TrustedPostStageState::off(SolverContext& /*context*/) {
+  csdebug() << name() << ": finishing 3rd stage";
   if (timeout_request_stage.cancel()) {
     csdebug() << name() << ": cancel track timeout of stages-3";
   }
@@ -117,9 +118,13 @@ void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
         // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
         csdebug() << name() << ": making fake stage-3 [" << static_cast<int>(i) << "] in round " << rNum;
         realTrusted[i] = cs::ConfidantConsts::InvalidConfidantIndex;
-        context.realTrustedSet(realTrusted);
-        context.fake_stage3(i);
         // this procedute can cause the round change
+      }
+    }
+    context.realTrustedSet(realTrusted);
+    for (uint8_t i = 0; i < cnt; ++i) {
+      if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+        context.fake_stage3(i);
       }
     }
     //csdebug() << name() << ": here the real trusted should be set";

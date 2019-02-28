@@ -388,13 +388,13 @@ class Pool::priv : public ::csdb::internal::shared_data {
     }
 
     if (!is.get(roundConfirmationMask_)) {
-      csmeta(cswarning) << "get real trusted is failed";
+      csmeta(cswarning) << "get confirmation mask is failed";
       return false;
     }
 
 
     if (!getTrustedConfirmation(is)) {
-      csmeta(cswarning) << "get signatures is failed";
+      csmeta(cswarning) << "get confirmations is failed";
       return false;
     }
 
@@ -762,6 +762,13 @@ void Pool::add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept
   priv* data = d.data();
   data->is_valid_ = true;
   data->realTrusted_ = trustedMask;
+}
+
+void Pool::add_confirmation_mask(const std::vector<uint8_t>& confMask) noexcept
+{
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->roundConfirmationMask_ = confMask;
 }
 
 

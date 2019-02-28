@@ -165,6 +165,7 @@ public:
   void set_signatures(std::vector<cs::Signature>& blockSignatures) noexcept;
   void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
   void add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept;
+  void add_confirmation_mask(const std::vector<uint8_t>& confMask) noexcept;
   void setRoundCost(const csdb::Amount& roundCost) noexcept;
   void add_round_confirmations(const std::vector<cs::Signature>& confirmations) noexcept;
 
