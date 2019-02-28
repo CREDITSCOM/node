@@ -367,14 +367,16 @@ void BlockChain::removeLastBlock() {
   csmeta(csdebug) << "begin";
   csdb::Pool pool {};
 
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.is_valid()) {
-    pool = deferredBlock_;
-    deferredBlock_ = csdb::Pool {};
-  }
-  else {
-    pool = storage_.pool_remove_last();
+    if (deferredBlock_.is_valid()) {
+      pool = deferredBlock_;
+      deferredBlock_ = csdb::Pool{};
+    }
+    else {
+      pool = storage_.pool_remove_last();
+    }
   }
 
   if (!pool.is_valid()) {
