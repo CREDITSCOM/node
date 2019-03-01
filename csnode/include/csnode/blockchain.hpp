@@ -80,7 +80,7 @@ public:
    *            for future use and will be recorded on time
    */
 
-  bool storeBlock(csdb::Pool pool, bool by_sync);
+  bool storeBlock(csdb::Pool& pool, bool by_sync);
 
   /**
    * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -218,7 +218,6 @@ private:
   mutable cs::SpinLock cacheMutex_;
 
   std::condition_variable_any newBlockCv_;
-  cs::SpinLock waitersLocker_;
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;
@@ -315,7 +314,7 @@ private:
    *            pool)
    */
 
-  std::optional<csdb::Pool> recordBlock(csdb::Pool pool, bool isTrusted);
+  std::optional<csdb::Pool> recordBlock(csdb::Pool& pool, bool isTrusted);
 
   // to store outrunning blocks until the time to insert them comes
   // stores pairs of <block, sender> sorted by sequence number

@@ -33,7 +33,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, waitersLocker_()
 , fee_(std::make_unique<cs::Fee>()) {
 
   cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
@@ -303,7 +302,7 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 #endif
 
 csdb::PoolHash BlockChain::getLastHash() const {
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  std::lock_guard l(dbLock_);
 
   if (deferredBlock_.is_valid())
     return deferredBlock_.hash().clone();
@@ -423,16 +422,10 @@ void BlockChain::removeLastBlock() {
 
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
   csunused(obsolete_block);
-  std::unique_lock<decltype(dbLock_)> l(dbLock_);
-  csdb::PoolHash res;
+  std::unique_lock lock(dbLock_);
 
-  newBlockCv_.wait(l);
-  /*newBlockCv_.wait(l, [this, &obsolete_block, &res]() {
-    res = storage_.last_hash();
-    //return obsolete_block != res;
-    return obsolete_block == res;
-  });*/
-  return res;
+  newBlockCv_.wait(lock);
+  return getLastHash();
 }
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
@@ -925,7 +918,7 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
   return true;
 }
 
-std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTrusted) {
+std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
@@ -941,19 +934,20 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
   cs::Sequence flushed_block_seq = NoSequence;
 
   {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    cs::Lock lock(dbLock_);
     if (deferredBlock_.is_valid()) {
       deferredBlock_.set_storage(storage_);
       if (deferredBlock_.save()) {
         flushed_block_seq = deferredBlock_.sequence();
-        std::lock_guard<decltype(waitersLocker_)> l2(waitersLocker_);
-        newBlockCv_.notify_all();
       }
       else {
         csmeta(cserror) << "Couldn't save block: " << deferredBlock_.sequence();
       }
     }
   }
+
+  // notify block recording
+  newBlockCv_.notify_all();
 
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
@@ -962,7 +956,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
   }
 
   {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    cs::Lock lock(dbLock_);
 
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
@@ -983,11 +977,11 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
   logBlockInfo(pool);
   csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
-  return std::make_optional(std::move(pool));
+  return std::make_optional(pool);
 }
 
-bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
-  csdebug() << __func__ << ":";
+bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
+  csdebug() << csfunc() << ":";
   const auto last_seq = getLastSequence();
   const auto pool_seq = pool.sequence();
   if (pool_seq <= last_seq) {
@@ -1043,6 +1037,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
       // testCachedBlocks();
       return true;
     }
+
     csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
     removeLastBlock();
     return false;
@@ -1055,7 +1050,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
   }
   // cache block for future recording
   csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
-  cachedBlocks_.emplace(pool_seq, BlockMeta{std::move(pool), by_sync});
+  cachedBlocks_.emplace(pool_seq, BlockMeta{pool, by_sync});
   csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
   cachedBlockEvent(pool_seq);
   // cache always successful
@@ -1080,7 +1075,7 @@ void BlockChain::testCachedBlocks() {
   }
 
   while (!cachedBlocks_.empty()) {
-    const auto firstBlockInCache = cachedBlocks_.cbegin();
+    auto firstBlockInCache = cachedBlocks_.begin();
 
     if ((*firstBlockInCache).first == lastSeq) {
       csdebug() << "BLOCKCHAIN> Retrieve required block #" << lastSeq << " from cache";
