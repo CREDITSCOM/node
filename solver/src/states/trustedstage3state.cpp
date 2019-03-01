@@ -27,7 +27,7 @@ void TrustedStage3State::on(SolverContext& context) {
     csdebug() << name() << ": handle early received stages-2";
     bool finish = false;
     for (const auto& st : context.stage2_data()) {
-      csdebug() << name() << ": stage-2[" << static_cast<int>(st.sender) << "]";
+      csdebug() << name() << ": stage-2[" << static_cast<int>(st.sender) << "] has already received";
       if (Result::Finish == onStage2(context, st)) {
         finish = true;
       }
@@ -46,16 +46,15 @@ void TrustedStage3State::on(SolverContext& context) {
 
   SolverContext* pctx = &context;
   auto dt = 2 * Consensus::T_stage_request;
-  csdebug() << name() << ": start track timeout " << dt << " ms of stages-2 received";
+  csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
   timeout_request_stage.start(
-      context.scheduler(), dt,
+      context.scheduler(), 0, // no timeout
       // timeout #1 handler:
       [pctx, this, dt]() {
-       csdebug() << name() << ": timeout for stages-2 is expired, make requests";
-        request_stages(*pctx);
+       csdebug() << name() << ": (now) skip direct requests for absent stages-2";
+        //request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        csdebug() << name() << ": start subsequent track timeout " << dt
-                            << " ms to request neighbors about stages-2";
+        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-2";
         timeout_request_neighbors.start(
             pctx->scheduler(), dt,
             // timeout #2 handler:
@@ -64,6 +63,7 @@ void TrustedStage3State::on(SolverContext& context) {
               request_stages_neighbors(*pctx);
               cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
               // timeout #3 handler
+              csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
               timeout_force_transition.start(
                 pctx->scheduler(), dt,
                 [pctx, this, rnum, dt]() {

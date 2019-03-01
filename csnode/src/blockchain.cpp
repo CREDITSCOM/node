@@ -366,14 +366,16 @@ void BlockChain::removeLastBlock() {
   csmeta(csdebug) << "begin";
   csdb::Pool pool {};
 
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
-  if (deferredBlock_.is_valid()) {
-    pool = deferredBlock_;
-    deferredBlock_ = csdb::Pool {};
-  }
-  else {
-    pool = storage_.pool_remove_last();
+    if (deferredBlock_.is_valid()) {
+      pool = deferredBlock_;
+      deferredBlock_ = csdb::Pool{};
+    }
+    else {
+      pool = storage_.pool_remove_last();
+    }
   }
 
   if (!pool.is_valid()) {
@@ -399,12 +401,12 @@ void BlockChain::removeLastBlock() {
     const auto& bh = blockHashes_->getHashes();
     csmeta(cserror) << "Block hashes size: " << bh.size()
                     << ", Pool sequence: " << pool.sequence()
-                    << ", in Block hashes sequence: " << findSequence;
-    if (findSequence == 0) {
-      for (std::size_t i = 0; i < bh.size(); ++i) {
-        csmeta(csdebug) << "Block hash [" << i << "]: " << bh[i].to_string();
-      }
-    }
+                    << ", in Block hashes sequence: " << findSequence << (findSequence != 0 ? "" : " (hash not found)");
+    //if (findSequence == 0) {
+    //  for (std::size_t i = 0; i < bh.size(); ++i) {
+    //    csmeta(csdebug) << "Block hash [" << i << "]: " << bh[i].to_string();
+    //  }
+    //}
   }
 
 #ifdef TRANSACTIONS_INDEX
