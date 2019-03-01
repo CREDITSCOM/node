@@ -33,7 +33,7 @@ std::string kGenesisPrivate =
     "3rUevsW5xfob6qDxWMDFwwTQCq39SYhzstuyfUGSDvF2QHBRyPD8fSk49wFXaPk3GztfxtuU85QHfMV3ozfqa7rN";
 
 constexpr auto kMaxTransactionsFromOneSource = 1000u;
-constexpr auto kMaxMoneyForOneSpammer = 10'000'000u;
+constexpr auto kMaxMoneyForOneSpammer = 1'000'000u;
 constexpr auto kMaxTransactionsInOneRound = 100;
 }  // namespace
 
@@ -61,7 +61,7 @@ void Spammer::SpamWithTransactions(Node& node) {
   FundMyWallets(node);
   csdb::Transaction transaction;
   transaction.set_currency(csdb::Currency(1));
-  transaction.set_amount(csdb::Amount(0.01));
+  transaction.set_amount(csdb::Amount(0.001));
   transaction.set_max_fee(csdb::AmountCommission(0.1));
 
   size_t target_wallet_counter = 0;
