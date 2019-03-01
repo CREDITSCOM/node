@@ -59,8 +59,9 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
   cs::Lock lock(public_access_lock);
 
   pnode = node;
-  if(pnode->getConnector()!=nullptr) {
-    papi = (pnode->getConnector())->apiHandler();
+  auto connector_ptr = pnode->getConnector();
+  if (connector_ptr != nullptr) {
+    exec_handler_ptr = connector_ptr->apiExecHandler();
   }
   node_id = id;
 
@@ -677,7 +678,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
           SmartExecutionData data;
           data.contract_ref = item.ref_start;
           data.error = "contract execution timeout";
-          data.ret_val.__set_v_byte(error::TimeExpired);
+          data.result.retValue.__set_v_byte(error::TimeExpired);
           on_execution_completed_impl(data);
         }
         else {
@@ -693,7 +694,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
           SmartExecutionData data;
           data.contract_ref = item.ref_start;
           data.error = "contract execution is out of funds";
-          data.ret_val.__set_v_byte(error::OutOfFunds);
+          data.result.retValue.__set_v_byte(error::OutOfFunds);
           on_execution_completed_impl(data);
         }
         else {
@@ -739,30 +740,35 @@ bool SmartContracts::execute(const std::string& invoker, const std::string& smar
                              /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms) {
   csdebug() << log_prefix << "execute " << (contract.method.empty() ? "constructor" : contract.method) << "()";
 
-  executor::ExecuteByteCodeResult result;
-  result.status.code = 0;
+  csdb::Pool block = bc.loadBlock(data.contract_ref.sequence);
+  if (!block.is_valid()) {
+    data.error = "load block with starter transaction failed";
+    data.result.retValue.__set_v_byte(error::InternalBug);
+    return false;
+  }
   try {
-    get_api()->getExecutor().executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params, timeout_ms);
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
+    if (maybe_result.has_value()) {
+      data.result = maybe_result.value();
+    }
+    else {
+      data.error = "contract execution failed";
+      data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+    }
+    //executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params, timeout_ms);
   }
   catch (std::exception& x) {
     data.error = x.what();
-    data.ret_val.__set_v_byte(error::StdException);
+    data.result.retValue.__set_v_byte(error::StdException);
     return false;
   }
   catch (...) {
     std::ostringstream os;
     os << log_prefix << " exception while executing " << contract.method << "()";
     data.error = os.str();
-    data.ret_val.__set_v_byte(error::Exception);
+    data.result.retValue.__set_v_byte(error::Exception);
     return false;
   }
-  if (result.status.code != 0) {
-    data.error = result.status.message;
-    data.ret_val.__set_v_byte(result.status.code);
-    return false;
-  }
-  data.state = result.invokedContractState;
-  data.ret_val = result.ret_val;
   return true;
 }
 
@@ -828,7 +834,6 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
       std::string smart_address = absolute_address(start_tr.target()).to_api_addr();
       SmartExecutionData data;
       data.contract_ref = item;
-      data.state = state;
       if (invoke_info.smartContractDeploy.byteCodeObjects.empty()) {
         data.error = "unable to execute empty byte code";
         return data;
@@ -859,7 +864,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item) {
         // contract has already been pre-registered and payable method is checked:
         if (deploy && tr_amount > std::numeric_limits<double>::epsilon()) {
           if (!is_payable) {
-            data.ret_val.__set_v_byte(error::UnpayableReplenish);
+            data.result.retValue.__set_v_byte(error::UnpayableReplenish);
             data.error = "deployed contract does not implement payable() while transaction amount > 0";
           }
           else if (!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
@@ -914,13 +919,13 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     // result contains empty USRFLD[state::Value]
     result.add_user_field(trx_uf::new_state::Value, std::string{});
     // result contains error code from ret_val
-    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.ret_val));
+    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.result.retValue));
     packet.addTransaction(result);
   }
   else {
-    csdebug() << log_prefix << "execution of smart contract is successful, new state size = " << data.state.size();
-    result.add_user_field(trx_uf::new_state::Value, data.state);
-    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.ret_val));
+    csdebug() << log_prefix << "execution of smart contract is successful, new state size = " << data.result.newState.size();
+    result.add_user_field(trx_uf::new_state::Value, data.result.newState);
+    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.result.retValue));
     packet.addTransaction(result);
 
     if (it != exe_queue.end()) {
@@ -1157,7 +1162,7 @@ bool SmartContracts::implements_payable(const api::SmartContractInvocation& cont
   std::string error;
 
   try {
-    get_api()->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
+    exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
   }
   catch (std::exception& x) {
     error = x.what();

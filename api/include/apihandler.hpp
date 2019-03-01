@@ -240,13 +240,15 @@ namespace executor {
       innerSendTransactions_.erase(accessId);
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& id, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, size_t trxn_idx, const csdb::Amount& feeLimit) {
+      csunused(feeLimit);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      const auto executeTrxn_it = std::find_if(pool.transactions().begin(), pool.transactions().end(), [&id](const csdb::Transaction& trxn) {return trxn.innerID() == id; });
-      if (executeTrxn_it == pool.transactions().end())
+      if (trxn_idx >= pool.transactions_count()) {
         return std::nullopt;
+      }
+      const auto executeTrxn_it = pool.transactions().cbegin() + trxn_idx; //std::find_if(pool.transactions().begin(), pool.transactions().end(), [&id](const csdb::Transaction& trxn) {return trxn.innerID() == id; });
     
       const auto deploy_it = deployTrxns_.find(executeTrxn_it->target());
       if (deploy_it == deployTrxns_.end())
@@ -400,6 +402,11 @@ namespace apiexec {
     void SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) override;
     void WalletIdGet(api::WalletIdGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
     void SmartContractGet(SmartContractGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
+
+    executor::Executor& getExecutor() const {
+      return executor_;
+    }
+
   private:
     executor::Executor  &executor_;
     BlockChain          &blockchain_;

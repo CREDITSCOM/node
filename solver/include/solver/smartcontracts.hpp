@@ -43,6 +43,10 @@ namespace cs {
     constexpr uint8_t UnpayableReplenish = 250;
     // the trusted consensus have rejected new_state (and emitted transactions)
     constexpr uint8_t ConsensusRejected = 249;
+    // error in Executor::ExecuteTransaction()
+    constexpr uint8_t ExecuteTransaction = 248;
+    // bug in SmartContracts
+    constexpr uint8_t InternalBug = 247;
   }
 
   // transactions user fields
@@ -139,8 +143,10 @@ struct SmartContractRef {
 
 struct SmartExecutionData {
   SmartContractRef contract_ref;
-  std::string state;
-  ::general::Variant ret_val;
+  csdb::Amount executor_fee;
+  executor::Executor::ExecuteResult result;
+  //std::string state;
+  //::general::Variant ret_val;
   std::string error;
 };
 
@@ -272,8 +278,8 @@ private:
   CallsQueueScheduler& scheduler;
   cs::PublicKey node_id;
   // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
-  csconnector::connector::ApiHandlerPtr papi;
-
+  csconnector::connector::ApiExecHandlerPtr exec_handler_ptr;
+ 
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
   enum class PayableStatus : int {
@@ -416,10 +422,6 @@ private:
   // tests passed list of trusted nodes to contain own node
   bool contains_me(const std::vector<cs::PublicKey>& list) const {
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
-  }
-
-  csconnector::connector::ApiHandlerPtr get_api() const {
-    return papi;
   }
 
   static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);

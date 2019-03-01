@@ -104,4 +104,9 @@ connector::~connector() {
 connector::ApiHandlerPtr connector::apiHandler() const {
   return api_handler;
 }
+
+connector::ApiExecHandlerPtr connector::apiExecHandler() const {
+  return apiexec_handler;
+}
+
 }  // namespace csconnector

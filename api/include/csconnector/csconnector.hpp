@@ -45,6 +45,7 @@ public:
 
   // interface
   ApiHandlerPtr apiHandler() const;
+  ApiExecHandlerPtr apiExecHandler() const;
 
 private:
   executor::Executor& executor_;
