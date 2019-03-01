@@ -218,7 +218,6 @@ private:
   mutable cs::SpinLock cacheMutex_;
 
   std::condition_variable_any newBlockCv_;
-  cs::SpinLock waitersLocker_;
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;

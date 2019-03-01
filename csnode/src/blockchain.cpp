@@ -33,7 +33,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, waitersLocker_()
 , fee_(std::make_unique<cs::Fee>()) {
 
   cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
@@ -303,7 +302,7 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 #endif
 
 csdb::PoolHash BlockChain::getLastHash() const {
-  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+  std::lock_guard l(dbLock_);
 
   if (deferredBlock_.is_valid())
     return deferredBlock_.hash().clone();
@@ -422,10 +421,9 @@ void BlockChain::removeLastBlock() {
 csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
   csunused(obsolete_block);
   std::unique_lock lock(dbLock_);
-  csdb::PoolHash res;
 
   newBlockCv_.wait(lock);
-  return res;
+  return getLastHash();
 }
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
