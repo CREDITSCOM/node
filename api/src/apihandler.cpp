@@ -1888,7 +1888,7 @@ void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
 void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult &_return, const general::AccessID accessId) {
   const auto opt_sequence = executor_.getSequence(accessId);
   if (!opt_sequence.has_value()) {
-    _return.status.message = "AccessId isn't correct!";
+    //_return.status.message = "AccessId isn't correct!";
     SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
     return;
   }
@@ -1902,7 +1902,7 @@ void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult &_r
   executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
 }
 
-void apiexec::APIEXECHandler::WalletIdGet(api::WalletIdGetResult &_return, const general::Address &address) {
+void apiexec::APIEXECHandler::WalletIdGet(api::WalletIdGetResult &_return, const general::AccessID accessId, const general::Address &address) {
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   BlockChain::WalletData wallData{};
   BlockChain::WalletId wallId{};

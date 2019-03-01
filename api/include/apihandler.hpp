@@ -398,7 +398,7 @@ namespace apiexec {
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult &_return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) override;
-    void WalletIdGet(api::WalletIdGetResult &_return, const general::Address &address) override;
+    void WalletIdGet(api::WalletIdGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
     void SmartContractGet(SmartContractGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
   private:
     executor::Executor  &executor_;
