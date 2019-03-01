@@ -55,6 +55,7 @@ const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_
 const std::string PARAM_NAME_API_PORT = "port";
 const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
 const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
+const std::string PARAM_NAME_APIEXEC_PORT = "apiexec_port";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -563,6 +564,7 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
   checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_API_PORT, apiData_.port);
   checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_PORT, apiData_.ajaxPort);
   checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
+  checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
 }
 
 template <typename T>

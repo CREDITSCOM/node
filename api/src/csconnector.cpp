@@ -24,8 +24,15 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
-: api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, config))
+: executor_(executor::Executor::getInstance(m_blockchain, config.executor_port))
+, api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
+, apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
 , p_api_processor(make_shared<api::APIProcessor>(api_handler))
+, p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
+#ifdef BINARY_TCP_EXECAPI
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(),
+  make_shared<TBinaryProtocolFactory>())
+#endif
 #ifdef BINARY_TCP_API
 , server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
          make_shared<TBinaryProtocolFactory>())
@@ -36,6 +43,18 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 {
   cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
+
+#ifdef BINARY_TCP_EXECAPI
+  exec_thread = std::thread([this]() {
+    try {
+      exec_server.run();
+    }
+    catch (...) {
+      cserror() << "Oh no! I'm dead :'-(";
+    }
+  });
+#endif
+
 #ifdef BINARY_TCP_API
   thread = std::thread([this]() {
     try {
@@ -64,6 +83,13 @@ connector::~connector() {
   server.stop();
   if (thread.joinable()) {
     thread.join();
+  }
+#endif
+
+#ifdef BINARY_TCP_EXECAPI
+  exec_server.stop();
+  if (exec_thread.joinable()) {
+    exec_thread.join();
   }
 #endif
 

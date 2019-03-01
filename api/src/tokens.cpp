@@ -180,9 +180,9 @@ template <typename T> T getVariantAs(const general::Variant&);
 template <> std::string getVariantAs(const general::Variant& var) { return var.v_string; }
 
 template <typename RetType>
-void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
-                    const api::Address& addr,
-                    const api::Address& addr_smart,
+void executeAndCall(api::APIHandler* p_api,
+                    const general::Address& addr,
+                    const general::Address& addr_smart,
                     const std::vector<general::ByteCodeObject> &byteCodeObjects,
                     const std::string& state,
                     const std::string& method,
@@ -193,14 +193,14 @@ void executeAndCall(executor::ContractExecutorConcurrentClient& executor,
 
   if (byteCodeObjects.empty())
     return;
-  executor.executeByteCode(result,
-                           addr,
-                           addr_smart,
-                           byteCodeObjects,
-                           state,
-                           method,
-                           params,
-                           timeout);
+  p_api->getExecutor().executeByteCode(result,
+    addr,
+    addr_smart,
+    byteCodeObjects,
+    state,
+    method,
+    params,
+    timeout);
 
   if (!result.status.code) handler(getVariantAs<RetType>(result.ret_val));
 }
@@ -212,7 +212,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   if (!present) return;
 
   const auto pk = token.public_key();
-  api::Address addr = std::string((char*)pk.data(), pk.size());
+  general::Address addr = std::string((char*)pk.data(), pk.size());
 
   std::string name, symbol, totalSupply;
 
@@ -222,15 +222,15 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
     std::lock_guard<decltype(dataMut_)> l(dataMut_);
     deployer = tokens_[token].owner;
   }
-  api::Address dpAddr = std::string((char*)deployer.public_key().data(), deployer.public_key().size());
+  general::Address dpAddr = std::string((char*)deployer.public_key().data(), deployer.public_key().size());
 
-  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
+  executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState,
                  "getName", std::vector<general::Variant>(), 250,
                  [&name](const std::string& newName) {
                    name = newName.substr(0, 255);
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
+  executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState,
                  "getSymbol", std::vector<general::Variant>(), 250,
                  [&symbol](const std::string& newSymb) {
                    symbol.clear();
@@ -241,7 +241,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
                    }
                  });
 
-  executeAndCall<std::string>(api_->getExecutor(), dpAddr, addr, byteCodeObjects, newState,
+  executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState,
                  "totalSupply", std::vector<general::Variant>(), 250,
                  [&totalSupply](const std::string& newSupp) {
                    totalSupply = tryExtractAmount(newSupp);
@@ -273,9 +273,14 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
   executor::ExecuteByteCodeMultipleResult result;
   if (byteCodeObjects.empty())
     return;
-  api_->getExecutor().
-    executeByteCodeMultiple(result, dpAddr, addr, byteCodeObjects, newState,
-                            "balanceOf", holderKeysParams, 100);
+
+  executor::SmartContractBinary smartContractBinary;
+  smartContractBinary.contractAddress = addr;
+  smartContractBinary.byteCodeObjects = byteCodeObjects;
+  smartContractBinary.contractState = newState;
+  smartContractBinary.stateCanModify = 0;
+
+  api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100);
 
   if (!result.status.code &&
       (result.results.size() == holders.size())) {
@@ -333,8 +338,8 @@ void TokensMaster::run() {
 
         executor::GetContractMethodsResult methodsResult;
 
-        try { api_->getExecutor(); }
-        catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
+        //try { api_->executor_.getOrigExecutor(); }
+        //catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
 
         if (!dt.byteCodeObjects.empty()) {
           api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
