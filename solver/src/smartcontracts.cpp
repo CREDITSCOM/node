@@ -311,12 +311,6 @@ bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
   return is_payable(abs_addr);
 }
 
-void SmartContracts::clear_emitted_transactions(const csdb::Address& abs_addr) {
-  if(emitted_transactions.count(abs_addr) > 0) {
-    emitted_transactions.erase(abs_addr);
-  }
-}
-
 //  const csdb::PoolHash blk_hash, cs::Sequence blk_seq, size_t trx_idx, cs::RoundNumber round
 void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   if (trx_idx >= block.transactions_count()) {
@@ -429,7 +423,6 @@ void SmartContracts::test_exe_queue() {
       continue;
     }
     csdebug() << log_prefix << "set running status to contract {" << it->seq_enqueue << "}";
-    clear_emitted_transactions(it->abs_addr); // insurance from obsolete transactions
     it->start(bc.getLastSequence()); // use blockchain based round counting
     // call to executor only if is trusted relatively to this contract
     if (it->is_executor) {
@@ -463,16 +456,19 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   // the new_state transaction is unable met here, we are the only one source of new_state
   csdb::Address abs_addr = absolute_address(tr.source());
   if(in_known_contracts(abs_addr)) {
-    if(get_smart_contract_status(abs_addr) == SmartContractStatus::Running) {
-      // expect calls from api when trxs received
-      auto& vect = emitted_transactions[abs_addr];
-      vect.push_back(tr.clone());
-      csdebug() << log_prefix << "smart contract emits transaction, add, total " << vect.size();
+    if (!exe_queue.empty()) {
+      const auto it = find_first_in_queue(abs_addr);
+      if (it != exe_queue.cend()) {
+        if (it->status == SmartContractStatus::Running) {
+          it->emitted_transactions.push_back(tr.clone());
+          csdebug() << log_prefix << "smart contract emits transaction, add, total " << it->emitted_transactions.size();
+        }
+        else {
+          csdebug() << log_prefix << "smart contract is not allowed to emit transaction, drop it";
+        }
+      }
     }
-    else {
-      csdebug() << log_prefix << "smart contract is not allowed to emit transaction, drop it";
-    }
-    return true; // block from conveyer sync
+    return true; // avoid from conveyer sync
   }
 
   // test smart contract as target of transaction (is it payable?)
@@ -699,7 +695,6 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
   }
   else {
     cslog() << std::endl << log_prefix << "remove from queue completed {" << it->seq_enqueue << "} " << get_executed_method(it->ref_start) << std::endl;
-    clear_emitted_transactions(it->abs_addr);
     const cs::Sequence seq = bc.getLastSequence();
     const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
     if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
@@ -907,12 +902,11 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     packet.addTransaction(result);
 
     if (it != exe_queue.end()) {
-      if (emitted_transactions.count(it->abs_addr) > 0) {
-        const auto& vect = emitted_transactions[it->abs_addr];
-        for (const auto& tr : vect) {
+      if (!it->emitted_transactions.empty()) {
+        for (const auto& tr : it->emitted_transactions) {
           packet.addTransaction(tr);
         }
-        csdebug() << log_prefix << "add " << vect.size() << " emitted transaction(s) to contract {" << it->seq_enqueue << "} state";
+        csdebug() << log_prefix << "add " << it->emitted_transactions.size() << " emitted transaction(s) to contract {" << it->seq_enqueue << "} state";
       }
       else {
         csdebug() << log_prefix << "no emitted transaction added to contract state";
@@ -921,8 +915,6 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
   }
 
   if (it != exe_queue.end()) {
-    clear_emitted_transactions(it->abs_addr);
-
     csdebug() << log_prefix << "starting contract {" << it->seq_enqueue << "} consensus";
     if (!it->start_consensus(packet, pnode, this)) {
       cserror() << log_prefix << "contract {" << it->seq_enqueue << "} consensus failed, remove item from queue";

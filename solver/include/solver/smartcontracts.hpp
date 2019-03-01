@@ -325,6 +325,8 @@ private:
     bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
+    // emitted transactions by this and subsequent contracts
+    std::vector<csdb::Transaction> emitted_transactions;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
       : ref_start(ref_contract)
@@ -390,11 +392,6 @@ private:
   using queue_const_iterator = std::vector<QueueItem>::const_iterator;
 
   Node* pnode;
-
-  // emitted transactions if any while execution running
-  std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
-
-  void clear_emitted_transactions(const csdb::Address& abs_addr);
 
   queue_iterator find_in_queue(const SmartContractRef& item)
   {
