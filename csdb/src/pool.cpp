@@ -227,15 +227,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getConfidants(::csdb::priv::ibstream& is) {
-    size_t cnt = 0;
+    size_t cnt = realTrusted_.size();
     //if (!is.get(cnt)) {
     //  return false;
     //}
-    for (auto& it : realTrusted_) {
-      if (it != 255) {
-        ++cnt;
-      }
-    }
+
 
     confidants_.clear();
     confidants_.reserve(cnt);

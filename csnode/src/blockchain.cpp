@@ -341,11 +341,8 @@ csdb::PoolHash BlockChain::getLastHash() const {
 }
 
 size_t BlockChain::getSize() const {
-  csdebug() << "_______________________________________________________________________________";
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-  csdebug() << "_______________________________________________________________________________";
   const auto storageSize = storage_.size();
-  csdebug() << "_______________________________________________________________________________";
   return deferredBlock_.is_valid() ? (storageSize + 1) : storageSize;
 }
 
@@ -515,9 +512,7 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
   }
   csdebug() << " previous hash: " << pool.previous_hash().to_string();
   csdebug() << " hash(" << pool.sequence() << "): " << pool.hash().to_string();
-  csdebug() << "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
   csdebug() << " last storage size: " << getSize();
-  csdebug() << "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
 }
 
 bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants) {
@@ -1103,7 +1098,16 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
-    cs::PublicKeys lastConfidants = deferredBlock_.confidants();
+    cs::PublicKeys lastConfidants;
+    if(pool_seq>1) {
+      if(deferredBlock_.sequence() + 1 == pool_seq) {
+        lastConfidants = deferredBlock_.confidants();
+      }
+      else {
+        lastConfidants = loadBlock(pool_seq - 1).confidants();
+      }
+    }
+
     deferredBlock_ = pool;
     if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
       csdebug() << "The block is correct";
