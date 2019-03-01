@@ -283,6 +283,8 @@ private:
   };
 
   struct StateItem {
+    // is temporary locked from execution until current execution completed
+    bool is_locked{ false };
     // payable() method is implemented
     PayableStatus payable{ PayableStatus::Unknown };
     // reference to deploy transaction
@@ -345,40 +347,6 @@ private:
       new_state_fee = tr_start_fee;
       avail_fee -= new_state_fee;
     }
-
-    void wait(cs::RoundNumber r)
-    {
-      seq_enqueue = r;
-      status = SmartContractStatus::Waiting;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is waiting from #" << r;
-    }
-
-    void start(cs::RoundNumber r)
-    {
-      seq_start = r;
-      status = SmartContractStatus::Running;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is running from #" << r;
-    }
-
-    void finish(cs::RoundNumber r)
-    {
-      seq_finish = r;
-      status = SmartContractStatus::Finished;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is finished on #" << r;
-    }
-
-    void close()
-    {
-      status = SmartContractStatus::Closed;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is closed";
-    }
-
-	  bool start_consensus(const cs::TransactionsPacket& pack, Node* pNode, SmartContracts* pSmarts)
-	  {
-		  pconsensus = std::make_unique<SmartConsensus>();
-		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
-	  }
-
   };
 
   // executiom queue
@@ -508,9 +476,38 @@ private:
     return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
   }
 
+  bool is_locked(const csdb::Address& abs_addr) const {
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+      return it->second.is_locked;
+    }
+    // only known contracts are allowed to execute!
+    return true;
+  }
+
+  void update_lock_status(const csdb::Address& abs_addr, bool value) {
+    auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.end()) {
+      it->second.is_locked = value;
+    }
+  }
+
   std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 
   void on_execution_completed_impl(const SmartExecutionData& data);
+
+  // exe_queue item modifiers
+  
+  void update_status(QueueItem & item, cs::RoundNumber r, SmartContractStatus status);
+
+  bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack)
+  {
+    item.pconsensus = std::make_unique<SmartConsensus>();
+    return item.pconsensus->initSmartRound(pack, this->pnode, this);
+  }
+
+  void test_contracts_locks();
+
 };
 
 }  // namespace cs
