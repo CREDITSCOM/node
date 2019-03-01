@@ -72,7 +72,8 @@ bool Node::init(const Config& config) {
     csconnector::Config {
      config.getApiSettings().port,
      config.getApiSettings().ajaxPort,
-     config.getApiSettings().executorPort
+     config.getApiSettings().executorPort,
+     config.getApiSettings().apiexecPort
     });
   std::cout << "Done\n";
 #endif

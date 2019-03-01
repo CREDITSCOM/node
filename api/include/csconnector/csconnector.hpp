@@ -29,11 +29,13 @@ struct Config {
   int ajax_port = 8081;
 #endif
   int executor_port = 9080;
+  int apiexec_port = 9070;
 };
 
 class connector {
 public:
   using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
+  using ApiExecHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<apiexec::APIEXECHandler>;
 
   explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
   ~connector();
@@ -45,8 +47,11 @@ public:
   ApiHandlerPtr apiHandler() const;
 
 private:
+  executor::Executor& executor_;
   ApiHandlerPtr api_handler;
+  ApiExecHandlerPtr apiexec_handler;
   ::apache::thrift::stdcxx::shared_ptr<::api::APIProcessor> p_api_processor;
+  ::apache::thrift::stdcxx::shared_ptr<::apiexec::APIEXECProcessor> p_apiexec_processor;
 #ifdef BINARY_TCP_API
   ::apache::thrift::server::TThreadedServer server;
   std::thread thread;
@@ -54,6 +59,10 @@ private:
 #ifdef AJAX_IFACE
   ::apache::thrift::server::TThreadedServer ajax_server;
   std::thread ajax_thread;
+#endif
+#ifdef BINARY_TCP_EXECAPI
+  ::apache::thrift::server::TThreadedServer exec_server;
+  std::thread exec_thread;
 #endif
 };
 }  // namespace csconnector

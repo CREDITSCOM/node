@@ -742,8 +742,7 @@ bool SmartContracts::execute(const std::string& invoker, const std::string& smar
   executor::ExecuteByteCodeResult result;
   result.status.code = 0;
   try {
-    get_api()->getExecutor().executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params,
-                                             timeout_ms);
+    get_api()->getExecutor().executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params, timeout_ms);
   }
   catch (std::exception& x) {
     data.error = x.what();
@@ -762,7 +761,7 @@ bool SmartContracts::execute(const std::string& invoker, const std::string& smar
     data.ret_val.__set_v_byte(result.status.code);
     return false;
   }
-  data.state = result.contractState;
+  data.state = result.invokedContractState;
   data.ret_val = result.ret_val;
   return true;
 }
