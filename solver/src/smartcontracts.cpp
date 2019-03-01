@@ -533,6 +533,11 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   return false; // allow pass to conveyer sync
 }
 
+CallsQueueScheduler & SmartContracts::getScheduler()
+{
+  return scheduler;
+}
+
 void SmartContracts::on_store_block(const csdb::Pool& block) {
 
   cs::Lock lock(public_access_lock);

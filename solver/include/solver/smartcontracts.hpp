@@ -237,8 +237,11 @@ public:
   // method is thread-safe to be called from API thread
   bool capture_transaction(const csdb::Transaction& t);
 
+  CallsQueueScheduler& getScheduler();
+
   // flag to allow execution, also depends on executor presence
   bool execution_allowed;
+  CallsQueueScheduler& scheduler;
 
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
@@ -269,7 +272,7 @@ private:
   const char *PayableNameArg1 = "currency";
 
   BlockChain& bc;
-  CallsQueueScheduler& scheduler;
+
   cs::PublicKey node_id;
   // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
   csconnector::connector::ApiHandlerPtr papi;
