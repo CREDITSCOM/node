@@ -983,7 +983,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, bool isTruste
   logBlockInfo(pool);
   csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
-  return std::optional(pool);
+  return std::make_optional(std::move(pool));
 }
 
 bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
