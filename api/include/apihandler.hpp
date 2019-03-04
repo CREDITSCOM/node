@@ -240,16 +240,16 @@ namespace executor {
       innerSendTransactions_.erase(accessId);
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, size_t trxn_idx, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& id, const csdb::Amount& feeLimit) {
       csunused(feeLimit);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      if (trxn_idx >= pool.transactions_count()) {
+      const auto executeTrxn_it = std::find_if(pool.transactions().begin(), pool.transactions().end(), [&id](const csdb::Transaction& trxn) {return trxn.innerID() == id; });
+      if (executeTrxn_it == pool.transactions().end()) {
         return std::nullopt;
       }
-      const auto executeTrxn_it = pool.transactions().cbegin() + trxn_idx; //std::find_if(pool.transactions().begin(), pool.transactions().end(), [&id](const csdb::Transaction& trxn) {return trxn.innerID() == id; });
-    
+
       const auto deploy_it = deployTrxns_.find(executeTrxn_it->target());
       if (deploy_it == deployTrxns_.end())
         return std::nullopt;
