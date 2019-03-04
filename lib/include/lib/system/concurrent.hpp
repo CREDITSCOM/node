@@ -166,7 +166,7 @@ protected:
 template<typename Result>
 class FutureWatcher : public FutureBase<Result> {
 public:
-  using FinishSignal = cs::Signal<void(Result)>;
+  using FinishSignal = cs::Signal<void(const Result&)>;
   using FailedSignal = cs::Signal<void()>;
 
   explicit FutureWatcher(RunPolicy policy, Future<Result>&& future)
@@ -193,12 +193,12 @@ protected:
       try {
         Result result = Super::future_.get();
 
-        auto lambda = [this](const Result& result) {
+        auto lambda = [this, res = std::move(result)]() {
           Super::await(finished);
-          emit finished(result);
+          emit finished(std::move(res));
         };
 
-        Super::callSignal(std::bind(lambda, std::move(result)));
+        Super::callSignal(std::bind(lambda));
       }
       catch (std::exception& e) {
         Super::await(failed);
