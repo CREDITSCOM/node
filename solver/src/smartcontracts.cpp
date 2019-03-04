@@ -209,7 +209,7 @@ csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const Sma
 }
 
 /*static*/
-bool SmartContracts::has_using_contracts(const csdb::Transaction& tr)
+bool SmartContracts::uses_contracts(const csdb::Transaction& tr)
 {
   if (!SmartContracts::is_start(tr)) {
     return false;
@@ -546,18 +546,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   // the new_state transaction is unable met here, we are the only one source of new_state
   csdb::Address abs_addr = absolute_address(tr.source());
   if(in_known_contracts(abs_addr)) {
-    if (!exe_queue.empty()) {
-      const auto it = find_first_in_queue(abs_addr);
-      if (it != exe_queue.cend()) {
-        if (it->status == SmartContractStatus::Running) {
-          it->emitted_transactions.push_back(tr.clone());
-          csdebug() << log_prefix << "smart contract emits transaction, add, total " << it->emitted_transactions.size();
-        }
-        else {
-          csdebug() << log_prefix << "smart contract is not allowed to emit transaction, drop it";
-        }
-      }
-    }
+    csdebug() << log_prefix << "smart contract is not allowed to emit transaction via API, drop it";
     return true; // avoid from conveyer sync
   }
 
@@ -611,7 +600,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
       }
       else /* not executable transaction */ {
         // contract is payable and transaction addresses it, ok then
-        csdebug() << log_prefix << "allow transaction targeting to payable contract";
+        csdebug() << log_prefix << "allow transaction to target payable contract";
       }
     }
   }
@@ -858,26 +847,6 @@ bool SmartContracts::execute(SmartExecutionData& data) {
   return true;
 }
 
-bool SmartContracts::execute_payable(const std::string& /*invoker*/, const std::string& /*smart_address*/,
-  const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t /*timeout_ms*/, double amount) {
-
-  api::SmartContractInvocation payable = contract;
-  payable.method = PayableName;
-  payable.params.clear();
-
-  ::general::Variant a0;
-  std::ostringstream os0;
-  os0 << amount;
-  a0.__set_v_string(os0.str());
-  payable.params.push_back(a0);
-  ::general::Variant a1;
-  a1.__set_v_string(std::string("1"));
-  payable.params.push_back(a1);
-
-  csdebug() << log_prefix << "execute " << PayableName << "(" << PayableNameArg0 << " = " << os0.str() << ", " << PayableNameArg1 << " = 1)";
-  return execute(data);
-}
-
 // returns false if execution canceled, so caller may call to remove_from_queue()
 bool SmartContracts::execute_async(const cs::SmartContractRef& item, csdb::Amount avail_fee) {
   csdb::Transaction start_tr = get_transaction(item);
@@ -890,96 +859,38 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item, csdb::Amoun
     }
   }
   bool deploy = is_deploy(start_tr);
-
   csdebug() << log_prefix << "invoke api to remote executor to " << (deploy ? "deploy" : (!replenish_only ? "execute" : "replenish")) << " contract";
 
-  auto maybe_invoke_info = get_smart_contract_impl(start_tr);
-  if (maybe_invoke_info.has_value()) {
-    const auto& invoke_info = maybe_invoke_info.value();
-    std::string state;
-    bool is_payable = false; // is contract actually payable
-    bool call_payable = false;  // only for start or replenish, not for deploy
-    double tr_amount = start_tr.amount().to_double();
-
-    const auto it = known_contracts.find(absolute_address(start_tr.target()));
-    if (it != known_contracts.cend()) {
-      const StateItem& val = it->second;
-      is_payable = (val.payable == PayableStatus::Implemented);
-      if (!deploy) {
-        state = val.state;
-        call_payable = (is_payable && tr_amount > std::numeric_limits<double>::epsilon()) || replenish_only;
-      }
-    }
-    else {
-      cserror() << log_prefix << "contract state is not found in private table";
-    }
-
-    // create runnable object
-    auto runnable = [=]() mutable {
-      std::string invoker = absolute_address(start_tr.source()).to_api_addr();
-      std::string smart_address = absolute_address(start_tr.target()).to_api_addr();
-      SmartExecutionData data;
-      data.contract_ref = item;
-      data.executor_fee = avail_fee;
-      if (invoke_info.smartContractDeploy.byteCodeObjects.empty()) {
-        data.error = "unable to execute empty byte code";
-        return data;
-      }
-      if (call_payable) {
-        if (!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
-          if (data.error.empty()) {
-            data.error = "failed to execute payable()";
-          }
-          return data;
+  // create runnable object
+  auto runnable = [=]() mutable {
+    SmartExecutionData data;
+    data.contract_ref = item;
+    data.executor_fee = avail_fee;
+    if (!execute(data)) {
+      if (data.error.empty()) {
+        if (deploy) {
+          data.error = "failed to deploy contract";
         }
-      }
-      // replenish_only is true only if neither deploy nor start transaction: replenish smarts' wallet
-      if (!replenish_only) {
-        if (!execute(data)) {
-          if (data.error.empty()) {
-            if (deploy) {
-              data.error = "failed to deploy contract";
-            }
-            else {
-              data.error = "failed to execute method";
-            }
-          }
-          return data;
+        else {
+          data.error = "failed to execute method";
         }
-        // on successful execution
-        // after deploy should call to payable() if tr_amount > 0,
-        // contract has already been pre-registered and payable method is checked:
-        if (deploy && tr_amount > std::numeric_limits<double>::epsilon()) {
-          if (!is_payable) {
-            data.result.retValue.__set_v_byte(error::UnpayableReplenish);
-            data.error = "deployed contract does not implement payable() while transaction amount > 0";
-          }
-          else if (!execute_payable(invoker, smart_address, invoke_info, data, Consensus::T_smart_contract >> 1, tr_amount)) {
-            if (data.error.empty()) {
-              data.error = "failed to execute payable() after deployment";
-            }
-          }
-        }
-      }
-      if (data.executor_fee > avail_fee) {
-        // out of fee detected
-        data.error = "contract execution is out of funds";
-        data.result.retValue.__set_v_byte(error::OutOfFunds);
       }
       return data;
-    };
+    }
+    if (data.executor_fee > avail_fee) {
+      // out of fee detected
+      data.error = "contract execution is out of funds";
+      data.result.retValue.__set_v_byte(error::OutOfFunds);
+    }
+    return data;
+  };
 
-    // run async and watch result
-    auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
-    executions_.push_back(std::move(watcher));
+  // run async and watch result
+  auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
+  cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
+  executions_.push_back(std::move(watcher));
 
-    return true;
-  }
-  else {
-    cserror() << log_prefix << "failed get smart contract from transaction";
-  }
-  return false;
+  return true;
 }
 
 void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data) {

@@ -218,7 +218,7 @@ public:
 
   // to/from user filed serializations
   
-  static bool has_using_contracts(const csdb::Transaction& tr);
+  static bool uses_contracts(const csdb::Transaction& tr);
   static std::vector<csdb::Address> get_using_contracts(const csdb::UserField& fld);
   static csdb::UserField set_using_contracts(const std::vector<csdb::Address>& using_list);
 
@@ -488,11 +488,7 @@ private:
   bool is_payable(const csdb::Address& abs_addr);
 
   // blocking call
-  bool execute(SmartExecutionData& data);
-
-  // blocking call
-  bool execute_payable(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
-    double amount);
+  bool execute(/*[in,out]*/ SmartExecutionData& data);
 
   // blocking call
   bool implements_payable(const api::SmartContractInvocation& contract);
@@ -504,7 +500,7 @@ private:
   csdb::Amount smart_round_fee(const csdb::Pool& block);
 
   // tests max fee amount and round-based timeout on executed smart contracts;
-  // invoked on every new block ready
+  // invoked after every new block appears in blockchain
   void test_exe_conditions(const csdb::Pool& block);
 
   bool in_known_contracts(const csdb::Address& addr) const
