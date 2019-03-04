@@ -1,6 +1,5 @@
 #pragma once
 
-#include <apihandler.hpp>
 #include <csdb/address.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
@@ -10,7 +9,7 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/logger.hpp>
 
-#include <csnode/node.hpp>  // introduce Node::api_handler_ptr_t
+#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr as well
 
 #include <list>
 #include <mutex>
@@ -57,8 +56,11 @@ namespace cs {
     {
       // byte-code (string)
       constexpr csdb::user_field_id_t Code = 0;
+      // executed contract may perform subsequent contracts call,
+      // serialized into string: count (byte) + count * contract absolute address
+      constexpr csdb::user_field_id_t Using = 1;
       // count of user fields
-      constexpr size_t Count = 1;
+      constexpr size_t Count = 2;
     }  // namespace deploy
     // start transaction fields
     namespace start
@@ -67,6 +69,9 @@ namespace cs {
       constexpr csdb::user_field_id_t Methods = 0;
       // reference to last state transaction
       constexpr csdb::user_field_id_t RefState = 1;
+      // executed contract may perform subsequent contracts call,
+      // serialized into string: count (byte) + count * contract absolute address
+      constexpr csdb::user_field_id_t Using = 2;
       // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
       // constexpr size_t Count = {1,2};
     }  // namespace start
@@ -145,8 +150,6 @@ struct SmartExecutionData {
   SmartContractRef contract_ref;
   csdb::Amount executor_fee;
   executor::Executor::ExecuteResult result;
-  //std::string state;
-  //::general::Variant ret_val;
   std::string error;
 };
 
@@ -212,6 +215,12 @@ public:
   /* Assuming deployer.is_public_key(), not a WalletId */
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
+
+  // to/from user filed serializations
+  
+  static bool has_using_contracts(const csdb::Transaction& tr);
+  static std::vector<csdb::Address> get_using_contracts(const csdb::UserField& fld);
+  static csdb::UserField set_using_contracts(const std::vector<csdb::Address>& using_list);
 
   std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr)
   {
@@ -335,6 +344,8 @@ private:
     std::unique_ptr<SmartConsensus> pconsensus;
     // emitted transactions by this and subsequent contracts
     std::vector<csdb::Transaction> emitted_transactions;
+    // using contracts, may store both absolute and optimized (WalletId) items
+    std::vector<csdb::Address> using_contracts;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
       : ref_start(ref_contract)
@@ -348,10 +359,33 @@ private:
     {
       avail_fee = csdb::Amount(tr_start.max_fee().to_double());
       csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
+
+      // apply starter fee consumed
       avail_fee -= tr_start_fee;
-      // here new_state_fee prediction may be implemented, currently it is equal to starter fee
+
+      //TODO: here new_state_fee prediction may be calculated, currently it is equal to starter fee
       new_state_fee = tr_start_fee;
+
+      csdb::UserField fld_using{};
+      if (SmartContracts::is_start(tr_start)) {
+        fld_using = tr_start.user_field(trx_uf::start::Using);
+      }
+      else if (SmartContracts::is_deploy(tr_start)) {
+        fld_using = tr_start.user_field(trx_uf::deploy::Using);
+      }
+
+      // apply reserved new_state fee
       avail_fee -= new_state_fee;
+
+      // get using contracts and reserve more fee for new_states
+      if (fld_using.is_valid()) {
+        using_contracts = std::move(SmartContracts::get_using_contracts(fld_using));
+        // reserve new_state fee for every using contract also
+        for (const auto& it : using_contracts) {
+          csunused(it);
+          avail_fee -= new_state_fee;
+        }
+      }
     }
   };
 
@@ -437,7 +471,7 @@ private:
 
   // perform async execution via API to remote executor
   // returns false if execution is canceled
-  bool execute_async(const cs::SmartContractRef& item);
+  bool execute_async(const cs::SmartContractRef& item, csdb::Amount avail_fee);
 
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
@@ -454,7 +488,7 @@ private:
   bool is_payable(const csdb::Address& abs_addr);
 
   // blocking call
-  bool execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms);
+  bool execute(SmartExecutionData& data);
 
   // blocking call
   bool execute_payable(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
@@ -494,6 +528,16 @@ private:
     }
   }
 
+  void update_lock_status(const QueueItem& item, bool value)
+  {
+    update_lock_status(item.abs_addr, value);
+    if (!item.using_contracts.empty()) {
+      for (const auto& u : item.using_contracts) {
+        update_lock_status(absolute_address(u), value);
+      }
+    }
+  }
+
   std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 
   void on_execution_completed_impl(const SmartExecutionData& data);
@@ -509,6 +553,9 @@ private:
   }
 
   void test_contracts_locks();
+
+  // returns 0 if any error
+  uint64_t next_inner_id(const csdb::Address& addr) const;
 
 };
 
