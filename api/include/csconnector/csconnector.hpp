@@ -1,25 +1,26 @@
 #ifndef CSCONNCETOR_HPP
 #define CSCONNCETOR_HPP
 
-#include <apihandler.hpp>
-
-#include <memory>
-#include <thread>
-
 #if defined(_MSC_VER)
 #pragma warning(push)
 // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
 #pragma warning(disable: 4245)
 #endif
+
+#include <apihandler.hpp>
+
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
+
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
 #include <solvercore.hpp>
-
 #include <client/params.hpp>
+
+#include <memory>
+#include <thread>
 
 namespace csconnector {
 
