@@ -821,9 +821,8 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     data.result.retValue.__set_v_byte(error::InternalBug);
     return false;
   }
-  csdb::Transaction transaction = get_transaction(data.contract_ref);
   try {
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, transaction.innerID(), data.executor_fee);
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
     if (maybe_result.has_value()) {
       data.result = maybe_result.value();
     }
