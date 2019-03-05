@@ -240,34 +240,46 @@ namespace executor {
       innerSendTransactions_.erase(accessId);
     }
 
+    bool isDeploy(const csdb::Transaction& trxn) {
+      const auto sci = deserialize<api::SmartContractInvocation>(trxn.user_field(0).value<std::string>());
+      if (sci.method.empty())
+        return true;
+      return false;
+    }
+
     std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offset_trxn, const csdb::Amount& feeLimit) {
       csunused(feeLimit);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      const auto executeTrxn = *(pool.transactions().begin() + offset_trxn);
+      auto smartTrxn = *(pool.transactions().begin() + offset_trxn - 1);
 
-      const auto optDeployId = getDeployTrxn(executeTrxn.target());
-      if (!optDeployId.has_value())
-        return std::nullopt;
-      const auto deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+      csdb::Transaction deployTrxn;
+      if (!isDeploy(smartTrxn)) { // execute
+        const auto optDeployId = getDeployTrxn(blockchain_.get_addr_by_type(smartTrxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY));
+        if (!optDeployId.has_value())
+          return std::nullopt;
+        deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+      }
+      else
+        deployTrxn = smartTrxn;
       const auto sci = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
 
       ExecuteByteCodeResult resp;        
       executor::SmartContractBinary smartContractBinary;
-      smartContractBinary.contractAddress = executeTrxn.target().to_api_addr();
+      smartContractBinary.contractAddress = smartTrxn.target().to_api_addr();
       smartContractBinary.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
       smartContractBinary.contractState   = sci.smartContractDeploy.hashState;
       smartContractBinary.stateCanModify  = 0;
 
       std::string method;
       std::vector<general::Variant> params;
-      if (!executeTrxn.user_field(0).is_valid() && executeTrxn.amount().to_double()) { // payable
+      if (!smartTrxn.user_field(0).is_valid() && smartTrxn.amount().to_double()) { // payable
         method = "payable";
         general::Variant var;
-        var.__set_v_string(executeTrxn.amount().to_string());
+        var.__set_v_string(smartTrxn.amount().to_string());
         params.emplace_back(var);
-        var.__set_v_string(executeTrxn.currency().to_string());
+        var.__set_v_string(smartTrxn.currency().to_string());
         params.emplace_back(var);
       }
       else {
@@ -279,7 +291,7 @@ namespace executor {
       const auto acceess_id = generateAccessId();
       ++execCount_;
       const auto timeBeg = std::chrono::system_clock::now();
-      origExecutor_->executeByteCode(resp, acceess_id, executeTrxn.source().to_api_addr(), smartContractBinary, sci.method, sci.params, 1000);
+      origExecutor_->executeByteCode(resp, acceess_id, smartTrxn.source().to_api_addr(), smartContractBinary, sci.method, sci.params, 1000);
       const auto timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
       --execCount_;
       deleteAccessId(acceess_id);
