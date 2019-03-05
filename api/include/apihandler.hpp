@@ -274,7 +274,7 @@ namespace executor {
       if (optInnerTransactions.has_value())
         res.trxns = optInnerTransactions.value();
       deleteInnerSendTransactions(acceess_id);
-      static const double FEE_IN_SECOND = 1;
+      static const double FEE_IN_SECOND = kMinFee * 4.0;
       res.fee = csdb::Amount(timeExecute * FEE_IN_SECOND);
       res.newState  = resp.invokedContractState;
       for (const auto &[itAddress, itState] : resp.externalContractsState) {
