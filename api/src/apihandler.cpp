@@ -616,13 +616,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     return (*smart_state)[smart_addr];
   }();
 
-  contract_state_entry.get_position();
+  contract_state_entry.getPosition();
 
   if (input_smart.forgetNewState) {
     // -- prevent start transaction from flow to solver, so move it here:
     std::string contract_state;
     if(!deploy) {
-      contract_state_entry.wait_till_front([&](SmartState& ss) {
+      contract_state_entry.waitTillFront([&](SmartState& ss) {
         if(ss.state.empty())
           return false;
         contract_state = ss.state;
@@ -661,13 +661,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   solver.send_wallet_transaction(send_transaction);
 
   if (deploy) {
-    contract_state_entry.wait_till_front([&](SmartState& ss) { return !ss.state.empty(); });
+    contract_state_entry.waitTillFront([&](SmartState& ss) { return !ss.state.empty(); });
   }
   else {
     std::string new_state;
     csdb::TransactionID trId;
 
-    contract_state_entry.wait_till_front([&](SmartState& ss) {
+    contract_state_entry.waitTillFront([&](SmartState& ss) {
       auto execTrans = s_blockchain.loadTransaction(ss.initer);
       if(execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
         new_state = ss.lastEmpty ? std::string() : ss.state;
@@ -785,7 +785,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
   _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
   const csdb::Address adrs = BlockChain::getAddressFromKey(address);
   auto smart_state(lockedReference(this->smart_state));
-  _return.smartContract.objectState = (*smart_state)[adrs].get_state().state;
+  _return.smartContract.objectState = (*smart_state)[adrs].getState().state;
 
   SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
   return;
@@ -889,7 +889,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
       std::string newState;
       auto smart_state(lockedReference(this->smart_state));
-      (*smart_state)[address].update_state([&](const SmartState& oldState) {
+      (*smart_state)[address].updateState([&](const SmartState& oldState) {
                                              newState = tr.user_field(smart_state_idx).value<std::string>();
                                              return SmartState { newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone() };
       });
@@ -1389,7 +1389,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
     //if (it != smartStateRef->end()) state = it->second.get_current_state().state;
     //else present = false;
 
-    if (it != smartStateRef->end()) state = (*smartStateRef)[addr].get_state().state;
+    if (it != smartStateRef->end()) state = (*smartStateRef)[addr].getState().state;
     else present = false;
   }
 

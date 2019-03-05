@@ -278,8 +278,8 @@ using FutureWatcherPtr = std::shared_ptr<FutureWatcher<T>>;
 class Concurrent {
 public:
   // runs function in another thread, returns future watcher
-  // that generates finished signal by run policy
-  // if does not stoge watcher object, then main thread will wait async entity in blocking mode
+  // than generates finished signal by run policy
+  // if does not store watcher object, then main thread will wait async entity in blocking mode
   template<typename Func, typename... Args>
   static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
     using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
@@ -338,28 +338,28 @@ private:
 public:
   inline WorkerQueue() noexcept : lock_() {}
 
-  S get_state() const {
+  S getState() const {
     return state_;
   }
 
-  void get_position() {
-    std::lock_guard<decltype(lock_)> l(lock_);
+  void getPosition() {
+    cs::Lock lock(lock_);
     auto tid = std::this_thread::get_id();
     tidMap_[tid] = tids_.insert(tids_.end(), std::make_tuple());
   }
 
-  template <typename J>
-  void wait_till_front(const J& j) {
-    std::unique_lock<decltype(lock_)> l(lock_);
+  template <typename T>
+  void waitTillFront(const T& t) {
+    std::unique_lock lock(lock_);
 
-    conditionalVariable_.wait(l, [&]() { return j(state_); });
+    conditionalVariable_.wait(lock, [&]() { return t(state_); });
 
     tidMap_.erase(std::this_thread::get_id());
     conditionalVariable_.notify_all();
   }
 
   void yield() {
-    std::unique_lock<decltype(lock_)> l(lock_);
+    std::unique_lock lock(lock_);
 
     auto tid = std::this_thread::get_id();
     auto tit = tidMap_.find(tid);
@@ -379,8 +379,8 @@ public:
   }
 
   template <typename State>
-  void update_state(const State& state) {
-    std::lock_guard<decltype(lock_)> lock(lock_);
+  void updateState(const State& state) {
+    cs::Lock lock(lock_);
     state_ = state(state_);
     conditionalVariable_.notify_all();
   }
@@ -397,7 +397,7 @@ public:
   inline SweetSpot() noexcept : lock_() {}
 
   void occupy() {
-    std::unique_lock<decltype(lock_)> lock(lock_);
+    std::unique_lock lock(lock_);
 
     conditionalVariable_.wait(lock, [this]() {
       auto res = !occupied_;
@@ -405,8 +405,9 @@ public:
       return res;
     });
   }
+
   void leave() {
-    std::lock_guard<decltype(lock_)> lock(lock_);
+    cs::Lock lock(lock_);
     occupied_ = false;
     conditionalVariable_.notify_one();
   }
