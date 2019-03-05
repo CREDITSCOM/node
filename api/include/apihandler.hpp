@@ -104,7 +104,7 @@ namespace executor {
         smartContractBinary.contractAddress = smart_address;
         smartContractBinary.byteCodeObjects = code;
         smartContractBinary.contractState   = state;
-        smartContractBinary.stateCanModify  = 0; // func(pool, trx, pk)
+        smartContractBinary.stateCanModify  = 1; // solver_->smart_contracts().is_contract_locked(csdb::Address::from_???(smart_address)) ? 1 : 0;
 
         const auto acceess_id = generateAccessId();
         ++execCount_;
@@ -270,7 +270,7 @@ namespace executor {
       smartContractBinary.contractAddress = smartTrxn.target().to_api_addr();
       smartContractBinary.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
       smartContractBinary.contractState   = sci.smartContractDeploy.hashState;
-      smartContractBinary.stateCanModify  = 1;
+      smartContractBinary.stateCanModify  = 1; // solver_->smart_contracts().is_contract_locked(executeTrxn_it->target()) : 1 : 0;
 
       std::string method;
       std::vector<general::Variant> params;

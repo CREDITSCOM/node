@@ -247,6 +247,11 @@ public:
     return in_known_contracts(addr);
   }
 
+  bool is_contract_locked(const csdb::Address& addr) const {
+    cs::Lock lock(public_access_lock);
+    return is_locked(absolute_address(addr));
+  }
+
   // return true if SmartContracts provide special handling for transaction, so
   // the transaction is not pass through conveyer
   // method is thread-safe to be called from API thread
@@ -308,6 +313,8 @@ private:
     SmartContractRef ref_execute;
     // current state which is result of last successful execution / deploy
     std::string state;
+    // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
+    std::map<std::string, std::map<csdb::Address, std::string>> uses;
   };
 
   // last contract's state storage
@@ -345,7 +352,7 @@ private:
     // emitted transactions by this and subsequent contracts
     std::vector<csdb::Transaction> emitted_transactions;
     // using contracts, may store both absolute and optimized (WalletId) items
-    std::vector<csdb::Address> using_contracts;
+    std::vector<csdb::Address> uses;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
       : ref_start(ref_contract)
@@ -379,9 +386,9 @@ private:
 
       // get using contracts and reserve more fee for new_states
       if (fld_using.is_valid()) {
-        using_contracts = std::move(SmartContracts::get_using_contracts(fld_using));
+        uses = std::move(SmartContracts::get_using_contracts(fld_using));
         // reserve new_state fee for every using contract also
-        for (const auto& it : using_contracts) {
+        for (const auto& it : uses) {
           csunused(it);
           avail_fee -= new_state_fee;
         }
@@ -491,10 +498,12 @@ private:
   bool execute(/*[in,out]*/ SmartExecutionData& data);
 
   // blocking call
-  bool implements_payable(const api::SmartContractInvocation& contract);
+  bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
 
   // extracts and returns name of method executed by referenced transaction
-  std::string get_executed_method(const SmartContractRef& ref);
+  std::string print_executed_method(const SmartContractRef& ref);
+
+  std::string get_executed_method_name(const SmartContractRef& ref);
 
   // calculates from block a one smart round costs
   csdb::Amount smart_round_fee(const csdb::Pool& block);
@@ -527,8 +536,8 @@ private:
   void update_lock_status(const QueueItem& item, bool value)
   {
     update_lock_status(item.abs_addr, value);
-    if (!item.using_contracts.empty()) {
-      for (const auto& u : item.using_contracts) {
+    if (!item.uses.empty()) {
+      for (const auto& u : item.uses) {
         update_lock_status(absolute_address(u), value);
       }
     }

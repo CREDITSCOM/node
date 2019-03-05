@@ -410,14 +410,10 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     auto maybe_invoke_info = get_smart_contract_impl(t);
     if(maybe_invoke_info.has_value()) {
       const auto& invoke_info = maybe_invoke_info.value();
-      StateItem& val = known_contracts[abs_addr];
-      val.ref_deploy = new_item;
-      if(implements_payable(invoke_info)) {
-        val.payable = PayableStatus::Implemented;
-        payable = true;
-      }
-      else {
-        val.payable = PayableStatus::Absent;
+      StateItem& state = known_contracts[abs_addr];
+      state.ref_deploy = new_item;
+      if(update_metadata(invoke_info, state)) {
+        payable = (state.payable == PayableStatus::Implemented);
       }
     }
   }
@@ -425,8 +421,20 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     payable = is_payable(abs_addr);
   }
 
-  cslog() << std::endl << log_prefix << "enqueue " << get_executed_method(new_item) << std::endl;
+  cslog() << std::endl << log_prefix << "enqueue " << print_executed_method(new_item) << std::endl;
   auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
+  // in addition to uses set by transaction take others from contract metadata:
+  auto it = known_contracts.find(abs_addr);
+  if (it != known_contracts.end()) {
+    auto& state = it->second;
+    const std::string method = get_executed_method_name(new_item);
+    if (state.uses.count(method) > 0) {
+      for (const auto u : state.uses.at(method)) {
+        queue_item.uses.emplace_back(u.first);
+        queue_item.avail_fee -= queue_item.new_state_fee; // reserve more fee for new_state
+      }
+    }
+  }
   update_status(queue_item, new_item.sequence, SmartContractStatus::Waiting);
   queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
   queue_item.is_executor = (execution_allowed && contains_me(block.confidants()));
@@ -496,7 +504,7 @@ void SmartContracts::test_exe_queue() {
     }
     // is anyone of using locked:
     else {
-      for (const auto u : it->using_contracts) {
+      for (const auto u : it->uses) {
         if (is_locked(absolute_address(u))) {
           csdebug() << log_prefix << "one of using by contract {"
             << it->ref_start.sequence << '.' << it->ref_start.transaction << "} still is locked, wait until unlocked";
@@ -798,7 +806,7 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
   }
   else {
     cslog() << std::endl << log_prefix << "remove from queue completed {"
-      << it->ref_start.sequence << '.' << it->ref_start.transaction << "} " << get_executed_method(it->ref_start) << std::endl;
+      << it->ref_start.sequence << '.' << it->ref_start.transaction << "} " << print_executed_method(it->ref_start) << std::endl;
     const cs::Sequence seq = bc.getLastSequence();
     const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
     if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
@@ -829,7 +837,7 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     return false;
   }
   cslog() << std::endl << log_prefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - "
-    << get_executed_method(data.contract_ref) << std::endl;
+    << print_executed_method(data.contract_ref) << std::endl;
   try {
     auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
     if (maybe_result.has_value()) {
@@ -1187,9 +1195,9 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
     // unknown contract
     return false;
   }
-  const StateItem& val = item->second;
-  if (val.payable != PayableStatus::Unknown) {
-    return val.payable == PayableStatus::Implemented;
+  StateItem& state = item->second;
+  if (state.payable != PayableStatus::Unknown) {
+    return state.payable == PayableStatus::Implemented;
   }
 
   // the first time test
@@ -1199,19 +1207,15 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
     result = PayableStatus::Absent;
   }
   else {
-    if (implements_payable(maybe_deploy.value())) {
-      result = PayableStatus::Implemented;
+    if (!update_metadata(maybe_deploy.value(), state)) {
+      return false;
     }
-    else {
-      result = PayableStatus::Absent;
-    }
+    result = state.payable;
   }
-
-  item->second.payable = result;
   return result == PayableStatus::Implemented;
 }
 
-bool SmartContracts::implements_payable(const api::SmartContractInvocation& contract) {
+bool SmartContracts::update_metadata(const api::SmartContractInvocation& contract, StateItem& state) {
   executor::GetContractMethodsResult result;
   std::string error;
 
@@ -1227,35 +1231,58 @@ bool SmartContracts::implements_payable(const api::SmartContractInvocation& cont
 
   if (!error.empty()) {
     cserror() << log_prefix << "" << error;
-    // remain payable status unknown for future calls
+    // remain payable status & using unknown for future calls
     return false;
   }
 
   if (result.status.code != 0) {
     cserror() << log_prefix << "" << result.status.message;
-    // remain payable status unknown for future calls
+    // remain payable status & using unknown for future calls
     return false;
   }
 
-  // lookup payable(amount, currency)
+  state.payable = PayableStatus::Absent;
+  // lookup payable(amount, currency) && annotations
   for (const auto& m : result.methods) {
-    if (m.name == PayableName && m.returnType == PayableRetType) {
-      if (m.arguments.size() == 2) {
-        const auto& a0 = m.arguments[0];
-        if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
-          const auto& a1 = m.arguments[1];
-          if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
-            return true;
+    // payable status
+    if (state.payable != PayableStatus::Implemented) {
+      if (m.name == PayableName && m.returnType == PayableRetType) {
+        if (m.arguments.size() == 2) {
+          const auto& a0 = m.arguments[0];
+          if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
+            const auto& a1 = m.arguments[1];
+            if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
+              state.payable = PayableStatus::Implemented;
+            }
+          }
+        }
+      }
+    }
+    // uses
+    if (!m.annotations.empty()) {
+      for (const auto& a : m.annotations) {
+        if (a.name == "Contract") {
+          csdb::Address addr;
+          std::string method;
+          if (a.arguments.count("address") > 0) {
+            addr = csdb::Address::from_string(a.arguments.at("address"));
+          }
+          if (a.arguments.count("method") > 0) {
+            method = a.arguments.at("method");
+          }
+          if (addr.is_valid()) {
+            auto& u = state.uses[m.name];
+            u[addr] = method;
           }
         }
       }
     }
   }
 
-  return false;
+  return true;
 }
 
-std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
+std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
   csdb::Transaction t = get_transaction(ref);
   if (!t.is_valid()) {
     return std::string();
@@ -1288,6 +1315,28 @@ std::string SmartContracts::get_executed_method(const SmartContractRef& ref) {
     return os.str();
   }
   return std::string("???");
+}
+
+std::string SmartContracts::get_executed_method_name(const SmartContractRef& ref) {
+  csdb::Transaction t = get_transaction(ref);
+  if (!t.is_valid()) {
+    return std::string();
+  }
+  if (is_executable(t)) {
+    const auto maybe_invoke_info = get_smart_contract_impl(t);
+    if (!maybe_invoke_info.has_value()) {
+      return std::string();
+    }
+    const auto& invoke_info = maybe_invoke_info.value();
+    if (invoke_info.method.empty()) {
+      return std::string("constructor");
+    }
+    return invoke_info.method;
+  }
+  if (is_payable_target(t)) {
+    return PayableName;
+  }
+  return std::string();
 }
 
 csdb::Amount SmartContracts::smart_round_fee(const csdb::Pool& block)
