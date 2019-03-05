@@ -245,24 +245,41 @@ namespace executor {
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      const auto executeTrxn_it = pool.transactions().begin() + offset_trxn;
+      const auto executeTrxn = *(pool.transactions().begin() + offset_trxn);
 
-      const auto sci = deserialize<api::SmartContractInvocation>(executeTrxn_it->user_field(0).value<std::string>());
-      if (sci.smartContractDeploy.byteCodeObjects.empty())
+      const auto optDeployId = getDeployTrxn(executeTrxn.target());
+      if (!optDeployId.has_value())
         return std::nullopt;
+      const auto deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+      const auto sci = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
 
       ExecuteByteCodeResult resp;        
       executor::SmartContractBinary smartContractBinary;
-      smartContractBinary.contractAddress = executeTrxn_it->target().to_api_addr();
+      smartContractBinary.contractAddress = executeTrxn.target().to_api_addr();
       smartContractBinary.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
       smartContractBinary.contractState   = sci.smartContractDeploy.hashState;
       smartContractBinary.stateCanModify  = 0;
+
+      std::string method;
+      std::vector<general::Variant> params;
+      if (!executeTrxn.user_field(0).is_valid() && executeTrxn.amount().to_double()) { // payable
+        method = "payable";
+        general::Variant var;
+        var.__set_v_string(executeTrxn.amount().to_string());
+        params.emplace_back(var);
+        var.__set_v_string(executeTrxn.currency().to_string());
+        params.emplace_back(var);
+      }
+      else {
+        method = sci.method;
+        params = sci.params;
+      }
 
       if (!connect()) return std::nullopt;
       const auto acceess_id = generateAccessId();
       ++execCount_;
       const auto timeBeg = std::chrono::system_clock::now();
-      origExecutor_->executeByteCode(resp, acceess_id, executeTrxn_it->source().to_api_addr(), smartContractBinary, sci.method, sci.params, 1000);
+      origExecutor_->executeByteCode(resp, acceess_id, executeTrxn.source().to_api_addr(), smartContractBinary, sci.method, sci.params, 1000);
       const auto timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
       --execCount_;
       deleteAccessId(acceess_id);
