@@ -376,11 +376,19 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions) {
   std::vector<api::SealedTransaction> result;
   result.resize(transactions.size());
-  const auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
+  /*const auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
   std::transform(transactions.begin(), transactions.end(), result.begin(), convert);
   for (auto& it : result) {
     auto poolHash = csdb::PoolHash::from_binary(toByteArray(it.id.poolHash));
     it.trxn.timeCreation = convertPool(poolHash).time;
+
+    auto smartResult = getSmartStatus(it.trxn.id());
+    it.trxn.__set_smartInfo(api::SmartTransInfo{});
+    it.trxn.smartInfo.__set_v_smartDeploy(SmartDeployTransInfo());
+    fillTransInfoWithOpData(smartResult, trxn.smartInfo.v_smartDeploy);
+  }*/
+  for (int Count = 0; Count < result.size(); Count++) {
+    result[Count] = convertTransaction(transactions[Count]);
   }
   return result;
 }
@@ -688,7 +696,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       }
     }
   }
-
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
 

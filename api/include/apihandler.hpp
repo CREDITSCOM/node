@@ -247,12 +247,12 @@ namespace executor {
       return false;
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offset_trxn, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit) {
       csunused(feeLimit);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      auto smartTrxn = *(pool.transactions().begin() + offset_trxn - 1);
+      auto smartTrxn = *(pool.transactions().begin() + offsetTrx);
 
       csdb::Transaction deployTrxn;
       if (!isDeploy(smartTrxn)) { // execute
