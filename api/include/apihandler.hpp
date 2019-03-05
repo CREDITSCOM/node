@@ -230,7 +230,7 @@ namespace executor {
 
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID &accessId) {
       std::shared_lock slk(mtx_);
-      if (const auto it = innerSendTransactions_.find(accessId); it == innerSendTransactions_.end())
+      if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end())
         return std::make_optional<std::vector<csdb::Transaction>>(it->second);
       return std::nullopt;
     }
@@ -240,22 +240,14 @@ namespace executor {
       innerSendTransactions_.erase(accessId);
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, size_t trxn_idx, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offset_trxn, const csdb::Amount& feeLimit) {
       csunused(feeLimit);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
-      if (trxn_idx >= pool.transactions_count()) {
-        return std::nullopt;
-      }
-      const auto executeTrxn_it = pool.transactions().cbegin() + trxn_idx; //std::find_if(pool.transactions().begin(), pool.transactions().end(), [&id](const csdb::Transaction& trxn) {return trxn.innerID() == id; });
-    
-      const auto deploy_it = deployTrxns_.find(executeTrxn_it->target());
-      if (deploy_it == deployTrxns_.end())
-        return std::nullopt;
-      auto deployTrxn = blockchain_.loadTransaction(deploy_it->second);
+      const auto executeTrxn_it = pool.transactions().begin() + offset_trxn;
 
-      const auto sci = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
+      const auto sci = deserialize<api::SmartContractInvocation>(executeTrxn_it->user_field(0).value<std::string>());
       if (sci.smartContractDeploy.byteCodeObjects.empty())
         return std::nullopt;
 
@@ -277,11 +269,10 @@ namespace executor {
       disconnect();
 
       const auto optInnerTransactions = getInnerSendTransactions(acceess_id);
-      if (!optInnerTransactions.has_value())
-        return std::nullopt;
 
       ExecuteResult res;
-      res.trxns = optInnerTransactions.value();
+      if (optInnerTransactions.has_value())
+        res.trxns = optInnerTransactions.value();
       deleteInnerSendTransactions(acceess_id);
       static const double FEE_IN_SECOND = 1;
       res.fee = csdb::Amount(timeExecute * FEE_IN_SECOND);
