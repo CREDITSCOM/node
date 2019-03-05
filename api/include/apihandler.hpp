@@ -256,7 +256,7 @@ namespace executor {
       smartContractBinary.contractAddress = executeTrxn_it->target().to_api_addr();
       smartContractBinary.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
       smartContractBinary.contractState   = sci.smartContractDeploy.hashState;
-      smartContractBinary.stateCanModify  = 0;
+      smartContractBinary.stateCanModify  = 1;
 
       if (!connect()) return std::nullopt;
       const auto acceess_id = generateAccessId();
