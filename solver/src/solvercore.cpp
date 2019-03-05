@@ -265,7 +265,8 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
     csdb::Pool tmpPool;
     tmpPool.set_sequence(deferredBlock_.sequence());
     tmpPool.set_previous_hash(deferredBlock_.previous_hash());
-    tmpPool.add_real_trusted(stage3.realTrustedMask);
+    tmpPool.add_real_trusted(cs::Utils::maskToBits(stage3.realTrustedMask));
+    tmpPool.add_number_trusted(static_cast<uint8_t>(stage3.realTrustedMask.size()));
     tmpPool.setRoundCost(deferredBlock_.roundCost());
     tmpPool.set_confidants(deferredBlock_.confidants());
     for(auto& it: deferredBlock_.transactions()) {

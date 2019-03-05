@@ -152,7 +152,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 #endif
 
   if (totalAmountOfCountedFee > 0) {
-    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, pool.realTrusted());
+    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()));
   }
 
   [[maybe_unused]] auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
@@ -220,7 +220,7 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
     return;
   }
   const ConfidantsKeys& confidants = pool.confidants();
-  const std::vector<uint8_t>& realTrusted = pool.realTrusted();
+  const std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
   int32_t realTrustedNumber = 0; // int32_t due to csdb::Amount operator/
   for (const auto& trustedMarker : realTrusted) {
     if (trustedMarker != kUntrustedMarker) {

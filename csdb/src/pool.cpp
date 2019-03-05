@@ -8,6 +8,12 @@
 
 #include <lz4.h>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
+
 #include "csdb/csdb.hpp"
 
 #include "binary_streams.hpp"
@@ -110,12 +116,14 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(wall);
     }
 
+    os.put(numberTrusted_);
     os.put(realTrusted_);
 
     for (const auto& it : confidants_) {
       os.put(it);
     }
 
+    os.put(numberConfirmations_);
     os.put(roundConfirmationMask_);
     for (const auto& it : roundConfirmations_){
       os.put(it);
@@ -227,12 +235,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getConfidants(::csdb::priv::ibstream& is) {
-    size_t cnt = realTrusted_.size();
-    //if (!is.get(cnt)) {
-    //  return false;
-    //}
-
-
+    size_t cnt = static_cast<size_t>(numberTrusted_);
     confidants_.clear();
     confidants_.reserve(cnt);
     for (size_t i = 0; i < cnt; ++i) {
@@ -246,26 +249,17 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getSignatures(::csdb::priv::ibstream& is) {
-    size_t cnt = 0;
-    //if (!is.get(cnt)) {
-    //  return false;
-    //}
 
-    for (auto& it : realTrusted_) {
-      if (it != 255) {
-        ++cnt;
-      }
-    }
+#ifdef _MSC_VER
+    uint8_t cnt = __popcnt64(realTrusted_);
+#else
+    uint8_t cnt = __builtin_popcountl(realTrusted_);
+#endif
 
     signatures_.clear();
-    signatures_.reserve(cnt);
-    for (size_t i = 0; i < cnt; ++i) {
-      //cs::Byte index = 0;
+    signatures_.reserve(static_cast<size_t>(cnt));
+    for (uint8_t i = 0; i < cnt; ++i) {
       cs::Signature sig;
-
-      //if (!is.get(index)) {
-      //  return false;
-      //}
       if (!is.get(sig)) {
         return false;
       }
@@ -276,30 +270,30 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getTrustedConfirmation(::csdb::priv::ibstream& is) {
-    size_t cnt = 0;
-    //if (!is.get(cnt)) {
-    //  return false;
-    //}
-
-    for (auto& it : roundConfirmationMask_) {
-      if (it != 255) {
-        ++cnt;
-      }
+    if (!is.get(numberConfirmations_)) {
+      return false;
     }
 
+    if (!is.get(roundConfirmationMask_)) {
+      return false;
+    }
+    
+#ifdef _MSC_VER
+    uint8_t cnt = __popcnt64(roundConfirmationMask_);
+#else
+    uint8_t cnt = __builtin_popcountl(roundConfirmationMask_);
+#endif
+
     roundConfirmations_.clear();
-    roundConfirmations_.reserve(cnt);
+    roundConfirmations_.reserve(static_cast<size_t>(cnt));
     for (size_t i = 0; i < cnt; ++i) {
       cs::Signature sig;
 
-      //if (!is.get(index)) {
-      //  return false;
-      //}
       if (!is.get(sig)) {
         return false;
       }
 
-      roundConfirmations_.push_back(sig);//emplace_back(make_pair(index, sig));
+      roundConfirmations_.push_back(sig);
     }
     return true;
   }
@@ -373,6 +367,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
+
+    if (!is.get(numberTrusted_)) {
+      csmeta(cswarning) << "get number trusted is failed";
+      return false;
+    }
+
     if (!is.get(realTrusted_)) {
       csmeta(cswarning) << "get real trusted is failed";
       return false;
@@ -382,12 +382,6 @@ class Pool::priv : public ::csdb::internal::shared_data {
       csmeta(cswarning) << "get confidants is failed";
       return false;
     }
-
-    if (!is.get(roundConfirmationMask_)) {
-      csmeta(cswarning) << "get confirmation mask is failed";
-      return false;
-    }
-
 
     if (!getTrustedConfirmation(is)) {
       csmeta(cswarning) << "get confirmations is failed";
@@ -487,6 +481,8 @@ class Pool::priv : public ::csdb::internal::shared_data {
     result.realTrusted_ = realTrusted_;
     result.roundConfirmationMask_ = roundConfirmationMask_;
     result.binary_representation_ = binary_representation_;
+    result.numberTrusted_ = numberTrusted_;
+    result.numberConfirmations_ = numberConfirmations_;
 
     result.storage_ = storage_;
 
@@ -503,8 +499,10 @@ class Pool::priv : public ::csdb::internal::shared_data {
   uint32_t transactionsCount_ = 0;
   NewWallets newWallets_;
   ::std::map<::csdb::user_field_id_t, ::csdb::UserField> user_fields_;
-  std::vector<uint8_t> realTrusted_;
-  std::vector<uint8_t> roundConfirmationMask_;
+  uint8_t numberTrusted_ = 0;
+  uint64_t realTrusted_ = 0;
+  uint8_t numberConfirmations_= 0;
+  uint64_t roundConfirmationMask_ = 0;
   size_t hashingLength_ = 0;
   csdb::Amount roundCost_;
   std::vector<cs::Signature> signatures_;
@@ -553,12 +551,20 @@ Transaction Pool::transaction(size_t index) const {
   return (d->transactions_.size() > index) ? d->transactions_[index] : Transaction{};
 }
 
-const std::vector<uint8_t>& Pool::realTrusted() const noexcept {
+const uint8_t Pool::numberTrusted() const noexcept {
+  return d->numberTrusted_;
+}
+
+const uint64_t Pool::realTrusted() const noexcept {
   return d->realTrusted_;
 }
 
-const std::vector<uint8_t>& Pool::roundConfirmationMask() const noexcept {
+const uint64_t Pool::roundConfirmationMask() const noexcept {
   return d->roundConfirmationMask_;
+}
+
+const uint8_t Pool::numberConfirmations() const noexcept {
+  return d->numberConfirmations_;
 }
 
 const std::vector<cs::Signature>& Pool::roundConfirmations() const noexcept {
@@ -658,8 +664,9 @@ const cs::PublicKey& Pool::writer_public_key() const noexcept {
     return csdb::Pool::priv::zero_writer_public_key_;
   }
   size_t index = 0;
-  for (const auto& it : d->realTrusted_) {
-    if (it == 0) {
+  auto mask = cs::Utils::bitsToMask(d->numberTrusted_, d->realTrusted_);
+  for (const auto& it : mask) {
+    if (it != 255) {
       break;
     }
     ++index;
@@ -753,18 +760,30 @@ void Pool::add_round_confirmations(const std::vector<cs::Signature>& confirmatio
   data->roundConfirmations_ = std::move(confirmations);
 }
 
-void Pool::add_real_trusted(const std::vector<uint8_t>& trustedMask) noexcept
+void Pool::add_real_trusted(const uint64_t trustedMask) noexcept
 {
   priv* data = d.data();
   data->is_valid_ = true;
   data->realTrusted_ = trustedMask;
 }
 
-void Pool::add_confirmation_mask(const std::vector<uint8_t>& confMask) noexcept
+void Pool::add_confirmation_mask(const uint64_t confMask) noexcept
 {
   priv* data = d.data();
   data->is_valid_ = true;
   data->roundConfirmationMask_ = confMask;
+}
+
+void Pool::add_number_trusted(const uint8_t trustedNumber) noexcept {
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->numberTrusted_ = trustedNumber;
+}
+
+void Pool::add_number_confirmations(const uint8_t confNumber) noexcept {
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->numberConfirmations_ = confNumber;
 }
 
 

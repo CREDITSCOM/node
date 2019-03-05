@@ -17,6 +17,12 @@
 #include <string>
 #include <thread>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
+
 #include <time.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -305,6 +311,46 @@ public:
   ///
   inline static std::string byteStreamToHex(const unsigned char* stream, const std::size_t length) {
     return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
+  }
+
+  inline static uint64_t maskToBits(cs::Bytes mask) {
+    if (mask.size() > 64) {
+      cserror() << "The mask number is larger than the alloowed value";
+    }
+    uint64_t addition = 1;
+    uint64_t value = 0;
+    for (auto& it : mask) {
+      if (it != 255U) {
+        value += addition;
+      }
+      addition *= 2;
+    }
+    return value;
+  }
+
+  inline static std::vector<uint8_t> bitsToMask(uint8_t size, uint64_t value) {
+    std::vector<uint8_t> mask;
+    mask.reserve(static_cast<size_t>(size));
+    uint64_t valCopy = value;
+    for(uint8_t i = 0; i< size; ++i){
+      if (valCopy % 2 == 1U) {
+        mask.push_back(0U);
+      }
+      else {
+        mask.push_back(255U);
+      }
+      valCopy /= 2U;
+    }
+    return mask;
+  }
+
+  inline static uint8_t maskValue(uint64_t value) {
+#ifdef _MSC_VER
+    uint8_t cnt = __popcnt64(value);
+#else
+    uint8_t cnt = __builtin_popcountl(value);
+#endif
+    return cnt;
   }
 
   ///

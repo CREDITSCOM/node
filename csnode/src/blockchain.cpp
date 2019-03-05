@@ -219,11 +219,11 @@ TrustedConfirmation BlockChain::confirmationList(cs::RoundNumber rNum) {
 
 cs::Bytes BlockChain::getLastBlockTrustedMask() {
   if(deferredBlock_.is_valid()) {
-    return deferredBlock_.realTrusted();
+    return cs::Utils::bitsToMask(deferredBlock_.numberTrusted(), deferredBlock_.realTrusted());
   }
   else {
     auto pool = loadBlock(getLastSequence());
-    return pool.realTrusted();
+    return cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
   }
 }
 
@@ -498,7 +498,8 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
 {
   const auto& trusted = pool.confidants();
   std::string  realTrustedString;
-  for (auto& i : pool.realTrusted()) {
+  auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+  for (auto i : mask) {
     realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
   }
 
@@ -538,7 +539,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
 
 
     cs::Signatures sigs = pool.roundConfirmations();
-    const auto& confMask = pool.roundConfirmationMask();
+    const auto& confMask = cs::Utils::bitsToMask(pool.numberConfirmations(), pool.roundConfirmationMask());
     //for debugging only delete->
     csdebug() << "Mask size = " << confMask.size() << " for next confidants:";
     for (auto& it : lastConfidants) {
@@ -566,12 +567,12 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     return false;
   }
 
-  if (signatures.size() < realTrustedValue(realTrusted) && !isTrusted && pool.sequence() != 0) {
+  if (signatures.size() < static_cast<size_t>(cs::Utils::maskValue(realTrusted)) && !isTrusted && pool.sequence() != 0) {
   
      csmeta(csdebug) << "The number of signatures is insufficient";
     return false;
   }
-  auto& mask = pool.realTrusted();
+  auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
 
   //pool signatures check: start
   if(pool.sequence() > 0){
@@ -1140,7 +1141,7 @@ bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync) {
     return true;
   }
 
-  if((pool.roundConfirmationMask().size()==0 || pool.roundConfirmations().size() ==0) && pool.sequence()>1) {
+  if((pool.numberConfirmations()==0 || pool.roundConfirmations().size() ==0) && pool.sequence()>1) {
     return false;
   }
  

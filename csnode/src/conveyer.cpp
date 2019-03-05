@@ -548,11 +548,13 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
-  newPool.add_real_trusted(metaPoolInfo.realTrustedMask);
+  newPool.add_number_trusted(metaPoolInfo.realTrustedMask.size());
+  newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
   if(metaPoolInfo.sequenceNumber>1) {
-    newPool.add_confirmation_mask(metaPoolInfo.confirmationMask);
+    newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
+    newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
     newPool.add_round_confirmations(metaPoolInfo.confirmations);
   }
 
