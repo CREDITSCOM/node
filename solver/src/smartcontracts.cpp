@@ -605,6 +605,13 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
     }
   }
 
+  if (SmartContracts::is_deploy(tr)) {
+    csdebug() << log_prefix << "deploy transaction detected";
+  }
+  else if (SmartContracts::is_start(tr)) {
+    csdebug() << log_prefix << "start transaction detected";
+  }
+
   return false; // allow pass to conveyer sync
 }
 
@@ -821,9 +828,10 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     data.result.retValue.__set_v_byte(error::InternalBug);
     return false;
   }
-  csdb::Transaction transaction = get_transaction(data.contract_ref);
+  cslog() << std::endl << log_prefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - "
+    << get_executed_method(data.contract_ref) << std::endl;
   try {
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, transaction.innerID(), data.executor_fee);
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
     if (maybe_result.has_value()) {
       data.result = maybe_result.value();
     }
@@ -878,7 +886,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item, csdb::Amoun
       }
       return data;
     }
-    if (data.executor_fee > avail_fee) {
+    if (data.result.fee > avail_fee) {
       // out of fee detected
       data.error = "contract execution is out of funds";
       data.result.retValue.__set_v_byte(error::OutOfFunds);
