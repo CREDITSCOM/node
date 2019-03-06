@@ -847,7 +847,6 @@ bool SmartContracts::execute(SmartExecutionData& data) {
       data.error = "contract execution failed";
       data.result.retValue.__set_v_byte(error::ExecuteTransaction);
     }
-    //executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params, timeout_ms);
   }
   catch (std::exception& x) {
     data.error = x.what();
