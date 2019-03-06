@@ -1390,7 +1390,7 @@ void SmartContracts::test_contracts_locks()
       if (item.second.is_locked) {
         item.second.is_locked = false;
         const cs::PublicKey& key = item.first.public_key();
-        csdebug() << log_prefix << "find locked contract " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " which is not executed now, unlock";
+        csdebug() << log_prefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
       }
     }
   }
@@ -1401,7 +1401,7 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
   if (it != known_contracts.end()) {
     if (it->second.is_locked != value) {
       const cs::PublicKey& key = abs_addr.public_key();
-      csdebug() << log_prefix << "contract " << cs::Utils::byteStreamToHex(key.data(), key.size()) << "lock set to " << value;
+      csdebug() << log_prefix << "contract " << EncodeBase58(key.data(), key.data() + key.size()) << " lock set to " << value;
       it->second.is_locked = value;
     }
   }
