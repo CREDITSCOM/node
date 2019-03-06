@@ -144,8 +144,8 @@ namespace executor {
     }
 
   public:
-    static Executor& getInstance(const BlockChain &p_blockchain, const int p_exec_port) { // singlton
-      static Executor executor(p_blockchain, p_exec_port);
+    static Executor& getInstance(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) { // singlton
+      static Executor executor(p_blockchain, solver, p_exec_port);
       return  executor;
     }
 
@@ -344,12 +344,13 @@ namespace executor {
     bool isConnect() { return isConnect_; }
 
   private:
-    explicit Executor(const BlockChain &p_blockchain, const int p_exec_port) :
+    explicit Executor(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) :
       executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
         ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
       , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(
         ::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_)))
       , blockchain_(p_blockchain)
+      , solver_(solver)
     {
       std::thread th([&]() {
         while (true) {
@@ -396,6 +397,7 @@ namespace executor {
 
   private:
     const BlockChain& blockchain_;
+    const cs::SolverCore& solver_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
     std::unique_ptr<executor::ContractExecutorConcurrentClient> origExecutor_;
 
