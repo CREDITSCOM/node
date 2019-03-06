@@ -6,6 +6,7 @@
 #include <csnode/datastream.hpp>
 #include <lib/system/logger.hpp>
 #include <cscrypto/cryptoconstants.hpp>
+#include <base58.h>
 
 #include <memory>
 #include <optional>
@@ -801,8 +802,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it)
 {
   if(it == exe_queue.cend()) {
-    cserror() << log_prefix << "contract {"
-      << it->ref_start.sequence << '.' << it->ref_start.transaction << "} to remove is not in queue";
+    cswarning() << log_prefix << "contract to remove is not in queue already";
   }
   else {
     cslog() << std::endl << log_prefix << "remove from queue completed {"
@@ -1265,14 +1265,17 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
           csdb::Address addr;
           std::string method;
           if (a.arguments.count("address") > 0) {
-            addr = csdb::Address::from_string(a.arguments.at("address"));
-          }
-          if (a.arguments.count("method") > 0) {
-            method = a.arguments.at("method");
-          }
-          if (addr.is_valid()) {
-            auto& u = state.uses[m.name];
-            u[addr] = method;
+            std::vector<uint8_t> bytes;
+            if (DecodeBase58(a.arguments.at("address"), bytes)) {
+              addr = csdb::Address::from_public_key(bytes);
+              if (addr.is_valid()) {
+                if (a.arguments.count("method") > 0) {
+                  method = a.arguments.at("method");
+                }
+                auto& u = state.uses[m.name];
+                u[addr] = method; // empty method name is allowed too
+              }
+            }
           }
         }
       }
