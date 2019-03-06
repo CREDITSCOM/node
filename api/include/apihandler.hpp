@@ -33,6 +33,8 @@
 
 #include <csdb/currency.hpp>
 
+#include <solvercore.hpp>
+
 class APIHandlerBase {
 public:
   enum class APIRequestStatusType : uint8_t {
@@ -99,19 +101,13 @@ namespace executor {
       std::lock_guard lk(m); // temporary solution
 
       if (!code.empty()) {
-        if (!connect()) return;
         executor::SmartContractBinary smartContractBinary;
         smartContractBinary.contractAddress = smart_address;
         smartContractBinary.byteCodeObjects = code;
         smartContractBinary.contractState   = state;
-        smartContractBinary.stateCanModify  = 1; // solver_->smart_contracts().is_contract_locked(csdb::Address::from_???(smart_address)) ? 1 : 0;
-
-        const auto acceess_id = generateAccessId();
-        ++execCount_;
-        origExecutor_->executeByteCode(resp, acceess_id, address, smartContractBinary, method, params, timeout);
-        --execCount_;
-        deleteAccessId(acceess_id);
-        disconnect();
+        smartContractBinary.stateCanModify  = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
+        if(auto optOriginRes = execute(address, smartContractBinary, method, params))
+          resp = optOriginRes.value().resp;
       }
     }
 
@@ -119,7 +115,7 @@ namespace executor {
       if (!connect()) return;
       const auto acceess_id = generateAccessId();
       ++execCount_;
-      origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime);
+      origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
       --execCount_;
       deleteAccessId(acceess_id);
       disconnect();
@@ -270,16 +266,14 @@ namespace executor {
       else
         deployTrxn = smartTrxn;
 
-      const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
-
-      ExecuteByteCodeResult resp;        
+      const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());  
       executor::SmartContractBinary smartContractBinary;
       smartContractBinary.contractAddress = smartTarget.to_api_addr();
       smartContractBinary.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
       auto optState = getState(smartTarget);
       if (optState.has_value())
         smartContractBinary.contractState = optState.value();
-      smartContractBinary.stateCanModify  = 1; // solver_->smart_contracts().is_contract_locked(executeTrxn_it->target()) : 1 : 0;
+      smartContractBinary.stateCanModify  = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
       std::string method;
       std::vector<general::Variant> params;
@@ -297,30 +291,24 @@ namespace executor {
         params = sci.params;
       }
 
-      if (!connect()) return std::nullopt;
-      const auto acceess_id = generateAccessId();
-      ++execCount_;
-      const auto timeBeg = std::chrono::system_clock::now();
-      origExecutor_->executeByteCode(resp, acceess_id, smartSource.to_api_addr(), smartContractBinary, method, params, 1000);
-      const auto timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
-      --execCount_;
-      deleteAccessId(acceess_id);
-      disconnect();
+      const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, method, params);
+      if (!optOriginRes.has_value())
+        return std::nullopt;
 
-      const auto optInnerTransactions = getInnerSendTransactions(acceess_id);
+      const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
       ExecuteResult res;
       if (optInnerTransactions.has_value())
         res.trxns = optInnerTransactions.value();
-      deleteInnerSendTransactions(acceess_id);
+      deleteInnerSendTransactions(optOriginRes.value().acceessId);
       static const double FEE_IN_SECOND = kMinFee * 4.0;
-      res.fee = csdb::Amount(timeExecute * FEE_IN_SECOND);
-      res.newState  = resp.invokedContractState;
-      for (const auto &[itAddress, itState] : resp.externalContractsState) {
+      res.fee = csdb::Amount(optOriginRes.value().timeExecute * FEE_IN_SECOND);
+      res.newState  = optOriginRes.value().resp.invokedContractState;
+      for (const auto &[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
         const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
         res.states[addr] = itState;
       }
-      res.retValue  = resp.ret_val;
+      res.retValue  = optOriginRes.value().resp.ret_val;
       return res;
     }
 
@@ -386,6 +374,28 @@ namespace executor {
       th.detach();
     }
 
+    struct OriginExecuteResult {
+      ExecuteByteCodeResult resp;
+      general::AccessID acceessId;
+      long long timeExecute;
+    };
+
+    std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method, const std::vector<general::Variant>& params) {
+      static const uint64_t EXECUTION_TIME = 1000;
+      OriginExecuteResult originExecuteRes{};
+      if (!connect()) return std::nullopt;
+      const auto acceess_id = generateAccessId();
+      ++execCount_;
+      const auto timeBeg = std::chrono::system_clock::now();
+      origExecutor_->executeByteCode(originExecuteRes.resp, acceess_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+      originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
+      --execCount_;
+      deleteAccessId(acceess_id);
+      disconnect();
+      originExecuteRes.acceessId = acceess_id;
+      return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
+    }
+
     bool connect() {
       try {
         if (!executorTransport_->isOpen()) {
@@ -423,6 +433,8 @@ namespace executor {
 
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{ false };
+
+    const uint8_t EXECUTOR_VERSION = 0;
   };
 }
 namespace apiexec {
