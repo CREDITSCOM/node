@@ -241,12 +241,11 @@ namespace executor {
     }
 
     bool isDeploy(const csdb::Transaction& trxn) {
-      if (!trxn.user_field(0).is_valid()) {
-        return false;
+      if (trxn.user_field(0).is_valid()) {
+        const auto sci = deserialize<api::SmartContractInvocation>(trxn.user_field(0).value<std::string>());
+        if (sci.method.empty())
+          return true;
       }
-      const auto sci = deserialize<api::SmartContractInvocation>(trxn.user_field(0).value<std::string>());
-      if (sci.method.empty())
-        return true;
       return false;
     }
 
@@ -257,22 +256,29 @@ namespace executor {
 
       auto smartTrxn = *(pool.transactions().begin() + offsetTrx);
 
+      auto smartSource = blockchain_.get_addr_by_type(smartTrxn.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+      auto smartTarget = blockchain_.get_addr_by_type(smartTrxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+
       csdb::Transaction deployTrxn;
-      if (!isDeploy(smartTrxn)) { // execute
-        const auto optDeployId = getDeployTrxn(blockchain_.get_addr_by_type(smartTrxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY));
+      auto isdeploy = isDeploy(smartTrxn);
+      if (!isdeploy) { // execute
+        const auto optDeployId = getDeployTrxn(smartTarget);
         if (!optDeployId.has_value())
           return std::nullopt;
         deployTrxn = blockchain_.loadTransaction(optDeployId.value());
       }
       else
         deployTrxn = smartTrxn;
-      const auto sci = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
+
+      const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
 
       ExecuteByteCodeResult resp;        
       executor::SmartContractBinary smartContractBinary;
-      smartContractBinary.contractAddress = smartTrxn.target().to_api_addr();
-      smartContractBinary.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
-      smartContractBinary.contractState   = sci.smartContractDeploy.hashState;
+      smartContractBinary.contractAddress = smartTarget.to_api_addr();
+      smartContractBinary.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
+      auto optState = getState(smartTarget);
+      if (optState.has_value())
+        smartContractBinary.contractState = optState.value();
       smartContractBinary.stateCanModify  = 1; // solver_->smart_contracts().is_contract_locked(executeTrxn_it->target()) : 1 : 0;
 
       std::string method;
@@ -285,7 +291,8 @@ namespace executor {
         var.__set_v_string(smartTrxn.currency().to_string());
         params.emplace_back(var);
       }
-      else {
+      else if(!isdeploy) {
+        const auto sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
         method = sci.method;
         params = sci.params;
       }
@@ -294,7 +301,7 @@ namespace executor {
       const auto acceess_id = generateAccessId();
       ++execCount_;
       const auto timeBeg = std::chrono::system_clock::now();
-      origExecutor_->executeByteCode(resp, acceess_id, smartTrxn.source().to_api_addr(), smartContractBinary, sci.method, sci.params, 1000);
+      origExecutor_->executeByteCode(resp, acceess_id, smartSource.to_api_addr(), smartContractBinary, method, params, 1000);
       const auto timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
       --execCount_;
       deleteAccessId(acceess_id);
