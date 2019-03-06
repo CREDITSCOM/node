@@ -301,8 +301,9 @@ namespace executor {
       if (optInnerTransactions.has_value())
         res.trxns = optInnerTransactions.value();
       deleteInnerSendTransactions(optOriginRes.value().acceessId);
-      static const double FEE_IN_SECOND = kMinFee * 4.0;
-      res.fee = csdb::Amount(optOriginRes.value().timeExecute * FEE_IN_SECOND);
+      constexpr double FEE_IN_SECOND = kMinFee * 4.0;
+      const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
+      res.fee = csdb::Amount(fee);
       res.newState  = optOriginRes.value().resp.invokedContractState;
       for (const auto &[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
         const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);

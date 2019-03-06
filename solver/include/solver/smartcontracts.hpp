@@ -526,12 +526,7 @@ private:
     return true;
   }
 
-  void update_lock_status(const csdb::Address& abs_addr, bool value) {
-    auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.end()) {
-      it->second.is_locked = value;
-    }
-  }
+  void update_lock_status(const csdb::Address& abs_addr, bool value);
 
   void update_lock_status(const QueueItem& item, bool value)
   {

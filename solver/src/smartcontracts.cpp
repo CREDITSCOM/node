@@ -847,7 +847,6 @@ bool SmartContracts::execute(SmartExecutionData& data) {
       data.error = "contract execution failed";
       data.result.retValue.__set_v_byte(error::ExecuteTransaction);
     }
-    //executeByteCode(result, invoker, smart_address, contract.smartContractDeploy.byteCodeObjects, data.state, contract.method, contract.params, timeout_ms);
   }
   catch (std::exception& x) {
     data.error = x.what();
@@ -1390,8 +1389,20 @@ void SmartContracts::test_contracts_locks()
     for (auto& item : known_contracts) {
       if (item.second.is_locked) {
         item.second.is_locked = false;
-        cslog() << log_prefix << "find locked contract which is not executed now, unlock";
+        const cs::PublicKey& key = item.first.public_key();
+        csdebug() << log_prefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
       }
+    }
+  }
+}
+
+void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool value) {
+  auto it = known_contracts.find(abs_addr);
+  if (it != known_contracts.end()) {
+    if (it->second.is_locked != value) {
+      const cs::PublicKey& key = abs_addr.public_key();
+      csdebug() << log_prefix << "contract " << EncodeBase58(key.data(), key.data() + key.size()) << " lock set to " << value;
+      it->second.is_locked = value;
     }
   }
 }
