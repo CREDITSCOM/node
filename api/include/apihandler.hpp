@@ -241,6 +241,9 @@ namespace executor {
     }
 
     bool isDeploy(const csdb::Transaction& trxn) {
+      if (!trxn.user_field(0).is_valid()) {
+        return false;
+      }
       const auto sci = deserialize<api::SmartContractInvocation>(trxn.user_field(0).value<std::string>());
       if (sci.method.empty())
         return true;
