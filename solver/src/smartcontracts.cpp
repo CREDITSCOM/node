@@ -1292,8 +1292,6 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     }
   }
 
-  // consolidate uses contracts with used by those
-  
   return true;
 }
 
@@ -1301,7 +1299,19 @@ void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::str
 {
   const auto it = known_contracts.find(abs_addr);
   if (it != known_contracts.cend()) {
+    
+    if (it->second.uses.empty() && it->second.payable != PayableStatus::Unknown) {
+      csdb::Transaction t = get_transaction(it->second.ref_deploy);
+      if (t.is_valid()) {
+        auto maybe_invoke_info = get_smart_contract_impl(t);
+        if (maybe_invoke_info.has_value()) {
+          update_metadata(maybe_invoke_info.value(), it->second);
+        }
+      }
+    }
+
     uses.emplace_back(abs_addr);
+    
     for (const auto& [meth, subcalls] : it->second.uses) {
       if (meth != method) {
         continue;
