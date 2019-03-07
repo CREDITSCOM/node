@@ -123,19 +123,19 @@ namespace executor {
 
     void getContractMethods(GetContractMethodsResult& _return, const std::vector< ::general::ByteCodeObject> & byteCodeObjects) {
       if (!connect()) return;
-      origExecutor_->getContractMethods(_return, byteCodeObjects);
+      origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
       disconnect();
     }
 
     void getContractVariables(GetContractVariablesResult& _return, const std::vector<::general::ByteCodeObject> & byteCodeObjects, const std::string& contractState) {
       if (!connect()) return;
-      origExecutor_->getContractVariables(_return, byteCodeObjects, contractState);
+      origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
       disconnect();
     }
 
     void compileSourceCode(CompileSourceCodeResult& _return, const std::string& sourceCode) {
       if (!connect()) return;
-      origExecutor_->compileSourceCode(_return, sourceCode);
+      origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
       disconnect();
     }
 
