@@ -349,8 +349,6 @@ private:
     bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
-    // emitted transactions by this and subsequent contracts
-    std::vector<csdb::Transaction> emitted_transactions;
     // using contracts, may store both absolute and optimized (WalletId) items
     std::vector<csdb::Address> uses;
 

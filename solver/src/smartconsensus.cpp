@@ -43,9 +43,12 @@ namespace cs{
 	  csdb::Address abs_addr;
     csdb::Amount executor_fee{0};
     cs::TransactionsPacket tmpPacket;
+    bool primary_new_state_found = false;
 
     for (const auto& tr : pack.transactions()) {
-      if (SmartContracts::is_new_state(tr)) {
+      // only the 1st new_state is specifically handled
+      if (SmartContracts::is_new_state(tr) && !primary_new_state_found) {
+        primary_new_state_found = true;
         abs_addr = smarts->absolute_address(tr.source());
 
         csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
@@ -81,7 +84,7 @@ namespace cs{
       }
     }
 
-    if (0 == smartRoundNumber_ || !abs_addr.is_valid()) {
+    if (!primary_new_state_found || 0 == smartRoundNumber_ || !abs_addr.is_valid()) {
       cserror() << log_prefix << "{" << smartRoundNumber_ << "} smart contract result packet must contain new state transaction";
       return false;
     }
@@ -402,8 +405,10 @@ namespace cs{
   }
 
   void SmartConsensus::createFinalTransactionSet(const csdb::Amount finalFee) {
+    bool primary_new_state_found = false;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
-      if (SmartContracts::is_new_state(tr)) {
+      if (!primary_new_state_found && SmartContracts::is_new_state(tr)) {
+        primary_new_state_found = true;
         tmpNewState_.add_user_field(trx_uf::new_state::Fee, finalFee);
         finalSmartTransactionPack_.addTransaction(tmpNewState_);
       }
