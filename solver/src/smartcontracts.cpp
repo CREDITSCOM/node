@@ -419,23 +419,31 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     }
   }
   else {
+    // "lazy" metadata update, also covers cases of reading contracts from DB
+    if (!is_metadata_actual(abs_addr)) {
+      auto maybe_invoke_info = get_smart_contract_impl(t);
+      if (maybe_invoke_info.has_value()) {
+        StateItem& state = known_contracts[abs_addr];
+        update_metadata(maybe_invoke_info.value(), state);
+      }
+    }
     payable = is_payable(abs_addr);
   }
 
   cslog() << std::endl << log_prefix << "enqueue " << print_executed_method(new_item) << std::endl;
   auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
-  // in addition to uses set by transaction take others from contract metadata:
-  auto it = known_contracts.find(abs_addr);
-  if (it != known_contracts.end()) {
-    auto& state = it->second;
-    const std::string method = get_executed_method_name(new_item);
-    if (state.uses.count(method) > 0) {
-      for (const auto u : state.uses.at(method)) {
-        queue_item.uses.emplace_back(u.first);
-        queue_item.avail_fee -= queue_item.new_state_fee; // reserve more fee for new_state
-      }
+
+  // in addition to contract "subcalls" set by transaction take more from contract metadata:
+  const std::string method = get_executed_method_name(new_item);
+  const size_t cnt_0 = queue_item.uses.size();
+  add_uses_from(abs_addr, method, queue_item.uses);
+  const size_t cnt = queue_item.uses.size();
+  if (cnt > cnt_0) {
+    for (size_t i = cnt_0; i < cnt; ++i) {
+      queue_item.avail_fee -= queue_item.new_state_fee; // reserve more fee for future new_state
     }
   }
+
   update_status(queue_item, new_item.sequence, SmartContractStatus::Waiting);
   queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
   queue_item.is_executor = (execution_allowed && contains_me(block.confidants()));
@@ -459,14 +467,16 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
       else {
         SmartContractRef contract_ref(fld_contract_ref);
         // update state
-        csdebug() << log_prefix << "updating contract state";
         update_contract_state(new_state);
+        const cs::PublicKey& key = absolute_address(new_state.target()).public_key();
+        cslog() << log_prefix << EncodeBase58(key.data(), key.data() + key.size()) <<
+          " state updated from {" << contract_ref.sequence << '.' << contract_ref.transaction << '}';
         remove_from_queue(contract_ref);
       }
       csdb::UserField fld_fee = new_state.user_field(trx_uf::new_state::Fee);
       if (fld_fee.is_valid()) {
-        cslog() << log_prefix << "contract execution fee " << fld_fee.value<csdb::Amount>().to_double();
-        cslog() << log_prefix << "contract new state fee " << new_state.counted_fee().to_double();
+        csdebug() << log_prefix << "contract execution fee " << fld_fee.value<csdb::Amount>().to_double();
+        csdebug() << log_prefix << "contract new state fee " << new_state.counted_fee().to_double();
       }
     }
   }
@@ -703,10 +713,10 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
             if(is_deploy(tr)) {
               // register ONLY contract deploy,
               // known contracts will be updated on new_state handling
-              StateItem& val = known_contracts[abs_addr];
-              val.ref_deploy.hash = block.hash();
-              val.ref_deploy.sequence = block.sequence();
-              val.ref_deploy.transaction = tr_idx;
+              StateItem& state = known_contracts[abs_addr];
+              state.ref_deploy.hash = block.hash();
+              state.ref_deploy.sequence = block.sequence();
+              state.ref_deploy.transaction = tr_idx;
             }
           }
           else {
@@ -801,10 +811,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 // return next element in queue
 SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it)
 {
-  if(it == exe_queue.cend()) {
-    cswarning() << log_prefix << "contract to remove is not in queue already";
-  }
-  else {
+  if(it != exe_queue.cend()) {
     cslog() << std::endl << log_prefix << "remove from queue completed {"
       << it->ref_start.sequence << '.' << it->ref_start.transaction << "} " << print_executed_method(it->ref_start) << std::endl;
     const cs::Sequence seq = bc.getLastSequence();
@@ -828,6 +835,11 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
 }
 
 bool SmartContracts::execute(SmartExecutionData& data) {
+  if (!exec_handler_ptr) {
+    data.error = "contract executor is unavailable";
+    data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+    return false;
+  }
   csdebug() << log_prefix << "execute contract #" << data.contract_ref.sequence << "." << data.contract_ref.transaction;
 
   csdb::Pool block = bc.loadBlock(data.contract_ref.sequence);
@@ -1042,7 +1054,7 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
   result.add_user_field(trx_uf::new_state::RefStart, queue_item.ref_start.to_user_field());
   // USRFLD2 - total fee
   result.add_user_field(trx_uf::new_state::Fee, queue_item.consumed_fee);
-  cslog() << log_prefix << "new_state fee " << result.counted_fee().to_double() << ", contract execution fee " << queue_item.consumed_fee.to_double();
+  csdebug() << log_prefix << "new_state fee " << result.counted_fee().to_double() << ", contract execution fee " << queue_item.consumed_fee.to_double();
   return result;
 }
 
@@ -1212,9 +1224,11 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
 }
 
 bool SmartContracts::update_metadata(const api::SmartContractInvocation& contract, StateItem& state) {
+  if (!exec_handler_ptr) {
+    return false;
+  }
   executor::GetContractMethodsResult result;
   std::string error;
-
   try {
     exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
   }
@@ -1257,16 +1271,16 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     // uses
     if (!m.annotations.empty()) {
       for (const auto& a : m.annotations) {
-        if (a.name == "Contract") {
+        if (a.name == UsesContract) {
           csdb::Address addr;
           std::string method;
-          if (a.arguments.count("address") > 0) {
+          if (a.arguments.count(UsesContractAddr) > 0) {
             std::vector<uint8_t> bytes;
-            if (DecodeBase58(a.arguments.at("address"), bytes)) {
+            if (DecodeBase58(a.arguments.at(UsesContractAddr), bytes)) {
               addr = csdb::Address::from_public_key(bytes);
               if (addr.is_valid()) {
-                if (a.arguments.count("method") > 0) {
-                  method = a.arguments.at("method");
+                if (a.arguments.count(UsesContractMethod) > 0) {
+                  method = a.arguments.at(UsesContractMethod);
                 }
                 auto& u = state.uses[m.name];
                 u[addr] = method; // empty method name is allowed too
@@ -1278,7 +1292,28 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     }
   }
 
+  // consolidate uses contracts with used by those
+  
   return true;
+}
+
+void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses)
+{
+  const auto it = known_contracts.find(abs_addr);
+  if (it != known_contracts.cend()) {
+    uses.emplace_back(abs_addr);
+    for (const auto& [meth, subcalls] : it->second.uses) {
+      if (meth != method) {
+        continue;
+      }
+      for (const auto&[addr, submeth] : subcalls) {
+        if (std::find(uses.cbegin(), uses.cend(), addr) != uses.cend()) {
+          continue; // skip, already in uses
+        }
+        add_uses_from(addr, submeth, uses);
+      }
+    }
+  }
 }
 
 std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {

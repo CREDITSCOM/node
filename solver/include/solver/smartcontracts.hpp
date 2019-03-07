@@ -288,6 +288,10 @@ private:
   const char *PayableNameArg0 = "amount";
   const char *PayableNameArg1 = "currency";
 
+  const char *UsesContract = "Contract";
+  const char *UsesContractAddr = "address";
+  const char *UsesContractMethod = "method";
+
   BlockChain& bc;
   CallsQueueScheduler& scheduler;
   cs::PublicKey node_id;
@@ -349,7 +353,7 @@ private:
     bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
-    // using contracts, may store both absolute and optimized (WalletId) items
+    // using contracts, must store absolute addresses (public keys)
     std::vector<csdb::Address> uses;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
@@ -492,11 +496,25 @@ private:
   // may make a BLOCKING call to java executor
   bool is_payable(const csdb::Address& abs_addr);
 
+  // test if metadata is actualized for given contract
+  // may make a BLOCKING call to java executor
+  bool is_metadata_actual(const csdb::Address& abs_addr)
+  {
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+      // both uses list and defined payable means metadata is actual:
+      return (!it->second.uses.empty() || it->second.payable != PayableStatus::Unknown);
+    }
+    return false;
+  }
+
   // blocking call
   bool execute(/*[in,out]*/ SmartExecutionData& data);
 
   // blocking call
   bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
+
+  void add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses);
 
   // extracts and returns name of method executed by referenced transaction
   std::string print_executed_method(const SmartContractRef& ref);

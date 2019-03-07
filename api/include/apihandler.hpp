@@ -97,6 +97,7 @@ namespace executor {
     void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address,
       const std::vector<general::ByteCodeObject>& code, const std::string& state, const std::string& method,
       const std::vector<general::Variant>& params, const int64_t &timeout) {
+      csunused(timeout);
       static std::mutex m;
       std::lock_guard lk(m); // temporary solution
 
@@ -382,7 +383,7 @@ namespace executor {
     };
 
     std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method, const std::vector<general::Variant>& params) {
-      static const uint64_t EXECUTION_TIME = 1000;
+      constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
       OriginExecuteResult originExecuteRes{};
       if (!connect()) return std::nullopt;
       const auto acceess_id = generateAccessId();
