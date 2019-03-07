@@ -910,6 +910,7 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item, csdb::Amoun
 }
 
 void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data) {
+  using namespace trx_uf;
   auto it = find_in_queue(data.contract_ref);
   csdb::Transaction result{};
   if (it != exe_queue.end()) {
@@ -924,13 +925,6 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     
     if (data.result.fee > csdb::Amount(0)) {
       it->consumed_fee = data.result.fee; // executor overrides fee for now
-    }
-
-    // add emitted transactions
-    if (!data.result.trxns.empty()) {
-      for (const auto& t : data.result.trxns) {
-        it->emitted_transactions.emplace_back(t);
-      }
     }
 
     result = create_new_state(*it);
@@ -949,46 +943,49 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
   if (!data.error.empty()) {
     cserror() << std::endl << log_prefix << data.error << std::endl;
     // result contains empty USRFLD[state::Value]
-    result.add_user_field(trx_uf::new_state::Value, std::string{});
+    result.add_user_field(new_state::Value, std::string{});
     // result contains error code from ret_val
-    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.result.retValue));
+    result.add_user_field(new_state::RetVal, serialize(data.result.retValue));
     packet.addTransaction(result);
   }
   else {
     csdebug() << log_prefix << "execution of smart contract is successful, new state size = " << data.result.newState.size();
 
     // put new state
-    result.add_user_field(trx_uf::new_state::Value, data.result.newState);
-    result.add_user_field(trx_uf::new_state::RetVal, serialize(data.result.retValue));
+    result.add_user_field(new_state::Value, data.result.newState);
+    result.add_user_field(new_state::RetVal, serialize(data.result.retValue));
     packet.addTransaction(result);
 
-    // put emitted transactions
     if (it != exe_queue.end()) {
-      if (!it->emitted_transactions.empty()) {
-        for (const auto& tr : it->emitted_transactions) {
+
+      // put emitted transactions
+      if (!data.result.trxns.empty()) {
+        for (const auto& tr : data.result.trxns) {
           packet.addTransaction(tr);
         }
-        csdebug() << log_prefix << "add " << it->emitted_transactions.size() << " emitted transaction(s) to contract {"
+        csdebug() << log_prefix << "add " << data.result.trxns.size() << " emitted transaction(s) to contract {"
           << it->ref_start.sequence << '.' << it->ref_start.transaction << "} state";
       }
       else {
         csdebug() << log_prefix << "no emitted transaction added to contract state";
       }
-    }
-  }
 
-  // put new states of using contracts into packet
-  if (!data.result.states.empty()) {
-    for (const auto& [addr, state] : data.result.states) {
-      csdb::Transaction t = create_new_state(*it);
-      if (t.is_valid()) {
-        // re-assign some fields
-        t.set_innerID(next_inner_id(addr));
-        t.set_source(addr);
-        t.set_target(addr);
-        t.add_user_field(trx_uf::new_state::Value, state);
-        t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-        packet.addTransaction(t);
+      // put subsequent new_states
+      if (!data.result.states.empty()) {
+        csdebug() << log_prefix << "add " << data.result.states.size() << " subsequent new state(s) {"
+          << it->ref_start.sequence << '.' << it->ref_start.transaction << "} state";
+        for (const auto&[addr, state] : data.result.states) {
+          csdb::Transaction t = create_new_state(*it);
+          if (t.is_valid()) {
+            // re-assign some fields
+            t.set_innerID(next_inner_id(addr));
+            t.set_source(addr);
+            t.set_target(addr);
+            t.add_user_field(trx_uf::new_state::Value, state);
+            t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+            packet.addTransaction(t);
+          }
+        }
       }
     }
   }
