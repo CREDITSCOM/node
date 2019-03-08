@@ -468,9 +468,11 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
         SmartContractRef contract_ref(fld_contract_ref);
         // update state
         update_contract_state(new_state);
-        const cs::PublicKey& key = absolute_address(new_state.target()).public_key();
+        const csdb::Address abs_addr = absolute_address( new_state.target() );
+        const cs::PublicKey& key = abs_addr.public_key();
         cslog() << log_prefix << EncodeBase58(key.data(), key.data() + key.size()) <<
           " state updated from {" << contract_ref.sequence << '.' << contract_ref.transaction << '}';
+        update_lock_status( abs_addr, false );
         remove_from_queue(contract_ref);
       }
       csdb::UserField fld_fee = new_state.user_field(trx_uf::new_state::Fee);
@@ -820,7 +822,11 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
       cslog() << log_prefix << seq_cancel - seq << " round(s) were to unconditional contract {"
         << it->ref_start.sequence << '.' << it->ref_start.transaction << "} timeout";
     }
-    update_lock_status(*it, false);
+    // its too early to unlock contract(s), wait until states will updated
+    // unlock only closed (after timeout) contracts
+    if( it->status == SmartContractStatus::Closed ) {
+        update_lock_status(*it, false);
+    }
     it = exe_queue.erase(it);
 
     if (exe_queue.empty()) {
@@ -1195,32 +1201,30 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
   return true;
 }
 
-bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
+bool SmartContracts::is_payable( const csdb::Address& abs_addr ) {
 
-  // the most frequent fast test
-  auto item = known_contracts.find(abs_addr);
-  if (item == known_contracts.end()) {
-    // unknown contract
-    return false;
-  }
-  StateItem& state = item->second;
-  if (state.payable != PayableStatus::Unknown) {
-    return state.payable == PayableStatus::Implemented;
-  }
-
-  // the first time test
-  auto maybe_deploy = find_deploy_info(abs_addr);
-  PayableStatus result = PayableStatus::Unknown;
-  if (!maybe_deploy.has_value()) {
-    result = PayableStatus::Absent;
-  }
-  else {
-    if (!update_metadata(maybe_deploy.value(), state)) {
-      return false;
+    // the most frequent fast test
+    auto item = known_contracts.find( abs_addr );
+    if( item == known_contracts.end() ) {
+        // unknown contract
+        return false;
     }
-    result = state.payable;
-  }
-  return result == PayableStatus::Implemented;
+
+    StateItem& state = item->second;
+    if( state.payable != PayableStatus::Unknown ) {
+        return state.payable == PayableStatus::Implemented;
+    }
+
+    // the first time test
+    auto maybe_deploy = find_deploy_info( abs_addr );
+    if( !maybe_deploy.has_value() ) {
+        // smth goes wrong, do not update contract state but return false result
+        return false;
+    }
+    if( !update_metadata( maybe_deploy.value(), state ) ) {
+        return false;
+    }
+    return ( state.payable == PayableStatus::Implemented );
 }
 
 bool SmartContracts::update_metadata(const api::SmartContractInvocation& contract, StateItem& state) {
@@ -1228,9 +1232,15 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     return false;
   }
   executor::GetContractMethodsResult result;
+  result.status.code = (int8_t) error::NoExecutor;
   std::string error;
   try {
     exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
+    if( result.status.code == (int8_t) error::NoExecutor ) {
+        if( result.status.message.empty() ) {
+            result.status.message = "Excutor is not available";
+        }
+    }
   }
   catch (std::exception& x) {
     error = x.what();
@@ -1300,7 +1310,7 @@ void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::str
   const auto it = known_contracts.find(abs_addr);
   if (it != known_contracts.cend()) {
     
-    if (it->second.uses.empty() && it->second.payable != PayableStatus::Unknown) {
+    if (it->second.uses.empty() && it->second.payable == PayableStatus::Unknown) {
       csdb::Transaction t = get_transaction(it->second.ref_deploy);
       if (t.is_valid()) {
         auto maybe_invoke_info = get_smart_contract_impl(t);
@@ -1310,17 +1320,16 @@ void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::str
       }
     }
 
-    uses.emplace_back(abs_addr);
-    
     for (const auto& [meth, subcalls] : it->second.uses) {
       if (meth != method) {
         continue;
       }
-      for (const auto&[addr, submeth] : subcalls) {
-        if (std::find(uses.cbegin(), uses.cend(), addr) != uses.cend()) {
+      for (const auto&[subaddr, submeth] : subcalls) {
+        if (std::find(uses.cbegin(), uses.cend(), subaddr) != uses.cend()) {
           continue; // skip, already in uses
         }
-        add_uses_from(addr, submeth, uses);
+        uses.emplace_back( subaddr );
+        add_uses_from(subaddr, submeth, uses);
       }
     }
   }

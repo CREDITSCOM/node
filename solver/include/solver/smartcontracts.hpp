@@ -46,6 +46,8 @@ namespace cs {
     constexpr uint8_t ExecuteTransaction = 248;
     // bug in SmartContracts
     constexpr uint8_t InternalBug = 247;
+    // executor is disconnected or unavailable
+    constexpr uint8_t NoExecutor = 246;
   }
 
   // transactions user fields
