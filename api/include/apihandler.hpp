@@ -376,17 +376,10 @@ namespace executor {
             cvErrorConnect_.wait(ulk, [&] { return !isConnect_; });
           }
 
-          try {
-            static const int RECONNECT_TIME = 10;
-            std::this_thread::sleep_for(std::chrono::seconds(RECONNECT_TIME));
-            executorTransport_->open();
-            if (executorTransport_->isOpen())
-              isConnect_ = true;
-          }
-          catch (...) {
-            isConnect_ = false;
-            continue;
-          }
+          static const int RECONNECT_TIME = 10;
+          std::this_thread::sleep_for(std::chrono::seconds(RECONNECT_TIME));
+          if (connect())
+            disconnect();
         }
       });
       th.detach();
@@ -416,17 +409,17 @@ namespace executor {
 
     bool connect() {
       try {
-        if (!executorTransport_->isOpen()) {
-          executorTransport_->open();
-          isConnect_ = true;
-        }
+        if (executorTransport_->isOpen())
+          executorTransport_->close();
+
+        executorTransport_->open();
+        isConnect_ = true;
       }
       catch (...) {
         isConnect_ = false;
         cvErrorConnect_.notify_one();
-        return false;
       }
-      return true;
+      return isConnect_;
     }
 
     void disconnect() {
