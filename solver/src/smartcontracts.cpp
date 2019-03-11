@@ -640,6 +640,19 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
 
   cs::Lock lock(public_access_lock);
 
+  if (!execution_allowed) {
+    try {
+      execution_allowed = exec_handler_ptr->getExecutor().isConnect();
+      if (execution_allowed) {
+        cslog() << std::endl << log_prefix << "connection to executor is restored" << std::endl;
+      }
+    }
+    catch (std::exception& ) {
+    }
+    catch (...) {
+    }
+  }
+
   test_exe_conditions(block);
   test_exe_queue();
   test_contracts_locks();
@@ -1232,15 +1245,13 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     return false;
   }
   executor::GetContractMethodsResult result;
-  //result.status.code = (int8_t) error::NoExecutor;
   std::string error;
   try {
     exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
-    /*if( result.status.code == (int8_t) error::NoExecutor ) {
-        if( result.status.message.empty() ) {
-            result.status.message = "Excutor is not available";
-        }
-    }*/
+    if (result.status.code == error::NoExecutor) {
+      cslog() << std::endl << log_prefix << "unable to connect to executor" << std::endl;
+      execution_allowed = false;
+    }
   }
   catch (std::exception& x) {
     error = x.what();
