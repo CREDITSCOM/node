@@ -616,7 +616,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       send_transaction.innerID(),
       input_smart.smartContractDeploy);
     if(scKey != addr) {
-      _return.status.code = 127;
+      _return.status.code = 1;
       const auto data = scKey.public_key().data();
       std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
       _return.status.message = "Bad smart contract address, expected " + str;

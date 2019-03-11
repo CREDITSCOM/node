@@ -113,7 +113,11 @@ namespace executor {
     }
 
     void executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract, const std::string& method, const std::vector<std::vector< ::general::Variant> > & params, const int64_t executionTime) {
-      if (!connect()) return;
+      if (!connect()) {
+        _return.status.code = 1;
+        _return.status.message = "No executor connection!";
+        return;
+      }
       const auto acceess_id = generateAccessId();
       ++execCount_;
       origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
@@ -123,19 +127,31 @@ namespace executor {
     }
 
     void getContractMethods(GetContractMethodsResult& _return, const std::vector< ::general::ByteCodeObject> & byteCodeObjects) {
-      if (!connect()) return;
+      if (!connect()) {
+        _return.status.code = 1;
+        _return.status.message = "No executor connection!";
+          return;
+      }
       origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
       disconnect();
     }
 
     void getContractVariables(GetContractVariablesResult& _return, const std::vector<::general::ByteCodeObject> & byteCodeObjects, const std::string& contractState) {
-      if (!connect()) return;
+      if (!connect()) {
+        _return.status.code = 1;
+        _return.status.message = "No executor connection!";
+          return;
+      }
       origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
       disconnect();
     }
 
     void compileSourceCode(CompileSourceCodeResult& _return, const std::string& sourceCode) {
-      if (!connect()) return;
+      if (!connect()) {
+        _return.status.code = 1;
+        _return.status.message = "No executor connection!";
+          return;
+      }
       origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
       disconnect();
     }

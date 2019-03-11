@@ -1232,15 +1232,15 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     return false;
   }
   executor::GetContractMethodsResult result;
-  result.status.code = (int8_t) error::NoExecutor;
+  //result.status.code = (int8_t) error::NoExecutor;
   std::string error;
   try {
     exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
-    if( result.status.code == (int8_t) error::NoExecutor ) {
+    /*if( result.status.code == (int8_t) error::NoExecutor ) {
         if( result.status.message.empty() ) {
             result.status.message = "Excutor is not available";
         }
-    }
+    }*/
   }
   catch (std::exception& x) {
     error = x.what();
