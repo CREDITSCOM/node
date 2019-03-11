@@ -43,9 +43,9 @@ namespace cs {
       void killTimer(int st);
       void fakeStage(uint8_t confIndex);
 
-      cs::PublicKey smartAddress();
+      //cs::PublicKey smartAddress();
       //Solver smarts consensus methods
-      void smartStagesStorageClear(size_t cSize);
+      //void smartStagesStorageClear(size_t cSize);
 
       void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
       void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
@@ -64,8 +64,8 @@ namespace cs {
       void createFinalTransactionSet(const csdb::Amount finalFee);
       void sendFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
-      void gotSmartStageRequest(uint8_t msgType, const cs::PublicKey& smartAddress
-        , uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
+      void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction,
+        uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
 
       void requestSmartStages(int st);
       void requestSmartStagesNeighbors(int st);
@@ -96,7 +96,7 @@ namespace cs {
       std::vector <int> smartUntrusted;
       std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
       cs::Sequence smartRoundNumber_;
-      cs::PublicKey smartAddress_;
+      uint32_t smartTransaction_;
 
       std::vector<cs::Bytes> smartStageOneMessage_;
       std::vector<cs::Bytes> smartStageTwoMessage_;

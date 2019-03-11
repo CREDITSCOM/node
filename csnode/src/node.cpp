@@ -1612,7 +1612,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   }
 
   csmeta(csdetails) << std::endl
-                    << "Smart starting Round: " << stageOneInfo.sRoundNum << std::endl
+                    << "Smart starting Round: " << stageOneInfo.sBlockNum << '.' << stageOneInfo.startTransaction << std::endl
                     << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                     << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
@@ -1626,14 +1626,14 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
-  stream << stageOneInfo.smartAddress;
+  stream << stageOneInfo.startTransaction;
   stream << stageOneInfo.hash;
 
   // hash of message
   stageOneInfo.messageHash = cscrypto::calculateHash(message.data(), message.size());
 
   cs::DataStream signStream(messageToSign);
-  signStream << stageOneInfo.sRoundNum;
+  signStream << stageOneInfo.sBlockNum;
   signStream << stageOneInfo.messageHash;
 
   csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
@@ -1643,7 +1643,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload
-    stageOneInfo.sRoundNum, stageOneInfo.signature, message, stageOneInfo.fee.integral(), stageOneInfo.fee.fraction());
+    stageOneInfo.sBlockNum, stageOneInfo.signature, message, stageOneInfo.fee.integral(), stageOneInfo.fee.fraction());
 
   // cache
   stageOneInfo.message = std::move(message);
@@ -1658,7 +1658,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   istream_.init(data, size);
 
   cs::StageOneSmarts stage;
-  istream_ >> stage.sRoundNum >> stage.signature;
+  istream_ >> stage.sBlockNum >> stage.signature;
 
   int32_t fee_integral = 0;
   uint64_t fee_fraction = 0;
@@ -1670,29 +1670,31 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     cserror() << "Bad Smart Stage One packet format";
     return;
   }
-  csdebug() << __func__ << ": starting #" << stage.sRoundNum;
   // hash of part received message
   stage.messageHash = cscrypto::calculateHash(bytes.data(), bytes.size());
   //csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
 
   cs::Bytes signedMessage;
   cs::DataStream signedStream(signedMessage);
-  signedStream << stage.sRoundNum;
+  signedStream << stage.sBlockNum;
   signedStream << stage.messageHash;
 
 
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.smartAddress;
-    stream >> stage.hash;
+  stream >> stage.startTransaction;
+  stream >> stage.hash;
+
+  csdebug() << __func__ << ": starting {" << stage.sBlockNum << '.' << stage.startTransaction << '}';
+
   csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
   csdebug() << "Fee constructed: " << fee.to_string();
   stage.fee = fee;
   csdebug() << "StageHash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
-    cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] (" 
-      << cs::Utils::byteStreamToHex(stage.smartAddress.data(), stage.smartAddress.size()) << ") -  WRONG SIGNATURE!!!";
+    cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] {" 
+      << stage.sBlockNum << '.' << stage.startTransaction << "} -  WRONG SIGNATURE!!!";
     return;
   }
 
@@ -1700,14 +1702,15 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 
   csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender)
                 << ", sender key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << std::endl 
-                << "Smart#: " << cs::Utils::byteStreamToHex(stage.smartAddress.data(), stage.smartAddress.size());
+                << "Smart#: {" << stage.sBlockNum << '.' << stage.startTransaction << '}';
   csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
   csdebug() << "NODE> SmartStage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
   //solver_->gotSmartStageOne(stage);
-  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.smartAddress) == activeSmartConsensuses_.cend()) {
-    csdebug() << "The SmartConsensus #" << cs::Utils::byteStreamToHex(stage.smartAddress.data(),stage.smartAddress.size()) 
-      << " is not active now, storing the stage";
+  const auto val = std::make_pair<>(stage.sBlockNum, stage.startTransaction);
+  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val) == activeSmartConsensuses_.cend()) {
+    csdebug() << "The SmartConsensus {" << stage.sBlockNum << '.' << stage.startTransaction
+      << "} is not active now, storing the stage";
       smartStageOneStorage_.push_back(stage);
       return;
   }
@@ -1732,7 +1735,7 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   cs::DataStream stream(bytes);
   stream << stageTwoInfo.sender;
-  stream << stageTwoInfo.smartAddress;
+  stream << stageTwoInfo.startTransaction;
   stream << stageTwoInfo.signatures;
   stream << stageTwoInfo.hashes;
 
@@ -1740,7 +1743,7 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(smartConfidants, stageTwoInfo.sender,
              MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(),
-             stageTwoInfo.sRoundNum, stageTwoInfo.signature, bytes);
+             stageTwoInfo.sBlockNum, stageTwoInfo.signature, bytes);
 
   // cash our stage two
   stageTwoInfo.message = std::move(bytes);
@@ -1755,7 +1758,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   istream_.init(data, size);
 
   cs::StageTwoSmarts stage;
-  istream_ >> stage.sRoundNum >> stage.signature;
+  istream_ >> stage.sBlockNum >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
@@ -1767,7 +1770,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.smartAddress;
+  stream >> stage.startTransaction;
   stream >> stage.signatures;
   stream >> stage.hashes;
   csdebug() << "NODE> Read all data from the stream";
@@ -1799,7 +1802,7 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
 
   cs::DataStream stream(bytes);
   stream << stageThreeInfo.sender;
-  stream << stageThreeInfo.smartAddress;
+  stream << stageThreeInfo.startTransaction;
   stream << stageThreeInfo.writer;
   stream << stageThreeInfo.realTrustedMask;
   stream << stageThreeInfo.packageSignature;
@@ -1807,7 +1810,7 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
   stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(smartConfidants, stageThreeInfo.sender, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload:
-             stageThreeInfo.sRoundNum, stageThreeInfo.signature, bytes);
+             stageThreeInfo.sBlockNum, stageThreeInfo.signature, bytes);
   
   // cach stage three
   stageThreeInfo.message = std::move(bytes);
@@ -1821,7 +1824,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   istream_.init(data, size);
 
   cs::StageThreeSmarts stage;
-  istream_ >> stage.sRoundNum >> stage.signature;
+  istream_ >> stage.sBlockNum >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
@@ -1833,7 +1836,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.smartAddress;
+  stream >> stage.startTransaction;
   stream >> stage.writer;
   stream >> stage.realTrustedMask;
   stream >> stage.packageSignature;
@@ -1850,9 +1853,9 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
+void Node::smartStageRequest(MsgTypes msgType, cs::Sequence smartRound, uint32_t startTransaction, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
 
-  sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartAddress ,respondent, required);
+  sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartRound, startTransaction, respondent, required);
   csmeta(csdetails) << "done";
 }
 
@@ -1862,8 +1865,9 @@ csmeta(csdetails) << "started";
   istream_.init(data, size);
 
   uint8_t requesterNumber = 0;
-  cs::PublicKey smartAddress;
-  istream_ >> smartAddress >> requesterNumber;
+  cs::Sequence smartRound;
+  uint32_t startTransaction;
+  istream_ >> smartRound >> startTransaction >> requesterNumber;
 
   uint8_t requiredNumber = 0;
   istream_ >> requiredNumber;
@@ -1875,7 +1879,7 @@ csmeta(csdetails) << "started";
 
   cs::PublicKey req = requester;
 
-  emit receivedSmartStageRequest(msgType, smartAddress, requesterNumber, requiredNumber, req);
+  emit receivedSmartStageRequest(msgType, smartRound, startTransaction, requesterNumber, requiredNumber, req);
   //solver_->gotSmartStageRequest(msgType, requesterNumber, requiredNumber);
 }
 
@@ -1886,26 +1890,29 @@ void Node::sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber s
   csmeta(csdetails) << "done";
 }
 
-void Node::addSmartConsensus(const cs::PublicKey& smartAddress) {
-  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress) != activeSmartConsensuses_.cend()) {
-    csdebug() << "The smartConsensus for smartContract #" << cs::Utils::byteStreamToHex(smartAddress.data(), smartAddress.size()) << " is already active";
+void Node::addSmartConsensus(cs::Sequence block, uint32_t transaction) {
+  const auto val = std::make_pair(block, transaction);
+  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val) != activeSmartConsensuses_.cend()) {
+    csdebug() << "The smartConsensus for {" << block << '.' << transaction << "} is already active";
     return;
   }
-  activeSmartConsensuses_.push_back(smartAddress);
-  checkForSavedSmartStages(smartAddress);
+  activeSmartConsensuses_.push_back(val);
+  checkForSavedSmartStages(block, transaction);
 }
 
-void Node::removeSmartConsensus(const cs::PublicKey& smartAddress) {
-  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress) == activeSmartConsensuses_.cend()) {
-    csdebug() << "The smartConsensus for smartContract #" << cs::Utils::byteStreamToHex(smartAddress.data(), smartAddress.size()) << " is not active";
+void Node::removeSmartConsensus(cs::Sequence block, uint32_t transaction) {
+  const auto val = std::make_pair(block, transaction);
+  const auto it = std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val);
+  if (it == activeSmartConsensuses_.cend()) {
+    csdebug() << "The smartConsensus for {" << block << '.' << transaction << "} is not active";
     return;
   }
-  activeSmartConsensuses_.erase(std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), smartAddress));
+  activeSmartConsensuses_.erase(it);
 }
 
-void Node::checkForSavedSmartStages(const cs::PublicKey& smartAddress) {
+void Node::checkForSavedSmartStages(cs::Sequence block, uint32_t transaction) {
   for (auto& it : smartStageOneStorage_) {
-    if (it.smartAddress == smartAddress) {
+    if (it.sBlockNum == block && it.startTransaction == transaction) {
       emit gotSmartStageOne(it, false);
     }
   }
