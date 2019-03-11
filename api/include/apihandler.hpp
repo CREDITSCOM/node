@@ -397,9 +397,9 @@ namespace executor {
       if (!connect()) return std::nullopt;
       const auto acceess_id = generateAccessId();
       ++execCount_;
-      const auto timeBeg = std::chrono::system_clock::now();
+      const auto timeBeg = std::chrono::steady_clock::now();
       origExecutor_->executeByteCode(originExecuteRes.resp, acceess_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
-      originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - timeBeg).count();
+      originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeBeg).count();
       --execCount_;
       deleteAccessId(acceess_id);
       disconnect();
