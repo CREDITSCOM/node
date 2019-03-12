@@ -436,8 +436,17 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
   // in addition to contract "subcalls" set by transaction take more from contract metadata:
   const std::string method = get_executed_method_name(new_item);
   const size_t cnt_0 = queue_item.uses.size();
-  add_uses_from(abs_addr, method, queue_item.uses);
+  add_uses_from(abs_addr, method, queue_item.uses); // if failed, execution_allowed wil be set to false
   const size_t cnt = queue_item.uses.size();
+  if (cnt > 0) {
+    for (const auto& u : queue_item.uses) {
+      if (!in_known_contracts(u)) {
+        cslog() << log_prefix << "call to unknown contract declared in executing item, stop execution";
+        exe_queue.erase(exe_queue.cend() - 1);
+        return;
+      }
+    }
+  }
   if (cnt > cnt_0) {
     for (size_t i = cnt_0; i < cnt; ++i) {
       queue_item.avail_fee -= queue_item.new_state_fee; // reserve more fee for future new_state
@@ -446,7 +455,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
 
   update_status(queue_item, new_item.sequence, SmartContractStatus::Waiting);
   queue_item.consumed_fee += smart_round_fee(block); // setup costs of initial round
-  queue_item.is_executor = (execution_allowed && contains_me(block.confidants()));
+  queue_item.is_executor = contains_me(block.confidants());
   test_exe_queue();
 }
 
@@ -535,9 +544,17 @@ void SmartContracts::test_exe_queue() {
     update_status(*it, bc.getLastSequence(), SmartContractStatus::Running);
     // call to executor only if is trusted relatively to this contract
     if (it->is_executor) {
-      csdebug() << log_prefix << "execute {"
-        << it->ref_start.sequence << '.' << it->ref_start.transaction << "} now";
-      execute_async(it->ref_start, it->avail_fee);
+      // final decision to execute contract is here, based on executor availability
+      if (!execution_allowed && !test_executor_availability()) {
+        cslog() << log_prefix << "skip {" << it->ref_start.sequence << '.' << it->ref_start.transaction
+          << "}, execution is not allowed (executor is not connected)";
+        it->is_executor = false;
+      }
+      else {
+        csdebug() << log_prefix << "execute {"
+          << it->ref_start.sequence << '.' << it->ref_start.transaction << "} now";
+        execute_async(it->ref_start, it->avail_fee);
+      }
     }
     else {
       csdebug() << log_prefix << "skip {"
@@ -636,23 +653,47 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr)
   return false; // allow pass to conveyer sync
 }
 
-void SmartContracts::on_store_block(const csdb::Pool& block) {
-
-  cs::Lock lock(public_access_lock);
-
+bool SmartContracts::test_executor_availability()
+{
   if (!execution_allowed) {
     try {
       execution_allowed = exec_handler_ptr->getExecutor().isConnect();
       if (execution_allowed) {
         cslog() << std::endl << log_prefix << "connection to executor is restored" << std::endl;
+        // update all currently running contracts locks, missed while executor was unavailable
+        for (const auto& exe_item : exe_queue) {
+          if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
+            if (!is_metadata_actual(exe_item.abs_addr)) {
+              auto maybe_deploy = find_deploy_info(exe_item.abs_addr);
+              if (maybe_deploy.has_value()) {
+                auto it_state = known_contracts.find(exe_item.abs_addr);
+                if (it_state != known_contracts.end()) {
+                  if (!update_metadata(maybe_deploy.value(), it_state->second)) {
+                    if (!execution_allowed) {
+                      // the problem has got back
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
-    catch (std::exception& ) {
+    catch (std::exception&) {
     }
     catch (...) {
     }
   }
+  return execution_allowed;
+}
 
+void SmartContracts::on_store_block(const csdb::Pool& block) {
+
+  cs::Lock lock(public_access_lock);
+
+  test_executor_availability();
   test_exe_conditions(block);
   test_exe_queue();
   test_contracts_locks();
@@ -1326,7 +1367,11 @@ void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::str
       if (t.is_valid()) {
         auto maybe_invoke_info = get_smart_contract_impl(t);
         if (maybe_invoke_info.has_value()) {
-          update_metadata(maybe_invoke_info.value(), it->second);
+          // try update it->second.uses, make a call to ApiExec
+          if (!update_metadata(maybe_invoke_info.value(), it->second)) {
+            // disable execution until metadata can be updated
+            execution_allowed = false;
+          }
         }
       }
     }
@@ -1447,13 +1492,20 @@ void SmartContracts::update_status(QueueItem & item, cs::RoundNumber r, SmartCon
 
 void SmartContracts::test_contracts_locks()
 {
-  if (exe_queue.empty()) {
-    for (auto& item : known_contracts) {
-      if (item.second.is_locked) {
-        item.second.is_locked = false;
-        const cs::PublicKey& key = item.first.public_key();
-        csdebug() << log_prefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
+  // lookup running items
+  if (!exe_queue.empty()) {
+    for (const auto& exe_item : exe_queue) {
+      if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
+        return;
       }
+    }
+  }
+  // no running items, ensure no locked contracts
+  for (auto& item : known_contracts) {
+    if (item.second.is_locked) {
+      item.second.is_locked = false;
+      const cs::PublicKey& key = item.first.public_key();
+      csdebug() << log_prefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
     }
   }
 }

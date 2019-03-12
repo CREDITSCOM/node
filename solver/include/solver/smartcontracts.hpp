@@ -259,9 +259,6 @@ public:
   // method is thread-safe to be called from API thread
   bool capture_transaction(const csdb::Transaction& t);
 
-  // flag to allow execution, also depends on executor presence
-  bool execution_allowed;
-
 public signals:
   SmartContractExecutedSignal signal_smart_executed;
   SmartContractSignal signal_payable_invoke;
@@ -300,6 +297,9 @@ private:
   // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
   csconnector::connector::ApiExecHandlerPtr exec_handler_ptr;
  
+  // flag to allow execution, currently depends on executor presence
+  bool execution_allowed;
+
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
   enum class PayableStatus : int {
@@ -574,6 +574,9 @@ private:
 
   // returns 0 if any error
   uint64_t next_inner_id(const csdb::Address& addr) const;
+
+  // tests conditions to allow contract execution if disabled
+  bool test_executor_availability();
 
 };
 
