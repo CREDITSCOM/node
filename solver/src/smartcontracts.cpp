@@ -708,21 +708,21 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
         bool is_start = is_deploy ? false : this->is_start(tr);
         if (is_deploy || is_start) {
           if (is_deploy) {
-            csdebug() << log_prefix << "smart contract is deployed by #" << block.sequence() << "." << tr_idx;
+            csdebug() << log_prefix << "contract is deployed by #" << block.sequence() << "." << tr_idx;
           }
           else {
-            csdebug() << log_prefix << "smart contract is called by #" << block.sequence() << "." << tr_idx;
+            csdebug() << log_prefix << "contract is called by #" << block.sequence() << "." << tr_idx;
           }
           enqueue(block, tr_idx);
         }
         else if (is_new_state(tr)) {
-          csdebug() << log_prefix << "smart contract state is updated by #" << block.sequence() << "." << tr_idx;
+          csdebug() << log_prefix << "contract state is updated by #" << block.sequence() << "." << tr_idx;
           on_new_state(block, tr_idx);
         }
       }
       else if( is_payable_target( tr ) ) {
         // execute payable method
-        csdebug() << log_prefix << "smart contract balance is replenished by #" << block.sequence() << "." << tr_idx;
+        csdebug() << log_prefix << "contract balance is replenished by #" << block.sequence() << "." << tr_idx;
         emit signal_payable_invoke(tr);
         enqueue( block, tr_idx );
       }
@@ -1370,6 +1370,7 @@ void SmartContracts::add_uses_from(const csdb::Address& abs_addr, const std::str
           // try update it->second.uses, make a call to ApiExec
           if (!update_metadata(maybe_invoke_info.value(), it->second)) {
             // disable execution until metadata can be updated
+            cslog() << log_prefix << "disable contract execution until connection to executor restored";
             execution_allowed = false;
           }
         }
@@ -1515,7 +1516,7 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
   if (it != known_contracts.end()) {
     if (it->second.is_locked != value) {
       const cs::PublicKey& key = abs_addr.public_key();
-      csdebug() << log_prefix << "contract " << EncodeBase58(key.data(), key.data() + key.size()) << " lock set to " << value;
+      csdebug() << log_prefix << "contract " << EncodeBase58(key.data(), key.data() + key.size()) << " has " << (value ? "locked" : "unlocked");
       it->second.is_locked = value;
     }
   }

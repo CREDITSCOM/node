@@ -139,7 +139,8 @@ namespace cs{
       if (e == pnode_->getNodeIdKey()) {
         ownSmartConfNumber = i;
       }
-      csdebug() << log_prefix << "{" << smartRoundNumber_ << "} [" << static_cast<int>(i) << "] "
+      csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_
+        << "} [" << static_cast<int>(i) << "] "
         << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber
           ? "me"
           : cs::Utils::byteStreamToHex(e.data(), e.size()));
@@ -147,7 +148,8 @@ namespace cs{
     }
 
     if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
-      csdebug() << log_prefix << "{" << smartRoundNumber_ << "} This NODE is not a confidant one for this smart-contract consensus round";
+      csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_
+        << "} This NODE is not a confidant one for this smart-contract consensus round";
     }
 
     return ownSmartConfNumber;
