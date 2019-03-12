@@ -1616,7 +1616,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
                     << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                     << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
-  size_t expectedMessageSize = sizeof(stageOneInfo.sender) + stageOneInfo.hash.size();
+  size_t expectedMessageSize = sizeof(stageOneInfo.sender) + sizeof(stageOneInfo.startTransaction) + stageOneInfo.hash.size();
 
   cs::Bytes message;
   message.reserve(expectedMessageSize);
