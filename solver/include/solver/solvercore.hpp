@@ -119,6 +119,7 @@ public:
     return *psmarts;
   }
 
+  bool isContractLocked(const csdb::Address&) const;
 
 private:
   // to use private data while serve for states as SolverCore context:

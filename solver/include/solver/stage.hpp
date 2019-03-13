@@ -68,8 +68,8 @@ struct StageThree {
 //smart-contracts stages
 struct StageOneSmarts {
   uint8_t sender;
-  cs::Sequence sRoundNum;
-  cs::PublicKey smartAddress;
+  cs::Sequence sBlockNum;
+  uint32_t startTransaction;
   csdb::Amount fee;
   Hash hash;
   Hash messageHash;
@@ -79,8 +79,8 @@ struct StageOneSmarts {
 
 struct StageTwoSmarts {
   uint8_t sender;
-  cs::Sequence sRoundNum;
-  cs::PublicKey smartAddress;
+  cs::Sequence sBlockNum;
+  uint32_t startTransaction;
   std::vector<Hash> hashes;  // hashes of stage one
   std::vector<Signature> signatures;
   Signature signature;
@@ -89,8 +89,8 @@ struct StageTwoSmarts {
 
 struct StageThreeSmarts {
   uint8_t sender;
-  cs::Sequence sRoundNum;
-  cs::PublicKey smartAddress;
+  cs::Sequence sBlockNum;
+  uint32_t startTransaction;
   uint8_t writer;
   std::vector<uint8_t> realTrustedMask;
   Signature packageSignature;

@@ -99,7 +99,7 @@ private:
   // adds slot to signal
   template <typename T>
   auto& add(T&& s, ObjectPointer obj = nullptr) {
-    Argument arg = std::forward<T>(s);
+    Argument arg = std::move(s);
 
     if (!arg) {
       return *this;

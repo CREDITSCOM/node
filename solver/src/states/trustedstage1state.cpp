@@ -237,10 +237,10 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
         byte = false;
       }
     } else {
-      csdebug() << name() << ": smart new_state trx[" << i << "] included in consensus";
+      csdebug() << name() << ": smart new_state transaction[" << i << "] included in consensus";
       if(context.smart_contracts().is_closed_smart_contract(transaction.target())) {
         byte = false;
-        cslog() << name() << ": reject smart new_state trx because related contract is closed";
+        cslog() << name() << ": reject smart new_state transaction because related contract is closed";
       } else {
         // set to false, then test by validator:
         byte = false;
@@ -254,8 +254,20 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
               csdb::Transaction new_state_tr(transaction);
               new_state_tr.set_source(initTransaction.source());
               byte = ptransval->validateTransaction(new_state_tr, i, del1, true);
+              if(!byte) {
+                cslog() << name() << ": transaction[" << i << "] rejected by validateTransaction()";
+              }
+            }
+            else {
+              cslog() << name() << ": reject new_state transaction because execution fee is not enough";
             }
           }
+          else {
+            cslog() << name() << ": reject new_state transaction because execution fee is not set properly";
+          }
+        }
+        else {
+          cslog() << name() << ": reject new_state transaction because related start transaction is not found";
         }
       }
     }
@@ -267,18 +279,16 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
           csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
           byte = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
           if (!byte) {
-            cslog() << name() << ": trx[" << i << "] rejected due to incorrect smart address";
+            cslog() << name() << ": transaction[" << i << "] rejected due to incorrect smart address";
           }
         }
       }
       if (byte) {
         byte = check_transaction_signature(context, transaction);
         if(!byte) {
-          cslog() << name() << ": trx[" << i << "] rejected by check_transaction_signature()";
+          cslog() << name() << ": transaction[" << i << "] rejected by check_transaction_signature()";
         }
       }
-    } else {
-      cslog() << name() << ": trx[" << i << "] rejected by validateTransaction()";
     }
     characteristicMask.push_back(byte ? (cs::Byte)1 : (cs::Byte)0);
   }
@@ -351,14 +361,14 @@ void TrustedStage1State::checkSignaturesSmartSource(SolverContext& context, cs::
         smartRef.from_user_field(transaction.user_field(trx_uf::smart_gen::RefStart));
       }
       if (!smartRef.is_valid()) {
-        cslog() << __func__ << ": SmartContractRef is not valid";
+        cslog() << name() << ": SmartContractRef is not properly set in transaction";
         smartSourceInvalidSignatures_.insert(transaction.source());
         continue;
       }
 
       csdb::Pool poolWithInitTr = context.blockchain().loadBlock(smartRef.sequence);
       if (!poolWithInitTr.is_valid()) {
-        cslog() << __func__ << ": poolWithInitTr is not valid";
+        cslog() << name() << ": failed to load block with init transaction";
         smartSourceInvalidSignatures_.insert(transaction.source());
         continue;
       }
@@ -377,7 +387,7 @@ void TrustedStage1State::checkSignaturesSmartSource(SolverContext& context, cs::
         }
       }
       if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-        cslog() << __func__ << ": not enough correct signatures";
+        cslog() << name() << ": is not enough valid signatures";
         smartSourceInvalidSignatures_.insert(transaction.source());
       }
     }

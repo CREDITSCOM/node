@@ -33,12 +33,12 @@ void TrustedPostStageState::on(SolverContext& context) {
   }
 
   SolverContext* pctx = &context;
-  csdebug() << name() << ": start track timeout " << Consensus::T_stage_request << " ms of stages-3 received";
+  csdebug() << name() << ": start track timeout " << 0 << " ms of stages-3 received";
   timeout_request_stage.start(
-      context.scheduler(), Consensus::T_stage_request,
+      context.scheduler(), 0,
       // timeout #1 handler:
       [pctx, this]() {
-        csdebug() << name() << ": timeout for stages-3 is expired, make requests";
+        csdebug() << name() << ": (now) skip direct requests for absent stages-3";
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
         csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
@@ -50,6 +50,8 @@ void TrustedPostStageState::on(SolverContext& context) {
               csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
               // timeout #3 handler
+              csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
+                << " ms to give up in receiving stages-3";
               timeout_force_transition.start(
                 pctx->scheduler(), Consensus::T_stage_request,
                 [pctx, this]() {

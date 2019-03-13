@@ -1,6 +1,5 @@
 #pragma once
 
-#include <apihandler.hpp>
 #include <csdb/address.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
@@ -10,7 +9,7 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/logger.hpp>
 
-#include <csnode/node.hpp>  // introduce Node::api_handler_ptr_t
+#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr as well
 
 #include <list>
 #include <mutex>
@@ -43,6 +42,12 @@ namespace cs {
     constexpr uint8_t UnpayableReplenish = 250;
     // the trusted consensus have rejected new_state (and emitted transactions)
     constexpr uint8_t ConsensusRejected = 249;
+    // error in Executor::ExecuteTransaction()
+    constexpr uint8_t ExecuteTransaction = 248;
+    // bug in SmartContracts
+    constexpr uint8_t InternalBug = 247;
+    // executor is disconnected or unavailable, value is hard-coded in ApiExec module
+    constexpr uint8_t NoExecutor = 1;
   }
 
   // transactions user fields
@@ -53,8 +58,11 @@ namespace cs {
     {
       // byte-code (string)
       constexpr csdb::user_field_id_t Code = 0;
+      // executed contract may perform subsequent contracts call,
+      // serialized into string: count (byte) + count * contract absolute address
+      constexpr csdb::user_field_id_t Using = 1;
       // count of user fields
-      constexpr size_t Count = 1;
+      constexpr size_t Count = 2;
     }  // namespace deploy
     // start transaction fields
     namespace start
@@ -63,6 +71,9 @@ namespace cs {
       constexpr csdb::user_field_id_t Methods = 0;
       // reference to last state transaction
       constexpr csdb::user_field_id_t RefState = 1;
+      // executed contract may perform subsequent contracts call,
+      // serialized into string: count (byte) + count * contract absolute address
+      constexpr csdb::user_field_id_t Using = 2;
       // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
       // constexpr size_t Count = {1,2};
     }  // namespace start
@@ -139,8 +150,8 @@ struct SmartContractRef {
 
 struct SmartExecutionData {
   SmartContractRef contract_ref;
-  std::string state;
-  ::general::Variant ret_val;
+  csdb::Amount executor_fee;
+  executor::Executor::ExecuteResult result;
   std::string error;
 };
 
@@ -207,6 +218,12 @@ public:
   static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId,
                                                const api::SmartContractDeploy&);
 
+  // to/from user filed serializations
+  
+  static bool uses_contracts(const csdb::Transaction& tr);
+  static std::vector<csdb::Address> get_using_contracts(const csdb::UserField& fld);
+  static csdb::UserField set_using_contracts(const std::vector<csdb::Address>& using_list);
+
   std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr)
   {
     cs::Lock lock(public_access_lock);
@@ -232,6 +249,11 @@ public:
     return in_known_contracts(addr);
   }
 
+  bool is_contract_locked(const csdb::Address& addr) const {
+    cs::Lock lock(public_access_lock);
+    return is_locked(absolute_address(addr));
+  }
+
   // return true if SmartContracts provide special handling for transaction, so
   // the transaction is not pass through conveyer
   // method is thread-safe to be called from API thread
@@ -240,7 +262,6 @@ public:
   CallsQueueScheduler& getScheduler();
 
   // flag to allow execution, also depends on executor presence
-  bool execution_allowed;
   CallsQueueScheduler& scheduler;
 
 public signals:
@@ -271,11 +292,18 @@ private:
   const char *PayableNameArg0 = "amount";
   const char *PayableNameArg1 = "currency";
 
+  const char *UsesContract = "Contract";
+  const char *UsesContractAddr = "address";
+  const char *UsesContractMethod = "method";
+
   BlockChain& bc;
 
   cs::PublicKey node_id;
   // be careful, may be equal to nullptr if api is not initialized (for instance, blockchain failed to load)
-  csconnector::connector::ApiHandlerPtr papi;
+  csconnector::connector::ApiExecHandlerPtr exec_handler_ptr;
+ 
+  // flag to allow execution, currently depends on executor presence
+  bool execution_allowed;
 
   CallsQueueScheduler::CallTag tag_cancel_running_contract;
 
@@ -286,6 +314,8 @@ private:
   };
 
   struct StateItem {
+    // is temporary locked from execution until current execution completed
+    bool is_locked{ false };
     // payable() method is implemented
     PayableStatus payable{ PayableStatus::Unknown };
     // reference to deploy transaction
@@ -294,6 +324,8 @@ private:
     SmartContractRef ref_execute;
     // current state which is result of last successful execution / deploy
     std::string state;
+    // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
+    std::map<std::string, std::map<csdb::Address, std::string>> uses;
   };
 
   // last contract's state storage
@@ -328,6 +360,8 @@ private:
     bool is_executor;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
+    // using contracts, must store absolute addresses (public keys)
+    std::vector<csdb::Address> uses;
 
     QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
       : ref_start(ref_contract)
@@ -341,45 +375,34 @@ private:
     {
       avail_fee = csdb::Amount(tr_start.max_fee().to_double());
       csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
+
+      // apply starter fee consumed
       avail_fee -= tr_start_fee;
-      // here new_state_fee prediction may be implemented, currently it is equal to starter fee
+
+      //TODO: here new_state_fee prediction may be calculated, currently it is equal to starter fee
       new_state_fee = tr_start_fee;
+
+      csdb::UserField fld_using{};
+      if (SmartContracts::is_start(tr_start)) {
+        fld_using = tr_start.user_field(trx_uf::start::Using);
+      }
+      else if (SmartContracts::is_deploy(tr_start)) {
+        fld_using = tr_start.user_field(trx_uf::deploy::Using);
+      }
+
+      // apply reserved new_state fee
       avail_fee -= new_state_fee;
+
+      // get using contracts and reserve more fee for new_states
+      if (fld_using.is_valid()) {
+        uses = std::move(SmartContracts::get_using_contracts(fld_using));
+        // reserve new_state fee for every using contract also
+        for (const auto& it : uses) {
+          csunused(it);
+          avail_fee -= new_state_fee;
+        }
+      }
     }
-
-    void wait(cs::RoundNumber r)
-    {
-      seq_enqueue = r;
-      status = SmartContractStatus::Waiting;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is waiting from #" << r;
-    }
-
-    void start(cs::RoundNumber r)
-    {
-      seq_start = r;
-      status = SmartContractStatus::Running;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is running from #" << r;
-    }
-
-    void finish(cs::RoundNumber r)
-    {
-      seq_finish = r;
-      status = SmartContractStatus::Finished;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is finished on #" << r;
-    }
-
-    void close()
-    {
-      status = SmartContractStatus::Closed;
-      csdebug() << "Smart: contract {" << seq_enqueue << "} is closed";
-    }
-
-	  bool start_consensus(const cs::TransactionsPacket& pack, Node* pNode, SmartContracts* pSmarts)
-	  {
-		  pconsensus = std::make_unique<SmartConsensus>();
-		  return pconsensus->initSmartRound(pack, pNode, pSmarts);
-	  }
-
   };
 
   // executiom queue
@@ -393,11 +416,6 @@ private:
   using queue_const_iterator = std::vector<QueueItem>::const_iterator;
 
   Node* pnode;
-
-  // emitted transactions if any while execution running
-  std::map<csdb::Address, std::vector<csdb::Transaction>> emitted_transactions;
-
-  void clear_emitted_transactions(const csdb::Address& abs_addr);
 
   queue_iterator find_in_queue(const SmartContractRef& item)
   {
@@ -456,10 +474,6 @@ private:
     return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
   }
 
-  csconnector::connector::ApiHandlerPtr get_api() const {
-    return papi;
-  }
-
   static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
 
   // non-static variant
@@ -473,7 +487,7 @@ private:
 
   // perform async execution via API to remote executor
   // returns false if execution is canceled
-  bool execute_async(const cs::SmartContractRef& item);
+  bool execute_async(const cs::SmartContractRef& item, csdb::Amount avail_fee);
 
   // makes a transaction to store new_state of smart contract invoked by src
   // caller is responsible to test src is a smart-contract-invoke transaction
@@ -489,24 +503,36 @@ private:
   // may make a BLOCKING call to java executor
   bool is_payable(const csdb::Address& abs_addr);
 
-  // blocking call
-  bool execute(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms);
+  // test if metadata is actualized for given contract
+  // may make a BLOCKING call to java executor
+  bool is_metadata_actual(const csdb::Address& abs_addr)
+  {
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+      // both uses list and defined payable means metadata is actual:
+      return (!it->second.uses.empty() || it->second.payable != PayableStatus::Unknown);
+    }
+    return false;
+  }
 
   // blocking call
-  bool execute_payable(const std::string& invoker, const std::string& smart_address, const api::SmartContractInvocation& contract, /*[in,out]*/ SmartExecutionData& data, uint32_t timeout_ms,
-    double amount);
+  bool execute(/*[in,out]*/ SmartExecutionData& data);
 
   // blocking call
-  bool implements_payable(const api::SmartContractInvocation& contract);
+  bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
+
+  void add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses);
 
   // extracts and returns name of method executed by referenced transaction
-  std::string get_executed_method(const SmartContractRef& ref);
+  std::string print_executed_method(const SmartContractRef& ref);
+
+  std::string get_executed_method_name(const SmartContractRef& ref);
 
   // calculates from block a one smart round costs
   csdb::Amount smart_round_fee(const csdb::Pool& block);
 
   // tests max fee amount and round-based timeout on executed smart contracts;
-  // invoked on every new block ready
+  // invoked after every new block appears in blockchain
   void test_exe_conditions(const csdb::Pool& block);
 
   bool in_known_contracts(const csdb::Address& addr) const
@@ -514,9 +540,49 @@ private:
     return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
   }
 
+  bool is_locked(const csdb::Address& abs_addr) const {
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+      return it->second.is_locked;
+    }
+    // only known contracts are allowed to execute!
+    return true;
+  }
+
+  void update_lock_status(const csdb::Address& abs_addr, bool value);
+
+  void update_lock_status(const QueueItem& item, bool value)
+  {
+    update_lock_status(item.abs_addr, value);
+    if (!item.uses.empty()) {
+      for (const auto& u : item.uses) {
+        update_lock_status(absolute_address(u), value);
+      }
+    }
+  }
+
   std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 
   void on_execution_completed_impl(const SmartExecutionData& data);
+
+  // exe_queue item modifiers
+  
+  void update_status(QueueItem & item, cs::RoundNumber r, SmartContractStatus status);
+
+  bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack)
+  {
+    item.pconsensus = std::make_unique<SmartConsensus>();
+    return item.pconsensus->initSmartRound(pack, this->pnode, this);
+  }
+
+  void test_contracts_locks();
+
+  // returns 0 if any error
+  uint64_t next_inner_id(const csdb::Address& addr) const;
+
+  // tests conditions to allow contract execution if disabled
+  bool test_executor_availability();
+
 };
 
 }  // namespace cs

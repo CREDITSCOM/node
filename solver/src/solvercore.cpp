@@ -346,4 +346,8 @@ void SolverCore::removeDeferredBlock(cs::Sequence seq)  {
 uint8_t SolverCore::subRound() {
   return (pnode->subRound());
 }
+
+bool SolverCore::isContractLocked(const csdb::Address& address) const {
+  return psmarts->is_contract_locked(address);
+}
 }  // namespace cs
