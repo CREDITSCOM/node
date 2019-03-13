@@ -76,14 +76,14 @@ public:
   void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
   void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
   void smartStageEmptyReply(uint8_t requesterNumber);
-  void smartStageRequest(MsgTypes msgType, cs::PublicKey smartAddress, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
+  void smartStageRequest(MsgTypes msgType, cs::Sequence smartRound, uint32_t startTransaction, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
   void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
   void sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature
       , const MsgTypes msgType, const cs::PublicKey& requester);
 
-  void addSmartConsensus(const cs::PublicKey& smartAddress);
-  void removeSmartConsensus(const cs::PublicKey& smartAddress);
-  void checkForSavedSmartStages(const cs::PublicKey& smartAddress);
+  void addSmartConsensus(cs::Sequence block, uint32_t transaction);
+  void removeSmartConsensus(cs::Sequence block, uint32_t transaction);
+  void checkForSavedSmartStages(cs::Sequence block, uint32_t transaction);
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
@@ -196,7 +196,7 @@ public:
 
   template <typename T>
   using SmartsSignal = cs::Signal<void(T&, bool)>;
-  using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::PublicKey, uint8_t, uint8_t, cs::PublicKey&)>;
+  using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
 
 public signals:
   SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
@@ -348,7 +348,7 @@ private:
   int corruptionLevel_ = 0;
 
   std::vector<cs::Stage> smartStageTemporary_;
-  std::vector< cs::PublicKey> activeSmartConsensuses_;
+  std::vector<std::pair<cs::Sequence, uint32_t>> activeSmartConsensuses_;
 
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;

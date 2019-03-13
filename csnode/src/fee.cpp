@@ -25,7 +25,6 @@ constexpr double kMarketRateCS = 0.06;
 constexpr double kFixedOneByteFee = 0.001 / kMarketRateCS / kLengthOfCommonTransaction;
 constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
-constexpr double kMinFee = 0.0001428 * 3.0;
 constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
 constexpr size_t kDefaultRoundFrequency = 5;
 }  // namespace

@@ -22,7 +22,7 @@ void TrustedStage2State::on(SolverContext& context) {
     csdebug() << name() << ": handle early received stages-1";
     bool finish = false;
     for (const auto& st : context.stage1_data()) {
-      csdebug() << name() << ": stage-1 [" << static_cast<int>(st.sender) << "]";
+      csdebug() << name() << ": stage-1 [" << static_cast<int>(st.sender) << "] has already received";
       if (Result::Finish == onStage1(context, st)) {
         finish = true;
       }
@@ -39,17 +39,16 @@ void TrustedStage2State::on(SolverContext& context) {
   //  - create fake stages-1 from outbound nodes and force to next state
 
   SolverContext* pctx = &context;
-  auto dt = 2 * Consensus::T_stage_request;
-  csdebug() << name() << ": start track timeout " << dt << " ms of stages-1 received";
+  auto dt = Consensus::T_stage_request;
+  csdebug() << name() << ": start track timeout " << 0 << " ms of stages-1 received";
   timeout_request_stage.start(
-      context.scheduler(), dt,
+      context.scheduler(), 0,
       // timeout #1 handler:
       [pctx, this, dt]() {
-        csdebug() << name() << ": timeout for stages-1 is expired, (now) skip make requests";
+        csdebug() << name() << ": (now) skip direct requests for absent stages-1";
         //request_stages(*pctx);
         // start subsequent track timeout for "wide" request
-        csdebug() << name() << ": start subsequent track timeout " << dt
-                          << " ms to request neighbors about stages-1";
+        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-1";
         timeout_request_neighbors.start(
             pctx->scheduler(), dt,
             // timeout #2 handler:
@@ -57,6 +56,7 @@ void TrustedStage2State::on(SolverContext& context) {
               csdebug() << name() << ": timeout for requested stages is expired, make requests to neighbors";
               request_stages_neighbors(*pctx);
               // timeout #3 handler
+              csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
               timeout_force_transition.start(
                 pctx->scheduler(), dt,
                 [pctx, this ,dt]() {
