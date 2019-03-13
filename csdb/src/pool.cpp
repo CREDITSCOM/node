@@ -100,6 +100,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   void put(::csdb::priv::obstream& os, bool doHash) const {
+    os.put(static_cast<uint8_t>(0)); // version
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -155,6 +156,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   void put_for_sig(::csdb::priv::obstream& os) const {
   //not used now
+    os.put(static_cast<uint8_t>(0)); // version
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -180,6 +182,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
+    uint8_t version;
+    if (!is.get(version)) {
+      csmeta(cswarning) << "get version is failed";
+      return false;
+    }
+
     if (!is.get(previous_hash_)) {
       csmeta(cswarning) << "get previous hash is failed";
       return false;
