@@ -460,7 +460,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
     return;
   }
 
-  pool.value().set_signatures(std::move(poolSignatures));
+  pool.value().set_signatures(poolSignatures);
   pool.value().set_confidants(confidantsReference);
 
   if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {

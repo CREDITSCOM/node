@@ -551,19 +551,19 @@ Transaction Pool::transaction(size_t index) const {
   return (d->transactions_.size() > index) ? d->transactions_[index] : Transaction{};
 }
 
-const uint8_t Pool::numberTrusted() const noexcept {
+uint8_t Pool::numberTrusted() const noexcept {
   return d->numberTrusted_;
 }
 
-const uint64_t Pool::realTrusted() const noexcept {
+uint64_t Pool::realTrusted() const noexcept {
   return d->realTrusted_;
 }
 
-const uint64_t Pool::roundConfirmationMask() const noexcept {
+uint64_t Pool::roundConfirmationMask() const noexcept {
   return d->roundConfirmationMask_;
 }
 
-const uint8_t Pool::numberConfirmations() const noexcept {
+uint8_t Pool::numberConfirmations() const noexcept {
   return d->numberConfirmations_;
 }
 

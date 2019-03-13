@@ -317,7 +317,7 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
   for (auto& it : blockSignatures) {
     csdebug() << cs::Utils::byteStreamToHex(it.data(), it.size());
   }
-  deferredBlock_.set_signatures(std::move(blockSignatures));
+  deferredBlock_.set_signatures(blockSignatures);
 
   auto resPool = pnode->getBlockChain().createBlock(deferredBlock_);
 

@@ -154,7 +154,7 @@ public:
   const cs::PublicKey& writer_public_key() const noexcept;
   const std::vector<cs::PublicKey>& confidants() const noexcept;
   const std::vector<cs::Signature>& signatures() const noexcept;
-  const ::std::vector<csdb::Pool::SmartSignature>& smartSignatures() const noexcept;
+  const ::std::vector<SmartSignature>& smartSignatures() const noexcept;
   const csdb::Amount& roundCost() const noexcept;
   const std::vector<cs::Signature>& roundConfirmations() const noexcept;
 
@@ -163,7 +163,7 @@ public:
   void set_storage(const Storage& storage) noexcept;
   void set_confidants(const std::vector<cs::PublicKey>& confidants) noexcept;
   void set_signatures(std::vector<cs::Signature>& blockSignatures) noexcept;
-  void add_smart_signature(const csdb::Pool::SmartSignature& smartSignature) noexcept;
+  void add_smart_signature(const SmartSignature& smartSignature) noexcept;
   void add_real_trusted(const uint64_t trustedMask) noexcept;
   void add_confirmation_mask(const uint64_t confMask) noexcept;
   void add_number_trusted(const uint8_t trustedMask) noexcept;
@@ -177,10 +177,10 @@ public:
   NewWallets* newWallets() noexcept;
   const NewWallets& newWallets() const noexcept;
   bool getWalletAddress(const NewWalletInfo& info, csdb::Address& wallAddress) const;
-  const uint64_t realTrusted() const noexcept;
-  const uint64_t roundConfirmationMask() const noexcept;
-  const uint8_t Pool::numberConfirmations() const noexcept;
-  const uint8_t Pool::numberTrusted() const noexcept;
+  uint64_t realTrusted() const noexcept;
+  uint64_t roundConfirmationMask() const noexcept;
+  uint8_t numberConfirmations() const noexcept;
+  uint8_t numberTrusted() const noexcept;
   /**
    * @brief Добавляет транзакцию в пул.
    * @param[in] transaction Транзакция для добавления

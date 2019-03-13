@@ -438,7 +438,7 @@ public:
    *
    */
 
-  size_t SolverContext::cnt_real_trusted() const;
+  size_t cnt_real_trusted() const;
 
   const std::vector<cs::PublicKey>& trusted() const;
 
