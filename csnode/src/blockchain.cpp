@@ -13,6 +13,7 @@
 #include <solver/smartcontracts.hpp>
 
 #include <client/config.hpp>
+#include <apihandler.hpp>
 
 //#define RECREATE_INDEX
 
@@ -948,6 +949,8 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
   // notify block recording
   newBlockCv_.notify_all();
+
+ executor::Executor::getInstance().state_update(pool);
 
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";

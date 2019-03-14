@@ -697,9 +697,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       auto stateTrans = s_blockchain.loadTransaction(trId);
       if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
         auto var_state = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
-        _return.__isset.smart_contract_result = var_state.__isset.v_string;
-        if (_return.__isset.smart_contract_result)
-          _return.__set_smart_contract_result(var_state);
+        _return.__set_smart_contract_result(var_state);
       }
     }
   }
@@ -939,10 +937,6 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto newState = tr.user_field(smart_state_idx).value<std::string>();
         if (!newState.empty())
           tm.checkNewState(target_pk, caller_pk, smart, newState);
-
-        auto pool = s_blockchain.loadBlock(tr.id().pool_hash());
-        executor_.setLastState(address, newState);
-        executor_.updateCacheLastStates(address, pool.sequence(), newState);
       }
     }
     else {
@@ -1946,6 +1940,9 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult &_return, 
   }
   _return.contractState = opt_state.value();
   _return.stateCanModify = solver_.isContractLocked(addr) ? true : false;
+
+  if(executor_.isLockSmart(address, accessId))
+    _return.stateCanModify = false;
   
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

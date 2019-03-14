@@ -157,8 +157,8 @@ namespace executor {
     }
 
   public:
-    static Executor& getInstance(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) { // singlton
-      static Executor executor(p_blockchain, solver, p_exec_port);
+    static Executor& getInstance(const BlockChain *p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0) { // singlton
+      static Executor executor(*p_blockchain, *solver, p_exec_port);
       return  executor;
     }
 
@@ -179,18 +179,6 @@ namespace executor {
     void updateDeployTrxns(const csdb::Address& p_address, const csdb::TransactionID& p_trxnsId) {
       std::lock_guard lk(mtx_);
       deployTrxns_[p_address] = p_trxnsId;
-    }
-
-    uint64_t generateAccessId() {
-      std::lock_guard lk(mtx_);
-      ++lastAccessId_;
-      accessSequence_[lastAccessId_] = blockchain_.getLastSequence();
-      return lastAccessId_;
-    }
-
-    void deleteAccessId(const general::AccessID& p_access_id) {
-      std::lock_guard lk(mtx_);
-      accessSequence_.erase(p_access_id);
     }
 
     void setLastState(const csdb::Address& p_address, const std::string& p_state) {
@@ -294,6 +282,7 @@ namespace executor {
 
       std::string method;
       std::vector<general::Variant> params;
+      api::SmartContractInvocation sci;
       if (!smartTrxn.user_field(0).is_valid() && smartTrxn.amount().to_double()) { // payable
         method = "payable";
         general::Variant var;
@@ -303,12 +292,23 @@ namespace executor {
         params.emplace_back(var);
       }
       else if(!isdeploy) {
-        const auto sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
+        sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
         method = sci.method;
         params = sci.params;
+
+        for (const auto &addrLock : sci.usedContracts) {
+          addToLockSmart(addrLock, getFutureAccessId());
+        }
       }
 
       const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, method, params);
+
+      if (!isdeploy) {
+        for (const auto &addrLock : sci.usedContracts) {
+          deleteFromLockSmart(addrLock, getFutureAccessId());
+        }
+      }
+
       if (!optOriginRes.has_value())
         return std::nullopt;
 
@@ -359,7 +359,40 @@ namespace executor {
 
     bool isConnect() { return isConnect_; }
 
+    void state_update(const csdb::Pool& pool) {
+      if (!pool.transactions().size())
+        return;
+      for (const auto& trxn : pool.transactions()) {
+        if (trxn.is_valid() && (trxn.user_field(-2).type() == csdb::UserField::Type::String &&
+          trxn.user_field(1).type() == csdb::UserField::Type::String)) {
+
+          const auto address = blockchain_.get_addr_by_type(trxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+          const auto newstate = trxn.user_field(-2).value<std::string>();
+          setLastState(address, newstate);
+          updateCacheLastStates(address, pool.sequence(), newstate);
+        }
+      }
+    }
+    
+    void addToLockSmart(const general::Address &address, const general::AccessID &accessId) {
+      std::lock_guard lk(mtx_);
+      lockSmarts[address] = accessId;
+    }
+
+    void deleteFromLockSmart(const general::Address &address, const general::AccessID &accessId) {
+      std::lock_guard lk(mtx_);
+      lockSmarts.erase(address);
+    }
+
+    bool isLockSmart(const general::Address &address, const general::AccessID &accessId) {
+      std::lock_guard lk(mtx_);
+      if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
+        return false;
+      return true;
+    }
+
   private:
+    std::map<general::Address, general::AccessID> lockSmarts;
     explicit Executor(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) :
       executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
         ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
@@ -390,6 +423,23 @@ namespace executor {
       general::AccessID acceessId;
       long long timeExecute;
     };
+
+    uint64_t generateAccessId() {
+      std::lock_guard lk(mtx_);
+      ++lastAccessId_;
+      accessSequence_[lastAccessId_] = blockchain_.getLastSequence();
+      return lastAccessId_;
+    }
+
+    uint64_t getFutureAccessId(){
+      return lastAccessId_ + 1;
+    }
+
+    void deleteAccessId(const general::AccessID& p_access_id) {
+      std::lock_guard lk(mtx_);
+      accessSequence_.erase(p_access_id);
+    }
+
 
     std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method, const std::vector<general::Variant>& params) {
       constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
