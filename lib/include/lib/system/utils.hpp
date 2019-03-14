@@ -346,7 +346,7 @@ public:
 
   inline static uint8_t maskValue(uint64_t value) {
 #ifdef _MSC_VER
-    uint8_t cnt = __popcnt64(value);
+    uint8_t cnt = static_cast<uint8_t>( __popcnt64(value) );
 #else
     uint8_t cnt = __builtin_popcountl(value);
 #endif
