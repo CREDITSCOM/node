@@ -1939,10 +1939,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult &_return, 
     return;
   }
   _return.contractState = opt_state.value();
-  _return.stateCanModify = solver_.isContractLocked(addr) ? true : false;
-
-  if(executor_.isLockSmart(address, accessId))
-    _return.stateCanModify = false;
+  _return.stateCanModify = solver_.isContractLocked(addr) && executor_.isLockSmart(address, accessId) ? true : false;
   
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
