@@ -112,7 +112,7 @@ void Network::readerRoutine(const Config& config) {
 #elif WIN32
       while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
         ; // spin
-      ++readerTaskCount_;
+      readerTaskCount_.fetch_add(1, std::memory_order_relaxed);
       SetEvent(readerEvent_);
       readerLock.clear(std::memory_order_release); // release lock
 #endif
@@ -298,7 +298,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 #elif WIN32
   while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
     ; // spin
-  ++writerTaskCount_;
+  writerTaskCount_.fetch_add(1, std::memory_order_relaxed);
   SetEvent(writerEvent_);
   writerLock.clear(std::memory_order_release); // release lock
 #endif
