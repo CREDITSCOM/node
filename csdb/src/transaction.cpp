@@ -328,14 +328,7 @@ void Transaction::put(::csdb::priv::obstream& os) const {
   os.put(data->max_fee_);
   os.put(data->currency_);
 
-  {
-    uint8_t size = static_cast<uint8_t>(data->user_fields_.size());
-    os.put(size);
-
-    if (size) {
-      os.put(data->user_fields_);
-    }
-  }
+  os.put(data->user_fields_);
 
   os.put(data->signature_);
   os.put(data->counted_fee_);
@@ -419,18 +412,10 @@ bool Transaction::get(::csdb::priv::ibstream& is) {
   }
 
   data->currency_ = parse;
-  res = is.get(parse);
 
+  res = is.get(data->user_fields_);
   if (!res) {
     return res;
-  }
-
-  if (parse) {
-    res = is.get(data->user_fields_);
-
-    if (!res) {
-      return res;
-    }
   }
 
   return is.get(data->signature_) && is.get(data->counted_fee_);
