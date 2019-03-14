@@ -66,6 +66,10 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
 }
 
 bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
+  if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
+    csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
+    return true;
+  }
   BlockChain::WalletData wData;
   BlockChain::WalletId wId;
   pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData, wId);
@@ -77,10 +81,10 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 
 void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
 //DPOS check start -> comment if unnecessary
-  //if (!checkNodeCache(sender)) {
-  //  csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
-  //  return;
-  //}
+  if (!checkNodeCache(sender)) {
+    csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
+    return;
+  }
 //DPOS check finish
   cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSequence();
   if (delta > 1) {
