@@ -250,10 +250,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
   // "normal" start
   if (roundTable.round == 1) {
-    cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, cs::RunPolicy::CallQueuePolicy, [this, roundTable]() {
+  //  cs::Timer::singleShot(TIME_TO_AWAIT_SS_ROUND, cs::RunPolicy::CallQueuePolicy, [this, roundTable]() {
       onRoundStart(roundTable);
       reviewConveyerHashes();
-    });
+ //   });
 
     return;
   }
@@ -1242,6 +1242,8 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
   // signature of round number + calculated hash
   stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
+  csdebug() << "Stage one Signature R-" << cs::Conveyer::instance().currentRoundNumber() << "(" << static_cast<int>(stageOneInfo.sender) 
+      << "): " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
   const int k1 = (corruptionLevel_ / 1) % 2;
   const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);

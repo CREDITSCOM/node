@@ -89,6 +89,7 @@ struct StageTwoSmarts {
 
 struct StageThreeSmarts {
   uint8_t sender;
+  uint8_t iteration;
   cs::Sequence sBlockNum;
   uint32_t startTransaction;
   uint8_t writer;

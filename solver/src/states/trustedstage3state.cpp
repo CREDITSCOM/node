@@ -178,7 +178,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     const size_t cnt = context.cnt_trusted();
     for (auto& it : context.stage2_data()) {
       if ( it.sender != context.own_conf_number()) {
-        csdebug() << "Comparing with T(" << static_cast<int>(it.sender) << "):";
+        csdebug() << "Comparing with T(" << static_cast<int>(ptr->sender) << "):";
         for (size_t j = 0; j < cnt; j++) {
           // check amount of trusted node's signatures nonconformity
           csdetails() << "Signature of T(" << j << ") in my storage is: " << cs::Utils::byteStreamToHex(ptr->signatures[j]);

@@ -380,6 +380,7 @@ namespace cs{
     st3.sender = ownSmartsConfNum_;
     st3.sBlockNum = smartRoundNumber_;
     st3.startTransaction = smartTransaction_;
+    st3.iteration = 0U;
     addSmartStageThree(st3, true);
   }
 
@@ -742,6 +743,12 @@ namespace cs{
           trustedChanged_ = true;
         }
         ++count;
+      }
+      if (trustedChanged_) {
+        smartStageThreeStorage_.clear();
+        smartStageThreeStorage_.resize(st3.realTrustedMask.size());
+        smartStageThreeTempStorage_.clear();
+        ++(st3.iteration);
       }
       return;
     }
