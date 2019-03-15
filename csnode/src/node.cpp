@@ -1260,9 +1260,9 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
-  if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0 && subRound_ == 0) {
-    return;
-  }
+  //if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0 && subRound_ == 0) {
+  //  return;
+  //}
   csmeta(csdetails) << "started";
 
   if (myLevel_ != Level::Confidant) {
