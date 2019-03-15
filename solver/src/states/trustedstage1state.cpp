@@ -302,8 +302,9 @@ void TrustedStage1State::validateTransactions( SolverContext& context, cs::Bytes
   }
   //validation of all transactions by graph
   csdb::Pool excluded;
-  ptransval->validateByGraph( characteristicMask, packet.transactions(), excluded );
-  if( excluded.transactions_count() > 0 ) {
+  ptransval->checkRejectedSmarts(context, packet.transactions(), characteristicMask);
+  ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
+  if (excluded.transactions_count() > 0) {
     cslog() << name() << ": " << excluded.transactions_count() << " transactions are rejected in validateByGraph()";
   }
 }
