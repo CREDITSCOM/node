@@ -261,7 +261,7 @@ namespace executor {
       auto smartTarget = blockchain_.get_addr_by_type(smartTrxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
 
       csdb::Transaction deployTrxn;
-      auto isdeploy = isDeploy(smartTrxn);
+      const auto isdeploy = isDeploy(smartTrxn);
       if (!isdeploy) { // execute
         const auto optDeployId = getDeployTrxn(smartTarget);
         if (!optDeployId.has_value())
