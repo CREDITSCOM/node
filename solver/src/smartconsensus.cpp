@@ -36,6 +36,10 @@ namespace cs{
   }
 
   bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, Node* node, SmartContracts* smarts) {
+    trustedChanged_ = false;
+    smartStageThreeSent_ = false;
+    zeroHash.fill(0);
+    zeroSignature.fill(0);
     pnode_ = node;
     psmarts_ = smarts;
     smartConfidants_.clear();
@@ -397,25 +401,51 @@ namespace cs{
     if (stage.sBlockNum != smartRoundNumber_ || stage.startTransaction != smartTransaction_) {
       return;
     }
-    csmeta(csdetails);
+
+    auto lambda = [this](const cs::StageThreeSmarts& stageFrom, cs::Bytes hash) {
+      if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender)
+        , hash.data(), hash.size())) {
+        cslog() << log_prefix << "{" << smartRoundNumber_ << "} ____ The signature is not valid";
+        return; //returns this function if the signature of smartco
+        smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
+      }
+    };
+
+
     if (send) {
       csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ 1.";
       pnode_->sendSmartStageThree(smartConfidants_, stage);
+      smartStageThreeSent_= true;
     }
     if (smartStageThreeStorage_.size() <= (size_t)stage.sender) {
       // normally unexpected
       return;
     }
     if (smartStageThreeStorage_.at(stage.sender).sender == stage.sender) {
+      // avoid duplication
       return;
     }
+    
+    
     if (stage.sender != ownSmartsConfNum_) {
-      //const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
-      if (!cscrypto::verifySignature(stage.packageSignature, smartConfidants().at(stage.sender)
-          , finalSmartTransactionPack_.hash().toBinary().data()
-          , finalSmartTransactionPack_.hash().toBinary().size())) {
-        cslog() << log_prefix << "{" << smartRoundNumber_ << "} ____ The signature is not valid";
-        return; //returns this function of the signature of smart confidant is not corresponding to its the previously sent hash
+      if (smartStageThreeSent_ = false) {
+        smartStageThreeTempStorage_.push_back(stage);
+      }
+      else {
+        //const auto& hash = smartStageOneStorage_.at(stage.sender).hash;
+        lambda(stage, finalSmartTransactionPack_.hash().toBinary());
+      }
+    }
+    else {
+      smartStageThreeSent_ = true;
+      for (auto& it : smartStageThreeTempStorage_) {
+        lambda(it, finalSmartTransactionPack_.hash().toBinary());
+        const auto smartStorageSize = std::count_if(smartStageThreeStorage_.begin(), smartStageThreeStorage_.end(),
+          [](const cs::StageThreeSmarts& it) {
+          return it.sender != cs::ConfidantConsts::InvalidConfidantIndex;
+        });
+        csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 ["
+          << static_cast<int>(stage.sender) << "] = " << smartStorageSize;
       }
     }
 
@@ -588,7 +618,7 @@ namespace cs{
           psmarts_->getScheduler(), Consensus::T_stage_request,
           [this, st]() {
           csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
-          markSmartOutboundNodes();
+          markSmartOutboundNodes(st);
         },
           true/*replace if exists*/);
       },
@@ -683,16 +713,90 @@ namespace cs{
   }
 
   // forces transition to next stage
-  void SmartConsensus::markSmartOutboundNodes()
+  void SmartConsensus::markSmartOutboundNodes(int st)
   {
-    //uint8_t cnt = (uint8_t)smartConfidants_.size();
-    //for (uint8_t i = 0; i < cnt; ++i) {
-    //  if (context.stage1(i) == nullptr) {
-    //    // it is possible to get a transition to other state in SmartConsensus from any iteration, this is not a problem, simply execute method until end
-    //    fake_stage1(i);
-    //  }
-    //}
+    uint8_t count = 0; 
+    switch (st) {
+      case 1:
+
+      for (auto& it : smartStageOneStorage_) {
+        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+          fake_stage1(count);
+        }
+        ++count;
+      }
+      return;
+      case 2:
+
+      for (auto& it : smartStageTwoStorage_) {
+        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+          fake_stage2(count);
+        }
+        ++count;
+      }
+      return;
+    case 3:
+      for (auto& it : smartStageThreeStorage_) {
+        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+          st3.realTrustedMask[count] = cs::ConfidantConsts::InvalidConfidantIndex;
+          trustedChanged_ = true;
+        }
+        ++count;
+      }
+      return;
+    }
+
   }
+
+  void SmartConsensus::fake_stage1(uint8_t from) {
+    bool find = false;
+    for (auto& it : smartStageOneStorage_) {
+      if (it.sender == from) {
+        find = true;
+        break;
+      }
+    }
+    if (find) {
+      csdebug() << "SmartConsensus: make stage-1 [" << static_cast<int>(from) << "] as silent";
+      cs::StageOneSmarts fake;
+      init_zero(fake);
+      fake.sender = from;
+      addSmartStageOne(fake,false);
+    }
+  }
+
+  void SmartConsensus::fake_stage2(uint8_t from) {
+    bool find = false;
+    for (auto& it : smartStageTwoStorage_) {
+      if (it.sender == from) {
+        find = true;
+        break;
+      }
+    }
+    if (find) {
+      csdebug() << "SmartConsensus: make stage-2 [" << static_cast<int>(from) << "] as silent";
+      cs::StageTwoSmarts fake;
+      init_zero(fake);
+      fake.sender = from;
+      addSmartStageTwo(fake,false);
+    }
+  }
+
+  void SmartConsensus::init_zero(cs::StageOneSmarts& stage) {
+    stage.sender = cs::ConfidantConsts::InvalidConfidantIndex;
+    stage.hash = zeroHash;
+    stage.messageHash = zeroHash;
+    stage.signature = zeroSignature;
+  }
+
+  void SmartConsensus::init_zero(cs::StageTwoSmarts& stage) {
+    stage.sender = cs::ConfidantConsts::InvalidConfidantIndex;
+    stage.signature = zeroSignature;
+    size_t cnt = smartConfidants_.size();
+    stage.hashes.resize(cnt,zeroHash);
+    stage.signatures.resize(cnt, zeroSignature);
+  }
+
 
   void SmartConsensus::fakeStage(uint8_t confIndex) {
     csunused(confIndex);
