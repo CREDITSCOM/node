@@ -207,8 +207,15 @@ void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::Conf
 }
 
 void BlockChain::removeConfirmationFromList(cs::RoundNumber rNum) {
-  confirmationList_.erase(rNum);
+  if(confirmationList_.find(rNum)!=confirmationList_.end()) {
+    confirmationList_.erase(rNum);
+    csdebug() << "The confirmation of R-" << rNum << " was successfully erased";
+  }
+  else {
+    csdebug() << "The confirmation of R-" << rNum << " was not found";
+  }
 }
+
 TrustedConfirmation BlockChain::confirmationList(cs::RoundNumber rNum) {
   if (confirmationList_.find(rNum) == confirmationList_.end()) {
     return TrustedConfirmation{};

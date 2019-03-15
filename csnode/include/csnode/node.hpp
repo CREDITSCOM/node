@@ -221,7 +221,7 @@ private:
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, cs::StageThree& st3);
 
-  bool readRoundData(cs::RoundTable& roundTable);
+  bool readRoundData(cs::RoundTable& roundTable, bool bang);
   void reviewConveyerHashes();
 
   // conveyer

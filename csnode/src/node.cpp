@@ -169,7 +169,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   cs::RoundTable globalTable;
   globalTable.round = rNum;
 
-  if (!readRoundData(globalTable)) {
+  if (!readRoundData(globalTable, true)) {
     cserror() << className() << " read round data from SS failed";
     return;
   }
@@ -229,11 +229,14 @@ void Node::getKeySS(const cs::PublicKey& key)
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
   istream_.init(data, size);
-
+  if (!(cs::Conveyer::instance().currentRoundNumber() == 0 && rNum == 1)) {
+    csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
+    return;
+  }
   cslog() << "NODE> get SS Round Table #" << rNum;
   cs::RoundTable roundTable;
 
-  if (!readRoundData(roundTable)) {
+  if (!readRoundData(roundTable, false)) {
     cserror() << "NODE> read round data from SS failed, continue without round table";
   }
 
@@ -475,6 +478,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     blockChain_.testCachedBlocks();
+    getBlockChain().removeConfirmationFromList(round);
   }
 
   csmeta(csdetails) << "done";
@@ -906,7 +910,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   return (rNum == round ? MessageActions::Process : MessageActions::Postpone);
 }
 
-inline bool Node::readRoundData(cs::RoundTable& roundTable) {
+inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
   cs::PublicKey mainNode;
 
   uint8_t confSize = 0;
@@ -925,24 +929,44 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable) {
   istream_ >> mainNode;
 
   // TODO Fix confidants array getting (From SS)
-  while (istream_) {
+  for (int i =0; i<confSize; ++i)
+  {
     cs::PublicKey key;
     istream_ >> key;
 
     confidants.push_back(std::move(key));
 
-    if (confidants.size() == confSize && !istream_.end()) {
-      cswarning() << "Too many confidant nodes received";
+  }
+  if (bang) {
+    cs::Signature sig;
+    istream_ >>sig;
+  
+    cs::Bytes trustedToHash;
+    cs::DataStream tth(trustedToHash);
+    tth << roundTable.round;
+    tth << confidants;
+    csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(trustedToHash);
+    //cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
+    csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(ssKey_.data(), ssKey_.size());
+    if (!cscrypto::verifySignature(sig, ssKey_, trustedToHash.data(), trustedToHash.size())) { 
+      cswarning() << "The BIGBANG message is incorrect: signature isn't valid";
       return false;
     }
+    cs::Bytes confMask;
+    cs::Signatures signatures;
+    signatures.push_back(sig);
+    confMask.push_back(0);
+    getBlockChain().removeConfirmationFromList(roundTable.round);
+    getBlockChain().addConfirmationToList(roundTable.round, bang, confidants, confMask, signatures);
   }
-  //cs::Signature sig;
-  //istream_ >>sig;
+
 
   if (!istream_.good() || confidants.size() < confSize) {
     cswarning() << "Bad round table format, ignoring";
     return false;
   }
+
+
 
   roundTable.confidants = std::move(confidants);
   roundTable.general = mainNode;
@@ -1236,6 +1260,9 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+  if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0 && subRound_ == 0) {
+    return;
+  }
   csmeta(csdetails) << "started";
 
   if (myLevel_ != Level::Confidant) {
@@ -1970,6 +1997,7 @@ void Node::sendRoundPackage(const cs::PublicKey& target) {
 }
 
 void Node::sendRoundPackageToAll() {
+
   //add signatures// blockSignatures, roundSignatures);
   csmeta(csdetails) << "Send round table to all";
 
