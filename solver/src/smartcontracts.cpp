@@ -1521,7 +1521,7 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
   if (it != known_contracts.end()) {
     if (it->second.is_locked != value) {
       const cs::PublicKey& key = abs_addr.public_key();
-      csdebug() << log_prefix << "contract " << EncodeBase58(key.data(), key.data() + key.size()) << " has " << (value ? "locked" : "unlocked");
+      csdebug() << log_prefix << (value ? "lock" : "unlock") << " contract " << EncodeBase58(key.data(), key.data() + key.size());
       it->second.is_locked = value;
     }
   }
