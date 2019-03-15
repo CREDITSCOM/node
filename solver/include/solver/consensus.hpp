@@ -29,10 +29,10 @@ public:
   constexpr static unsigned int MaxTrustedNodes = 5;
 
   /** @brief   The minimum cash for trusted nodes to participate consensus */
-  constexpr static csdb::Amount MinStakeValue = csdb::Amount{500000};
+  constexpr static csdb::Amount MinStakeValue = csdb::Amount{ 50000 };
 
   /** @brief   The round when DPOS starts working */
-  constexpr static uint64_t StartingDPOS = 1000U;
+  constexpr static uint64_t StartingDPOS = 5000U;
 
   /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
   constexpr static uint8_t GeneralNotSelected = 100;
