@@ -81,11 +81,29 @@ PoolHash PoolHash::calc_from_data(const cs::Bytes& data) {
 }
 
 void PoolHash::put(::csdb::priv::obstream& os) const {
-  os.put(d->value);
+  size_t size = d->value.size();
+  os.put(static_cast<uint8_t>(size));
+  if (!d->value.empty()) {
+    os.put((const void *)d->value.data(), size);
+  }
 }
 
 bool PoolHash::get(::csdb::priv::ibstream& is) {
-  return is.get(d->value);
+  uint8_t size;
+  if (!is.get(size)) {
+    return false;
+  }
+  if (size == 0) {
+    d->value.clear();
+    return true;
+  }
+  if (size != cscrypto::kHashSize || is.size() < cscrypto::kHashSize) {
+    return false;
+  }
+  if (d->value.size() != cscrypto::kHashSize) {
+    d->value.resize(cscrypto::kHashSize);
+  }
+  return is.get(d->value.data(), cscrypto::kHashSize);
 }
 
 class Pool::priv : public ::csdb::internal::shared_data {
@@ -107,12 +125,12 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(user_fields_);
     os.put(roundCost_);
 
-    os.put(transactions_.size());
+    os.put(static_cast<uint32_t>(transactions_.size()));
     for (const auto& it : transactions_) {
       os.put(it);
     }
 
-    os.put(newWallets_.size());
+    os.put(static_cast<uint32_t>(newWallets_.size()));
     for (const auto& wall : newWallets_) {
       os.put(wall);
     }
@@ -120,13 +138,14 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(numberTrusted_);
     os.put(realTrusted_);
 
+    //TODO: ensure confidants.size() <= numTrusted_
     for (const auto& it : confidants_) {
       os.put(it);
     }
 
     os.put(numberConfirmations_);
     os.put(roundConfirmationMask_);
-    for (const auto& it : roundConfirmations_){
+    for (const auto& it : roundConfirmations_) {
       os.put(it);
     }
 
@@ -140,13 +159,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
       os.put(it);
     }
 
-
-
-    os.put(smartSignatures_.size());
+    os.put(static_cast<uint8_t>(smartSignatures_.size()));
     for (const auto& it : smartSignatures_) {
       os.put(it.smartKey);
       os.put(it.smartConsensusPool);
-      os.put(it.signatures.size());
+      os.put(static_cast<uint8_t>(it.signatures.size()));
       for (const auto& itt : it.signatures) {
         os.put(itt.first);
         os.put(itt.second);
@@ -163,17 +180,17 @@ class Pool::priv : public ::csdb::internal::shared_data {
     os.put(user_fields_);
     os.put(roundCost_);
 
-    os.put(transactions_.size());
+    os.put(static_cast<uint32_t>(transactions_.size()));
     for (const auto& it : transactions_) {
       os.put(it);
     }
 
-    os.put(newWallets_.size());
+    os.put(static_cast<uint32_t>(newWallets_.size()));
     for (const auto& wall : newWallets_) {
       os.put(wall);
     }
 
-    os.put(confidants_.size());
+    os.put(static_cast<uint8_t>(confidants_.size()));
     for (const auto& it : confidants_) {
       os.put(it);
     }
@@ -208,12 +225,11 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
 
-    if (!is.get(cnt)) {
+    if (!is.get(transactionsCount_)) {
       csmeta(cswarning) << "get cnt is failed";
       return false;
     }
-
-    transactionsCount_ = static_cast<decltype(transactionsCount_)>(cnt);
+    cnt = transactionsCount_;
     is_valid_ = true;
 
     return true;
@@ -243,10 +259,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getConfidants(::csdb::priv::ibstream& is) {
-    size_t cnt = static_cast<size_t>(numberTrusted_);
     confidants_.clear();
-    confidants_.reserve(cnt);
-    for (size_t i = 0; i < cnt; ++i) {
+    confidants_.reserve(numberTrusted_);
+    for (uint8_t i = 0; i < numberTrusted_; ++i) {
       cs::PublicKey conf;
       if (!is.get(conf)) {
         return false;
@@ -259,7 +274,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   bool getSignatures(::csdb::priv::ibstream& is) {
 
 #ifdef _MSC_VER
-    uint8_t cnt = __popcnt64(realTrusted_);
+    uint8_t cnt = (uint8_t) __popcnt64(realTrusted_);
 #else
     uint8_t cnt = __builtin_popcountl(realTrusted_);
 #endif
@@ -287,7 +302,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     }
     
 #ifdef _MSC_VER
-    uint8_t cnt = __popcnt64(roundConfirmationMask_);
+    uint8_t cnt = (uint8_t) __popcnt64(roundConfirmationMask_);
 #else
     uint8_t cnt = __builtin_popcountl(roundConfirmationMask_);
 #endif
@@ -307,8 +322,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getSmartSignatures(::csdb::priv::ibstream& is) {
-    size_t cnt = 0;
-    size_t confCount = 0;
+    uint8_t cnt = 0;
     if (!is.get(cnt)) {
       return false;
     }
@@ -316,7 +330,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     smartSignatures_.clear();
     smartSignatures_.reserve(cnt);
 
-    for (size_t smarts = 0; smarts < cnt; ++smarts) {
+    for (uint8_t smarts = 0; smarts < cnt; ++smarts) {
       SmartSignature sSig;
       sSig.smartConsensusPool = 0;
       sSig.smartKey.fill(0);
@@ -330,8 +344,20 @@ class Pool::priv : public ::csdb::internal::shared_data {
         return false;
       }
 
+      uint8_t confCount = 0;
       if (!is.get(confCount)) {
         return false;
+      }
+      for (uint8_t i = 0; i < confCount; i++) {
+        cs::Byte b;
+        cs::Signature sig;
+        if (!is.get(b)) {
+          return false;
+        }
+        if (!is.get(sig)) {
+          return false;
+        }
+        sSig.signatures.emplace_back(std::make_pair(b, sig));
       }
 
       smartSignatures_.emplace_back(sSig);
@@ -340,14 +366,14 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool getNewWallets(::csdb::priv::ibstream& is) {
-    size_t cnt = 0;
+    uint32_t cnt = 0;
     if (!is.get(cnt)) {
       return false;
     }
 
     newWallets_.clear();
     newWallets_.reserve(cnt);
-    for (size_t i = 0; i < cnt; ++i) {
+    for (uint32_t i = 0; i < cnt; ++i) {
       NewWalletInfo wall;
       if (!is.get(wall)) {
         return false;
@@ -412,6 +438,9 @@ class Pool::priv : public ::csdb::internal::shared_data {
       return false;
     }
     is_valid_ = true;
+    if (is.size() > 0) {
+      cserror() << "Pool::get(): inconsistent binary pool";
+    }
     return true;
   }
 

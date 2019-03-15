@@ -220,6 +220,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   }
 }
 
+void Node::getKeySS(const cs::PublicKey& key)
+{
+  std::copy(key.cbegin(), key.cend(), ssKey_.begin());
+  cslog() << "Node: SS registration key " << cs::Utils::byteStreamToHex(ssKey_.data(), ssKey_.size()) << " ("
+    << EncodeBase58(ssKey_.data(), ssKey_.data() + ssKey_.size()) << ')';
+}
+
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
   istream_.init(data, size);
 

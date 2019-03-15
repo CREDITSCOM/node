@@ -47,6 +47,7 @@ public:
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
   void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
+  void getKeySS(const cs::PublicKey& key);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
@@ -278,6 +279,8 @@ private:
   // TODO: C++ 17 static inline?
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
+
+  cs::PublicKey ssKey_;
 
   const cs::PublicKey nodeIdKey_;
   const cs::PrivateKey nodeIdPrivate_;
