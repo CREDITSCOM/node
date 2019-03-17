@@ -1104,7 +1104,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
   {
     cs::Lock lock(dbLock_);
 
-    // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     cs::PublicKeys lastConfidants;
     if(pool_seq>1) {
       if(deferredBlock_.sequence() + 1 == pool_seq) {
@@ -1115,6 +1114,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
       }
     }
 
+    // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
     if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
       csdebug() << "The block is correct";

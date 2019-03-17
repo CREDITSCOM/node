@@ -53,19 +53,6 @@ protected:
   std::unique_ptr<cs::TransactionsValidator> ptransval;
   std::set<csdb::Address> smartSourceInvalidSignatures_;
 
-  /**
-   * @fn  void TrustedStage1State::filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
-   *
-   * @brief   Filter transactions in packet by testing signatures and remove them
-   *
-   * @author  Alexander Avramenko
-   * @date    13.11.2018
-   *
-   * @param [in,out]  context The context.
-   * @param [in,out]  p       A cs::TransactionsPacket to remove transactions with bad signatures.
-   */
-
-  void filter_test_signatures(SolverContext& context, cs::TransactionsPacket& p);
   bool check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction);
   cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
   cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
