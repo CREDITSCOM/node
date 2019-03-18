@@ -25,6 +25,8 @@ void TransactionsValidator::reset(size_t transactionsNum) {
   cntRemovedTrxs_ = 0;
 }
 
+static const char * log_prefix = "Validator: ";
+
 bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState) {
   if (!validateTransactionAsSource(trx, trxInd, del1, newState)) {
     return false;
@@ -61,9 +63,11 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 #ifndef SPAMMER
   if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID())) {
     del1 = -bitcnt;
+    csdebug() << log_prefix << "new_state rejected, incorrect innerID";
     return false;
   }
   else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID())) {
+    csdebug() << log_prefix << "transaction rejected, incorrect innerID";
     del1 = -bitcnt;
     return false;
   }
@@ -73,10 +77,14 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   wallState.balance_ = newBalance;
 #else
 #ifndef SPAMMER
-  if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID()))
+  if( newState && !wallStateIfNewState.trxTail_.isAllowed( trx.innerID() ) ) {
+    csdebug() << log_prefix << "new_state rejected, incorrect innerID";
     return false;
-  else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID()))
+  }
+  else if( !newState && !wallState.trxTail_.isAllowed( trx.innerID() ) ) {
+    csdebug() << log_prefix << "transaction rejected, incorrect innerID";
     return false;
+  }
 #endif
   if (!newState && !SmartContracts::is_executable(trx)) {
     wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
