@@ -135,7 +135,7 @@ bool BlockChain::postInitFromDB() {
   auto func = [](const WalletData::Address&, const WalletData& wallet) {
     double bal = wallet.balance_.to_double();
     if(bal < -std::numeric_limits<double>::min()) {
-      cslog() << "Wallet with negative balance (" << bal << ") detected: "
+      csdebug() << "Wallet with negative balance (" << bal << ") detected: "
         << cs::Utils::byteStreamToHex(wallet.address_.data(), wallet.address_.size())
         << " (" << EncodeBase58(wallet.address_.data(), wallet.address_.data() + wallet.address_.size()) << ")";
     }
