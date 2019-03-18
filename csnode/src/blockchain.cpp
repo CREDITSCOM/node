@@ -13,7 +13,6 @@
 #include <solver/smartcontracts.hpp>
 
 #include <client/config.hpp>
-#include <apihandler.hpp>
 
 //#define RECREATE_INDEX
 
@@ -271,7 +270,7 @@ void BlockChain::writeGenesisBlock() {
 
   finalizeBlock(genesis, true);
   deferredBlock_ = genesis;
-  emit storeBlockEvent_(deferredBlock_);
+  emit storeBlockEvent(deferredBlock_);
 
   csdebug() << genesis.hash().to_string();
 
@@ -950,8 +949,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
   // notify block recording
   newBlockCv_.notify_all();
 
- executor::Executor::getInstance().state_update(pool);
-
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
     csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << ", smartSignatures amount = " << deferredBlock_.smartSignatures().size() << ", see block info above";
@@ -973,7 +970,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     pool = deferredBlock_.clone();
   }
 
-  emit storeBlockEvent_(pool);
+  emit storeBlockEvent(pool);
 
   // log cached block
   csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";

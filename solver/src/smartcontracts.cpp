@@ -47,7 +47,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
   // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
   
   // as event receiver:
-  cs::Connector::connect(&bc.storeBlockEvent_, this, &SmartContracts::on_store_block);
+  cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
   cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
   // as event source:
   cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
