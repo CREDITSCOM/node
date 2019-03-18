@@ -25,10 +25,11 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     }
 
     sock.set_option(ip::udp::socket::reuse_address(true));
-
 #ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
+#else
+    sock.non_blocking(true);
 #endif
 
 #ifdef WIN32
@@ -37,7 +38,6 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned,
              NULL, NULL);
 #endif
-
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
       sock.bind(ep);
@@ -91,18 +91,33 @@ void Network::readerRoutine(const Config& config) {
   while (!initFlag_.load());
 
   boost::system::error_code lastError;
+  size_t packetSize;
 
   while (stopReaderRoutine == false) { // changed from true
     auto& task = iPacMan_.allocNext();
+#ifdef __APPLE__
+    uint32_t cnt = 0;
+    do {
+      if (stopReaderRoutine) {
+        return;
+      }
 
+      packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+      task.size = task.pack.decode(packetSize);
+
+      if (++cnt == 10) {
+        cnt = 0;
+        std::this_thread::yield();
+      }
+    } while (lastError == boost::asio::error::would_block);
+#else
     if (stopReaderRoutine) {
         return;
     }
 
-    size_t packetSize = 0;
     packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
     task.size = task.pack.decode(packetSize);
-
+#endif
     if (!lastError) {
       iPacMan_.enQueueLast();
 #ifdef __linux__
@@ -307,11 +322,6 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 Network::Network(const Config& config, Transport* transport)
 : resolver_(context_)
 , transport_(transport)
-#if !(__linux__ || WIN32)
-, readerThread_{ &Network::readerRoutine, this, config }
-, writerThread_{ &Network::writerRoutine, this, config }
-, processorThread_{ &Network::processorRoutine, this }
-#endif
 {
 #ifdef __linux__
   readerEventfd_ = eventfd(0, 0);
@@ -325,9 +335,6 @@ Network::Network(const Config& config, Transport* transport)
     good_ = false;
     return;
   }
-  readerThread_ = std::thread(&Network::readerRoutine, this, config);
-  writerThread_ = std::thread(&Network::writerRoutine, this, config);
-  processorThread_ = std::thread(&Network::processorRoutine, this);
 #elif WIN32
   writerEvent_ = CreateEvent(
     NULL,               // default security attributes
@@ -352,11 +359,11 @@ Network::Network(const Config& config, Transport* transport)
     good_ = false;
     return;
   }
-
+#endif
   readerThread_ = std::thread(&Network::readerRoutine, this, config);
   writerThread_ = std::thread(&Network::writerRoutine, this, config);
   processorThread_ = std::thread(&Network::processorRoutine, this);
-#endif
+
   if (!config.hasTwoSockets()) {
     auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 

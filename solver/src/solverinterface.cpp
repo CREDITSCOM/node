@@ -212,38 +212,46 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
-  if (find_stage3(stage.sender) != nullptr) {
-    // duplicated
-    return;
+  auto ptr = find_stage3(stage.sender);
+  if (ptr != nullptr) {
+    if(ptr->iteration >= stage.iteration) {
+      // duplicated
+      return;
+    }
   }
 
   auto lamda = [this] (const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.blockHash.data(), stageTo.blockHash.size())) {
-      cswarning() << "Block Signatures are not valid !";
+      cswarning() << "Block Signatures are not valid ! -> ";
+      printStage3(stageFrom);
       return;
     }
 
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
       cswarning() << "Round Signatures are not valid !";
+      printStage3(stageFrom);
       return;
     }
 
     if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
                                     stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
       cswarning() << "Trusted Signatures are not valid !";
+      printStage3(stageFrom);
       return;
     }
 
     if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
       cswarning() << "Real Trusted are not valid !";
+      printStage3(stageFrom);
       return;
     }
 
     if (!(stageFrom.writer == stageTo.writer)) {
       cswarning() << "Writer is not valid !";
+      printStage3(stageFrom);
       return;
     }
 
@@ -259,7 +267,9 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     case 1:
       // TODO: change the routine of pool signing
       for (const auto& st : stageThreeStorage) {
-        lamda(st, stage);
+        if(stage.iteration == st.iteration) {
+          lamda(st, stage);
+        }
       }
       trueStageThreeStorage.push_back(stage);
       pnode->addRoundSignature(stage);
@@ -267,7 +277,9 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
     case 2:
       const auto st = find_stage3(pnode->getConfidantNumber());
-      lamda(stage, *st);
+      if (stage.iteration == st->iteration) {
+        lamda(stage, *st);
+      }
       break;
   }
 

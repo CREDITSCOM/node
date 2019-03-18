@@ -199,6 +199,9 @@ cs::Sequence BlockChain::getLastSequence() const {
 }
 
 void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask,cs::Signatures confirmation) {
+  if(confirmationList_.find(rNum) != confirmationList_.cend()){
+    removeConfirmationFromList(rNum);
+  }
   TrustedConfirmation tConfirmation;
   tConfirmation.bigBang = bang;
   tConfirmation.confidants = confidants;
@@ -1125,7 +1128,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
     pool = deferredBlock_.clone();
   }
-  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   emit storeBlockEvent_(pool);
 
   // log cached block
