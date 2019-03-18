@@ -363,10 +363,10 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     auto varRetVal = deserialize<::general::Variant>(std::move(retVal));
     sti.__isset.returnValue = varRetVal.__isset.v_string;
-    if (sti.__isset.returnValue)
+    if (sti.__isset.returnValue){
       sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
-
-    result.trxn.smartInfo.__set_v_smartState(sti);
+      result.trxn.smartInfo.__set_v_smartState(sti);
+    }
   }
   else {
     result.trxn.type = api::TransactionType::TT_Normal;
