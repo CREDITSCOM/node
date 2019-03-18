@@ -131,16 +131,13 @@ private:
   }
 
   virtual void drop(void* object) override final {
-    std::vector<typename Slots::iterator> iterators;
-
-    for (auto iterator = slots_.begin(); iterator != slots_.end(); ++iterator) {
+    for (auto iterator = slots_.begin(); iterator != slots_.end();) {
       if (iterator->first == ObjectPointer(object)) {
-        iterators.push_back(iterator);
+        iterator = slots_.erase(iterator);
       }
-    }
-
-    for (auto& iter : iterators) {
-      slots_.erase(iter);
+      else {
+        ++iterator;
+      }
     }
   }
 
