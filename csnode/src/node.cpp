@@ -153,7 +153,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   istream_ >> subRound_;
 
   if (subRound_ <= recdBangs[rNum]) {
-    cswarning() << "Old Big Bang received: " << rNum << "." << subRound_ << " is <= " << rNum << "." << recdBangs[rNum];
+    cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(subRound_) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
     return;
   }
 
@@ -340,6 +340,7 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+  //csdebug() << __func__ << ": start";
   istream_.init(data, size);
 
   cs::PacketsHashes hashes;
@@ -354,6 +355,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
   }
 
   processPacketsRequest(std::move(hashes), round, sender);
+ // csdebug() << __func__ << ": done";
 }
 
 void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -411,7 +413,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> smartSigCount;
   poolMetaInfo.realTrustedMask = realTrusted;
   if (myLevel_ == Level::Confidant) {
-    csdebug() << "We probably don't have enouch confirmations so we try to throw our last deferred block";
+    csdebug() << "We probably don't have enough confirmations so we try to throw our last deferred block";
     solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
   }
 
@@ -568,6 +570,7 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
 }
 
 void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
+  //csdebug() << __func__ << ": start";
   if (packets.empty()) {
     return;
   }
@@ -581,6 +584,7 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
     csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
     sendBroadcast(target, msgType, round, packets);
   }
+  //csdebug() << __func__ << ": done";
 }
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -712,6 +716,7 @@ void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumb
     csdebug() << "NODE> Found packets in storage: " << packets.size();
     sendPacketHashesReply(packets, round, sender);
   }
+  //csdebug() << __func__ << ": done";
 }
 
 void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round) {

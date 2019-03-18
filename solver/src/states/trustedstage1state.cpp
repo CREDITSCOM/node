@@ -235,6 +235,7 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
         byte = byte && ptransval->validateTransaction(transaction, i, del1);
       } else {
         byte = false;
+        cslog() << name() << ": reject transaction because max_fee is less than conted_fee";
       }
     } else {
       csdebug() << name() << ": smart new_state transaction[" << i << "] included in consensus";

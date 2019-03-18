@@ -38,7 +38,7 @@ void TrustedPostStageState::on(SolverContext& context) {
       context.scheduler(), 0,
       // timeout #1 handler:
       [pctx, this]() {
-        csdebug() << name() << ": (now) skip direct requests for absent stages-3";
+        csdebug() << name() << ": direct request for absent stages-3";
         request_stages(*pctx);
         // start subsequent track timeout for "wide" request
         csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request
@@ -129,9 +129,6 @@ void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
         context.fake_stage3(i);
       }
     }
-    //csdebug() << name() << ": here the real trusted should be set";
-    //context.realTrustedSet(realTrusted);
-    //csdebug() << name() << ": here the real trusted are set";
   }
   //TODO: add the code to go to the third stage -> 
 }

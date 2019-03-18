@@ -292,7 +292,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
   }
   deferredBlock_.to_byte_stream(binSize);
   deferredBlock_.hash();
-  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   const auto lastHashBin = deferredBlock_.hash().to_binary();
   std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
   stage3.blockSignature = cscrypto::generateSignature(private_key,
