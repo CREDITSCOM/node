@@ -25,9 +25,29 @@ void TrustedStage1State::on(SolverContext& context) {
 
   enough_hashes = false;
   transactions_checked = false;
+  min_time_expired = false;
+
+  SolverContext* pctx = &context;
+  auto dt = Consensus::T_min_stage1;
+  csdebug() << name() << ": start track min time " << dt << " ms for state";
+  min_time_tracking.start(
+    context.scheduler(), dt,
+    [this, pctx](){
+      csdebug() << name() << ": min timeout for state is expired, may proceed to the next state";
+      min_time_expired = true;
+      if (transactions_checked && enough_hashes) {
+        csdebug() << name() << ": transactions & hashes ready, so proceed to the next state now";
+        pctx->complete_stage1();
+      }
+    },
+    true /*replace if exists*/
+  );
 }
 
 void TrustedStage1State::off(SolverContext& context) {
+  if (min_time_tracking.cancel()) {
+    csdebug() << name() << ": cancel track mine time for state";
+  }
   csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
   context.add_stage1(stage, true);
 }
@@ -35,7 +55,7 @@ void TrustedStage1State::off(SolverContext& context) {
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   if (round < conveyer.currentRoundNumber()) {
-    cserror() << name() << ": cannot handle previous round transactions";
+    cserror() << name() << ": cannot handle transactions from old round " << round;
     return Result::Ignore;
   }
 
@@ -79,8 +99,8 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
   }
 
   transactions_checked = true;
-
-  return (enough_hashes ? Result::Finish : Result::Ignore);
+  bool other_conditions = enough_hashes && min_time_expired;
+  return (other_conditions ? Result::Finish : Result::Ignore);
 }
 
 
@@ -93,17 +113,18 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
   if (spoiledHash == pool_hash) {
     // get node status for useful logging
 
-    if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
+    //if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
       csdebug() << name() << ": hash is OK";
       if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
         stage.trustedCandidates.push_back(sender);
       }
-    }
+    //}
     if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes)  {
       // enough hashes
       // flush deferred block to blockchain if any
       enough_hashes = true;
-      return (transactions_checked ? Result::Finish : Result::Ignore);
+      bool other_conditions = transactions_checked && min_time_expired;
+      return (other_conditions ? Result::Finish : Result::Ignore);
     }
   }
   else {

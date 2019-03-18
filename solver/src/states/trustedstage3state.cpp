@@ -501,6 +501,10 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
   csdebug() << name() << ": final list of next round trusted:";
 
   if (aboveThreshold.size() >= max_conf) {  // Consensus::MinTrustedNodes) {
+    std::random_device rd;
+    std::mt19937 g;
+    g.seed( (unsigned int) Conveyer::instance().currentRoundNumber());
+    std::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
     for (size_t i = 0; i < max_conf; ++i) {
       const auto& tmp = aboveThreshold.at(i);
       next_round_trust.emplace_back(tmp);

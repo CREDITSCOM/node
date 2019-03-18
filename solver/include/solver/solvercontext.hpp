@@ -82,6 +82,10 @@ public:
     }
   }
 
+  void complete_stage1() {
+    core.handleTransitions(SolverCore::Event::Hashes); // SolverCore::Event::Transactions may be used as well
+  }
+
   void complete_stage2() {
     core.handleTransitions(SolverCore::Event::Stage1Enough);
   }
