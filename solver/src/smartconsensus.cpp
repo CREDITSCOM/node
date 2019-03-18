@@ -408,8 +408,8 @@ namespace cs{
         , hash.data(), hash.size())) {
         cslog() << log_prefix << "{" << smartRoundNumber_ << "} ____ The signature is not valid";
         return; //returns this function if the signature of smartco
-        smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
       }
+      smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
     };
 
 
@@ -429,7 +429,7 @@ namespace cs{
     
     
     if (stage.sender != ownSmartsConfNum_) {
-      if (smartStageThreeSent_ = false) {
+      if (smartStageThreeSent_ == false) {
         smartStageThreeTempStorage_.push_back(stage);
       }
       else {
@@ -721,7 +721,7 @@ namespace cs{
       case 1:
 
       for (auto& it : smartStageOneStorage_) {
-        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+        if (it.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
           fake_stage1(count);
         }
         ++count;
@@ -730,7 +730,7 @@ namespace cs{
       case 2:
 
       for (auto& it : smartStageTwoStorage_) {
-        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+        if (it.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
           fake_stage2(count);
         }
         ++count;
@@ -738,7 +738,7 @@ namespace cs{
       return;
     case 3:
       for (auto& it : smartStageThreeStorage_) {
-        if (it.sender = cs::ConfidantConsts::InvalidConfidantIndex) {
+        if (it.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
           st3.realTrustedMask[count] = cs::ConfidantConsts::InvalidConfidantIndex;
           trustedChanged_ = true;
         }
