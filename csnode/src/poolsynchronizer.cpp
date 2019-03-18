@@ -96,7 +96,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
 
   if (!isSyncroStarted_) {
     isSyncroStarted_ = true;
-    cs::Connector::connect(&blockChain_->storeBlockEvent_, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+    cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
     cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
     cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 
@@ -622,7 +622,7 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
-  cs::Connector::disconnect(&blockChain_->storeBlockEvent_, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+  cs::Connector::disconnect(&blockChain_->storeBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
   cs::Connector::disconnect(&blockChain_->cachedBlockEvent, this, static_cast<void(PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
   cs::Connector::disconnect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 

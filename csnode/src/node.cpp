@@ -48,7 +48,8 @@ Node::Node(const Config& config)
   poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
-  cs::Connector::connect(&blockChain_.storeBlockEvent_, &stat_, &cs::RoundStat::onStoreBlock);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(), &executor::Executor::onBlockStored);
   good_ = init(config);
 }
 

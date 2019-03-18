@@ -167,7 +167,7 @@ namespace executor {
       if (auto it = accessSequence_.find(accessId); it != accessSequence_.end())
         return std::make_optional(it->second);
       return std::nullopt;
-    };
+    }
 
     std::optional<csdb::TransactionID> getDeployTrxn(const csdb::Address& p_address) {
       std::shared_lock slk(mtx_);
@@ -389,6 +389,11 @@ namespace executor {
       if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
         return false;
       return true;
+    }
+
+  public slots:
+    void onBlockStored(const csdb::Pool& pool) {
+      state_update(pool);
     }
 
   private:

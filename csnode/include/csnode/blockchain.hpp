@@ -95,7 +95,7 @@ public:
    * @return    The new recorded block if ok, otherwise nullopt.
    */
 
-  inline std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+  std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
     return recordBlock(pool, true);
   }
 
@@ -279,7 +279,7 @@ public:
 public signals:
 
   /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
-  cs::StoreBlockSignal storeBlockEvent_;
+  cs::StoreBlockSignal storeBlockEvent;
 
   /** @brief The cached block event. Raised when the next block is flushed to storage */
   cs::ChangeBlockSignal cachedBlockEvent;
