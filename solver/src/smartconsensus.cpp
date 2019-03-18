@@ -412,7 +412,6 @@ namespace cs{
       smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
     };
 
-
     if (send) {
       csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ 1.";
       pnode_->sendSmartStageThree(smartConfidants_, stage);
