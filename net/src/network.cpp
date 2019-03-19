@@ -5,8 +5,11 @@
 #include <net/logger.hpp>
 
 #ifdef __linux__
+#include <sys/socket.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
+#include <array>
+#include <vector>
 #endif
 
 #include "network.hpp"
@@ -181,18 +184,42 @@ void Network::writerRoutine(const Config& config) {
   if (!sock) {
     return;
   }
-
+#ifdef __linux__
+  std::vector<struct mmsghdr> msg;
+  std::vector<struct iovec> iovecs;
+  std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
+  std::vector<boost::asio::mutable_buffer> encoded_packets;
+#endif
   while (stopWriterRoutine == false) { //changed from true
 #ifdef __linux__
     uint64_t tasks;
     int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
-
     if (s != sizeof(uint64_t)) continue;
+
+    msg.resize(tasks);
+    std::fill(msg.begin(), msg.end(), mmsghdr{});
+    iovecs.resize(tasks);
+    std::fill(iovecs.begin(), iovecs.end(), iovec{});
+    packets_buffer.resize(tasks);
+    encoded_packets.clear();
 
     for (uint64_t i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
-      sendPack(*sock, task, task->endpoint);
+      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
+      iovecs[i].iov_base = encoded_packets[i].data();
+      iovecs[i].iov_len = encoded_packets[i].size();
+      msg[i].msg_hdr.msg_iov = &iovecs[i];
+      msg[i].msg_hdr.msg_iovlen = 1;
+      msg[i].msg_hdr.msg_name = task->endpoint.data();
+      msg[i].msg_hdr.msg_namelen = task->endpoint.size();
     }
+    int sended = 0;
+    struct mmsghdr *messages = msg.data();
+    do {
+      sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+      messages += sended;
+      tasks -= sended;
+    } while (tasks);
 #elif WIN32
     WaitForSingleObject(writerEvent_, INFINITE);
     while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
@@ -205,7 +232,7 @@ void Network::writerRoutine(const Config& config) {
       auto task = oPacMan_.getNextTask();
       sendPack(*sock, task, task->endpoint);
     }
-#else
+#elif __APPLE__
     auto task = oPacMan_.getNextTask();
     sendPack(*sock, task, task->endpoint);
 #endif
@@ -220,7 +247,6 @@ void Network::processorRoutine() {
 
   while (stopProcessorRoutine == false) {
     externals.callAll();
-
 #ifdef __linux__
     uint64_t tasks;
     int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
