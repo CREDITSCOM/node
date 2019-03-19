@@ -107,6 +107,8 @@ public:
   size_t stagesThree();
   bool stateFailed(Result res);
 
+  void rebuildDeferredBLock(cs::StageThree& st3);
+
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
   /// <remarks>   Aae, 14.10.2018. </remarks>

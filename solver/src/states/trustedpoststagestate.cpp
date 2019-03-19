@@ -140,7 +140,7 @@ Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageTh
     csdebug() << name() << ": enough stage-3 received amount = " << context.trueStagesThree();
     return Result::Finish;
   }
-  if (context.realTrustedChanged()) {
+  if (context.realTrustedChanged() && context.stagesThree() == context.cnt_real_trusted()) {
     if(context.cnt_real_trusted() > context.getRealTrusted().size() / 2U) {
       csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
       return Result::Retry;

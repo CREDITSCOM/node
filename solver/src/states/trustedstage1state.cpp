@@ -45,11 +45,11 @@ void TrustedStage1State::on(SolverContext& context) {
 }
 
 void TrustedStage1State::off(SolverContext& context) {
-  if (min_time_tracking.cancel()) {
-    csdebug() << name() << ": cancel track mine time for state";
+  if (min_time_expired && transactions_checked && enough_hashes) {
+    csdebug() << name() << ": cancel track mine time for state";  
+    csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
+    context.add_stage1(stage, true);
   }
-  csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
-  context.add_stage1(stage, true);
 }
 
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {

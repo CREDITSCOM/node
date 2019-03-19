@@ -201,6 +201,42 @@ bool SolverCore::stateFailed(Result res) {
 
 }
 
+//void SolverCore::adjustTrustedCandidates(cs::Bytes mask, cs::PublicKeys& confidants) {
+//  for (int i = 0; i < mask.size(); ++i) {
+//    if (mask[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+//      auto it = std::find(trusted_candidates.cbegin(), trusted_candidates.cend(), confidants[i]);
+//      if (it != trusted_candidates.cend()) {
+//        trusted_candidates.erase(it);
+//      }
+//    }
+//  }
+//}
+
+//void SolverCore::rebuildDeferredBLock(cs::StageThree& st3) {
+//  csmeta(csdetails) << "start";
+//  cs::Conveyer& conveyer = cs::Conveyer::instance();
+//  cs::RoundTable table;
+//  adjustTrustedCandidates(st3.realTrustedMask, conveyer.confidants());
+//  table.round = conveyer.currentRoundNumber() + 1;
+//  table.confidants = trusted_candidates;
+//  table.hashes = hashes_candidates;
+//  csdb::Pool newDeferredBlock;
+//  for(auto& it : deferredBlock_.transactions()) {
+//    newDeferredBlock.add_transaction(it);
+//  }
+//
+//  newDeferredBlock.set_previous_hash(deferredBlock_.previous_hash());
+//  newDeferredBlock.set_sequence();
+//  newDeferredBlock.add_user_field(0, deferredBlock_.user_field(0));
+//  newDeferredBlockadd_number_trusted(st3.realTrustedMask.size());
+//  newDeferredBlockadd_real_trusted(cs::Utils::maskToBits(st3.realTrustedMask));
+//
+//  newDeferredBlock.newWallets() = deferredBlock_.newWallets();
+//  newDeferredBlock.set_confidants(conveyer.confidants());
+//
+//
+//  }
+
 
 //TODO: this function is to be implemented the block and RoundTable building <====
 void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
@@ -286,13 +322,18 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
     for (auto& it : *defWallets) {
       newWallets->push_back(it);
     }
-    
+    if (poolMetaInfo.sequenceNumber > 1) {
+      tmpPool.add_number_confirmations(static_cast<uint8_t>(poolMetaInfo.confirmationMask.size()));
+      tmpPool.add_confirmation_mask(cs::Utils::maskToBits(poolMetaInfo.confirmationMask));
+      tmpPool.add_round_confirmations(poolMetaInfo.confirmations);
+    }
+
     deferredBlock_ = csdb::Pool{};
     deferredBlock_ = tmpPool;
   }
   deferredBlock_.to_byte_stream(binSize);
   deferredBlock_.hash();
-  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   const auto lastHashBin = deferredBlock_.hash().to_binary();
   std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
   stage3.blockSignature = cscrypto::generateSignature(private_key,
