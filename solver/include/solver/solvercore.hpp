@@ -98,6 +98,7 @@ public:
   void removeDeferredBlock(cs::Sequence);
   bool realTrustedChanged() const;
   void realTrustedChangedSet(bool);
+  void realTrustedSetValue(cs::Byte position, cs::Byte value);
   void realTrustedSet(cs::Bytes realTrusted);
   bool checkNodeCache(const cs::PublicKey& sender);
   cs::Bytes getRealTrusted();

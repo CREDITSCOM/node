@@ -289,6 +289,11 @@ public:
     return core.realTrustedChangedSet(val);
   }
 
+  void realTrustedSetValue(cs::Byte position, cs::Byte value) {
+    csdebug() << __func__;
+    core.realTrustedSetValue(position, value);
+  }
+
   void realTrustedSet(cs::Bytes realTrusted) {
     csdebug() << __func__;
     core.realTrustedSet(realTrusted);

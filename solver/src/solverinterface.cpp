@@ -124,6 +124,7 @@ void SolverCore::nextRound() {
   realTrustedChanged_ = false;
   tempRealTrusted_.clear();
 
+
   if (!pstate) {
     return;
   }
@@ -222,39 +223,57 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
   auto lamda = [this] (const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
+    bool somethingInvalid = false;
+    if (stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
+      cswarning() << "The node, who sent this stage was marked as untrusted";
+      somethingInvalid = true;
+    }
+
     if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.blockHash.data(), stageTo.blockHash.size())) {
       cswarning() << "Block Signatures are not valid ! -> ";
       printStage3(stageFrom);
-      return;
+      somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
       cswarning() << "Round Signatures are not valid !";
       printStage3(stageFrom);
-      return;
+      somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
                                     stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
       cswarning() << "Trusted Signatures are not valid !";
       printStage3(stageFrom);
-      return;
+      somethingInvalid = true;
     }
 
     if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
       cswarning() << "Real Trusted are not valid !";
       printStage3(stageFrom);
-      return;
+      somethingInvalid = true;
     }
 
     if (!(stageFrom.writer == stageTo.writer)) {
       cswarning() << "Writer is not valid !";
       printStage3(stageFrom);
+      somethingInvalid = true;
+    }
+
+
+
+    if (somethingInvalid) {
+      if (stageTo.realTrustedMask[stageFrom.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
+        realTrustedSetValue(stageFrom.sender,cs::ConfidantConsts::InvalidConfidantIndex);
+      }
       return;
     }
 
+    //if (getRealTrusted()[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
+    //  realTrustedSet(stageFrom.sender, cs::ConfidantConsts::FirstWriterIndex);
+    //}
     trueStageThreeStorage.emplace_back(stageFrom);
     pnode->addRoundSignature(stageFrom);
     csdebug() << "Stage3 [" << static_cast<int>(stageFrom.sender) << "] - signatures are OK";
@@ -321,9 +340,16 @@ void SolverCore::realTrustedChangedSet(bool val) {
   realTrustedChanged_ = val;
 }
 
-void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
+void SolverCore::realTrustedSetValue(cs::Byte position, cs::Byte value) {
   csdebug() << __func__ << ": realtrusted in solvercore set, realTrustedChanged switched to true";
   realTrustedChangedSet(true);
+  size_t pos = static_cast<size_t>(position);
+  if(tempRealTrusted_.size() > pos) {
+    tempRealTrusted_[pos] = value;
+  }
+}
+
+void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
   tempRealTrusted_ = realTrusted;
 }
 

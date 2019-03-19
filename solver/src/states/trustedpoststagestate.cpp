@@ -120,10 +120,11 @@ void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
         // it is possible to get a transition to other state in SolverCore from any iteration, this is not a problem, simply execute method until end
         csdebug() << name() << ": making fake stage-3 [" << static_cast<int>(i) << "] in round " << rNum;
         realTrusted[i] = cs::ConfidantConsts::InvalidConfidantIndex;
+        context.realTrustedSetValue(i, cs::ConfidantConsts::InvalidConfidantIndex);
         // this procedute can cause the round change
       }
     }
-    context.realTrustedSet(realTrusted);
+
     for (uint8_t i = 0; i < cnt; ++i) {
       if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
         context.fake_stage3(i);
@@ -135,17 +136,19 @@ void TrustedPostStageState::mark_outbound_nodes(SolverContext& context) {
 
 Result TrustedPostStageState::onStage3(SolverContext& context, const cs::StageThree& /*stage*/) {
   csdebug() << name() << ": TrueStages3 amount = " <<  context.trueStagesThree() << ", realTrusted.value = " << context.cnt_real_trusted();
-  if (context.realTrustedChanged()) {
-    csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
-    return Result::Retry;
-  }
- if(context.trueStagesThree() == context.cnt_real_trusted()) {// / 2U + 1U) {
+  if (context.trueStagesThree() == context.cnt_real_trusted()) {
     csdebug() << name() << ": enough stage-3 received amount = " << context.trueStagesThree();
     return Result::Finish;
   }
-  if (context.stagesThree() == context.cnt_trusted()) {
-    csdebug() << name() << ": there is no availability to continue this consensus - not enough stages 3 with hashes like mine";
-    return Result::Failure;
+  if (context.realTrustedChanged()) {
+    if(context.cnt_real_trusted() > context.getRealTrusted().size() / 2U) {
+      csdebug() << name() << ": the number of received messages on stage 3 doesn't correspond to the signed one, we have to retry stage 3";
+      return Result::Retry;
+    }
+    else {
+      csdebug() << name() << ": there is no availability to continue this consensus - not enough stages 3 with hashes like mine";
+      return Result::Failure;
+    }
   }
   return Result::Ignore;
 }
