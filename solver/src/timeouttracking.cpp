@@ -18,9 +18,9 @@ void TimeoutTracking::start(CallsQueueScheduler& scheduler, uint32_t wait_for_ms
 
 bool TimeoutTracking::cancel() {
   if (call_tag != CallsQueueScheduler::no_tag) {
-    pscheduler->Remove(call_tag);
+    bool ret = pscheduler->Remove(call_tag);
     call_tag = CallsQueueScheduler::no_tag;
-    return true;
+    return ret;
   }
   return false;
 }

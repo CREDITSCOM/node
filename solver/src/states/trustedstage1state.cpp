@@ -29,27 +29,39 @@ void TrustedStage1State::on(SolverContext& context) {
 
   SolverContext* pctx = &context;
   auto dt = Consensus::T_min_stage1;
-  csdebug() << name() << ": start track min time " << dt << " ms for state";
-  min_time_tracking.start(
-    context.scheduler(), dt,
-    [this, pctx](){
-      csdebug() << name() << ": min timeout for state is expired, may proceed to the next state";
-      min_time_expired = true;
-      if (transactions_checked && enough_hashes) {
-        csdebug() << name() << ": transactions & hashes ready, so proceed to the next state now";
-        pctx->complete_stage1();
-      }
-    },
-    true /*replace if exists*/
-  );
+  csdebug() << name() << ": start track min time " << dt << " ms to get hashes";
+
+  cs::Timer::singleShot(dt, cs::RunPolicy::CallQueuePolicy, [this, pctx] () {
+    csdebug() << name() << ": min time to get hashes is expired, may proceed to the next state";
+    min_time_expired = true;
+    if (transactions_checked && enough_hashes) {
+      csdebug() << name() << ": transactions & hashes ready, so proceed to the next state now";
+      pctx->complete_stage1();
+    }
+  });
+
+  //min_time_tracking.start(
+  //  context.scheduler(), dt,
+  //  [this, pctx](){
+  //    csdebug() << name() << ": min time to get hashes is expired, may proceed to the next state";
+  //    min_time_expired = true;
+  //    if (transactions_checked && enough_hashes) {
+  //      csdebug() << name() << ": transactions & hashes ready, so proceed to the next state now";
+  //      pctx->complete_stage1();
+  //    }
+  //  },
+  //  true /*replace if exists*/
+  //);
 }
 
 void TrustedStage1State::off(SolverContext& context) {
-  if (min_time_tracking.cancel()) {
-    csdebug() << name() << ": cancel track mine time for state";
-  }
+  //if (min_time_tracking.cancel()) {
+  //  csdebug() << name() << ": cancel track min time to get hashes";
+  //}
   csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
-  context.add_stage1(stage, true);
+  if (min_time_expired && transactions_checked && enough_hashes) {
+    context.add_stage1(stage, true);
+  }
 }
 
 Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundNumber round) {

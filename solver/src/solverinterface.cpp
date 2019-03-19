@@ -243,7 +243,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       return;
     }
 
-    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
+    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
       cswarning() << "Real Trusted are not valid !";
       printStage3(stageFrom);
       return;
