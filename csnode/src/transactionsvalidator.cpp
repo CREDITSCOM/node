@@ -116,6 +116,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
+    return false;
   }
 
   return true;
@@ -134,16 +135,17 @@ bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction&
 
 void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs,
                                                 CharacteristicMask& maskIncluded) {
+  using rejectedSmart = std::pair<csdb::Transaction, size_t>;
   auto& smarts = context.smart_contracts();
   std::vector<csdb::Transaction> newStates;
-  std::map<csdb::Address, size_t> rejectedSmarts;
+  std::vector<rejectedSmart> rejectedSmarts;
   size_t maskSize = maskIncluded.size();
   size_t i = 0;
 
   for (const auto& t : trxs) {
     if (i < maskSize && *(maskIncluded.cbegin() + i) == 0) {
       if (smarts.is_known_smart_contract(t.source())) {
-        rejectedSmarts.insert(std::make_pair(t.source(), i));
+        rejectedSmarts.push_back(std::make_pair(t, i));
       }
     }
     if (i < maskSize && SmartContracts::is_new_state(t) &&
@@ -155,11 +157,13 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
 
   for (const auto& state : newStates) {
     csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(state, context.blockchain());
-    auto it = rejectedSmarts.find(initTransaction.target());
+    auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
+      [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
     if (it != rejectedSmarts.end()) {
       WalletsState::WalletId walletId{};
-      WalletsState::WalletData& wallState = walletsState_.getData(it->first, walletId);
+      WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
       wallState.balance_ += initTransaction.amount();
+      wallState.balance_ += csdb::Amount(it->first.counted_fee().to_double());
       if (wallState.balance_ >= zeroBalance_) {
         maskIncluded[it->second] = 1;
         rejectedSmarts.erase(it);

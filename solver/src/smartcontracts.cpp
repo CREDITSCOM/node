@@ -1099,12 +1099,6 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
     return csdb::Transaction{};
   }
 
-  BlockChain::WalletData wallData{};
-  BlockChain::WalletId wallId{};
-  if (!bc.findWalletData(SmartContracts::absolute_address(src.target()), wallData, wallId)) {
-    return csdb::Transaction{};
-  }
-
   csdb::Transaction result(
     next_inner_id(src.target()), // see: APIHandler::WalletDataGet(...) in apihandler.cpp
     src.target(),     // contracts is source
