@@ -93,6 +93,12 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
                - feeForExecution
                - csdb::Amount(trx.counted_fee().to_double());
 
+    initTrxWallState.balance_ = newBalance;
+    if (initTrxWallState.balance_ < zeroBalance_) {
+      cslog() << __func__ << ": reject new_state transaction because initier not enough balance";
+      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+      return false;
+    }
     walletsState_.setModified(initTrxId);
   } else {
     if (trx.source() == trx.target()) {
@@ -138,22 +144,19 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         }
       }
     }
+    wallState.balance_ = newBalance;
   }
 
-  wallState.balance_ = newBalance;
+  if (wallState.balance_ < zeroBalance_) {
+    negativeNodes_.push_back(&wallState);
+    return false;
+  }
 
   wallState.trxTail_.push(trx.innerID());
   trxList_[trxInd] = wallState.lastTrxInd_;
   wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
   walletsState_.setModified(walletId);
 
-  if (wallState.balance_ < zeroBalance_) {
-    negativeNodes_.push_back(&wallState);
-    if (SmartContracts::is_new_state(trx)) {
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
-    }
-    return false;
-  }
   return true;
 }
 
@@ -198,7 +201,6 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
       WalletsState::WalletId walletId{};
       WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
       wallState.balance_ += initTransaction.amount();
-      wallState.balance_ += csdb::Amount(it->first.counted_fee().to_double());
       if (wallState.balance_ >= zeroBalance_) {
         maskIncluded[it->second] = 1;
         rejectedSmarts.erase(it);
