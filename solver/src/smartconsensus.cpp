@@ -451,7 +451,7 @@ namespace cs{
     if (smartStageThreeSent_ && smartStageThreeEnough()) {
       killTimer(3);
       cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
-      if(finalSmartTransactionPack_.isHashEmpty() || finalSmartTransactionPack_.signatures().empty()) {
+      if(finalSmartTransactionPack_.isHashEmpty()) {
         cserror() << log_prefix << "Trying to send FinalTransactionSet that doesn't exest";
         return;
       }
@@ -600,7 +600,7 @@ namespace cs{
 
   void SmartConsensus::startTimer(int st)
   {
-    csmeta(csdetails) << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    csmeta(csdebug) << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
     timeout_request_stage.start(
       psmarts_->getScheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
