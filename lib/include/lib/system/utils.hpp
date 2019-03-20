@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -444,6 +445,16 @@ public:
     (std::cout << ... << std::forward<Args>(args)) << std::endl;
   }
 };
+
+template<class RandomIt, class UniformRandomNumberGenerator>
+inline void shuffle(RandomIt first, RandomIt last, UniformRandomNumberGenerator&& g) {
+  typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+
+  diff_t n = last - first;
+  for (diff_t i = n - 1; i > 0; --i) {
+    std::swap(first[i], first[g() % (i + 1)]);
+  }
+}
 }  // namespace cs
 
 inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {

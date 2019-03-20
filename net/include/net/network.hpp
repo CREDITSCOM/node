@@ -79,7 +79,6 @@ private:
 #ifdef __linux__
   int readerEventfd_;
   int writerEventfd_;
-  std::atomic<int> count_ = 0;
 #elif WIN32
   HANDLE readerEvent_;
   HANDLE writerEvent_;
