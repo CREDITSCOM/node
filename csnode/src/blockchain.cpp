@@ -620,18 +620,6 @@ private:
 };
 
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
-  /*if (offset >= getSize())
-    return;
-  if (!limit)
-    return;
-  WalletId id{};
-  csdb::Address wallPubKey;
-  WalletsPools::WalletData::PoolsHashes hashesArray;
-
-  if (!findDataForTransactions(address, wallPubKey, id, hashesArray))
-    return;
-
-  getTransactions(transactions, wallPubKey, id, hashesArray, offset, limit);*/
   for (auto trIt = TransactionsIterator(*this, address);
     trIt.isValid();
     trIt.next()) {
@@ -641,7 +629,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 
     transactions.push_back(*trIt);
-    //transactions.back().set_time(trIt.getPool().get_time());
+    transactions.back().set_time(trIt.getPool().get_time());
 
     if (--limit == 0) break;
   }

@@ -49,7 +49,7 @@ Node::Node(const Config& config)
 
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(), &executor::Executor::onBlockStored);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
   good_ = init(config);
 }
 
