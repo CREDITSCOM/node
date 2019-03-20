@@ -548,7 +548,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   // creating new pool
   newPool.set_sequence(metaPoolInfo.sequenceNumber);
   newPool.add_user_field(0, metaPoolInfo.timestamp);
-  newPool.add_number_trusted(metaPoolInfo.realTrustedMask.size());
+  newPool.add_number_trusted(static_cast<uint8_t>(metaPoolInfo.realTrustedMask.size()));
   newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 

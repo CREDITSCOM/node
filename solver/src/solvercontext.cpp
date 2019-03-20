@@ -116,7 +116,7 @@ Role SolverContext::role() const {
 
 void SolverContext::spawn_next_round(cs::StageThree& st3) {
   if (st3.sender == InvalidConfidantIndex) {
-    cserror() << "Writer wans't elected on this node";
+    cserror() << "Writer wasn't elected on this node";
     return;
   }
 

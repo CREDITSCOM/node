@@ -97,7 +97,9 @@ public:
 
   void removeDeferredBlock(cs::Sequence);
   bool realTrustedChanged() const;
+  void adjustStageThreeStorage();
   void realTrustedChangedSet(bool);
+  void realTrustedSetValue(cs::Byte position, cs::Byte value);
   void realTrustedSet(cs::Bytes realTrusted);
   bool checkNodeCache(const cs::PublicKey& sender);
   cs::Bytes getRealTrusted();
@@ -105,6 +107,7 @@ public:
 
   size_t stagesThree();
   bool stateFailed(Result res);
+
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -295,6 +298,7 @@ private:
   std::vector<cs::PublicKey> trusted_candidates;
   std::vector <cs::TransactionsPacketHash> hashes_candidates;
   csdb::Pool deferredBlock_;
+  uint8_t currentStage3iteration_ = 0;
 
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;

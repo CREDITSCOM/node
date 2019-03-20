@@ -16,7 +16,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <utility>
+#include <algorithm>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -446,13 +446,60 @@ public:
   }
 };
 
-template<class RandomIt, class UniformRandomNumberGenerator>
-inline void shuffle(RandomIt first, RandomIt last, UniformRandomNumberGenerator&& g) {
-  typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+template<class _RanIt, class _RngFn>
+inline void shuffle(_RanIt _First, _RanIt _Last, _RngFn&& _RngFunc) {
+  // shuffle [_First, _Last) using random function _RngFunc
+  auto _UFirst = _First;
+  const auto _ULast = _Last;
+  if (_UFirst == _ULast) {
+    return;
+  }
 
-  diff_t n = last - first;
-  for (diff_t i = n - 1; i > 0; --i) {
-    std::swap(first[i], first[g() % (i + 1)]);
+  typedef typename std::iterator_traits<_RanIt>::difference_type _Diff;
+  typedef typename std::make_unsigned<_Diff>::type _Udiff;
+
+  _Udiff _Bits = 8 * sizeof(_Udiff);
+  _Udiff _Bmask = _Udiff(-1);
+
+  auto _UTarget = _UFirst;
+  _Diff _Target_index = 1;
+  for (; ++_UTarget != _ULast; ++_Target_index) {
+    // randomly place an element from [_First, _Target] at _Target
+    _Diff _Off;// = _RngFunc(static_cast<_Diff>(_Target_index + 1));
+    _Diff _Index = _Target_index + 1;
+    for (;;) {
+      // try a sample random value
+      _Udiff _Ret = 0;    // random bits
+      _Udiff _Mask = 0;    // 2^N - 1, _Ret is within [0, _Mask]
+
+      while (_Mask < _Udiff(_Index - 1)) {
+        // need more random bits
+        _Ret <<= _Bits - 1;    // avoid full shift
+        _Ret <<= 1;
+        _Udiff _Get_bits;
+        // return a random value within [0, _Bmask]
+        for (;;) {
+          // repeat until random value is in range
+          _Udiff _Val = _RngFunc();
+
+          if (_Val <= _Bmask) {
+            _Get_bits = _Val;
+            break;
+          }
+        }
+        _Ret |= _Get_bits;
+        _Mask <<= _Bits - 1;    // avoid full shift
+        _Mask <<= 1;
+        _Mask |= _Bmask;
+      }
+      // _Ret is [0, _Mask], _Index - 1 <= _Mask, return if unbiased
+      if (_Ret / _Index < _Mask / _Index
+        || _Mask % _Index == _Udiff(_Index - 1)) {
+        _Off = static_cast<_Diff>(_Ret % _Index);
+        break;
+      }
+    }
+    std::iter_swap(_UTarget, _UFirst + _Off);
   }
 }
 }  // namespace cs

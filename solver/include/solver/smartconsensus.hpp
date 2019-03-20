@@ -62,6 +62,7 @@ namespace cs {
       cs::Sequence smartRoundNumber();
 
       void createFinalTransactionSet(const csdb::Amount finalFee);
+      size_t smartStage3StorageSize();
       void sendFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
       void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction,

@@ -266,6 +266,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
     }
     csdebug() << "================================================================================";
 
+    context.realTrustedSet(stage.realTrustedMask);
     // all trusted nodes must send stage3 data
     context.next_trusted_candidates(next_round_trust, next_round_hashes);
     //TODO: The pool building is starting here <===

@@ -201,6 +201,17 @@ bool SolverCore::stateFailed(Result res) {
 
 }
 
+//void SolverCore::adjustTrustedCandidates(cs::Bytes mask, cs::PublicKeys& confidants) {
+//  for (int i = 0; i < mask.size(); ++i) {
+//    if (mask[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+//      auto it = std::find(trusted_candidates.cbegin(), trusted_candidates.cend(), confidants[i]);
+//      if (it != trusted_candidates.cend()) {
+//        trusted_candidates.erase(it);
+//      }
+//    }
+//  }
+//}
+
 
 //TODO: this function is to be implemented the block and RoundTable building <====
 void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
@@ -286,13 +297,18 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
     for (auto& it : *defWallets) {
       newWallets->push_back(it);
     }
-    
+    if (poolMetaInfo.sequenceNumber > 1) {
+      tmpPool.add_number_confirmations(static_cast<uint8_t>(poolMetaInfo.confirmationMask.size()));
+      tmpPool.add_confirmation_mask(cs::Utils::maskToBits(poolMetaInfo.confirmationMask));
+      tmpPool.add_round_confirmations(poolMetaInfo.confirmations);
+    }
+
     deferredBlock_ = csdb::Pool{};
     deferredBlock_ = tmpPool;
   }
   deferredBlock_.to_byte_stream(binSize);
   deferredBlock_.hash();
-  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   const auto lastHashBin = deferredBlock_.hash().to_binary();
   std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
   stage3.blockSignature = cscrypto::generateSignature(private_key,

@@ -437,30 +437,33 @@ namespace cs{
       }
     }
     else {
-      smartStageThreeSent_ = true;
+      smartStageThreeStorage_.at(stage.sender) = stage;
       for (auto& it : smartStageThreeTempStorage_) {
         lambda(it, finalSmartTransactionPack_.hash().toBinary());
-        const auto smartStorageSize = std::count_if(smartStageThreeStorage_.begin(), smartStageThreeStorage_.end(),
-          [](const cs::StageThreeSmarts& it) {
-          return it.sender != cs::ConfidantConsts::InvalidConfidantIndex;
-        });
         csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 ["
-          << static_cast<int>(stage.sender) << "] = " << smartStorageSize;
+          << static_cast<int>(stage.sender) << "] = " << smartStage3StorageSize();
       }
     }
 
-    smartStageThreeStorage_.at(stage.sender) = stage;
-    const auto smartStorageSize = std::count_if(smartStageThreeStorage_.begin(), smartStageThreeStorage_.end(),
+
+    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 ["
+      << static_cast<int>(stage.sender) << "] = " << smartStage3StorageSize();
+    if (smartStageThreeSent_ && smartStageThreeEnough()) {
+      killTimer(3);
+      cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
+      if(finalSmartTransactionPack_.isHashEmpty() || finalSmartTransactionPack_.signatures().empty()) {
+        cserror() << log_prefix << "Trying to send FinalTransactionSet that doesn't exest";
+        return;
+      }
+      sendFinalTransactionSet();
+    }
+  }
+
+  size_t SmartConsensus::smartStage3StorageSize() {
+    return std::count_if(smartStageThreeStorage_.begin(), smartStageThreeStorage_.end(),
       [](const cs::StageThreeSmarts& it) {
       return it.sender != cs::ConfidantConsts::InvalidConfidantIndex;
     });
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 ["
-      << static_cast<int>(stage.sender) << "] = " << smartStorageSize;
-    if (smartStageThreeEnough()) {
-      killTimer(3);
-      cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
-      sendFinalTransactionSet();
-    }
   }
 
   void SmartConsensus::createFinalTransactionSet(const csdb::Amount finalFee) {
